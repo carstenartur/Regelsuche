@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchBatches.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">SearchBatches.java</span></div><h1>SearchBatches.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.RetainedGraph;
+
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.List;
+
+/** Representation-free batch opening/ranking; candidates retain their producer metadata. */
+final class SearchBatches {
+    private SearchBatches() {}
+    record Batch&lt;M&gt;(List&lt;M&gt; moves,TransformationWorkMetrics work,boolean complete,
+            List&lt;IncrementalProviderContract.Snapshot&gt; cursorReceipts) implements RetainedGraph.View {
+<span class="fc" id="L13">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(moves);v.reference(work);v.reference(cursorReceipts);}</span>
+
+<span class="fc" id="L15">        Batch(List&lt;M&gt; moves,TransformationWorkMetrics work,boolean complete){this(moves,work,complete,List.of());}</span>
+<span class="fc" id="L16">        Batch { moves=List.copyOf(moves);cursorReceipts=List.copyOf(cursorReceipts); }</span>
+    }
+    interface Provider&lt;M&gt; extends RetainedGraph.View {
+<span class="nc" id="L19">        @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}</span>
+ MoveProvider.Descriptor descriptor(); Batch&lt;M&gt; candidates(); }
+    interface Ranking&lt;M&gt; extends RetainedGraph.View {
+<span class="nc" id="L22">        @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}</span>
+
+        double score(M move); int stage(MoveProvider.Descriptor descriptor);
+        double providerScore(MoveProvider.Descriptor descriptor); long contextWork(); void requireSource(M move);
+    }
+    static List&lt;Provider&lt;SearchMove&gt;&gt; legacyProviders(List&lt;MoveProvider&gt; providers,MoveState state,MoveContext context) {
+<span class="fc" id="L28">        return providers.stream().&lt;Provider&lt;SearchMove&gt;&gt;map(provider-&gt;new Provider&lt;&gt;() {</span>
+<span class="fc" id="L29">            @Override public MoveProvider.Descriptor descriptor(){return provider.descriptor();}</span>
+<span class="fc" id="L30">            @Override public Batch&lt;SearchMove&gt; candidates(){var batch=provider.candidates(state,context);return new Batch&lt;&gt;(batch.moves(),batch.work(),batch.complete());}</span>
+<span class="fc" id="L31">        }).toList();</span>
+    }
+    static Ranking&lt;SearchMove&gt; legacyRanking(MovePriorityPolicy policy,MoveState state,MoveContext context) {
+<span class="fc" id="L34">        return new Ranking&lt;&gt;() {</span>
+<span class="fc" id="L35">            @Override public double score(SearchMove move){return policy.score(move,state,context);}</span>
+<span class="fc" id="L36">            @Override public int stage(MoveProvider.Descriptor provider){return policy.stage(provider,state,context).ordinal();}</span>
+<span class="fc" id="L37">            @Override public double providerScore(MoveProvider.Descriptor provider){return policy.providerScore(provider,state,context);}</span>
+<span class="fc" id="L38">            @Override public long contextWork(){return policy.contextWork(state,context);}</span>
+<span class="fc" id="L39">            @Override public void requireSource(SearchMove move){move.requireSource(state.expression());}</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

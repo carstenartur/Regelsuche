@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EagerBatchPicker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">EagerBatchPicker.java</span></div><h1>EagerBatchPicker.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+/** Explicit eager control. Stable ties preserve inventory order; every score is evaluated once. */
+final class EagerBatchPicker&lt;M&gt; implements SearchExecution.Picker&lt;M&gt;,RetainedGraph.View {
+<span class="fc" id="L14">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(generated);v.reference(batchReceipts);v.reference(work);v.reference(providers);v.reference(policy);}</span>
+
+<span class="fc" id="L16">    private final List&lt;IncrementalProviderContract.Snapshot&gt; batchReceipts=new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L17">    @Override public List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts(){return batchReceipts;}</span>
+
+<span class="fc" id="L19">    private record Ranked&lt;M&gt;(M move, double score) implements RetainedGraph.View {</span>
+<span class="fc" id="L20">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(move);}</span>
+    }
+<span class="fc" id="L22">    private List&lt;M&gt; generated=new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L23">    private TransformationWorkMetrics work=TransformationWorkMetrics.ZERO;</span>
+    private List&lt;SearchBatches.Provider&lt;M&gt;&gt; providers;
+    private SearchBatches.Ranking&lt;M&gt; policy;
+    private boolean complete,initialized;
+    private int cursor;
+
+    EagerBatchPicker(List&lt;SearchBatches.Provider&lt;M&gt;&gt; providers, SearchBatches.Ranking&lt;M&gt; policy) {
+<span class="fc" id="L30">        this(providers,policy,true);</span>
+<span class="fc" id="L31">    }</span>
+    /** The frontier owns the picker before atomic opening can exhaust native resources. */
+<span class="fc" id="L33">    EagerBatchPicker(List&lt;SearchBatches.Provider&lt;M&gt;&gt; providers, SearchBatches.Ranking&lt;M&gt; policy,boolean openImmediately) {</span>
+<span class="fc" id="L34">        this.providers=List.copyOf(providers);this.policy=policy;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if(openImmediately)initialize();</span>
+<span class="fc" id="L36">    }</span>
+    @Override public void initialize() {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if(initialized)return;</span>
+<span class="fc" id="L39">        initialized=true;</span>
+<span class="fc" id="L40">        var ranked=new ArrayList&lt;Ranked&lt;M&gt;&gt;();</span>
+<span class="fc" id="L41">        try(var retained=RetainedOperation.retain(this,ranked)) {</span>
+<span class="fc" id="L42">            work=work.withDelegatedMechanicalWork(policy.contextWork());</span>
+<span class="fc" id="L43">            boolean exhaustive=true;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            for(var provider:providers) {</span>
+<span class="fc" id="L45">                var batch=provider.candidates();</span>
+<span class="fc" id="L46">                work=work.plus(batch.work());</span>
+<span class="fc" id="L47">                batchReceipts.addAll(batch.cursorReceipts());</span>
+<span class="fc" id="L48">                de.regelsuche.retention.RetainedOperation.work(batch.cursorReceipts().size());</span>
+<span class="fc" id="L49">                generated.addAll(batch.moves());</span>
+<span class="fc" id="L50">                exhaustive&amp;=batch.complete();</span>
+<span class="fc" id="L51">                try(var held=RetainedOperation.retain(batch)) {</span>
+<span class="fc" id="L52">                    RetainedOperation.work(batch.moves().size());</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                    for(var move:batch.moves()) {</span>
+<span class="fc" id="L54">                        policy.requireSource(move);</span>
+<span class="fc" id="L55">                        work=work.plus(ordering(1));</span>
+<span class="fc" id="L56">                        double score=policy.score(move);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                        if(!Double.isFinite(score))throw new IllegalArgumentException(&quot;nonfinite move priority&quot;);</span>
+<span class="fc" id="L58">                        ranked.add(new Ranked&lt;&gt;(move,score));</span>
+<span class="fc" id="L59">                        RetainedOperation.work(2);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L60">                    }</span>
+                }
+<span class="fc" id="L62">            }</span>
+<span class="fc" id="L63">            ranked.sort(Comparator.&lt;Ranked&lt;M&gt;&gt;comparingDouble(Ranked::score).reversed());</span>
+<span class="fc" id="L64">            var ordered=new ArrayList&lt;M&gt;();</span>
+<span class="fc" id="L65">            try(var held=RetainedOperation.retain(ordered)) {</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                for(var rank:ranked){ordered.add(rank.move());RetainedOperation.work(1);}</span>
+<span class="fc" id="L67">                generated=RetainedOperation.produced(List.copyOf(ordered));</span>
+<span class="fc" id="L68">                RetainedOperation.work(ordered.size());</span>
+            }
+<span class="fc" id="L70">            complete=exhaustive;</span>
+<span class="fc" id="L71">        } finally {providers=null;policy=null;RetainedOperation.work(2);}</span>
+<span class="fc" id="L72">    }</span>
+    private static TransformationWorkMetrics ordering(int count) {
+<span class="fc" id="L74">        return new TransformationWorkMetrics(0,0,0,0,0,0,0,count,0,0,0,0,0,0);</span>
+    }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">    @Override public Optional&lt;M&gt; next() { initialize(); return cursor == generated.size() ? Optional.empty() : Optional.of(generated.get(cursor++)); }</span>
+<span class="fc" id="L77">    @Override public TransformationWorkMetrics workMetrics() { return work; }</span>
+<span class="fc" id="L78">    @Override public List&lt;M&gt; generatedMoves() { return generated; }</span>
+<span class="fc" id="L79">    @Override public boolean complete() { return complete; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IncrementalProviderContract.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">IncrementalProviderContract.java</span></div><h1>IncrementalProviderContract.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationCursor;
@@ -17,49 +19,57 @@ public final class IncrementalProviderContract {
     private IncrementalProviderContract() {}
     public static final String REVISION = &quot;regelsuche.incremental-provider/v2&quot;;
     public static final String PREPAID_REVISION = &quot;regelsuche.incremental-provider/v3-prepaid&quot;;
+    public static final String NATIVE_REVISION = &quot;regelsuche.incremental-provider/v4-native-expr&quot;;
+    public static final String NATIVE_PREPAID_REVISION = &quot;regelsuche.incremental-provider/v4-native-expr-prepaid&quot;;
     public static final String PREPAID_WORK_REVISION = &quot;regelsuche.prepaid-application-work/v1&quot;;
-<span class="fc" id="L21">    public enum ApplicationPhase { SUBSTITUTION_DOMAIN, INSTANTIATION, TARGET_DOMAIN, EVIDENCE }</span>
-<span class="fc" id="L22">    public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH }</span>
-<span class="fc" id="L23">    public enum Transport { PARSER_TEXT, TYPED_AST_JSON }</span>
-<span class="fc" id="L24">    public enum Mathematics { PRIMITIVE, EXACT, MIXED }</span>
-<span class="fc" id="L25">    public enum Status { OPEN, READY, EXHAUSTED, LIMIT, INCONCLUSIVE, FAILED, CLOSED }</span>
-<span class="fc" id="L26">    public enum Operation { OPEN, ADMISSION, PULL, MATCH, LOAD, ABORT, CLOSE }</span>
+<span class="fc" id="L25">    public enum ApplicationPhase { SUBSTITUTION_DOMAIN, INSTANTIATION, TARGET_DOMAIN, EVIDENCE }</span>
+<span class="fc" id="L26">    public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH, NATIVE_BATCH }</span>
+<span class="fc" id="L27">    public enum Transport { PARSER_TEXT, TYPED_AST_JSON, NATIVE_EXPR_V1 }</span>
+<span class="fc" id="L28">    public enum Mathematics { PRIMITIVE, EXACT, MIXED }</span>
+<span class="fc" id="L29">    public enum Status { OPEN, READY, EXHAUSTED, LIMIT, INCONCLUSIVE, FAILED, CLOSED }</span>
+<span class="fc" id="L30">    public enum Operation { OPEN, ADMISSION, PULL, MATCH, LOAD, ABORT, CLOSE }</span>
 
     public record Definition(String revision, String providerId, Kind kind, String modelRevision,
             String semanticsRevision, Transport transport, Mathematics mathematics,
-            TransformationCursor.Definition nativeDefinition) {
-<span class="fc" id="L31">        public Definition {</span>
-<span class="fc bfc" id="L32" title="All 4 branches covered.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported provider revision&quot;);</span>
-<span class="fc bfc" id="L33" title="All 2 branches covered.">            for (var text : List.of(providerId, modelRevision, semanticsRevision))</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                if (text.isBlank()) throw new IllegalArgumentException(&quot;blank provider binding&quot;);</span>
-<span class="fc" id="L35">            Objects.requireNonNull(kind); Objects.requireNonNull(transport); Objects.requireNonNull(mathematics);</span>
-<span class="fc bfc" id="L36" title="All 6 branches covered.">            if ((kind == Kind.NATIVE_RULES) != (nativeDefinition != null))</span>
-<span class="fc" id="L37">                throw new IllegalArgumentException(&quot;only native providers carry native rule definitions&quot;);</span>
-<span class="pc bpc" id="L38" title="2 of 6 branches missed.">            if (PREPAID_REVISION.equals(revision) &amp;&amp; (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))</span>
-<span class="nc" id="L39">                throw new IllegalArgumentException(&quot;prepaid applications require registered exact mathematics&quot;);</span>
-<span class="fc" id="L40">        }</span>
+            TransformationCursor.Definition nativeDefinition) implements RetainedGraph.View {
+<span class="fc" id="L35">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(providerId);v.reference(kind);v.reference(modelRevision);v.reference(semanticsRevision);v.reference(transport);v.reference(mathematics);v.reference(nativeDefinition);}</span>
+
+<span class="fc" id="L37">        public Definition {</span>
+<span class="pc bpc" id="L38" title="1 of 8 branches missed.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision) &amp;&amp; !NATIVE_REVISION.equals(revision) &amp;&amp; !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported provider revision&quot;);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            for (var text : List.of(providerId, modelRevision, semanticsRevision))</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                if (text.isBlank()) throw new IllegalArgumentException(&quot;blank provider binding&quot;);</span>
+<span class="fc" id="L41">            Objects.requireNonNull(kind); Objects.requireNonNull(transport); Objects.requireNonNull(mathematics);</span>
+<span class="pc bpc" id="L42" title="2 of 8 branches missed.">            if ((NATIVE_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) != (transport==Transport.NATIVE_EXPR_V1))</span>
+<span class="nc" id="L43">                throw new IllegalArgumentException(&quot;native transport requires its explicit revision&quot;);</span>
+<span class="fc bfc" id="L44" title="All 6 branches covered.">            if ((kind == Kind.NATIVE_RULES) != (nativeDefinition != null))</span>
+<span class="fc" id="L45">                throw new IllegalArgumentException(&quot;only native providers carry native rule definitions&quot;);</span>
+<span class="pc bpc" id="L46" title="3 of 8 branches missed.">            if ((PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) &amp;&amp; (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))</span>
+<span class="nc" id="L47">                throw new IllegalArgumentException(&quot;prepaid applications require registered exact mathematics&quot;);</span>
+<span class="fc" id="L48">        }</span>
     }
 
     /** Observational settlement metadata. Every charged unit stays paid after completion or abandonment. */
     public record PrepaidApplications(String revision, long chargedUnits, Map&lt;String, Long&gt; phaseCalls, Map&lt;String, Long&gt; phaseWork,
-            ExecutionWork completedMathematics, long openApplications, long abandonedApplications) {
-<span class="fc" id="L46">        public PrepaidApplications {</span>
-<span class="pc bpc" id="L47" title="4 of 8 branches missed.">            if (!PREPAID_WORK_REVISION.equals(revision) || chargedUnits &lt; 0 || openApplications &lt; 0 || abandonedApplications &lt; 0)</span>
-<span class="nc" id="L48">                throw new IllegalArgumentException(&quot;invalid prepaid application receipt&quot;);</span>
-<span class="fc" id="L49">            phaseCalls = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(phaseCalls));</span>
-<span class="fc" id="L50">            phaseCalls.forEach((phase, calls) -&gt; {</span>
-<span class="fc" id="L51">                ApplicationPhase.valueOf(phase);</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                if (calls &lt; 0) throw new IllegalArgumentException(&quot;negative prepaid phase count&quot;);</span>
-<span class="fc" id="L53">            });</span>
-<span class="fc" id="L54">            phaseWork = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(phaseWork));</span>
-<span class="pc bpc" id="L55" title="3 of 6 branches missed.">            if (!phaseWork.keySet().equals(phaseCalls.keySet()) || phaseWork.values().stream().anyMatch(units -&gt; units &lt; 0)</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                    || phaseWork.values().stream().reduce(0L, Math::addExact) != chargedUnits)</span>
-<span class="nc" id="L57">                throw new IllegalArgumentException(&quot;prepaid phase breakdown differs from charged work&quot;);</span>
-<span class="fc" id="L58">            Objects.requireNonNull(completedMathematics);</span>
-<span class="pc bpc" id="L59" title="2 of 4 branches missed.">            if (completedMathematics.primitiveRewrites() != 0 || completedMathematics.exactTheoryWorkUnits() &gt; chargedUnits)</span>
-<span class="nc" id="L60">                throw new IllegalArgumentException(&quot;completed application lacks prepayment&quot;);</span>
-<span class="fc" id="L61">        }</span>
-<span class="fc" id="L62">        long paidUnits() { return Math.addExact(chargedUnits, phaseCalls.values().stream().reduce(0L, Math::addExact)); }</span>
+            ExecutionWork completedMathematics, long openApplications, long abandonedApplications) implements RetainedGraph.View {
+<span class="nc" id="L54">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(phaseCalls);v.reference(phaseWork);v.reference(completedMathematics);}</span>
+
+<span class="fc" id="L56">        public PrepaidApplications {</span>
+<span class="pc bpc" id="L57" title="4 of 8 branches missed.">            if (!PREPAID_WORK_REVISION.equals(revision) || chargedUnits &lt; 0 || openApplications &lt; 0 || abandonedApplications &lt; 0)</span>
+<span class="nc" id="L58">                throw new IllegalArgumentException(&quot;invalid prepaid application receipt&quot;);</span>
+<span class="fc" id="L59">            phaseCalls = de.regelsuche.retention.RetainedSortedMap.copyOf(phaseCalls);</span>
+<span class="fc" id="L60">            phaseCalls.forEach((phase, calls) -&gt; {</span>
+<span class="fc" id="L61">                ApplicationPhase.valueOf(phase);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                if (calls &lt; 0) throw new IllegalArgumentException(&quot;negative prepaid phase count&quot;);</span>
+<span class="fc" id="L63">            });</span>
+<span class="fc" id="L64">            phaseWork = de.regelsuche.retention.RetainedSortedMap.copyOf(phaseWork);</span>
+<span class="pc bpc" id="L65" title="3 of 6 branches missed.">            if (!phaseWork.keySet().equals(phaseCalls.keySet()) || phaseWork.values().stream().anyMatch(units -&gt; units &lt; 0)</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    || phaseWork.values().stream().reduce(0L, Math::addExact) != chargedUnits)</span>
+<span class="nc" id="L67">                throw new IllegalArgumentException(&quot;prepaid phase breakdown differs from charged work&quot;);</span>
+<span class="fc" id="L68">            Objects.requireNonNull(completedMathematics);</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">            if (completedMathematics.primitiveRewrites() != 0 || completedMathematics.exactTheoryWorkUnits() &gt; chargedUnits)</span>
+<span class="nc" id="L70">                throw new IllegalArgumentException(&quot;completed application lacks prepayment&quot;);</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">        long paidUnits() { return Math.addExact(chargedUnits, phaseCalls.values().stream().reduce(0L, Math::addExact)); }</span>
     }
     /**
      * Cumulative full mathematics is diagnostic. Use metrics() for paid work: prepaid units and phase events
@@ -67,161 +77,173 @@ public final class IncrementalProviderContract {
      */
     public record Work(Map&lt;String, Long&gt; operations, ExecutionWork mathematics,
             @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-            PrepaidApplications prepaidApplications) {
+            PrepaidApplications prepaidApplications) implements RetainedGraph.View {
+<span class="fc" id="L81">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operations);v.reference(mathematics);v.reference(prepaidApplications);}</span>
+
         /** Frozen v2 shape/formula; serializers omit the absent prepaid extension. */
-<span class="nc" id="L72">        public Work(Map&lt;String, Long&gt; operations, ExecutionWork mathematics) { this(operations, mathematics, null); }</span>
-<span class="fc" id="L73">        public Work {</span>
-<span class="fc" id="L74">            operations = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(operations));</span>
-<span class="fc" id="L75">            Objects.requireNonNull(mathematics);</span>
-<span class="fc" id="L76">            operations.forEach((name, units) -&gt; {</span>
-<span class="fc" id="L77">                Operation.valueOf(name);</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                if (units &lt; 0) throw new IllegalArgumentException(&quot;negative incremental work&quot;);</span>
-<span class="fc" id="L79">            });</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (prepaidApplications != null) unpaidMathematics(mathematics, prepaidApplications);</span>
-<span class="fc" id="L81">        }</span>
-<span class="fc" id="L82">        public long units(Operation operation) { return operations.getOrDefault(operation.name(), 0L); }</span>
+<span class="nc" id="L84">        public Work(Map&lt;String, Long&gt; operations, ExecutionWork mathematics) { this(operations, mathematics, null); }</span>
+<span class="fc" id="L85">        public Work {</span>
+<span class="fc" id="L86">            operations = de.regelsuche.retention.RetainedSortedMap.copyOf(operations);</span>
+<span class="fc" id="L87">            Objects.requireNonNull(mathematics);</span>
+<span class="fc" id="L88">            operations.forEach((name, units) -&gt; {</span>
+<span class="fc" id="L89">                Operation.valueOf(name);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                if (units &lt; 0) throw new IllegalArgumentException(&quot;negative incremental work&quot;);</span>
+<span class="fc" id="L91">            });</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (prepaidApplications != null) unpaidMathematics(mathematics, prepaidApplications);</span>
+<span class="fc" id="L93">        }</span>
+<span class="fc" id="L94">        public long units(Operation operation) { return operations.getOrDefault(operation.name(), 0L); }</span>
         public TransformationWorkMetrics metrics() {
-<span class="fc" id="L84">            long mechanical = operations.values().stream().reduce(0L, Math::addExact);</span>
-<span class="fc" id="L85">            var billable = mathematics;</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (prepaidApplications != null) {</span>
-<span class="fc" id="L87">                mechanical = Math.addExact(mechanical, prepaidApplications.paidUnits());</span>
-<span class="fc" id="L88">                billable = unpaidMathematics(mathematics, prepaidApplications);</span>
+<span class="fc" id="L96">            long mechanical = operations.values().stream().reduce(0L, Math::addExact);</span>
+<span class="fc" id="L97">            var billable = mathematics;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (prepaidApplications != null) {</span>
+<span class="fc" id="L99">                mechanical = Math.addExact(mechanical, prepaidApplications.paidUnits());</span>
+<span class="fc" id="L100">                billable = unpaidMathematics(mathematics, prepaidApplications);</span>
             }
-<span class="fc" id="L90">            return TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(mechanical).withCandidateWork(billable);</span>
+<span class="fc" id="L102">            return TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(mechanical).withCandidateWork(billable);</span>
         }
         private static ExecutionWork unpaidMathematics(ExecutionWork full, PrepaidApplications prepaid) {
-<span class="fc" id="L93">            var settled = prepaid.completedMathematics();</span>
-<span class="fc" id="L94">            return new ExecutionWork(full.primitiveRewrites(),</span>
-<span class="fc" id="L95">                Math.subtractExact(full.exactTheorySteps(), settled.exactTheorySteps()),</span>
-<span class="fc" id="L96">                Math.subtractExact(full.exactTheoryWorkUnits(), settled.exactTheoryWorkUnits()));</span>
+<span class="fc" id="L105">            var settled = prepaid.completedMathematics();</span>
+<span class="fc" id="L106">            return new ExecutionWork(full.primitiveRewrites(),</span>
+<span class="fc" id="L107">                Math.subtractExact(full.exactTheorySteps(), settled.exactTheorySteps()),</span>
+<span class="fc" id="L108">                Math.subtractExact(full.exactTheoryWorkUnits(), settled.exactTheoryWorkUnits()));</span>
         }
     }
-<span class="fc" id="L99">    public record Snapshot(Definition definition, Status status, boolean closed, boolean resumable,</span>
-            boolean accountingComplete, Work work, long emittedCandidates, String detailCode) {
-<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        public boolean complete() { return status == Status.EXHAUSTED &amp;&amp; accountingComplete; }</span>
+<span class="fc" id="L111">    public record Snapshot(Definition definition, Status status, boolean closed, boolean resumable,</span>
+            boolean accountingComplete, Work work, long emittedCandidates, String detailCode) implements RetainedGraph.View {
+<span class="fc" id="L113">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(definition);v.reference(status);v.reference(work);v.reference(detailCode);}</span>
+
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        public boolean complete() { return status == Status.EXHAUSTED &amp;&amp; accountingComplete; }</span>
     }
-    public interface Cursor extends AutoCloseable {
+    public interface ObjectCursor&lt;T&gt; extends AutoCloseable {
         /** One candidate at most. LIMIT is resumable on the same cursor; all atomic overruns remain paid. */
-        Optional&lt;Transformation&gt; next(long allowance);
+        Optional&lt;T&gt; next(long allowance);
         Snapshot snapshot();
+        /** Immutable, append-only receipt sequence for delegated batch drains; historical cursors have none. */
+<span class="nc" id="L122">        default List&lt;Snapshot&gt; batchCursorReceipts(){return List.of();}</span>
         @Override void close();
     }
+    public interface Cursor extends ObjectCursor&lt;Transformation&gt; {}
     /** A registered implementation must charge delegated work before returning OR throwing. */
-    public interface Source extends AutoCloseable {
-        Optional&lt;Transformation&gt; next(long allowance);
+    public interface ObjectSource&lt;T&gt; extends AutoCloseable {
+        Optional&lt;T&gt; next(long allowance);
         Status status();
-<span class="fc" id="L113">        @Override default void close() {}</span>
+<span class="fc" id="L130">        @Override default void close() {}</span>
     }
-    public static final class Meter {
-<span class="fc" id="L116">        private final Map&lt;String, Long&gt; operations = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L117">        private ExecutionWork mathematics = ExecutionWork.ZERO;</span>
+    public interface Source extends ObjectSource&lt;Transformation&gt; {}
+    public static final class Meter implements RetainedGraph.View {
+<span class="fc" id="L134">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operations);v.reference(mathematics);v.reference(pending);v.reference(phaseCalls);v.reference(phaseWork);v.reference(prepaidCompleted);}</span>
+
+<span class="fc" id="L136">        private final Map&lt;String, Long&gt; operations = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L137">        private ExecutionWork mathematics = ExecutionWork.ZERO;</span>
         private final boolean prepaidSupported;
-<span class="fc" id="L119">        private final Set&lt;PrepaidApplication&gt; pending = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L120">        private final Map&lt;String, Long&gt; phaseCalls = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L121">        private final Map&lt;String, Long&gt; phaseWork = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L139">        private final Set&lt;PrepaidApplication&gt; pending = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L140">        private final Map&lt;String, Long&gt; phaseCalls = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L141">        private final Map&lt;String, Long&gt; phaseWork = new TreeMap&lt;&gt;();</span>
         private long prepaidUnits, abandoned;
-<span class="fc" id="L123">        private ExecutionWork prepaidCompleted = ExecutionWork.ZERO;</span>
-<span class="fc" id="L124">        public Meter() { this(REVISION); }</span>
-<span class="fc" id="L125">        public Meter(String revision) {</span>
-<span class="pc bpc" id="L126" title="1 of 4 branches missed.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported meter revision&quot;);</span>
-<span class="fc" id="L127">            prepaidSupported = PREPAID_REVISION.equals(revision);</span>
-<span class="fc" id="L128">        }</span>
+<span class="fc" id="L143">        private ExecutionWork prepaidCompleted = ExecutionWork.ZERO;</span>
+<span class="fc" id="L144">        public Meter() { this(REVISION); }</span>
+<span class="fc" id="L145">        public Meter(String revision) {</span>
+<span class="pc bpc" id="L146" title="3 of 8 branches missed.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision) &amp;&amp; !NATIVE_REVISION.equals(revision) &amp;&amp; !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported meter revision&quot;);</span>
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">            prepaidSupported = PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision);</span>
+<span class="fc" id="L148">        }</span>
         public PrepaidApplication beginPrepaidApplication() {
-<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (!prepaidSupported) throw new IllegalStateException(&quot;prepaid applications require provider v3&quot;);</span>
-<span class="fc" id="L131">            var application = new PrepaidApplication(this);</span>
-<span class="fc" id="L132">            pending.add(application);</span>
-<span class="fc" id="L133">            return application;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (!prepaidSupported) throw new IllegalStateException(&quot;prepaid applications require provider v3&quot;);</span>
+<span class="fc" id="L151">            var application = new PrepaidApplication(this);</span>
+<span class="fc" id="L152">            pending.add(application);</span>
+<span class="fc" id="L153">            return application;</span>
         }
         /** Charge after each actually executed bounded phase, also in failure paths. One phase event is one additional unit. */
         public void prepay(PrepaidApplication application, ApplicationPhase phase, long units) {
-<span class="fc" id="L137">            requirePending(application);</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative application work&quot;);</span>
-<span class="fc" id="L139">            Objects.requireNonNull(phase);</span>
-<span class="fc" id="L140">            long nextUnits = Math.addExact(prepaidUnits, units);</span>
-<span class="fc" id="L141">            long ticketUnits = Math.addExact(application.units, units);</span>
-<span class="fc" id="L142">            long calls = Math.addExact(phaseCalls.getOrDefault(phase.name(), 0L), 1);</span>
+<span class="fc" id="L157">            requirePending(application);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative application work&quot;);</span>
+<span class="fc" id="L159">            Objects.requireNonNull(phase);</span>
+<span class="fc" id="L160">            long nextUnits = Math.addExact(prepaidUnits, units);</span>
+<span class="fc" id="L161">            long ticketUnits = Math.addExact(application.units, units);</span>
+<span class="fc" id="L162">            long calls = Math.addExact(phaseCalls.getOrDefault(phase.name(), 0L), 1);</span>
             // Calculate every fallible arithmetic operation before changing either the account or ticket.
-<span class="fc" id="L144">            var nextCalls = new TreeMap&lt;&gt;(phaseCalls); nextCalls.put(phase.name(), calls);</span>
-<span class="fc" id="L145">            var nextWork = new TreeMap&lt;&gt;(phaseWork);</span>
-<span class="fc" id="L146">            nextWork.merge(phase.name(), units, Math::addExact);</span>
-<span class="fc" id="L147">            var next = new PrepaidApplications(PREPAID_WORK_REVISION, nextUnits, nextCalls, nextWork, prepaidCompleted, pending.size(), abandoned);</span>
-<span class="fc" id="L148">            new Work(operations, mathematics, next).metrics().totalWorkUnitsV2();</span>
-<span class="fc" id="L149">            prepaidUnits = nextUnits; application.units = ticketUnits; phaseCalls.put(phase.name(), calls);</span>
-<span class="fc" id="L150">            phaseWork.put(phase.name(), nextWork.get(phase.name()));</span>
-<span class="fc" id="L151">        }</span>
+<span class="fc" id="L164">            var nextCalls = new TreeMap&lt;&gt;(phaseCalls); nextCalls.put(phase.name(), calls);</span>
+<span class="fc" id="L165">            var nextWork = new TreeMap&lt;&gt;(phaseWork);</span>
+<span class="fc" id="L166">            nextWork.merge(phase.name(), units, Math::addExact);</span>
+<span class="fc" id="L167">            var next = new PrepaidApplications(PREPAID_WORK_REVISION, nextUnits, nextCalls, nextWork, prepaidCompleted, pending.size(), abandoned);</span>
+<span class="fc" id="L168">            new Work(operations, mathematics, next).metrics().totalWorkUnitsV2();</span>
+<span class="fc" id="L169">            prepaidUnits = nextUnits; application.units = ticketUnits; phaseCalls.put(phase.name(), calls);</span>
+<span class="fc" id="L170">            phaseWork.put(phase.name(), nextWork.get(phase.name()));</span>
+<span class="fc" id="L171">        }</span>
         /** Reconcile one completed candidate's exact receipt, without removing or recharging its prepayment. */
         public void complete(PrepaidApplication application, ExecutionWork work) {
-<span class="fc" id="L154">            requirePending(application); Objects.requireNonNull(work);</span>
-<span class="fc bfc" id="L155" title="All 6 branches covered.">            if (work.primitiveRewrites() != 0 || work.exactTheorySteps() != 1 || work.exactTheoryWorkUnits() != application.units)</span>
-<span class="fc" id="L156">                throw new IllegalArgumentException(&quot;completed candidate differs from its exact prepayment&quot;);</span>
-<span class="fc" id="L157">            var nextMathematics = mathematics.plus(work);</span>
-<span class="fc" id="L158">            var nextCompleted = prepaidCompleted.plus(work);</span>
-<span class="fc" id="L159">            mathematics = nextMathematics; prepaidCompleted = nextCompleted;</span>
-<span class="fc" id="L160">            pending.remove(application); application.finished = true;</span>
-<span class="fc" id="L161">        }</span>
+<span class="fc" id="L174">            requirePending(application); Objects.requireNonNull(work);</span>
+<span class="fc bfc" id="L175" title="All 6 branches covered.">            if (work.primitiveRewrites() != 0 || work.exactTheorySteps() != 1 || work.exactTheoryWorkUnits() != application.units)</span>
+<span class="fc" id="L176">                throw new IllegalArgumentException(&quot;completed candidate differs from its exact prepayment&quot;);</span>
+<span class="fc" id="L177">            var nextMathematics = mathematics.plus(work);</span>
+<span class="fc" id="L178">            var nextCompleted = prepaidCompleted.plus(work);</span>
+<span class="fc" id="L179">            mathematics = nextMathematics; prepaidCompleted = nextCompleted;</span>
+<span class="fc" id="L180">            pending.remove(application); application.finished = true;</span>
+<span class="fc" id="L181">        }</span>
         public void abandon(PrepaidApplication application) {
-<span class="fc" id="L163">            requirePending(application);</span>
-<span class="fc" id="L164">            long nextAbandoned = Math.addExact(abandoned, 1);</span>
-<span class="fc" id="L165">            pending.remove(application); application.finished = true; abandoned = nextAbandoned;</span>
-<span class="fc" id="L166">        }</span>
+<span class="fc" id="L183">            requirePending(application);</span>
+<span class="fc" id="L184">            long nextAbandoned = Math.addExact(abandoned, 1);</span>
+<span class="fc" id="L185">            pending.remove(application); application.finished = true; abandoned = nextAbandoned;</span>
+<span class="fc" id="L186">        }</span>
         private void requirePending(PrepaidApplication application) {
-<span class="pc bpc" id="L168" title="1 of 4 branches missed.">            if (application == null || application.owner != this) throw new IllegalArgumentException(&quot;foreign application payment ticket&quot;);</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (application.finished) throw new IllegalStateException(&quot;application payment already settled&quot;);</span>
-<span class="fc" id="L170">        }</span>
-<span class="fc bfc" id="L171" title="All 2 branches covered.">        void abandonPending() { for (var application : List.copyOf(pending)) abandon(application); }</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">            if (application == null || application.owner != this) throw new IllegalArgumentException(&quot;foreign application payment ticket&quot;);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (application.finished) throw new IllegalStateException(&quot;application payment already settled&quot;);</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        void abandonPending() { for (var application : List.copyOf(pending)) abandon(application); }</span>
         public void charge(Operation operation, long units) {
-<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative incremental work&quot;);</span>
-<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (prepaidSupported) {</span>
-<span class="fc" id="L175">                var next = new TreeMap&lt;&gt;(operations);</span>
-<span class="fc" id="L176">                next.merge(Objects.requireNonNull(operation).name(), units, Math::addExact);</span>
-<span class="fc" id="L177">                new Work(next, mathematics, prepaidReceipt()).metrics().totalWorkUnitsV2();</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative incremental work&quot;);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (prepaidSupported) {</span>
+<span class="fc" id="L195">                var next = new TreeMap&lt;&gt;(operations);</span>
+<span class="fc" id="L196">                next.merge(Objects.requireNonNull(operation).name(), units, Math::addExact);</span>
+<span class="fc" id="L197">                new Work(next, mathematics, prepaidReceipt()).metrics().totalWorkUnitsV2();</span>
             }
-<span class="fc" id="L179">            operations.merge(Objects.requireNonNull(operation).name(), units, Math::addExact);</span>
-<span class="fc" id="L180">        }</span>
+<span class="fc" id="L199">            operations.merge(Objects.requireNonNull(operation).name(), units, Math::addExact);</span>
+<span class="fc" id="L200">        }</span>
         public void charge(ExecutionWork work) {
-<span class="fc" id="L182">            var next = mathematics.plus(Objects.requireNonNull(work));</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (prepaidSupported) new Work(operations, next, prepaidReceipt()).metrics().totalWorkUnitsV2();</span>
-<span class="fc" id="L184">            mathematics = next;</span>
-<span class="fc" id="L185">        }</span>
+<span class="fc" id="L202">            var next = mathematics.plus(Objects.requireNonNull(work));</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (prepaidSupported) new Work(operations, next, prepaidReceipt()).metrics().totalWorkUnitsV2();</span>
+<span class="fc" id="L204">            mathematics = next;</span>
+<span class="fc" id="L205">        }</span>
         private PrepaidApplications prepaidReceipt() {
-<span class="fc" id="L187">            return new PrepaidApplications(PREPAID_WORK_REVISION, prepaidUnits, phaseCalls, phaseWork, prepaidCompleted, pending.size(), abandoned);</span>
+<span class="fc" id="L207">            return new PrepaidApplications(PREPAID_WORK_REVISION, prepaidUnits, phaseCalls, phaseWork, prepaidCompleted, pending.size(), abandoned);</span>
         }
         public Work work() {
-<span class="fc bfc" id="L190" title="All 2 branches covered.">            return new Work(operations, mathematics, prepaidSupported ? prepaidReceipt() : null);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            return new Work(operations, mathematics, prepaidSupported ? prepaidReceipt() : null);</span>
         }
     }
     /** Opaque meter-owned payment handle; never a mathematical capability. */
-    public static final class PrepaidApplication {
+    public static final class PrepaidApplication implements RetainedGraph.View {
+<span class="nc" id="L215">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(owner);}</span>
+
         private final Meter owner;
         private long units;
         private boolean finished;
-<span class="fc" id="L198">        private PrepaidApplication(Meter owner) { this.owner = owner; }</span>
+<span class="fc" id="L220">        private PrepaidApplication(Meter owner) { this.owner = owner; }</span>
     }
     @FunctionalInterface public interface Factory {
         Source open(MoveState state, MoveContext context, Meter meter);
     }
     public record Registration(Definition definition, Factory factory) {
-<span class="fc" id="L204">        public Registration {</span>
-<span class="fc" id="L205">            Objects.requireNonNull(definition); Objects.requireNonNull(factory);</span>
-<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            if (definition.kind() != Kind.REGISTERED_SCHEMA) throw new IllegalArgumentException(&quot;registration requires schema kind&quot;);</span>
-<span class="fc" id="L207">        }</span>
+<span class="fc" id="L226">        public Registration {</span>
+<span class="fc" id="L227">            Objects.requireNonNull(definition); Objects.requireNonNull(factory);</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (definition.kind() != Kind.REGISTERED_SCHEMA) throw new IllegalArgumentException(&quot;registration requires schema kind&quot;);</span>
+<span class="fc" id="L229">        }</span>
     }
     /** Immutable explicit allowlist. Matching a registration binds code/configuration, not a proof. */
     public static final class Registry {
         private final Map&lt;String, Registration&gt; registrations;
-<span class="fc" id="L212">        public Registry(List&lt;Registration&gt; registrations) {</span>
-<span class="fc" id="L213">            var entries = new TreeMap&lt;String, Registration&gt;();</span>
-<span class="fc bfc" id="L214" title="All 2 branches covered.">            for (var entry : List.copyOf(registrations)) {</span>
-<span class="fc bfc" id="L215" title="All 2 branches covered.">                if (entries.putIfAbsent(entry.definition().providerId(), entry) != null)</span>
-<span class="fc" id="L216">                    throw new IllegalArgumentException(&quot;duplicate provider registration&quot;);</span>
-<span class="fc" id="L217">            }</span>
-<span class="fc" id="L218">            this.registrations = Map.copyOf(entries);</span>
-<span class="fc" id="L219">        }</span>
+<span class="fc" id="L234">        public Registry(List&lt;Registration&gt; registrations) {</span>
+<span class="fc" id="L235">            var entries = new TreeMap&lt;String, Registration&gt;();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            for (var entry : List.copyOf(registrations)) {</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                if (entries.putIfAbsent(entry.definition().providerId(), entry) != null)</span>
+<span class="fc" id="L238">                    throw new IllegalArgumentException(&quot;duplicate provider registration&quot;);</span>
+<span class="fc" id="L239">            }</span>
+<span class="fc" id="L240">            this.registrations = Map.copyOf(entries);</span>
+<span class="fc" id="L241">        }</span>
         Factory require(Definition definition) {
-<span class="fc" id="L221">            var entry = registrations.get(definition.providerId());</span>
-<span class="fc bfc" id="L222" title="All 4 branches covered.">            if (entry == null || !entry.definition().equals(definition))</span>
-<span class="fc" id="L223">                throw new IllegalArgumentException(&quot;provider model/semantics/transport is not explicitly registered&quot;);</span>
-<span class="fc" id="L224">            return entry.factory();</span>
+<span class="fc" id="L243">            var entry = registrations.get(definition.providerId());</span>
+<span class="fc bfc" id="L244" title="All 4 branches covered.">            if (entry == null || !entry.definition().equals(definition))</span>
+<span class="fc" id="L245">                throw new IllegalArgumentException(&quot;provider model/semantics/transport is not explicitly registered&quot;);</span>
+<span class="fc" id="L246">            return entry.factory();</span>
         }
     }
 }

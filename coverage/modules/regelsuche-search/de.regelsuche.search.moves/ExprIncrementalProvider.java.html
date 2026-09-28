@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExprIncrementalProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">ExprIncrementalProvider.java</span></div><h1>ExprIncrementalProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.RetainedGraph;
+import static de.regelsuche.search.moves.IncrementalProviderContract.*;
+import de.regelsuche.transform.ExecutionWork;
+import java.util.ArrayList;
+import java.util.Set;
+
+/** Explicit native expression continuation, using the same managed P02/P03 contract. */
+public interface ExprIncrementalProvider extends NativeMoveProvider {
+    Definition contractDefinition();
+<span class="nc" id="L12">    @Override default Mathematics mathematicalKind(){return contractDefinition().mathematics();}</span>
+    ObjectSource&lt;NativeMoveProof&gt; openSource(TypedMoveSearch.State state,TypedMoveSearch.Context context,Meter meter);
+    default ObjectCursor&lt;NativeMoveProof&gt; openSession(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if(contractDefinition().transport()!=Transport.NATIVE_EXPR_V1)throw new IllegalArgumentException(&quot;native cursor requires native transport&quot;);</span>
+<span class="fc" id="L16">        return new ManagedProviderCursor&lt;&gt;(contractDefinition(),new ManagedProviderCursor.Binding&lt;&gt;() {</span>
+<span class="nc" id="L17">            @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(ExprIncrementalProvider.this);v.reference(state);v.reference(context);}</span>
+<span class="fc" id="L18">            @Override public boolean carries(){return NativeMoveProvider.carries(descriptor().requiredAssumptions(),state,context);}</span>
+<span class="fc" id="L19">            @Override public ObjectSource&lt;NativeMoveProof&gt; open(Meter meter){return openSource(state,context,meter);}</span>
+            @Override public void requireSource(NativeMoveProof candidate){
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">                if(!candidate.source().equals(state.expression()))throw new IllegalArgumentException(&quot;native cursor source differs&quot;);</span>
+<span class="fc" id="L22">            }</span>
+<span class="fc" id="L23">            @Override public ExecutionWork work(NativeMoveProof candidate){return candidate.work();}</span>
+        });
+    }
+    @Override default Batch candidates(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
+<span class="fc" id="L27">        var proofs=new ArrayList&lt;NativeMoveProof&gt;();var cursor=openSession(state,context);</span>
+        try {
+            while(true) {
+<span class="fc" id="L30">                cursor.next(Long.MAX_VALUE).ifPresent(proofs::add);</span>
+<span class="fc" id="L31">                var status=cursor.snapshot().status();</span>
+<span class="pc bpc" id="L32" title="3 of 6 branches missed.">                if(status!=Status.READY &amp;&amp; status!=Status.LIMIT &amp;&amp; status!=Status.OPEN)break;</span>
+<span class="nc" id="L33">            }</span>
+<span class="fc" id="L34">        } finally {cursor.close();}</span>
+<span class="fc" id="L35">        var receipt=cursor.snapshot();var work=receipt.work().metrics();</span>
+<span class="fc" id="L36">        return new Batch(proofs.stream().map(proof-&gt;new NativeSearchMove(proof,descriptor(),work.totalWorkUnits(),Set.of())).toList(),work,receipt.complete(),java.util.List.of(receipt));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

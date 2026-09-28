@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeStateValue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeStateValue.java</span></div><h1>NativeStateValue.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.ast.Expr;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Costed structural capability descriptions; these are never mathematical proof. */
+@FunctionalInterface
+public interface NativeStateValue {
+    Assessment evaluate(TypedMoveSearch.State state,TypedMoveSearch.Context context);
+    record Capability(String providerId,Expr sourceExpression,String subtreePath,Expr matchedExpression,Expr rewrittenExpression)
+            implements SearchExecution.Capability&lt;Expr&gt;,de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L13">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(providerId);v.reference(sourceExpression);v.reference(subtreePath);v.reference(matchedExpression);v.reference(rewrittenExpression);}</span>
+<span class="fc" id="L14">        public Capability {</span>
+<span class="pc bpc" id="L15" title="6 of 12 branches missed.">            if(providerId==null || providerId.isBlank() || sourceExpression==null || subtreePath==null</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">                || matchedExpression==null || rewrittenExpression==null || matchedExpression.equals(rewrittenExpression))</span>
+<span class="nc" id="L17">                throw new IllegalArgumentException(&quot;capability requires an executable non-identity witness&quot;);</span>
+<span class="fc" id="L18">        }</span>
+    }
+    record Assessment(int complexity,double value,long searchWork,long primitiveWork,Map&lt;String,Capability&gt; capabilities)
+            implements SearchExecution.Assessment&lt;Expr&gt;,de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L22">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(capabilities);}</span>
+<span class="fc" id="L23">        public static final Assessment EMPTY=new Assessment(0,0,0,0,Map.of());</span>
+<span class="fc" id="L24">        public Assessment {</span>
+<span class="pc bpc" id="L25" title="5 of 10 branches missed.">            if(complexity&lt;0 || !Double.isFinite(value) || searchWork&lt;0 || primitiveWork&lt;0 || capabilities==null</span>
+<span class="pc bpc" id="L26" title="4 of 8 branches missed.">                || capabilities.entrySet().stream().anyMatch(e-&gt;e.getKey()==null || e.getKey().isBlank() || e.getValue()==null))</span>
+<span class="nc" id="L27">                throw new IllegalArgumentException(&quot;invalid native state assessment&quot;);</span>
+<span class="fc" id="L28">            capabilities=de.regelsuche.retention.RetainedSortedMap.copyOf(capabilities);</span>
+<span class="fc" id="L29">        }</span>
+    }
+<span class="fc" id="L31">    enum Empty implements NativeStateValue { INSTANCE; @Override public Assessment evaluate(TypedMoveSearch.State state,TypedMoveSearch.Context context){return Assessment.EMPTY;} }</span>
+<span class="fc" id="L32">    NativeStateValue NONE=Empty.INSTANCE;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StagedBatchPicker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">StagedBatchPicker.java</span></div><h1>StagedBatchPicker.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+/** Opens provider batches on demand. Metadata ordering never invokes an engine. */
+final class StagedBatchPicker&lt;M&gt; implements SearchExecution.Picker&lt;M&gt;,RetainedGraph.View {
+<span class="fc" id="L14">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(primitiveLanes);v.reference(generated);v.reference(batchReceipts);v.reference(policy);v.reference(work);}</span>
+
+<span class="fc" id="L16">    private static final int EXHAUSTED_STAGE = MovePriorityPolicy.Stage.values().length;</span>
+<span class="fc" id="L17">    private final List&lt;IncrementalProviderContract.Snapshot&gt; batchReceipts=new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L18">    @Override public List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts(){return batchReceipts;}</span>
+
+<span class="fc" id="L20">    private record Ranked&lt;M&gt;(M move, double score) implements RetainedGraph.View {</span>
+<span class="fc" id="L21">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(move);}</span>
+    }
+    private final class Lane implements RetainedGraph.View {
+<span class="fc" id="L24">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(StagedBatchPicker.this);v.reference(provider);v.reference(moves);}</span>
+
+        final SearchBatches.Provider&lt;M&gt; provider;
+        final int stage;
+        final double score;
+        List&lt;M&gt; moves;
+        int cursor;
+<span class="fc" id="L31">        Lane(SearchBatches.Provider&lt;M&gt; provider, int stage, double score) {</span>
+<span class="fc" id="L32">            this.provider = provider; this.stage = stage; this.score = finite(score);</span>
+<span class="fc" id="L33">        }</span>
+    }
+<span class="fc" id="L35">    private final List&lt;Lane&gt; lanes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L36">    private final java.util.ArrayDeque&lt;Lane&gt; primitiveLanes = new java.util.ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L37">    private final List&lt;M&gt; generated = new ArrayList&lt;&gt;();</span>
+    private final SearchBatches.Ranking&lt;M&gt; policy;
+<span class="fc" id="L39">    private TransformationWorkMetrics work = TransformationWorkMetrics.ZERO;</span>
+<span class="fc" id="L40">    private boolean exhaustive = true;</span>
+    private int valuableBurst;
+
+<span class="fc" id="L43">    StagedBatchPicker(List&lt;SearchBatches.Provider&lt;M&gt;&gt; providers, SearchBatches.Ranking&lt;M&gt; policy) {</span>
+<span class="fc" id="L44">        this.policy = policy;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var provider : List.copyOf(providers)) lanes.add(new Lane(provider,</span>
+<span class="fc" id="L46">            policy.stage(provider.descriptor()), policy.providerScore(provider.descriptor())));</span>
+<span class="pc" id="L47">        lanes.sort(Comparator.comparingInt((Lane lane) -&gt; lane.stage).thenComparing(Comparator.comparingDouble((Lane lane) -&gt; lane.score).reversed()));</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        lanes.stream().filter(lane -&gt; lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.PRIMITIVE).forEach(primitiveLanes::addLast);</span>
+<span class="fc" id="L49">        work = ordering(providers.size()).withDelegatedMechanicalWork(policy.contextWork());</span>
+<span class="fc" id="L50">    }</span>
+
+    @Override public Optional&lt;M&gt; next() {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        while (!lanes.isEmpty()) {</span>
+            // A large learned batch cannot monopolize candidate consumption before primitive mathematics.
+<span class="fc bfc" id="L55" title="All 4 branches covered.">            Lane lane = valuableBurst &gt;= 2 &amp;&amp; !primitiveLanes.isEmpty() ? primitiveLanes.getFirst()</span>
+<span class="fc" id="L56">                : lanes.getFirst();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (lane.moves == null) {</span>
+<span class="fc" id="L58">                var batch = lane.provider.candidates();</span>
+<span class="fc" id="L59">                work = work.plus(batch.work());</span>
+<span class="fc" id="L60">                batchReceipts.addAll(batch.cursorReceipts());</span>
+<span class="fc" id="L61">                de.regelsuche.retention.RetainedOperation.work(batch.cursorReceipts().size());</span>
+<span class="fc" id="L62">                exhaustive &amp;= batch.complete();</span>
+<span class="fc" id="L63">                generated.addAll(batch.moves());</span>
+<span class="fc" id="L64">                var ranked = new ArrayList&lt;Ranked&lt;M&gt;&gt;();</span>
+<span class="fc" id="L65">                try(var held=RetainedOperation.retain(this,batch,ranked)) {</span>
+<span class="fc" id="L66">                RetainedOperation.work(batch.moves().size());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                for (var move : batch.moves()) {</span>
+<span class="fc" id="L68">                    policy.requireSource(move);</span>
+<span class="fc" id="L69">                    work=work.plus(ordering(1));</span>
+<span class="fc" id="L70">                    ranked.add(new Ranked&lt;&gt;(move, finite(policy.score(move))));</span>
+<span class="fc" id="L71">                    RetainedOperation.work(2);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L72">                }</span>
+<span class="fc" id="L73">                ranked.sort(Comparator.&lt;Ranked&lt;M&gt;&gt;comparingDouble(Ranked::score).reversed());</span>
+<span class="fc" id="L74">                var ordered=new ArrayList&lt;M&gt;();</span>
+<span class="fc" id="L75">                try(var orderedFrame=RetainedOperation.retain(ordered)) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                    for(var rank:ranked){ordered.add(rank.move());RetainedOperation.work(1);}</span>
+<span class="fc" id="L77">                    lane.moves=RetainedOperation.produced(List.copyOf(ordered));</span>
+<span class="fc" id="L78">                    RetainedOperation.work(ordered.size());</span>
+                }
+                }
+            }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (lane.cursor == lane.moves.size()) {</span>
+<span class="fc" id="L83">                lanes.remove(lane);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                if (primitiveLanes.peekFirst() == lane) primitiveLanes.removeFirst();</span>
+                continue;
+            }
+<span class="fc" id="L87">            var result = lane.moves.get(lane.cursor++);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.LEARNED) valuableBurst++;</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            else if (lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.PRIMITIVE) valuableBurst = 0;</span>
+<span class="fc" id="L90">            return Optional.of(result);</span>
+        }
+<span class="fc" id="L92">        return Optional.empty();</span>
+    }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">    public int nextStage() { return lanes.isEmpty() ? EXHAUSTED_STAGE : lanes.getFirst().stage; }</span>
+<span class="fc" id="L95">    @Override public TransformationWorkMetrics workMetrics() { return work; }</span>
+<span class="fc" id="L96">    @Override public List&lt;M&gt; generatedMoves() { return List.copyOf(generated); }</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">    @Override public boolean complete() { return lanes.isEmpty() &amp;&amp; exhaustive; }</span>
+    private static TransformationWorkMetrics ordering(int count) {
+<span class="fc" id="L99">        return new TransformationWorkMetrics(0, 0, 0, 0, 0, 0, 0, count, 0, 0, 0, 0, 0, 0);</span>
+    }
+    private static double finite(double score) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (!Double.isFinite(score)) throw new IllegalArgumentException(&quot;nonfinite move priority&quot;);</span>
+<span class="fc" id="L103">        return score;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

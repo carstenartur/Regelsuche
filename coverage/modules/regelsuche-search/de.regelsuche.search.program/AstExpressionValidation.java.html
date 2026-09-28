@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstExpressionValidation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">AstExpressionValidation.java</span></div><h1>AstExpressionValidation.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.transform.AstRewriteTransport;
+import java.util.Objects;
+
+/** Direct counterpart of the canonical expression codec guards; never builds JSON or copies ASTs. */
+public final class AstExpressionValidation {
+    private AstExpressionValidation() {}
+<span class="fc" id="L10">    public record Inspection(long nodes, long textCharacters, long canonicalBytes,long canonicalCharacters) {</span>
+<span class="fc" id="L11">        public long work() { return Math.addExact(nodes, textCharacters); }</span>
+    }
+    public static Inspection inspect(Expr expression) {
+<span class="fc" id="L14">        var counter = new Counter();</span>
+<span class="fc" id="L15">        long bytes = Math.addExact(27L + CompiledAstReplayCodec.EXPRESSION_SCHEMA.length(), counter.expression(expression, 0));</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        if (bytes &gt; CompiledAstReplayCodec.MAXIMUM_BYTES) throw new IllegalArgumentException(&quot;invalid AST replay byte length&quot;);</span>
+<span class="fc" id="L17">        return new Inspection(counter.nodes, counter.characters, bytes,bytes-counter.extraUtf8Bytes);</span>
+    }
+    /** Same per-state and cumulative history limits as encode, including unexported intermediate states. */
+    public static Inspection inspectHistory(CompiledAstRewriteProgram.Candidate history) {
+<span class="fc" id="L21">        Objects.requireNonNull(history);</span>
+<span class="fc" id="L22">        var counter = new Counter();</span>
+<span class="fc" id="L23">        counter.byteGenerator = true;</span>
+<span class="fc" id="L24">        long bytes = &quot;{\&quot;schema\&quot;:\&quot;\&quot;,\&quot;backend\&quot;:\&quot;\&quot;,\&quot;program\&quot;:\&quot;\&quot;,\&quot;sourceIds\&quot;:[],\&quot;states\&quot;:[],\&quot;steps\&quot;:[]}&quot;.length()</span>
+<span class="fc" id="L25">            + CompiledAstReplayCodec.SCHEMA.length() + CompiledAstRewriteProgram.REVISION.length() + counter.text(history.programId());</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        for (int i = 0; i &lt; history.sourceIds().size(); i++)</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            bytes = Math.addExact(bytes, 2 + counter.text(history.sourceIds().get(i)) + (i == 0 ? 0 : 1));</span>
+<span class="fc" id="L28">        long nodes = 0;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (int i = 0; i &lt;= history.steps().size(); i++) {</span>
+<span class="fc" id="L30">            counter.nodes = 0;</span>
+<span class="fc bfc" id="L31" title="All 4 branches covered.">            bytes = Math.addExact(bytes, counter.expression(i == 0 ? history.source() : history.steps().get(i - 1).target(), 0) + (i == 0 ? 0 : 1));</span>
+<span class="fc" id="L32">            nodes = Math.addExact(nodes, counter.nodes);</span>
+        }
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (int i = 0; i &lt; history.steps().size(); i++) {</span>
+<span class="fc" id="L35">            var step = history.steps().get(i);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (step.assumptions().size() &gt; CompiledAstReplayCodec.MAXIMUM_ASSUMPTIONS)</span>
+<span class="fc" id="L37">                throw new IllegalArgumentException(&quot;too many AST replay assumptions&quot;);</span>
+<span class="fc" id="L38">            bytes = Math.addExact(bytes, &quot;{\&quot;rule\&quot;:\&quot;\&quot;,\&quot;kind\&quot;:\&quot;\&quot;,\&quot;mayIncreaseComplexity\&quot;:,\&quot;estimatedCostDelta\&quot;:,\&quot;equivalencePreservingByConstruction\&quot;:,\&quot;assumptions\&quot;:[],\&quot;packId\&quot;:\&quot;\&quot;,\&quot;license\&quot;:\&quot;\&quot;}&quot;.length()</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                + counter.text(step.rule()) + step.kind().name().length() + (step.mayIncreaseComplexity() ? 4 : 5)</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                + integerCharacters(step.estimatedCostDelta()) + (step.equivalencePreservingByConstruction() ? 4 : 5)</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">                + counter.text(step.packId()) + counter.text(step.license()) + (i == 0 ? 0 : 1));</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (int j = 0; j &lt; step.assumptions().size(); j++)</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                bytes = Math.addExact(bytes, 2 + counter.text(step.assumptions().get(j)) + (j == 0 ? 0 : 1));</span>
+        }
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (bytes &gt; CompiledAstReplayCodec.MAXIMUM_BYTES) throw new IllegalArgumentException(&quot;invalid AST replay byte length&quot;);</span>
+<span class="fc" id="L46">        return new Inspection(nodes, counter.characters, bytes, bytes - counter.extraUtf8Bytes);</span>
+    }
+    private static int integerCharacters(int value) {
+<span class="fc" id="L49">        long magnitude = Math.abs((long) value);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        int count = value &lt; 0 ? 2 : 1;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        while (magnitude &gt;= 10) { magnitude /= 10; count++; }</span>
+<span class="fc" id="L52">        return count;</span>
+    }
+    private static final class Counter {
+        long nodes, characters,extraUtf8Bytes;
+        boolean byteGenerator;
+        long expression(Expr expression, int depth) {
+<span class="fc" id="L58">            Objects.requireNonNull(expression);</span>
+<span class="fc" id="L59">            de.regelsuche.retention.RetainedOperation.validation(1);</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">            if (++nodes &gt; AstRewriteTransport.MAXIMUM_NODES || depth &gt; AstRewriteTransport.MAXIMUM_DEPTH)</span>
+<span class="nc" id="L61">                throw new IllegalArgumentException(&quot;AST replay structural limit exceeded&quot;);</span>
+<span class="fc bfc" id="L62" title="All 4 branches covered.">            return switch (expression) {</span>
+<span class="fc" id="L63">                case NumberExpr number -&gt; {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                    if (number.value().numerator().bitLength() &gt; 4 * CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                            || number.value().denominator().bitLength() &gt; 4 * CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS)</span>
+<span class="nc" id="L66">                        throw new IllegalArgumentException(&quot;AST replay numeric literal is too large&quot;);</span>
+<span class="fc" id="L67">                    yield 28 + text(number.value().canonicalText());</span>
+                }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                case VariableExpr variable -&gt; variable.symbol().isPresent()</span>
+<span class="fc" id="L70">                    ? 25 + text(variable.symbol().orElseThrow().canonicalText()) : 29 + text(variable.name());</span>
+<span class="fc" id="L71">                case BinaryExpr binary -&gt; 48L + binary.operator().name().length()</span>
+<span class="fc" id="L72">                    + expression(binary.left(), depth + 1) + expression(binary.right(), depth + 1);</span>
+<span class="fc" id="L73">                case FunctionExpr function -&gt; {</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                    if (function.arguments().size() &gt; AstRewriteTransport.MAXIMUM_NODES - nodes)</span>
+<span class="nc" id="L75">                        throw new IllegalArgumentException(&quot;AST replay argument count exceeded&quot;);</span>
+<span class="fc" id="L76">                    long size = 44 + text(function.name());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                    for (int i = 0; i &lt; function.arguments().size(); i++)</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                        size = Math.addExact(size, expression(function.arguments().get(i), depth + 1) + (i == 0 ? 0 : 1));</span>
+<span class="fc" id="L79">                    yield size;</span>
+                }
+            };
+        }
+        long text(String value) {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            de.regelsuche.retention.RetainedOperation.validation(value==null?0:value.length());</span>
+<span class="pc bpc" id="L85" title="2 of 6 branches missed.">            if (value == null || value.isBlank() || value.length() &gt; CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS)</span>
+<span class="fc" id="L86">                throw new IllegalArgumentException(&quot;invalid or oversized AST replay text&quot;);</span>
+<span class="fc" id="L87">            characters = Math.addExact(characters, value.length());</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (characters &gt; CompiledAstReplayCodec.MAXIMUM_BYTES) throw new IllegalArgumentException(&quot;AST replay text limit exceeded&quot;);</span>
+<span class="fc" id="L89">            long bytes = 0;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L91">                char c = value.charAt(i);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                if (Character.isHighSurrogate(c)) {</span>
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">                    if (++i == value.length() || !Character.isLowSurrogate(value.charAt(i))) throw new IllegalArgumentException(&quot;unpaired Unicode surrogate&quot;);</span>
+                    // Jackson byte output escapes each supplementary UTF-16 code unit; String output retains the pair.
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                    if (byteGenerator) bytes += 12;</span>
+<span class="fc" id="L96">                    else { bytes += 4; extraUtf8Bytes += 2; }</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                } else if (Character.isLowSurrogate(c)) throw new IllegalArgumentException(&quot;unpaired Unicode surrogate&quot;);</span>
+<span class="pc bpc" id="L98" title="4 of 14 branches missed.">                else if (c == '&quot;' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\b' || c == '\f') bytes += 2;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                else if (c &lt; 32) bytes += 6;</span>
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">                else { int size=c &lt; 128 ? 1 : c &lt; 2048 ? 2 : 3;bytes+=size;extraUtf8Bytes+=size-1; }</span>
+            }
+<span class="fc" id="L102">            return bytes;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

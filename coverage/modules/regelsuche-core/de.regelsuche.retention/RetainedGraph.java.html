@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RetainedGraph.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.retention</a> &gt; <span class="el_source">RetainedGraph.java</span></div><h1>RetainedGraph.java</h1><pre class="source lang-java linenums">package de.regelsuche.retention;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.*;
+
+/**
+ * Explicit logical ownership, not JVM bytes. Each described field/collection entry is a slot;
+ * collection backing storage contributes one slot. Only exact audited owning container classes are supported;
+ * wrappers/views/subclasses and opaque comparators are rejected. Scalars use canonical decimal characters;
+ * BigInteger conversion text is paid and overlaps the retained scalar in the peak. Null fields still occupy slots. Shared objects
+ * count once by identity. Only explicitly audited stateless enum types are borrowed; enum Views are traversed. No reflection or retained registry.
+ */
+public final class RetainedGraph {
+    private RetainedGraph() {}
+    // Cross-module names avoid a core -&gt; search dependency. Same-loader exact declaring types
+    // only: no package-prefix admission and no exemption for caller-defined enum callbacks.
+<span class="fc" id="L20">    private static final Set&lt;String&gt; STATELESS_ENUMS=Set.of(</span>
+        &quot;de.regelsuche.ast.BinaryOperator&quot;, &quot;de.regelsuche.transform.RewriteKind&quot;,
+        &quot;de.regelsuche.assumption.Assumption$Kind&quot;, &quot;de.regelsuche.knowledge.DerivationType&quot;,
+        &quot;de.regelsuche.knowledge.RuleStatus&quot;, &quot;de.regelsuche.knowledge.SearchEffect&quot;,
+        &quot;de.regelsuche.search.moves.MoveSearch$Mode&quot;, &quot;de.regelsuche.search.moves.MoveSearch$Scheduling&quot;,
+        &quot;de.regelsuche.search.moves.MoveSearch$Outcome&quot;, &quot;de.regelsuche.search.moves.MoveSearch$Decision&quot;,
+        &quot;de.regelsuche.search.moves.MoveContext$Phase&quot;, &quot;de.regelsuche.search.moves.SearchMove$SourceKind&quot;,
+        &quot;de.regelsuche.search.moves.SearchMove$ProofStrength&quot;, &quot;de.regelsuche.search.moves.MovePriorityPolicy$Stage&quot;,
+        &quot;de.regelsuche.search.moves.SearchContinuationContract&quot;, &quot;de.regelsuche.search.moves.NativeMoveSearch$ZeroScore&quot;,
+        &quot;de.regelsuche.search.moves.NativeMovePriorityPolicy$InventoryOrder&quot;, &quot;de.regelsuche.search.moves.NativeStateValue$Empty&quot;,
+        &quot;de.regelsuche.search.moves.IncrementalProviderContract$ApplicationPhase&quot;,
+        &quot;de.regelsuche.search.moves.IncrementalProviderContract$Kind&quot;, &quot;de.regelsuche.search.moves.IncrementalProviderContract$Transport&quot;,
+        &quot;de.regelsuche.search.moves.IncrementalProviderContract$Mathematics&quot;, &quot;de.regelsuche.search.moves.IncrementalProviderContract$Status&quot;,
+        &quot;de.regelsuche.search.moves.IncrementalProviderContract$Operation&quot;);
+    private static boolean borrowedEnum(Object value){
+<span class="fc bfc" id="L35" title="All 4 branches covered.">        if(!(value instanceof Enum&lt;?&gt; enumeration) || value instanceof View)return false;</span>
+<span class="fc" id="L36">        Class&lt;?&gt; type=enumeration.getDeclaringClass();</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        return type.getClassLoader()==RetainedGraph.class.getClassLoader() &amp;&amp; STATELESS_ENUMS.contains(type.getName());</span>
+    }
+
+    public interface View { void retainedReferences(Visitor visitor); }
+    public interface Visitor {
+        void reference(Object value);
+        void requireExact(Object value,Class&lt;?&gt; auditedType);
+    }
+    public record Usage(long nodes,long characters,long references) implements View {
+<span class="nc" id="L46">        @Override public void retainedReferences(Visitor visitor) {}</span>
+<span class="pc bpc" id="L47" title="3 of 6 branches missed.">        public Usage { if(nodes&lt;0 || characters&lt;0 || references&lt;0)throw new IllegalArgumentException(&quot;negative retention&quot;); }</span>
+<span class="nc" id="L48">        public Usage maximum(Usage other){return new Usage(Math.max(nodes,other.nodes),Math.max(characters,other.characters),Math.max(references,other.references));}</span>
+    }
+<span class="fc" id="L50">    public record Observation(Usage retained,Usage peak,long work,long objects) {}</span>
+    public static final class Unmeasured extends IllegalArgumentException {
+        private final Observation attempted;
+<span class="fc" id="L53">        private Unmeasured(Object payload,Observation attempted){super(&quot;unsupported retention payload: &quot;+payload.getClass().getName());this.attempted=attempted;}</span>
+<span class="fc" id="L54">        public Observation attempted(){return attempted;}</span>
+    }
+    /** Each invocation pays fresh traversal/index work and drops all strong bookkeeping references. */
+    public static Observation measure(Object root) {
+<span class="fc" id="L58">        var scan=new Scan();</span>
+        try {
+<span class="fc" id="L60">            scan.reference(root);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            while(!scan.pending.isEmpty()) {</span>
+<span class="fc" id="L62">                Object value=scan.pending.removeFirst();scan.work=Math.addExact(scan.work,1);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                if(scan.seen.put(value,Boolean.TRUE)!=null)continue;</span>
+<span class="fc" id="L64">                scan.work=Math.addExact(scan.work,1);scan.accountingPeak();scan.inspect(value);</span>
+<span class="fc" id="L65">            }</span>
+<span class="fc" id="L66">            return scan.observation();</span>
+<span class="fc" id="L67">        } finally { scan.pending.clear();scan.seen.clear(); }</span>
+    }
+<span class="fc" id="L69">    private static final class Scan implements Visitor {</span>
+<span class="fc" id="L70">        final IdentityHashMap&lt;Object,Boolean&gt; seen=new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L71">        final ArrayDeque&lt;Object&gt; pending=new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L72">        long nodes,characters,references,work,accountingReferences=5,temporaryCharacters;</span>
+        @Override public void requireExact(Object value,Class&lt;?&gt; auditedType){
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            if(value.getClass()!=auditedType)throw new Unmeasured(value,observation());</span>
+<span class="nc" id="L75">        }</span>
+        @Override public void reference(Object value){
+<span class="fc" id="L77">            references=Math.addExact(references,1);work=Math.addExact(work,1);</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            if(value!=null &amp;&amp; !borrowedEnum(value))pending.addLast(value);</span>
+<span class="fc" id="L79">            accountingPeak();</span>
+<span class="fc" id="L80">        }</span>
+        void accountingPeak(){
+            // Scan owns map, queue and current-object slots plus their two backing-storage slots.
+<span class="fc" id="L83">            accountingReferences=Math.max(accountingReferences,Math.addExact(5,Math.addExact(2L*seen.size(),pending.size())));</span>
+<span class="fc" id="L84">        }</span>
+        void inspect(Object value){
+<span class="pc bpc" id="L86" title="20 of 36 branches missed.">            switch(value) {</span>
+<span class="fc" id="L87">                case BinaryExpr binary -&gt; { node();reference(binary.left());reference(binary.operator());reference(binary.right()); }</span>
+<span class="nc" id="L88">                case FunctionExpr function -&gt; { node();reference(function.name());reference(function.arguments()); }</span>
+<span class="fc" id="L89">                case VariableExpr variable -&gt; { node();reference(variable.name());reference(variable.symbol().orElse(null)); }</span>
+<span class="nc" id="L90">                case NumberExpr number -&gt; { node();reference(number.value()); }</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                case com.fasterxml.jackson.core.io.ContentReference content when content.getClass()==com.fasterxml.jackson.core.io.ContentReference.class -&gt; {reference(content.getRawContent());reference(null); /* pre-existing error-report metadata */}</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                case com.fasterxml.jackson.databind.node.TextNode text when text.getClass()==com.fasterxml.jackson.databind.node.TextNode.class -&gt; reference(text.textValue());</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                case com.fasterxml.jackson.databind.node.IntNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.IntNode.class -&gt; {}</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                case com.fasterxml.jackson.databind.node.LongNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.LongNode.class -&gt; {}</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                case com.fasterxml.jackson.databind.node.DoubleNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.DoubleNode.class -&gt; {}</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                case com.fasterxml.jackson.databind.node.BooleanNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.BooleanNode.class -&gt; {}</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                case com.fasterxml.jackson.databind.node.NullNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.NullNode.class -&gt; {}</span>
+<span class="fc" id="L98">                case String text -&gt; characters=Math.addExact(characters,text.length());</span>
+<span class="fc" id="L99">                case StringBuilder text -&gt; {reference(null);characters=Math.addExact(characters,text.length());}</span>
+<span class="nc" id="L100">                case ExactRational rational -&gt; { reference(rational.numerator());reference(rational.denominator()); }</span>
+<span class="fc" id="L101">                case BigInteger integer -&gt; {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                    if(integer.getClass()!=BigInteger.class)throw new Unmeasured(integer,observation());</span>
+<span class="fc" id="L103">                    String decimal=integer.toString();int digits=decimal.length();</span>
+<span class="fc" id="L104">                    characters=Math.addExact(characters,digits);temporaryCharacters=Math.max(temporaryCharacters,digits);</span>
+<span class="fc" id="L105">                    accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));</span>
+<span class="fc" id="L106">                    work=Math.addExact(work,Math.addExact(digits,2L)); // conversion scan and temporary reference acquisition/release</span>
+<span class="fc" id="L107">                }</span>
+<span class="nc" id="L108">                case SymbolId symbol -&gt; reference(symbol.namespace());</span>
+                // The exact ThreadLocal key has no strong value field; values belong to the thread map.
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                case ThreadLocal&lt;?&gt; local when local.getClass()==ThreadLocal.class -&gt; {}</span>
+<span class="nc" id="L111">                case UUID ignored -&gt; {}</span>
+<span class="nc" id="L112">                case Long ignored -&gt; {}</span>
+<span class="nc" id="L113">                case Integer ignored -&gt; {}</span>
+<span class="nc" id="L114">                case Double ignored -&gt; {}</span>
+<span class="nc" id="L115">                case Float ignored -&gt; {}</span>
+<span class="nc" id="L116">                case Short ignored -&gt; {}</span>
+<span class="nc" id="L117">                case Byte ignored -&gt; {}</span>
+<span class="nc" id="L118">                case Boolean ignored -&gt; {}</span>
+<span class="nc" id="L119">                case Character ignored -&gt; characters=Math.addExact(characters,1);</span>
+<span class="fc" id="L120">                case View view -&gt; view.retainedReferences(this);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                case Map&lt;?,?&gt; map when standardContainer(map) -&gt; {</span>
+<span class="fc" id="L122">                    reference(null); // logical backing slot</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                    if(map instanceof SortedMap&lt;?,?&gt; sorted)reference(sorted.comparator());</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                    for(var entry:map.entrySet()){reference(entry.getKey());reference(entry.getValue());}</span>
+<span class="fc" id="L125">                }</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                case Collection&lt;?&gt; collection when standardContainer(collection) -&gt; {</span>
+<span class="fc" id="L127">                    reference(null);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                    if(collection instanceof SortedSet&lt;?&gt; sorted)reference(sorted.comparator());</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                    if(collection instanceof PriorityQueue&lt;?&gt; queue)reference(queue.comparator());</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                    for(Object entry:collection)reference(entry);</span>
+<span class="fc" id="L131">                }</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">                case java.util.concurrent.atomic.AtomicReferenceArray&lt;?&gt; array when array.getClass()==java.util.concurrent.atomic.AtomicReferenceArray.class -&gt; { reference(null);for(int i=0;i&lt;array.length();i++)reference(array.get(i)); }</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                case Object[] array -&gt; { for(Object entry:array)reference(entry); }</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                case long[] array -&gt; { for(int i=0;i&lt;array.length;i++)reference(null); }</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                case int[] array -&gt; { for(int i=0;i&lt;array.length;i++)reference(null); }</span>
+<span class="fc" id="L136">                case byte[] array -&gt; characters=Math.addExact(characters,array.length);</span>
+<span class="fc" id="L137">                case char[] array -&gt; characters=Math.addExact(characters,array.length);</span>
+<span class="fc" id="L138">                default -&gt; throw new Unmeasured(value,observation());</span>
+            }
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">        void node(){nodes=Math.addExact(nodes,1);}</span>
+        boolean standardContainer(Object value){
+<span class="fc" id="L143">            Class&lt;?&gt; type=value.getClass();</span>
+<span class="fc bfc" id="L144" title="All 4 branches covered.">            if(type==TreeMap.class)return ((TreeMap&lt;?,?&gt;)value).comparator()==null;</span>
+<span class="pc bpc" id="L145" title="3 of 4 branches missed.">            if(type==TreeSet.class)return ((TreeSet&lt;?&gt;)value).comparator()==null;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if(type==PriorityQueue.class) {</span>
+<span class="nc" id="L147">                var comparator=((PriorityQueue&lt;?&gt;)value).comparator();</span>
+<span class="nc bnc" id="L148" title="All 4 branches missed.">                return comparator==null || comparator instanceof View;</span>
+            }
+<span class="pc bpc" id="L150" title="6 of 16 branches missed.">            if(type==ArrayList.class || type==LinkedList.class || type==ArrayDeque.class || type==HashMap.class</span>
+<span class="fc" id="L151">                    || type==LinkedHashMap.class || type==IdentityHashMap.class || type==HashSet.class || type==LinkedHashSet.class)return true;</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            return switch(type.getName()) {</span>
+                case &quot;java.util.ImmutableCollections$ListN&quot;, &quot;java.util.ImmutableCollections$List12&quot;,
+                    &quot;java.util.ImmutableCollections$MapN&quot;, &quot;java.util.ImmutableCollections$Map1&quot;,
+                    &quot;java.util.ImmutableCollections$SetN&quot;, &quot;java.util.ImmutableCollections$Set12&quot;,
+                    &quot;java.util.Collections$EmptyList&quot;, &quot;java.util.Collections$EmptyMap&quot;, &quot;java.util.Collections$EmptySet&quot;,
+<span class="nc" id="L157">                    &quot;java.util.Collections$SingletonList&quot;, &quot;java.util.Collections$SingletonMap&quot;, &quot;java.util.Collections$SingletonSet&quot; -&gt; true;</span>
+<span class="fc" id="L158">                default -&gt; false;</span>
+            };
+        }
+        Observation observation(){
+<span class="fc" id="L162">            var retained=new Usage(nodes,characters,references);</span>
+            // Both paths leave through measure's finally. Settle each occupied identity slot and
+            // pending traversal slot before publishing the receipt; none can survive the call.
+<span class="fc" id="L165">            long settledWork=Math.addExact(work,Math.addExact(2L*seen.size(),pending.size()));</span>
+<span class="fc" id="L166">            return new Observation(retained,new Usage(nodes,Math.addExact(characters,temporaryCharacters),Math.addExact(references,accountingReferences)),settledWork,seen.size());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

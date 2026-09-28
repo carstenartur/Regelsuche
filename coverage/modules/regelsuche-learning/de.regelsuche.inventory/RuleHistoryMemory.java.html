@@ -3,6 +3,7 @@
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.search.moves.*;
+import de.regelsuche.retention.RetainedGraph;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -10,84 +11,91 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /** Transparent family and continuation observations; no labels or weights update during TEST. */
-<span class="fc" id="L13">public final class RuleHistoryMemory {</span>
+<span class="fc" id="L14">public final class RuleHistoryMemory {</span>
     public record Stats(long applications, long success, long failure, long duplicates, long capabilityUnlocks,
-            long measuredWorkSaved, long verificationWork) {
-<span class="fc" id="L16">        public static final Stats EMPTY = new Stats(0, 0, 0, 0, 0, 0, 0);</span>
-<span class="fc" id="L17">        public Stats {</span>
-<span class="pc bpc" id="L18" title="10 of 20 branches missed.">            if (applications &lt; 0 || success &lt; 0 || failure &lt; 0 || duplicates &lt; 0 || capabilityUnlocks &lt; 0</span>
+            long measuredWorkSaved, long verificationWork) implements RetainedGraph.View {
+<span class="fc" id="L17">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L18">        public static final Stats EMPTY = new Stats(0, 0, 0, 0, 0, 0, 0);</span>
+<span class="fc" id="L19">        public Stats {</span>
+<span class="pc bpc" id="L20" title="10 of 20 branches missed.">            if (applications &lt; 0 || success &lt; 0 || failure &lt; 0 || duplicates &lt; 0 || capabilityUnlocks &lt; 0</span>
                     || measuredWorkSaved &lt; 0 || verificationWork &lt; 0 || success &gt; applications || failure &gt; applications
-<span class="nc" id="L20">                    || duplicates &gt; applications) throw new IllegalArgumentException(&quot;invalid history counters&quot;);</span>
-<span class="fc" id="L21">        }</span>
-<span class="fc" id="L22">        public double successValue() { return (double) (success - failure) / (applications + 2); }</span>
-<span class="fc bfc" id="L23" title="All 2 branches covered.">        public double duplicateRate() { return applications == 0 ? 0 : (double) duplicates / applications; }</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">        public double failureRate() { return applications == 0 ? 0 : (double) failure / applications; }</span>
-<span class="fc bfc" id="L25" title="All 2 branches covered.">        public double averageWorkSaved() { return success == 0 ? 0 : (double) measuredWorkSaved / success; }</span>
+<span class="nc" id="L22">                    || duplicates &gt; applications) throw new IllegalArgumentException(&quot;invalid history counters&quot;);</span>
+<span class="fc" id="L23">        }</span>
+<span class="fc" id="L24">        public double successValue() { return (double) (success - failure) / (applications + 2); }</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        public double duplicateRate() { return applications == 0 ? 0 : (double) duplicates / applications; }</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        public double failureRate() { return applications == 0 ? 0 : (double) failure / applications; }</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        public double averageWorkSaved() { return success == 0 ? 0 : (double) measuredWorkSaved / success; }</span>
     }
-    public record Snapshot(String schema, Map&lt;String, Stats&gt; families, Map&lt;String, Stats&gt; continuations) {
-<span class="fc" id="L28">        public Snapshot {</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">            if (!&quot;regelsuche.rule-history/v1&quot;.equals(schema)) throw new IllegalArgumentException(&quot;unsupported history schema&quot;);</span>
-<span class="fc" id="L30">            families = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(families));</span>
-<span class="fc" id="L31">            continuations = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(continuations));</span>
-<span class="fc" id="L32">        }</span>
-<span class="fc" id="L33">        public Stats family(String context, String family) { return families.getOrDefault(key(context, &quot;&quot;, family), Stats.EMPTY); }</span>
-<span class="fc" id="L34">        public Stats continuation(String context, String previous, String next) { return continuations.getOrDefault(key(context, previous, next), Stats.EMPTY); }</span>
-<span class="fc" id="L35">        public void persistTo(Path path) throws IOException { mapper().writeValue(path.toFile(), this); }</span>
-<span class="fc" id="L36">        public static Snapshot load(Path path) throws IOException { return mapper().readValue(path.toFile(), Snapshot.class); }</span>
+    public record Snapshot(String schema, Map&lt;String, Stats&gt; families, Map&lt;String, Stats&gt; continuations) implements RetainedGraph.View {
+<span class="fc" id="L30">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(schema);v.reference(families);v.reference(continuations);}</span>
+<span class="fc" id="L31">        public Snapshot {</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if (!&quot;regelsuche.rule-history/v1&quot;.equals(schema)) throw new IllegalArgumentException(&quot;unsupported history schema&quot;);</span>
+<span class="fc" id="L33">            families = de.regelsuche.retention.RetainedSortedMap.copyOf(families);</span>
+<span class="fc" id="L34">            continuations = de.regelsuche.retention.RetainedSortedMap.copyOf(continuations);</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        public Stats family(String context, String family) { return families.getOrDefault(key(context, &quot;&quot;, family), Stats.EMPTY); }</span>
+<span class="fc" id="L37">        public Stats continuation(String context, String previous, String next) { return continuations.getOrDefault(key(context, previous, next), Stats.EMPTY); }</span>
+<span class="fc" id="L38">        public void persistTo(Path path) throws IOException { mapper().writeValue(path.toFile(), this); }</span>
+<span class="fc" id="L39">        public static Snapshot load(Path path) throws IOException { return mapper().readValue(path.toFile(), Snapshot.class); }</span>
     }
-<span class="fc" id="L38">    private final Map&lt;String, Stats&gt; families = new TreeMap&lt;&gt;(), continuations = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L41">    private final Map&lt;String, Stats&gt; families = new TreeMap&lt;&gt;(), continuations = new TreeMap&lt;&gt;();</span>
     private long measuredWork;
-<span class="fc" id="L40">    public Snapshot freeze() { return new Snapshot(&quot;regelsuche.rule-history/v1&quot;, families, continuations); }</span>
+<span class="fc" id="L43">    public Snapshot freeze() { return new Snapshot(&quot;regelsuche.rule-history/v1&quot;, families, continuations); }</span>
     /** TRAIN context inspection and two retained table-entry updates per observation. */
-<span class="fc" id="L42">    public long measuredWork() { return measuredWork; }</span>
+<span class="fc" id="L45">    public long measuredWork() { return measuredWork; }</span>
     public void observe(MoveSearch.Result result, MoveContext.Phase phase, Map&lt;String, Long&gt; pairedWorkSavings) {
-<span class="fc" id="L44">        observe(result, phase, pairedWorkSavings, false);</span>
-<span class="fc" id="L45">    }</span>
+<span class="fc" id="L47">        observe(result, phase, pairedWorkSavings, false);</span>
+<span class="fc" id="L48">    }</span>
     /** Typed intermediate states are inspected directly and retained in a separate context namespace. */
     public void observe(TypedMoveSearch.Result result, MoveContext.Phase phase, Map&lt;String, Long&gt; pairedWorkSavings) {
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (result == null) throw new IllegalArgumentException(&quot;feedback result is required&quot;);</span>
-<span class="fc" id="L49">        observe(result.encodedResult(), phase, pairedWorkSavings, true);</span>
-<span class="fc" id="L50">    }</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (result == null) throw new IllegalArgumentException(&quot;feedback result is required&quot;);</span>
+<span class="fc" id="L52">        observe(result.encodedResult(), phase, pairedWorkSavings, true);</span>
+<span class="fc" id="L53">    }</span>
     private void observe(MoveSearch.Result result, MoveContext.Phase phase, Map&lt;String, Long&gt; pairedWorkSavings, boolean typed) {
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (phase != MoveContext.Phase.TRAIN) throw new IllegalArgumentException(&quot;history updates require TRAIN&quot;);</span>
-<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (result == null || pairedWorkSavings == null) throw new IllegalArgumentException(&quot;feedback result and savings are required&quot;);</span>
-<span class="pc bpc" id="L54" title="3 of 6 branches missed.">        if (pairedWorkSavings.values().stream().anyMatch(value -&gt; value == null || value &lt; 0)) throw new IllegalArgumentException(&quot;invalid measured work saving&quot;);</span>
-<span class="fc" id="L55">        var successful = result.witness(); var credited = new java.util.HashSet&lt;String&gt;();</span>
-<span class="fc" id="L56">        var contexts = new java.util.HashMap&lt;MoveState, StructuralMoveContext&gt;();</span>
-<span class="fc" id="L57">        var deadEnds = new java.util.HashSet&lt;&gt;(result.deadEndStates());</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (var event : result.events()) {</span>
-<span class="fc" id="L59">            var structure = contexts.computeIfAbsent(event.source(), source -&gt; {</span>
-<span class="fc bfc" id="L60" title="All 2 branches covered.">                var inspected = typed ? StructuralMoveContext.fromTyped(source) : StructuralMoveContext.of(source);</span>
-<span class="fc" id="L61">                measuredWork = Math.addExact(measuredWork, 2L * inspected.visitedNodes());</span>
-<span class="fc" id="L62">                return inspected;</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (phase != MoveContext.Phase.TRAIN) throw new IllegalArgumentException(&quot;history updates require TRAIN&quot;);</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        if (result == null || pairedWorkSavings == null) throw new IllegalArgumentException(&quot;feedback result and savings are required&quot;);</span>
+<span class="pc bpc" id="L57" title="3 of 6 branches missed.">        if (pairedWorkSavings.values().stream().anyMatch(value -&gt; value == null || value &lt; 0)) throw new IllegalArgumentException(&quot;invalid measured work saving&quot;);</span>
+<span class="fc" id="L58">        var successful = result.witness(); var credited = new java.util.HashSet&lt;String&gt;();</span>
+<span class="fc" id="L59">        var contexts = new java.util.HashMap&lt;MoveState, StructuralMoveContext&gt;();</span>
+<span class="fc" id="L60">        var deadEnds = new java.util.HashSet&lt;&gt;(result.deadEndStates());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (var event : result.events()) {</span>
+<span class="fc" id="L62">            var structure = contexts.computeIfAbsent(event.source(), source -&gt; {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                var inspected = typed ? StructuralMoveContext.fromTyped(source) : StructuralMoveContext.of(source);</span>
+<span class="fc" id="L64">                measuredWork = Math.addExact(measuredWork, 2L * inspected.visitedNodes());</span>
+<span class="fc" id="L65">                return inspected;</span>
             });
-<span class="fc bfc" id="L64" title="All 2 branches covered.">            String context = typed ? structure.typedKey() : structure.key();</span>
-<span class="fc bfc" id="L65" title="All 4 branches covered.">            var witness = successful.stream().filter(step -&gt; step.source().equals(event.source()) &amp;&amp; step.move().equals(event.move())).findFirst();</span>
-<span class="fc" id="L66">            boolean won = witness.isPresent();</span>
-<span class="fc bfc" id="L67" title="All 4 branches covered.">            boolean dead = event.decision() == MoveSearch.Decision.ENQUEUED &amp;&amp; deadEnds.contains(event.target());</span>
-<span class="pc bpc" id="L68" title="1 of 4 branches missed.">            boolean failed = dead || event.decision() == MoveSearch.Decision.PROOF_REJECTED</span>
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                || event.decision() == MoveSearch.Decision.ASSUMPTION_REJECTED;</span>
-<span class="fc bfc" id="L70" title="All 2 branches covered.">            boolean duplicate = event.decision() == MoveSearch.Decision.DUPLICATE;</span>
-<span class="fc" id="L71">            long unlocks = witness.map(step -&gt; step.target().capabilities().stream()</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                .filter(capability -&gt; !step.source().capabilities().contains(capability)).count()).orElse(0L);</span>
-<span class="pc bpc" id="L73" title="1 of 4 branches missed.">            long saved = won &amp;&amp; credited.add(event.move().ruleId()) ? pairedWorkSavings.getOrDefault(event.move().ruleId(), 0L) : 0;</span>
-<span class="fc bfc" id="L74" title="All 6 branches covered.">            var delta = new Stats(1, won ? 1 : 0, failed ? 1 : 0, duplicate ? 1 : 0, unlocks, saved,</span>
-<span class="fc" id="L75">                event.verificationResult().map(MoveVerifier.Verification::work).orElse(0L));</span>
-<span class="fc" id="L76">            measuredWork = Math.addExact(measuredWork, 2);</span>
-<span class="fc" id="L77">            families.merge(key(context, &quot;&quot;, event.move().ruleFamily()), delta, RuleHistoryMemory::plus);</span>
-<span class="fc" id="L78">            continuations.merge(key(context, event.source().previousRule(), event.move().ruleId()), delta, RuleHistoryMemory::plus);</span>
-<span class="fc" id="L79">        }</span>
-<span class="fc" id="L80">    }</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            String context = typed ? structure.typedKey() : structure.key();</span>
+<span class="fc bfc" id="L68" title="All 4 branches covered.">            var witness = successful.stream().filter(step -&gt; step.source().equals(event.source()) &amp;&amp; step.move().equals(event.move())).findFirst();</span>
+<span class="fc" id="L69">            boolean won = witness.isPresent();</span>
+<span class="fc bfc" id="L70" title="All 4 branches covered.">            boolean dead = event.decision() == MoveSearch.Decision.ENQUEUED &amp;&amp; deadEnds.contains(event.target());</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">            boolean failed = dead || event.decision() == MoveSearch.Decision.PROOF_REJECTED</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                || event.decision() == MoveSearch.Decision.ASSUMPTION_REJECTED;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            boolean duplicate = event.decision() == MoveSearch.Decision.DUPLICATE;</span>
+<span class="fc" id="L74">            long unlocks = witness.map(step -&gt; step.target().capabilities().stream()</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                .filter(capability -&gt; !step.source().capabilities().contains(capability)).count()).orElse(0L);</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">            long saved = won &amp;&amp; credited.add(event.move().ruleId()) ? pairedWorkSavings.getOrDefault(event.move().ruleId(), 0L) : 0;</span>
+<span class="fc bfc" id="L77" title="All 6 branches covered.">            var delta = new Stats(1, won ? 1 : 0, failed ? 1 : 0, duplicate ? 1 : 0, unlocks, saved,</span>
+<span class="fc" id="L78">                event.verificationResult().map(MoveVerifier.Verification::work).orElse(0L));</span>
+<span class="fc" id="L79">            measuredWork = Math.addExact(measuredWork, 2);</span>
+<span class="fc" id="L80">            families.merge(key(context, &quot;&quot;, event.move().ruleFamily()), delta, RuleHistoryMemory::plus);</span>
+<span class="fc" id="L81">            continuations.merge(key(context, event.source().previousRule(), event.move().ruleId()), delta, RuleHistoryMemory::plus);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
     private static Stats plus(Stats a, Stats b) {
-<span class="fc" id="L82">        return new Stats(Math.addExact(a.applications(), b.applications()), Math.addExact(a.success(), b.success()),</span>
-<span class="fc" id="L83">            Math.addExact(a.failure(), b.failure()), Math.addExact(a.duplicates(), b.duplicates()),</span>
-<span class="fc" id="L84">            Math.addExact(a.capabilityUnlocks(), b.capabilityUnlocks()), Math.addExact(a.measuredWorkSaved(), b.measuredWorkSaved()),</span>
-<span class="fc" id="L85">            Math.addExact(a.verificationWork(), b.verificationWork()));</span>
+<span class="fc" id="L85">        return new Stats(Math.addExact(a.applications(), b.applications()), Math.addExact(a.success(), b.success()),</span>
+<span class="fc" id="L86">            Math.addExact(a.failure(), b.failure()), Math.addExact(a.duplicates(), b.duplicates()),</span>
+<span class="fc" id="L87">            Math.addExact(a.capabilityUnlocks(), b.capabilityUnlocks()), Math.addExact(a.measuredWorkSaved(), b.measuredWorkSaved()),</span>
+<span class="fc" id="L88">            Math.addExact(a.verificationWork(), b.verificationWork()));</span>
     }
     private static String key(String context, String previous, String rule) {
-<span class="fc" id="L88">        return new de.regelsuche.json.JsonWriter().beginArray().value(context).value(previous).value(rule).endArray().toString();</span>
+<span class="fc" id="L91">        var writer=new de.regelsuche.json.JsonWriter();</span>
+<span class="fc" id="L92">        try(var retained=de.regelsuche.retention.RetainedOperation.retain(context,previous,rule,writer)) {</span>
+<span class="fc" id="L93">            String result=writer.beginArray().value(context).value(previous).value(rule).endArray().toString();</span>
+<span class="fc" id="L94">            de.regelsuche.retention.RetainedOperation.work(result.length());</span>
+<span class="fc" id="L95">            return de.regelsuche.retention.RetainedOperation.produced(result);</span>
+        }
     }
-<span class="fc" id="L90">    private static ObjectMapper mapper() { return new ObjectMapper().enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
-<span class="fc" id="L91">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS); }</span>
+<span class="fc" id="L98">    private static ObjectMapper mapper() { return new ObjectMapper().enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L99">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

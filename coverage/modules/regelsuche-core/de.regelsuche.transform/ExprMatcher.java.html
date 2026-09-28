@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExprMatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">ExprMatcher.java</span></div><h1>ExprMatcher.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -21,65 +22,65 @@ public sealed interface ExprMatcher
         ExprMatcher.Equivalent, ExprMatcher.Where {
 
     default MatchOutcome match(Expr expression) {
-<span class="fc" id="L24">        return match(expression, MatchOptions.defaults());</span>
+<span class="fc" id="L25">        return match(expression, MatchOptions.defaults());</span>
     }
 
     default MatchOutcome match(Expr expression, MatchOptions options) {
-<span class="fc" id="L28">        return ExprMatcherEngine.match(</span>
+<span class="fc" id="L29">        return ExprMatcherEngine.match(</span>
             this,
-<span class="fc" id="L30">            Objects.requireNonNull(expression, &quot;expression&quot;),</span>
-<span class="fc" id="L31">            Objects.requireNonNull(options, &quot;options&quot;)</span>
+<span class="fc" id="L31">            Objects.requireNonNull(expression, &quot;expression&quot;),</span>
+<span class="fc" id="L32">            Objects.requireNonNull(options, &quot;options&quot;)</span>
         );
     }
 
     String canonicalDescriptor();
 
     static ExprMatcher any() {
-<span class="fc" id="L38">        return new Any();</span>
+<span class="fc" id="L39">        return new Any();</span>
     }
 
     static ExprMatcher literalNumber(long value) {
-<span class="nc" id="L42">        return literalNumber(ExactRational.integer(value));</span>
+<span class="nc" id="L43">        return literalNumber(ExactRational.integer(value));</span>
     }
 
     static ExprMatcher literalNumber(String value) {
-<span class="fc" id="L46">        return literalNumber(de.regelsuche.ast.NumberExpr.exact(value).value());</span>
+<span class="fc" id="L47">        return literalNumber(de.regelsuche.ast.NumberExpr.exact(value).value());</span>
     }
 
     static ExprMatcher literalNumber(ExactRational value) {
-<span class="fc" id="L50">        return new LiteralNumber(value);</span>
+<span class="fc" id="L51">        return new LiteralNumber(value);</span>
     }
 
     static ExprMatcher literalVariable(String name) {
-<span class="fc" id="L54">        return new LiteralVariable(name);</span>
+<span class="fc" id="L55">        return new LiteralVariable(name);</span>
     }
 
     static ExprMatcher numberLiteral() {
-<span class="fc" id="L58">        return new NumberProperty(NumberPropertyKind.NUMBER_LITERAL);</span>
+<span class="fc" id="L59">        return new NumberProperty(NumberPropertyKind.NUMBER_LITERAL);</span>
     }
 
     static ExprMatcher integerLiteral() {
-<span class="nc" id="L62">        return new NumberProperty(NumberPropertyKind.INTEGER_LITERAL);</span>
+<span class="nc" id="L63">        return new NumberProperty(NumberPropertyKind.INTEGER_LITERAL);</span>
     }
 
     static ExprMatcher nonZeroNumberLiteral() {
-<span class="fc" id="L66">        return new NumberProperty(NumberPropertyKind.NON_ZERO_NUMBER_LITERAL);</span>
+<span class="fc" id="L67">        return new NumberProperty(NumberPropertyKind.NON_ZERO_NUMBER_LITERAL);</span>
     }
 
     static ExprMatcher pattern(PatternExpr pattern) {
-<span class="fc" id="L70">        return pattern(pattern, RecognitionProfile.exact());</span>
+<span class="fc" id="L71">        return pattern(pattern, RecognitionProfile.exact());</span>
     }
 
     static ExprMatcher pattern(PatternExpr pattern, RecognitionProfile profile) {
-<span class="fc" id="L74">        Pattern structural = new Pattern(pattern, profile);</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        return profile.recognitionRuleIds().isEmpty()</span>
-<span class="pc bpc" id="L76" title="1 of 2 branches missed.">                || profile.maxEquivalenceDepth() == 0</span>
-<span class="fc" id="L77">            ? structural</span>
-<span class="fc" id="L78">            : new Equivalent(profile, structural);</span>
+<span class="fc" id="L75">        Pattern structural = new Pattern(pattern, profile);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        return profile.recognitionRuleIds().isEmpty()</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                || profile.maxEquivalenceDepth() == 0</span>
+<span class="fc" id="L78">            ? structural</span>
+<span class="fc" id="L79">            : new Equivalent(profile, structural);</span>
     }
 
     static ExprMatcher bind(String name, ExprMatcher matcher) {
-<span class="fc" id="L82">        return new Bind(name, matcher, RecognitionProfile.exact());</span>
+<span class="fc" id="L83">        return new Bind(name, matcher, RecognitionProfile.exact());</span>
     }
 
     static ExprMatcher bindEquivalent(
@@ -87,19 +88,19 @@ public sealed interface ExprMatcher
         ExprMatcher matcher,
         RecognitionProfile equalityProfile
     ) {
-<span class="fc" id="L90">        return new Bind(name, matcher, equalityProfile);</span>
+<span class="fc" id="L91">        return new Bind(name, matcher, equalityProfile);</span>
     }
 
     static ExprMatcher allOf(ExprMatcher... matchers) {
-<span class="fc" id="L94">        return new AllOf(List.of(matchers));</span>
+<span class="fc" id="L95">        return new AllOf(List.of(matchers));</span>
     }
 
     static ExprMatcher anyOf(ExprMatcher... matchers) {
-<span class="fc" id="L98">        return new AnyOf(List.of(matchers));</span>
+<span class="fc" id="L99">        return new AnyOf(List.of(matchers));</span>
     }
 
     static ExprMatcher not(ExprMatcher matcher) {
-<span class="fc" id="L102">        return new Not(matcher);</span>
+<span class="fc" id="L103">        return new Not(matcher);</span>
     }
 
     static ExprMatcher op(
@@ -107,37 +108,37 @@ public sealed interface ExprMatcher
         ExprMatcher left,
         ExprMatcher right
     ) {
-<span class="fc" id="L110">        return new Operation(operator, left, right);</span>
+<span class="fc" id="L111">        return new Operation(operator, left, right);</span>
     }
 
     static ExprMatcher fn(String name, ExprMatcher... arguments) {
-<span class="nc" id="L114">        return new Function(name, List.of(arguments));</span>
+<span class="nc" id="L115">        return new Function(name, List.of(arguments));</span>
     }
 
     static ExprMatcher contains(ExprMatcher matcher) {
-<span class="fc" id="L118">        return new Contains(matcher);</span>
+<span class="fc" id="L119">        return new Contains(matcher);</span>
     }
 
     static ExprMatcher equivalent(
         RecognitionProfile profile,
         ExprMatcher matcher
     ) {
-<span class="nc" id="L125">        return new Equivalent(profile, matcher);</span>
+<span class="nc" id="L126">        return new Equivalent(profile, matcher);</span>
     }
 
     static ExprMatcher where(ExprMatcher matcher, Constraint constraint) {
-<span class="fc" id="L129">        return new Where(matcher, constraint);</span>
+<span class="fc" id="L130">        return new Where(matcher, constraint);</span>
     }
 
     static Constraint bindingMatches(
         String bindingName,
         ExprMatcher matcher
     ) {
-<span class="nc" id="L136">        return new BindingMatches(bindingName, matcher);</span>
+<span class="nc" id="L137">        return new BindingMatches(bindingName, matcher);</span>
     }
 
     static Constraint sameAs(String leftBinding, String rightBinding) {
-<span class="nc" id="L140">        return sameAs(leftBinding, rightBinding, RecognitionProfile.exact());</span>
+<span class="nc" id="L141">        return sameAs(leftBinding, rightBinding, RecognitionProfile.exact());</span>
     }
 
     static Constraint sameAs(
@@ -145,7 +146,7 @@ public sealed interface ExprMatcher
         String rightBinding,
         RecognitionProfile profile
     ) {
-<span class="fc" id="L148">        return new SameAs(leftBinding, rightBinding, profile);</span>
+<span class="fc" id="L149">        return new SameAs(leftBinding, rightBinding, profile);</span>
     }
 
     record MatchOptions(
@@ -154,19 +155,19 @@ public sealed interface ExprMatcher
         int maxSteps,
         int maxPatternBranches
     ) {
-<span class="fc" id="L157">        public MatchOptions {</span>
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            representativeProvider = representativeProvider == null</span>
-<span class="nc" id="L159">                ? EquivalentExpressionProvider.identity()</span>
-<span class="fc" id="L160">                : representativeProvider;</span>
-<span class="pc bpc" id="L161" title="3 of 6 branches missed.">            if (maxResults &lt; 1 || maxSteps &lt; 1 || maxPatternBranches &lt; 1) {</span>
-<span class="nc" id="L162">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L158">        public MatchOptions {</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            representativeProvider = representativeProvider == null</span>
+<span class="nc" id="L160">                ? EquivalentExpressionProvider.identity()</span>
+<span class="fc" id="L161">                : representativeProvider;</span>
+<span class="pc bpc" id="L162" title="3 of 6 branches missed.">            if (maxResults &lt; 1 || maxSteps &lt; 1 || maxPatternBranches &lt; 1) {</span>
+<span class="nc" id="L163">                throw new IllegalArgumentException(</span>
                     &quot;matcher limits must be positive&quot;);
             }
-<span class="fc" id="L165">        }</span>
+<span class="fc" id="L166">        }</span>
 
         public static MatchOptions defaults() {
-<span class="fc" id="L168">            return new MatchOptions(</span>
-<span class="fc" id="L169">                EquivalentExpressionProvider.identity(),</span>
+<span class="fc" id="L169">            return new MatchOptions(</span>
+<span class="fc" id="L170">                EquivalentExpressionProvider.identity(),</span>
                 64,
                 20_000,
                 10_000
@@ -176,7 +177,7 @@ public sealed interface ExprMatcher
         public MatchOptions withRepresentativeProvider(
             EquivalentExpressionProvider provider
         ) {
-<span class="fc" id="L179">            return new MatchOptions(</span>
+<span class="fc" id="L180">            return new MatchOptions(</span>
                 provider,
                 maxResults,
                 maxSteps,
@@ -185,22 +186,22 @@ public sealed interface ExprMatcher
         }
     }
 
-<span class="fc" id="L188">    enum MatchStatus {</span>
-<span class="fc" id="L189">        MATCHED,</span>
-<span class="fc" id="L190">        NOT_MATCHED,</span>
-<span class="fc" id="L191">        INCONCLUSIVE</span>
+<span class="fc" id="L189">    enum MatchStatus {</span>
+<span class="fc" id="L190">        MATCHED,</span>
+<span class="fc" id="L191">        NOT_MATCHED,</span>
+<span class="fc" id="L192">        INCONCLUSIVE</span>
     }
 
-<span class="fc" id="L194">    enum RecognitionStrength {</span>
-<span class="fc" id="L195">        EXACT,</span>
-<span class="fc" id="L196">        EQUIVALENCE_AWARE,</span>
-<span class="fc" id="L197">        BOUNDED_REPRESENTATIVE;</span>
+<span class="fc" id="L195">    enum RecognitionStrength {</span>
+<span class="fc" id="L196">        EXACT,</span>
+<span class="fc" id="L197">        EQUIVALENCE_AWARE,</span>
+<span class="fc" id="L198">        BOUNDED_REPRESENTATIVE;</span>
 
         static RecognitionStrength strongest(
             RecognitionStrength left,
             RecognitionStrength right
         ) {
-<span class="fc bfc" id="L203" title="All 2 branches covered.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            return left.ordinal() &gt;= right.ordinal() ? left : right;</span>
         }
     }
 
@@ -211,10 +212,9 @@ public sealed interface ExprMatcher
         RecognitionStrength recognitionStrength,
         List&lt;String&gt; trace
     ) {
-<span class="fc" id="L214">        public MatchResult {</span>
-<span class="fc" id="L215">            Objects.requireNonNull(bindings, &quot;bindings&quot;);</span>
-<span class="fc" id="L216">            bindings = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(</span>
-                new TreeMap&lt;&gt;(bindings)));
+<span class="fc" id="L215">        public MatchResult {</span>
+<span class="fc" id="L216">            Objects.requireNonNull(bindings, &quot;bindings&quot;);</span>
+<span class="fc" id="L217">            bindings = de.regelsuche.retention.RetainedSortedMap.copyOf(bindings);</span>
 <span class="fc" id="L218">            representative = Objects.requireNonNull(</span>
                 representative, &quot;representative&quot;);
 <span class="fc" id="L220">            recognitionStrength = Objects.requireNonNull(</span>
@@ -318,20 +318,21 @@ public sealed interface ExprMatcher
     record Pattern(
         PatternExpr pattern,
         RecognitionProfile recognitionProfile
-    ) implements ExprMatcher {
-<span class="fc" id="L322">        public Pattern {</span>
-<span class="fc" id="L323">            pattern = Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
-<span class="nc" id="L325">                ? RecognitionProfile.exact()</span>
-<span class="fc" id="L326">                : recognitionProfile;</span>
-<span class="fc" id="L327">        }</span>
+    ) implements ExprMatcher,RetainedGraph.View {
+<span class="nc" id="L322">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(pattern);v.reference(recognitionProfile);}</span>
+<span class="fc" id="L323">        public Pattern {</span>
+<span class="fc" id="L324">            pattern = Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
+<span class="nc" id="L326">                ? RecognitionProfile.exact()</span>
+<span class="fc" id="L327">                : recognitionProfile;</span>
+<span class="fc" id="L328">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L331">            return descriptor(</span>
+<span class="fc" id="L332">            return descriptor(</span>
                 &quot;pattern&quot;,
-<span class="fc" id="L333">                pattern.toString(),</span>
-<span class="fc" id="L334">                profileDescriptor(recognitionProfile)</span>
+<span class="fc" id="L334">                pattern.toString(),</span>
+<span class="fc" id="L335">                profileDescriptor(recognitionProfile)</span>
             );
         }
     }
@@ -341,55 +342,55 @@ public sealed interface ExprMatcher
         ExprMatcher matcher,
         RecognitionProfile equalityProfile
     ) implements ExprMatcher {
-<span class="fc" id="L344">        public Bind {</span>
-<span class="fc" id="L345">            name = requireText(name, &quot;name&quot;);</span>
-<span class="fc" id="L346">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
-<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            equalityProfile = equalityProfile == null</span>
-<span class="nc" id="L348">                ? RecognitionProfile.exact()</span>
-<span class="fc" id="L349">                : equalityProfile;</span>
-<span class="fc" id="L350">        }</span>
+<span class="fc" id="L345">        public Bind {</span>
+<span class="fc" id="L346">            name = requireText(name, &quot;name&quot;);</span>
+<span class="fc" id="L347">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">            equalityProfile = equalityProfile == null</span>
+<span class="nc" id="L349">                ? RecognitionProfile.exact()</span>
+<span class="fc" id="L350">                : equalityProfile;</span>
+<span class="fc" id="L351">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L354">            return descriptor(</span>
+<span class="fc" id="L355">            return descriptor(</span>
                 &quot;bind&quot;,
                 name,
-<span class="fc" id="L357">                matcher.canonicalDescriptor(),</span>
-<span class="fc" id="L358">                profileDescriptor(equalityProfile)</span>
+<span class="fc" id="L358">                matcher.canonicalDescriptor(),</span>
+<span class="fc" id="L359">                profileDescriptor(equalityProfile)</span>
             );
         }
     }
 
     record AllOf(List&lt;ExprMatcher&gt; matchers) implements ExprMatcher {
-<span class="fc" id="L364">        public AllOf {</span>
-<span class="fc" id="L365">            matchers = matcherList(matchers, &quot;matchers&quot;);</span>
-<span class="fc" id="L366">        }</span>
+<span class="fc" id="L365">        public AllOf {</span>
+<span class="fc" id="L366">            matchers = matcherList(matchers, &quot;matchers&quot;);</span>
+<span class="fc" id="L367">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L370">            return descriptor(&quot;all-of&quot;, matcherDescriptors(matchers));</span>
+<span class="fc" id="L371">            return descriptor(&quot;all-of&quot;, matcherDescriptors(matchers));</span>
         }
     }
 
     record AnyOf(List&lt;ExprMatcher&gt; matchers) implements ExprMatcher {
-<span class="fc" id="L375">        public AnyOf {</span>
-<span class="fc" id="L376">            matchers = matcherList(matchers, &quot;matchers&quot;);</span>
-<span class="fc" id="L377">        }</span>
+<span class="fc" id="L376">        public AnyOf {</span>
+<span class="fc" id="L377">            matchers = matcherList(matchers, &quot;matchers&quot;);</span>
+<span class="fc" id="L378">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L381">            return descriptor(&quot;any-of&quot;, matcherDescriptors(matchers));</span>
+<span class="fc" id="L382">            return descriptor(&quot;any-of&quot;, matcherDescriptors(matchers));</span>
         }
     }
 
     record Not(ExprMatcher matcher) implements ExprMatcher {
-<span class="fc" id="L386">        public Not {</span>
-<span class="fc" id="L387">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
-<span class="fc" id="L388">        }</span>
+<span class="fc" id="L387">        public Not {</span>
+<span class="fc" id="L388">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L389">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L392">            return descriptor(&quot;not&quot;, matcher.canonicalDescriptor());</span>
+<span class="fc" id="L393">            return descriptor(&quot;not&quot;, matcher.canonicalDescriptor());</span>
         }
     }
 
@@ -398,19 +399,19 @@ public sealed interface ExprMatcher
         ExprMatcher left,
         ExprMatcher right
     ) implements ExprMatcher {
-<span class="fc" id="L401">        public Operation {</span>
-<span class="fc" id="L402">            operator = Objects.requireNonNull(operator, &quot;operator&quot;);</span>
-<span class="fc" id="L403">            left = Objects.requireNonNull(left, &quot;left&quot;);</span>
-<span class="fc" id="L404">            right = Objects.requireNonNull(right, &quot;right&quot;);</span>
-<span class="fc" id="L405">        }</span>
+<span class="fc" id="L402">        public Operation {</span>
+<span class="fc" id="L403">            operator = Objects.requireNonNull(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L404">            left = Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L405">            right = Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L406">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L409">            return descriptor(</span>
+<span class="fc" id="L410">            return descriptor(</span>
                 &quot;operation&quot;,
-<span class="fc" id="L411">                operator.name(),</span>
-<span class="fc" id="L412">                left.canonicalDescriptor(),</span>
-<span class="fc" id="L413">                right.canonicalDescriptor()</span>
+<span class="fc" id="L412">                operator.name(),</span>
+<span class="fc" id="L413">                left.canonicalDescriptor(),</span>
+<span class="fc" id="L414">                right.canonicalDescriptor()</span>
             );
         }
     }
@@ -419,29 +420,29 @@ public sealed interface ExprMatcher
         String name,
         List&lt;ExprMatcher&gt; arguments
     ) implements ExprMatcher {
-<span class="nc" id="L422">        public Function {</span>
-<span class="nc" id="L423">            name = requireText(name, &quot;name&quot;);</span>
-<span class="nc" id="L424">            arguments = matcherList(arguments, &quot;arguments&quot;);</span>
-<span class="nc" id="L425">        }</span>
+<span class="nc" id="L423">        public Function {</span>
+<span class="nc" id="L424">            name = requireText(name, &quot;name&quot;);</span>
+<span class="nc" id="L425">            arguments = matcherList(arguments, &quot;arguments&quot;);</span>
+<span class="nc" id="L426">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="nc" id="L429">            return descriptor(</span>
+<span class="nc" id="L430">            return descriptor(</span>
                 &quot;function&quot;,
                 name,
-<span class="nc" id="L432">                matcherDescriptors(arguments)</span>
+<span class="nc" id="L433">                matcherDescriptors(arguments)</span>
             );
         }
     }
 
     record Contains(ExprMatcher matcher) implements ExprMatcher {
-<span class="fc" id="L438">        public Contains {</span>
-<span class="fc" id="L439">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
-<span class="fc" id="L440">        }</span>
+<span class="fc" id="L439">        public Contains {</span>
+<span class="fc" id="L440">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L441">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L444">            return descriptor(&quot;contains&quot;, matcher.canonicalDescriptor());</span>
+<span class="fc" id="L445">            return descriptor(&quot;contains&quot;, matcher.canonicalDescriptor());</span>
         }
     }
 
@@ -449,19 +450,19 @@ public sealed interface ExprMatcher
         RecognitionProfile recognitionProfile,
         ExprMatcher matcher
     ) implements ExprMatcher {
-<span class="fc" id="L452">        public Equivalent {</span>
-<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
-<span class="nc" id="L454">                ? RecognitionProfile.exact()</span>
-<span class="fc" id="L455">                : recognitionProfile;</span>
-<span class="fc" id="L456">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
-<span class="fc" id="L457">        }</span>
+<span class="fc" id="L453">        public Equivalent {</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
+<span class="nc" id="L455">                ? RecognitionProfile.exact()</span>
+<span class="fc" id="L456">                : recognitionProfile;</span>
+<span class="fc" id="L457">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L458">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L461">            return descriptor(</span>
+<span class="fc" id="L462">            return descriptor(</span>
                 &quot;equivalent&quot;,
-<span class="fc" id="L463">                profileDescriptor(recognitionProfile),</span>
-<span class="fc" id="L464">                matcher.canonicalDescriptor()</span>
+<span class="fc" id="L464">                profileDescriptor(recognitionProfile),</span>
+<span class="fc" id="L465">                matcher.canonicalDescriptor()</span>
             );
         }
     }
@@ -470,17 +471,17 @@ public sealed interface ExprMatcher
         ExprMatcher matcher,
         Constraint constraint
     ) implements ExprMatcher {
-<span class="fc" id="L473">        public Where {</span>
-<span class="fc" id="L474">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
-<span class="fc" id="L475">            constraint = Objects.requireNonNull(constraint, &quot;constraint&quot;);</span>
-<span class="fc" id="L476">        }</span>
+<span class="fc" id="L474">        public Where {</span>
+<span class="fc" id="L475">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L476">            constraint = Objects.requireNonNull(constraint, &quot;constraint&quot;);</span>
+<span class="fc" id="L477">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L480">            return descriptor(</span>
+<span class="fc" id="L481">            return descriptor(</span>
                 &quot;where&quot;,
-<span class="fc" id="L482">                matcher.canonicalDescriptor(),</span>
-<span class="fc" id="L483">                constraint.canonicalDescriptor()</span>
+<span class="fc" id="L483">                matcher.canonicalDescriptor(),</span>
+<span class="fc" id="L484">                constraint.canonicalDescriptor()</span>
             );
         }
     }
@@ -493,17 +494,17 @@ public sealed interface ExprMatcher
         String bindingName,
         ExprMatcher matcher
     ) implements Constraint {
-<span class="nc" id="L496">        public BindingMatches {</span>
-<span class="nc" id="L497">            bindingName = requireText(bindingName, &quot;bindingName&quot;);</span>
-<span class="nc" id="L498">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
-<span class="nc" id="L499">        }</span>
+<span class="nc" id="L497">        public BindingMatches {</span>
+<span class="nc" id="L498">            bindingName = requireText(bindingName, &quot;bindingName&quot;);</span>
+<span class="nc" id="L499">            matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="nc" id="L500">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="nc" id="L503">            return descriptor(</span>
+<span class="nc" id="L504">            return descriptor(</span>
                 &quot;binding-matches&quot;,
                 bindingName,
-<span class="nc" id="L506">                matcher.canonicalDescriptor()</span>
+<span class="nc" id="L507">                matcher.canonicalDescriptor()</span>
             );
         }
     }
@@ -513,21 +514,21 @@ public sealed interface ExprMatcher
         String rightBinding,
         RecognitionProfile recognitionProfile
     ) implements Constraint {
-<span class="fc" id="L516">        public SameAs {</span>
-<span class="fc" id="L517">            leftBinding = requireText(leftBinding, &quot;leftBinding&quot;);</span>
-<span class="fc" id="L518">            rightBinding = requireText(rightBinding, &quot;rightBinding&quot;);</span>
-<span class="pc bpc" id="L519" title="1 of 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
-<span class="nc" id="L520">                ? RecognitionProfile.exact()</span>
-<span class="fc" id="L521">                : recognitionProfile;</span>
-<span class="fc" id="L522">        }</span>
+<span class="fc" id="L517">        public SameAs {</span>
+<span class="fc" id="L518">            leftBinding = requireText(leftBinding, &quot;leftBinding&quot;);</span>
+<span class="fc" id="L519">            rightBinding = requireText(rightBinding, &quot;rightBinding&quot;);</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">            recognitionProfile = recognitionProfile == null</span>
+<span class="nc" id="L521">                ? RecognitionProfile.exact()</span>
+<span class="fc" id="L522">                : recognitionProfile;</span>
+<span class="fc" id="L523">        }</span>
 
         @Override
         public String canonicalDescriptor() {
-<span class="fc" id="L526">            return descriptor(</span>
+<span class="fc" id="L527">            return descriptor(</span>
                 &quot;same-as&quot;,
                 leftBinding,
                 rightBinding,
-<span class="fc" id="L530">                profileDescriptor(recognitionProfile)</span>
+<span class="fc" id="L531">                profileDescriptor(recognitionProfile)</span>
             );
         }
     }
@@ -536,66 +537,66 @@ public sealed interface ExprMatcher
         List&lt;ExprMatcher&gt; values,
         String field
     ) {
-<span class="fc" id="L539">        Objects.requireNonNull(values, field);</span>
-<span class="pc bpc" id="L540" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
-<span class="nc" id="L541">            throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+<span class="fc" id="L540">        Objects.requireNonNull(values, field);</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L542">            throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
         }
-<span class="fc" id="L543">        return values.stream()</span>
-<span class="fc" id="L544">            .map(value -&gt; Objects.requireNonNull(value, field + &quot; entry&quot;))</span>
-<span class="fc" id="L545">            .toList();</span>
+<span class="fc" id="L544">        return values.stream()</span>
+<span class="fc" id="L545">            .map(value -&gt; Objects.requireNonNull(value, field + &quot; entry&quot;))</span>
+<span class="fc" id="L546">            .toList();</span>
     }
 
     private static String matcherDescriptors(List&lt;ExprMatcher&gt; matchers) {
-<span class="fc" id="L549">        return descriptor(</span>
+<span class="fc" id="L550">        return descriptor(</span>
             &quot;matcher-list&quot;,
-<span class="fc" id="L551">            matchers.stream()</span>
-<span class="fc" id="L552">                .map(ExprMatcher::canonicalDescriptor)</span>
-<span class="fc" id="L553">                .toArray(String[]::new)</span>
+<span class="fc" id="L552">            matchers.stream()</span>
+<span class="fc" id="L553">                .map(ExprMatcher::canonicalDescriptor)</span>
+<span class="fc" id="L554">                .toArray(String[]::new)</span>
         );
     }
 
     private static String profileDescriptor(RecognitionProfile profile) {
-<span class="fc" id="L558">        return descriptor(</span>
+<span class="fc" id="L559">        return descriptor(</span>
             &quot;recognition-profile&quot;,
-<span class="fc" id="L560">            descriptor(</span>
+<span class="fc" id="L561">            descriptor(</span>
                 &quot;associative&quot;,
-<span class="fc" id="L562">                profile.associativeOperators().stream()</span>
-<span class="fc" id="L563">                    .map(Enum::name).sorted().toArray(String[]::new)</span>
+<span class="fc" id="L563">                profile.associativeOperators().stream()</span>
+<span class="fc" id="L564">                    .map(Enum::name).sorted().toArray(String[]::new)</span>
             ),
-<span class="fc" id="L565">            descriptor(</span>
+<span class="fc" id="L566">            descriptor(</span>
                 &quot;commutative&quot;,
-<span class="fc" id="L567">                profile.commutativeOperators().stream()</span>
-<span class="fc" id="L568">                    .map(Enum::name).sorted().toArray(String[]::new)</span>
+<span class="fc" id="L568">                profile.commutativeOperators().stream()</span>
+<span class="fc" id="L569">                    .map(Enum::name).sorted().toArray(String[]::new)</span>
             ),
-<span class="fc" id="L570">            Boolean.toString(profile.inferAlgebraicBindings()),</span>
-<span class="fc" id="L571">            descriptor(</span>
+<span class="fc" id="L571">            Boolean.toString(profile.inferAlgebraicBindings()),</span>
+<span class="fc" id="L572">            descriptor(</span>
                 &quot;recognition-rules&quot;,
-<span class="fc" id="L573">                profile.recognitionRuleIds().stream()</span>
-<span class="fc" id="L574">                    .sorted().toArray(String[]::new)</span>
+<span class="fc" id="L574">                profile.recognitionRuleIds().stream()</span>
+<span class="fc" id="L575">                    .sorted().toArray(String[]::new)</span>
             ),
-<span class="fc" id="L576">            Integer.toString(profile.maxEquivalenceDepth())</span>
+<span class="fc" id="L577">            Integer.toString(profile.maxEquivalenceDepth())</span>
         );
     }
 
     private static String descriptor(String type, String... fields) {
-<span class="fc" id="L581">        StringBuilder result = new StringBuilder();</span>
-<span class="fc" id="L582">        appendField(result, requireText(type, &quot;type&quot;));</span>
-<span class="fc" id="L583">        Arrays.stream(fields).forEach(field -&gt;</span>
-<span class="fc" id="L584">            appendField(result, Objects.requireNonNull(field, &quot;field&quot;)));</span>
-<span class="fc" id="L585">        return result.toString();</span>
+<span class="fc" id="L582">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L583">        appendField(result, requireText(type, &quot;type&quot;));</span>
+<span class="fc" id="L584">        Arrays.stream(fields).forEach(field -&gt;</span>
+<span class="fc" id="L585">            appendField(result, Objects.requireNonNull(field, &quot;field&quot;)));</span>
+<span class="fc" id="L586">        return result.toString();</span>
     }
 
     private static void appendField(StringBuilder result, String field) {
-<span class="fc" id="L589">        result.append(field.length()).append(':').append(field);</span>
-<span class="fc" id="L590">    }</span>
+<span class="fc" id="L590">        result.append(field.length()).append(':').append(field);</span>
+<span class="fc" id="L591">    }</span>
 
     private static String requireText(String value, String field) {
-<span class="fc" id="L593">        Objects.requireNonNull(value, field);</span>
-<span class="fc" id="L594">        String normalized = value.trim();</span>
-<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
-<span class="nc" id="L596">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+<span class="fc" id="L594">        Objects.requireNonNull(value, field);</span>
+<span class="fc" id="L595">        String normalized = value.trim();</span>
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
+<span class="nc" id="L597">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L598">        return normalized;</span>
+<span class="fc" id="L599">        return normalized;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

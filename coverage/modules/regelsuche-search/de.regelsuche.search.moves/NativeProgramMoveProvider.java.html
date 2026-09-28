@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeProgramMoveProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeProgramMoveProvider.java</span></div><h1>NativeProgramMoveProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.search.program.CompiledAstRewriteProgram;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.*;
+
+/** Object transport of the existing registered interpreter, with independent full regeneration. */
+public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,CompiledAstRewriteProgram program) implements NativeMoveProvider,de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L10">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(descriptor);v.reference(program);}</span>
+<span class="fc" id="L11">    public NativeProgramMoveProvider {</span>
+<span class="fc" id="L12">        Objects.requireNonNull(descriptor);Objects.requireNonNull(program);</span>
+<span class="pc bpc" id="L13" title="3 of 4 branches missed.">        if((descriptor.sourceKind()!=SearchMove.SourceKind.LEARNED &amp;&amp; descriptor.sourceKind()!=SearchMove.SourceKind.EXPERT)</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">                || descriptor.proofStrength()!=SearchMove.ProofStrength.REPLAYABLE)</span>
+<span class="nc" id="L15">            throw new IllegalArgumentException(&quot;compiled regeneration requires a replayable learned/expert program&quot;);</span>
+<span class="fc" id="L16">    }</span>
+<span class="fc" id="L17">    @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.PRIMITIVE;}</span>
+    @Override public Batch candidates(TypedMoveSearch.State source,TypedMoveSearch.Context context) {
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if(!NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return NativeMoveProvider.rejectedAssumptions();</span>
+        try {
+<span class="fc" id="L21">            var batch=program.transformMeasured(source.expression());</span>
+<span class="fc" id="L22">            var moves=new ArrayList&lt;NativeSearchMove&gt;();</span>
+<span class="fc" id="L23">            try(var retained=RetainedOperation.retain(this,source,context,batch,moves)) {</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">                for(var history:batch.candidates()) {</span>
+<span class="fc" id="L25">                    moves.add(proposal(history,batch.workMetrics().totalWorkUnits()));</span>
+<span class="fc" id="L26">                    RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L27">                }</span>
+<span class="fc" id="L28">                return RetainedOperation.produced(new Batch(moves,batch.workMetrics(),false));</span>
+<span class="fc" id="L29">            } catch(SearchExecution.ResourceLimit exhausted){throw exhausted.paidGeneration(batch.workMetrics());}</span>
+<span class="nc" id="L30">        } catch(CompiledAstRewriteProgram.CandidateLimitExceeded limit){return new Batch(List.of(),limit.workMetrics(),false);}</span>
+    }
+    public NativeSearchMove proposal(CompiledAstRewriteProgram.Candidate history,long generationCost){
+<span class="fc" id="L33">        try(var retained=RetainedOperation.retain(this,history)) {</span>
+<span class="fc" id="L34">            de.regelsuche.search.program.AstExpressionValidation.inspectHistory(history);</span>
+<span class="fc" id="L35">            RetainedOperation.work(2);</span>
+<span class="fc" id="L36">            return RetainedOperation.produced(new NativeSearchMove(new NativeMoveProof.Program(history),descriptor,generationCost,Set.of()));</span>
+        }
+    }
+    @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
+<span class="pc bpc" id="L40" title="2 of 4 branches missed.">        if(!NativeMoveProvider.carries(move.assumptions(),source,context) || !NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))</span>
+<span class="nc" id="L41">            return new NativeVerification(false,1,null,null,&quot;TYPED_PROGRAM_ASSUMPTIONS_MISSING&quot;);</span>
+        CompiledAstRewriteProgram.Batch regenerated;
+<span class="fc" id="L43">        try{regenerated=program.transformMeasured(source.expression());}</span>
+<span class="nc" id="L44">        catch(SearchExecution.ResourceLimit exhausted){throw exhausted.verificationPhase();}</span>
+<span class="pc" id="L45">        catch(CompiledAstRewriteProgram.CandidateLimitExceeded limit){return new NativeVerification(false,verificationWork(limit.workMetrics()),null,null,&quot;TYPED_PROGRAM_CANDIDATE_LIMIT&quot;);}</span>
+<span class="fc" id="L46">        long work=Math.addExact(verificationWork(regenerated.workMetrics()),regenerated.candidates().size());</span>
+<span class="fc" id="L47">        long compared=0;</span>
+<span class="fc" id="L48">        try(var retained=RetainedOperation.retain(this,source,move,context,regenerated)) {</span>
+<span class="fc" id="L49">            var expected=move.withCapabilityDelta(Set.of());</span>
+<span class="fc" id="L50">            try(var expectedFrame=RetainedOperation.retain(expected)) {</span>
+<span class="fc" id="L51">                boolean accepted=false;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                for(var history:regenerated.candidates()) {</span>
+<span class="fc" id="L53">                    var candidate=proposal(history,move.generationCost());</span>
+<span class="fc" id="L54">                    try(var comparedFrame=RetainedOperation.retain(candidate)) {</span>
+<span class="fc" id="L55">                        compared++;RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                        if(expected.equals(candidate)){accepted=true;break;}</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                    }</span>
+<span class="fc" id="L58">                }</span>
+<span class="fc bfc" id="L59" title="All 4 branches covered.">                return RetainedOperation.produced(new NativeVerification(accepted,work,accepted?move.proof():null,accepted?move.ruleId():null,</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                    accepted?&quot;TYPED_PROGRAM_REPLAYED&quot;:&quot;TYPED_PROGRAM_REPLAY_REJECTED&quot;));</span>
+            }
+<span class="fc" id="L62">        } catch(SearchExecution.ResourceLimit exhausted) {</span>
+<span class="fc" id="L63">            throw exhausted.paidVerification(Math.addExact(verificationWork(regenerated.workMetrics()),compared));</span>
+        }
+    }
+<span class="fc" id="L66">    private static long verificationWork(TransformationWorkMetrics work){return Math.addExact(work.totalWorkUnits(),work.candidateWork().canonicalWorkUnits());}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExpressionParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.parse</a> &gt; <span class="el_source">ExpressionParser.java</span></div><h1>ExpressionParser.java</h1><pre class="source lang-java linenums">package de.regelsuche.parse;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
@@ -17,35 +19,37 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class ExpressionParser {
+public class ExpressionParser implements RetainedGraph.View {
+<span class="nc" id="L23">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,ExpressionParser.class);v.reference(exactRationalDomain);}</span>
+
     private final ExactRationalDomain exactRationalDomain;
 
     public ExpressionParser() {
-<span class="fc" id="L24">        this(new ExactRationalDomain());</span>
-<span class="fc" id="L25">    }</span>
+<span class="fc" id="L28">        this(new ExactRationalDomain());</span>
+<span class="fc" id="L29">    }</span>
 
-<span class="fc" id="L27">    ExpressionParser(ExactRationalDomain exactRationalDomain) {</span>
-<span class="fc" id="L28">        this.exactRationalDomain = Objects.requireNonNull(</span>
+<span class="fc" id="L31">    ExpressionParser(ExactRationalDomain exactRationalDomain) {</span>
+<span class="fc" id="L32">        this.exactRationalDomain = Objects.requireNonNull(</span>
             exactRationalDomain,
             &quot;exactRationalDomain&quot;);
-<span class="fc" id="L31">    }</span>
+<span class="fc" id="L35">    }</span>
 
     public ParsedInput parse(InputRequest input) {
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (input.type() == InputType.TERM) {</span>
-<span class="fc" id="L35">            return new ParsedInput(List.of(parseTerm(input.rawInput())), List.of());</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (input.type() == InputType.TERM) {</span>
+<span class="fc" id="L39">            return new ParsedInput(List.of(parseTerm(input.rawInput())), List.of());</span>
         }
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (input.type() == InputType.EQUATION) {</span>
-<span class="nc" id="L38">            return new ParsedInput(List.of(), List.of(parseEquation(input.rawInput())));</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (input.type() == InputType.EQUATION) {</span>
+<span class="nc" id="L42">            return new ParsedInput(List.of(), List.of(parseEquation(input.rawInput())));</span>
         }
 
-<span class="fc" id="L41">        List&lt;Equation&gt; equations = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (String candidate : input.rawInput().split(&quot;[;\\n]+&quot;)) {</span>
-<span class="fc" id="L43">            String trimmed = candidate.trim();</span>
-<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (!trimmed.isEmpty()) {</span>
-<span class="fc" id="L45">                equations.add(parseEquation(trimmed));</span>
+<span class="fc" id="L45">        List&lt;Equation&gt; equations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (String candidate : input.rawInput().split(&quot;[;\\n]+&quot;)) {</span>
+<span class="fc" id="L47">            String trimmed = candidate.trim();</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (!trimmed.isEmpty()) {</span>
+<span class="fc" id="L49">                equations.add(parseEquation(trimmed));</span>
             }
         }
-<span class="fc" id="L48">        return new ParsedInput(List.of(), equations);</span>
+<span class="fc" id="L52">        return new ParsedInput(List.of(), equations);</span>
     }
 
     /**
@@ -55,11 +59,11 @@ public class ExpressionParser {
      * {@link #parseExactTerm}.
      */
     public Expr parseTerm(String term) {
-<span class="fc" id="L58">        String source = Objects.requireNonNull(term, &quot;term&quot;);</span>
-<span class="fc" id="L59">        Cursor cursor = Cursor.ordinary(source);</span>
-<span class="fc" id="L60">        Expr expr = parseExpression(cursor);</span>
-<span class="fc" id="L61">        requireEnd(cursor);</span>
-<span class="fc" id="L62">        return expr;</span>
+<span class="fc" id="L62">        String source = Objects.requireNonNull(term, &quot;term&quot;);</span>
+<span class="fc" id="L63">        Cursor cursor = Cursor.ordinary(source);</span>
+<span class="fc" id="L64">        Expr expr = parseExpression(cursor);</span>
+<span class="fc" id="L65">        requireEnd(cursor);</span>
+<span class="fc" id="L66">        return expr;</span>
     }
 
     /**
@@ -69,123 +73,123 @@ public class ExpressionParser {
      * exact {@link NumberExpr} values.
      */
     public ExactParsedTerm parseExactTerm(String term) {
-<span class="fc" id="L72">        String source = Objects.requireNonNull(term, &quot;term&quot;);</span>
-<span class="fc" id="L73">        Cursor cursor = Cursor.exact(source);</span>
-<span class="fc" id="L74">        Expr expr = parseExpression(cursor);</span>
-<span class="fc" id="L75">        requireEnd(cursor);</span>
-<span class="fc" id="L76">        return new ExactParsedTerm(</span>
+<span class="fc" id="L76">        String source = Objects.requireNonNull(term, &quot;term&quot;);</span>
+<span class="fc" id="L77">        Cursor cursor = Cursor.exact(source);</span>
+<span class="fc" id="L78">        Expr expr = parseExpression(cursor);</span>
+<span class="fc" id="L79">        requireEnd(cursor);</span>
+<span class="fc" id="L80">        return new ExactParsedTerm(</span>
             source,
             expr,
-<span class="fc" id="L79">            cursor.exactLiterals(),</span>
-<span class="fc" id="L80">            cursor.exactSourceRanges());</span>
+<span class="fc" id="L83">            cursor.exactLiterals(),</span>
+<span class="fc" id="L84">            cursor.exactSourceRanges());</span>
     }
 
     private static void requireEnd(Cursor cursor) {
-<span class="fc" id="L84">        cursor.skipWhitespace();</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!cursor.isAtEnd()) {</span>
-<span class="fc" id="L86">            throw new IllegalArgumentException(</span>
-<span class="fc" id="L87">                &quot;Unexpected token at position &quot; + cursor.position());</span>
+<span class="fc" id="L88">        cursor.skipWhitespace();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (!cursor.isAtEnd()) {</span>
+<span class="fc" id="L90">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L91">                &quot;Unexpected token at position &quot; + cursor.position());</span>
         }
-<span class="fc" id="L89">    }</span>
+<span class="fc" id="L93">    }</span>
 
     public Equation parseEquation(String equation) {
-<span class="fc" id="L92">        int idx = equation.indexOf('=');</span>
-<span class="pc bpc" id="L93" title="2 of 4 branches missed.">        if (idx &lt; 1 || idx == equation.length() - 1) {</span>
-<span class="nc" id="L94">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L96">        int idx = equation.indexOf('=');</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if (idx &lt; 1 || idx == equation.length() - 1) {</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(</span>
                 &quot;Equation must contain exactly one '=' with both sides present&quot;);
         }
-<span class="fc" id="L97">        String left = equation.substring(0, idx);</span>
-<span class="fc" id="L98">        String right = equation.substring(idx + 1);</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (equation.indexOf('=', idx + 1) &gt;= 0) {</span>
-<span class="nc" id="L100">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L101">        String left = equation.substring(0, idx);</span>
+<span class="fc" id="L102">        String right = equation.substring(idx + 1);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (equation.indexOf('=', idx + 1) &gt;= 0) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(</span>
                 &quot;Equation must contain exactly one '='&quot;);
         }
-<span class="fc" id="L103">        return new Equation(parseTerm(left), parseTerm(right));</span>
+<span class="fc" id="L107">        return new Equation(parseTerm(left), parseTerm(right));</span>
     }
 
     private Expr parseExpression(Cursor cursor) {
-<span class="fc" id="L107">        Expr result = parseTermInternal(cursor);</span>
+<span class="fc" id="L111">        Expr result = parseTermInternal(cursor);</span>
         while (true) {
-<span class="fc" id="L109">            cursor.skipWhitespace();</span>
-<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (cursor.consume('+')) {</span>
-<span class="fc" id="L111">                Expr right = parseTermInternal(cursor);</span>
-<span class="fc" id="L112">                BinaryExpr combined = new BinaryExpr(</span>
+<span class="fc" id="L113">            cursor.skipWhitespace();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (cursor.consume('+')) {</span>
+<span class="fc" id="L115">                Expr right = parseTermInternal(cursor);</span>
+<span class="fc" id="L116">                BinaryExpr combined = new BinaryExpr(</span>
                     result,
                     BinaryOperator.ADD,
                     right);
-<span class="fc" id="L116">                result = cursor.retainCombinedRange(</span>
+<span class="fc" id="L120">                result = cursor.retainCombinedRange(</span>
                     combined,
                     result,
                     right);
-<span class="fc bfc" id="L120" title="All 2 branches covered.">            } else if (cursor.consume('-')) {</span>
-<span class="fc" id="L121">                Expr right = parseTermInternal(cursor);</span>
-<span class="fc" id="L122">                BinaryExpr combined = new BinaryExpr(</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            } else if (cursor.consume('-')) {</span>
+<span class="fc" id="L125">                Expr right = parseTermInternal(cursor);</span>
+<span class="fc" id="L126">                BinaryExpr combined = new BinaryExpr(</span>
                     result,
                     BinaryOperator.SUB,
                     right);
-<span class="fc" id="L126">                result = cursor.retainCombinedRange(</span>
+<span class="fc" id="L130">                result = cursor.retainCombinedRange(</span>
                     combined,
                     result,
                     right);
-<span class="fc" id="L130">            } else {</span>
-<span class="fc" id="L131">                return result;</span>
+<span class="fc" id="L134">            } else {</span>
+<span class="fc" id="L135">                return result;</span>
             }
         }
     }
 
     private Expr parseTermInternal(Cursor cursor) {
-<span class="fc" id="L137">        Expr result = parseUnary(cursor);</span>
+<span class="fc" id="L141">        Expr result = parseUnary(cursor);</span>
         while (true) {
-<span class="fc" id="L139">            cursor.skipWhitespace();</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (cursor.consume('*')) {</span>
-<span class="fc" id="L141">                Expr right = parseUnary(cursor);</span>
-<span class="fc" id="L142">                BinaryExpr combined = new BinaryExpr(</span>
+<span class="fc" id="L143">            cursor.skipWhitespace();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (cursor.consume('*')) {</span>
+<span class="fc" id="L145">                Expr right = parseUnary(cursor);</span>
+<span class="fc" id="L146">                BinaryExpr combined = new BinaryExpr(</span>
                     result,
                     BinaryOperator.MUL,
                     right);
-<span class="fc" id="L146">                result = cursor.retainCombinedRange(</span>
+<span class="fc" id="L150">                result = cursor.retainCombinedRange(</span>
                     combined,
                     result,
                     right);
-<span class="fc bfc" id="L150" title="All 2 branches covered.">            } else if (cursor.consume('/')) {</span>
-<span class="fc" id="L151">                Expr right = parseUnary(cursor);</span>
-<span class="fc" id="L152">                BinaryExpr combined = new BinaryExpr(</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            } else if (cursor.consume('/')) {</span>
+<span class="fc" id="L155">                Expr right = parseUnary(cursor);</span>
+<span class="fc" id="L156">                BinaryExpr combined = new BinaryExpr(</span>
                     result,
                     BinaryOperator.DIV,
                     right);
-<span class="fc" id="L156">                result = cursor.retainCombinedRange(</span>
+<span class="fc" id="L160">                result = cursor.retainCombinedRange(</span>
                     combined,
                     result,
                     right);
-<span class="fc" id="L160">            } else {</span>
-<span class="fc" id="L161">                return result;</span>
+<span class="fc" id="L164">            } else {</span>
+<span class="fc" id="L165">                return result;</span>
             }
         }
     }
 
     private Expr parseUnary(Cursor cursor) {
-<span class="fc" id="L167">        cursor.skipWhitespace();</span>
-<span class="fc" id="L168">        int start = cursor.position();</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (cursor.consume('-')) {</span>
-<span class="fc" id="L170">            Expr operand = parseUnary(cursor);</span>
-<span class="fc" id="L171">            BinaryExpr unary = new BinaryExpr(</span>
+<span class="fc" id="L171">        cursor.skipWhitespace();</span>
+<span class="fc" id="L172">        int start = cursor.position();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (cursor.consume('-')) {</span>
+<span class="fc" id="L174">            Expr operand = parseUnary(cursor);</span>
+<span class="fc" id="L175">            BinaryExpr unary = new BinaryExpr(</span>
                 new NumberExpr(0),
                 BinaryOperator.SUB,
                 operand);
-<span class="fc" id="L175">            return cursor.retainRange(</span>
+<span class="fc" id="L179">            return cursor.retainRange(</span>
                 unary,
                 start,
-<span class="fc" id="L178">                cursor.rangeEnd(operand));</span>
+<span class="fc" id="L182">                cursor.rangeEnd(operand));</span>
         }
-<span class="fc" id="L180">        return parsePower(cursor);</span>
+<span class="fc" id="L184">        return parsePower(cursor);</span>
     }
 
     private Expr parsePower(Cursor cursor) {
-<span class="fc" id="L184">        Expr left = parsePrimary(cursor);</span>
-<span class="fc" id="L185">        cursor.skipWhitespace();</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (cursor.consume('^')) {</span>
-<span class="fc" id="L187">            Expr right = parseUnary(cursor);</span>
-<span class="fc" id="L188">            return cursor.retainCombinedRange(</span>
+<span class="fc" id="L188">        Expr left = parsePrimary(cursor);</span>
+<span class="fc" id="L189">        cursor.skipWhitespace();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (cursor.consume('^')) {</span>
+<span class="fc" id="L191">            Expr right = parseUnary(cursor);</span>
+<span class="fc" id="L192">            return cursor.retainCombinedRange(</span>
                 new BinaryExpr(
                     left,
                     BinaryOperator.POW,
@@ -193,118 +197,118 @@ public class ExpressionParser {
                 left,
                 right);
         }
-<span class="fc" id="L196">        return left;</span>
+<span class="fc" id="L200">        return left;</span>
     }
 
     private Expr parsePrimary(Cursor cursor) {
-<span class="fc" id="L200">        cursor.skipWhitespace();</span>
-<span class="fc" id="L201">        int start = cursor.position();</span>
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (cursor.consume('(')) {</span>
-<span class="fc" id="L203">            Expr inner = parseExpression(cursor);</span>
-<span class="fc" id="L204">            cursor.skipWhitespace();</span>
-<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (!cursor.consume(')')) {</span>
-<span class="nc" id="L206">                throw new IllegalArgumentException(</span>
-<span class="nc" id="L207">                    &quot;Missing closing ')' at position &quot; + cursor.position());</span>
+<span class="fc" id="L204">        cursor.skipWhitespace();</span>
+<span class="fc" id="L205">        int start = cursor.position();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (cursor.consume('(')) {</span>
+<span class="fc" id="L207">            Expr inner = parseExpression(cursor);</span>
+<span class="fc" id="L208">            cursor.skipWhitespace();</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if (!cursor.consume(')')) {</span>
+<span class="nc" id="L210">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L211">                    &quot;Missing closing ')' at position &quot; + cursor.position());</span>
             }
-<span class="fc" id="L209">            return cursor.retainRange(inner, start, cursor.position());</span>
+<span class="fc" id="L213">            return cursor.retainRange(inner, start, cursor.position());</span>
         }
-<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (cursor.peek('.')) {</span>
-<span class="fc" id="L212">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (cursor.peek('.')) {</span>
+<span class="fc" id="L216">            throw new IllegalArgumentException(</span>
                 &quot;Decimal point must be preceded by a digit at position &quot;
-<span class="fc" id="L214">                    + cursor.position());</span>
+<span class="fc" id="L218">                    + cursor.position());</span>
         }
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (cursor.peekDigit()) {</span>
-<span class="fc" id="L217">            return parseNumber(cursor);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (cursor.peekDigit()) {</span>
+<span class="fc" id="L221">            return parseNumber(cursor);</span>
         }
-<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (cursor.peekLetter()) {</span>
-<span class="fc" id="L220">            return parseVariable(cursor);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (cursor.peekLetter()) {</span>
+<span class="fc" id="L224">            return parseVariable(cursor);</span>
         }
-<span class="fc" id="L222">        throw new IllegalArgumentException(</span>
-<span class="fc" id="L223">            &quot;Unexpected token at position &quot; + cursor.position());</span>
+<span class="fc" id="L226">        throw new IllegalArgumentException(</span>
+<span class="fc" id="L227">            &quot;Unexpected token at position &quot; + cursor.position());</span>
     }
 
     private Expr parseNumber(Cursor cursor) {
-<span class="fc" id="L227">        int start = cursor.position();</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        while (cursor.peekDigit()) {</span>
-<span class="fc" id="L229">            cursor.advance();</span>
-        }
-<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (cursor.peek('.')) {</span>
-<span class="fc" id="L232">            int decimalPoint = cursor.position();</span>
+<span class="fc" id="L231">        int start = cursor.position();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        while (cursor.peekDigit()) {</span>
 <span class="fc" id="L233">            cursor.advance();</span>
-<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (!cursor.peekDigit()) {</span>
-<span class="fc" id="L235">                throw new IllegalArgumentException(</span>
+        }
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (cursor.peek('.')) {</span>
+<span class="fc" id="L236">            int decimalPoint = cursor.position();</span>
+<span class="fc" id="L237">            cursor.advance();</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            if (!cursor.peekDigit()) {</span>
+<span class="fc" id="L239">                throw new IllegalArgumentException(</span>
                     &quot;Decimal point must be followed by a digit at position &quot;
                         + decimalPoint);
             }
-<span class="fc bfc" id="L239" title="All 2 branches covered.">            while (cursor.peekDigit()) {</span>
-<span class="fc" id="L240">                cursor.advance();</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            while (cursor.peekDigit()) {</span>
+<span class="fc" id="L244">                cursor.advance();</span>
             }
         }
 
-<span class="fc" id="L244">        int end = cursor.position();</span>
-<span class="fc" id="L245">        String sourceLexeme = cursor.slice(start, end);</span>
-<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (!cursor.retainsExactLiterals()) {</span>
+<span class="fc" id="L248">        int end = cursor.position();</span>
+<span class="fc" id="L249">        String sourceLexeme = cursor.slice(start, end);</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (!cursor.retainsExactLiterals()) {</span>
             try {
-<span class="fc" id="L248">                return new NumberExpr(exactRationalDomain.parseValue(sourceLexeme));</span>
-<span class="fc" id="L249">            } catch (IllegalArgumentException invalid) {</span>
-<span class="fc" id="L250">                throw new IllegalArgumentException(</span>
-<span class="fc" id="L251">                    &quot;Numeric literal at position &quot; + start + &quot;: &quot; + invalid.getMessage(), invalid);</span>
+<span class="fc" id="L252">                return new NumberExpr(exactRationalDomain.parseValue(sourceLexeme));</span>
+<span class="fc" id="L253">            } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L254">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L255">                    &quot;Numeric literal at position &quot; + start + &quot;: &quot; + invalid.getMessage(), invalid);</span>
             }
         }
-<span class="fc" id="L254">        ExactRationalParseEvidence evidence =</span>
-<span class="fc" id="L255">            exactRationalDomain.parse(sourceLexeme);</span>
-<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (!evidence.exact()) {</span>
-<span class="fc" id="L257">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L258">        ExactRationalParseEvidence evidence =</span>
+<span class="fc" id="L259">            exactRationalDomain.parse(sourceLexeme);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (!evidence.exact()) {</span>
+<span class="fc" id="L261">            throw new IllegalArgumentException(</span>
                 &quot;Numeric literal is outside the exact rational domain at &quot;
-<span class="fc" id="L259">                    + &quot;position &quot; + start + &quot;: &quot; + evidence.detailCode());</span>
+<span class="fc" id="L263">                    + &quot;position &quot; + start + &quot;: &quot; + evidence.detailCode());</span>
         }
 
-<span class="fc" id="L262">        NumberExpr number = cursor.retainRange(</span>
-<span class="fc" id="L263">            new NumberExpr(evidence.value().orElseThrow()),</span>
+<span class="fc" id="L266">        NumberExpr number = cursor.retainRange(</span>
+<span class="fc" id="L267">            new NumberExpr(evidence.value().orElseThrow()),</span>
             start,
             end);
-<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (cursor.retainsExactLiterals()) {</span>
-<span class="fc" id="L267">            cursor.retainExactLiteral(</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (cursor.retainsExactLiterals()) {</span>
+<span class="fc" id="L271">            cursor.retainExactLiteral(</span>
             number,
             start,
             end,
             sourceLexeme,
             evidence);
         }
-<span class="fc" id="L274">        return number;</span>
+<span class="fc" id="L278">        return number;</span>
     }
 
     private Expr parseVariable(Cursor cursor) {
-<span class="fc" id="L278">        int start = cursor.position();</span>
-<span class="fc bfc" id="L279" title="All 2 branches covered.">        while (cursor.peekLetterOrDigitOrUnderscore()) {</span>
-<span class="fc" id="L280">            cursor.advance();</span>
+<span class="fc" id="L282">        int start = cursor.position();</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        while (cursor.peekLetterOrDigitOrUnderscore()) {</span>
+<span class="fc" id="L284">            cursor.advance();</span>
         }
-<span class="fc" id="L282">        int nameEnd = cursor.position();</span>
-<span class="fc" id="L283">        String name = cursor.slice(start, nameEnd);</span>
-<span class="fc" id="L284">        cursor.skipWhitespace();</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (cursor.peek('(')) {</span>
-<span class="fc" id="L286">            cursor.advance();</span>
-<span class="fc" id="L287">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L288">            cursor.skipWhitespace();</span>
-<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (!cursor.peek(')')) {</span>
-<span class="fc" id="L290">                arguments.add(parseExpression(cursor));</span>
-<span class="fc" id="L291">                cursor.skipWhitespace();</span>
-<span class="fc bfc" id="L292" title="All 2 branches covered.">                while (cursor.consume(',')) {</span>
-<span class="fc" id="L293">                    arguments.add(parseExpression(cursor));</span>
-<span class="fc" id="L294">                    cursor.skipWhitespace();</span>
+<span class="fc" id="L286">        int nameEnd = cursor.position();</span>
+<span class="fc" id="L287">        String name = cursor.slice(start, nameEnd);</span>
+<span class="fc" id="L288">        cursor.skipWhitespace();</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (cursor.peek('(')) {</span>
+<span class="fc" id="L290">            cursor.advance();</span>
+<span class="fc" id="L291">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L292">            cursor.skipWhitespace();</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            if (!cursor.peek(')')) {</span>
+<span class="fc" id="L294">                arguments.add(parseExpression(cursor));</span>
+<span class="fc" id="L295">                cursor.skipWhitespace();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                while (cursor.consume(',')) {</span>
+<span class="fc" id="L297">                    arguments.add(parseExpression(cursor));</span>
+<span class="fc" id="L298">                    cursor.skipWhitespace();</span>
                 }
             }
-<span class="pc bpc" id="L297" title="1 of 2 branches missed.">            if (!cursor.consume(')')) {</span>
-<span class="nc" id="L298">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            if (!cursor.consume(')')) {</span>
+<span class="nc" id="L302">                throw new IllegalArgumentException(</span>
                     &quot;Missing closing ')' after function arguments at position &quot;
-<span class="nc" id="L300">                        + cursor.position());</span>
+<span class="nc" id="L304">                        + cursor.position());</span>
             }
-<span class="fc" id="L302">            return cursor.retainRange(</span>
+<span class="fc" id="L306">            return cursor.retainRange(</span>
                 new FunctionExpr(name, arguments),
                 start,
-<span class="fc" id="L305">                cursor.position());</span>
+<span class="fc" id="L309">                cursor.position());</span>
         }
-<span class="fc" id="L307">        return cursor.retainRange(</span>
+<span class="fc" id="L311">        return cursor.retainRange(</span>
             new VariableExpr(name),
             start,
             nameEnd);
@@ -316,80 +320,80 @@ public class ExpressionParser {
         private final Map&lt;Expr, ExactParsedTerm.SourceRange&gt; exactSourceRanges;
         private int position;
 
-<span class="fc" id="L319">        private Cursor(String value, boolean retainExactEvidence) {</span>
-<span class="fc" id="L320">            this.value = value;</span>
-<span class="fc bfc" id="L321" title="All 2 branches covered.">            this.exactLiterals = retainExactEvidence</span>
-<span class="fc" id="L322">                ? new ArrayList&lt;&gt;()</span>
-<span class="fc" id="L323">                : null;</span>
-<span class="fc bfc" id="L324" title="All 2 branches covered.">            this.exactSourceRanges = retainExactEvidence</span>
-<span class="fc" id="L325">                ? new IdentityHashMap&lt;&gt;()</span>
-<span class="fc" id="L326">                : null;</span>
-<span class="fc" id="L327">            this.position = 0;</span>
-<span class="fc" id="L328">        }</span>
+<span class="fc" id="L323">        private Cursor(String value, boolean retainExactEvidence) {</span>
+<span class="fc" id="L324">            this.value = value;</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            this.exactLiterals = retainExactEvidence</span>
+<span class="fc" id="L326">                ? new ArrayList&lt;&gt;()</span>
+<span class="fc" id="L327">                : null;</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            this.exactSourceRanges = retainExactEvidence</span>
+<span class="fc" id="L329">                ? new IdentityHashMap&lt;&gt;()</span>
+<span class="fc" id="L330">                : null;</span>
+<span class="fc" id="L331">            this.position = 0;</span>
+<span class="fc" id="L332">        }</span>
 
         private static Cursor ordinary(String value) {
-<span class="fc" id="L331">            return new Cursor(value, false);</span>
+<span class="fc" id="L335">            return new Cursor(value, false);</span>
         }
 
         private static Cursor exact(String value) {
-<span class="fc" id="L335">            return new Cursor(value, true);</span>
+<span class="fc" id="L339">            return new Cursor(value, true);</span>
         }
 
         private int position() {
-<span class="fc" id="L339">            return position;</span>
+<span class="fc" id="L343">            return position;</span>
         }
 
         private void skipWhitespace() {
-<span class="fc bfc" id="L343" title="All 2 branches covered.">            while (!isAtEnd()</span>
-<span class="fc bfc" id="L344" title="All 2 branches covered.">                    &amp;&amp; Character.isWhitespace(value.charAt(position))) {</span>
-<span class="fc" id="L345">                position++;</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            while (!isAtEnd()</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                    &amp;&amp; Character.isWhitespace(value.charAt(position))) {</span>
+<span class="fc" id="L349">                position++;</span>
             }
-<span class="fc" id="L347">        }</span>
+<span class="fc" id="L351">        }</span>
 
         private boolean isAtEnd() {
-<span class="fc bfc" id="L350" title="All 2 branches covered.">            return position &gt;= value.length();</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            return position &gt;= value.length();</span>
         }
 
         private boolean consume(char c) {
-<span class="fc bfc" id="L354" title="All 4 branches covered.">            if (!isAtEnd() &amp;&amp; value.charAt(position) == c) {</span>
-<span class="fc" id="L355">                position++;</span>
-<span class="fc" id="L356">                return true;</span>
+<span class="fc bfc" id="L358" title="All 4 branches covered.">            if (!isAtEnd() &amp;&amp; value.charAt(position) == c) {</span>
+<span class="fc" id="L359">                position++;</span>
+<span class="fc" id="L360">                return true;</span>
             }
-<span class="fc" id="L358">            return false;</span>
+<span class="fc" id="L362">            return false;</span>
         }
 
         private boolean peek(char c) {
-<span class="fc bfc" id="L362" title="All 4 branches covered.">            return !isAtEnd() &amp;&amp; value.charAt(position) == c;</span>
+<span class="fc bfc" id="L366" title="All 4 branches covered.">            return !isAtEnd() &amp;&amp; value.charAt(position) == c;</span>
         }
 
         private boolean peekDigit() {
-<span class="fc bfc" id="L366" title="All 2 branches covered.">            return !isAtEnd()</span>
-<span class="fc bfc" id="L367" title="All 2 branches covered.">                &amp;&amp; Character.isDigit(value.charAt(position));</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">            return !isAtEnd()</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                &amp;&amp; Character.isDigit(value.charAt(position));</span>
         }
 
         private boolean peekLetter() {
-<span class="fc bfc" id="L371" title="All 2 branches covered.">            return !isAtEnd()</span>
-<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                &amp;&amp; Character.isLetter(value.charAt(position));</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            return !isAtEnd()</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                &amp;&amp; Character.isLetter(value.charAt(position));</span>
         }
 
         private boolean peekLetterOrDigitOrUnderscore() {
-<span class="fc bfc" id="L376" title="All 2 branches covered.">            return !isAtEnd()</span>
-<span class="fc bfc" id="L377" title="All 2 branches covered.">                &amp;&amp; (Character.isLetterOrDigit(value.charAt(position))</span>
-<span class="fc bfc" id="L378" title="All 2 branches covered.">                    || value.charAt(position) == '_');</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            return !isAtEnd()</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                &amp;&amp; (Character.isLetterOrDigit(value.charAt(position))</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                    || value.charAt(position) == '_');</span>
         }
 
         private void advance() {
-<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            if (!isAtEnd()) {</span>
-<span class="fc" id="L383">                position++;</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">            if (!isAtEnd()) {</span>
+<span class="fc" id="L387">                position++;</span>
             }
-<span class="fc" id="L385">        }</span>
+<span class="fc" id="L389">        }</span>
 
         private String slice(int from, int to) {
-<span class="fc" id="L388">            return value.substring(from, to);</span>
+<span class="fc" id="L392">            return value.substring(from, to);</span>
         }
 
         private boolean retainsExactLiterals() {
-<span class="fc bfc" id="L392" title="All 2 branches covered.">            return exactLiterals != null;</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            return exactLiterals != null;</span>
         }
 
         private &lt;T extends Expr&gt; T retainRange(
@@ -397,20 +401,20 @@ public class ExpressionParser {
             int startInclusive,
             int endExclusive
         ) {
-<span class="fc bfc" id="L400" title="All 2 branches covered.">            if (exactSourceRanges == null) {</span>
-<span class="fc" id="L401">                return node;</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            if (exactSourceRanges == null) {</span>
+<span class="fc" id="L405">                return node;</span>
             }
-<span class="fc" id="L403">            ExactParsedTerm.SourceRange range =</span>
+<span class="fc" id="L407">            ExactParsedTerm.SourceRange range =</span>
                 new ExactParsedTerm.SourceRange(
                     startInclusive,
                     endExclusive);
-<span class="fc" id="L407">            ExactParsedTerm.SourceRange previous =</span>
-<span class="fc" id="L408">                exactSourceRanges.put(node, range);</span>
-<span class="pc bpc" id="L409" title="1 of 4 branches missed.">            if (previous != null &amp;&amp; !range.contains(previous)) {</span>
-<span class="nc" id="L410">                throw new IllegalStateException(</span>
+<span class="fc" id="L411">            ExactParsedTerm.SourceRange previous =</span>
+<span class="fc" id="L412">                exactSourceRanges.put(node, range);</span>
+<span class="pc bpc" id="L413" title="1 of 4 branches missed.">            if (previous != null &amp;&amp; !range.contains(previous)) {</span>
+<span class="nc" id="L414">                throw new IllegalStateException(</span>
                     &quot;AST source range replacement must retain the prior range&quot;);
             }
-<span class="fc" id="L413">            return node;</span>
+<span class="fc" id="L417">            return node;</span>
         }
 
         private BinaryExpr retainCombinedRange(
@@ -418,30 +422,30 @@ public class ExpressionParser {
             Expr left,
             Expr right
         ) {
-<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (exactSourceRanges == null) {</span>
-<span class="fc" id="L422">                return node;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">            if (exactSourceRanges == null) {</span>
+<span class="fc" id="L426">                return node;</span>
             }
-<span class="fc" id="L424">            ExactParsedTerm.SourceRange leftRange = requireRange(left);</span>
-<span class="fc" id="L425">            ExactParsedTerm.SourceRange rightRange = requireRange(right);</span>
-<span class="fc" id="L426">            return retainRange(</span>
+<span class="fc" id="L428">            ExactParsedTerm.SourceRange leftRange = requireRange(left);</span>
+<span class="fc" id="L429">            ExactParsedTerm.SourceRange rightRange = requireRange(right);</span>
+<span class="fc" id="L430">            return retainRange(</span>
                 node,
-<span class="fc" id="L428">                leftRange.startInclusive(),</span>
-<span class="fc" id="L429">                rightRange.endExclusive());</span>
+<span class="fc" id="L432">                leftRange.startInclusive(),</span>
+<span class="fc" id="L433">                rightRange.endExclusive());</span>
         }
 
         private int rangeEnd(Expr node) {
-<span class="fc bfc" id="L433" title="All 2 branches covered.">            return exactSourceRanges == null</span>
-<span class="fc" id="L434">                ? position</span>
-<span class="fc" id="L435">                : requireRange(node).endExclusive();</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            return exactSourceRanges == null</span>
+<span class="fc" id="L438">                ? position</span>
+<span class="fc" id="L439">                : requireRange(node).endExclusive();</span>
         }
 
         private ExactParsedTerm.SourceRange requireRange(Expr node) {
-<span class="fc" id="L439">            ExactParsedTerm.SourceRange range = exactSourceRanges.get(node);</span>
-<span class="pc bpc" id="L440" title="1 of 2 branches missed.">            if (range == null) {</span>
-<span class="nc" id="L441">                throw new IllegalStateException(</span>
+<span class="fc" id="L443">            ExactParsedTerm.SourceRange range = exactSourceRanges.get(node);</span>
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">            if (range == null) {</span>
+<span class="nc" id="L445">                throw new IllegalStateException(</span>
                     &quot;source-backed AST node lacks a parser range&quot;);
             }
-<span class="fc" id="L444">            return range;</span>
+<span class="fc" id="L448">            return range;</span>
         }
 
         private void retainExactLiteral(
@@ -451,36 +455,36 @@ public class ExpressionParser {
             String sourceLexeme,
             ExactRationalParseEvidence evidence
         ) {
-<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            if (exactLiterals == null) {</span>
-<span class="nc" id="L455">                throw new IllegalStateException(</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            if (exactLiterals == null) {</span>
+<span class="nc" id="L459">                throw new IllegalStateException(</span>
                     &quot;legacy parser path cannot retain exact literals&quot;);
             }
-<span class="fc" id="L458">            exactLiterals.add(new ExactParsedTerm.LiteralOccurrence(</span>
+<span class="fc" id="L462">            exactLiterals.add(new ExactParsedTerm.LiteralOccurrence(</span>
                 node,
                 startInclusive,
                 endExclusive,
                 sourceLexeme,
                 evidence));
-<span class="fc" id="L464">        }</span>
+<span class="fc" id="L468">        }</span>
 
         private List&lt;ExactParsedTerm.LiteralOccurrence&gt; exactLiterals() {
-<span class="pc bpc" id="L467" title="1 of 2 branches missed.">            if (exactLiterals == null) {</span>
-<span class="nc" id="L468">                throw new IllegalStateException(</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">            if (exactLiterals == null) {</span>
+<span class="nc" id="L472">                throw new IllegalStateException(</span>
                     &quot;legacy parser path has no exact literals&quot;);
             }
             // ExactParsedTerm performs the single defensive copy at the
             // ownership boundary.
-<span class="fc" id="L473">            return exactLiterals;</span>
+<span class="fc" id="L477">            return exactLiterals;</span>
         }
 
         private Map&lt;Expr, ExactParsedTerm.SourceRange&gt; exactSourceRanges() {
-<span class="pc bpc" id="L477" title="1 of 2 branches missed.">            if (exactSourceRanges == null) {</span>
-<span class="nc" id="L478">                throw new IllegalStateException(</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            if (exactSourceRanges == null) {</span>
+<span class="nc" id="L482">                throw new IllegalStateException(</span>
                     &quot;legacy parser path has no AST source ranges&quot;);
             }
             // ExactParsedTerm performs the single identity-preserving copy at
             // the ownership boundary.
-<span class="fc" id="L483">            return exactSourceRanges;</span>
+<span class="fc" id="L487">            return exactSourceRanges;</span>
         }
     }
 }

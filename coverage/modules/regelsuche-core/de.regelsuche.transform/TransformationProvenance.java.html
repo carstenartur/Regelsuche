@@ -50,77 +50,83 @@ public sealed interface TransformationProvenance permits TransformationProvenanc
 <span class="fc" id="L50">    }</span>
 
     record PrimitiveRewriteSequence(List&lt;String&gt; primitiveRuleIds, String applicationKey)
-            implements TransformationProvenance {
-<span class="fc" id="L54">        public PrimitiveRewriteSequence {</span>
-<span class="pc bpc" id="L55" title="1 of 4 branches missed.">            if (primitiveRuleIds == null || primitiveRuleIds.isEmpty()) {</span>
-<span class="fc" id="L56">                throw new IllegalArgumentException(&quot;primitive provenance requires a real nonempty rule sequence&quot;);</span>
+            implements TransformationProvenance, de.regelsuche.retention.RetainedGraph.View {
+<span class="nc" id="L54">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(primitiveRuleIds);v.reference(applicationKey);}</span>
+
+<span class="fc" id="L56">        public PrimitiveRewriteSequence {</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">            if (primitiveRuleIds == null || primitiveRuleIds.isEmpty()) {</span>
+<span class="fc" id="L58">                throw new IllegalArgumentException(&quot;primitive provenance requires a real nonempty rule sequence&quot;);</span>
             }
-<span class="fc" id="L58">            boolean needsTrimming = false;</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (String value : primitiveRuleIds) {</span>
-<span class="pc bpc" id="L60" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) throw new IllegalArgumentException(&quot;blank primitive rule&quot;);</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                needsTrimming |= !value.equals(value.trim());</span>
-<span class="fc" id="L62">            }</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            primitiveRuleIds = needsTrimming ? primitiveRuleIds.stream().map(String::trim).toList()</span>
-<span class="fc" id="L64">                : List.copyOf(primitiveRuleIds);</span>
-<span class="pc bpc" id="L65" title="2 of 4 branches missed.">            if (applicationKey == null || applicationKey.isBlank()) {</span>
-<span class="nc" id="L66">                throw new IllegalArgumentException(&quot;blank primitive application identity&quot;);</span>
+<span class="fc" id="L60">            boolean needsTrimming = false;</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            for (String value : primitiveRuleIds) {</span>
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) throw new IllegalArgumentException(&quot;blank primitive rule&quot;);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                needsTrimming |= !value.equals(value.trim());</span>
+<span class="fc" id="L64">            }</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            primitiveRuleIds = needsTrimming ? primitiveRuleIds.stream().map(String::trim).toList()</span>
+<span class="fc" id="L66">                : List.copyOf(primitiveRuleIds);</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">            if (applicationKey == null || applicationKey.isBlank()) {</span>
+<span class="nc" id="L68">                throw new IllegalArgumentException(&quot;blank primitive application identity&quot;);</span>
             }
-<span class="fc" id="L68">        }</span>
-<span class="fc" id="L69">        @Override public ExecutionWork work() { return new ExecutionWork(primitiveRuleIds.size(), 0, 0); }</span>
+<span class="fc" id="L70">        }</span>
+<span class="fc" id="L71">        @Override public ExecutionWork work() { return new ExecutionWork(primitiveRuleIds.size(), 0, 0); }</span>
         @Override public void write(JsonWriter writer) {
-<span class="fc" id="L71">            writer.property(&quot;kind&quot;, &quot;PRIMITIVE_REWRITE_SEQUENCE&quot;)</span>
-<span class="fc" id="L72">                .stringArray(&quot;primitiveRuleIds&quot;, primitiveRuleIds).property(&quot;applicationKey&quot;, applicationKey);</span>
-<span class="fc" id="L73">        }</span>
+<span class="fc" id="L73">            writer.property(&quot;kind&quot;, &quot;PRIMITIVE_REWRITE_SEQUENCE&quot;)</span>
+<span class="fc" id="L74">                .stringArray(&quot;primitiveRuleIds&quot;, primitiveRuleIds).property(&quot;applicationKey&quot;, applicationKey);</span>
+<span class="fc" id="L75">        }</span>
     }
 
-    record ExactTheoryStep(ExactTheoryEvidence evidence) implements TransformationProvenance {
-<span class="nc" id="L77">        public ExactTheoryStep { Objects.requireNonNull(evidence, &quot;verified evidence&quot;); }</span>
-<span class="nc" id="L78">        @Override public List&lt;String&gt; primitiveRuleIds() { return List.of(); }</span>
-<span class="nc" id="L79">        @Override public ExecutionWork work() { return new ExecutionWork(0, 1, evidence.binding().canonicalWorkUnits()); }</span>
+    record ExactTheoryStep(ExactTheoryEvidence evidence) implements TransformationProvenance, de.regelsuche.retention.RetainedGraph.View {
+<span class="nc" id="L79">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(evidence);}</span>
+
+<span class="nc" id="L81">        public ExactTheoryStep { Objects.requireNonNull(evidence, &quot;verified evidence&quot;); }</span>
+<span class="nc" id="L82">        @Override public List&lt;String&gt; primitiveRuleIds() { return List.of(); }</span>
+<span class="nc" id="L83">        @Override public ExecutionWork work() { return new ExecutionWork(0, 1, evidence.binding().canonicalWorkUnits()); }</span>
         @Override public void write(JsonWriter writer) {
-<span class="nc" id="L81">            var bound = evidence.binding();</span>
-<span class="nc" id="L82">            writer.property(&quot;kind&quot;, &quot;EXACT_THEORY_STEP&quot;)</span>
-<span class="nc" id="L83">                .property(&quot;sourceExpression&quot;, bound.sourceExpression())</span>
-<span class="nc" id="L84">                .property(&quot;transformedExpression&quot;, bound.transformedExpression())</span>
-<span class="nc" id="L85">                .property(&quot;theoryStepId&quot;, bound.theoryStepId()).property(&quot;evidenceHash&quot;, bound.evidenceHash())</span>
-<span class="nc" id="L86">                .property(&quot;receiptArtifactId&quot;, bound.receiptArtifactId()).property(&quot;runArtifactId&quot;, bound.runArtifactId())</span>
-<span class="nc" id="L87">                .property(&quot;canonicalWorkUnits&quot;, bound.canonicalWorkUnits())</span>
-<span class="nc" id="L88">                .stringArray(&quot;assumptions&quot;, List.of()).property(&quot;canonicalEvidenceJson&quot;, bound.canonicalEvidenceJson());</span>
-<span class="nc" id="L89">        }</span>
+<span class="nc" id="L85">            var bound = evidence.binding();</span>
+<span class="nc" id="L86">            writer.property(&quot;kind&quot;, &quot;EXACT_THEORY_STEP&quot;)</span>
+<span class="nc" id="L87">                .property(&quot;sourceExpression&quot;, bound.sourceExpression())</span>
+<span class="nc" id="L88">                .property(&quot;transformedExpression&quot;, bound.transformedExpression())</span>
+<span class="nc" id="L89">                .property(&quot;theoryStepId&quot;, bound.theoryStepId()).property(&quot;evidenceHash&quot;, bound.evidenceHash())</span>
+<span class="nc" id="L90">                .property(&quot;receiptArtifactId&quot;, bound.receiptArtifactId()).property(&quot;runArtifactId&quot;, bound.runArtifactId())</span>
+<span class="nc" id="L91">                .property(&quot;canonicalWorkUnits&quot;, bound.canonicalWorkUnits())</span>
+<span class="nc" id="L92">                .stringArray(&quot;assumptions&quot;, List.of()).property(&quot;canonicalEvidenceJson&quot;, bound.canonicalEvidenceJson());</span>
+<span class="nc" id="L93">        }</span>
     }
 
     /** Ordered, source-bound composition retaining every application and intermediate expression. */
-    record Sequence(String sourceExpression, List&lt;Transformation&gt; steps) implements TransformationProvenance {
-<span class="fc" id="L94">        public Sequence {</span>
-<span class="pc bpc" id="L95" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) throw new IllegalArgumentException(&quot;blank source&quot;);</span>
-<span class="fc" id="L96">            steps = List.copyOf(steps);</span>
-<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            if (steps.isEmpty()) throw new IllegalArgumentException(&quot;empty execution sequence&quot;);</span>
-<span class="fc" id="L98">            String current = sourceExpression;</span>
-<span class="fc" id="L99">            ExecutionWork work = ExecutionWork.ZERO;</span>
-<span class="fc bfc" id="L100" title="All 2 branches covered.">            for (Transformation step : steps) {</span>
-<span class="fc" id="L101">                step.provenance().requireSource(current);</span>
-<span class="fc" id="L102">                current = step.transformedExpression();</span>
-<span class="fc" id="L103">                work = work.plus(step.executionWork());</span>
-<span class="fc" id="L104">            }</span>
-<span class="fc" id="L105">        }</span>
+    record Sequence(String sourceExpression, List&lt;Transformation&gt; steps) implements TransformationProvenance, de.regelsuche.retention.RetainedGraph.View {
+<span class="nc" id="L98">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(sourceExpression);v.reference(steps);}</span>
+
+<span class="fc" id="L100">        public Sequence {</span>
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) throw new IllegalArgumentException(&quot;blank source&quot;);</span>
+<span class="fc" id="L102">            steps = List.copyOf(steps);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            if (steps.isEmpty()) throw new IllegalArgumentException(&quot;empty execution sequence&quot;);</span>
+<span class="fc" id="L104">            String current = sourceExpression;</span>
+<span class="fc" id="L105">            ExecutionWork work = ExecutionWork.ZERO;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (Transformation step : steps) {</span>
+<span class="fc" id="L107">                step.provenance().requireSource(current);</span>
+<span class="fc" id="L108">                current = step.transformedExpression();</span>
+<span class="fc" id="L109">                work = work.plus(step.executionWork());</span>
+<span class="fc" id="L110">            }</span>
+<span class="fc" id="L111">        }</span>
         @Override public List&lt;String&gt; primitiveRuleIds() {
-<span class="fc" id="L107">            return steps.stream().flatMap(step -&gt; step.primitiveRuleIds().stream()).toList();</span>
+<span class="fc" id="L113">            return steps.stream().flatMap(step -&gt; step.primitiveRuleIds().stream()).toList();</span>
         }
         @Override public ExecutionWork work() {
-<span class="fc" id="L110">            return steps.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
+<span class="fc" id="L116">            return steps.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
         }
         @Override public void write(JsonWriter writer) {
-<span class="fc" id="L113">            writer.property(&quot;kind&quot;, &quot;SEQUENCE&quot;).property(&quot;sourceExpression&quot;, sourceExpression)</span>
-<span class="fc" id="L114">                .array(&quot;steps&quot;, array -&gt; steps.forEach(step -&gt; array.objectValue(item -&gt; {</span>
-<span class="fc" id="L115">                    item.property(&quot;rule&quot;, step.rule()).property(&quot;output&quot;, step.transformedExpression())</span>
-<span class="fc" id="L116">                        .property(&quot;applicationKey&quot;, step.applicationKey()).property(&quot;kind&quot;, step.kind().name())</span>
-<span class="fc" id="L117">                        .property(&quot;mayIncreaseComplexity&quot;, step.mayIncreaseComplexity())</span>
-<span class="fc" id="L118">                        .property(&quot;estimatedCostDelta&quot;, step.estimatedCostDelta())</span>
-<span class="fc" id="L119">                        .property(&quot;equivalencePreserving&quot;, step.equivalencePreservingByConstruction())</span>
-<span class="fc" id="L120">                        .stringArray(&quot;assumptions&quot;, step.assumptions()).property(&quot;packId&quot;, step.packId())</span>
-<span class="fc" id="L121">                        .property(&quot;license&quot;, step.license()).property(&quot;provenance&quot;, step.provenance().toCanonicalJson());</span>
-<span class="fc" id="L122">                })));</span>
-<span class="fc" id="L123">        }</span>
+<span class="fc" id="L119">            writer.property(&quot;kind&quot;, &quot;SEQUENCE&quot;).property(&quot;sourceExpression&quot;, sourceExpression)</span>
+<span class="fc" id="L120">                .array(&quot;steps&quot;, array -&gt; steps.forEach(step -&gt; array.objectValue(item -&gt; {</span>
+<span class="fc" id="L121">                    item.property(&quot;rule&quot;, step.rule()).property(&quot;output&quot;, step.transformedExpression())</span>
+<span class="fc" id="L122">                        .property(&quot;applicationKey&quot;, step.applicationKey()).property(&quot;kind&quot;, step.kind().name())</span>
+<span class="fc" id="L123">                        .property(&quot;mayIncreaseComplexity&quot;, step.mayIncreaseComplexity())</span>
+<span class="fc" id="L124">                        .property(&quot;estimatedCostDelta&quot;, step.estimatedCostDelta())</span>
+<span class="fc" id="L125">                        .property(&quot;equivalencePreserving&quot;, step.equivalencePreservingByConstruction())</span>
+<span class="fc" id="L126">                        .stringArray(&quot;assumptions&quot;, step.assumptions()).property(&quot;packId&quot;, step.packId())</span>
+<span class="fc" id="L127">                        .property(&quot;license&quot;, step.license()).property(&quot;provenance&quot;, step.provenance().toCanonicalJson());</span>
+<span class="fc" id="L128">                })));</span>
+<span class="fc" id="L129">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

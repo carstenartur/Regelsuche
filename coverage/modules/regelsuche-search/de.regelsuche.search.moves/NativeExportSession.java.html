@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeExportSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeExportSession.java</span></div><h1>NativeExportSession.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.*;
+
+/** A separate paid output phase. Shares the same explicit graph visitor and lexical operation observer. */
+final class NativeExportSession implements RetainedOperation.Sink {
+    private NativeMoveSearch.Result source;
+    private final long budget;
+    private final SearchExpressionStore.Limits limits;
+    private RetainedOperation operation;
+    private RetainedJson.Scope json;
+    private MoveSearch.Result projection;
+    private long work,peakNodes,peakCharacters,peakReferences;
+<span class="fc" id="L14">    private boolean complete=true,closing;</span>
+<span class="fc" id="L15">    private String detail=&quot;&quot;;</span>
+<span class="fc" id="L16">    private NativeExportSession(NativeMoveSearch.Result source,long budget,SearchExpressionStore.Limits limits){</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if(budget&lt;0)throw new IllegalArgumentException(&quot;negative export work budget&quot;);</span>
+<span class="fc" id="L18">        this.source=java.util.Objects.requireNonNull(source);this.budget=budget;this.limits=java.util.Objects.requireNonNull(limits);work=3;</span>
+<span class="fc" id="L19">    }</span>
+<span class="fc" id="L20">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(limits);v.reference(operation);v.reference(json);v.reference(projection);v.reference(detail);}</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">    @Override public void executionWork(long amount){if(amount&lt;0)throw new IllegalArgumentException(&quot;negative export work&quot;);work=Math.addExact(work,amount);}</span>
+<span class="nc" id="L22">    @Override public void validationWork(long amount){executionWork(amount);}</span>
+<span class="nc" id="L23">    @Override public long observedWork(){return work;}</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">    @Override public void checkpoint(){observe(this,!closing);}</span>
+    private RetainedGraph.Observation observe(Object value,boolean enforce){
+        RetainedGraph.Observation observation;
+<span class="fc" id="L27">        try{observation=RetainedGraph.measure(value);}</span>
+<span class="pc" id="L28">        catch(RetainedGraph.Unmeasured unknown){observation=unknown.attempted();fail(&quot;NATIVE_EXPORT_RETENTION_UNSUPPORTED:&quot;+unknown.getMessage());}</span>
+<span class="fc" id="L29">        executionWork(observation.work());peakNodes=Math.max(peakNodes,observation.peak().nodes());</span>
+<span class="fc" id="L30">        peakCharacters=Math.max(peakCharacters,observation.peak().characters());peakReferences=Math.max(peakReferences,observation.peak().references());</span>
+<span class="pc bpc" id="L31" title="2 of 6 branches missed.">        if(peakNodes&gt;limits.nodes() || peakCharacters&gt;limits.characters() || peakReferences&gt;limits.references())fail(&quot;NATIVE_EXPORT_RETENTION_EXHAUSTED&quot;);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if(work&gt;budget)fail(&quot;NATIVE_EXPORT_WORK_EXHAUSTED&quot;);</span>
+<span class="fc bfc" id="L33" title="All 4 branches covered.">        if(enforce &amp;&amp; !complete)throw new SearchExecution.ResourceLimit();return observation;</span>
+    }
+<span class="fc bfc" id="L35" title="All 2 branches covered.">    private void fail(String reason){complete=false;if(detail.isEmpty())detail=reason;}</span>
+    static NativeMoveSearch.ExportResult run(NativeMoveSearch.Result source,long budget,SearchExpressionStore.Limits limits){
+<span class="fc" id="L37">        var session=new NativeExportSession(source,budget,limits);return session.run();</span>
+    }
+    private NativeMoveSearch.ExportResult run(){
+<span class="fc" id="L40">        operation=RetainedOperation.open(this);</span>
+        try{
+<span class="fc" id="L42">            json=RetainedJson.open();checkpoint();projection=source.projectLegacy();checkpoint();</span>
+<span class="fc" id="L43">        }catch(SearchExecution.ResourceLimit exhausted){projection=null;}</span>
+        finally{
+<span class="fc" id="L45">            closing=true;</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            try{if(json!=null)json.close();}</span>
+<span class="fc" id="L47">            finally{json=null;operation.close();operation=null;source=null;executionWork(3);}</span>
+        }
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        if(work&gt;budget)fail(&quot;NATIVE_EXPORT_WORK_EXHAUSTED&quot;);if(!complete)projection=null;</span>
+<span class="fc" id="L50">        var receipt=new NativeMoveSearch.ExportAccounting(budget);</span>
+<span class="fc" id="L51">        var output=new NativeMoveSearch.ExportResult(projection,receipt);</span>
+<span class="fc" id="L52">        var retained=new RetainedGraph.Usage(0,0,0);</span>
+        boolean changed;
+        do {
+<span class="fc" id="L55">            settle(output,receipt,retained);</span>
+<span class="fc" id="L56">            String measuredDetail=detail;var measuredProjection=output.projection();</span>
+<span class="fc" id="L57">            retained=observe(output,false).retained();</span>
+<span class="fc" id="L58">            settle(output,receipt,retained);</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">            changed=!measuredDetail.equals(detail) || measuredProjection!=output.projection();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        }while(changed); // only the one-way complete -&gt; incomplete transition can change this graph</span>
+<span class="fc" id="L61">        return output;</span>
+    }
+    private void settle(NativeMoveSearch.ExportResult output,NativeMoveSearch.ExportAccounting receipt,RetainedGraph.Usage retained){
+<span class="fc" id="L64">        executionWork(12);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if(work&gt;budget)fail(&quot;NATIVE_EXPORT_WORK_EXHAUSTED&quot;);</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if(!complete &amp;&amp; output.projection()!=null){output.discard();projection=null;executionWork(2);}</span>
+<span class="fc" id="L67">        receipt.update(work,peakNodes,peakCharacters,peakReferences,retained,complete,detail);</span>
+<span class="fc" id="L68">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

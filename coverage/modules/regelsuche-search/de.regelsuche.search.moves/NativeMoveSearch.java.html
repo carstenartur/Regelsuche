@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeMoveSearch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeMoveSearch.java</span></div><h1>NativeMoveSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.*;
+import java.util.*;
+
+/** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
+<span class="fc" id="L10">public final class NativeMoveSearch {</span>
+    public static final String REVISION = &quot;regelsuche.native-expr-move-search/v4-partial-atomic-inventory&quot;;
+    /** Fixed release coverage, independent of mathematical proof validity or observed resource limits. */
+<span class="fc" id="L13">    public enum Coverage { PARTIAL_ATOMIC_INVENTORY }</span>
+<span class="fc" id="L14">    public static Coverage coverage(){return Coverage.PARTIAL_ATOMIC_INVENTORY;}</span>
+    public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider,RetainedGraph.View {
+<span class="fc" id="L16">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(descriptor);v.reference(transport);}</span>
+
+<span class="fc" id="L18">        public Primitive {</span>
+<span class="fc" id="L19">            Objects.requireNonNull(descriptor);Objects.requireNonNull(transport);</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">            if(descriptor.sourceKind()!=SearchMove.SourceKind.PRIMITIVE)throw new IllegalArgumentException(&quot;primitive native provider required&quot;);</span>
+<span class="fc" id="L21">        }</span>
+<span class="fc" id="L22">        @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.PRIMITIVE;}</span>
+        @Override public Batch candidates(TypedMoveSearch.State source,TypedMoveSearch.Context context){
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            if(!NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return NativeMoveProvider.rejectedAssumptions();</span>
+<span class="fc" id="L25">            var steps=transport.generate(source.expression());var work=TransformationWorkMetrics.flatEngine(steps.size());</span>
+<span class="fc" id="L26">            return new Batch(steps.stream().map(step-&gt;new NativeSearchMove(step,descriptor,work.totalWorkUnits(),Set.of())).toList(),</span>
+<span class="fc" id="L27">                work.withCandidateWork(new ExecutionWork(steps.size(),0,0)),false);</span>
+        }
+        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">            if(!NativeMoveProvider.carries(move.assumptions(),source,context) || !NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return new NativeVerification(false,1,null,null,&quot;TYPED_PRIMITIVE_ASSUMPTIONS_MISSING&quot;);</span>
+<span class="fc" id="L31">            var generated=transport.generate(source.expression());</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">            boolean accepted=descriptor.equals(move.descriptor()) &amp;&amp; source.expression().equals(move.sourceExpression())</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">                &amp;&amp; move.proof() instanceof NativeMoveProof.Primitive proof &amp;&amp; generated.contains(proof.step());</span>
+<span class="fc" id="L34">            return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(generated.size())</span>
+<span class="fc" id="L35">                    .withCandidateWork(new ExecutionWork(generated.size(),0,0)).totalWorkUnitsV2(),</span>
+<span class="fc bfc" id="L36" title="All 6 branches covered.">                accepted?move.proof():null,accepted?move.ruleId():null,accepted?&quot;TYPED_PRIMITIVE_REPLAYED&quot;:&quot;TYPED_PRIMITIVE_REPLAY_REJECTED&quot;);</span>
+        }
+    }
+<span class="fc" id="L39">    public enum ZeroScore implements java.util.function.ToDoubleFunction&lt;TypedMoveSearch.State&gt; { INSTANCE;</span>
+<span class="fc" id="L40">        @Override public double applyAsDouble(TypedMoveSearch.State state){return 0;}</span>
+    }
+    public record Problem(Expr source, TypedMoveSearch.Context context, List&lt;NativeMoveProvider&gt; providers,
+            MoveSearch.Mode mode, MoveSearch.Scheduling scheduling, MoveSearch.Budget budget,
+            NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction&lt;TypedMoveSearch.State&gt; stateScore,NativeStateValue stateValue,NativeVerifier verifier) implements RetainedGraph.View {
+<span class="fc" id="L45">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(context);v.reference(providers);v.reference(mode);v.reference(scheduling);v.reference(budget);v.reference(policy);v.reference(stateScore);v.reference(stateValue);v.reference(verifier);}</span>
+        public Problem(Expr source,TypedMoveSearch.Context context,List&lt;NativeMoveProvider&gt; providers,MoveSearch.Mode mode,MoveSearch.Scheduling scheduling,MoveSearch.Budget budget){
+<span class="fc" id="L47">            this(source,context,providers,mode,scheduling,budget,NativeMovePriorityPolicy.INVENTORY_ORDER,ZeroScore.INSTANCE,NativeStateValue.NONE,NativeVerifier.registered(providers));</span>
+<span class="fc" id="L48">        }</span>
+        public Problem(Expr source,TypedMoveSearch.Context context,List&lt;NativeMoveProvider&gt; providers,MoveSearch.Mode mode,MoveSearch.Scheduling scheduling,MoveSearch.Budget budget,
+                NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction&lt;TypedMoveSearch.State&gt; stateScore,NativeStateValue stateValue){
+<span class="fc" id="L51">            this(source,context,providers,mode,scheduling,budget,policy,stateScore,stateValue,NativeVerifier.registered(providers));</span>
+<span class="fc" id="L52">        }</span>
+<span class="fc" id="L53">        public Problem {</span>
+<span class="fc" id="L54">            Objects.requireNonNull(source);Objects.requireNonNull(context);providers=List.copyOf(providers);</span>
+<span class="fc" id="L55">            Objects.requireNonNull(mode);Objects.requireNonNull(scheduling);Objects.requireNonNull(budget);</span>
+<span class="fc" id="L56">            Objects.requireNonNull(policy);Objects.requireNonNull(stateScore);Objects.requireNonNull(stateValue);Objects.requireNonNull(verifier);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if(context.phase()==MoveContext.Phase.PRODUCTION)throw new IllegalArgumentException(&quot;experimental scheduling is not production-qualified (#745)&quot;);</span>
+<span class="pc bpc" id="L58" title="1 of 6 branches missed.">            if(scheduling!=MoveSearch.Scheduling.STAGED &amp;&amp; scheduling!=MoveSearch.Scheduling.EAGER_CONTROL &amp;&amp; scheduling!=MoveSearch.Scheduling.STAGED_INCREMENTAL)</span>
+<span class="nc" id="L59">                throw new IllegalArgumentException(&quot;native provider does not implement this scheduling contract&quot;);</span>
+<span class="fc" id="L60">        }</span>
+    }
+    /** Populated privately before result publication; accessors expose only immutable scalar observations. */
+<span class="fc" id="L63">    public static final class Accounting implements RetainedGraph.View {</span>
+        private long validationWork,executionWork,storageWork,retentionWork,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
+<span class="fc" id="L65">        private boolean complete,externalKnown;private long externalNodes,externalCharacters,externalReferences;private String detail=&quot;&quot;;</span>
+        void update(long validation,long execution,long storage,long retention,long pn,long pc,long pr,long rn,long rc,long rr,boolean complete,String detail){
+<span class="fc" id="L67">            validationWork=validation;executionWork=execution;storageWork=storage;retentionWork=retention;peakNodes=pn;peakCharacters=pc;peakReferences=pr;</span>
+<span class="fc" id="L68">            resultNodes=rn;resultCharacters=rc;resultReferences=rr;this.complete=complete;this.detail=detail;</span>
+<span class="fc" id="L69">        }</span>
+<span class="fc" id="L70">        public long validationWork(){return validationWork;}</span>
+<span class="fc" id="L71">        public long executionWork(){return executionWork;}</span>
+<span class="fc" id="L72">        public long storageWork(){return storageWork;}</span>
+<span class="fc" id="L73">        public long retentionWork(){return retentionWork;}</span>
+        /** Post-close caller input graph, separate from and overlapping result ownership; empty means unknown. */
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        public Optional&lt;RetainedGraph.Usage&gt; externalRetained(){return externalKnown?Optional.of(new RetainedGraph.Usage(externalNodes,externalCharacters,externalReferences)):Optional.empty();}</span>
+<span class="fc" id="L76">        void external(RetainedGraph.Usage usage,boolean known){externalNodes=usage.nodes();externalCharacters=usage.characters();externalReferences=usage.references();externalKnown=known;}</span>
+        /** Session-owned lookup/kernel graph after close, excluding result and caller input graphs. */
+<span class="fc" id="L78">        public RetainedGraph.Usage live(){return new RetainedGraph.Usage(0,0,0);}</span>
+        /** Peak of observed graphs only; uninstrumented atomic temporaries make total coverage incomplete. */
+<span class="fc" id="L80">        public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}</span>
+<span class="fc" id="L81">        public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}</span>
+        /** No total work/retention qualification is available while the atomic inventory remains partial. */
+<span class="fc" id="L83">        public boolean complete(){return false;}</span>
+<span class="nc" id="L84">        public Coverage coverage(){return NativeMoveSearch.coverage();}</span>
+        /** Diagnostic completion of installed observations, never evidence of complete accounting. */
+<span class="fc" id="L86">        public boolean observationsComplete(){return complete;}</span>
+<span class="fc" id="L87">        public String detail(){return detail;}</span>
+<span class="fc" id="L88">        long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),storageWork),retentionWork);}</span>
+<span class="fc" id="L89">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}</span>
+    }
+    /** Separate output-phase receipt; never changes the already published search charge. */
+    public static final class ExportAccounting implements RetainedGraph.View {
+        private final long budget;
+        private long work,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
+<span class="fc" id="L95">        private boolean complete;private String detail=&quot;&quot;;</span>
+<span class="fc" id="L96">        ExportAccounting(long budget){this.budget=budget;}</span>
+        void update(long work,long pn,long pc,long pr,RetainedGraph.Usage retained,boolean complete,String detail){
+<span class="fc" id="L98">            this.work=work;peakNodes=pn;peakCharacters=pc;peakReferences=pr;</span>
+<span class="fc" id="L99">            resultNodes=retained.nodes();resultCharacters=retained.characters();resultReferences=retained.references();this.complete=complete;this.detail=detail;</span>
+<span class="fc" id="L100">        }</span>
+        /** Observed output work only; missing atomic helpers prevent a total-cost claim. */
+<span class="pc" id="L102">        public long work(){return work;}public long budget(){return budget;}</span>
+        /** Peak of observed graphs only; uninstrumented atomic temporaries make total coverage incomplete. */
+<span class="fc" id="L104">        public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}</span>
+<span class="fc" id="L105">        public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}</span>
+        /** No total work/retention qualification is available while the atomic inventory remains partial. */
+<span class="fc" id="L107">        public boolean complete(){return false;}</span>
+<span class="fc" id="L108">        public Coverage coverage(){return NativeMoveSearch.coverage();}</span>
+        /** Diagnostic completion of installed observations, never evidence of complete accounting. */
+<span class="fc" id="L110">        public boolean observationsComplete(){return complete;}public String detail(){return detail;}</span>
+<span class="nc" id="L111">        public String workRevision(){return Result.EXPORT_REVISION;}</span>
+<span class="fc" id="L112">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}</span>
+    }
+    public static final class ExportFailure extends IllegalStateException {
+        private final ExportResult attempted;
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        ExportFailure(ExportResult attempted){super(attempted.accounting().detail().isEmpty()?attempted.coverage().name():attempted.accounting().detail());this.attempted=attempted;}</span>
+<span class="fc" id="L117">        public ExportResult attempted(){return attempted;}</span>
+    }
+    public static final class ExportResult implements RetainedGraph.View {
+        private MoveSearch.Result projection;private final ExportAccounting accounting;
+<span class="fc" id="L121">        ExportResult(MoveSearch.Result projection,ExportAccounting accounting){this.projection=projection;this.accounting=accounting;}</span>
+<span class="fc" id="L122">        void discard(){projection=null;}</span>
+<span class="fc" id="L123">        public MoveSearch.Result projection(){return projection;}public ExportAccounting accounting(){return accounting;}</span>
+<span class="fc" id="L124">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(projection);v.reference(accounting);}</span>
+<span class="fc" id="L125">        public boolean complete(){return accounting.complete();}</span>
+        /** A diagnostic artefact was materialized; this does not qualify its costs or bounded relation. */
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        public boolean artifactAvailable(){return projection!=null;}</span>
+<span class="fc" id="L128">        public Coverage coverage(){return accounting.coverage();}</span>
+    }
+    public static final class Result implements RetainedGraph.View {
+        Accounting accounting;
+<span class="fc" id="L132">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(result);v.reference(source);v.reference(incrementalProviders);v.reference(accounting);}</span>
+        private final SearchExecution.Result&lt;TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment&gt; result;
+        private final Expr source;
+        private final long replayWork,workBudget;
+        private final List&lt;StagedIncrementalMoveExecution.Provider&gt; incrementalProviders;
+        private Result(Problem problem,SearchExecution.Result&lt;TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment&gt; result){
+<span class="nc" id="L138">            this(problem,result,0);</span>
+<span class="nc" id="L139">        }</span>
+<span class="fc" id="L140">        private Result(Problem problem,SearchExecution.Result&lt;TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment&gt; result,long replayWork){</span>
+<span class="fc" id="L141">            this.source=problem.source();this.result=result;this.replayWork=replayWork;this.workBudget=problem.budget().totalWork();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            incrementalProviders=problem.scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL?problem.providers().stream()</span>
+<span class="fc" id="L143">                .map(p-&gt;new StagedIncrementalMoveExecution.Provider(p.descriptor(),NativeIncrementalSources.definition(p))).toList():null;</span>
+<span class="fc" id="L144">        }</span>
+        @SuppressWarnings(&quot;unchecked&quot;)
+        public List&lt;SearchExecution.Expansion&lt;TypedMoveSearch.State&gt;&gt; cursorReceipts(){
+<span class="fc" id="L147">            return result.pickerReceipts().stream().map(r-&gt;(SearchExecution.Expansion&lt;TypedMoveSearch.State&gt;)r).toList();</span>
+        }
+        /** Managed cursor receipts from eager/staged batch draining; separate from lane scheduling receipts. */
+<span class="fc" id="L150">        public List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts(){return result.batchCursorReceipts();}</span>
+<span class="fc" id="L151">        public Coverage coverage(){return NativeMoveSearch.coverage();}</span>
+<span class="fc" id="L152">        public boolean accountingComplete(){return false;}</span>
+        /** Installed observations completed; partial coverage still precludes total qualification. */
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        public boolean observationsComplete(){return (accounting==null || accounting.observationsComplete())</span>
+<span class="pc bpc" id="L155" title="1 of 6 branches missed.">            &amp;&amp; batchCursorReceipts().stream().allMatch(receipt-&gt;receipt.accountingComplete() &amp;&amp; receipt.status()!=IncrementalProviderContract.Status.FAILED)</span>
+<span class="pc bpc" id="L156" title="3 of 6 branches missed.">            &amp;&amp; cursorReceipts().stream().flatMap(r-&gt;r.lanes().stream()).allMatch(l-&gt;l.cursor()==null || l.cursor().accountingComplete());}</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        public Accounting accounting(){if(accounting==null)throw new IllegalStateException(&quot;ownership accounting unavailable for this revision&quot;);return accounting;}</span>
+<span class="fc" id="L158">        public String workRevision(){return REVISION;}</span>
+<span class="fc" id="L159">        public long replayWork(){return replayWork;}</span>
+        /** Sum of observed search/replay/accounting work, not a complete execution-cost upper bound. */
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        public long totalWork(){return Math.addExact(Math.addExact(metrics().totalWork(),replayWork),accounting==null?0:accounting.work());}</span>
+<span class="pc bpc" id="L162" title="3 of 4 branches missed.">        public boolean withinBudget(){return accountingComplete() &amp;&amp; totalWork()&lt;=workBudget;}</span>
+<span class="fc" id="L163">        public MoveSearch.Outcome outcome(){return MoveSearch.Outcome.INCONCLUSIVE;}</span>
+        /** Diagnostic execution outcome including observed failures; never a total-budget qualification. */
+<span class="pc bpc" id="L165" title="1 of 6 branches missed.">        public MoveSearch.Outcome observedOutcome(){if(accounting!=null &amp;&amp; !accounting.observationsComplete())return MoveSearch.Outcome.INCONCLUSIVE;return totalWork()&gt;workBudget?MoveSearch.Outcome.WORK_EXHAUSTED:result.outcome();}</span>
+<span class="fc" id="L166">        public long workBudget(){return workBudget;}</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        public Expr output(){return result.witness().isEmpty()?source:result.witness().getLast().target().expression();}</span>
+<span class="fc" id="L168">        public List&lt;SearchExecution.Step&lt;TypedMoveSearch.State,NativeSearchMove,NativeVerification&gt;&gt; witness(){return result.witness();}</span>
+        /** Frontier receipt. Independently paid final replay is separate; totalWork adds the other observed result costs. */
+<span class="fc" id="L170">        public MoveSearch.Metrics metrics(){return result.metrics();}</span>
+        /** Independent finite output-phase budget; add its observed work once to totalWork; coverage remains incomplete. */
+<span class="fc" id="L172">        public ExportResult exportLegacy(long workBudget,SearchExpressionStore.Limits limits){return NativeExportSession.run(this,workBudget,limits);}</span>
+        public static final long DEFAULT_EXPORT_WORK=10_000_000;
+        public static final String EXPORT_REVISION=&quot;regelsuche.native-legacy-export/v2-partial-atomic-inventory&quot;;
+        /** Requires fully qualified output accounting; partial coverage throws with its paid diagnostic artefact. */
+        public MoveSearch.Result exportLegacy(){
+<span class="fc" id="L177">            var exported=exportLegacy(DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if(!exported.complete())throw new ExportFailure(exported);return exported.projection();</span>
+        }
+        MoveSearch.Result projectLegacy(){
+<span class="fc" id="L181">            var assessments=new HashMap&lt;MoveState,StateValue.Assessment&gt;();</span>
+<span class="fc" id="L182">            var witness=new ArrayList&lt;MoveSearch.WitnessStep&gt;();var events=new ArrayList&lt;MoveSearch.Event&gt;();</span>
+<span class="fc" id="L183">            var reached=new HashSet&lt;MoveState&gt;();var dead=new ArrayList&lt;MoveState&gt;();</span>
+<span class="fc" id="L184">            var expansions=new ArrayList&lt;StagedIncrementalMoveExecution.Expansion&gt;();</span>
+<span class="fc" id="L185">            try(var retained=de.regelsuche.retention.RetainedOperation.retain(assessments,witness,events,reached,dead,expansions)) {</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                for(var e:result.stateAssessments().entrySet()){assessments.put(export(e.getKey()),export(e.getValue()));de.regelsuche.retention.RetainedOperation.checkpoint();}</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                for(var step:result.witness()){witness.add(new MoveSearch.WitnessStep(export(step.source()),export(step.target()),step.move().exportLegacy(),step.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">                for(var event:result.events()){events.add(new MoveSearch.Event(export(event.source()),export(event.target()),event.move().exportLegacy(),event.decision(),event.verification()==null?null:event.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                for(var state:result.reachedStates()){reached.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                for(var state:result.deadEndStates()){dead.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}</span>
+<span class="fc bfc" id="L191" title="All 4 branches covered.">                if(incrementalProviders!=null)for(var receipt:cursorReceipts()){expansions.add(new StagedIncrementalMoveExecution.Expansion(export(receipt.source()),receipt.closed(),receipt.lanes()));de.regelsuche.retention.RetainedOperation.checkpoint();}</span>
+<span class="fc" id="L192">                de.regelsuche.retention.RetainedOperation.work(assessments.size()+witness.size()+events.size()+reached.size()+dead.size()+expansions.size()+7L);</span>
+<span class="fc" id="L193">                return de.regelsuche.retention.RetainedOperation.produced(new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),false,assessments,null,</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                    incrementalProviders==null?null:new StagedIncrementalMoveExecution(REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,expansions)));</span>
+            }
+        }
+    }
+    public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
+            List&lt;SearchExecution.Step&lt;TypedMoveSearch.State,NativeSearchMove,NativeVerification&gt;&gt; witness,long replayWork,long workBudget) implements RetainedGraph.View {
+<span class="fc" id="L200">        public QualityResult { witness=List.copyOf(witness); }</span>
+        /** Observed work only; see the native search coverage and accounting receipt. */
+<span class="fc" id="L202">        public long totalWork(){return search.totalWork();}</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        public boolean hasIncumbent(){return incumbent!=null;}</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        @Override public long inputScore(){if(!hasIncumbent())throw new IllegalStateException(&quot;input was not scored&quot;);return inputScore;}</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        @Override public long outputScore(){if(!hasIncumbent())throw new IllegalStateException(&quot;no scored incumbent&quot;);return outputScore;}</span>
+<span class="fc" id="L206">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(search);v.reference(incumbent);v.reference(witness);}</span>
+<span class="pc bpc" id="L207" title="3 of 4 branches missed.">        public boolean withinBudget(){return search.accountingComplete() &amp;&amp; totalWork()&lt;=workBudget;}</span>
+    }
+    public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation){
+<span class="fc" id="L210">        return select(problem,objective,maximumOutputScore,true,continuation,SearchExpressionStore.Limits.DEFAULT);</span>
+    }
+    public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
+<span class="fc" id="L213">        return select(problem,objective,maximumOutputScore,true,continuation,Objects.requireNonNull(limits));</span>
+    }
+    public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
+<span class="fc" id="L216">        return select(problem,objective,0,false,continuation,Objects.requireNonNull(limits));</span>
+    }
+    /** Best admitted incumbent under the fixed budget; does not stop at an adequate score. */
+    public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation){
+<span class="fc" id="L220">        return select(problem,objective,0,false,continuation,SearchExpressionStore.Limits.DEFAULT);</span>
+    }
+    public static final class FinalCheckFailure extends IllegalStateException {
+        private final QualityResult attempted;
+        private final NativeVerification rejected;
+        private FinalCheckFailure(QualityResult attempted,NativeVerification rejected){
+<span class="fc" id="L226">            super(&quot;independent native selected-path replay differs&quot;);this.attempted=attempted;this.rejected=rejected;</span>
+<span class="fc" id="L227">        }</span>
+<span class="fc" id="L228">        public QualityResult attempted(){return attempted;}</span>
+<span class="fc" id="L229">        public NativeVerification rejected(){return rejected;}</span>
+    }
+<span class="fc" id="L231">    private record ObjectiveAdapter(TypedSourceOnlySearch.Objective objective)</span>
+            implements java.util.function.Function&lt;TypedMoveSearch.State,MoveSearch.ObjectiveScore&gt;,RetainedGraph.View {
+        @Override public MoveSearch.ObjectiveScore apply(TypedMoveSearch.State state){
+<span class="fc" id="L234">            var score=objective.evaluate(state);return new MoveSearch.ObjectiveScore(score.value(),score.work());</span>
+        }
+<span class="fc" id="L236">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(objective);}</span>
+    }
+    private QualityResult select(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,
+            boolean stopAtQuality,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
+<span class="fc" id="L240">        Objects.requireNonNull(objective);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if(!problem.context().sourceOnly())throw new IllegalArgumentException(&quot;source-only context required&quot;);</span>
+<span class="fc" id="L242">        var selection=new MoveSearchObjective&lt;TypedMoveSearch.State,NativeSearchMove,NativeVerification&gt;(</span>
+            new ObjectiveAdapter(objective),maximumOutputScore,stopAtQuality);
+<span class="fc" id="L244">        try(var store=new SearchExpressionStore(limits)) {</span>
+<span class="fc" id="L245">            var accounting=new NativeRetentionSession(problem,store,limits);</span>
+<span class="fc" id="L246">            try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {</span>
+<span class="fc" id="L247">                accounting.operation(operation);accounting.externalObjective(objective);accounting.validate(problem.source());</span>
+<span class="fc" id="L248">                var execution=new Execution(problem,store,accounting);</span>
+<span class="fc" id="L249">                var searched=new MoveSearchKernel&lt;Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification&gt;()</span>
+<span class="fc" id="L250">                    .search(execution,continuation,selection);</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                var replay=selection.incumbent()==null?new Replay(0,null):</span>
+<span class="fc" id="L252">                    replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());</span>
+<span class="fc" id="L253">                var result=new Result(problem,searched,replay.work());</span>
+<span class="fc" id="L254">                var quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());</span>
+<span class="fc" id="L255">                accounting.finish(result,quality);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">                if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());</span>
+<span class="fc" id="L257">                return quality;</span>
+            }
+        }
+    }
+    public Result search(Problem problem,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
+<span class="fc" id="L262">        Objects.requireNonNull(limits);</span>
+<span class="fc" id="L263">        try(var store=new SearchExpressionStore(limits)) {</span>
+<span class="fc" id="L264">            var accounting=new NativeRetentionSession(problem,store,limits);</span>
+<span class="fc" id="L265">            try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {</span>
+<span class="fc" id="L266">            accounting.operation(operation);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            accounting.validate(problem.source());if(problem.context().goal()!=null)accounting.validate(problem.context().goal());</span>
+<span class="fc" id="L268">            var execution=new Execution(problem,store,accounting);</span>
+<span class="fc" id="L269">            var searched=new MoveSearchKernel&lt;Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification&gt;()</span>
+<span class="fc" id="L270">                .search(execution,continuation,null);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED</span>
+<span class="fc" id="L272">                ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);</span>
+<span class="fc" id="L273">            var result=new Result(problem,searched,replay.work());accounting.finish(result);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());</span>
+<span class="fc" id="L275">            return result;</span>
+            }
+        }
+    }
+    /** Default native execution includes validation, ownership observations, cleanup and fresh final replay. */
+    public Result search(Problem problem,SearchContinuationContract continuation){
+<span class="fc" id="L281">        return search(problem,continuation,SearchExpressionStore.Limits.DEFAULT);</span>
+    }
+    public static final class TargetCheckFailure extends IllegalStateException {
+        private final Result attempted;private final NativeVerification rejected;
+        private TargetCheckFailure(Result attempted,NativeVerification rejected){
+<span class="fc" id="L286">            super(&quot;independent native target replay differs&quot;);this.attempted=attempted;this.rejected=rejected;</span>
+<span class="fc" id="L287">        }</span>
+<span class="fc" id="L288">        public Result attempted(){return attempted;}</span>
+<span class="fc" id="L289">        public NativeVerification rejected(){return rejected;}</span>
+    }
+<span class="fc" id="L291">    private record Replay(long work,NativeVerification rejected) {}</span>
+    private static Replay replay(Execution execution,Expr source,Expr target,
+            List&lt;SearchExecution.Step&lt;TypedMoveSearch.State,NativeSearchMove,NativeVerification&gt;&gt; witness){
+<span class="fc" id="L294">        long work=0;</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        TypedMoveSearch.State cursor=witness.isEmpty()?null:witness.getFirst().source();</span>
+<span class="pc bpc" id="L296" title="2 of 6 branches missed.">        if(cursor!=null &amp;&amp; (!cursor.expression().equals(source) || cursor.searchDepth()!=0))</span>
+<span class="nc" id="L297">            throw new IllegalStateException(&quot;native replay root differs&quot;);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        for(var step:witness) {</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            if(!cursor.equals(step.source()))throw new IllegalStateException(&quot;broken native witness lineage&quot;);</span>
+            NativeVerification checked;
+<span class="fc" id="L301">            try {checked=execution.verify(cursor,step.move());}</span>
+<span class="fc" id="L302">            catch(SearchExecution.ResourceLimit exhausted) {</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                if(execution.accounting==null)throw exhausted;</span>
+<span class="fc" id="L304">                execution.accounting.incomplete(&quot;NATIVE_RESOURCE_LIMIT&quot;);</span>
+<span class="fc" id="L305">                return new Replay(Math.addExact(work,exhausted.takeWork().total()),null);</span>
+<span class="fc" id="L306">            }</span>
+<span class="fc" id="L307">            work=Math.addExact(work,checked.work());</span>
+<span class="fc bfc" id="L308" title="All 4 branches covered.">            if(!checked.accepted() || !checked.equals(step.verification()))return new Replay(work,checked);</span>
+<span class="fc" id="L309">            cursor=step.target();</span>
+<span class="fc" id="L310">        }</span>
+<span class="pc bpc" id="L311" title="1 of 4 branches missed.">        if(!(cursor==null?source:cursor.expression()).equals(target))throw new IllegalStateException(&quot;native replay endpoint differs&quot;);</span>
+<span class="fc" id="L312">        return new Replay(work,null);</span>
+    }
+    private static final class Execution implements SearchExecution.Environment&lt;Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification&gt;,RetainedGraph.View {
+        private final Problem problem;private final SearchExpressionStore store;
+        private final NativeRetentionSession accounting;
+<span class="fc" id="L317">        Execution(Problem problem,SearchExpressionStore store,NativeRetentionSession accounting){this.problem=Objects.requireNonNull(problem);this.store=store;this.accounting=accounting;}</span>
+<span class="fc" id="L318">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(accounting);}</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        @Override public void ownership(RetainedGraph.View root){if(accounting!=null)accounting.ownership(root);}</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        @Override public void checkpoint(){if(accounting!=null)accounting.checkpoint();}</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        @Override public long additionalWork(){return accounting==null?0:accounting.work();}</span>
+<span class="pc bpc" id="L322" title="1 of 4 branches missed.">        @Override public boolean ownershipComplete(){return accounting==null || accounting.complete();}</span>
+<span class="fc" id="L323">        @Override public Expr source(){return problem.source();}</span>
+<span class="fc" id="L324">        @Override public Expr goal(){return problem.context().goal();}</span>
+<span class="fc" id="L325">        @Override public List&lt;String&gt; initialAssumptions(){return problem.context().initialAssumptions();}</span>
+<span class="fc" id="L326">        @Override public MoveSearch.Budget budget(){return problem.budget();}</span>
+<span class="fc" id="L327">        @Override public MoveSearch.Mode mode(){return problem.mode();}</span>
+<span class="fc" id="L328">        @Override public MoveSearch.Scheduling scheduling(){return problem.scheduling();}</span>
+        @Override public TypedMoveSearch.State state(Expr expression,int depth,int primitive,String previous,List&lt;String&gt; assumptions,Set&lt;String&gt; capabilities,int debt){
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if(accounting==null)de.regelsuche.search.program.AstExpressionValidation.inspect(expression);else accounting.validate(expression);</span>
+<span class="fc" id="L331">            try {return new TypedMoveSearch.State(store.dereference(store.intern(expression)),depth,primitive,previous,assumptions,capabilities,debt);}</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">            catch(SearchExpressionStore.LimitExceeded exhausted){if(accounting!=null)accounting.fail(&quot;NATIVE_RETENTION_EXHAUSTED&quot;);throw exhausted;}</span>
+        }
+<span class="fc" id="L334">        @Override public NativeStateValue.Assessment inspect(TypedMoveSearch.State state){return problem.stateValue().evaluate(state,problem.context());}</span>
+<span class="fc" id="L335">        @Override public double score(TypedMoveSearch.State state){return problem.stateScore().applyAsDouble(state);}</span>
+        @Override public boolean carries(List&lt;String&gt; assumptions,TypedMoveSearch.State state){
+<span class="fc" id="L337">            var available=new HashSet&lt;&gt;(initialAssumptions());available.addAll(state.assumptions());return available.containsAll(assumptions);</span>
+        }
+        @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move){
+<span class="fc" id="L340">            de.regelsuche.retention.RetainedOperation.work(1);</span>
+<span class="fc" id="L341">            return problem.verifier().verify(state,move,problem.context());</span>
+        }
+        @Override public SearchExecution.Picker&lt;NativeSearchMove&gt; picker(TypedMoveSearch.State state){
+<span class="fc" id="L344">            var ranking=new SearchBatches.Ranking&lt;NativeSearchMove&gt;() {</span>
+<span class="fc" id="L345">                @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(Execution.this);v.reference(state);}</span>
+<span class="fc" id="L346">                @Override public double score(NativeSearchMove move){return problem.policy().score(move,state,problem.context());}</span>
+<span class="fc" id="L347">                @Override public int stage(MoveProvider.Descriptor descriptor){return problem.policy().stage(descriptor,state,problem.context()).ordinal();}</span>
+<span class="fc" id="L348">                @Override public double providerScore(MoveProvider.Descriptor descriptor){return problem.policy().providerScore(descriptor,state,problem.context());}</span>
+<span class="fc" id="L349">                @Override public long contextWork(){return problem.policy().contextWork(state,problem.context());}</span>
+<span class="fc" id="L350">                @Override public void requireSource(NativeSearchMove move){move.requireSource(state.expression());}</span>
+            };
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if(scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL)return new StagedIncrementalLanes&lt;&gt;(problem.providers().stream()</span>
+<span class="fc" id="L353">                .map(p-&gt;NativeIncrementalSources.lane(p,state,problem.context())).toList(),ranking,state);</span>
+<span class="fc" id="L354">            var providers=problem.providers().stream().&lt;SearchBatches.Provider&lt;NativeSearchMove&gt;&gt;map(p-&gt;new SearchBatches.Provider&lt;&gt;() {</span>
+<span class="fc" id="L355">                @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(Execution.this);v.reference(p);v.reference(state);}</span>
+<span class="fc" id="L356">                @Override public MoveProvider.Descriptor descriptor(){return p.descriptor();}</span>
+                @Override public SearchBatches.Batch&lt;NativeSearchMove&gt; candidates(){
+<span class="fc" id="L358">                    var batch=p.candidates(state,problem.context());</span>
+<span class="fc" id="L359">                    return new SearchBatches.Batch&lt;&gt;(batch.moves(),batch.work(),batch.complete(),batch.cursorReceipts());</span>
+                }
+<span class="fc" id="L361">            }).toList();</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">            return scheduling()==MoveSearch.Scheduling.STAGED?new StagedBatchPicker&lt;&gt;(providers,ranking):new EagerBatchPicker&lt;&gt;(providers,ranking,false);</span>
+        }
+    }
+    private static StateValue.Assessment export(NativeStateValue.Assessment value){
+<span class="fc" id="L366">        var capabilities=new TreeMap&lt;String,StateValue.Capability&gt;();var codec=new CompiledAstReplayCodec();</span>
+<span class="fc" id="L367">        var text=new String[3];</span>
+<span class="fc" id="L368">        try(var retained=de.regelsuche.retention.RetainedOperation.retain(capabilities,text)) {</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            for(var entry:value.capabilities().entrySet()) {</span>
+<span class="fc" id="L370">                var c=entry.getValue();text[0]=codec.encodeExpression(c.sourceExpression());text[1]=codec.encodeExpression(c.matchedExpression());text[2]=codec.encodeExpression(c.rewrittenExpression());</span>
+<span class="fc" id="L371">                capabilities.put(entry.getKey(),new StateValue.Capability(c.providerId(),text[0],c.subtreePath(),text[1],text[2]));</span>
+<span class="fc" id="L372">                de.regelsuche.retention.RetainedOperation.work(4);de.regelsuche.retention.RetainedOperation.checkpoint();</span>
+<span class="fc" id="L373">            }</span>
+<span class="fc" id="L374">            return de.regelsuche.retention.RetainedOperation.produced(new StateValue.Assessment(value.complexity(),value.value(),value.searchWork(),value.primitiveWork(),capabilities));</span>
+        }
+    }
+<span class="fc" id="L377">    static MoveState export(TypedMoveSearch.State state){return new MoveState(new CompiledAstReplayCodec().encodeExpression(state.expression()),state.searchDepth(),state.primitiveDepth(),state.previousRule(),state.assumptions(),state.capabilities(),state.complexityDebt());}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

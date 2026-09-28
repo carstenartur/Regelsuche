@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeVerification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeVerification.java</span></div><h1>NativeVerification.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.RetainedGraph;
+
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.util.List;
+
+/** Typed recheck receipt. Complete producer structure, never a digest, determines equality. */
+public record NativeVerification(boolean accepted,long work,NativeMoveProof checkedProof,String ruleId,String reason)
+        implements SearchExecution.Verification,RetainedGraph.View {
+<span class="fc" id="L11">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(checkedProof);v.reference(ruleId);v.reference(reason);}</span>
+
+<span class="fc" id="L13">    public NativeVerification {</span>
+<span class="pc bpc" id="L14" title="4 of 10 branches missed.">        if(work&lt;0 || reason==null || (accepted &amp;&amp; (checkedProof==null || ruleId==null)))throw new IllegalArgumentException(&quot;invalid native verification&quot;);</span>
+<span class="fc" id="L15">    }</span>
+    public MoveVerifier.Verification exportLegacy(){
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if(!accepted)return new MoveVerifier.Verification(false,work,List.of(),reason);</span>
+<span class="pc bpc" id="L18" title="1 of 3 branches missed.">        String receipt=switch(checkedProof) {</span>
+<span class="fc" id="L19">            case NativeMoveProof.Primitive primitive -&gt; {</span>
+<span class="fc" id="L20">                var codec=new CompiledAstReplayCodec();</span>
+<span class="fc" id="L21">                var text=new String[2];</span>
+<span class="fc" id="L22">                try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {</span>
+<span class="fc" id="L23">                    text[0]=codec.encodeExpression(primitive.source());text[1]=codec.encodeExpression(primitive.target());</span>
+<span class="fc" id="L24">                    yield &quot;typed-primitive-replay:&quot;+NativeSearchMove.digest(text[0]+&quot;\n&quot;+text[1]+&quot;\n&quot;+ruleId);</span>
+<span class="fc" id="L25">                }</span>
+            }
+<span class="fc" id="L27">            case NativeMoveProof.Program program -&gt; &quot;typed-program-replay:&quot;+program.exportLegacy().applicationKey();</span>
+<span class="nc" id="L28">            case NativeMoveProof.Exact exact -&gt; &quot;checked-schema-application:&quot;+exact.evidence().exportLegacy().binding().evidenceHash();</span>
+<span class="fc" id="L29">        };</span>
+<span class="fc" id="L30">        return new MoveVerifier.Verification(true,work,List.of(receipt),reason);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

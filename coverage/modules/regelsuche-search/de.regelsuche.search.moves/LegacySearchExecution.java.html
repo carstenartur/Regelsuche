@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LegacySearchExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">LegacySearchExecution.java</span></div><h1>LegacySearchExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.List;
+import java.util.Set;
+
+/** Original public records enter/leave the common frontier without changing their serialization. */
+final class LegacySearchExecution implements SearchExecution.Environment&lt;String,MoveState,SearchMove,StateValue.Assessment,MoveVerifier.Verification&gt; {
+    private final MoveSearch.Problem problem;
+<span class="fc" id="L9">    LegacySearchExecution(MoveSearch.Problem problem){this.problem=problem;}</span>
+<span class="fc" id="L10">    @Override public String source(){return problem.source();}</span>
+<span class="fc" id="L11">    @Override public String goal(){return problem.context().goal();}</span>
+<span class="fc" id="L12">    @Override public List&lt;String&gt; initialAssumptions(){return problem.context().initialAssumptions();}</span>
+<span class="fc" id="L13">    @Override public MoveSearch.Budget budget(){return problem.budget();}</span>
+<span class="fc" id="L14">    @Override public MoveSearch.Mode mode(){return problem.mode();}</span>
+<span class="fc" id="L15">    @Override public MoveSearch.Scheduling scheduling(){return problem.scheduling();}</span>
+<span class="fc" id="L16">    @Override public MoveState state(String expression,int depth,int primitive,String previous,List&lt;String&gt; assumptions,Set&lt;String&gt; capabilities,int debt){return new MoveState(expression,depth,primitive,previous,assumptions,capabilities,debt);}</span>
+<span class="fc" id="L17">    @Override public StateValue.Assessment inspect(MoveState state){return problem.stateValue().evaluate(state,problem.context());}</span>
+<span class="fc" id="L18">    @Override public double score(MoveState state){return problem.stateScore().applyAsDouble(state);}</span>
+<span class="fc" id="L19">    @Override public MoveVerifier.Verification verify(MoveState state,SearchMove move){return problem.verifier().verify(state,move,problem.context());}</span>
+<span class="fc" id="L20">    @Override public boolean carries(List&lt;String&gt; assumptions,MoveState state){return problem.context().carries(assumptions,state);}</span>
+    @Override public MovePicker picker(MoveState state){
+<span class="fc bfc" id="L22" title="All 4 branches covered.">        return switch(problem.scheduling()) {</span>
+<span class="fc" id="L23">            case STAGED_INCREMENTAL -&gt; new IncrementalMovePicker(problem.providers(),problem.policy(),state,problem.context());</span>
+<span class="fc" id="L24">            case INCREMENTAL_NATIVE_ORDER -&gt; new IncrementalMovePicker(problem.providers(),state,problem.context());</span>
+<span class="fc" id="L25">            case STAGED -&gt; new StagedMovePicker(problem.providers(),problem.policy(),state,problem.context());</span>
+<span class="fc" id="L26">            case EAGER_CONTROL -&gt; new EagerMovePicker(problem.providers(),problem.policy(),state,problem.context());</span>
+        };
+    }
+    static MoveSearch.WitnessStep step(SearchExecution.Step&lt;MoveState,SearchMove,MoveVerifier.Verification&gt; step){
+<span class="fc" id="L30">        return new MoveSearch.WitnessStep(step.source(),step.target(),step.move(),step.verification());</span>
+    }
+    static MoveSearch.Result project(MoveSearch.Problem problem,SearchExecution.Result&lt;MoveState,SearchMove,MoveVerifier.Verification,StateValue.Assessment&gt; result){
+<span class="fc" id="L33">        IncrementalMoveExecution nativeReceipt=null; StagedIncrementalMoveExecution stagedReceipt=null;</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if(problem.scheduling()==MoveSearch.Scheduling.INCREMENTAL_NATIVE_ORDER)</span>
+<span class="fc" id="L35">            nativeReceipt=new IncrementalMoveExecution(IncrementalMoveExecution.WORK_REVISION,IncrementalMoveExecution.ORDER_REVISION,</span>
+<span class="fc" id="L36">                problem.providers().stream().map(p-&gt;new IncrementalMoveExecution.Provider(p.descriptor(),((IncrementalMoveProvider)p).definition())).toList(),</span>
+<span class="fc" id="L37">                result.pickerReceipts().stream().map(IncrementalMoveExecution.Expansion.class::cast).toList());</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if(problem.scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL)</span>
+<span class="fc" id="L39">            stagedReceipt=new StagedIncrementalMoveExecution(StagedIncrementalMoveExecution.WORK_REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,</span>
+<span class="fc" id="L40">                problem.providers().stream().map(p-&gt;new StagedIncrementalMoveExecution.Provider(p.descriptor(),StagedIncrementalSources.definition(p))).toList(),</span>
+<span class="fc" id="L41">                result.pickerReceipts().stream().map(StagedIncrementalMoveExecution.Expansion.class::cast).toList());</span>
+<span class="fc" id="L42">        return new MoveSearch.Result(result.outcome(),result.witness().stream().map(LegacySearchExecution::step).toList(),</span>
+<span class="fc" id="L43">            result.events().stream().map(e-&gt;new MoveSearch.Event(e.source(),e.target(),e.move(),e.decision(),e.verification())).toList(),</span>
+<span class="fc" id="L44">            result.reachedStates(),result.deadEndStates(),result.metrics(),result.completeBoundedRelation(),result.stateAssessments(),nativeReceipt,stagedReceipt);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

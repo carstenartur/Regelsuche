@@ -6,11 +6,13 @@ import java.util.List;
 @FunctionalInterface
 public interface MoveVerifier {
     Verification verify(MoveState source, SearchMove move, MoveContext context);
-    record Verification(boolean accepted, long work, List&lt;String&gt; receipts, String reason) {
-<span class="fc" id="L10">        public Verification {</span>
-<span class="pc bpc" id="L11" title="3 of 8 branches missed.">            if (work &lt; 0 || reason == null || (accepted &amp;&amp; receipts.isEmpty())) throw new IllegalArgumentException(&quot;invalid verification receipt&quot;);</span>
-<span class="fc" id="L12">            receipts = List.copyOf(receipts);</span>
-<span class="fc" id="L13">        }</span>
+    record Verification(boolean accepted, long work, List&lt;String&gt; receipts, String reason) implements SearchExecution.Verification, de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L10">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(receipts);v.reference(reason);}</span>
+
+<span class="fc" id="L12">        public Verification {</span>
+<span class="pc bpc" id="L13" title="3 of 8 branches missed.">            if (work &lt; 0 || reason == null || (accepted &amp;&amp; receipts.isEmpty())) throw new IllegalArgumentException(&quot;invalid verification receipt&quot;);</span>
+<span class="fc" id="L14">            receipts = List.copyOf(receipts);</span>
+<span class="fc" id="L15">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

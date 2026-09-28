@@ -471,12 +471,13 @@ public record EvolutionGenome(
         }
     }
 
-<span class="fc" id="L474">    public enum EvidenceObligation {</span>
+<span class="fc" id="L474">    public enum EvidenceObligation implements de.regelsuche.retention.RetainedGraph.View {</span>
 <span class="fc" id="L475">        SEMANTIC_VALIDATION,</span>
 <span class="fc" id="L476">        COUNTEREXAMPLE_SEARCH,</span>
 <span class="fc" id="L477">        PROOF_OR_CERTIFICATE,</span>
 <span class="fc" id="L478">        NOVELTY_REVIEW,</span>
-<span class="fc" id="L479">        HOLDOUT_EVALUATION</span>
+<span class="fc" id="L479">        HOLDOUT_EVALUATION;</span>
+<span class="fc" id="L480">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){}</span>
     }
 
     public record TrainingScope(
@@ -486,39 +487,40 @@ public record EvolutionGenome(
         String signaturePartitionHash,
         String featureSchemaHash
     ) {
-<span class="fc" id="L489">        public TrainingScope {</span>
-<span class="pc bpc" id="L490" title="1 of 2 branches missed.">            if (sourceSplit != SourceSplit.TRAIN) {</span>
-<span class="nc" id="L491">                throw new IllegalArgumentException(&quot;genome formation is restricted to TRAIN&quot;);</span>
+<span class="fc" id="L490">        public TrainingScope {</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">            if (sourceSplit != SourceSplit.TRAIN) {</span>
+<span class="nc" id="L492">                throw new IllegalArgumentException(&quot;genome formation is restricted to TRAIN&quot;);</span>
             }
-<span class="fc" id="L493">            requireSha256(corpusHash, &quot;corpusHash&quot;);</span>
-<span class="fc" id="L494">            requireSha256(familyPartitionHash, &quot;familyPartitionHash&quot;);</span>
-<span class="fc" id="L495">            requireSha256(signaturePartitionHash, &quot;signaturePartitionHash&quot;);</span>
-<span class="fc" id="L496">            requireSha256(featureSchemaHash, &quot;featureSchemaHash&quot;);</span>
-<span class="fc" id="L497">        }</span>
+<span class="fc" id="L494">            requireSha256(corpusHash, &quot;corpusHash&quot;);</span>
+<span class="fc" id="L495">            requireSha256(familyPartitionHash, &quot;familyPartitionHash&quot;);</span>
+<span class="fc" id="L496">            requireSha256(signaturePartitionHash, &quot;signaturePartitionHash&quot;);</span>
+<span class="fc" id="L497">            requireSha256(featureSchemaHash, &quot;featureSchemaHash&quot;);</span>
+<span class="fc" id="L498">        }</span>
     }
 
     public record AssumptionTemplate(
         Assumption.Kind kind,
         String expression,
         List&lt;String&gt; symbols
-    ) {
-<span class="fc" id="L505">        public AssumptionTemplate {</span>
-<span class="fc" id="L506">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="fc" id="L507">            requireText(expression, &quot;assumption expression&quot;);</span>
-<span class="fc" id="L508">            expression = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
-<span class="pc bpc" id="L509" title="1 of 2 branches missed.">            symbols = symbols == null</span>
-<span class="nc" id="L510">                ? List.of()</span>
-<span class="fc" id="L511">                : symbols.stream()</span>
-<span class="fc" id="L512">                    .filter(Objects::nonNull)</span>
-<span class="fc" id="L513">                    .map(String::trim)</span>
-<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                    .filter(value -&gt; !value.isEmpty())</span>
-<span class="fc" id="L515">                    .distinct()</span>
-<span class="fc" id="L516">                    .sorted()</span>
-<span class="fc" id="L517">                    .toList();</span>
-<span class="fc" id="L518">        }</span>
+    ) implements de.regelsuche.retention.RetainedGraph.View {
+<span class="nc" id="L506">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(kind);v.reference(expression);v.reference(symbols);}</span>
+<span class="fc" id="L507">        public AssumptionTemplate {</span>
+<span class="fc" id="L508">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L509">            requireText(expression, &quot;assumption expression&quot;);</span>
+<span class="fc" id="L510">            expression = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">            symbols = symbols == null</span>
+<span class="nc" id="L512">                ? List.of()</span>
+<span class="fc" id="L513">                : symbols.stream()</span>
+<span class="fc" id="L514">                    .filter(Objects::nonNull)</span>
+<span class="fc" id="L515">                    .map(String::trim)</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">                    .filter(value -&gt; !value.isEmpty())</span>
+<span class="fc" id="L517">                    .distinct()</span>
+<span class="fc" id="L518">                    .sorted()</span>
+<span class="fc" id="L519">                    .toList();</span>
+<span class="fc" id="L520">        }</span>
 
         String canonicalMaterial() {
-<span class="fc" id="L521">            return kind.name() + &quot;|&quot; + expression + &quot;|&quot; + symbols;</span>
+<span class="fc" id="L523">            return kind.name() + &quot;|&quot; + expression + &quot;|&quot; + symbols;</span>
         }
     }
 
@@ -533,41 +535,42 @@ public record EvolutionGenome(
         int maxAstGrowth,
         List&lt;AssumptionTemplate&gt; assumptions,
         List&lt;EvidenceObligation&gt; evidenceObligations
-    ) {
-<span class="fc" id="L537">        public RewriteGene {</span>
-<span class="fc" id="L538">            requireText(geneId, &quot;geneId&quot;);</span>
-<span class="fc" id="L539">            geneId = geneId.trim().toLowerCase(java.util.Locale.ROOT);</span>
-<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if (!GENE_ID.matcher(geneId).matches()) {</span>
-<span class="nc" id="L541">                throw new IllegalArgumentException(&quot;invalid geneId: &quot; + geneId);</span>
+    ) implements de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L539">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(geneId);v.reference(sourcePattern);v.reference(targetPattern);v.reference(kind);v.reference(assumptions);v.reference(evidenceObligations);}</span>
+<span class="fc" id="L540">        public RewriteGene {</span>
+<span class="fc" id="L541">            requireText(geneId, &quot;geneId&quot;);</span>
+<span class="fc" id="L542">            geneId = geneId.trim().toLowerCase(java.util.Locale.ROOT);</span>
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">            if (!GENE_ID.matcher(geneId).matches()) {</span>
+<span class="nc" id="L544">                throw new IllegalArgumentException(&quot;invalid geneId: &quot; + geneId);</span>
             }
-<span class="fc" id="L543">            sourcePattern = normalizePattern(sourcePattern);</span>
-<span class="fc" id="L544">            targetPattern = normalizePattern(targetPattern);</span>
-<span class="fc" id="L545">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="pc bpc" id="L546" title="2 of 4 branches missed.">            if (estimatedCostDelta &lt; -1000 || estimatedCostDelta &gt; 1000) {</span>
-<span class="nc" id="L547">                throw new IllegalArgumentException(&quot;estimatedCostDelta must be in [-1000,1000]&quot;);</span>
+<span class="fc" id="L546">            sourcePattern = normalizePattern(sourcePattern);</span>
+<span class="fc" id="L547">            targetPattern = normalizePattern(targetPattern);</span>
+<span class="fc" id="L548">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L549" title="2 of 4 branches missed.">            if (estimatedCostDelta &lt; -1000 || estimatedCostDelta &gt; 1000) {</span>
+<span class="nc" id="L550">                throw new IllegalArgumentException(&quot;estimatedCostDelta must be in [-1000,1000]&quot;);</span>
             }
-<span class="pc bpc" id="L549" title="2 of 4 branches missed.">            if (maxApplicationsPerPath &lt; 1 || maxApplicationsPerPath &gt; 1024) {</span>
-<span class="nc" id="L550">                throw new IllegalArgumentException(&quot;maxApplicationsPerPath must be in [1,1024]&quot;);</span>
+<span class="pc bpc" id="L552" title="2 of 4 branches missed.">            if (maxApplicationsPerPath &lt; 1 || maxApplicationsPerPath &gt; 1024) {</span>
+<span class="nc" id="L553">                throw new IllegalArgumentException(&quot;maxApplicationsPerPath must be in [1,1024]&quot;);</span>
             }
-<span class="pc bpc" id="L552" title="2 of 4 branches missed.">            if (maxAstGrowth &lt; 0 || maxAstGrowth &gt; 1024) {</span>
-<span class="nc" id="L553">                throw new IllegalArgumentException(&quot;maxAstGrowth must be in [0,1024]&quot;);</span>
+<span class="pc bpc" id="L555" title="2 of 4 branches missed.">            if (maxAstGrowth &lt; 0 || maxAstGrowth &gt; 1024) {</span>
+<span class="nc" id="L556">                throw new IllegalArgumentException(&quot;maxAstGrowth must be in [0,1024]&quot;);</span>
             }
-<span class="pc bpc" id="L555" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
-<span class="nc" id="L556">                ? List.of()</span>
-<span class="fc" id="L557">                : assumptions.stream().filter(Objects::nonNull)</span>
-<span class="fc" id="L558">                    .distinct()</span>
-<span class="fc" id="L559">                    .sorted(Comparator.comparing(AssumptionTemplate::canonicalMaterial))</span>
-<span class="fc" id="L560">                    .toList();</span>
-<span class="pc bpc" id="L561" title="1 of 2 branches missed.">            evidenceObligations = evidenceObligations == null</span>
-<span class="nc" id="L562">                ? List.of()</span>
-<span class="fc" id="L563">                : evidenceObligations.stream().filter(Objects::nonNull)</span>
-<span class="fc" id="L564">                    .distinct()</span>
-<span class="fc" id="L565">                    .sorted(Comparator.comparing(Enum::name))</span>
-<span class="fc" id="L566">                    .toList();</span>
-<span class="fc" id="L567">        }</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
+<span class="nc" id="L559">                ? List.of()</span>
+<span class="fc" id="L560">                : assumptions.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L561">                    .distinct()</span>
+<span class="fc" id="L562">                    .sorted(Comparator.comparing(AssumptionTemplate::canonicalMaterial))</span>
+<span class="fc" id="L563">                    .toList();</span>
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">            evidenceObligations = evidenceObligations == null</span>
+<span class="nc" id="L565">                ? List.of()</span>
+<span class="fc" id="L566">                : evidenceObligations.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L567">                    .distinct()</span>
+<span class="fc" id="L568">                    .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L569">                    .toList();</span>
+<span class="fc" id="L570">        }</span>
 
         public RewriteGene withPatterns(String source, String target) {
-<span class="fc" id="L570">            return new RewriteGene(</span>
+<span class="fc" id="L573">            return new RewriteGene(</span>
                 geneId,
                 source,
                 target,
@@ -581,7 +584,7 @@ public record EvolutionGenome(
         }
 
         public RewriteGene withAssumptions(List&lt;AssumptionTemplate&gt; replacements) {
-<span class="fc" id="L584">            return new RewriteGene(</span>
+<span class="fc" id="L587">            return new RewriteGene(</span>
                 geneId,
                 sourcePattern,
                 targetPattern,
@@ -596,15 +599,15 @@ public record EvolutionGenome(
     }
 
     public record FeatureWeight(FitnessSignal signal, int weightPermille) {
-<span class="fc" id="L599">        public FeatureWeight {</span>
-<span class="fc" id="L600">            Objects.requireNonNull(signal, &quot;signal&quot;);</span>
-<span class="pc bpc" id="L601" title="3 of 6 branches missed.">            if (weightPermille &lt; -1000 || weightPermille &gt; 1000 || weightPermille == 0) {</span>
-<span class="nc" id="L602">                throw new IllegalArgumentException(&quot;weightPermille must be non-zero in [-1000,1000]&quot;);</span>
+<span class="fc" id="L602">        public FeatureWeight {</span>
+<span class="fc" id="L603">            Objects.requireNonNull(signal, &quot;signal&quot;);</span>
+<span class="pc bpc" id="L604" title="3 of 6 branches missed.">            if (weightPermille &lt; -1000 || weightPermille &gt; 1000 || weightPermille == 0) {</span>
+<span class="nc" id="L605">                throw new IllegalArgumentException(&quot;weightPermille must be non-zero in [-1000,1000]&quot;);</span>
             }
-<span class="fc" id="L604">        }</span>
+<span class="fc" id="L607">        }</span>
     }
 
-<span class="fc" id="L607">    public record GuardPolicy(</span>
+<span class="fc" id="L610">    public record GuardPolicy(</span>
         boolean rejectCycles,
         boolean rejectUnboundedGrowth,
         boolean requireApplicabilityChecks,
@@ -612,11 +615,11 @@ public record EvolutionGenome(
         boolean deterministicTieBreaking
     ) {
         public static GuardPolicy strictDefault() {
-<span class="fc" id="L615">            return new GuardPolicy(true, true, true, true, true);</span>
+<span class="fc" id="L618">            return new GuardPolicy(true, true, true, true, true);</span>
         }
 
         String canonicalMaterial() {
-<span class="fc" id="L619">            return rejectCycles + &quot;|&quot; + rejectUnboundedGrowth + &quot;|&quot;</span>
+<span class="fc" id="L622">            return rejectCycles + &quot;|&quot; + rejectUnboundedGrowth + &quot;|&quot;</span>
                 + requireApplicabilityChecks + &quot;|&quot; + enforceDuplicateSuppression
                 + &quot;|&quot; + deterministicTieBreaking;
         }
@@ -629,30 +632,30 @@ public record EvolutionGenome(
         int maxApplicationsPerPath,
         int maxCandidatesPerState
     ) {
-<span class="fc" id="L632">        public ResourceBudget {</span>
-<span class="fc" id="L633">            requireRange(maxProgramLength, 1, 1024, &quot;maxProgramLength&quot;);</span>
-<span class="fc" id="L634">            requireRange(maxAstNodes, 1, 100_000, &quot;maxAstNodes&quot;);</span>
-<span class="fc" id="L635">            requireRange(maxAstGrowthPerStep, 0, 1024, &quot;maxAstGrowthPerStep&quot;);</span>
-<span class="fc" id="L636">            requireRange(maxApplicationsPerPath, 1, 100_000, &quot;maxApplicationsPerPath&quot;);</span>
-<span class="fc" id="L637">            requireRange(maxCandidatesPerState, 1, 100_000, &quot;maxCandidatesPerState&quot;);</span>
-<span class="fc" id="L638">        }</span>
+<span class="fc" id="L635">        public ResourceBudget {</span>
+<span class="fc" id="L636">            requireRange(maxProgramLength, 1, 1024, &quot;maxProgramLength&quot;);</span>
+<span class="fc" id="L637">            requireRange(maxAstNodes, 1, 100_000, &quot;maxAstNodes&quot;);</span>
+<span class="fc" id="L638">            requireRange(maxAstGrowthPerStep, 0, 1024, &quot;maxAstGrowthPerStep&quot;);</span>
+<span class="fc" id="L639">            requireRange(maxApplicationsPerPath, 1, 100_000, &quot;maxApplicationsPerPath&quot;);</span>
+<span class="fc" id="L640">            requireRange(maxCandidatesPerState, 1, 100_000, &quot;maxCandidatesPerState&quot;);</span>
+<span class="fc" id="L641">        }</span>
 
         public static ResourceBudget conservativeDefault() {
-<span class="fc" id="L641">            return new ResourceBudget(16, 256, 12, 32, 80);</span>
+<span class="fc" id="L644">            return new ResourceBudget(16, 256, 12, 32, 80);</span>
         }
 
         String canonicalMaterial() {
-<span class="fc" id="L645">            return maxProgramLength + &quot;|&quot; + maxAstNodes + &quot;|&quot;</span>
+<span class="fc" id="L648">            return maxProgramLength + &quot;|&quot; + maxAstNodes + &quot;|&quot;</span>
                 + maxAstGrowthPerStep + &quot;|&quot; + maxApplicationsPerPath
                 + &quot;|&quot; + maxCandidatesPerState;
         }
     }
 
     private static void requireRange(int value, int minimum, int maximum, String name) {
-<span class="pc bpc" id="L652" title="2 of 4 branches missed.">        if (value &lt; minimum || value &gt; maximum) {</span>
-<span class="nc" id="L653">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L655" title="2 of 4 branches missed.">        if (value &lt; minimum || value &gt; maximum) {</span>
+<span class="nc" id="L656">            throw new IllegalArgumentException(</span>
                 name + &quot; must be in [&quot; + minimum + &quot;,&quot; + maximum + &quot;]&quot;);
         }
-<span class="fc" id="L656">    }</span>
+<span class="fc" id="L659">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">SearchExecution.java</span></div><h1>SearchExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+/** Representation boundary of the one frontier. Neither scheduling nor proof authority lives here. */
+public final class SearchExecution {
+    private SearchExecution() {}
+    /** Internal abort transport. Only completed, not-yet-transferred work; never mathematical authority. */
+    public static final class ResourceLimit extends RuntimeException {
+        private long mechanical,verification;
+<span class="fc" id="L17">        private ExecutionWork mathematics=ExecutionWork.ZERO;</span>
+<span class="fc" id="L18">        ResourceLimit() {}</span>
+        public ResourceLimit paidGeneration(TransformationWorkMetrics work) {
+<span class="fc" id="L20">            long updated=Math.addExact(mechanical,work.totalWorkUnits());</span>
+<span class="fc" id="L21">            var updatedMath=mathematics.plus(work.candidateWork());</span>
+<span class="fc" id="L22">            mechanical=updated;mathematics=updatedMath;return this;</span>
+        }
+        ResourceLimit paidVerification(long units) {
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">            if(units&lt;0)throw new IllegalArgumentException(&quot;negative aborted verification work&quot;);</span>
+<span class="fc" id="L26">            verification=Math.addExact(verification,units);return this;</span>
+        }
+        ResourceLimit verificationPhase() {
+<span class="nc" id="L29">            long updated=Math.addExact(verification,Math.addExact(mechanical,mathematics.canonicalWorkUnits()));</span>
+<span class="nc" id="L30">            verification=updated;mechanical=0;mathematics=ExecutionWork.ZERO;return this;</span>
+        }
+        AbortedWork takeWork() {
+<span class="fc" id="L33">            var result=new AbortedWork(mechanical,mathematics,verification);</span>
+<span class="fc" id="L34">            mechanical=0;mathematics=ExecutionWork.ZERO;verification=0;return result;</span>
+        }
+    }
+<span class="fc" id="L37">    record AbortedWork(long mechanical,ExecutionWork mathematics,long verification) {</span>
+<span class="fc" id="L38">        long total(){return Math.addExact(Math.addExact(mechanical,mathematics.canonicalWorkUnits()),verification);}</span>
+    }
+    public interface Position&lt;E&gt; {
+        E expression(); int searchDepth(); int primitiveDepth(); String previousRule();
+        List&lt;String&gt; assumptions(); Set&lt;String&gt; capabilities(); int complexityDebt();
+    }
+    public interface Edge&lt;E, M&gt; {
+        E targetExpression(); int primitiveStepCount(); ExecutionWork executionWork();
+        String ruleId(); String ruleFamily(); List&lt;String&gt; assumptions();
+        M withCapabilityDelta(Set&lt;String&gt; delta);
+        void requireSource(E expression);
+    }
+    public interface Verification { boolean accepted(); long work(); }
+    public interface Capability&lt;E&gt; { E sourceExpression(); }
+    public interface Assessment&lt;E&gt; {
+        int complexity(); double value(); long searchWork(); long primitiveWork();
+        Map&lt;String, ? extends Capability&lt;E&gt;&gt; capabilities();
+    }
+    public interface Picker&lt;M&gt; extends AutoCloseable {
+<span class="fc" id="L57">        default void initialize() {}</span>
+<span class="fc" id="L58">        default List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts(){return List.of();}</span>
+        Optional&lt;M&gt; next(); TransformationWorkMetrics workMetrics(); List&lt;M&gt; generatedMoves(); boolean complete();
+<span class="nc" id="L60">        default Optional&lt;M&gt; next(long allowance) { return next(); }</span>
+<span class="nc" id="L61">        default boolean accountingComplete() { return true; }</span>
+<span class="fc" id="L62">        default boolean incremental() { return false; }</span>
+<span class="nc" id="L63">        default boolean workExhausted() { return false; }</span>
+<span class="fc" id="L64">        default int nextStage() { return 0; }</span>
+<span class="nc" id="L65">        default Object executionReceipt() { return null; }</span>
+<span class="nc" id="L66">        @Override default void close() {}</span>
+    }
+    interface Environment&lt;E,S extends Position&lt;E&gt;,M extends Edge&lt;E,M&gt;,A extends Assessment&lt;E&gt;,V extends Verification&gt; {
+        E source(); E goal(); List&lt;String&gt; initialAssumptions(); MoveSearch.Budget budget();
+        MoveSearch.Mode mode(); MoveSearch.Scheduling scheduling();
+        S state(E expression,int depth,int primitive,String previous,List&lt;String&gt; assumptions,Set&lt;String&gt; capabilities,int debt);
+        A inspect(S state); double score(S state); V verify(S state,M move); boolean carries(List&lt;String&gt; assumptions,S state);
+        Picker&lt;M&gt; picker(S state);
+<span class="fc" id="L74">        default void ownership(RetainedGraph.View root) {}</span>
+<span class="fc" id="L75">        default void checkpoint() {}</span>
+<span class="fc" id="L76">        default long additionalWork(){return 0;}</span>
+<span class="fc" id="L77">        default boolean ownershipComplete(){return true;}</span>
+
+    }
+    public record Expansion&lt;S&gt;(S source,boolean closed,List&lt;StagedIncrementalMoveExecution.Lane&gt; lanes) implements RetainedGraph.View {
+<span class="fc" id="L81">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(lanes);}</span>
+
+<span class="fc" id="L83">        public Expansion { lanes=List.copyOf(lanes); }</span>
+    }
+<span class="fc" id="L85">    public record Step&lt;S,M,V&gt;(S source,S target,M move,V verification) implements RetainedGraph.View {</span>
+<span class="fc" id="L86">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(verification);}</span>
+    }
+<span class="fc" id="L88">    public record Event&lt;S,M,V&gt;(S source,S target,M move,MoveSearch.Decision decision,V verification) implements RetainedGraph.View {</span>
+<span class="fc" id="L89">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(decision);v.reference(verification);}</span>
+    }
+    record Result&lt;S,M,V,A&gt;(MoveSearch.Outcome outcome,List&lt;Step&lt;S,M,V&gt;&gt; witness,List&lt;Event&lt;S,M,V&gt;&gt; events,
+            Set&lt;S&gt; reachedStates,List&lt;S&gt; deadEndStates,MoveSearch.Metrics metrics,boolean completeBoundedRelation,
+            Map&lt;S,A&gt; stateAssessments,List&lt;Object&gt; pickerReceipts,List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts) implements RetainedGraph.View {
+<span class="fc" id="L94">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);v.reference(batchCursorReceipts);}</span>
+<span class="fc" id="L95">        Result {</span>
+<span class="fc" id="L96">            witness=List.copyOf(witness);events=List.copyOf(events);reachedStates=Set.copyOf(reachedStates);</span>
+<span class="fc" id="L97">            deadEndStates=List.copyOf(deadEndStates);stateAssessments=Map.copyOf(stateAssessments);pickerReceipts=List.copyOf(pickerReceipts);batchCursorReceipts=List.copyOf(batchCursorReceipts);</span>
+<span class="fc" id="L98">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

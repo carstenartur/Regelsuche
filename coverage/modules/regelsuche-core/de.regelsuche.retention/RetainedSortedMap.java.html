@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RetainedSortedMap.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.retention</a> &gt; <span class="el_source">RetainedSortedMap.java</span></div><h1>RetainedSortedMap.java</h1><pre class="source lang-java linenums">package de.regelsuche.retention;
+
+import java.util.*;
+
+/** Immutable natural-order map whose actual backing owner is explicitly inspectable. */
+public final class RetainedSortedMap&lt;K,V&gt; implements Map&lt;K,V&gt;,RetainedGraph.View {
+    private final TreeMap&lt;K,V&gt; values;
+<span class="fc" id="L8">    private RetainedSortedMap(Map&lt;? extends K,? extends V&gt; source){values=new TreeMap&lt;&gt;();values.putAll(source);}</span>
+<span class="fc" id="L9">    public static &lt;K,V&gt; RetainedSortedMap&lt;K,V&gt; copyOf(Map&lt;? extends K,? extends V&gt; source){return new RetainedSortedMap&lt;&gt;(source);}</span>
+<span class="fc" id="L10">    @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(values);}</span>
+<span class="fc" id="L11">    @Override public int size(){return values.size();}</span>
+<span class="nc" id="L12">    @Override public boolean isEmpty(){return values.isEmpty();}</span>
+<span class="fc" id="L13">    @Override public boolean containsKey(Object key){return values.containsKey(key);}</span>
+<span class="nc" id="L14">    @Override public boolean containsValue(Object value){return values.containsValue(value);}</span>
+<span class="fc" id="L15">    @Override public V get(Object key){return values.get(key);}</span>
+<span class="fc" id="L16">    @Override public Set&lt;K&gt; keySet(){return Collections.unmodifiableSet(values.keySet());}</span>
+<span class="nc" id="L17">    @Override public Collection&lt;V&gt; values(){return Collections.unmodifiableCollection(values.values());}</span>
+<span class="fc" id="L18">    @Override public Set&lt;Entry&lt;K,V&gt;&gt; entrySet(){return Collections.unmodifiableMap(values).entrySet();}</span>
+<span class="nc" id="L19">    @Override public V put(K key,V value){throw new UnsupportedOperationException(&quot;immutable map&quot;);}</span>
+<span class="nc" id="L20">    @Override public V remove(Object key){throw new UnsupportedOperationException(&quot;immutable map&quot;);}</span>
+<span class="nc" id="L21">    @Override public void putAll(Map&lt;? extends K,? extends V&gt; other){throw new UnsupportedOperationException(&quot;immutable map&quot;);}</span>
+<span class="nc" id="L22">    @Override public void clear(){throw new UnsupportedOperationException(&quot;immutable map&quot;);}</span>
+<span class="nc" id="L23">    @Override public boolean equals(Object other){return values.equals(other);}</span>
+<span class="nc" id="L24">    @Override public int hashCode(){return values.hashCode();}</span>
+<span class="nc" id="L25">    @Override public String toString(){return values.toString();}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

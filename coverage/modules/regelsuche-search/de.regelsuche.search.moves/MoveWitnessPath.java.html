@@ -5,22 +5,23 @@ import java.util.Collections;
 import java.util.List;
 
 /** Immutable shared witness prefixes; appending never copies the complete ancestral path. */
-final class MoveWitnessPath {
-<span class="fc" id="L9">    static final MoveWitnessPath ROOT = new MoveWitnessPath(null, null);</span>
-    private final MoveWitnessPath parent;
-    private final MoveSearch.WitnessStep step;
-<span class="fc" id="L12">    private MoveWitnessPath(MoveWitnessPath parent, MoveSearch.WitnessStep step) {</span>
-<span class="fc" id="L13">        this.parent = parent;</span>
-<span class="fc" id="L14">        this.step = step;</span>
-<span class="fc" id="L15">    }</span>
-    MoveWitnessPath append(MoveSearch.WitnessStep next) {
-<span class="fc" id="L17">        return new MoveWitnessPath(this, java.util.Objects.requireNonNull(next));</span>
+final class MoveWitnessPath&lt;S,M,V&gt; implements de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L9">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(parent);v.reference(step);}</span>
+<span class="fc" id="L10">    static &lt;S,M,V&gt; MoveWitnessPath&lt;S,M,V&gt; root() { return new MoveWitnessPath&lt;&gt;(null,null); }</span>
+    private final MoveWitnessPath&lt;S,M,V&gt; parent;
+    private final SearchExecution.Step&lt;S,M,V&gt; step;
+<span class="fc" id="L13">    private MoveWitnessPath(MoveWitnessPath&lt;S,M,V&gt; parent, SearchExecution.Step&lt;S,M,V&gt; step) {</span>
+<span class="fc" id="L14">        this.parent = parent;</span>
+<span class="fc" id="L15">        this.step = step;</span>
+<span class="fc" id="L16">    }</span>
+    MoveWitnessPath&lt;S,M,V&gt; append(SearchExecution.Step&lt;S,M,V&gt; next) {
+<span class="fc" id="L18">        return new MoveWitnessPath&lt;&gt;(this, java.util.Objects.requireNonNull(next));</span>
     }
-    List&lt;MoveSearch.WitnessStep&gt; steps() {
-<span class="fc" id="L20">        var steps = new ArrayList&lt;MoveSearch.WitnessStep&gt;();</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        for (var cursor = this; cursor.step != null; cursor = cursor.parent) steps.add(cursor.step);</span>
-<span class="fc" id="L22">        Collections.reverse(steps);</span>
-<span class="fc" id="L23">        return List.copyOf(steps);</span>
+    List&lt;SearchExecution.Step&lt;S,M,V&gt;&gt; steps() {
+<span class="fc" id="L21">        var steps = new ArrayList&lt;SearchExecution.Step&lt;S,M,V&gt;&gt;();</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (var cursor = this; cursor.step != null; cursor = cursor.parent) steps.add(cursor.step);</span>
+<span class="fc" id="L23">        Collections.reverse(steps);</span>
+<span class="fc" id="L24">        return List.copyOf(steps);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

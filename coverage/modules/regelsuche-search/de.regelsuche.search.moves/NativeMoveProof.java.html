@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeMoveProof.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeMoveProof.java</span></div><h1>NativeMoveProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.retention.RetainedGraph;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.program.*;
+import de.regelsuche.transform.*;
+import java.util.*;
+
+/** Source-bound producer structures. Construction describes a proposal, never proves it. */
+public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,NativeMoveProof.Program,NativeMoveProof.Exact {
+    Expr source(); Expr target(); List&lt;String&gt; assumptions(); ExecutionWork work(); String rule();
+    Transformation exportLegacy();
+    record Primitive(AstRewriteTransport.Step step) implements NativeMoveProof,RetainedGraph.View {
+<span class="fc" id="L15">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(step);}</span>
+
+<span class="fc" id="L17">        public Primitive { Objects.requireNonNull(step); }</span>
+<span class="fc" id="L18">        @Override public Expr source(){return step.source();}</span>
+<span class="fc" id="L19">        @Override public Expr target(){return step.target();}</span>
+<span class="fc" id="L20">        @Override public List&lt;String&gt; assumptions(){return step.assumptions();}</span>
+<span class="fc" id="L21">        @Override public ExecutionWork work(){return new ExecutionWork(1,0,0);}</span>
+<span class="fc" id="L22">        @Override public String rule(){return step.rule();}</span>
+        @Override public Transformation exportLegacy(){
+<span class="fc" id="L24">            var codec=new CompiledAstReplayCodec();var text=new String[2];</span>
+<span class="fc" id="L25">            try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {</span>
+<span class="fc" id="L26">            text[0]=codec.encodeExpression(source());text[1]=codec.encodeExpression(target());</span>
+<span class="fc" id="L27">            String source=text[0],target=text[1];</span>
+<span class="fc" id="L28">            return de.regelsuche.retention.RetainedOperation.produced(new Transformation(step.rule(),target,step.kind(),step.mayIncreaseComplexity(),step.estimatedCostDelta(),</span>
+<span class="fc" id="L29">                step.equivalencePreservingByConstruction(),&quot;typed:&quot;+NativeSearchMove.digest(source+&quot;\n&quot;+target+&quot;\n&quot;+step.rule()),step.assumptions(),step.packId(),step.license()));</span>
+            }
+        }
+    }
+    record Program(CompiledAstRewriteProgram.Candidate history) implements NativeMoveProof,RetainedGraph.View {
+<span class="fc" id="L34">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(history);}</span>
+
+<span class="fc" id="L36">        public Program { Objects.requireNonNull(history); }</span>
+<span class="fc" id="L37">        @Override public Expr source(){return history.source();}</span>
+<span class="fc" id="L38">        @Override public Expr target(){return history.target();}</span>
+<span class="fc" id="L39">        @Override public List&lt;String&gt; assumptions(){return history.assumptions();}</span>
+<span class="fc" id="L40">        @Override public ExecutionWork work(){return new ExecutionWork(history.steps().size(),0,0);}</span>
+<span class="nc" id="L41">        @Override public String rule(){return history.programId();}</span>
+        @Override public Transformation exportLegacy(){
+<span class="fc" id="L43">            var codec=new CompiledAstReplayCodec();String identity=codec.contentHash(history);</span>
+<span class="fc" id="L44">            var steps=new ArrayList&lt;Transformation&gt;();var expressions=new String[2];</span>
+<span class="fc" id="L45">            try(var held=de.regelsuche.retention.RetainedOperation.retain(history,identity,steps,expressions)) {</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            for(int i=0;i&lt;history.steps().size();i++) {</span>
+<span class="fc" id="L47">                var step=history.steps().get(i);</span>
+<span class="fc" id="L48">                steps.add(new Transformation(step.rule(),codec.encodeExpression(step.target()),step.kind(),step.mayIncreaseComplexity(),</span>
+<span class="fc" id="L49">                    step.estimatedCostDelta(),step.equivalencePreservingByConstruction(),&quot;typed-program:&quot;+identity+&quot;:&quot;+i,step.assumptions(),step.packId(),step.license()));</span>
+            }
+<span class="fc" id="L51">            expressions[0]=codec.encodeExpression(source());expressions[1]=codec.encodeExpression(target());</span>
+<span class="fc" id="L52">            de.regelsuche.retention.RetainedOperation.work(steps.size()+3L);</span>
+<span class="fc" id="L53">            return de.regelsuche.retention.RetainedOperation.produced(new RewriteCandidate(history.programId(),expressions[0],expressions[1],steps).toTransformation());</span>
+            }
+        }
+    }
+    record Exact(NativeExactTheoryEvidence evidence) implements NativeMoveProof,RetainedGraph.View {
+<span class="nc" id="L58">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(evidence);}</span>
+
+<span class="nc" id="L60">        public Exact { Objects.requireNonNull(evidence); }</span>
+<span class="nc" id="L61">        @Override public Expr source(){return evidence.binding().source();}</span>
+<span class="nc" id="L62">        @Override public Expr target(){return evidence.binding().target();}</span>
+<span class="nc" id="L63">        @Override public List&lt;String&gt; assumptions(){return List.of();}</span>
+<span class="nc" id="L64">        @Override public ExecutionWork work(){return new ExecutionWork(0,1,evidence.binding().canonicalWorkUnits());}</span>
+<span class="nc" id="L65">        @Override public String rule(){return evidence.binding().theoryStepId();}</span>
+<span class="nc" id="L66">        @Override public Transformation exportLegacy(){return Transformation.exactTheory(evidence.exportLegacy());}</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

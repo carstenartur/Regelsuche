@@ -4,60 +4,64 @@ import java.util.Objects;
 import java.util.ServiceLoader;
 
 /** Immutable core capability. Public evidence descriptions alone cannot issue it. */
-public final class ExactTheoryEvidence {
+public final class ExactTheoryEvidence implements de.regelsuche.retention.RetainedGraph.View {
+<span class="nc" id="L8">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(binding);}</span>
+
     private final Binding binding;
 
-<span class="nc" id="L10">    private ExactTheoryEvidence(Binding binding) {</span>
-<span class="nc" id="L11">        this.binding = Objects.requireNonNull(binding, &quot;binding&quot;);</span>
-<span class="nc" id="L12">    }</span>
+<span class="nc" id="L12">    private ExactTheoryEvidence(Binding binding) {</span>
+<span class="nc" id="L13">        this.binding = Objects.requireNonNull(binding, &quot;binding&quot;);</span>
+<span class="nc" id="L14">    }</span>
 
     public static ExactTheoryEvidence fromVerified(Object verifierOwnedEvidence) {
-<span class="fc" id="L15">        Objects.requireNonNull(verifierOwnedEvidence, &quot;verifierOwnedEvidence&quot;);</span>
-<span class="fc" id="L16">        Binding accepted = null;</span>
-<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        for (ExactTheoryEvidenceProvider provider : ServiceLoader.load(</span>
-<span class="fc" id="L18">                ExactTheoryEvidenceProvider.class, ExactTheoryEvidence.class.getClassLoader())) {</span>
-<span class="nc" id="L19">            var result = Objects.requireNonNull(provider.bind(verifierOwnedEvidence), &quot;provider result&quot;);</span>
-<span class="nc bnc" id="L20" title="All 2 branches missed.">            if (result.isPresent()) {</span>
-<span class="nc bnc" id="L21" title="All 2 branches missed.">                if (accepted != null) {</span>
-<span class="nc" id="L22">                    throw new IllegalArgumentException(&quot;ambiguous installed theory evidence providers&quot;);</span>
+<span class="fc" id="L17">        Objects.requireNonNull(verifierOwnedEvidence, &quot;verifierOwnedEvidence&quot;);</span>
+<span class="fc" id="L18">        Binding accepted = null;</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        for (ExactTheoryEvidenceProvider provider : ServiceLoader.load(</span>
+<span class="fc" id="L20">                ExactTheoryEvidenceProvider.class, ExactTheoryEvidence.class.getClassLoader())) {</span>
+<span class="nc" id="L21">            var result = Objects.requireNonNull(provider.bind(verifierOwnedEvidence), &quot;provider result&quot;);</span>
+<span class="nc bnc" id="L22" title="All 2 branches missed.">            if (result.isPresent()) {</span>
+<span class="nc bnc" id="L23" title="All 2 branches missed.">                if (accepted != null) {</span>
+<span class="nc" id="L24">                    throw new IllegalArgumentException(&quot;ambiguous installed theory evidence providers&quot;);</span>
                 }
-<span class="nc" id="L24">                accepted = result.orElseThrow();</span>
+<span class="nc" id="L26">                accepted = result.orElseThrow();</span>
             }
-<span class="nc" id="L26">        }</span>
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (accepted == null) {</span>
-<span class="fc" id="L28">            throw new IllegalArgumentException(&quot;no installed verifier recognizes this evidence capability&quot;);</span>
+<span class="nc" id="L28">        }</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (accepted == null) {</span>
+<span class="fc" id="L30">            throw new IllegalArgumentException(&quot;no installed verifier recognizes this evidence capability&quot;);</span>
         }
-<span class="nc" id="L30">        return new ExactTheoryEvidence(accepted);</span>
+<span class="nc" id="L32">        return new ExactTheoryEvidence(accepted);</span>
     }
 
-<span class="nc" id="L33">    public Binding binding() { return binding; }</span>
+<span class="nc" id="L35">    public Binding binding() { return binding; }</span>
 
     @Override public boolean equals(Object other) {
-<span class="nc bnc" id="L36" title="All 4 branches missed.">        return other instanceof ExactTheoryEvidence evidence &amp;&amp; binding.equals(evidence.binding);</span>
+<span class="nc bnc" id="L38" title="All 4 branches missed.">        return other instanceof ExactTheoryEvidence evidence &amp;&amp; binding.equals(evidence.binding);</span>
     }
-<span class="nc" id="L38">    @Override public int hashCode() { return binding.hashCode(); }</span>
+<span class="nc" id="L40">    @Override public int hashCode() { return binding.hashCode(); }</span>
 
     /** Observational data; constructing this record does not authorize execution. */
     public record Binding(String sourceExpression, String transformedExpression, String theoryStepId,
                           String evidenceHash, String receiptArtifactId, String runArtifactId,
-                          long canonicalWorkUnits, String canonicalEvidenceJson) {
-<span class="nc" id="L44">        public Binding {</span>
-<span class="nc" id="L45">            requireText(sourceExpression);</span>
-<span class="nc" id="L46">            requireText(transformedExpression);</span>
-<span class="nc" id="L47">            requireText(theoryStepId);</span>
-<span class="nc" id="L48">            requireText(canonicalEvidenceJson);</span>
-<span class="nc bnc" id="L49" title="All 2 branches missed.">            for (String hash : new String[] { evidenceHash, receiptArtifactId, runArtifactId }) {</span>
-<span class="nc bnc" id="L50" title="All 4 branches missed.">                if (hash == null || !hash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L51">                    throw new IllegalArgumentException(&quot;invalid evidence/artifact identity&quot;);</span>
+                          long canonicalWorkUnits, String canonicalEvidenceJson) implements de.regelsuche.retention.RetainedGraph.View {
+<span class="nc" id="L46">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(sourceExpression);v.reference(transformedExpression);v.reference(theoryStepId);v.reference(evidenceHash);v.reference(receiptArtifactId);v.reference(runArtifactId);v.reference(canonicalEvidenceJson);}</span>
+
+<span class="nc" id="L48">        public Binding {</span>
+<span class="nc" id="L49">            requireText(sourceExpression);</span>
+<span class="nc" id="L50">            requireText(transformedExpression);</span>
+<span class="nc" id="L51">            requireText(theoryStepId);</span>
+<span class="nc" id="L52">            requireText(canonicalEvidenceJson);</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            for (String hash : new String[] { evidenceHash, receiptArtifactId, runArtifactId }) {</span>
+<span class="nc bnc" id="L54" title="All 4 branches missed.">                if (hash == null || !hash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L55">                    throw new IllegalArgumentException(&quot;invalid evidence/artifact identity&quot;);</span>
                 }
             }
-<span class="nc bnc" id="L54" title="All 4 branches missed.">            if (sourceExpression.equals(transformedExpression) || canonicalWorkUnits &lt; 1) {</span>
-<span class="nc" id="L55">                throw new IllegalArgumentException(&quot;theory evidence needs a changed representation and positive work&quot;);</span>
+<span class="nc bnc" id="L58" title="All 4 branches missed.">            if (sourceExpression.equals(transformedExpression) || canonicalWorkUnits &lt; 1) {</span>
+<span class="nc" id="L59">                throw new IllegalArgumentException(&quot;theory evidence needs a changed representation and positive work&quot;);</span>
             }
-<span class="nc" id="L57">        }</span>
+<span class="nc" id="L61">        }</span>
         private static void requireText(String value) {
-<span class="nc bnc" id="L59" title="All 4 branches missed.">            if (value == null || value.isBlank()) throw new IllegalArgumentException(&quot;blank evidence field&quot;);</span>
-<span class="nc" id="L60">        }</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">            if (value == null || value.isBlank()) throw new IllegalArgumentException(&quot;blank evidence field&quot;);</span>
+<span class="nc" id="L64">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

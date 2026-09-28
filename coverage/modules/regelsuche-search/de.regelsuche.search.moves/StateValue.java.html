@@ -7,22 +7,26 @@ import java.util.TreeMap;
 @FunctionalInterface
 public interface StateValue {
     Assessment evaluate(MoveState state, MoveContext context);
-    record Capability(String providerId, String sourceExpression, String subtreePath, String matchedExpression, String rewrittenExpression) {
-<span class="fc" id="L11">        public Capability {</span>
-<span class="pc bpc" id="L12" title="6 of 12 branches missed.">            if (providerId == null || providerId.isBlank() || sourceExpression == null || subtreePath == null</span>
-<span class="pc bpc" id="L13" title="1 of 2 branches missed.">                    || matchedExpression == null || rewrittenExpression == null || matchedExpression.equals(rewrittenExpression))</span>
-<span class="nc" id="L14">                throw new IllegalArgumentException(&quot;capability requires an executable non-identity witness&quot;);</span>
-<span class="fc" id="L15">        }</span>
+    record Capability(String providerId, String sourceExpression, String subtreePath, String matchedExpression, String rewrittenExpression) implements SearchExecution.Capability&lt;String&gt;, de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L11">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(providerId);v.reference(sourceExpression);v.reference(subtreePath);v.reference(matchedExpression);v.reference(rewrittenExpression);}</span>
+
+<span class="fc" id="L13">        public Capability {</span>
+<span class="pc bpc" id="L14" title="6 of 12 branches missed.">            if (providerId == null || providerId.isBlank() || sourceExpression == null || subtreePath == null</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">                    || matchedExpression == null || rewrittenExpression == null || matchedExpression.equals(rewrittenExpression))</span>
+<span class="nc" id="L16">                throw new IllegalArgumentException(&quot;capability requires an executable non-identity witness&quot;);</span>
+<span class="fc" id="L17">        }</span>
     }
-    record Assessment(int complexity, double value, long searchWork, long primitiveWork, Map&lt;String, Capability&gt; capabilities) {
-<span class="fc" id="L18">        public static final Assessment EMPTY = new Assessment(0, 0, 0, 0, Map.of());</span>
-<span class="fc" id="L19">        public Assessment {</span>
-<span class="pc bpc" id="L20" title="4 of 10 branches missed.">            if (complexity &lt; 0 || !Double.isFinite(value) || searchWork &lt; 0 || primitiveWork &lt; 0 || capabilities == null</span>
-<span class="pc bpc" id="L21" title="1 of 8 branches missed.">                    || capabilities.entrySet().stream().anyMatch(entry -&gt; entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null))</span>
-<span class="fc" id="L22">                throw new IllegalArgumentException(&quot;invalid state assessment&quot;);</span>
-<span class="fc" id="L23">            capabilities = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(capabilities));</span>
-<span class="fc" id="L24">        }</span>
+    record Assessment(int complexity, double value, long searchWork, long primitiveWork, Map&lt;String, Capability&gt; capabilities) implements SearchExecution.Assessment&lt;String&gt;, de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L20">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(capabilities);}</span>
+
+<span class="fc" id="L22">        public static final Assessment EMPTY = new Assessment(0, 0, 0, 0, Map.of());</span>
+<span class="fc" id="L23">        public Assessment {</span>
+<span class="pc bpc" id="L24" title="4 of 10 branches missed.">            if (complexity &lt; 0 || !Double.isFinite(value) || searchWork &lt; 0 || primitiveWork &lt; 0 || capabilities == null</span>
+<span class="pc bpc" id="L25" title="1 of 8 branches missed.">                    || capabilities.entrySet().stream().anyMatch(entry -&gt; entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null))</span>
+<span class="fc" id="L26">                throw new IllegalArgumentException(&quot;invalid state assessment&quot;);</span>
+<span class="fc" id="L27">            capabilities = de.regelsuche.retention.RetainedSortedMap.copyOf(capabilities);</span>
+<span class="fc" id="L28">        }</span>
     }
-<span class="fc" id="L26">    StateValue NONE = (state, context) -&gt; Assessment.EMPTY;</span>
+<span class="fc" id="L30">    StateValue NONE = (state, context) -&gt; Assessment.EMPTY;</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

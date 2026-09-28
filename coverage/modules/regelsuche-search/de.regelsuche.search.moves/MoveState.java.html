@@ -6,15 +6,17 @@ import java.util.Set;
 
 /** Source-only search position, independent of any learning implementation. */
 public record MoveState(String expression, int searchDepth, int primitiveDepth, String previousRule,
-                        List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities, int complexityDebt) {
-<span class="fc" id="L10">    public MoveState {</span>
-<span class="pc bpc" id="L11" title="6 of 12 branches missed.">        if (expression == null || expression.isBlank() || previousRule == null</span>
+                        List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities, int complexityDebt) implements SearchExecution.Position&lt;String&gt;, de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L10">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(expression);v.reference(previousRule);v.reference(assumptions);v.reference(capabilities);}</span>
+
+<span class="fc" id="L12">    public MoveState {</span>
+<span class="pc bpc" id="L13" title="6 of 12 branches missed.">        if (expression == null || expression.isBlank() || previousRule == null</span>
                 || searchDepth &lt; 0 || primitiveDepth &lt; 0 || complexityDebt &lt; 0) {
-<span class="nc" id="L13">            throw new IllegalArgumentException(&quot;invalid move state&quot;);</span>
+<span class="nc" id="L15">            throw new IllegalArgumentException(&quot;invalid move state&quot;);</span>
         }
-<span class="fc" id="L15">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
-<span class="fc" id="L16">        capabilities = Set.copyOf(capabilities);</span>
-<span class="fc" id="L17">    }</span>
-<span class="fc" id="L18">    public static MoveState root(String expression) { return new MoveState(expression, 0, 0, &quot;&quot;, List.of(), Set.of(), 0); }</span>
+<span class="fc" id="L17">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc" id="L18">        capabilities = Set.copyOf(capabilities);</span>
+<span class="fc" id="L19">    }</span>
+<span class="fc" id="L20">    public static MoveState root(String expression) { return new MoveState(expression, 0, 0, &quot;&quot;, List.of(), Set.of(), 0); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

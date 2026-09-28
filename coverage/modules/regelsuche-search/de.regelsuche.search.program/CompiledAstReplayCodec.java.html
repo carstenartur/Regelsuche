@@ -37,11 +37,11 @@ import java.util.function.Supplier;
 <span class="fc" id="L37">    private static final Set&lt;String&gt; EXPRESSION_FIELDS = Set.of(&quot;schema&quot;, &quot;expression&quot;);</span>
 <span class="fc" id="L38">    private static final Set&lt;String&gt; STEP_FIELDS = Set.of(&quot;rule&quot;, &quot;kind&quot;, &quot;mayIncreaseComplexity&quot;, &quot;estimatedCostDelta&quot;,</span>
         &quot;equivalencePreservingByConstruction&quot;, &quot;assumptions&quot;, &quot;packId&quot;, &quot;license&quot;);
-<span class="fc" id="L40">    private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()</span>
+<span class="fc" id="L40">    private static final ObjectMapper JSON = new ObjectMapper(new de.regelsuche.retention.RetainedJson.Factory(JsonFactory.builder()</span>
 <span class="fc" id="L41">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
 <span class="fc" id="L42">        .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(270)</span>
 <span class="fc" id="L43">            .maxStringLength(MAXIMUM_TEXT_CHARACTERS).maxNameLength(128).maxNumberLength(32).build())</span>
-<span class="fc" id="L44">        .build()).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L44">        .build())).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
 <span class="fc" id="L45">    private static final ThreadLocal&lt;ExpressionCache&gt; EXPRESSION_CACHE = new ThreadLocal&lt;&gt;();</span>
 
     /**
@@ -101,163 +101,186 @@ import java.util.function.Supplier;
 
     /** Canonical structural transport for one AST search state; no parser/formatter round-trip. */
     public String encodeExpression(Expr expression) {
-<span class="fc" id="L104">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L105">        ExpressionCache cache = EXPRESSION_CACHE.get();</span>
-<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (cache != null) {</span>
-<span class="fc" id="L107">            String existing = cache.byIdentity.get(expression);</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (existing != null) return existing;</span>
+<span class="fc" id="L104">        AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_ENCODE);</span>
+<span class="fc" id="L105">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        ExpressionCache cache = de.regelsuche.retention.RetainedJson.active()?null:EXPRESSION_CACHE.get();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (cache != null) {</span>
+<span class="fc" id="L108">            String existing = cache.byIdentity.get(expression);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (existing != null) return existing;</span>
         }
-<span class="fc" id="L110">        String encoded = encodeExpressionUncached(expression);</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        return cache == null ? encoded : cache.retain(expression, encoded);</span>
+<span class="fc" id="L111">        String encoded = encodeExpressionUncached(expression);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        return cache == null ? encoded : cache.retain(expression, encoded);</span>
     }
 
     private String encodeExpressionUncached(Expr expression) {
-<span class="fc" id="L115">        var data = new AstReplayJson(JSON);</span>
-<span class="fc" id="L116">        var root = JSON.createObjectNode().put(&quot;schema&quot;, EXPRESSION_SCHEMA);</span>
-<span class="fc" id="L117">        root.set(&quot;expression&quot;, data.write(expression));</span>
+<span class="fc" id="L116">        AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_JSON_WRITE);</span>
+<span class="fc" id="L117">        var data = new AstReplayJson(JSON);</span>
+<span class="fc" id="L118">        var root = de.regelsuche.retention.RetainedJson.object(JSON).put(&quot;schema&quot;, EXPRESSION_SCHEMA);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        try(var retained=de.regelsuche.retention.RetainedJson.active()?de.regelsuche.retention.RetainedOperation.retain(root):null) {</span>
+<span class="fc" id="L120">        root.set(&quot;expression&quot;, data.write(expression));</span>
         try {
-<span class="fc" id="L119">            String encoded = JSON.writeValueAsString(root);</span>
-<span class="fc" id="L120">            requireBytes(encoded.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L121">            return encoded;</span>
-<span class="nc" id="L122">        } catch (JsonProcessingException exception) {</span>
-<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;cannot encode typed move expression&quot;, exception);</span>
+<span class="fc" id="L122">            String encoded = de.regelsuche.retention.RetainedJson.writeString(JSON,root);</span>
+<span class="fc" id="L123">            byte[] utf8=encoded.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L124">            try(var text=de.regelsuche.retention.RetainedOperation.retain(encoded,utf8)) {</span>
+<span class="fc" id="L125">                de.regelsuche.retention.RetainedOperation.work(Math.addExact(encoded.length(),utf8.length));</span>
+<span class="fc" id="L126">                requireBytes(utf8);return encoded;</span>
+            }
+<span class="nc" id="L128">        } catch (java.io.IOException exception) {</span>
+<span class="nc" id="L129">            throw new IllegalArgumentException(&quot;cannot encode typed move expression&quot;, exception);</span>
+        }
         }
     }
 
     /** Decodes only the canonical expression-state schema and rejects alternate JSON spellings. */
     public Expr decodeExpression(String document) {
-<span class="fc" id="L129">        Objects.requireNonNull(document, &quot;document&quot;);</span>
-<span class="fc" id="L130">        ExpressionCache cache = EXPRESSION_CACHE.get();</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (cache != null) {</span>
-<span class="fc" id="L132">            Expr existing = cache.byDocument.get(document);</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (existing != null) return existing;</span>
+<span class="fc" id="L136">        AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_DECODE);</span>
+<span class="fc" id="L137">        Objects.requireNonNull(document, &quot;document&quot;);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        ExpressionCache cache = de.regelsuche.retention.RetainedJson.active()?null:EXPRESSION_CACHE.get();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (cache != null) {</span>
+<span class="fc" id="L140">            Expr existing = cache.byDocument.get(document);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (existing != null) return existing;</span>
         }
-<span class="fc" id="L135">        byte[] bytes = document.getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L136">        requireBytes(bytes);</span>
+<span class="fc" id="L143">        byte[] bytes = document.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L144">        requireBytes(bytes);</span>
         try {
-<span class="fc" id="L138">            JsonNode root = JSON.readTree(document);</span>
-<span class="fc" id="L139">            AstReplayJson.fields(root, EXPRESSION_FIELDS);</span>
-<span class="fc" id="L140">            var data = new AstReplayJson(JSON);</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (!EXPRESSION_SCHEMA.equals(data.text(root, &quot;schema&quot;))) {</span>
-<span class="fc" id="L142">                throw new IllegalArgumentException(&quot;unsupported typed move expression version&quot;);</span>
+<span class="fc" id="L146">            AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_JSON_READ);</span>
+<span class="fc" id="L147">            JsonNode root = JSON.readTree(document);</span>
+<span class="fc" id="L148">            AstReplayJson.fields(root, EXPRESSION_FIELDS);</span>
+<span class="fc" id="L149">            var data = new AstReplayJson(JSON);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (!EXPRESSION_SCHEMA.equals(data.text(root, &quot;schema&quot;))) {</span>
+<span class="fc" id="L151">                throw new IllegalArgumentException(&quot;unsupported typed move expression version&quot;);</span>
             }
-<span class="fc" id="L144">            Expr expression = data.read(root.get(&quot;expression&quot;));</span>
-<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (!encodeExpressionUncached(expression).equals(document)) {</span>
-<span class="fc" id="L146">                throw new IllegalArgumentException(&quot;noncanonical typed move expression&quot;);</span>
+<span class="fc" id="L153">            Expr expression = data.read(root.get(&quot;expression&quot;));</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (!encodeExpressionUncached(expression).equals(document)) {</span>
+<span class="fc" id="L155">                throw new IllegalArgumentException(&quot;noncanonical typed move expression&quot;);</span>
             }
-<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (cache != null) cache.retain(expression, document);</span>
-<span class="fc" id="L149">            return expression;</span>
-<span class="fc" id="L150">        } catch (JsonProcessingException exception) {</span>
-<span class="fc" id="L151">            throw new IllegalArgumentException(&quot;invalid typed move expression JSON&quot;, exception);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (cache != null) cache.retain(expression, document);</span>
+<span class="fc" id="L158">            return expression;</span>
+<span class="fc" id="L159">        } catch (java.io.IOException exception) {</span>
+<span class="fc" id="L160">            throw new IllegalArgumentException(&quot;invalid typed move expression JSON&quot;, exception);</span>
         }
     }
 
     /** Canonical field order and exact typed values. No executable rule or class is serialized. */
     public byte[] encode(Candidate candidate) {
-<span class="fc" id="L157">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L158">        var data = new AstReplayJson(JSON);</span>
-<span class="fc" id="L159">        var root = JSON.createObjectNode().put(&quot;schema&quot;, SCHEMA).put(&quot;backend&quot;, CompiledAstRewriteProgram.REVISION)</span>
-<span class="fc" id="L160">            .put(&quot;program&quot;, data.text(candidate.programId()));</span>
-<span class="fc" id="L161">        var sources = root.putArray(&quot;sourceIds&quot;);</span>
-<span class="fc" id="L162">        candidate.sourceIds().forEach(id -&gt; sources.add(data.text(id)));</span>
-<span class="fc" id="L163">        var states = root.putArray(&quot;states&quot;);</span>
-<span class="fc" id="L164">        candidate.states().forEach(state -&gt; states.add(data.write(state)));</span>
-<span class="fc" id="L165">        var steps = root.putArray(&quot;steps&quot;);</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (var step : candidate.steps()) {</span>
-<span class="fc" id="L167">            var node = steps.addObject().put(&quot;rule&quot;, data.text(step.rule())).put(&quot;kind&quot;, step.kind().name())</span>
-<span class="fc" id="L168">                .put(&quot;mayIncreaseComplexity&quot;, step.mayIncreaseComplexity()).put(&quot;estimatedCostDelta&quot;, step.estimatedCostDelta())</span>
-<span class="fc" id="L169">                .put(&quot;equivalencePreservingByConstruction&quot;, step.equivalencePreservingByConstruction());</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (step.assumptions().size() &gt; MAXIMUM_ASSUMPTIONS) throw new IllegalArgumentException(&quot;too many AST replay assumptions&quot;);</span>
-<span class="fc" id="L171">            var assumptions = node.putArray(&quot;assumptions&quot;);</span>
-<span class="fc" id="L172">            step.assumptions().forEach(value -&gt; assumptions.add(data.text(value)));</span>
-<span class="fc" id="L173">            node.put(&quot;packId&quot;, data.text(step.packId())).put(&quot;license&quot;, data.text(step.license()));</span>
-<span class="fc" id="L174">        }</span>
+<span class="fc" id="L166">        AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_ENCODE);</span>
+<span class="fc" id="L167">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L168">        var data = new AstReplayJson(JSON);</span>
+<span class="fc" id="L169">        var root = de.regelsuche.retention.RetainedJson.object(JSON).put(&quot;schema&quot;, SCHEMA).put(&quot;backend&quot;, CompiledAstRewriteProgram.REVISION)</span>
+<span class="fc" id="L170">            .put(&quot;program&quot;, data.text(candidate.programId()));</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        try(var retained=de.regelsuche.retention.RetainedJson.active()?de.regelsuche.retention.RetainedOperation.retain(root):null) {</span>
+<span class="fc" id="L172">        var sources = root.putArray(&quot;sourceIds&quot;);</span>
+<span class="fc" id="L173">        candidate.sourceIds().forEach(id -&gt; sources.add(data.text(id)));</span>
+<span class="fc" id="L174">        var states = root.putArray(&quot;states&quot;);</span>
+<span class="fc" id="L175">        candidate.states().forEach(state -&gt; states.add(data.write(state)));</span>
+<span class="fc" id="L176">        var steps = root.putArray(&quot;steps&quot;);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (var step : candidate.steps()) {</span>
+<span class="fc" id="L178">            var node = steps.addObject().put(&quot;rule&quot;, data.text(step.rule())).put(&quot;kind&quot;, step.kind().name())</span>
+<span class="fc" id="L179">                .put(&quot;mayIncreaseComplexity&quot;, step.mayIncreaseComplexity()).put(&quot;estimatedCostDelta&quot;, step.estimatedCostDelta())</span>
+<span class="fc" id="L180">                .put(&quot;equivalencePreservingByConstruction&quot;, step.equivalencePreservingByConstruction());</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (step.assumptions().size() &gt; MAXIMUM_ASSUMPTIONS) throw new IllegalArgumentException(&quot;too many AST replay assumptions&quot;);</span>
+<span class="fc" id="L182">            var assumptions = node.putArray(&quot;assumptions&quot;);</span>
+<span class="fc" id="L183">            step.assumptions().forEach(value -&gt; assumptions.add(data.text(value)));</span>
+<span class="fc" id="L184">            node.put(&quot;packId&quot;, data.text(step.packId())).put(&quot;license&quot;, data.text(step.license()));</span>
+<span class="fc" id="L185">        }</span>
         try {
-<span class="fc" id="L176">            byte[] result = JSON.writeValueAsBytes(root);</span>
-<span class="fc" id="L177">            requireBytes(result);</span>
-<span class="fc" id="L178">            return result;</span>
-<span class="nc" id="L179">        } catch (JsonProcessingException exception) {</span>
-<span class="nc" id="L180">            throw new IllegalArgumentException(&quot;cannot encode AST replay&quot;, exception);</span>
+<span class="fc" id="L187">            byte[] result = de.regelsuche.retention.RetainedJson.writeBytes(JSON,root);</span>
+<span class="fc" id="L188">            try(var bytes=de.regelsuche.retention.RetainedOperation.retain(result)) {</span>
+<span class="fc" id="L189">                de.regelsuche.retention.RetainedOperation.work(result.length);requireBytes(result);return result;</span>
+            }
+<span class="nc" id="L191">        } catch (java.io.IOException exception) {</span>
+<span class="nc" id="L192">            throw new IllegalArgumentException(&quot;cannot encode AST replay&quot;, exception);</span>
+        }
         }
     }
 
     /** Returns data only. Use the receiving program's replayEncoded method for source-bound regeneration. */
     public Candidate decode(byte[] bytes) {
-<span class="fc" id="L186">        requireBytes(bytes);</span>
+<span class="fc" id="L199">        AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_DECODE);</span>
+<span class="fc" id="L200">        requireBytes(bytes);</span>
         try {
-<span class="fc" id="L188">            String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)</span>
-<span class="fc" id="L189">                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();</span>
-<span class="fc" id="L190">            JsonNode root = JSON.readTree(text);</span>
-<span class="fc" id="L191">            AstReplayJson.fields(root, ROOT_FIELDS);</span>
-<span class="fc" id="L192">            var data = new AstReplayJson(JSON);</span>
-<span class="fc bfc" id="L193" title="All 4 branches covered.">            if (!SCHEMA.equals(data.text(root, &quot;schema&quot;)) || !CompiledAstRewriteProgram.REVISION.equals(data.text(root, &quot;backend&quot;))) {</span>
-<span class="fc" id="L194">                throw new IllegalArgumentException(&quot;unsupported AST replay version&quot;);</span>
+<span class="fc" id="L202">            String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L203">                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();</span>
+<span class="fc" id="L204">            JsonNode root = JSON.readTree(text);</span>
+<span class="fc" id="L205">            AstReplayJson.fields(root, ROOT_FIELDS);</span>
+<span class="fc" id="L206">            var data = new AstReplayJson(JSON);</span>
+<span class="fc bfc" id="L207" title="All 4 branches covered.">            if (!SCHEMA.equals(data.text(root, &quot;schema&quot;)) || !CompiledAstRewriteProgram.REVISION.equals(data.text(root, &quot;backend&quot;))) {</span>
+<span class="fc" id="L208">                throw new IllegalArgumentException(&quot;unsupported AST replay version&quot;);</span>
             }
-<span class="fc" id="L196">            var stepNodes = root.get(&quot;steps&quot;);</span>
-<span class="fc" id="L197">            AstReplayJson.array(stepNodes, 1, 8);</span>
-<span class="fc" id="L198">            var stateNodes = root.get(&quot;states&quot;);</span>
-<span class="fc" id="L199">            AstReplayJson.array(stateNodes, stepNodes.size() + 1, stepNodes.size() + 1);</span>
-<span class="fc" id="L200">            List&lt;String&gt; sourceIds = texts(root.get(&quot;sourceIds&quot;), stepNodes.size(), stepNodes.size(), data);</span>
-<span class="fc" id="L201">            var states = new ArrayList&lt;Expr&gt;();</span>
-<span class="fc bfc" id="L202" title="All 2 branches covered.">            for (var state : stateNodes) states.add(data.read(state));</span>
-<span class="fc" id="L203">            var steps = new ArrayList&lt;AstRewriteTransport.Step&gt;();</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (int i = 0; i &lt; stepNodes.size(); i++) {</span>
-<span class="fc" id="L205">                var node = stepNodes.get(i);</span>
-<span class="fc" id="L206">                AstReplayJson.fields(node, STEP_FIELDS);</span>
-<span class="fc" id="L207">                var assumptions = texts(node.get(&quot;assumptions&quot;), 0, MAXIMUM_ASSUMPTIONS, data);</span>
-<span class="fc" id="L208">                var step = new AstRewriteTransport.Step(states.get(i), states.get(i + 1), data.text(node, &quot;rule&quot;),</span>
-<span class="fc" id="L209">                    RewriteKind.valueOf(data.text(node, &quot;kind&quot;)), bool(node, &quot;mayIncreaseComplexity&quot;),</span>
-<span class="fc" id="L210">                    integer(node, &quot;estimatedCostDelta&quot;), bool(node, &quot;equivalencePreservingByConstruction&quot;), assumptions,</span>
-<span class="fc" id="L211">                    data.text(node, &quot;packId&quot;), data.text(node, &quot;license&quot;));</span>
-<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (!step.assumptions().equals(assumptions)) {</span>
-<span class="fc" id="L213">                    throw new IllegalArgumentException(&quot;noncanonical AST replay assumptions&quot;);</span>
+<span class="fc" id="L210">            var stepNodes = root.get(&quot;steps&quot;);</span>
+<span class="fc" id="L211">            AstReplayJson.array(stepNodes, 1, 8);</span>
+<span class="fc" id="L212">            var stateNodes = root.get(&quot;states&quot;);</span>
+<span class="fc" id="L213">            AstReplayJson.array(stateNodes, stepNodes.size() + 1, stepNodes.size() + 1);</span>
+<span class="fc" id="L214">            List&lt;String&gt; sourceIds = texts(root.get(&quot;sourceIds&quot;), stepNodes.size(), stepNodes.size(), data);</span>
+<span class="fc" id="L215">            var states = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            for (var state : stateNodes) states.add(data.read(state));</span>
+<span class="fc" id="L217">            var steps = new ArrayList&lt;AstRewriteTransport.Step&gt;();</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            for (int i = 0; i &lt; stepNodes.size(); i++) {</span>
+<span class="fc" id="L219">                var node = stepNodes.get(i);</span>
+<span class="fc" id="L220">                AstReplayJson.fields(node, STEP_FIELDS);</span>
+<span class="fc" id="L221">                var assumptions = texts(node.get(&quot;assumptions&quot;), 0, MAXIMUM_ASSUMPTIONS, data);</span>
+<span class="fc" id="L222">                var step = new AstRewriteTransport.Step(states.get(i), states.get(i + 1), data.text(node, &quot;rule&quot;),</span>
+<span class="fc" id="L223">                    RewriteKind.valueOf(data.text(node, &quot;kind&quot;)), bool(node, &quot;mayIncreaseComplexity&quot;),</span>
+<span class="fc" id="L224">                    integer(node, &quot;estimatedCostDelta&quot;), bool(node, &quot;equivalencePreservingByConstruction&quot;), assumptions,</span>
+<span class="fc" id="L225">                    data.text(node, &quot;packId&quot;), data.text(node, &quot;license&quot;));</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                if (!step.assumptions().equals(assumptions)) {</span>
+<span class="fc" id="L227">                    throw new IllegalArgumentException(&quot;noncanonical AST replay assumptions&quot;);</span>
                 }
-<span class="fc" id="L215">                steps.add(step);</span>
+<span class="fc" id="L229">                steps.add(step);</span>
             }
-<span class="fc" id="L217">            return new Candidate(data.text(root, &quot;program&quot;), sourceIds, steps);</span>
-<span class="fc" id="L218">        } catch (CharacterCodingException exception) {</span>
-<span class="fc" id="L219">            throw new IllegalArgumentException(&quot;invalid UTF-8 AST replay JSON&quot;, exception);</span>
-<span class="fc" id="L220">        } catch (JsonProcessingException exception) {</span>
-<span class="fc" id="L221">            throw new IllegalArgumentException(&quot;invalid AST replay JSON&quot;, exception);</span>
+<span class="fc" id="L231">            return new Candidate(data.text(root, &quot;program&quot;), sourceIds, steps);</span>
+<span class="fc" id="L232">        } catch (CharacterCodingException exception) {</span>
+<span class="fc" id="L233">            throw new IllegalArgumentException(&quot;invalid UTF-8 AST replay JSON&quot;, exception);</span>
+<span class="fc" id="L234">        } catch (java.io.IOException exception) {</span>
+<span class="fc" id="L235">            throw new IllegalArgumentException(&quot;invalid AST replay JSON&quot;, exception);</span>
         }
     }
 
     /** Content identity of canonical data, not a signature, rule-set identity or proof. */
     public String contentHash(Candidate candidate) {
+<span class="fc" id="L241">        AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_HASH);</span>
         try {
-<span class="fc" id="L228">            return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(encode(candidate)));</span>
-<span class="nc" id="L229">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L230">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L243">            byte[] encoded=encode(candidate);</span>
+<span class="fc" id="L244">            try(var held=de.regelsuche.retention.RetainedOperation.retain(encoded)) {</span>
+<span class="fc" id="L245">                de.regelsuche.retention.RetainedOperation.work(encoded.length);</span>
+<span class="fc" id="L246">                byte[] digest=MessageDigest.getInstance(&quot;SHA-256&quot;).digest(encoded);</span>
+<span class="fc" id="L247">                try(var output=de.regelsuche.retention.RetainedOperation.retain(digest)) {</span>
+<span class="fc" id="L248">                    de.regelsuche.retention.RetainedOperation.work(digest.length*3L);</span>
+<span class="fc" id="L249">                    return de.regelsuche.retention.RetainedOperation.produced(&quot;sha256:&quot;+HexFormat.of().formatHex(digest));</span>
+                }
+            }
+<span class="nc" id="L252">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L253">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
     private static void requireBytes(byte[] bytes) {
-<span class="fc" id="L235">        Objects.requireNonNull(bytes, &quot;bytes&quot;);</span>
-<span class="fc bfc" id="L236" title="All 4 branches covered.">        if (bytes.length == 0 || bytes.length &gt; MAXIMUM_BYTES) throw new IllegalArgumentException(&quot;invalid AST replay byte length&quot;);</span>
-<span class="fc" id="L237">    }</span>
+<span class="fc" id="L258">        Objects.requireNonNull(bytes, &quot;bytes&quot;);</span>
+<span class="fc bfc" id="L259" title="All 4 branches covered.">        if (bytes.length == 0 || bytes.length &gt; MAXIMUM_BYTES) throw new IllegalArgumentException(&quot;invalid AST replay byte length&quot;);</span>
+<span class="fc" id="L260">    }</span>
 
     private static List&lt;String&gt; texts(JsonNode array, int minimum, int maximum, AstReplayJson data) {
-<span class="fc" id="L240">        AstReplayJson.array(array, minimum, maximum);</span>
-<span class="fc" id="L241">        var values = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (var value : array) {</span>
-<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            if (!value.isTextual()) throw new IllegalArgumentException(&quot;expected AST replay text array&quot;);</span>
-<span class="fc" id="L244">            values.add(data.text(value.textValue()));</span>
-<span class="fc" id="L245">        }</span>
-<span class="fc" id="L246">        return List.copyOf(values);</span>
+<span class="fc" id="L263">        AstReplayJson.array(array, minimum, maximum);</span>
+<span class="fc" id="L264">        var values = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (var value : array) {</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            if (!value.isTextual()) throw new IllegalArgumentException(&quot;expected AST replay text array&quot;);</span>
+<span class="fc" id="L267">            values.add(data.text(value.textValue()));</span>
+<span class="fc" id="L268">        }</span>
+<span class="fc" id="L269">        return List.copyOf(values);</span>
     }
 
     private static boolean bool(JsonNode node, String field) {
-<span class="fc" id="L250">        var value = node.get(field);</span>
-<span class="pc bpc" id="L251" title="1 of 4 branches missed.">        if (value == null || !value.isBoolean()) throw new IllegalArgumentException(&quot;expected boolean: &quot; + field);</span>
-<span class="fc" id="L252">        return value.booleanValue();</span>
+<span class="fc" id="L273">        var value = node.get(field);</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">        if (value == null || !value.isBoolean()) throw new IllegalArgumentException(&quot;expected boolean: &quot; + field);</span>
+<span class="fc" id="L275">        return value.booleanValue();</span>
     }
 
     private static int integer(JsonNode node, String field) {
-<span class="fc" id="L256">        var value = node.get(field);</span>
-<span class="pc bpc" id="L257" title="1 of 6 branches missed.">        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) {</span>
-<span class="fc" id="L258">            throw new IllegalArgumentException(&quot;expected exact 32-bit integer: &quot; + field);</span>
+<span class="fc" id="L279">        var value = node.get(field);</span>
+<span class="pc bpc" id="L280" title="1 of 6 branches missed.">        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) {</span>
+<span class="fc" id="L281">            throw new IllegalArgumentException(&quot;expected exact 32-bit integer: &quot; + field);</span>
         }
-<span class="fc" id="L260">        return value.intValue();</span>
+<span class="fc" id="L283">        return value.intValue();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

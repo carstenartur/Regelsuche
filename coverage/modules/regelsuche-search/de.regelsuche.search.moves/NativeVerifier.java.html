@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeVerifier.java</span></div><h1>NativeVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+import java.util.ServiceLoader;
+
+/**
+ * Explicit trusted mathematical checker, independent of the candidate channel.
+ * Supplying an implementation has the same trust responsibility as the historical Problem.verifier.
+ * An accepted public receipt or a provider identifier does not install a checker.
+ */
+@FunctionalInterface
+public interface NativeVerifier {
+    NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove proposal,TypedMoveSearch.Context context);
+
+    /** Register only final built-in implementations or privately recognized installed checker types. */
+    static NativeVerifier registered(List&lt;NativeMoveProvider&gt; providers) {
+<span class="fc" id="L19">        var verifiers=new LinkedHashMap&lt;MoveProvider.Descriptor,NativeVerifier&gt;();</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        for(var provider:List.copyOf(providers)) {</span>
+<span class="fc" id="L21">            NativeVerifier verifier=null;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            if(provider instanceof NativeMoveSearch.Primitive primitive)verifier=new Builtin(primitive);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">            else if(provider instanceof NativeProgramMoveProvider program)verifier=new Builtin(program);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            else for(var installed:ServiceLoader.load(NativeVerifierProvider.class,NativeVerifier.class.getClassLoader())) {</span>
+<span class="nc" id="L25">                var recognized=Objects.requireNonNull(installed.recognize(provider));</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">                if(recognized.isPresent()) {</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">                    if(verifier!=null)throw new IllegalArgumentException(&quot;ambiguous installed native verifier&quot;);</span>
+<span class="nc" id="L28">                    verifier=recognized.orElseThrow();</span>
+                }
+<span class="nc" id="L30">            }</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if(verifier==null)throw new IllegalArgumentException(&quot;unsupported native provider registration&quot;);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if(verifiers.putIfAbsent(provider.descriptor(),verifier)!=null)throw new IllegalArgumentException(&quot;duplicate native provider descriptor&quot;);</span>
+<span class="fc" id="L33">        }</span>
+<span class="fc" id="L34">        return new Registered(verifiers);</span>
+    }
+    final class Builtin implements NativeVerifier,de.regelsuche.retention.RetainedGraph.View {
+        private final NativeMoveProvider provider;
+<span class="fc" id="L38">        private Builtin(NativeMoveProvider provider){this.provider=provider;}</span>
+<span class="fc" id="L39">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(provider);}</span>
+<span class="fc" id="L40">        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove proposal,TypedMoveSearch.Context context){return provider.verify(source,proposal,context);}</span>
+    }
+    final class Registered implements NativeVerifier,de.regelsuche.retention.RetainedGraph.View {
+        private final java.util.Map&lt;MoveProvider.Descriptor,NativeVerifier&gt; verifiers;
+<span class="fc" id="L44">        private Registered(java.util.Map&lt;MoveProvider.Descriptor,NativeVerifier&gt; verifiers){this.verifiers=java.util.Map.copyOf(verifiers);}</span>
+<span class="fc" id="L45">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(verifiers);}</span>
+        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove proposal,TypedMoveSearch.Context context){
+<span class="fc" id="L47">            var verifier=verifiers.get(proposal.descriptor());</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            return verifier==null?new NativeVerification(false,1,null,null,&quot;UNREGISTERED_NATIVE_PROVIDER&quot;):</span>
+<span class="fc" id="L49">                verifier.verify(source,proposal,context);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

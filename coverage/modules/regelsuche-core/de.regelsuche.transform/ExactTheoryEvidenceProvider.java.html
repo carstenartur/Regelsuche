@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactTheoryEvidenceProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">ExactTheoryEvidenceProvider.java</span></div><h1>ExactTheoryEvidenceProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import java.util.Optional;
+
+/**
+ * Trusted installed-code SPI bridging verifier-owned capabilities into core.
+ * Providers must recognize a sealed verifier-issued object, never accept its
+ * public data/JSON/hash as authority. Providers are installed in META-INF/services;
+ * callers cannot supply a provider to the evidence factory.
+ */
+public interface ExactTheoryEvidenceProvider {
+    Optional&lt;ExactTheoryEvidence.Binding&gt; bind(Object verifierOwnedEvidence);
+<span class="nc" id="L13">    default Optional&lt;NativeExactTheoryEvidence.Binding&gt; bindNative(Object verifierOwnedEvidence){return Optional.empty();}</span>
+<span class="nc" id="L14">    default Object exportNative(Object verifierOwnedEvidence){throw new IllegalArgumentException(&quot;unsupported native evidence export&quot;);}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
