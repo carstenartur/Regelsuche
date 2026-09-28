@@ -16,13 +16,14 @@ class ExprMatcherOwnershipTest {
         RetainedOperation scope;
         Expr input;
         ExprMatcher.MatchOutcome outcome;
-        long work, workAfterFailure;
+        long work, workAfterFailure, retentionWork;
         MatchAbort failure;
         boolean abortOutcome, abortClose, sawSession, inputMissing;
         boolean abortBindingCopy, sawBindingCopy, sawTraceCopy;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
+        final Set<Object> states = Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -33,7 +34,7 @@ class ExprMatcherOwnershipTest {
         @Override public void validationWork(long units) { executionWork(units); }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(scope); }
         @Override public void checkpoint() {
-            RetainedGraph.measure(scope);
+            retentionWork += RetainedGraph.measure(scope).work();
             var pending = new ArrayDeque<Object>();
             var seen = Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
             var visitor = new RetainedGraph.Visitor() {
@@ -48,6 +49,8 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
                 sawSession |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
                     && value.getClass().getSimpleName().equals("Session");
+                if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
+                        && value.getClass().getSimpleName().equals("State")) states.add(value);
                 if (value instanceof ExprMatcher.MatchOutcome result) outcome = result;
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
@@ -186,6 +189,26 @@ class ExprMatcherOwnershipTest {
             assertNull(observation.outcome);
             assertTrue(observation.workAfterFailure > 0,"cleanup and unreturned match work must remain paid");
         }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void anExactRecognitionThatChangesNoFieldsReusesItsState() {
+        Expr input = new VariableExpr("x");
+        var matcher = ExprMatcher.pattern(PatternExpr.var("A"));
+        var expected = matcher.match(input);
+        var observation = new Observation(); observation.input = input;
+        ExprMatcher.MatchOutcome result;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            result = matcher.match(input);
+        }
+        assertEquals(expected,result);
+        System.out.println("P04_MATCHER_STATE_UPDATE states=" + observation.states.size()
+            + " execution=" + observation.work + " retention=" + observation.retentionWork
+            + " total=" + (observation.work + observation.retentionWork));
+        assertTrue(observation.states.size() <= 3,
+            "source, changed bindings and new trace need at most three states; unchanged recognition adds none");
+        assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
