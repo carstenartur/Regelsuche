@@ -1,6 +1,7 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -621,7 +622,10 @@ public sealed interface ExprMatcher extends RetainedGraph.View
         appendField(result, requireText(type, "type"));
         Arrays.stream(fields).forEach(field ->
             appendField(result, Objects.requireNonNull(field, "field")));
-        return result.toString();
+        String description = result.toString();
+        try (var owned = RetainedOperation.retainCompleted(description.length() + 1L,description)) {
+            return description;
+        }
     }
 
     private static void appendField(StringBuilder result, String field) {

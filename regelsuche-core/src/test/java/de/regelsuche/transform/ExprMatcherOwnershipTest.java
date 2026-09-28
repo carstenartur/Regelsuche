@@ -136,6 +136,34 @@ class ExprMatcherOwnershipTest {
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
+    @Test void aBoundedPatternMatchDoesNotConstructUnusedDiagnosticDescriptions() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertTrue(matcher().match(input).matched());
+        }
+        assertTrue(observation.patternDescriptions.isEmpty(),
+            "a successful bounded match needs no canonical diagnostic description");
+        assertFalse(observation.inputMissing);
+    }
+
+    @Test void aRealStepLimitStillProducesTheSamePaidDescription() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var pattern = matcher(); var expected = pattern.canonicalDescriptor();
+        var limited = ExprMatcher.allOf(ExprMatcher.any(),pattern);
+        var observation = new Observation(); observation.input = input;
+        ExprMatcher.MatchOutcome result;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            result = limited.match(input,new ExprMatcher.MatchOptions(null,64,2,1000));
+        }
+        assertFalse(result.complete()); assertFalse(result.matched()); assertEquals(2,result.evaluatedSteps());
+        assertEquals(new ExprMatcher.MatchDiagnostic("MATCH_STEP_LIMIT",expected),result.diagnostics().getFirst());
+        assertTrue(observation.patternDescriptions.contains(result.diagnostics().getFirst().matcherDescriptor()));
+        assertFalse(observation.inputMissing);
+    }
+
     @Test void abortedOutcomePaysItsUnreturnedStepsAndNestedBranchCounters() {
         verifyFailedHandoff(false);
     }
