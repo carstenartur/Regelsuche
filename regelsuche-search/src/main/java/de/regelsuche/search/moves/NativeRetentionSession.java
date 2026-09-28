@@ -13,6 +13,7 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private final RetainedGraph.Usage inventoryLimits;
     private RetainedGraph.View kernel;
     private RetainedGraph.View finalSelection;
+    private RetainedGraph.View replayExecution;
     private TypedSourceOnlySearch.Objective externalObjective;
     private boolean lastObservationComplete;
     private de.regelsuche.retention.RetainedOperation operation;
@@ -30,12 +31,12 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
         inventoryLimits=useInventory?new RetainedGraph.Usage(limits.nodes(),limits.characters(),limits.references()):null;
         retentionWork=useInventory?6:0; // actual inventory/backend/containers and limit value only
     }
-    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(finalSelection);v.reference(detail);v.reference(operation);v.reference(externalObjective);v.reference(inventory);v.reference(inventoryLimits);}
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(finalSelection);v.reference(replayExecution);v.reference(detail);v.reference(operation);v.reference(externalObjective);v.reference(inventory);v.reference(inventoryLimits);}
     void externalObjective(TypedSourceOnlySearch.Objective objective){executionWork(1);externalObjective=objective;}
     void ownership(RetainedGraph.View root){kernel=root;executionWork(1);}
-    /** The completed output replaces closed frontier scratch; source-only replay still owns its selection. */
-    void completed(RetainedGraph.View result,RetainedGraph.View selection){
-        ownership(result);finalSelection=selection;executionWork(1);
+    /** Completed output replaces frontier scratch; replay owns its live environment and optional selection. */
+    void completed(RetainedGraph.View result,RetainedGraph.View selection,RetainedGraph.View execution){
+        ownership(result);finalSelection=selection;replayExecution=execution;executionWork(2);
     }
     void operation(de.regelsuche.retention.RetainedOperation scope){operation=scope;}
     @Override public void executionWork(long units){if(units<0)throw new IllegalArgumentException("negative native work");executionWork=Math.addExact(executionWork,units);}
@@ -82,8 +83,8 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
             retentionWork=Math.addExact(retentionWork,inventory.close());inventory=null;
             retentionWork=Math.addExact(retentionWork,1);
         }
-        store.close();kernel=null;finalSelection=null;
-        if(operation!=null)operation.close();operation=null;executionWork(3);
+        store.close();kernel=null;finalSelection=null;replayExecution=null;
+        if(operation!=null)operation.close();operation=null;executionWork(4);
         executionWork(7);
         var external=observe(new ExternalInputs(problem,externalObjective),false);
         receipt.external(external.retained(),lastObservationComplete);externalObjective=null;
