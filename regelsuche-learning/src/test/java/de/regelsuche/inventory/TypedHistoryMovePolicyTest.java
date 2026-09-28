@@ -99,6 +99,22 @@ class TypedHistoryMovePolicyTest {
         assertEquals(run(source,goal,legacy,10000).encodedResult(),new NativeMoveSearch().search(nativeProblem,SearchContinuationContract.PATH_SENSITIVE).exportLegacy());
     }
 
+    @Test void nativeHistoryRankingHasAuditedBoundedOwnershipAcrossIndependentSearches() {
+        var policy=HistoryMovePolicy.nativePolicy(new RuleHistoryMemory().freeze(),HistoryMovePolicy.Weights.DEFAULT);
+        for(String symbol:List.of("first","second")) {
+            Expr goal=new VariableExpr(symbol);Expr source=new BinaryExpr(goal,ADD,new NumberExpr(0));
+            var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(goal),
+                List.of(new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
+                new MoveSearch.Budget(3,3,0,20,10000000),policy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
+            try(var transport=de.regelsuche.search.program.AstTransportObservation.open()) {
+                var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
+                assertTrue(result.withinBudget());assertTrue(result.accounting().executionWork()>0);assertEquals(0,transport.total());
+            }
+            assertEquals(0,de.regelsuche.retention.RetainedGraph.measure(policy).retained().nodes(),"completed runs must not accumulate caller-retained expression cache entries");
+        }
+    }
+
     private static TypedMoveSearch.Result run(Expr source, Expr goal, MovePriorityPolicy policy, long work) {
         return new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
             new TypedMoveSearch.Context(goal, List.of(), MoveContext.Phase.TRAIN),
