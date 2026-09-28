@@ -4,11 +4,13 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.search.program.AstExpressionValidation;
 
-/** One run's paid ownership observations; no strong registry survives a scan or session close. */
+/** One run's paid ownership observations; its bounded immutable inventory is released at handoff. */
 final class NativeRetentionSession implements de.regelsuche.retention.RetainedOperation.Sink {
     private final NativeMoveSearch.Problem problem;
     private final SearchExpressionStore store;
     private final SearchExpressionStore.Limits limits;
+    private RetainedGraph.Inventory inventory;
+    private final RetainedGraph.Usage inventoryLimits;
     private RetainedGraph.View kernel;
     private TypedSourceOnlySearch.Objective externalObjective;
     private boolean lastObservationComplete;
@@ -19,8 +21,12 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private String detail="";
     NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){
         this.problem=problem;this.store=store;this.limits=limits;
+        inventory=new RetainedGraph.Inventory();
+        inventoryLimits=new RetainedGraph.Usage(limits.nodes(),limits.characters(),limits.references());
+        retentionWork=6; // inventory/backend/map/backing/list and the immutable limit value
+
     }
-    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(detail);v.reference(operation);v.reference(externalObjective);}
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(detail);v.reference(operation);v.reference(externalObjective);v.reference(inventory);v.reference(inventoryLimits);}
     void externalObjective(TypedSourceOnlySearch.Objective objective){executionWork(1);externalObjective=objective;}
     void ownership(RetainedGraph.View root){kernel=root;}
     void operation(de.regelsuche.retention.RetainedOperation scope){operation=scope;}
@@ -35,9 +41,13 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     void fail(String reason){incomplete(reason);throw new SearchExecution.ResourceLimit();}
     private RetainedGraph.Observation observe(Object root,boolean enforce){
         RetainedGraph.Observation measured;lastObservationComplete=true;
-        try { measured=RetainedGraph.measure(root); }
+        try { measured=inventory==null?RetainedGraph.measure(root):inventory.measure(root,inventoryLimits); }
         catch(RetainedGraph.Unmeasured unknown) {
             measured=unknown.attempted();lastObservationComplete=false;complete=false;if(detail.isEmpty())detail="NATIVE_RETENTION_UNSUPPORTED:"+unknown.getMessage();
+        }
+        catch(RetainedGraph.InventoryFailure missingOwner) {
+            measured=missingOwner.attempted();lastObservationComplete=false;complete=false;
+            if(detail.isEmpty())detail="NATIVE_RETENTION_UNSUPPORTED:"+missingOwner.getMessage();
         }
         retentionWork=Math.addExact(retentionWork,measured.work());
         peakNodes=Math.max(peakNodes,measured.peak().nodes());peakCharacters=Math.max(peakCharacters,measured.peak().characters());
@@ -60,6 +70,8 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
         var receipt=new NativeMoveSearch.Accounting();result.accounting=receipt;
         update(receipt,0,0,0);
         observe(new Handoff(this,output),false);
+        retentionWork=Math.addExact(retentionWork,inventory.close());inventory=null;
+        retentionWork=Math.addExact(retentionWork,1);
         store.close();kernel=null;
         if(operation!=null)operation.close();operation=null;executionWork(2);
         executionWork(7);
