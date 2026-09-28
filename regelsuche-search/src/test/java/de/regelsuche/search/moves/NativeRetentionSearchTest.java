@@ -34,6 +34,28 @@ class NativeRetentionSearchTest {
         @Override public TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state){return new TypedSourceOnlySearch.Score(state.searchDepth()==0?1:0,1);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){}
     }
+    @Test void handingOffAResultCountsItsOverlapWithTheStillOwnedSessionGraph() {
+        var source=new VariableExpr("source");
+        var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000));
+        var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
+        var working=new java.util.ArrayList<de.regelsuche.ast.Expr>();
+        var published=new java.util.ArrayList<de.regelsuche.ast.Expr>();
+        for(int i=0;i<20;i++)working.add(new VariableExpr("working"+i));
+        for(int i=0;i<30;i++)published.add(new VariableExpr("published"+i));
+        RetainedGraph.View kernel=visitor->visitor.reference(working);
+        RetainedGraph.View output=visitor->{visitor.reference(result);visitor.reference(published);};
+        try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
+            var session=new NativeRetentionSession(problem,store,SearchExpressionStore.Limits.DEFAULT);
+            try(var operation=de.regelsuche.retention.RetainedOperation.open(session)) {
+                session.operation(operation);session.ownership(kernel);session.checkpoint();
+                session.finish(result,output);
+            }
+        }
+        assertEquals(51,result.accounting().peak().nodes(),"handoff keeps both actual graphs live until session close");
+        assertEquals(31,result.accounting().resultRetained().nodes());
+        assertEquals(new RetainedGraph.Usage(0,0,0),result.accounting().live());
+    }
     @Test void sourceOnlyQualityAndBestSelectionKeepTheSameTotalOwnershipAndReplayReceipt() {
         var a=de.regelsuche.transform.PatternExpr.var("A");
         var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
