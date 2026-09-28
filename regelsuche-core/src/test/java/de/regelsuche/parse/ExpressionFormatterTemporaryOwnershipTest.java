@@ -10,12 +10,15 @@ import org.junit.jupiter.api.Test;
 
 class ExpressionFormatterTemporaryOwnershipTest {
     private static final class GrowthLimit extends RuntimeException { }
+    private static final class CallbackFailure extends RuntimeException { }
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;
         Expr input;
-        long work, previousWork, growthWork, peakCharacters;
+        long work, previousWork, growthWork, peakCharacters, abortCharactersAt = Long.MAX_VALUE;
         int queuedActions, buffers;
         boolean inputMissing, growth, abortGrowth, unwrittenReplacement;
+        boolean parenthesisGrowth, renderedNumberOwned;
+        String renderedNumber;
         @Override public void executionWork(long units) { work = Math.addExact(work, units); }
         @Override public void validationWork(long units) { executionWork(units); }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(scope); }
@@ -28,7 +31,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 @Override public void requireExact(Object value, Class<?> type) { assertEquals(type, value.getClass()); }
             };
             visitor.reference(scope);
-            boolean oldBuffer = false, replacement = false;
+            boolean oldBuffer = false, replacement = false, parenthesisReplacement = false;
             int currentBuffers = 0;
             while (!pending.isEmpty()) {
                 var value = pending.remove();
@@ -36,6 +39,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 if (value instanceof char[] buffer) {
                     currentBuffers++;
                     if (buffer.length == 16) oldBuffer = true;
+                    if (buffer.length == 34) parenthesisReplacement = true;
                     if (buffer.length == 80) {
                         replacement = true;
                         unwrittenReplacement = true;
@@ -54,6 +58,10 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
             buffers = Math.max(buffers, currentBuffers);
+            if (oldBuffer && parenthesisReplacement) {
+                parenthesisGrowth = true;
+                renderedNumberOwned = seen.stream().anyMatch(value -> value instanceof String text && text.equals(renderedNumber));
+            }
             if (input != null && !seen.contains(input)) inputMissing = true;
             if (oldBuffer && replacement) {
                 growth = true;
@@ -61,6 +69,62 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 if (abortGrowth) throw new GrowthLimit();
             }
             previousWork = work;
+            if (peakCharacters >= abortCharactersAt) throw new GrowthLimit();
+        }
+    }
+    private static final class AllocatingEmission implements LongConsumer, RetainedGraph.View {
+        char[] captured;
+        boolean fail;
+        @Override public void accept(long units) {
+            captured = new char[1_000];
+            RetainedOperation.work(captured.length);
+            if (fail) throw new CallbackFailure();
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(captured); }
+    }
+
+    @Test void parenthesisGrowthKeepsTheAlreadyRenderedNumberAlive() {
+        for (var number : List.of(new NumberExpr(-2), NumberExpr.exact("1/3"))) {
+            var input = new BinaryExpr(new VariableExpr("abcdefghijklm"), BinaryOperator.POW, number);
+            var observation = new Observation(); observation.input = input;
+            observation.renderedNumber = number.value().isInteger() ? "-2" : "1 / 3";
+            try (var scope = RetainedOperation.open(observation)) {
+                observation.scope = scope;
+                assertEquals("abcdefghijklm ^ (" + observation.renderedNumber + ")", ExpressionFormatter.format(input));
+            }
+            assertTrue(observation.parenthesisGrowth, "the opening parenthesis grows the real full buffer");
+            assertTrue(observation.renderedNumberOwned, "the final numeric fragment already exists at that growth checkpoint");
+            assertFalse(observation.inputMissing);
+            assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+        }
+    }
+
+    @Test void mutableCallbackAllocationIsObservedBeforeSuccessfulReturn() {
+        for (Expr input : List.of(new VariableExpr("x"), new FunctionExpr("f", List.of()))) {
+            var observation = new Observation(); var emitted = new AllocatingEmission();
+            try (var scope = RetainedOperation.open(observation)) {
+                observation.scope = scope;
+                assertEquals(ExpressionFormatter.format(input), ExpressionFormatter.formatMeasured(input, emitted));
+            }
+            assertTrue(observation.peakCharacters >= 1_001, "callback-created storage must be observed before owner release");
+            assertTrue(observation.work >= 1_000);
+            assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+        }
+    }
+
+    @Test void failedCallbackKeepsItsWorkAndOwnershipWithoutLosingTheOriginalFailure() {
+        for (Expr input : List.of(new VariableExpr("x"), new FunctionExpr("f", List.of()))) {
+            var observation = new Observation(); observation.abortCharactersAt = 1_000;
+            var emitted = new AllocatingEmission(); emitted.fail = true;
+            try (var scope = RetainedOperation.open(observation)) {
+                observation.scope = scope;
+                var failure = assertThrows(CallbackFailure.class, () -> ExpressionFormatter.formatMeasured(input, emitted));
+                assertEquals(1, failure.getSuppressed().length);
+                assertInstanceOf(GrowthLimit.class, failure.getSuppressed()[0]);
+                assertTrue(observation.peakCharacters >= 1_001);
+                assertTrue(observation.work >= 1_000);
+            }
+            assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
         }
     }
     private static final class Emission implements LongConsumer, RetainedGraph.View {
