@@ -182,22 +182,28 @@ Vorhandene Engines lassen sich ohne zweite Suchimplementierung kombinieren:
 
 ```java
 import static de.regelsuche.search.program.RewritePrograms.*;
+import de.regelsuche.search.program.RewriteProgram;
 
 RewriteProgram strategy = firstApplicable(
-    "learn-or-derive",
-    source("learned-macros", macroEngine),
+    source(macroEngine),
     sequence(
-        "normalize-then-factor",
-        source("normalization", normalizationEngine),
-        source("factorization", factorizationEngine)
+        source(normalizationEngine),
+        source(factorizationEngine)
     ),
-    source("ordinary-rules", ordinaryRuleEngine)
-);
+    source(ordinaryRuleEngine)
+).named("learn-or-derive");
 ```
+
+Die Methoden und Engine-Objekte bestimmen das Verfahren. `named(...)` vergibt
+nur die Wurzelkennung für Tracing und Evidence; die übrigen Knotenkennungen
+entstehen deterministisch aus ihren Positionen. Es gibt keine Verfahrenssuche
+über Zeichenfolgen. Bevorzugte Regeln werden ebenfalls als Objekte mit
+`preferRules(normalizationRule, factorizationRule)` übergeben.
 
 `Require`, `Prioritize` und `Prune` bleiben getrennte Operationen; Tracing kann
 Kandidaten, verworfene Alternativen und reale Kürzungen sichtbar machen. Details
-stehen unter [Java-internal Rewrite Programs](docs/java-rewrite-programs.md) und
+stehen unter [Java-internal Rewrite Programs](docs/java-rewrite-programs.md),
+[typsichere Java-Integration](docs/type-safe-java-integration.md) und
 [Plugin-API](docs/plugin-api.md).
 
 ### Eigene Discovery-Domänen mit dem Java-SDK
@@ -215,19 +221,26 @@ import static de.regelsuche.sdk.discovery.DiscoveryRunAssertions.assertThat;
 import de.regelsuche.sdk.discovery.DiscoveryBudgets;
 import de.regelsuche.sdk.discovery.RegelsucheDiscovery;
 import example.GeometricSequenceDomainProvider;
+import example.GeometricSequenceDomainProvider.Input;
+import java.util.List;
 
+var input = new Input(List.of(2L, 4L, 8L, 16L), List.of(32L, 64L), 6);
 var run = RegelsucheDiscovery
-    .forDomain(GeometricSequenceDomainProvider.domain())
+    .forDomain(GeometricSequenceDomainProvider.typedDomain())
     .campaign("external-geometric-sequence-demo")
-    .seed("powers-of-two",
-        "observed=2,4,8,16;holdout=32,64;maxMultiplier=6",
-        "external-java25-example")
+    .seed("powers-of-two", input, "external-java25-example")
     .budget(DiscoveryBudgets.small())
     .run();
 
 assertThat(run).isConfirmed().hasContentAddressedEvidence();
 System.out.println(run.selectedCandidate().orElseThrow().multiplier()); // 2
 ```
+
+Der Eingabetyp ist an die Domäne gebunden. Ein String-Payload oder ein Eingabeobjekt
+einer anderen Domäne passt nicht auf diesen Java-Einstieg. Der domäneneigene Codec
+übernimmt die bestehende Seed-Serialisierung; freie Kampagnen- und Herkunftsnamen
+bleiben Texte. Details zu Importgrenzen und Migration stehen unter
+[typsichere Java-Integration](docs/type-safe-java-integration.md).
 
 Der Lauf sucht den Multiplikator aus den beobachteten Werten, behält
 Gegenbeispiele und prüft den Kandidaten getrennt an den zurückgehaltenen Werten.

@@ -18,7 +18,7 @@ Der Domänenautor definiert Zustände, legale Übergänge, mindestens eine
 Invariante, Zielfunktion, Kandidatenbildung, Gegenbeispielsuche, unabhängigen
 Evaluator und Zertifikat. Ein leerer Gegenbeispielfund ist niemals ein Beweis.
 
-Weiterführend: [15-Minuten-Quickstart](java-sdk-quickstart.md), [Domain-Tutorial](java-sdk-domain-tutorial.md), [API-Vertrag und Release-Distributionsweg](java-sdk-api-policy.md).
+Weiterführend: [15-Minuten-Quickstart](java-sdk-quickstart.md), [Domain-Tutorial](java-sdk-domain-tutorial.md), [API-Vertrag und Release-Distributionsweg](java-sdk-api-policy.md), [typsichere Java-Integration](type-safe-java-integration.md).
 
 ## Abhängigkeit
 
@@ -56,12 +56,15 @@ ersetzen.
 
 ## Domäne definieren
 
-Der Builder verdrahtet die portable `DiscoveryDomain`-Schnittstelle:
+Der Builder verdrahtet die portable `DiscoveryDomain`-Schnittstelle. Ein
+domäneneigener Codec verbindet den fachlichen Java-Eingabetyp mit dem vorhandenen
+Seed-Format; derselbe Codec wird im Generator und im typisierten Binding benutzt:
 
 ```java
+DiscoveryInputCodec<Input> inputCodec = DiscoveryInputCodec.of(Input::payload, Input::parse);
 var domain = DiscoveryDomainBuilder
     .<State, Candidate, Certificate>domain("my-domain", "v1")
-    .generator(this::initialStates)
+    .generator(seed -> initialStates(inputCodec.decode(seed.payload())))
     .stateCodec(State::canonical)
     .invariant("valid-state", this::checkInvariant)
     .operator("next", this::successors)
@@ -74,7 +77,13 @@ var domain = DiscoveryDomainBuilder
         Certificate::canonical,
         Certificate::canonical)
     .build();
+var typedDomain = TypedDiscoveryDomain.of(domain, inputCodec);
 ```
+
+`Input`, `payload`, `parse` und `initialStates(Input)` gehören zur jeweiligen
+Domänendefinition. Die Strings bei `invariant`, `operator` und `certificate`
+benennen neu definierte Beiträge; die übergebenen Methoden bestimmen deren
+Verhalten. Sie wählen keine versteckten Verfahren über String-Konstanten aus.
 
 Unvollständige Definitionen und doppelte Operator- oder Invariantenidentitäten
 werden abgewiesen. Invariante, Gegenbeispielsuche, Evaluator und
@@ -86,12 +95,18 @@ Beispieldomäne liegt unter
 
 ```java
 DiscoveryRun<Candidate, Certificate> run =
-    RegelsucheDiscovery.forDomain(domain)
+    RegelsucheDiscovery.forDomain(typedDomain)
         .campaign("my-campaign")
-        .seed("seed-1", payload, "student-example")
+        .seed("seed-1", input, "student-example")
         .budget(DiscoveryBudgets.small())
         .run();
 ```
+
+`input` muss zum Eingabetyp der gewählten Domäne passen. Eine fremde
+Eingabeklasse oder ein roher String-Payload kompiliert an diesem Einstieg nicht.
+Die ursprüngliche `forDomain(domain).seed(id, payload, source)`-Form bleibt als
+explizite Text-/Kompatibilitätsgrenze verfügbar. Der Codec erhält die bisherigen
+Payloadbytes, wenn bestehende Evidence-Identitäten unverändert bleiben sollen.
 
 `DiscoveryRun` stellt Ergebniszustand, ausgewählten Kandidaten, Zertifikat,
 Gegenbeispiele, verbrauchte Arbeit und kanonische Evidence getrennt bereit. Ein
@@ -165,6 +180,12 @@ doppelte Kombinationen aus Domain-ID und Revision sowie mehrdeutige
 Komponentenidentitäten werden abgewiesen. Die Auffindbarkeit eines Providers ist
 keine Aussage über Artefaktvertrauen, mathematische Korrektheit, Proof oder
 Promotion. Die registrierte Domäne bindet Provider-ID, API-Revision und den SHA-256 der beobachteten Provider-Artefaktbytes in `sdk.provider.*`-Eigenschaften der Evidence. `forRegistration(...)` führt genau diese Domäne aus; eine neu konstruierte Instanz über `forDomain(...)` behauptet keine Providerregistrierung.
+
+Ein dynamisch geladenes Providerregister ist eine explizite Textgrenze:
+`forRegistration(...)` erhält weiterhin serialisierte Seeds. Das Folgenbeispiel
+kodiert dort ein `Input`-Objekt mit dem domäneneigenen Codec und erhält die
+host-beobachtete Registration. Statische Java-Consumer verwenden bevorzugt
+`forDomain(GeometricSequenceDomainProvider.typedDomain())`.
 
 ## Eigenständiges Starterprojekt erzeugen
 
