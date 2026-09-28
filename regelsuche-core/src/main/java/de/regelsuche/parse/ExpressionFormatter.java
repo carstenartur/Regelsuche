@@ -61,7 +61,7 @@ public final class ExpressionFormatter {
             builder.current = action;
             RetainedOperation.work(2);
             if (action instanceof AppendText text) {
-                builder.append(text.value());
+                builder.appendOwned(text.value());
             } else {
                 FormatExpression format = (FormatExpression) action;
                 schedule(format.expression(), format.parentPrecedence(), builder.pending, builder);
@@ -87,7 +87,7 @@ public final class ExpressionFormatter {
             return;
         }
         if (expression instanceof VariableExpr variable) {
-            builder.append(variable.name());
+            builder.appendOwned(variable.name());
             return;
         }
         if (expression instanceof FunctionExpr function) {
@@ -146,7 +146,7 @@ public final class ExpressionFormatter {
         Deque<Action> pending,
         Output builder
     ) {
-        builder.append(function.name()).append('(');
+        builder.appendOwned(function.name()).append('(');
         push(pending, new AppendText(")"));
         List<Expr> arguments = function.arguments();
         for (int index = arguments.size() - 1;
@@ -248,8 +248,14 @@ public final class ExpressionFormatter {
             }
         }
 
-        private Output append(String value) {
-            return append(value, false);
+        /** Only source names or the current AppendText value enter here; their owner stays live. */
+        private Output appendOwned(String value) {
+            emit(emittedCodeUnits, value.length());
+            ensureCapacity(value.length());
+            value.getChars(0, value.length(), text, size);
+            size += value.length();
+            RetainedOperation.work(1);
+            return this;
         }
 
         private Output append(String value, boolean parenthesized) {
