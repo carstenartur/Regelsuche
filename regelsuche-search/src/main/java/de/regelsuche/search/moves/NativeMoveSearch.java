@@ -79,6 +79,15 @@ public final class NativeMoveSearch {
         long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),storageWork),retentionWork);}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
     }
+    /** Separate output-phase receipt; never changes the already published search charge. */
+    public record ExportAccounting(long work,long budget,RetainedGraph.Usage peak,RetainedGraph.Usage resultRetained,
+            boolean complete,String detail) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(peak);v.reference(resultRetained);v.reference(detail);}
+    }
+    public record ExportResult(MoveSearch.Result projection,ExportAccounting accounting) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(projection);v.reference(accounting);}
+        public boolean complete(){return accounting.complete();}
+    }
     public static final class Result implements RetainedGraph.View {
         Accounting accounting;
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(result);v.reference(source);v.reference(incrementalProviders);v.reference(accounting);}
@@ -109,6 +118,7 @@ public final class NativeMoveSearch {
         public List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness(){return result.witness();}
         /** Frontier receipt. Independently paid final replay is separate; use totalWork for the whole result. */
         public MoveSearch.Metrics metrics(){return result.metrics();}
+        public ExportResult exportLegacy(long workBudget,SearchExpressionStore.Limits limits){throw new UnsupportedOperationException("paid export not installed");}
         /** Historical frontier projection; the additive native replay receipt remains available separately. */
         public MoveSearch.Result exportLegacy(){
             var assessments=new HashMap<MoveState,StateValue.Assessment>();
