@@ -136,7 +136,10 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
 
     private static int compareVariables(VariableExpr left, VariableExpr right) {
         // A degree-one monomial's existing sortKey is exactly its lossless variable name.
-        String a = left.name(), b = right.name();
+        return compareText(left.name(),right.name());
+    }
+
+    private static int compareText(String a,String b) {
         for (int index = 0; index < Math.min(a.length(), b.length()); index++) {
             RetainedOperation.work(1);
             int order = Character.compare(a.charAt(index), b.charAt(index));
@@ -308,6 +311,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         private long degree() {
             long degree = 0;
             for (int exponent : powers.values()) {
+                RetainedOperation.work(1);
                 degree += exponent;
             }
             return degree;
@@ -349,22 +353,83 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             }
         }
 
-        private String sortKey() {
-            if (powers.isEmpty()) {
-                return "";
-            }
-            StringBuilder builder = new StringBuilder();
-            for (Map.Entry<String, Integer> entry
-                    : powers.entrySet()) {
-                if (!builder.isEmpty()) {
-                    builder.append('*');
+        private int compareKey(Monomial other) {
+            RetainedOperation.work(1);
+            var keys = new SortKeys(this,other);
+            try(var owned=RetainedOperation.retain(keys)) {
+                try {
+                    keys.leftText=keys.render(this,true);
+                    keys.rightText=keys.render(other,false);
+                } catch(RuntimeException | Error failure) {
+                    try{RetainedOperation.checkpoint();}
+                    catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}
+                    throw failure;
                 }
-                builder.append(entry.getKey());
-                if (entry.getValue() != 1) {
-                    builder.append('^').append(entry.getValue());
+                RetainedOperation.checkpoint();
+                return compareText(keys.leftText,keys.rightText);
+            }
+        }
+
+        /** Both keys and their actual copy buffers stay live until comparison completes. */
+        private static final class SortKeys implements RetainedGraph.View {
+            private final Monomial left,right;
+            private char[] leftBuffer,rightBuffer;
+            private String leftText,rightText;
+            private SortKeys(Monomial left,Monomial right){this.left=left;this.right=right;}
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor){
+                visitor.reference(left);visitor.reference(right);
+                visitor.reference(leftBuffer);visitor.reference(rightBuffer);
+                visitor.reference(leftText);visitor.reference(rightText);
+            }
+            private String render(Monomial monomial,boolean first){
+                if(monomial.powers.isEmpty())return "";
+                if(monomial.powers.size()==1){
+                    var entry=monomial.powers.entrySet().iterator().next();
+                    RetainedOperation.work(1);
+                    if(entry.getValue()==1)return entry.getKey();
+                }
+                int length=keyLength(monomial);
+                char[] buffer=new char[length];
+                if(first)leftBuffer=buffer;else rightBuffer=buffer;
+                RetainedOperation.work(length+1L);
+                writeKey(monomial,buffer);
+                RetainedOperation.work(length+1L); // completed key copy and String creation
+                return new String(buffer);
+            }
+            private static int keyLength(Monomial monomial){
+                int length=0;
+                for(var entry:monomial.powers.entrySet()){
+                    RetainedOperation.work(1);
+                    if(length!=0)length=Math.addExact(length,1);
+                    length=Math.addExact(length,entry.getKey().length());
+                    if(entry.getValue()!=1)length=Math.addExact(length,1+digits(entry.getValue()));
+                }
+                return length;
+            }
+            private static void writeKey(Monomial monomial,char[] buffer){
+                int position=0;
+                for(var entry:monomial.powers.entrySet()){
+                    RetainedOperation.work(1);
+                    if(position!=0){buffer[position++]='*';RetainedOperation.work(1);}
+                    String name=entry.getKey();
+                    name.getChars(0,name.length(),buffer,position);position+=name.length();
+                    RetainedOperation.work(name.length());
+                    int exponent=entry.getValue();
+                    if(exponent!=1){
+                        buffer[position++]='^';RetainedOperation.work(1);
+                        int end=position+digits(exponent);
+                        for(int index=end-1;index>=position;index--){
+                            buffer[index]=(char)('0'+exponent%10);exponent/=10;RetainedOperation.work(1);
+                        }
+                        position=end;
+                    }
                 }
             }
-            return builder.toString();
+            private static int digits(int value){
+                int digits=1;
+                while(value>=10){value/=10;digits++;RetainedOperation.work(1);}
+                RetainedOperation.work(1);return digits;
+            }
         }
     }
 
@@ -372,7 +437,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(terms);}
         private static final Comparator<Monomial> TERM_ORDER =
             Comparator.comparingLong(Monomial::degree).reversed()
-                .thenComparing(Monomial::sortKey);
+                .thenComparing(Monomial::compareKey);
 
         private final Map<Monomial, ExactRational> terms;
 
