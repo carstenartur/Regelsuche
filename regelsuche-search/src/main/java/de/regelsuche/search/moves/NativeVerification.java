@@ -17,6 +17,7 @@ public record NativeVerification(boolean accepted,long work,NativeMoveProof chec
                 yield "typed-primitive-replay:"+NativeSearchMove.digest(codec.encodeExpression(primitive.source())+"\n"+codec.encodeExpression(primitive.target())+"\n"+ruleId);
             }
             case NativeMoveProof.Program program -> "typed-program-replay:"+program.exportLegacy().applicationKey();
+            case NativeMoveProof.Exact exact -> "checked-schema-application:"+exact.evidence().exportLegacy().binding().evidenceHash();
         };
         return new MoveVerifier.Verification(true,work,List.of(receipt),reason);
     }

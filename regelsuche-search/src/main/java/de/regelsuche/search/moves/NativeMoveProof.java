@@ -6,7 +6,7 @@ import de.regelsuche.transform.*;
 import java.util.*;
 
 /** Source-bound producer structures. Construction describes a proposal, never proves it. */
-public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,NativeMoveProof.Program {
+public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,NativeMoveProof.Program,NativeMoveProof.Exact {
     Expr source(); Expr target(); List<String> assumptions(); ExecutionWork work(); String rule();
     Transformation exportLegacy();
     record Primitive(AstRewriteTransport.Step step) implements NativeMoveProof {
@@ -39,5 +39,14 @@ public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,Native
             }
             return new RewriteCandidate(history.programId(),codec.encodeExpression(source()),codec.encodeExpression(target()),steps).toTransformation();
         }
+    }
+    record Exact(NativeExactTheoryEvidence evidence) implements NativeMoveProof {
+        public Exact { Objects.requireNonNull(evidence); }
+        @Override public Expr source(){return evidence.binding().source();}
+        @Override public Expr target(){return evidence.binding().target();}
+        @Override public List<String> assumptions(){return List.of();}
+        @Override public ExecutionWork work(){return new ExecutionWork(0,1,evidence.binding().canonicalWorkUnits());}
+        @Override public String rule(){return evidence.binding().theoryStepId();}
+        @Override public Transformation exportLegacy(){return Transformation.exactTheory(evidence.exportLegacy());}
     }
 }

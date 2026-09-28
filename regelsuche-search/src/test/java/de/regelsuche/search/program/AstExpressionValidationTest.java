@@ -16,6 +16,7 @@ class AstExpressionValidationTest {
                 new BinaryExpr(new VariableExpr("a"),BinaryOperator.ADD,new NumberExpr(0)))) {
             long bytes=new CompiledAstReplayCodec().encodeExpression(expression).getBytes(StandardCharsets.UTF_8).length;
             assertEquals(bytes,AstExpressionValidation.inspect(expression).canonicalBytes(),expression.toString());
+            assertEquals(new CompiledAstReplayCodec().encodeExpression(expression).length(),AstExpressionValidation.inspect(expression).canonicalCharacters());
         }
     }
 }

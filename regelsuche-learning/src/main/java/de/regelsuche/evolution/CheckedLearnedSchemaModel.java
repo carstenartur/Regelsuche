@@ -12,7 +12,9 @@ import de.regelsuche.mining.TypedPatternGeneralizer;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.MoveContext;
-import de.regelsuche.search.moves.NativeMoveProvider;
+import de.regelsuche.search.moves.*;
+import de.regelsuche.transform.NativeExactTheoryEvidence;
+import de.regelsuche.search.program.AstExpressionValidation;
 import de.regelsuche.search.moves.IncrementalProviderContract.ApplicationPhase;
 import de.regelsuche.search.moves.MoveProvider;
 import de.regelsuche.search.moves.MoveState;
@@ -280,7 +282,10 @@ public final class CheckedLearnedSchemaModel {
     }
 
     public List<NativeMoveProvider> nativeProviders() {
-        throw new UnsupportedOperationException("native checked schema generation is not implemented");
+        return nativeProviders(bounds.maximumSchemas(),Map.of(),byId.keySet());
+    }
+    public List<NativeMoveProvider> nativeProviders(int maximum,Map<String,Double> utilities,Set<String> included) {
+        return providers(maximum,utilities,included).stream().<NativeMoveProvider>map(provider->new NativeProvider((IndexedProvider)provider)).toList();
     }
     public List<MoveProvider> providers() { return providers(bounds.maximumSchemas()); }
     public List<MoveProvider> providers(int maximumSchemasPerOccurrence) { return providers(maximumSchemasPerOccurrence, Map.of()); }
@@ -338,9 +343,13 @@ public final class CheckedLearnedSchemaModel {
                 work.add(1);
                 domain(source, bounds, work);
             } catch (IllegalArgumentException unsupported) { return batch(List.of(), work, false); }
+            var generated=generate(source,state.expression(),work);
+            return batch(generated.applications().stream().map(application->Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application))).toList(),work,generated.complete());
+        }
+        private ApplicationBatch generate(Expr source,String encodedSource,Work work) {
             var pending = new ArrayDeque<Occurrence>();
             pending.push(new Occurrence(source, List.of()));
-            var candidates = new ArrayList<Transformation>();
+            var candidates = new ArrayList<VerifiedApplication>();
             int matched = 0;
             boolean complete = allSchemasIncluded;
             outer: while (!pending.isEmpty()) {
@@ -366,9 +375,9 @@ public final class CheckedLearnedSchemaModel {
                     if (!outcome.matched()) continue;
                     var applicationWork = new Work();
                     try {
-                        var application = apply(schema, source, state.expression(), occurrence.path(),
+                        var application = apply(schema, source, encodedSource, occurrence.path(),
                             outcome.matches().getFirst().bindings(), applicationWork);
-                        if (application != null) candidates.add(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application)));
+                        if (application != null) candidates.add(application);
                         else work.add(applicationWork.units);
                     } catch (IllegalArgumentException unsupported) {
                         // Failed/unchanged applications have no execution edge whose receipt could carry this work.
@@ -381,7 +390,7 @@ public final class CheckedLearnedSchemaModel {
                     pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));
                 }
             }
-            return batch(candidates, work, complete);
+            return new ApplicationBatch(List.copyOf(candidates),complete);
         }
         private Batch batch(List<Transformation> transformations, Work work, boolean complete) {
             var candidateWork = transformations.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);
@@ -390,6 +399,31 @@ public final class CheckedLearnedSchemaModel {
             return new Batch(transformations.stream().map(transformation -> SearchMove.from(transformation,
                 descriptor, metrics.totalWorkUnits())).toList(), metrics, complete);
         }
+    }
+
+    private record ApplicationBatch(List<VerifiedApplication> applications,boolean complete) {}
+    /** Only this final model-owned provider is recognized by the installed native checker. */
+    final class NativeProvider implements NativeMoveProvider {
+        private final IndexedProvider index;
+        private NativeProvider(IndexedProvider index){this.index=index;}
+        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
+        @Override public Batch candidates(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
+            var work=new Work();work.add(1);
+            if(!NativeMoveProvider.carries(requiredAssumptions,state,context))return nativeBatch(new ApplicationBatch(List.of(),true),work);
+            try {
+                if(AstExpressionValidation.inspect(state.expression()).canonicalCharacters()>262144)
+                    throw new IllegalArgumentException("schema source transport size limit");
+                work.add(1);domain(state.expression(),bounds,work);
+            } catch(IllegalArgumentException unsupported){return nativeBatch(new ApplicationBatch(List.of(),false),work);}
+            return nativeBatch(index.generate(state.expression(),null,work),work);
+        }
+        NativeVerifier independentVerifier(){return CheckedLearnedSchemaModel.this.nativeVerifier();}
+    }
+    private NativeMoveProvider.Batch nativeBatch(ApplicationBatch batch,Work work) {
+        var proofs=batch.applications().stream().map(application->new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(application))).toList();
+        var mathematical=proofs.stream().map(NativeMoveProof::work).reduce(ExecutionWork.ZERO,ExecutionWork::plus);
+        var metrics=new TransformationWorkMetrics(1,0,1,proofs.size(),0,0,0,0,0,0,0,0,0,0,mathematical).withDelegatedMechanicalWork(work.units);
+        return new NativeMoveProvider.Batch(proofs.stream().map(proof->new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList(),metrics,batch.complete());
     }
 
     private record Occurrence(Expr expression, List<Integer> path) {}
@@ -404,10 +438,17 @@ public final class CheckedLearnedSchemaModel {
     }
 
     /** Privately issued capability recognized by the installed SPI; public records/JSON are not accepted. */
+    public record ApplicationData(String revision,String checkerRevision,String inventorySemanticsHash,String modelId,
+            String schemaId,String proofHash,String domain,Expr source,Expr target,List<Integer> path,Map<String,Expr> substitutions,
+            long applicationWork,String modelHash) {
+        public ApplicationData { path=List.copyOf(path);substitutions=java.util.Collections.unmodifiableMap(new TreeMap<>(substitutions)); }
+    }
     static final class VerifiedApplication {
+        private final ApplicationData data;
         private final ExactTheoryEvidence.Binding binding;
-        private VerifiedApplication(ExactTheoryEvidence.Binding binding) { this.binding = binding; }
-        ExactTheoryEvidence.Binding binding() { return binding; }
+        private VerifiedApplication(ApplicationData data,String encodedSource){this.data=data;binding=encodedSource==null?null:renderEvidence(data,encodedSource);}
+        ExactTheoryEvidence.Binding binding(){return binding==null?renderEvidence(data,CODEC.encodeExpression(data.source())):binding;}
+        NativeExactTheoryEvidence.Binding nativeBinding(){return new NativeExactTheoryEvidence.Binding(data.source(),data.target(),data.schemaId(),data.applicationWork(),data);}
     }
     private VerifiedApplication apply(Schema schema, Expr source, String encodedSource,
             List<Integer> path, Map<String, Expr> substitutions, Work work) {
@@ -458,7 +499,7 @@ public final class CheckedLearnedSchemaModel {
                     else phase = ApplicationPhase.EVIDENCE;
                 }
                 case EVIDENCE -> {
-                    verified = evidence(schema, encodedSource, target, path, substitutions, work);
+                    verified = evidence(schema, source, encodedSource, target, path, substitutions, work);
                     done = true;
                 }
             }
@@ -469,22 +510,23 @@ public final class CheckedLearnedSchemaModel {
         }
     }
 
-    private VerifiedApplication evidence(Schema schema, String encodedSource, Expr target,
-            List<Integer> path, Map<String, Expr> substitutions, Work work) {
-        String encodedTarget = CODEC.encodeExpression(target);
-        var evidence = JSON.createObjectNode().put("schema", APPLICATION_REVISION).put("checkerRevision", CHECKER_REVISION)
-            .put("inventorySemanticsHash", inventorySemanticsHash).put("modelId", descriptor.id())
-            .put("schemaId", schema.id()).put("proofHash", schema.proofHash()).put("domain", DOMAIN)
-            .put("source", encodedSource).put("target", encodedTarget);
-        var positions = evidence.putArray("path");
-        path.forEach(positions::add);
-        var bindings = evidence.putArray("bindings");
-        new TreeMap<>(substitutions).forEach((name, value) -> bindings.addObject()
-            .put("name", name).put("expression", CODEC.encodeExpression(value)));
-        evidence.put("applicationWork", work.units);
-        String canonical = write(evidence);
-        return new VerifiedApplication(new ExactTheoryEvidence.Binding(encodedSource, encodedTarget, schema.id(),
-            SchematicProofPlan.hash(canonical), schema.proofHash(), modelHash, work.units, canonical));
+    private VerifiedApplication evidence(Schema schema,Expr source,String encodedSource,Expr target,
+            List<Integer> path,Map<String,Expr> substitutions,Work work) {
+        return new VerifiedApplication(new ApplicationData(APPLICATION_REVISION,CHECKER_REVISION,inventorySemanticsHash,descriptor.id(),
+            schema.id(),schema.proofHash(),DOMAIN,source,target,path,substitutions,work.units,modelHash),encodedSource);
+    }
+    private static ExactTheoryEvidence.Binding renderEvidence(ApplicationData data,String encodedSource) {
+        String encodedTarget=CODEC.encodeExpression(data.target());
+        var evidence=JSON.createObjectNode().put("schema",data.revision()).put("checkerRevision",data.checkerRevision())
+            .put("inventorySemanticsHash",data.inventorySemanticsHash()).put("modelId",data.modelId())
+            .put("schemaId",data.schemaId()).put("proofHash",data.proofHash()).put("domain",data.domain())
+            .put("source",encodedSource).put("target",encodedTarget);
+        var positions=evidence.putArray("path");data.path().forEach(positions::add);
+        var bindings=evidence.putArray("bindings");data.substitutions().forEach((name,value)->bindings.addObject()
+            .put("name",name).put("expression",CODEC.encodeExpression(value)));
+        evidence.put("applicationWork",data.applicationWork());String canonical=write(evidence);
+        return new ExactTheoryEvidence.Binding(encodedSource,encodedTarget,data.schemaId(),SchematicProofPlan.hash(canonical),
+            data.proofHash(),data.modelHash(),data.applicationWork(),canonical);
     }
 
     /** Checks one supplied occurrence and substitution; never enumerates primitive paths or other sites. */
@@ -522,25 +564,17 @@ public final class CheckedLearnedSchemaModel {
                     if (!part.isInt() || part.intValue() < 0 || part.intValue() > 1) return rejected(work, "CHECKED_SCHEMA_INVALID_PATH");
                     path.add(part.intValue());
                 }
-                work.add(path.size() + 1L);
-                var occurrence = new TreePosition(path, "checked-verification").subtreeAt(source.expression());
-                if (occurrence.isEmpty()) return rejected(work, "CHECKED_SCHEMA_ABSENT_OCCURRENCE");
-                var outcome = match(schema, occurrence.orElseThrow());
-                work.add((long) outcome.evaluatedSteps() + outcome.patternBranches());
-                if (!outcome.complete() || !outcome.matched()) return rejected(work, "CHECKED_SCHEMA_BINDING_MISMATCH");
+                var checked=replayOccurrence(schema,source.expression(),encodedSource,path,()->{
                 var substitutions = new TreeMap<String, Expr>();
                 array(data.get("bindings"), 16);
                 for (var value : data.get("bindings")) {
                     fields(value, "name", "expression");
                     Expr ast = CODEC.decodeExpression(text(value, "expression"));
                     domain(ast, bounds, work);
-                    if (substitutions.put(text(value, "name"), ast) != null) return rejected(work, "CHECKED_SCHEMA_DUPLICATE_BINDING");
+                    if (substitutions.put(text(value, "name"), ast) != null) throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
                 }
-                if (!substitutions.equals(outcome.matches().getFirst().bindings())) return rejected(work, "CHECKED_SCHEMA_BINDING_MISMATCH");
-                var applicationWork = new Work();
-                VerifiedApplication checked;
-                try { checked = apply(schema, source.expression(), encodedSource, path, substitutions, applicationWork); }
-                finally { work.add(applicationWork.units); }
+                    return substitutions;
+                },work);
                 if (checked == null) return rejected(work, "CHECKED_SCHEMA_UNCHANGED");
                 var expected = SearchMove.from(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(checked)), descriptor, move.generationCost());
                 // StateValue assesses capabilities after mathematical admission. MoveSearch overwrites
@@ -550,9 +584,58 @@ public final class CheckedLearnedSchemaModel {
                 return new MoveVerifier.Verification(accepted, work.units,
                     accepted ? List.of("checked-schema-application:" + checked.binding().evidenceHash()) : List.of(),
                     accepted ? "CHECKED_SCHEMA_OCCURRENCE_VERIFIED" : "CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
-            } catch (IllegalArgumentException unsupported) { return rejected(work, "CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED"); }
+            } catch(ReplayRejected rejected){return rejected(work,rejected.getMessage());}
+            catch (IllegalArgumentException unsupported) { return rejected(work, "CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED"); }
         };
     }
+    private static final class ReplayRejected extends IllegalArgumentException {
+        ReplayRejected(String reason){super(reason);}
+    }
+    /** Same concrete occurrence/match/substitution and phase replay for both representations. */
+    private VerifiedApplication replayOccurrence(Schema schema,Expr source,String encodedSource,List<Integer> path,
+            java.util.function.Supplier<Map<String,Expr>> bindings,Work work) {
+        if(path.size()>bounds.maximumDepth() || path.stream().anyMatch(part->part==null || part<0 || part>1))
+            throw new ReplayRejected("CHECKED_SCHEMA_INVALID_PATH");
+        work.add(path.size()+1L);
+        var occurrence=new TreePosition(path,"checked-verification").subtreeAt(source);
+        if(occurrence.isEmpty())throw new ReplayRejected("CHECKED_SCHEMA_ABSENT_OCCURRENCE");
+        var outcome=match(schema,occurrence.orElseThrow());work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());
+        if(!outcome.complete() || !outcome.matched())throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
+        var substitutions=bindings.get();
+        if(!substitutions.equals(outcome.matches().getFirst().bindings()))throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
+        var applicationWork=new Work();
+        try{return apply(schema,source,encodedSource,path,substitutions,applicationWork);}
+        finally{work.add(applicationWork.units);}
+    }
+    public NativeVerifier nativeVerifier() {
+        return (source,move,context)->{
+            var work=new Work();work.add(1);
+            try {
+                if(!NativeMoveProvider.carries(requiredAssumptions,source,context) || !NativeMoveProvider.carries(move.assumptions(),source,context))
+                    return nativeRejected(work,"CHECKED_SCHEMA_PREREQUISITES_MISSING");
+                if(!(move.proof() instanceof NativeMoveProof.Exact exact) || !move.ruleId().equals(descriptor.id())
+                    || !(exact.evidence().binding().observation() instanceof ApplicationData data))return nativeRejected(work,"CHECKED_SCHEMA_PROVENANCE_REQUIRED");
+                if(!APPLICATION_REVISION.equals(data.revision()) || !CHECKER_REVISION.equals(data.checkerRevision())
+                    || !inventorySemanticsHash.equals(data.inventorySemanticsHash()) || !descriptor.id().equals(data.modelId()) || !DOMAIN.equals(data.domain()))
+                    return nativeRejected(work,"CHECKED_SCHEMA_STALE_SEMANTICS");
+                var schema=byId.get(data.schemaId());if(schema==null)return nativeRejected(work,"CHECKED_SCHEMA_UNREGISTERED");
+                domain(source.expression(),bounds,work);
+                if(!source.expression().equals(data.source()) || !source.expression().equals(exact.source()))return nativeRejected(work,"CHECKED_SCHEMA_WRONG_SOURCE");
+                var checked=replayOccurrence(schema,source.expression(),null,data.path(),()->{
+                    if(data.substitutions().size()>16)throw new IllegalArgumentException("schema binding count limit");
+                    data.substitutions().values().forEach(value->domain(value,bounds,work));return data.substitutions();
+                },work);
+                if(checked==null)return nativeRejected(work,"CHECKED_SCHEMA_UNCHANGED");
+                var proof=new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));
+                var expected=new NativeSearchMove(proof,descriptor,move.generationCost(),Set.of());
+                boolean accepted=expected.equals(move.withCapabilityDelta(Set.of()));
+                return new NativeVerification(accepted,work.units,accepted?proof:null,accepted?move.ruleId():null,
+                    accepted?"CHECKED_SCHEMA_OCCURRENCE_VERIFIED":"CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
+            } catch(ReplayRejected rejected){return nativeRejected(work,rejected.getMessage());}
+            catch(IllegalArgumentException unsupported){return nativeRejected(work,"CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED");}
+        };
+    }
+    private static NativeVerification nativeRejected(Work work,String detail){return new NativeVerification(false,work.units,null,null,detail);}
     private static MoveVerifier.Verification rejected(Work work, String detail) {
         return new MoveVerifier.Verification(false, work.units, List.of(), detail);
     }

@@ -7,17 +7,17 @@ import java.util.Objects;
 /** Direct counterpart of the canonical expression codec guards; never builds JSON or copies ASTs. */
 public final class AstExpressionValidation {
     private AstExpressionValidation() {}
-    public record Inspection(long nodes, long textCharacters, long canonicalBytes) {
+    public record Inspection(long nodes, long textCharacters, long canonicalBytes,long canonicalCharacters) {
         public long work() { return Math.addExact(nodes, textCharacters); }
     }
     public static Inspection inspect(Expr expression) {
         var counter = new Counter();
         long bytes = Math.addExact(27L + CompiledAstReplayCodec.EXPRESSION_SCHEMA.length(), counter.expression(expression, 0));
         if (bytes > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new IllegalArgumentException("invalid AST replay byte length");
-        return new Inspection(counter.nodes, counter.characters, bytes);
+        return new Inspection(counter.nodes, counter.characters, bytes,bytes-counter.extraUtf8Bytes);
     }
     private static final class Counter {
-        long nodes, characters;
+        long nodes, characters,extraUtf8Bytes;
         long expression(Expr expression, int depth) {
             Objects.requireNonNull(expression);
             if (++nodes > AstRewriteTransport.MAXIMUM_NODES || depth > AstRewriteTransport.MAXIMUM_DEPTH)
@@ -53,11 +53,11 @@ public final class AstExpressionValidation {
                 char c = value.charAt(i);
                 if (Character.isHighSurrogate(c)) {
                     if (++i == value.length() || !Character.isLowSurrogate(value.charAt(i))) throw new IllegalArgumentException("unpaired Unicode surrogate");
-                    bytes += 4;
+                    bytes += 4;extraUtf8Bytes+=2;
                 } else if (Character.isLowSurrogate(c)) throw new IllegalArgumentException("unpaired Unicode surrogate");
                 else if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\b' || c == '\f') bytes += 2;
                 else if (c < 32) bytes += 6;
-                else bytes += c < 128 ? 1 : c < 2048 ? 2 : 3;
+                else { int size=c < 128 ? 1 : c < 2048 ? 2 : 3;bytes+=size;extraUtf8Bytes+=size-1; }
             }
             return bytes;
         }
