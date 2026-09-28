@@ -60,7 +60,8 @@ class MatcherAttemptOwnershipTest {
                             @Override public void reference(Object item) { references.add(item); }
                             @Override public void requireExact(Object item,Class<?> type) { assertEquals(type,item.getClass()); }
                         });
-                        traced |= references.stream().anyMatch(item -> item instanceof List<?> list && list.contains(trace));
+                        traced |= trace != null && references.stream()
+                            .anyMatch(item -> item instanceof List<?> list && list.contains(trace));
                     }
                     view.retainedReferences(visitor);
                 } else if (value instanceof Object[] array) {
