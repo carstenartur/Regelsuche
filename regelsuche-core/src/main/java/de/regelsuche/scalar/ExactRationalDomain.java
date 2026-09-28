@@ -1,5 +1,7 @@
 package de.regelsuche.scalar;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -20,7 +22,9 @@ import java.util.regex.Pattern;
  * never through {@code double}. Scientific notation, repeating decimals and
  * approximate values are outside this domain.</p>
  */
-public final class ExactRationalDomain {
+public final class ExactRationalDomain implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(limits);}
+
     public static final String DOMAIN_ID =
         "regelsuche.exact-rational-scalar/v1";
     public static final int MAX_LITERAL_CHARACTERS = 4_096;
@@ -326,7 +330,9 @@ public final class ExactRationalDomain {
         int maxLiteralCharacters,
         int maxDigits,
         int maxDecimalScale
-    ) {
+    ) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){}
+
         public Limits {
             if (maxLiteralCharacters < 1
                     || maxLiteralCharacters > MAX_LITERAL_CHARACTERS

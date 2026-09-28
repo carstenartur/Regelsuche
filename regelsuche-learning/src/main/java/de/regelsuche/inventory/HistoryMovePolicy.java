@@ -1,11 +1,15 @@
 package de.regelsuche.inventory;
 
 import de.regelsuche.search.moves.*;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 /** An inspectable linear policy with fixed weights and immutable TRAIN tables. */
-public final class HistoryMovePolicy implements MovePriorityPolicy {
+public final class HistoryMovePolicy implements MovePriorityPolicy,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(history);v.reference(weights);v.reference(contexts);}
     public record Weights(double compression, double history, double capability, double goal, double proof,
-            double branching, double failure, double verification) {
+            double branching, double failure, double verification) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
         public static final Weights DEFAULT = new Weights(3, 4, 6, 8, 0.25, 1, 3, 0.02);
         public Weights {
             for (double weight : new double[]{compression, history, capability, goal, proof, branching, failure, verification})
@@ -43,6 +47,35 @@ public final class HistoryMovePolicy implements MovePriorityPolicy {
             }
         };
     }
+    /** Native revision recomputes and pays each context; no caller-retained expression cache. */
+    public static NativeMovePriorityPolicy nativePolicy(RuleHistoryMemory.Snapshot history,Weights weights) {
+        return new NativePolicy(new HistoryMovePolicy(history,weights,true));
+    }
+    private record NativePolicy(HistoryMovePolicy policy) implements NativeMovePriorityPolicy,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(policy);}
+        @Override public long contextWork(TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)){return 2L*structure.visitedNodes();}
+        }
+        @Override public double score(NativeSearchMove move,TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)) {
+                return policy.rank(policy.features(structure.typedKey(),state.previousRule(),move.ruleFamily(),move.ruleId(),
+                    move.descriptor().valueEvidence(),move.descriptor().proofStrength(),move.capabilityDelta().size(),
+                    move.targetExpression().equals(context.goal()),move.generationCost(),move.executionWork().canonicalWorkUnits()));
+            }
+        }
+        @Override public double providerScore(MoveProvider.Descriptor provider,TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)){return policy.providerScore(provider,structure.typedKey(),state.previousRule());}
+        }
+        @Override public MovePriorityPolicy.Stage stage(MoveProvider.Descriptor provider,TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)) {
+                return policy.stage(provider,structure.typedKey(),state.previousRule(),NativeMovePriorityPolicy.super.stage(provider,state,context));
+            }
+        }
+    }
     public RuleHistoryMemory.Snapshot history() { return history; }
     public Weights weights() { return weights; }
     private StructuralMoveContext context(MoveState state) {
@@ -51,32 +84,45 @@ public final class HistoryMovePolicy implements MovePriorityPolicy {
     private String contextKey(MoveState state) { return typed ? context(state).typedKey() : context(state).key(); }
     @Override public long contextWork(MoveState state, MoveContext context) { return 2L * context(state).visitedNodes(); }
     public Features features(SearchMove move, MoveState state, MoveContext context) {
-        String key = contextKey(state); var family = history.family(key, move.ruleFamily());
-        var continuation = history.continuation(key, state.previousRule(), move.ruleId());
-        double verification = family.applications() == 0 ? move.applicationCost() : (double) family.verificationWork() / family.applications();
-        return new Features(move.valueEvidence().knownDepthCompression() * move.valueEvidence().confidence(),
-            family.successValue() + continuation.successValue() + Math.log1p(family.averageWorkSaved()), move.capabilityDelta().size(),
-            move.transformation().transformedExpression().equals(context.goal()) ? 1 : 0,
-            move.proofStrength() == SearchMove.ProofStrength.VERIFIED ? 2 : move.proofStrength() == SearchMove.ProofStrength.REPLAYABLE ? 1 : 0,
-            Math.log1p(move.generationCost()) + family.duplicateRate(), family.failureRate(), verification);
+        return features(contextKey(state),state.previousRule(),move.ruleFamily(),move.ruleId(),move.valueEvidence(),
+            move.proofStrength(),move.capabilityDelta().size(),move.transformation().transformedExpression().equals(context.goal()),
+            move.generationCost(),move.applicationCost());
+    }
+    private Features features(String key,String previous,String ruleFamily,String ruleId,SearchMove.ValueEvidence value,
+            SearchMove.ProofStrength proof,int capabilities,boolean goal,long generation,long application) {
+        var family=history.family(key,ruleFamily);var continuation=history.continuation(key,previous,ruleId);
+        double verification=family.applications()==0?application:(double)family.verificationWork()/family.applications();
+        return new Features(value.knownDepthCompression()*value.confidence(),
+            family.successValue()+continuation.successValue()+Math.log1p(family.averageWorkSaved()),capabilities,goal?1:0,
+            proof==SearchMove.ProofStrength.VERIFIED?2:proof==SearchMove.ProofStrength.REPLAYABLE?1:0,
+            Math.log1p(generation)+family.duplicateRate(),family.failureRate(),verification);
     }
     @Override public double score(SearchMove move, MoveState state, MoveContext context) {
-        var f = features(move, state, context);
+        return rank(features(move,state,context));
+    }
+    private double rank(Features f) {
         return weights.compression() * f.compression() + weights.history() * f.history() + weights.capability() * f.capability()
             + weights.goal() * f.goal() + weights.proof() * f.proof() - weights.branching() * f.branching()
             - weights.failure() * f.failure() - weights.verification() * f.verification();
     }
     @Override public double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext ignored) {
-        String key = contextKey(state); var family = history.family(key, provider.ruleFamily());
+        return providerScore(provider,contextKey(state),state.previousRule());
+    }
+    private double providerScore(MoveProvider.Descriptor provider,String key,String previousRule) {
+        var family=history.family(key,provider.ruleFamily());
         return weights.compression() * provider.valueEvidence().knownDepthCompression() * provider.valueEvidence().confidence()
-            + weights.history() * (family.successValue() + history.continuation(key, state.previousRule(), provider.id()).successValue())
+            + weights.history() * (family.successValue() + history.continuation(key, previousRule, provider.id()).successValue())
             - weights.branching() * family.duplicateRate() - weights.failure() * family.failureRate();
     }
     @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
         // Expensive/bridge lanes do not become cheap simply because they were useful before.
-        var ordinary = MovePriorityPolicy.super.stage(provider, state, context);
+        var ordinary=MovePriorityPolicy.super.stage(provider,state,context);
+        if(ordinary==Stage.EXPENSIVE || ordinary==Stage.EXPLORATION)return ordinary;
+        return stage(provider,contextKey(state),state.previousRule(),ordinary);
+    }
+    private Stage stage(MoveProvider.Descriptor provider,String key,String previousRule,Stage ordinary) {
         if (ordinary == Stage.EXPENSIVE || ordinary == Stage.EXPLORATION) return ordinary;
-        var continuation = history.continuation(contextKey(state), state.previousRule(), provider.id());
+        var continuation = history.continuation(key,previousRule,provider.id());
         return continuation.success() >= 2 && continuation.failure() == 0 ? Stage.PRINCIPAL_HISTORY : ordinary;
     }
 }

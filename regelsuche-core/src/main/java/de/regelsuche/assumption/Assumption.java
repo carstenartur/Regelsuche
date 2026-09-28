@@ -15,7 +15,8 @@ import java.util.Objects;
  * free-form {@link #expression()} carries the actual symbolic statement
  * (e.g. {@code "b != 0"} or {@code "x > 0"}).</p>
  */
-public record Assumption(Kind kind, String expression, List<String> symbols) {
+public record Assumption(Kind kind, String expression, List<String> symbols) implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(kind);v.reference(expression);v.reference(symbols);}
     public Assumption {
         Objects.requireNonNull(kind, "kind");
         if (expression == null || expression.isBlank()) {

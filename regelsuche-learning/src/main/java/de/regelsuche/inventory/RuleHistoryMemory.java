@@ -3,6 +3,7 @@ package de.regelsuche.inventory;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.search.moves.*;
+import de.regelsuche.retention.RetainedGraph;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -12,7 +13,8 @@ import java.util.TreeMap;
 /** Transparent family and continuation observations; no labels or weights update during TEST. */
 public final class RuleHistoryMemory {
     public record Stats(long applications, long success, long failure, long duplicates, long capabilityUnlocks,
-            long measuredWorkSaved, long verificationWork) {
+            long measuredWorkSaved, long verificationWork) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
         public static final Stats EMPTY = new Stats(0, 0, 0, 0, 0, 0, 0);
         public Stats {
             if (applications < 0 || success < 0 || failure < 0 || duplicates < 0 || capabilityUnlocks < 0
@@ -24,11 +26,12 @@ public final class RuleHistoryMemory {
         public double failureRate() { return applications == 0 ? 0 : (double) failure / applications; }
         public double averageWorkSaved() { return success == 0 ? 0 : (double) measuredWorkSaved / success; }
     }
-    public record Snapshot(String schema, Map<String, Stats> families, Map<String, Stats> continuations) {
+    public record Snapshot(String schema, Map<String, Stats> families, Map<String, Stats> continuations) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(schema);v.reference(families);v.reference(continuations);}
         public Snapshot {
             if (!"regelsuche.rule-history/v1".equals(schema)) throw new IllegalArgumentException("unsupported history schema");
-            families = java.util.Collections.unmodifiableMap(new TreeMap<>(families));
-            continuations = java.util.Collections.unmodifiableMap(new TreeMap<>(continuations));
+            families = de.regelsuche.retention.RetainedSortedMap.copyOf(families);
+            continuations = de.regelsuche.retention.RetainedSortedMap.copyOf(continuations);
         }
         public Stats family(String context, String family) { return families.getOrDefault(key(context, "", family), Stats.EMPTY); }
         public Stats continuation(String context, String previous, String next) { return continuations.getOrDefault(key(context, previous, next), Stats.EMPTY); }
@@ -85,7 +88,12 @@ public final class RuleHistoryMemory {
             Math.addExact(a.verificationWork(), b.verificationWork()));
     }
     private static String key(String context, String previous, String rule) {
-        return new de.regelsuche.json.JsonWriter().beginArray().value(context).value(previous).value(rule).endArray().toString();
+        var writer=new de.regelsuche.json.JsonWriter();
+        try(var retained=de.regelsuche.retention.RetainedOperation.retain(context,previous,rule,writer)) {
+            String result=writer.beginArray().value(context).value(previous).value(rule).endArray().toString();
+            de.regelsuche.retention.RetainedOperation.work(result.length());
+            return de.regelsuche.retention.RetainedOperation.produced(result);
+        }
     }
     private static ObjectMapper mapper() { return new ObjectMapper().enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS); }

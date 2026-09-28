@@ -1,7 +1,11 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 /** Mathematical path work, independent of the frozen mechanical v1 ledger. */
-public record ExecutionWork(long primitiveRewrites, long exactTheorySteps, long exactTheoryWorkUnits) {
+public record ExecutionWork(long primitiveRewrites, long exactTheorySteps, long exactTheoryWorkUnits) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){}
+
     public static final ExecutionWork ZERO = new ExecutionWork(0, 0, 0);
 
     public ExecutionWork {

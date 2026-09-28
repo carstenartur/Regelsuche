@@ -10,4 +10,6 @@ import java.util.Optional;
  */
 public interface ExactTheoryEvidenceProvider {
     Optional<ExactTheoryEvidence.Binding> bind(Object verifierOwnedEvidence);
+    default Optional<NativeExactTheoryEvidence.Binding> bindNative(Object verifierOwnedEvidence){return Optional.empty();}
+    default Object exportNative(Object verifierOwnedEvidence){throw new IllegalArgumentException("unsupported native evidence export");}
 }

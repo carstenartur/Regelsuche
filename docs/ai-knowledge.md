@@ -157,9 +157,32 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted predecessor for work-replacement P04 (2026-09-28)
+
+The current baseline is the exact generated snapshot of accepted P03 main
+`ee6dd6892d899662c857c1f2bc2861e233e68563`, tree
+`e1bee2a7712ff95f14b2c3513f565ff6c26bde8b`. Its
+[main CI](https://github.com/carstenartur/Regelsuche/actions/runs/36360112301)
+(attempt 2) passed all six mandatory authorities and `ciCheck`; CodeQL also passed.
+A fresh clean checkout with unchanged extractor v0.1.10 passed all 12 gate tasks:
+655685 tokens, +7660 against the former 648025 baseline, below the unchanged
+15000 allowance. No threshold, selector, exception or test was changed.
+
+The active file is byte-identical to the
+[approved snapshot](../ai-knowledge/baseline-history/2026-09-28-mainee6dd689-metrics-snapshot.json),
+SHA256 `2df07604122be739198f4258797379097df6df27e993d706daebd39707ae61c0`.
+[Provenance](../ai-knowledge/baseline-history/2026-09-28-mainee6dd689-provenance.json)
+and [independent review](../ai-knowledge/baseline-history/2026-09-28-mainee6dd689-independent-review.md)
+retain source/tool identities, original commands, successful gate/CI evidence and
+all copied evidence hashes. The earlier baseline remains unchanged in history.
+The [rejected P04 opening-head trend](../ai-knowledge/baseline-history/2026-09-28-p04-b9fa5833-rejected-trend.json)
+(663565 tokens, +15540) and its raw job log/archive identity are retained; they
+supplied no baseline values. P04 still requires complete final-head gates, CI
+and full independent review. This promotion is no implementation or performance acceptance.
+
 ### Accepted predecessor for work-replacement P01 (2026-09-20)
 
-The current baseline is the exact freshly generated snapshot of integrated M0
+The P01 baseline was the exact freshly generated snapshot of integrated M0
 main `7aec9ae0a1619dda98f859d1277ac8b287471423`, tree
 `56b841cf704a8db32b1c7c7420faff653087cc0f`, after #1047 and #1048.
 Both [the source-head CI](https://github.com/carstenartur/Regelsuche/actions/runs/35514858944)
@@ -172,7 +195,7 @@ below the unchanged 15000 allowance. Eight coverage controls, 17 hotspot checks,
 and all absolute/trend limits passed. The clean pinned v0.1.10 extractor and
 existing Java 25 initializer retain the original `--release 17` target.
 
-The active file is a byte-for-byte copy of
+That baseline was a byte-for-byte copy of
 [the accepted snapshot](../ai-knowledge/baseline-history/2026-09-20-main7aec9ae0-metrics-snapshot.json),
 SHA256 `b2d65ffe25f98ebbac0ca4e493d1b056d8e521cecb034d6b320277eb4e6d584b`.
 [Provenance](../ai-knowledge/baseline-history/2026-09-20-main7aec9ae0-provenance.json)
@@ -206,7 +229,7 @@ The pinned v0.1.10 extractor source was clean. A retained local initializer
 selected JDK 25 to compile it with its unchanged `--release 17` target; it altered
 no source, estimator weight, selector, threshold or verification task.
 
-The active file is a byte-for-byte copy of
+That baseline was a byte-for-byte copy of
 [that generated snapshot](../ai-knowledge/baseline-history/2026-09-20-main81ea9ac7-metrics-snapshot.json),
 SHA256 `2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9`.
 The [qualification and measurement provenance](../ai-knowledge/baseline-history/2026-09-20-main81ea9ac7-provenance.json)
@@ -251,7 +274,7 @@ coverage controls and all 16 method-hotspot checks. Its generated snapshot measu
 - normalized `aiContextDebt = 16.59`
 - `contextDebtModelVersion = context-footprint-v3`
 
-The active baseline is a byte-for-byte copy of the retained
+That historical baseline was a byte-for-byte copy of the retained
 [predecessor snapshot](../ai-knowledge/baseline-history/5041f9d880-metrics-snapshot.json),
 SHA-256 `c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881`.
 The [provenance record](../ai-knowledge/baseline-history/2026-09-13-main5041-provenance.json)
@@ -357,4 +380,4 @@ selector expansion also affected normalized debt, so that historical comparison
 was not a controlled comparison of source changes alone. None of these rejected
 integration values established a baseline. All older measurements retain their
 original source and qualification identities; the active successor is the
-independently accepted `5041f9d880...` snapshot above.
+independently accepted P03 snapshot described above.

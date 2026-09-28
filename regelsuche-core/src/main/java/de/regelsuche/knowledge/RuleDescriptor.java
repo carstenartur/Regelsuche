@@ -1,5 +1,7 @@
 package de.regelsuche.knowledge;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import java.util.List;
 
 public record RuleDescriptor(
@@ -15,7 +17,9 @@ public record RuleDescriptor(
         List<String> categories,
         List<SearchEffect> searchEffects,
         List<ValidationExample> validationExamples,
-        List<ValidationExample> counterExamples) {
+        List<ValidationExample> counterExamples) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(ruleId);v.reference(packId);v.reference(originProject);v.reference(license);v.reference(sourceVersion);v.reference(sourceReference);v.reference(derivationType);v.reference(status);v.reference(riskLevel);v.reference(categories);v.reference(searchEffects);v.reference(validationExamples);v.reference(counterExamples);}
+
 
     public RuleDescriptor {
         if (isBlank(ruleId)) {

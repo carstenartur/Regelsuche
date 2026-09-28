@@ -26,6 +26,36 @@ class CheckedLearnedSchemaModelTest {
             TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());
     }
 
+    @Test void nativeLearnedSchemasCarryPrivateExactStructureThroughIndependentReplay() {
+        var learned=CheckedLearnedSchemaModel.learn(formation);
+        var model=CheckedLearnedSchemaModel.load(learned.toCanonicalJson(),learned.inventoryHash());
+        Expr source=parse("(x+y)*(x-y)+y*y"),target=parse("x^2");
+        var providers=assertDoesNotThrow(()->model.nativeProviders());
+        var context=TypedMoveSearch.Context.frozen(target);
+        var generated=providers.getFirst().candidates(state(source),context);
+        assertEquals(moves(model,source),generated.moves().stream().map(NativeSearchMove::exportLegacy).toList());
+        var verifier=NativeVerifier.registered(providers);
+        var proposal=generated.moves().stream().filter(move->move.targetExpression().equals(target)).findFirst().orElseThrow();
+        var exact=(NativeMoveProof.Exact)proposal.proof();
+        assertThrows(IllegalArgumentException.class,()->de.regelsuche.transform.NativeExactTheoryEvidence.fromVerified(exact.evidence().binding()));
+        assertThrows(IllegalArgumentException.class,()->de.regelsuche.transform.NativeExactTheoryEvidence.fromVerified(exact.evidence().binding().observation()));
+        var checked=verifier.verify(state(source),proposal,context);
+        assertTrue(checked.accepted());assertTrue(checked.work()>0);
+        assertEquals(model.verifier().verify(state(source),proposal.exportLegacy(),context),checked.exportLegacy());
+        assertFalse(verifier.verify(state(parse("(x+y)*(x-y)+z*z")),proposal,context).accepted());
+        var result=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,providers,
+            MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(0,1,100000,10,1000000)),SearchContinuationContract.PATH_SENSITIVE);
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());assertEquals(target,result.output());
+        assertEquals(0,result.witness().getFirst().move().primitiveStepCount());
+        var checks=new NativeTestObservation.Checks(verifier);
+        var sourceOnly=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION),providers,
+            MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,
+            NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,checks);
+        var quality=new NativeMoveSearch().searchUntil(sourceOnly,NativeTestObservation.Objective.POWER,0,SearchContinuationContract.PATH_SENSITIVE);
+        assertEquals(MoveSearch.Outcome.QUALITY_REACHED,quality.search().observedOutcome());assertEquals(target,quality.incumbent().expression());
+        assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);assertFalse(quality.withinBudget());assertTrue(quality.totalWork()<=quality.workBudget());
+    }
+
     @Test void formsDirectCheckedRulesFromChangedSubtreesOfActualSelectedPaths() {
         var model = CheckedLearnedSchemaModel.learn(formation);
         Expr source = parse("(x+y)*(x-y)+y*y");
@@ -56,6 +86,11 @@ class CheckedLearnedSchemaModelTest {
         var move = moves(model, source).stream().filter(value ->
             CODEC.decodeExpression(value.transformation().transformedExpression()).equals(target)).findFirst().orElseThrow();
         assertTrue(model.verifier().verify(state(source), move, TypedMoveSearch.Context.frozen(target)).accepted());
+        var nativeProviders=model.nativeProviders();
+        var nativeMoves=nativeProviders.getFirst().candidates(state(source),TypedMoveSearch.Context.frozen(target)).moves();
+        assertEquals(moves(model,source),nativeMoves.stream().map(NativeSearchMove::exportLegacy).toList());
+        var nativeMove=nativeMoves.stream().filter(candidate->candidate.targetExpression().equals(target)).findFirst().orElseThrow();
+        assertTrue(NativeVerifier.registered(nativeProviders).verify(state(source),nativeMove,TypedMoveSearch.Context.frozen(target)).accepted());
     }
 
     @Test void excludesUnsupportedDomainsAndRequiresCallerPrerequisitesAtGenerationAndVerification() {

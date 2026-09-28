@@ -11,13 +11,20 @@ import java.util.Set;
 public record SearchMove(Transformation transformation, SourceKind sourceKind, String ruleId, String ruleFamily,
         long generationCost, long applicationCost, long verificationCost, List<Transformation> primitiveExpansion,
         List<String> assumptions, ProofStrength proofStrength, TransformationProvenance provenance,
-        Set<String> capabilityDelta, ValueEvidence valueEvidence) {
+        Set<String> capabilityDelta, ValueEvidence valueEvidence) implements SearchExecution.Edge<String, SearchMove>, de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(transformation);v.reference(sourceKind);v.reference(ruleId);v.reference(ruleFamily);v.reference(primitiveExpansion);v.reference(assumptions);v.reference(proofStrength);v.reference(provenance);v.reference(capabilityDelta);v.reference(valueEvidence);}
+
+    @Override public String targetExpression() { return transformation.transformedExpression(); }
+    @Override public int primitiveStepCount() { return transformation.primitiveStepCount(); }
+    @Override public de.regelsuche.transform.ExecutionWork executionWork() { return transformation.executionWork(); }
+    @Override public void requireSource(String source) { provenance.requireSource(source); }
     public enum SourceKind { PRIMITIVE, HYPOTHESIS, LEARNED, PREPARATION, BRIDGE, SOLVER, EXPERT }
     public enum ProofStrength { UNVALIDATED, EMPIRICAL, REPLAYABLE, VERIFIED }
 
     /** Estimates are features, not certificates. Unknown path length is -1, never the observed detour length. */
     public record ValueEvidence(double confidence, double legacyAverageImprovement, long supportingObservations,
-            int bestKnownPrimitiveSteps, int macroSearchDepth, boolean boundedMinimumProved, String evidenceId) {
+            int bestKnownPrimitiveSteps, int macroSearchDepth, boolean boundedMinimumProved, String evidenceId) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(evidenceId);}
         public static final ValueEvidence UNKNOWN = new ValueEvidence(0, 0, 0, -1, 1, false, "");
         public ValueEvidence {
             if (!Double.isFinite(confidence) || confidence < 0 || confidence > 1

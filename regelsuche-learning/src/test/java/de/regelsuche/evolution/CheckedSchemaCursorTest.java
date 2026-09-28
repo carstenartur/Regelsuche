@@ -5,6 +5,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.search.program.AstTransportObservation;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,162 @@ class CheckedSchemaCursorTest {
         schemaId = model.providers().getFirst().candidates(state("(x+y)*(x-y)+y*y"), context())
             .moves().stream().filter(move -> CODEC.decodeExpression(move.transformation().transformedExpression())
                 .equals(parse("x^2"))).findFirst().orElseThrow().transformation().rule();
+    }
+
+    private static final class PhaseObserver implements de.regelsuche.retention.RetainedOperation.Sink {
+        private IncrementalProviderContract.ObjectCursor<NativeMoveProof> cursor;
+        private de.regelsuche.retention.RetainedOperation operation;
+        private long paid,peakNodes;
+        private boolean evidenceObserved;
+        @Override public void executionWork(long units){paid=Math.addExact(paid,units);}
+        @Override public void validationWork(long units){paid=Math.addExact(paid,units);}
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(cursor);v.reference(operation);}
+        @Override public void checkpoint(){
+            var measured=de.regelsuche.retention.RetainedGraph.measure(this);paid=Math.addExact(paid,measured.work());
+            peakNodes=Math.max(peakNodes,measured.peak().nodes());
+            if(cursor!=null)evidenceObserved|=cursor.snapshot().work().prepaidApplications().completedMathematics().exactTheorySteps()>0;
+        }
+    }
+    @Test void completedPrepaidEvidenceIsObservedWhileItIsStillOwnedBeforeEmission() {
+        var provider=plan(model).nativeProvider();
+        var observer=new PhaseObserver();
+        try(var operation=de.regelsuche.retention.RetainedOperation.open(observer)) {
+            observer.operation=operation;
+            var cursor=provider.openSession(new TypedMoveSearch.State(parse(PAIR),0,0,"",List.of(),Set.of(),0),
+                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+            observer.cursor=cursor;
+            try {
+                assertTrue(cursor.next(100000).isPresent(),cursor.snapshot().detailCode());
+                assertTrue(observer.paid>0);assertTrue(observer.peakNodes>0);
+                assertTrue(observer.evidenceObserved,"proof ownership and settled prepaid phases must be measured before emission releases them");
+            } finally {cursor.close();}
+        }
+    }
+
+    @Test void nativeSchemaSearchAccountsForTheActualProviderProofAndSuspendedCursorGraphs() {
+        var selected=plan(model);Expr source=parse(PAIR);
+        Expr goal=CODEC.decodeExpression(eager(PAIR).moves().getFirst().transformation().transformedExpression());
+        for(var scheduling:List.of(MoveSearch.Scheduling.STAGED,MoveSearch.Scheduling.EAGER_CONTROL,MoveSearch.Scheduling.STAGED_INCREMENTAL)) {
+            var providers=scheduling==MoveSearch.Scheduling.STAGED_INCREMENTAL?List.<NativeMoveProvider>of(selected.nativeProvider()):
+                model.nativeProviders(1,Map.of(),Set.of(schemaId));
+            var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(goal),providers,MoveSearch.Mode.FAST,scheduling,
+                new MoveSearch.Budget(0,1,100000,10,100000000));
+            try(var transport=AstTransportObservation.open()) {
+                var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),result.accounting().detail());
+                assertTrue(result.observationsComplete());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());assertTrue(result.replayWork()>0);
+                assertEquals(0,transport.total());assertTrue(result.accounting().peak().nodes()>0);
+                assertTrue(result.accounting().resultRetained().nodes()>0);
+                assertEquals(new de.regelsuche.retention.RetainedGraph.Usage(0,0,0),result.accounting().live());
+                assertTrue(result.cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+            }
+        }
+        var cursor=selected.nativeProvider().openSession(new TypedMoveSearch.State(source,0,0,"",List.of(),Set.of(),0),
+            TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+        try {
+            boolean suspended=false;
+            for(int i=0;i<1000;i++) {
+                cursor.next(2);
+                var retained=assertDoesNotThrow(()->de.regelsuche.retention.RetainedGraph.measure(cursor));
+                assertTrue(retained.retained().nodes()>0);
+                if(cursor.snapshot().work().prepaidApplications().openApplications()>0){suspended=true;break;}
+            }
+            assertTrue(suspended);
+        } finally {cursor.close();}
+        assertEquals(0,cursor.snapshot().work().prepaidApplications().openApplications());
+    }
+
+    @Test void nativeCursorSuspendsTheSamePaidPhasesAndExportsTheSameApplications() {
+        var provider=assertDoesNotThrow(()->plan(model).nativeProvider());
+        var nativeState=new TypedMoveSearch.State(parse(PAIR),0,0,"",List.of(),Set.of(),0);
+        var nativeContext=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var cursor=provider.openSession(nativeState,nativeContext);
+        var applications=new ArrayList<NativeMoveProof>();boolean suspended=false;
+        for(int i=0;i<2000;i++) {
+            cursor.next(2).ifPresent(applications::add);
+            var receipt=cursor.snapshot();assertTrue(receipt.accountingComplete(),receipt.detailCode());
+            var prepaid=receipt.work().prepaidApplications();
+            if(prepaid!=null && prepaid.openApplications()>0) {
+                suspended=true;assertFalse(prepaid.phaseCalls().isEmpty());
+                assertEquals(applications.size(),receipt.work().mathematics().exactTheorySteps());
+            }
+            if(receipt.status()==IncrementalProviderContract.Status.EXHAUSTED || receipt.status()==IncrementalProviderContract.Status.INCONCLUSIVE)break;
+        }
+        assertTrue(suspended);assertEquals(2,applications.size());
+        assertEquals(eager(PAIR).moves().stream().map(SearchMove::transformation).toList(),applications.stream().map(NativeMoveProof::exportLegacy).toList());
+        assertEquals(2,cursor.snapshot().work().mathematics().exactTheorySteps());
+        assertEquals(0,cursor.snapshot().work().metrics().candidateWork().exactTheoryWorkUnits());
+        cursor.close();long paid=cursor.snapshot().work().metrics().totalWorkUnitsV2();cursor.close();
+        assertEquals(paid,cursor.snapshot().work().metrics().totalWorkUnitsV2());
+    }
+
+    @Test void closingNativeSuspensionAbandonsItsTicketWithoutRefundOrIssuingProof() {
+        var provider=plan(model).nativeProvider();
+        var state=new TypedMoveSearch.State(parse(PAIR),0,0,"",List.of(),Set.of(),0);
+        var cursor=provider.openSession(state,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+        assertTrue(cursor.next(0).isEmpty());assertEquals(0,cursor.snapshot().work().metrics().totalWorkUnitsV2());
+        for(int i=0;i<1000 && cursor.snapshot().work().prepaidApplications().openApplications()==0;i++)assertTrue(cursor.next(2).isEmpty());
+        var before=cursor.snapshot();assertEquals(1,before.work().prepaidApplications().openApplications());
+        assertTrue(before.work().prepaidApplications().chargedUnits()>0);
+        cursor.close();var after=cursor.snapshot();
+        assertTrue(after.closed());assertEquals(0,after.work().prepaidApplications().openApplications());
+        assertEquals(1,after.work().prepaidApplications().abandonedApplications());
+        assertEquals(before.work().prepaidApplications().chargedUnits(),after.work().prepaidApplications().chargedUnits());
+        assertEquals(before.work().prepaidApplications().phaseCalls(),after.work().prepaidApplications().phaseCalls());
+        assertEquals(before.work().metrics().totalWorkUnitsV2()+1,after.work().metrics().totalWorkUnitsV2());
+        assertEquals(0,after.work().mathematics().exactTheorySteps());assertTrue(cursor.next(10000).isEmpty());
+    }
+
+    @Test void nativeStagedFrontierUsesTheSameCursorOrderingAndClosesItsReceipts() {
+        var selected=plan(model);Expr source=parse(PAIR);
+        Expr goal=CODEC.decodeExpression(eager(PAIR).moves().getFirst().transformation().transformedExpression());
+        var context=TypedMoveSearch.Context.frozen(goal);var budget=new MoveSearch.Budget(0,1,100000,10,1000000);
+        var legacy=new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,context,List.of(selected.provider()),
+            MovePriorityPolicy.INVENTORY_ORDER,model.verifier(),s->0,MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget));
+        var result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(selected.nativeProvider()),
+            MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget),SearchContinuationContract.PATH_SENSITIVE));
+        long paidSearch=result.totalWork();var searchOwned=de.regelsuche.retention.RetainedGraph.measure(result).retained();
+        var paidExport=result.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);
+        assertTrue(paidExport.artifactAvailable(),paidExport.accounting().detail());assertFalse(paidExport.complete());assertTrue(paidExport.accounting().work()>0);
+        var projection=paidExport.projection();assertEquals(projection,result.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection());
+        assertEquals(paidSearch,result.totalWork());assertEquals(searchOwned,de.regelsuche.retention.RetainedGraph.measure(result).retained());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());
+        assertEquals(legacy.encodedResult().witness(),projection.witness());assertEquals(legacy.encodedResult().events(),projection.events());
+        assertEquals(legacy.metrics(),result.metrics());
+        var receipts=projection.stagedIncrementalExecution();assertNotNull(receipts);assertTrue(receipts.accountingComplete());
+        assertTrue(receipts.expansions().stream().allMatch(StagedIncrementalMoveExecution.Expansion::closed));
+        var cursor=receipts.expansions().getFirst().lanes().getFirst().cursor();
+        assertTrue(cursor.closed());assertEquals(1,cursor.work().mathematics().exactTheorySteps());
+        assertEquals(0,cursor.work().prepaidApplications().openApplications());
+    }
+
+    @Test void nativeStagedSourceOnlyFinalReplayAndPartialBudgetRetainPrepaidWork() {
+        var provider=plan(model).nativeProvider();Expr source=parse(PAIR);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var verifier=NativeVerifier.registered(List.of(provider));var checks=new NativeTestObservation.Checks(verifier);
+        var problem=new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,
+            new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,checks);
+        try(var transport=AstTransportObservation.open()) {
+        var quality=new NativeMoveSearch().searchUntil(problem,NativeTestObservation.Objective.DEPTH,0,SearchContinuationContract.PATH_SENSITIVE);
+        assertFalse(quality.withinBudget());assertTrue(quality.totalWork()<=quality.workBudget());assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);
+        assertTrue(quality.search().cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+        assertEquals(0,transport.total(),"checked schema generation, selection, admission and final replay must stay native");
+        }
+        boolean abandoned=false;var observedBudgets=new ArrayList<String>();
+        for(long budget:List.of(8L,128L,1024L,2048L,4096L,8192L,16384L,32768L,65536L,131072L,262144L,524288L)) {
+            var limited=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
+                MoveSearch.Scheduling.STAGED_INCREMENTAL,new MoveSearch.Budget(0,1,100000,10,budget)),SearchContinuationContract.PATH_SENSITIVE);
+            observedBudgets.add(budget+":"+limited.observedOutcome()+":"+limited.totalWork()+":"+limited.cursorReceipts().stream().flatMap(expansion->expansion.lanes().stream()).filter(lane->lane.cursor()!=null).map(lane->lane.cursor().work().prepaidApplications().toString()).toList());
+            for(var expansion:limited.cursorReceipts())for(var lane:expansion.lanes())if(lane.cursor()!=null) {
+                assertTrue(lane.cursor().closed());var prepaid=lane.cursor().work().prepaidApplications();
+                if(prepaid.abandonedApplications()>0) {
+                    abandoned=true;assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.observedOutcome());
+                    assertTrue(prepaid.chargedUnits()>0);assertEquals(0,prepaid.openApplications());
+                    assertTrue(limited.metrics().totalWork()>=prepaid.chargedUnits());
+                }
+            }
+        }
+        assertTrue(abandoned,"a bounded real search must expose the paid suspended phase at cleanup: "+observedBudgets);
     }
 
     @Test void firstPullDoesNotInstantiateTheSecondRealLearnedOccurrence() {

@@ -1,5 +1,7 @@
 package de.regelsuche.canonical;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -25,7 +27,9 @@ import java.util.TreeMap;
  * {@link ExactRational} contract. Expansion and coefficient bit budgets bound
  * normalization work; accepted coefficients are emitted without rounding.</p>
  */
-public final class PolynomialNormalizer {
+public final class PolynomialNormalizer implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){}
+
     private static final int MAX_EXPANDED_TERMS = 1_000;
     private static final int MAX_COEFFICIENT_BITS = 4_096;
 

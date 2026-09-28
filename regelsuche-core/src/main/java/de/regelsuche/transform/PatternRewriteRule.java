@@ -1,12 +1,16 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.Expr;
 import de.regelsuche.knowledge.RuleDescriptor;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 
-public class PatternRewriteRule implements RewriteRule {
+public class PatternRewriteRule implements RewriteRule,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,PatternRewriteRule.class);v.reference(id);v.reference(source);v.reference(target);v.reference(kind);v.reference(descriptor);v.reference(recognitionProfile);v.reference(preparedMatch);}
+
     private final String id;
     private final PatternExpr source;
     private final PatternExpr target;

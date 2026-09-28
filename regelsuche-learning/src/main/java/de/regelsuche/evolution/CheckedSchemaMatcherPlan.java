@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import de.regelsuche.retention.RetainedGraph;
 import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 import de.regelsuche.search.moves.IncrementalProviderContract.Definition;
 import de.regelsuche.search.moves.IncrementalProviderContract.Kind;
@@ -12,6 +13,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.search.moves.IncrementalProviderContract;
 import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.*;
 import de.regelsuche.search.moves.RegisteredIncrementalMoveProvider;
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
@@ -26,14 +28,20 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /** Immutable preparation shared by cursor sessions, not an eagerly generated candidate list. */
-public final class CheckedSchemaMatcherPlan {
+public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(bounds);v.reference(descriptor);v.reference(index);v.reference(application);v.reference(definition);v.reference(compilation);v.reference(model);}
     public static final String REVISION = "regelsuche.checked-schema-matcher-plan/v1";
     public static final String WORK_REVISION = "regelsuche.checked-schema-cursor-work/v2-prepaid-phases";
     /** Preparation is a separate lifecycle charge; opening a cursor never rebuilds this index. */
     public record Compilation(String revision, String configurationHash, long workUnits,
-            int includedSchemas, long patternNodeVisits, long orderingComparisons) {}
-    record Entry(CheckedLearnedSchemaModel.Schema schema, ExprMatcher matcher, int reduction) {}
-    record Range(List<Entry> shaped, List<Entry> wildcard) {
+            int includedSchemas, long patternNodeVisits, long orderingComparisons)  implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(configurationHash);}
+    }
+    record Entry(CheckedLearnedSchemaModel.Schema schema, ExprMatcher matcher, int reduction)  implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(schema);v.reference(matcher);}
+    }
+    record Range(List<Entry> shaped, List<Entry> wildcard) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(shaped);v.reference(wildcard);}
         int size() { return shaped.size() + wildcard.size(); }
         Entry get(int index) { return index < shaped.size() ? shaped.get(index) : wildcard.get(index - shaped.size()); }
     }
@@ -46,6 +54,7 @@ public final class CheckedSchemaMatcherPlan {
         void advance();
         boolean done();
         Transformation result();
+        NativeMoveProof nativeResult();
     }
 
     private final CheckedLearnedSchemaModel.Bounds bounds;
@@ -56,9 +65,11 @@ public final class CheckedSchemaMatcherPlan {
     private final Application application;
     private final Definition definition;
     private final Compilation compilation;
+    private final CheckedLearnedSchemaModel model;
 
     CheckedSchemaMatcherPlan(CheckedLearnedSchemaModel model, MoveProvider.Descriptor descriptor, int maximum,
             Map<String, Double> utilities, Set<String> included, Application application) {
+        this.model=Objects.requireNonNull(model);
         this.descriptor = Objects.requireNonNull(descriptor);
         this.application = Objects.requireNonNull(application);
         bounds = model.bounds();
@@ -90,10 +101,27 @@ public final class CheckedSchemaMatcherPlan {
     }
     public Compilation compilationReceipt() { return compilation; }
     public long compilationWork() { return compilation.workUnits(); }
+    public de.regelsuche.search.moves.ExprIncrementalProvider nativeProvider() {
+        return new NativeProvider();
+    }
     public RegisteredIncrementalMoveProvider provider() {
         var registration = new Registration(definition,
-            (state, context, meter) -> new CheckedSchemaCursor(this, state.expression(), meter));
+            (state, context, meter) -> CheckedSchemaCursor.legacy(this, state.expression(), meter));
         return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));
+    }
+    final class NativeProvider implements ExprIncrementalProvider,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}
+        private NativeProvider() {}
+        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
+        @Override public Definition contractDefinition(){
+            return new Definition(IncrementalProviderContract.NATIVE_PREPAID_REVISION,definition.providerId(),definition.kind(),definition.modelRevision(),
+                definition.semanticsRevision()+";"+NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,definition.mathematics(),null);
+        }
+        @Override public IncrementalProviderContract.ObjectSource<NativeMoveProof> openSource(TypedMoveSearch.State state,
+                TypedMoveSearch.Context context,IncrementalProviderContract.Meter meter){
+            return CheckedSchemaCursor.nativeSource(CheckedSchemaMatcherPlan.this,state.expression(),meter);
+        }
+        NativeVerifier independentVerifier(){return model.nativeVerifier();}
     }
     CheckedLearnedSchemaModel.Bounds bounds() { return bounds; }
     int maximumSchemasPerOccurrence() { return maximumSchemasPerOccurrence; }

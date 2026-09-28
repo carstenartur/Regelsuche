@@ -10,32 +10,35 @@ import java.util.Set;
 import java.util.function.LongConsumer;
 
 /** Per-search admitted labels. A proposal enters this index only after successful admission. */
-final class MoveSearchVisits {
-    private record Label(MoveState state, long theoryWork) {
-        boolean noMoreExpensiveThan(Label other) {
+final class MoveSearchVisits<S extends SearchExecution.Position<?>> implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(live);v.reference(positions);v.reference(charge);}
+    private record Label<S extends SearchExecution.Position<?>>(S state, long theoryWork) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(state);}
+        boolean noMoreExpensiveThan(Label<S> other) {
             return state.searchDepth() <= other.state.searchDepth()
                 && state.primitiveDepth() <= other.state.primitiveDepth()
                 && theoryWork <= other.theoryWork
                 && state.complexityDebt() <= other.state.complexityDebt();
         }
     }
-    private record Position(String expression, List<String> assumptions, Set<String> capabilities) {
-        static Position of(MoveState state) {
+    private record Position(Object expression, List<String> assumptions, Set<String> capabilities) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(expression);v.reference(assumptions);v.reference(capabilities);}
+        static Position of(SearchExecution.Position<?> state) {
             return new Position(state.expression(), state.assumptions(), state.capabilities());
         }
     }
     private final boolean stateLocal;
     private final LongConsumer charge;
-    private final Set<Label> live = new HashSet<>();
-    private final Map<Position, List<Label>> positions = new HashMap<>();
+    private final Set<Label<S>> live = new HashSet<>();
+    private final Map<Position, List<Label<S>>> positions = new HashMap<>();
 
     MoveSearchVisits(SearchContinuationContract contract, LongConsumer charge) {
         stateLocal = Objects.requireNonNull(contract) == SearchContinuationContract.DECLARED_STATE_LOCAL;
         this.charge = Objects.requireNonNull(charge);
     }
 
-    MoveSearch.Decision rejection(MoveState state, long theoryWork) {
-        var proposed = new Label(state, theoryWork);
+    MoveSearch.Decision rejection(S state, long theoryWork) {
+        var proposed = new Label<>(state, theoryWork);
         if (!stateLocal) return live.contains(proposed) ? MoveSearch.Decision.DUPLICATE : null;
         charge.accept(1);
         for (var admitted : positions.getOrDefault(Position.of(state), List.of())) {
@@ -47,8 +50,8 @@ final class MoveSearchVisits {
         return null;
     }
 
-    void add(MoveState state, long theoryWork) {
-        var admitted = new Label(state, theoryWork);
+    void add(S state, long theoryWork) {
+        var admitted = new Label<>(state, theoryWork);
         if (stateLocal) {
             charge.accept(1);
             var alternatives = positions.computeIfAbsent(Position.of(state), ignored -> new ArrayList<>());
@@ -68,9 +71,9 @@ final class MoveSearchVisits {
     }
 
     /** Invalidated tickets must not open or resume a picker, or consume another state slot. */
-    boolean current(MoveState state, long theoryWork) {
+    boolean current(S state, long theoryWork) {
         if (!stateLocal) return true;
         charge.accept(1);
-        return live.contains(new Label(state, theoryWork));
+        return live.contains(new Label<>(state, theoryWork));
     }
 }

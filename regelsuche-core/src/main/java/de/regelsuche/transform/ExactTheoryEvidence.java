@@ -4,7 +4,9 @@ import java.util.Objects;
 import java.util.ServiceLoader;
 
 /** Immutable core capability. Public evidence descriptions alone cannot issue it. */
-public final class ExactTheoryEvidence {
+public final class ExactTheoryEvidence implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(binding);}
+
     private final Binding binding;
 
     private ExactTheoryEvidence(Binding binding) {
@@ -40,7 +42,9 @@ public final class ExactTheoryEvidence {
     /** Observational data; constructing this record does not authorize execution. */
     public record Binding(String sourceExpression, String transformedExpression, String theoryStepId,
                           String evidenceHash, String receiptArtifactId, String runArtifactId,
-                          long canonicalWorkUnits, String canonicalEvidenceJson) {
+                          long canonicalWorkUnits, String canonicalEvidenceJson) implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(sourceExpression);v.reference(transformedExpression);v.reference(theoryStepId);v.reference(evidenceHash);v.reference(receiptArtifactId);v.reference(runArtifactId);v.reference(canonicalEvidenceJson);}
+
         public Binding {
             requireText(sourceExpression);
             requireText(transformedExpression);

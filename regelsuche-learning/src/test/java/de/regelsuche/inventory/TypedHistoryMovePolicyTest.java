@@ -79,11 +79,67 @@ class TypedHistoryMovePolicyTest {
             > run(source, goal, MovePriorityPolicy.INVENTORY_ORDER, 1000).metrics().searchWork());
     }
 
+    @Test void nativeRankingConsumesTheSameFrozenFeaturesWithoutExpressionTransport() {
+        Expr goal=NumberExpr.exact("1/3");Expr source=new BinaryExpr(goal,ADD,new NumberExpr(0));
+        var snapshot=new RuleHistoryMemory().freeze();
+        var legacy=HistoryMovePolicy.typed(snapshot,HistoryMovePolicy.Weights.DEFAULT);
+        var nativePolicy=assertDoesNotThrow(()->HistoryMovePolicy.nativePolicy(snapshot,HistoryMovePolicy.Weights.DEFAULT));
+        var state=new TypedMoveSearch.State(source,0,0,"",List.of(),Set.of(),0);
+        var context=TypedMoveSearch.Context.frozen(goal);
+        var move=new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT).candidates(state,context).moves().getFirst();
+        var encoded=new MoveState(CODEC.encodeExpression(source),0,0,"",List.of(),Set.of(),0);
+        var oldContext=MoveContext.frozen(CODEC.encodeExpression(goal));
+        assertEquals(legacy.contextWork(encoded,oldContext),nativePolicy.contextWork(state,context));
+        assertEquals(legacy.score(move.exportLegacy(),encoded,oldContext),nativePolicy.score(move,state,context));
+        assertEquals(legacy.providerScore(DESCRIPTOR,encoded,oldContext),nativePolicy.providerScore(DESCRIPTOR,state,context));
+        assertEquals(legacy.stage(DESCRIPTOR,encoded,oldContext),nativePolicy.stage(DESCRIPTOR,state,context));
+        var nativeProblem=new NativeMoveSearch.Problem(source,new TypedMoveSearch.Context(goal,List.of(),MoveContext.Phase.TRAIN),
+            List.of(new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(3,3,0,20,1000000),nativePolicy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
+        assertEquals(withNativePrimitiveVerificationWork(run(source,goal,legacy,10000).encodedResult()),
+            new NativeMoveSearch().search(nativeProblem,SearchContinuationContract.PATH_SENSITIVE).exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection());
+    }
+
+    @Test void nativeHistoryRankingHasAuditedBoundedOwnershipAcrossIndependentSearches() {
+        var policy=HistoryMovePolicy.nativePolicy(new RuleHistoryMemory().freeze(),HistoryMovePolicy.Weights.DEFAULT);
+        for(String symbol:List.of("first","second")) {
+            Expr goal=new VariableExpr(symbol);Expr source=new BinaryExpr(goal,ADD,new NumberExpr(0));
+            var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(goal),
+                List.of(new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
+                new MoveSearch.Budget(3,3,0,20,10000000),policy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
+            try(var transport=de.regelsuche.search.program.AstTransportObservation.open()) {
+                var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),result.accounting().detail());
+                assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());assertTrue(result.accounting().executionWork()>0);assertEquals(0,transport.total());
+                var limited=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
+                    new SearchExpressionStore.Limits(1000000,result.accounting().peak().characters()-1,2000000,0));
+                assertEquals(MoveSearch.Outcome.INCONCLUSIVE,limited.observedOutcome());assertFalse(limited.withinBudget());
+                assertEquals("NATIVE_RETENTION_EXHAUSTED",limited.accounting().detail());assertTrue(limited.totalWork()>0);
+                assertEquals(new de.regelsuche.retention.RetainedGraph.Usage(0,0,0),limited.accounting().live());
+            }
+            assertEquals(0,de.regelsuche.retention.RetainedGraph.measure(policy).retained().nodes(),"completed runs must not accumulate caller-retained expression cache entries");
+        }
+    }
+
     private static TypedMoveSearch.Result run(Expr source, Expr goal, MovePriorityPolicy policy, long work) {
         return new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
             new TypedMoveSearch.Context(goal, List.of(), MoveContext.Phase.TRAIN),
             List.of(TypedMoveSearch.primitiveProvider(DESCRIPTOR, TRANSPORT)), policy,
             TypedMoveSearch.primitiveReplay(TRANSPORT), state -> 0,
             MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(3, 3, 0, 20, work)));
+    }
+
+    /** These single-step fixtures regenerate one primitive in each admission; v3 pays that actual work. */
+    private static MoveSearch.Result withNativePrimitiveVerificationWork(MoveSearch.Result old) {
+        var m=old.metrics();
+        var metrics=new MoveSearch.Metrics(m.generatedSuccessors(),m.consumedSuccessors(),m.discardedSuccessors(),m.unconsumedSuccessors(),
+            m.duplicates(),m.deadEnds(),m.exploredStates(),m.expandedStates(),m.primitiveWork(),m.searchWork(),m.verificationWork()+1,
+            m.firstHitDepth(),m.firstHitPrimitiveDepth(),m.familyMatches());
+        return new MoveSearch.Result(MoveSearch.Outcome.INCONCLUSIVE,old.witness().stream().map(w->new MoveSearch.WitnessStep(w.source(),w.target(),w.move(),nativeVerification(w.verification()))).toList(),
+            old.events().stream().map(e->new MoveSearch.Event(e.source(),e.target(),e.move(),e.decision(),nativeVerification(e.verification()))).toList(),
+            old.reachedStates(),old.deadEndStates(),metrics,false,old.stateAssessments(),old.incrementalExecution(),old.stagedIncrementalExecution());
+    }
+    private static MoveVerifier.Verification nativeVerification(MoveVerifier.Verification old) {
+        return old==null?null:new MoveVerifier.Verification(old.accepted(),old.work()+1,old.receipts(),old.reason());
     }
 }

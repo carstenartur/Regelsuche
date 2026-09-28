@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -213,8 +214,7 @@ public sealed interface ExprMatcher
     ) {
         public MatchResult {
             Objects.requireNonNull(bindings, "bindings");
-            bindings = Collections.unmodifiableMap(new LinkedHashMap<>(
-                new TreeMap<>(bindings)));
+            bindings = de.regelsuche.retention.RetainedSortedMap.copyOf(bindings);
             representative = Objects.requireNonNull(
                 representative, "representative");
             recognitionStrength = Objects.requireNonNull(
@@ -318,7 +318,8 @@ public sealed interface ExprMatcher
     record Pattern(
         PatternExpr pattern,
         RecognitionProfile recognitionProfile
-    ) implements ExprMatcher {
+    ) implements ExprMatcher,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(pattern);v.reference(recognitionProfile);}
         public Pattern {
             pattern = Objects.requireNonNull(pattern, "pattern");
             recognitionProfile = recognitionProfile == null

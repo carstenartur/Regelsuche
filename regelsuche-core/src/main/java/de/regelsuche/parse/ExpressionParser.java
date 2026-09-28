@@ -1,5 +1,7 @@
 package de.regelsuche.parse;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
@@ -17,7 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class ExpressionParser {
+public class ExpressionParser implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,ExpressionParser.class);v.reference(exactRationalDomain);}
+
     private final ExactRationalDomain exactRationalDomain;
 
     public ExpressionParser() {

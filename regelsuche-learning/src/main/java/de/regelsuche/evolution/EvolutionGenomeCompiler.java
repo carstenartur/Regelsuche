@@ -110,7 +110,8 @@ public final class EvolutionGenomeCompiler {
         }
     }
 
-    private static final class CompiledGenomeRule implements RewriteRule {
+    private static final class CompiledGenomeRule implements RewriteRule,de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(id);v.reference(gene);v.reference(source);v.reference(target);}
         private final String id;
         private final EvolutionGenome.RewriteGene gene;
         private final PatternExpr source;

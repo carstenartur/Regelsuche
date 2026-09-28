@@ -12,6 +12,24 @@ import java.util.function.Consumer;
 /** Explicit adapters for native text and existing typed primitive batches. No learning dependency. */
 final class StagedIncrementalSources {
     private StagedIncrementalSources() {}
+    static StagedIncrementalLanes.Source<SearchMove> lane(MoveProvider provider,MoveState state,MoveContext context) {
+        if(!supported(provider))throw new IllegalArgumentException("unsupported staged incremental provider");
+        return new StagedIncrementalLanes.Source<>() {
+            @Override public MoveProvider.Descriptor descriptor(){return provider.descriptor();}
+            @Override public boolean batch(){return typedBatch(provider);}
+            @Override public ObjectCursor<SearchMove> open(Consumer<List<SearchMove>> generated,java.util.function.LongSupplier totalWork) {
+                return new ObjectCursor<>() {
+                    private List<SearchMove> batch=List.of();private int index;
+                    private final Cursor cursor=StagedIncrementalSources.open(provider,state,context,moves->{batch=moves;generated.accept(moves);});
+                    @Override public Optional<SearchMove> next(long allowance){
+                        return cursor.next(allowance).map(candidate->typedBatch(provider)?batch.get(index++):SearchMove.from(candidate,provider.descriptor(),totalWork.getAsLong()));
+                    }
+                    @Override public Snapshot snapshot(){return cursor.snapshot();}
+                    @Override public void close(){cursor.close();}
+                };
+            }
+        };
+    }
     static boolean supported(MoveProvider provider) {
         return provider instanceof IncrementalMoveProvider || typedBatch(provider);
     }

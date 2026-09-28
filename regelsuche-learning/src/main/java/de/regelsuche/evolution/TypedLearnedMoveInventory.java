@@ -67,6 +67,20 @@ public final class TypedLearnedMoveInventory {
         learned = List.copyOf(programs.values());
     }
 
+    /** The existing frozen learner and compiled programs, with object-native transport. */
+    public List<NativeMoveProvider> nativeProviders() {
+        var providers = new ArrayList<>(nativePrimitiveProviders());
+        learned.forEach(provider -> providers.add(provider.nativeProvider()));
+        return List.copyOf(providers);
+    }
+
+    public List<NativeMoveProvider> nativePrimitiveProviders() {
+        var providers = new ArrayList<NativeMoveProvider>();
+        for (int i = 0; i < primitives.size(); i++)
+            providers.add(new NativeMoveSearch.Primitive(primitives.get(i).descriptor(), primitiveTransports.get(i)));
+        return List.copyOf(providers);
+    }
+
     public List<MoveProvider> primitiveProviders() { return primitives; }
 
     /** Generalizes actual successful observations, then proves each symbolic statement. */

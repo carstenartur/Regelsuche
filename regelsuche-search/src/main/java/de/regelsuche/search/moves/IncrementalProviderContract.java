@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationCursor;
@@ -17,41 +19,49 @@ public final class IncrementalProviderContract {
     private IncrementalProviderContract() {}
     public static final String REVISION = "regelsuche.incremental-provider/v2";
     public static final String PREPAID_REVISION = "regelsuche.incremental-provider/v3-prepaid";
+    public static final String NATIVE_REVISION = "regelsuche.incremental-provider/v4-native-expr";
+    public static final String NATIVE_PREPAID_REVISION = "regelsuche.incremental-provider/v4-native-expr-prepaid";
     public static final String PREPAID_WORK_REVISION = "regelsuche.prepaid-application-work/v1";
     public enum ApplicationPhase { SUBSTITUTION_DOMAIN, INSTANTIATION, TARGET_DOMAIN, EVIDENCE }
-    public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH }
-    public enum Transport { PARSER_TEXT, TYPED_AST_JSON }
+    public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH, NATIVE_BATCH }
+    public enum Transport { PARSER_TEXT, TYPED_AST_JSON, NATIVE_EXPR_V1 }
     public enum Mathematics { PRIMITIVE, EXACT, MIXED }
     public enum Status { OPEN, READY, EXHAUSTED, LIMIT, INCONCLUSIVE, FAILED, CLOSED }
     public enum Operation { OPEN, ADMISSION, PULL, MATCH, LOAD, ABORT, CLOSE }
 
     public record Definition(String revision, String providerId, Kind kind, String modelRevision,
             String semanticsRevision, Transport transport, Mathematics mathematics,
-            TransformationCursor.Definition nativeDefinition) {
+            TransformationCursor.Definition nativeDefinition) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(providerId);v.reference(kind);v.reference(modelRevision);v.reference(semanticsRevision);v.reference(transport);v.reference(mathematics);v.reference(nativeDefinition);}
+
         public Definition {
-            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported provider revision");
+            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision) && !NATIVE_REVISION.equals(revision) && !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported provider revision");
             for (var text : List.of(providerId, modelRevision, semanticsRevision))
                 if (text.isBlank()) throw new IllegalArgumentException("blank provider binding");
             Objects.requireNonNull(kind); Objects.requireNonNull(transport); Objects.requireNonNull(mathematics);
+            if ((NATIVE_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) != (transport==Transport.NATIVE_EXPR_V1))
+                throw new IllegalArgumentException("native transport requires its explicit revision");
             if ((kind == Kind.NATIVE_RULES) != (nativeDefinition != null))
                 throw new IllegalArgumentException("only native providers carry native rule definitions");
-            if (PREPAID_REVISION.equals(revision) && (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))
+            if ((PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) && (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))
                 throw new IllegalArgumentException("prepaid applications require registered exact mathematics");
         }
     }
 
     /** Observational settlement metadata. Every charged unit stays paid after completion or abandonment. */
     public record PrepaidApplications(String revision, long chargedUnits, Map<String, Long> phaseCalls, Map<String, Long> phaseWork,
-            ExecutionWork completedMathematics, long openApplications, long abandonedApplications) {
+            ExecutionWork completedMathematics, long openApplications, long abandonedApplications) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(phaseCalls);v.reference(phaseWork);v.reference(completedMathematics);}
+
         public PrepaidApplications {
             if (!PREPAID_WORK_REVISION.equals(revision) || chargedUnits < 0 || openApplications < 0 || abandonedApplications < 0)
                 throw new IllegalArgumentException("invalid prepaid application receipt");
-            phaseCalls = java.util.Collections.unmodifiableMap(new TreeMap<>(phaseCalls));
+            phaseCalls = de.regelsuche.retention.RetainedSortedMap.copyOf(phaseCalls);
             phaseCalls.forEach((phase, calls) -> {
                 ApplicationPhase.valueOf(phase);
                 if (calls < 0) throw new IllegalArgumentException("negative prepaid phase count");
             });
-            phaseWork = java.util.Collections.unmodifiableMap(new TreeMap<>(phaseWork));
+            phaseWork = de.regelsuche.retention.RetainedSortedMap.copyOf(phaseWork);
             if (!phaseWork.keySet().equals(phaseCalls.keySet()) || phaseWork.values().stream().anyMatch(units -> units < 0)
                     || phaseWork.values().stream().reduce(0L, Math::addExact) != chargedUnits)
                 throw new IllegalArgumentException("prepaid phase breakdown differs from charged work");
@@ -67,11 +77,13 @@ public final class IncrementalProviderContract {
      */
     public record Work(Map<String, Long> operations, ExecutionWork mathematics,
             @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-            PrepaidApplications prepaidApplications) {
+            PrepaidApplications prepaidApplications) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operations);v.reference(mathematics);v.reference(prepaidApplications);}
+
         /** Frozen v2 shape/formula; serializers omit the absent prepaid extension. */
         public Work(Map<String, Long> operations, ExecutionWork mathematics) { this(operations, mathematics, null); }
         public Work {
-            operations = java.util.Collections.unmodifiableMap(new TreeMap<>(operations));
+            operations = de.regelsuche.retention.RetainedSortedMap.copyOf(operations);
             Objects.requireNonNull(mathematics);
             operations.forEach((name, units) -> {
                 Operation.valueOf(name);
@@ -97,22 +109,30 @@ public final class IncrementalProviderContract {
         }
     }
     public record Snapshot(Definition definition, Status status, boolean closed, boolean resumable,
-            boolean accountingComplete, Work work, long emittedCandidates, String detailCode) {
+            boolean accountingComplete, Work work, long emittedCandidates, String detailCode) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(definition);v.reference(status);v.reference(work);v.reference(detailCode);}
+
         public boolean complete() { return status == Status.EXHAUSTED && accountingComplete; }
     }
-    public interface Cursor extends AutoCloseable {
+    public interface ObjectCursor<T> extends AutoCloseable {
         /** One candidate at most. LIMIT is resumable on the same cursor; all atomic overruns remain paid. */
-        Optional<Transformation> next(long allowance);
+        Optional<T> next(long allowance);
         Snapshot snapshot();
+        /** Immutable, append-only receipt sequence for delegated batch drains; historical cursors have none. */
+        default List<Snapshot> batchCursorReceipts(){return List.of();}
         @Override void close();
     }
+    public interface Cursor extends ObjectCursor<Transformation> {}
     /** A registered implementation must charge delegated work before returning OR throwing. */
-    public interface Source extends AutoCloseable {
-        Optional<Transformation> next(long allowance);
+    public interface ObjectSource<T> extends AutoCloseable {
+        Optional<T> next(long allowance);
         Status status();
         @Override default void close() {}
     }
-    public static final class Meter {
+    public interface Source extends ObjectSource<Transformation> {}
+    public static final class Meter implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operations);v.reference(mathematics);v.reference(pending);v.reference(phaseCalls);v.reference(phaseWork);v.reference(prepaidCompleted);}
+
         private final Map<String, Long> operations = new TreeMap<>();
         private ExecutionWork mathematics = ExecutionWork.ZERO;
         private final boolean prepaidSupported;
@@ -123,8 +143,8 @@ public final class IncrementalProviderContract {
         private ExecutionWork prepaidCompleted = ExecutionWork.ZERO;
         public Meter() { this(REVISION); }
         public Meter(String revision) {
-            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported meter revision");
-            prepaidSupported = PREPAID_REVISION.equals(revision);
+            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision) && !NATIVE_REVISION.equals(revision) && !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported meter revision");
+            prepaidSupported = PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision);
         }
         public PrepaidApplication beginPrepaidApplication() {
             if (!prepaidSupported) throw new IllegalStateException("prepaid applications require provider v3");
@@ -191,7 +211,9 @@ public final class IncrementalProviderContract {
         }
     }
     /** Opaque meter-owned payment handle; never a mathematical capability. */
-    public static final class PrepaidApplication {
+    public static final class PrepaidApplication implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(owner);}
+
         private final Meter owner;
         private long units;
         private boolean finished;

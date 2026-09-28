@@ -43,7 +43,8 @@ public final class TypedMoveSearch {
     public interface TypedPolicy extends MovePriorityPolicy {}
 
     /** A null goal is permitted only in the explicit source-only mode. */
-    public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase, boolean sourceOnly) {
+    public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase, boolean sourceOnly) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(goal);v.reference(initialAssumptions);v.reference(phase);}
         public Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase) {
             this(Objects.requireNonNull(goal, "goal"), initialAssumptions, phase, false);
         }
@@ -66,7 +67,8 @@ public final class TypedMoveSearch {
     }
 
     public record State(Expr expression, int searchDepth, int primitiveDepth, String previousRule,
-            List<String> assumptions, Set<String> capabilities, int complexityDebt) {
+            List<String> assumptions, Set<String> capabilities, int complexityDebt) implements SearchExecution.Position<Expr>,de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(expression);v.reference(previousRule);v.reference(assumptions);v.reference(capabilities);}
         public State {
             Objects.requireNonNull(expression, "expression");
             assumptions = List.copyOf(assumptions);

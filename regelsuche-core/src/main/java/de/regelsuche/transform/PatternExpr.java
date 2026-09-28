@@ -1,5 +1,8 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -70,7 +73,9 @@ public sealed interface PatternExpr extends ExprTemplate
     @Override
     Expr instantiate(Map<String, Expr> bindings);
 
-    record Placeholder(String name) implements PatternExpr {
+    record Placeholder(String name) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}
+
         public Placeholder {
             if (name == null || name.isBlank()) {
                 throw new IllegalArgumentException(
@@ -90,13 +95,16 @@ public sealed interface PatternExpr extends ExprTemplate
 
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
+            RetainedOperation.work(1);
             return Optional.ofNullable(bindings.get(name))
                 .orElseThrow(() -> new IllegalArgumentException(
                     "Missing binding for " + name));
         }
     }
 
-    record LiteralNumber(ExactRational value) implements PatternExpr {
+    record LiteralNumber(ExactRational value) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(value);}
+
         public LiteralNumber {
             Objects.requireNonNull(value, "value");
         }
@@ -109,11 +117,13 @@ public sealed interface PatternExpr extends ExprTemplate
 
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
-            return new NumberExpr(value);
+            return RetainedOperation.produced(new NumberExpr(value));
         }
     }
 
-    record LiteralVariable(String name) implements PatternExpr {
+    record LiteralVariable(String name) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}
+
         public LiteralVariable {
             Objects.requireNonNull(name, "name");
             if (name.isBlank()) {
@@ -130,7 +140,7 @@ public sealed interface PatternExpr extends ExprTemplate
 
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
-            return new VariableExpr(name);
+            return RetainedOperation.produced(new VariableExpr(name));
         }
     }
 
@@ -138,7 +148,9 @@ public sealed interface PatternExpr extends ExprTemplate
         BinaryOperator operator,
         PatternExpr left,
         PatternExpr right
-    ) implements PatternExpr {
+    ) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operator);v.reference(left);v.reference(right);}
+
         public Operation {
             if (operator == null || left == null || right == null) {
                 throw new IllegalArgumentException(
@@ -158,11 +170,10 @@ public sealed interface PatternExpr extends ExprTemplate
 
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
-            return new BinaryExpr(
-                left.instantiate(bindings),
-                operator,
-                right.instantiate(bindings)
-            );
+            Expr first=left.instantiate(bindings);
+            try(var retained=RetainedOperation.retain(this,bindings,first)) {
+                return RetainedOperation.produced(new BinaryExpr(first,operator,right.instantiate(bindings)));
+            }
         }
     }
 
@@ -170,7 +181,9 @@ public sealed interface PatternExpr extends ExprTemplate
     record Function(
         String name,
         List<PatternExpr> arguments
-    ) implements PatternExpr {
+    ) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);v.reference(arguments);}
+
         public Function {
             Objects.requireNonNull(name, "name");
             if (name.isBlank()) {
@@ -202,10 +215,13 @@ public sealed interface PatternExpr extends ExprTemplate
         @Override
         public Expr instantiate(Map<String, Expr> bindings) {
             List<Expr> args = new ArrayList<>(arguments.size());
-            for (PatternExpr argument : arguments) {
-                args.add(argument.instantiate(bindings));
+            try(var retained=RetainedOperation.retain(this,bindings,args)) {
+                for (PatternExpr argument : arguments) {
+                    args.add(argument.instantiate(bindings));
+                    RetainedOperation.work(1);RetainedOperation.checkpoint();
+                }
+                return RetainedOperation.produced(new FunctionExpr(name, args));
             }
-            return new FunctionExpr(name, args);
         }
     }
 }

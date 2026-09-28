@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** Pull boundary shared by eager controls and later staged/lazy scheduling. */
-public interface MovePicker {
+public interface MovePicker extends SearchExecution.Picker<SearchMove> {
     Optional<SearchMove> next();
     TransformationWorkMetrics workMetrics();
     List<SearchMove> generatedMoves();

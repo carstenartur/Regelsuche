@@ -50,7 +50,9 @@ public sealed interface TransformationProvenance permits TransformationProvenanc
     }
 
     record PrimitiveRewriteSequence(List<String> primitiveRuleIds, String applicationKey)
-            implements TransformationProvenance {
+            implements TransformationProvenance, de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(primitiveRuleIds);v.reference(applicationKey);}
+
         public PrimitiveRewriteSequence {
             if (primitiveRuleIds == null || primitiveRuleIds.isEmpty()) {
                 throw new IllegalArgumentException("primitive provenance requires a real nonempty rule sequence");
@@ -73,7 +75,9 @@ public sealed interface TransformationProvenance permits TransformationProvenanc
         }
     }
 
-    record ExactTheoryStep(ExactTheoryEvidence evidence) implements TransformationProvenance {
+    record ExactTheoryStep(ExactTheoryEvidence evidence) implements TransformationProvenance, de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(evidence);}
+
         public ExactTheoryStep { Objects.requireNonNull(evidence, "verified evidence"); }
         @Override public List<String> primitiveRuleIds() { return List.of(); }
         @Override public ExecutionWork work() { return new ExecutionWork(0, 1, evidence.binding().canonicalWorkUnits()); }
@@ -90,7 +94,9 @@ public sealed interface TransformationProvenance permits TransformationProvenanc
     }
 
     /** Ordered, source-bound composition retaining every application and intermediate expression. */
-    record Sequence(String sourceExpression, List<Transformation> steps) implements TransformationProvenance {
+    record Sequence(String sourceExpression, List<Transformation> steps) implements TransformationProvenance, de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(sourceExpression);v.reference(steps);}
+
         public Sequence {
             if (sourceExpression == null || sourceExpression.isBlank()) throw new IllegalArgumentException("blank source");
             steps = List.copyOf(steps);
