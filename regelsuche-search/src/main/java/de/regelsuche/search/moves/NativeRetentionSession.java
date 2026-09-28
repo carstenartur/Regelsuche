@@ -10,6 +10,8 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private final SearchExpressionStore store;
     private final SearchExpressionStore.Limits limits;
     private RetainedGraph.View kernel;
+    private TypedSourceOnlySearch.Objective externalObjective;
+    private boolean lastObservationComplete;
     private de.regelsuche.retention.RetainedOperation operation;
     private long executionWork;
     private long validationWork,retentionWork,peakNodes,peakCharacters,peakReferences;
@@ -18,7 +20,8 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){
         this.problem=problem;this.store=store;this.limits=limits;
     }
-    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(detail);v.reference(operation);}
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(detail);v.reference(operation);v.reference(externalObjective);}
+    void externalObjective(TypedSourceOnlySearch.Objective objective){executionWork(1);externalObjective=objective;}
     void ownership(RetainedGraph.View root){kernel=root;}
     void operation(de.regelsuche.retention.RetainedOperation scope){operation=scope;}
     @Override public void executionWork(long units){if(units<0)throw new IllegalArgumentException("negative native work");executionWork=Math.addExact(executionWork,units);}
@@ -31,10 +34,10 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     void incomplete(String reason){complete=false;if(detail.isEmpty())detail=reason;}
     void fail(String reason){incomplete(reason);throw new SearchExecution.ResourceLimit();}
     private RetainedGraph.Observation observe(Object root,boolean enforce){
-        RetainedGraph.Observation measured;
+        RetainedGraph.Observation measured;lastObservationComplete=true;
         try { measured=RetainedGraph.measure(root); }
         catch(RetainedGraph.Unmeasured unknown) {
-            measured=unknown.attempted();complete=false;if(detail.isEmpty())detail="NATIVE_RETENTION_UNSUPPORTED:"+unknown.getMessage();
+            measured=unknown.attempted();lastObservationComplete=false;complete=false;if(detail.isEmpty())detail="NATIVE_RETENTION_UNSUPPORTED:"+unknown.getMessage();
         }
         retentionWork=Math.addExact(retentionWork,measured.work());
         peakNodes=Math.max(peakNodes,measured.peak().nodes());peakCharacters=Math.max(peakCharacters,measured.peak().characters());
@@ -48,6 +51,9 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private record Handoff(NativeRetentionSession session,RetainedGraph.View output) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(session);v.reference(output);}
     }
+    private record ExternalInputs(NativeMoveSearch.Problem problem,TypedSourceOnlySearch.Objective objective) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(objective);}
+    }
     void finish(NativeMoveSearch.Result result){finish(result,result);}
     void finish(NativeMoveSearch.Result result,RetainedGraph.View output){
         executionWork(5);
@@ -56,6 +62,9 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
         observe(new Handoff(this,output),false);
         store.close();kernel=null;
         if(operation!=null)operation.close();operation=null;executionWork(2);
+        executionWork(7);
+        var external=observe(new ExternalInputs(problem,externalObjective),false);
+        receipt.external(external.retained(),lastObservationComplete);externalObjective=null;
         update(receipt,0,0,0);
         String measuredDetail=detail;
         var retained=observe(output,false).retained();

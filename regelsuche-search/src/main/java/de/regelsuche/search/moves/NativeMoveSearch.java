@@ -58,7 +58,7 @@ public final class NativeMoveSearch {
     /** Populated privately before result publication; accessors expose only immutable scalar observations. */
     public static final class Accounting implements RetainedGraph.View {
         private long validationWork,executionWork,storageWork,retentionWork,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
-        private boolean complete;private String detail="";
+        private boolean complete,externalKnown;private long externalNodes,externalCharacters,externalReferences;private String detail="";
         void update(long validation,long execution,long storage,long retention,long pn,long pc,long pr,long rn,long rc,long rr,boolean complete,String detail){
             validationWork=validation;executionWork=execution;storageWork=storage;retentionWork=retention;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
             resultNodes=rn;resultCharacters=rc;resultReferences=rr;this.complete=complete;this.detail=detail;
@@ -68,7 +68,9 @@ public final class NativeMoveSearch {
         public long storageWork(){return storageWork;}
         public long retentionWork(){return retentionWork;}
         /** Post-close caller input graph, separate from and overlapping result ownership; empty means unknown. */
-        public Optional<RetainedGraph.Usage> externalRetained(){throw new UnsupportedOperationException("external ownership observation not installed");}
+        public Optional<RetainedGraph.Usage> externalRetained(){return externalKnown?Optional.of(new RetainedGraph.Usage(externalNodes,externalCharacters,externalReferences)):Optional.empty();}
+        void external(RetainedGraph.Usage usage,boolean known){externalNodes=usage.nodes();externalCharacters=usage.characters();externalReferences=usage.references();externalKnown=known;}
+        /** Session-owned lookup/kernel graph after close, excluding result and caller input graphs. */
         public RetainedGraph.Usage live(){return new RetainedGraph.Usage(0,0,0);}
         public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
         public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
@@ -167,7 +169,7 @@ public final class NativeMoveSearch {
         try(var store=new SearchExpressionStore(limits)) {
             var accounting=new NativeRetentionSession(problem,store,limits);
             try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {
-                accounting.operation(operation);accounting.validate(problem.source());
+                accounting.operation(operation);accounting.externalObjective(objective);accounting.validate(problem.source());
                 var execution=new Execution(problem,store,accounting);
                 var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                     .search(execution,continuation,selection);
