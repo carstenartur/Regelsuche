@@ -87,18 +87,19 @@ public final class EquivalenceAwarePatternMatcher {
         MatchBudget budget = new MatchBudget(
             maxBacktrackingBranches, profile.inferAlgebraicBindings());
         Object[] result = new Object[1];
-        long setupWork = 4L + bindings.size() + (original == bindings ? 0 : bindings.size())
+        var search = new MatchSearch(pattern,expression,working,profile,budget);
+        long setupWork = 7L + bindings.size() + (original == bindings ? 0 : bindings.size())
             + (profile.inferAlgebraicBindings() ? 1 : 0);
         try (var owned = RetainedOperation.retainCompleted(setupWork,
-                pattern,expression,bindings,profile,original,working,budget,result)) {
+                pattern,expression,bindings,profile,original,working,budget,result,search)) {
             try {
                 AttemptStatus status;
                 String detail = "";
                 Map<String,Expr> selected = original;
                 try {
-                    boolean matched = matchInternal(pattern,expression,working,profile,budget);
-                    status = matched ? AttemptStatus.MATCHED : AttemptStatus.NOT_MATCHED;
-                    if (matched) selected = working;
+                    var matched = search.match();
+                    status = matched != null ? AttemptStatus.MATCHED : AttemptStatus.NOT_MATCHED;
+                    if (matched != null) selected = matched;
                 } catch (BoundedExactMonomial.LimitExceeded limit) {
                     status = AttemptStatus.INCONCLUSIVE; detail = limit.code;
                 } catch (MatchLimitExceeded limit) {
@@ -150,23 +151,6 @@ public final class EquivalenceAwarePatternMatcher {
         }
     }
 
-    private static boolean matchInternal(
-        PatternExpr pattern,
-        Expr expression,
-        Map<String, Expr> bindings,
-        RecognitionProfile profile,
-        MatchBudget budget
-    ) {
-        var search = new MatchSearch(profile,budget);
-        try (var owned = RetainedOperation.retainCompleted(2,search)) {
-            try { return search.match(pattern,expression,bindings); }
-            catch (RuntimeException | Error failure) {
-                observeFailure(failure);
-                throw failure;
-            }
-        }
-    }
-
     /**
      * Owns one bounded search. A later constraint can reopen an earlier choice;
      * node matching only schedules work or rejects the current alternative.
@@ -189,31 +173,23 @@ public final class EquivalenceAwarePatternMatcher {
             visitor.reference(inferred); visitor.reference(patternOperands); visitor.reference(expressionOperands);
         }
 
-        private MatchSearch(RecognitionProfile profile, MatchBudget budget) {
+        private MatchSearch(PatternExpr pattern, Expr expression, Map<String,Expr> bindings,
+                RecognitionProfile profile, MatchBudget budget) {
             this.profile = profile;
             this.budget = budget;
+            pending = new PairTask(pattern,expression,null);
+            current = bindings;
         }
 
-        private boolean match(PatternExpr pattern, Expr expression, Map<String, Expr> bindings) {
-            alternatives.push(new Alternative(new PairTask(pattern, expression, null), new HashMap<>(bindings)));
-            RetainedOperation.work(4L + bindings.size());
-            while (!alternatives.isEmpty()) {
-                RetainedOperation.checkpoint();
+        private Map<String,Expr> match() {
+            while (true) {
+                if (matchContinuation()) return current;
+                if (alternatives.isEmpty()) return null;
                 var alternative = alternatives.pop();
                 pending = alternative.pending();
                 current = alternative.bindings();
                 RetainedOperation.work(3);
-                if (!matchContinuation()) {
-                    continue;
-                }
-                int priorSize = bindings.size();
-                bindings.clear();
-                bindings.putAll(current);
-                RetainedOperation.work(priorSize + current.size() + 1L);
-                RetainedOperation.checkpoint();
-                return true;
             }
-            return false;
         }
 
         private boolean matchContinuation() {
