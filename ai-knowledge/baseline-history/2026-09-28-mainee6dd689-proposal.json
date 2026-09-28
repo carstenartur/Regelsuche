@@ -1,0 +1,59 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-proposal/v1",
+  "status": "PROPOSED_NOT_APPLIED",
+  "decision": "Promote only byte-identical generated metrics snapshot from clean independently qualified accepted P03, after independent review; no failing P04 values.",
+  "acceptedSource": {
+    "commit": "ee6dd6892d899662c857c1f2bc2861e233e68563",
+    "tree": "e1bee2a7712ff95f14b2c3513f565ff6c26bde8b",
+    "pullRequest": 1051,
+    "head": "be423b3f99c5f1e3bb4ea159e2610ecc5e63596a",
+    "mainCI": 36360112301,
+    "mainAttempt": 2,
+    "mainCodeQL": 36360112513
+  },
+  "measurement": {
+    "sourceCheckout": "/workspace/scratch/7ff736a22947/p04-p03-predecessor-ai-evidence-source",
+    "extractorCheckout": "/workspace/scratch/7ff736a22947/ai-knowledge-extractor",
+    "extractorTag": "v0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "exitCode": 0,
+    "all12GateTasksExecuted": true,
+    "tokens": 655685,
+    "oldBaselineTokens": 648025,
+    "increase": 7660,
+    "maximumIncrease": 15000,
+    "violations": 0,
+    "debt": 15.95,
+    "sourceAndExtractorClean": true
+  },
+  "previousBaselineSha256": "b2d65ffe25f98ebbac0ca4e493d1b056d8e521cecb034d6b320277eb4e6d584b",
+  "proposedBaselineSha256": "2df07604122be739198f4258797379097df6df27e993d706daebd39707ae61c0",
+  "derivation": "Byte-for-byte copy only of retained metrics-snapshot.json; no numeric edits or candidate measurements.",
+  "rejectedFeature": {
+    "commit": "b9fa5833a4eb7a78243ec862d997d917447caadf",
+    "run": 36396005914,
+    "tokens": 663565,
+    "oldBaselineIncrease": 15540,
+    "passed": false,
+    "usedForBaseline": false,
+    "artifact": 10958038724,
+    "verifiedZipSha256": "b32d2a899de8e9fd11808bb3e4c1de948640d3c651700876acc3a7f9ab3928f3",
+    "evidenceDirectory": "../p04-draft-ci"
+  },
+  "unchangedPolicy": {
+    "thresholdsSelectorsHotspotExceptionsUnchanged": true,
+    "testsRemovedOrSkipped": false,
+    "oldBaselineUnchanged": true
+  },
+  "reportHashes": {
+    "aiKnowledgeCheck.log": "6faac42fa069060be429f29623e828d1ccaef3c1d3f1850d20feadcbb4b1d096",
+    "check.json": "5c9f537acd43dda90b49298e21ed8a9f48bb4765cd7c7d6e69dadb93a15d15a3",
+    "complexity.json": "153e6b9af98d1644e0b618b94c2bd3a2827f2800231203f48e0f74eecbdb72aa",
+    "metrics-snapshot.json": "2df07604122be739198f4258797379097df6df27e993d706daebd39707ae61c0",
+    "previous-baseline.json": "b2d65ffe25f98ebbac0ca4e493d1b056d8e521cecb034d6b320277eb4e6d584b",
+    "receipt.json": "4d6b766330b675fe3bf9adbb1eed9566d7235296ac4e51d1683a2e9abbc2ce68",
+    "run-clean-ai-gate.py": "3800f352e47fef9e1b59bc3bbecf75d908d62a7579d98f4eb075c8af160a9d1f",
+    "trend.json": "48e8dd88dfa805c268b5f7fb87a17c54bd39c31bb80e73a07d680c2b1918bcb7"
+  },
+  "acceptanceBoundary": "No P04 implementation, CI, performance, or merge acceptance. Full final head still requires unchanged gates and independent code review."
+}
