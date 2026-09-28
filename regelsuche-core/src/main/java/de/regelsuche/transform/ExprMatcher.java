@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /** Declarative, nestable matcher algebra independent of {@link ExprTemplate}. */
-public sealed interface ExprMatcher extends RetainedGraph.View
+public sealed interface ExprMatcher extends MatcherDescriptor.Source
     permits ExprMatcher.Any, ExprMatcher.LiteralNumber,
         ExprMatcher.LiteralVariable, ExprMatcher.NumberProperty,
         ExprMatcher.Pattern, ExprMatcher.Bind, ExprMatcher.AllOf,
@@ -517,7 +517,7 @@ public sealed interface ExprMatcher extends RetainedGraph.View
         }
     }
 
-    sealed interface Constraint extends RetainedGraph.View permits BindingMatches, SameAs {
+    sealed interface Constraint extends MatcherDescriptor.Source permits BindingMatches, SameAs {
         String canonicalDescriptor();
         @Override default void retainedReferences(RetainedGraph.Visitor visitor) {
             switch (this) {

@@ -8,6 +8,11 @@ import java.util.Objects;
 final class MatcherDescriptor {
     private MatcherDescriptor() { }
 
+    /** The existing immutable definition, rather than a captured rendering callback. */
+    sealed interface Source extends RetainedGraph.View permits ExprMatcher,ExprMatcher.Constraint {
+        String canonicalDescriptor();
+    }
+
     /** Callers delegate their freshly assembled field array; field strings keep their own production work. */
     static String render(String type,String[] fields) {
         var assembly = new Assembly(type,fields);

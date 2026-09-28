@@ -226,15 +226,14 @@ final class ExprMatcherEngine {
                         lists.add(candidate.withBinding(bind.name(),expression).traced(lists.trace));
                         continue;
                     }
-                    Comparison comparison = compare(previous,expression,bind.equalityProfile(),session,
-                        bind.canonicalDescriptor());
-                    if (comparison.matched) {
+                    ExprMatcher.RecognitionStrength strength = compare(previous,expression,bind.equalityProfile(),session,bind);
+                    if (strength != null) {
                         RetainedOperation.work(1);
                         if (lists.rebindTrace == null) {
                             lists.rebindTrace = MatcherTrace.text("rebind:",bind.name());
                             RetainedOperation.work(1);
                         }
-                        lists.add(candidate.withStrength(comparison.strength).traced(lists.rebindTrace));
+                        lists.add(candidate.withStrength(strength).traced(lists.rebindTrace));
                     }
                 }
                 lists.freeze(session,bind);
@@ -544,96 +543,108 @@ final class ExprMatcherEngine {
         if (left == null || right == null) {
             return List.of();
         }
-        Comparison comparison = compare(
+        ExprMatcher.RecognitionStrength strength = compare(
             left,
             right,
             sameAs.recognitionProfile(),
             session,
-            sameAs.canonicalDescriptor()
+            sameAs
         );
-        return comparison.matched
+        return strength != null
             ? List.of(state
-                .withStrength(comparison.strength)
+                .withStrength(strength)
                 .traced("same-as"))
             : List.of();
     }
 
-    private static Comparison compare(
+    /** Returns the existing recognition strength, or null for no match; no result wrapper is allocated. */
+    private static ExprMatcher.RecognitionStrength compare(
         Expr expected,
         Expr candidate,
         RecognitionProfile profile,
         Session session,
-        String descriptor
+        MatcherDescriptor.Source source
     ) {
         if (expected.equals(candidate)) {
-            return Comparison.exact();
+            return ExprMatcher.RecognitionStrength.EXACT;
         }
-        List<Expr> representatives = profile.recognitionRuleIds().isEmpty()
-                || profile.maxEquivalenceDepth() == 0
-            ? List.of(candidate)
-            : session.options.representativeProvider()
-                .representatives(candidate, profile);
-        if (representatives == null || representatives.isEmpty()) {
-            session.diagnostic("REPRESENTATIVE_PROVIDER_EMPTY", descriptor);
-            return Comparison.noMatch();
+        var comparison = new ComparisonWork(expected,candidate,profile,source);
+        try (var owned = RetainedOperation.retainCompleted(1,comparison,session)) {
+            try {
+                boolean identityOnly = profile.recognitionRuleIds().isEmpty() || profile.maxEquivalenceDepth() == 0;
+                comparison.representatives = identityOnly ? List.of(candidate)
+                    : session.options.representativeProvider().representatives(candidate,profile);
+                // Only the local singleton's allocation belongs to this caller.
+                RetainedOperation.work(identityOnly ? 2 : 1);
+                if (comparison.representatives == null || comparison.representatives.isEmpty()) {
+                    comparison.diagnostic(session,"REPRESENTATIVE_PROVIDER_EMPTY");
+                    return null;
+                }
+                comparison.pattern = literalPattern(expected);
+                RetainedOperation.work(1);
+                for (int index = 0; index < comparison.representatives.size(); index++) {
+                    Expr representative = comparison.representatives.get(index);
+                    if (representative == null) {
+                        comparison.diagnostic(session,"REPRESENTATIVE_PROVIDER_NULL");
+                        continue;
+                    }
+                    comparison.attempt = EquivalenceAwarePatternMatcher.matchDetailed(comparison.pattern,representative,
+                        Map.of(),profile,session.options.maxPatternBranches());
+                    // Take delegated branches before any subsequent debit can fail.
+                    session.patternBranches += comparison.attempt.visitedBranches();
+                    RetainedOperation.work(1);
+                    RetainedOperation.checkpoint();
+                    if (comparison.attempt.matched()) {
+                        return index > 0 || !representative.equals(candidate)
+                            ? ExprMatcher.RecognitionStrength.BOUNDED_REPRESENTATIVE
+                            : ExprMatcher.RecognitionStrength.EQUIVALENCE_AWARE;
+                    }
+                    if (comparison.attempt.inconclusive()) comparison.diagnostic(session,comparison.attempt.limitCode());
+                }
+                return null;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
         }
-        PatternExpr pattern = literalPattern(expected);
-        for (int index = 0; index < representatives.size(); index++) {
-            Expr representative = representatives.get(index);
-            if (representative == null) {
-                session.diagnostic("REPRESENTATIVE_PROVIDER_NULL", descriptor);
-                continue;
-            }
-            EquivalenceAwarePatternMatcher.MatchAttempt attempt =
-                EquivalenceAwarePatternMatcher.matchDetailed(
-                    pattern,
-                    representative,
-                    Map.of(),
-                    profile,
-                    session.options.maxPatternBranches()
-                );
-            session.patternBranches += attempt.visitedBranches();
-            if (attempt.matched()) {
-                return new Comparison(
-                    true,
-                    index > 0 || !representative.equals(candidate)
-                        ? ExprMatcher.RecognitionStrength
-                            .BOUNDED_REPRESENTATIVE
-                        : ExprMatcher.RecognitionStrength
-                            .EQUIVALENCE_AWARE
-                );
-            }
-            if (attempt.inconclusive()) {
-                session.diagnostic(attempt.limitCode(), descriptor);
-            }
-        }
-        return Comparison.noMatch();
     }
 
     private static PatternExpr literalPattern(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            return PatternExpr.num(number.value());
+            PatternExpr result = PatternExpr.num(number.value());
+            try (var owned = RetainedOperation.retainCompleted(1,expression,result)) { return result; }
         }
         if (expression instanceof VariableExpr variable) {
-            return PatternExpr.variable(variable.name());
+            PatternExpr result = PatternExpr.variable(variable.name());
+            try (var owned = RetainedOperation.retainCompleted(1,expression,result)) { return result; }
         }
-        if (expression instanceof BinaryExpr binary) {
-            return PatternExpr.op(
-                binary.operator(),
-                literalPattern(binary.left()),
-                literalPattern(binary.right())
-            );
+        var assembly = new LiteralPatternAssembly(expression);
+        try (var owned = RetainedOperation.retainCompleted(1,assembly)) {
+            try {
+                if (expression instanceof BinaryExpr binary) {
+                    assembly.left = literalPattern(binary.left());
+                    RetainedOperation.work(1);
+                    assembly.right = literalPattern(binary.right());
+                    RetainedOperation.work(1);
+                    assembly.result = PatternExpr.op(binary.operator(),assembly.left,assembly.right);
+                    RetainedOperation.work(1);
+                } else if (expression instanceof FunctionExpr function) {
+                    assembly.arguments = new ArrayList<>();
+                    RetainedOperation.work(1);
+                    for (Expr argument : function.arguments()) {
+                        assembly.arguments.add(literalPattern(argument));
+                        RetainedOperation.work(1);
+                    }
+                    assembly.result = new PatternExpr.Function(function.name(),assembly.arguments);
+                    RetainedOperation.work(3L + assembly.arguments.size());
+                } else {
+                    throw new IllegalArgumentException("Unsupported expression type: " + expression.getClass().getName());
+                }
+                RetainedOperation.checkpoint();
+                return assembly.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
         }
-        if (expression instanceof FunctionExpr function) {
-            return PatternExpr.fn(
-                function.name(),
-                function.arguments().stream()
-                    .map(ExprMatcherEngine::literalPattern)
-                    .toArray(PatternExpr[]::new)
-            );
-        }
-        throw new IllegalArgumentException(
-            "Unsupported expression type: " + expression.getClass().getName());
     }
 
     private static boolean matchesNumberProperty(
@@ -664,6 +675,47 @@ final class ExprMatcherEngine {
         try { RetainedOperation.checkpoint(); }
         catch (RuntimeException | Error observation) {
             if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+
+    private static final class ComparisonWork implements RetainedGraph.View {
+        private final Expr expected, candidate;
+        private final RecognitionProfile profile;
+        private final MatcherDescriptor.Source source;
+        private List<Expr> representatives;
+        private PatternExpr pattern;
+        private EquivalenceAwarePatternMatcher.MatchAttempt attempt;
+        private String descriptor;
+
+        private ComparisonWork(Expr expected,Expr candidate,RecognitionProfile profile,MatcherDescriptor.Source source) {
+            this.expected = expected; this.candidate = candidate; this.profile = profile; this.source = source;
+        }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(expected); visitor.reference(candidate); visitor.reference(profile); visitor.reference(source);
+            visitor.reference(representatives); visitor.reference(pattern); visitor.reference(attempt); visitor.reference(descriptor);
+        }
+
+        private void diagnostic(Session session,String code) {
+            RetainedOperation.work(1);
+            if (descriptor == null) {
+                descriptor = source.canonicalDescriptor();
+                RetainedOperation.work(1);
+            }
+            session.diagnostic(code,descriptor);
+        }
+    }
+
+    private static final class LiteralPatternAssembly implements RetainedGraph.View {
+        private final Expr source;
+        private PatternExpr left, right, result;
+        private ArrayList<PatternExpr> arguments;
+
+        private LiteralPatternAssembly(Expr source) { this.source = source; }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(source); visitor.reference(left); visitor.reference(right);
+            visitor.reference(result); visitor.reference(arguments);
         }
     }
 
@@ -919,18 +971,4 @@ final class ExprMatcherEngine {
         }
     }
 
-    private record Comparison(
-        boolean matched,
-        ExprMatcher.RecognitionStrength strength
-    ) {
-        private static Comparison exact() {
-            return new Comparison(
-                true, ExprMatcher.RecognitionStrength.EXACT);
-        }
-
-        private static Comparison noMatch() {
-            return new Comparison(
-                false, ExprMatcher.RecognitionStrength.EXACT);
-        }
-    }
 }
