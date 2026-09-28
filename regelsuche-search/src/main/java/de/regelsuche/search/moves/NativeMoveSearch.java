@@ -329,7 +329,7 @@ public final class NativeMoveSearch {
                     return new SearchBatches.Batch<>(batch.moves(),batch.work(),batch.complete());
                 }
             }).toList();
-            return scheduling()==MoveSearch.Scheduling.STAGED?new StagedBatchPicker<>(providers,ranking):new EagerBatchPicker<>(providers,ranking);
+            return scheduling()==MoveSearch.Scheduling.STAGED?new StagedBatchPicker<>(providers,ranking):new EagerBatchPicker<>(providers,ranking,false);
         }
     }
     private static StateValue.Assessment export(NativeStateValue.Assessment value){

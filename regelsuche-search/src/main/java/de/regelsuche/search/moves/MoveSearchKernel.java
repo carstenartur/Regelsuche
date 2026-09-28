@@ -137,6 +137,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             } catch(SearchExecution.ResourceLimit exhausted) { stop(Outcome.INCONCLUSIVE); }
             finally {
                 closeIncremental(opened, ledger);
+                if(active!=null && active.picker!=null && !active.picker.incremental())ledger.collect(active);
             }
             return finish();
         }
@@ -182,6 +183,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             ledger.expanded++;
             node.picker = picker(problem, node.state);
             retainIncremental(node, opened);
+            node.picker.initialize();
             return true;
         }
 

@@ -1,6 +1,7 @@
 package de.regelsuche.search.moves;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
@@ -13,7 +14,9 @@ final class StagedBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGr
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(primitiveLanes);v.reference(generated);v.reference(policy);v.reference(work);}
 
     private static final int EXHAUSTED_STAGE = MovePriorityPolicy.Stage.values().length;
-    private record Ranked<M>(M move, double score) {}
+    private record Ranked<M>(M move, double score) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(move);}
+    }
     private final class Lane implements RetainedGraph.View {
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(StagedBatchPicker.this);v.reference(provider);v.reference(moves);}
 
@@ -54,12 +57,21 @@ final class StagedBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGr
                 exhaustive &= batch.complete();
                 generated.addAll(batch.moves());
                 var ranked = new ArrayList<Ranked<M>>();
+                try(var held=RetainedOperation.retain(this,batch,ranked)) {
+                RetainedOperation.work(batch.moves().size());
                 for (var move : batch.moves()) {
                     policy.requireSource(move);
                     ranked.add(new Ranked<>(move, finite(policy.score(move))));
+                    RetainedOperation.work(2);RetainedOperation.checkpoint();
                 }
                 ranked.sort(Comparator.<Ranked<M>>comparingDouble(Ranked::score).reversed());
-                lane.moves = ranked.stream().map(Ranked::move).toList();
+                var ordered=new ArrayList<M>();
+                try(var orderedFrame=RetainedOperation.retain(ordered)) {
+                    for(var rank:ranked){ordered.add(rank.move());RetainedOperation.work(1);}
+                    lane.moves=RetainedOperation.produced(List.copyOf(ordered));
+                    RetainedOperation.work(ordered.size());
+                }
+                }
             }
             if (lane.cursor == lane.moves.size()) {
                 lanes.remove(lane);

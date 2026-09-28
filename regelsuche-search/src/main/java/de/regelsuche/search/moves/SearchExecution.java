@@ -29,6 +29,7 @@ public final class SearchExecution {
         Map<String, ? extends Capability<E>> capabilities();
     }
     public interface Picker<M> extends AutoCloseable {
+        default void initialize() {}
         Optional<M> next(); TransformationWorkMetrics workMetrics(); List<M> generatedMoves(); boolean complete();
         default Optional<M> next(long allowance) { return next(); }
         default boolean accountingComplete() { return true; }
