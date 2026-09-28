@@ -11,6 +11,7 @@ class RewriteTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;long execution,validation;int queueWidth,simultaneousResults;
         boolean canonicalThree,replacedArguments;
+        List<Expr> abortAtCopiedArguments;long previousCheckpointWork,copyCheckpointWork;
         @Override public void executionWork(long units){execution=Math.addExact(execution,units);}
         @Override public void validationWork(long units){validation=Math.addExact(validation,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -41,6 +42,11 @@ class RewriteTemporaryOwnershipTest {
                 else if(value instanceof Map<?,?> map)map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
                 else if(value instanceof Object[] array)for(var item:array)visitor.reference(item);
             }
+            if(abortAtCopiedArguments!=null && argumentLists.stream().anyMatch(abortAtCopiedArguments::equals)) {
+                copyCheckpointWork=execution-previousCheckpointWork;
+                throw new CopyLimit();
+            }
+            previousCheckpointWork=execution;
             simultaneousResults=Math.max(simultaneousResults,results);
             for(var function:expressions)for(var args:argumentLists)
                 if(args!=function.arguments() && args.equals(function.arguments()) && args.getFirst().equals(new VariableExpr("x")))replacedArguments=true;
@@ -80,4 +86,24 @@ class RewriteTemporaryOwnershipTest {
             ()->assertTrue(observation.replacedArguments,"mutable rebuilt argument list overlaps FunctionExpr's immutable argument list"));
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
+    private static final class CopyLimit extends RuntimeException {}
+    @Test void argumentCopyIsPaidBeforeItsOwnershipCheckpointCanAbort(){
+        var a=PatternExpr.var("A");
+        var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
+        var arguments=List.<Expr>of(new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new NumberExpr(0)),
+            new VariableExpr("y"),new VariableExpr("z"));
+        var source=new FunctionExpr("f",arguments);
+        var transport=new AstRewriteTransport(List.of(zero),32,32);
+        var observation=new Observation();observation.abortAtCopiedArguments=arguments;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertThrows(CopyLimit.class,()->transport.generate(source));
+        }
+        assertEquals(arguments.size()+2,observation.copyCheckpointWork,
+            "completed argument copies and frame acquisition are paid before the failing checkpoint");
+        assertFalse(observation.replacedArguments,"abort occurs before replacing an argument or producing its ancestor");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+        assertEquals(1,transport.generate(source).size(),"the failed scope cannot leak into a later historical call");
+    }
+
 }
