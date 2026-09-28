@@ -22,11 +22,13 @@ class ExprMatcherOwnershipTest {
         boolean abortBindingCopy, sawBindingCopy, sawTraceCopy;
         boolean abortStateList, sawSecondBinding, sawOperationTrace;
         boolean sawRepresentativeList, sawLaterRepresentative, sawDescendantTrace;
+        boolean sawPathCopy, sawPathBufferAndText, abortPathBuffer;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
         final Set<Object> states = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<Object> mutableStateLists = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Set<String> renderedPaths = Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -47,12 +49,17 @@ class ExprMatcherOwnershipTest {
             visitor.reference(scope);
             boolean hasStateList = false;
             boolean hasMutableBinding = false, hasFrozenBinding = false;
+            boolean hasMutablePath = false, hasFrozenPath = false, hasPathBuffer = false, hasPathText = false;
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
                 if ("operation:ADD".equals(value)) sawOperationTrace = true;
                 if ("representative:1".equals(value)) sawLaterRepresentative = true;
                 if ("contains@0".equals(value)) sawDescendantTrace = true;
+                if (value instanceof String text && Set.of("root","0","1","1.0","12.0").contains(text)) {
+                    renderedPaths.add(text); hasPathText |= text.equals("1.0");
+                }
+                if (value instanceof char[] buffer && Arrays.equals(buffer,new char[]{'1','.','0'})) hasPathBuffer = true;
                 sawSession |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
                     && value.getClass().getSimpleName().equals("Session");
                 if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
@@ -61,6 +68,10 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) {
+                    if (values.equals(List.of(1,0))) {
+                        hasMutablePath |= values instanceof ArrayList<?>;
+                        hasFrozenPath |= !(values instanceof ArrayList<?>);
+                    }
                     sawRepresentativeList |= values instanceof List<?> && values.size() == 2
                         && values.stream().anyMatch(item -> item == input)
                         && values.stream().allMatch(item -> item instanceof Expr);
@@ -90,11 +101,16 @@ class ExprMatcherOwnershipTest {
             }
             inputMissing |= !seen.contains(input);
             sawBindingCopy |= hasMutableBinding && hasFrozenBinding;
+            sawPathCopy |= hasMutablePath && hasFrozenPath;
+            sawPathBufferAndText |= hasPathBuffer && hasPathText;
             if (hasStateList && outcome == null) unpublishedResultScans++;
             if (abortBindingCopy && sawBindingCopy && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
             if (abortStateList && !mutableStateLists.isEmpty() && failure == null) {
+                failure = new MatchAbort(); throw failure;
+            }
+            if (abortPathBuffer && sawPathBufferAndText && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
             if (abortOutcome && outcome != null && failure == null) {
@@ -371,6 +387,62 @@ class ExprMatcherOwnershipTest {
             assertFalse(result.complete());
         }
         assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void descendantPathCopiesAndRenderedBuffersOverlapTheirActualResults() {
+        Expr input = new ExpressionParser().parseTerm("f(y,g(x,z))");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = ExprMatcher.contains(ExprMatcher.literalVariable("x")).match(input);
+            assertEquals(List.of("literal-variable","contains@1.0"),result.matches().getFirst().trace());
+        }
+        assertTrue(observation.sawPathCopy,"the actual mutable and frozen [1,0] path must overlap");
+        assertTrue(observation.sawPathBufferAndText,"the populated path buffer must overlap its String result");
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void aMissingDescendantDoesNotRenderUnusedOccurrenceText() {
+        Expr input = new ExpressionParser().parseTerm("f(x,y)");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertFalse(ExprMatcher.contains(ExprMatcher.literalVariable("absent")).match(input).matched());
+        }
+        assertTrue(observation.renderedPaths.isEmpty(),"occurrence text is needed only for actual matches");
+        assertFalse(observation.inputMissing);
+    }
+
+    @Test void pathRenderingKeepsMultiDigitIndicesAndNestedOrder() {
+        var arguments = new ArrayList<Expr>();
+        for (int i = 0; i < 12; i++) arguments.add(new VariableExpr("y"));
+        arguments.add(new FunctionExpr("g",new VariableExpr("x")));
+        Expr input = new FunctionExpr("f",arguments);
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = ExprMatcher.contains(ExprMatcher.literalVariable("x")).match(input);
+            assertEquals(1,result.matches().size());
+            assertEquals(List.of("literal-variable","contains@12.0"),result.matches().getFirst().trace());
+        }
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void anAbortedOccurrenceTextCopyCannotProduceAnOutcome() {
+        Expr input = new ExpressionParser().parseTerm("f(y,g(x,z))");
+        var observation = new Observation(); observation.input = input; observation.abortPathBuffer = true;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,
+                () -> ExprMatcher.contains(ExprMatcher.literalVariable("x")).match(input));
+            assertSame(observation.failure,failure);
+            assertTrue(observation.sawPathBufferAndText);
+            assertNull(observation.outcome);
+            assertTrue(observation.workAfterFailure > 0);
+        }
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
