@@ -105,7 +105,7 @@ class MatcherDescriptorOwnershipTest {
 
     @Test void nestedDescriptorsKeepTheirHistoricalFraming() {
         var nested = ExprMatcher.allOf(ExprMatcher.literalVariable("x"),ExprMatcher.any());
-        String children = "12:matcher-list20:16:literal-variable1:x5:3:any";
+        String children = "12:matcher-list22:16:literal-variable1:x5:3:any";
         assertEquals("6:all-of" + children.length() + ":" + children,nested.canonicalDescriptor());
     }
 }
