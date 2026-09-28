@@ -71,4 +71,53 @@ class NativePullBudgetTest {
             assertEquals(1,binding.opens);assertEquals(1,binding.pulls);
         }
     }
+    private static final class EmptyLane implements StagedIncrementalLanes.Source<NativeMoveProof>,ManagedProviderCursor.Binding<NativeMoveProof>,ObjectSource<NativeMoveProof> {
+        private final String id;private final long closingWork;
+        private int opens,pulls,closes;
+        EmptyLane(String id,long closingWork){this.id=id;this.closingWork=closingWork;}
+        @Override public MoveProvider.Descriptor descriptor(){return new MoveProvider.Descriptor(id,id,SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,id);}
+        @Override public boolean batch(){return false;}
+        @Override public ObjectCursor<NativeMoveProof> open(java.util.function.Consumer<List<NativeMoveProof>> generated,java.util.function.LongSupplier totalWork){
+            return new ManagedProviderCursor<>(new Definition(NATIVE_REVISION,id,Kind.REGISTERED_SCHEMA,"model","semantics",Transport.NATIVE_EXPR_V1,Mathematics.PRIMITIVE,null),this);
+        }
+        @Override public boolean carries(){return true;}
+        @Override public ObjectSource<NativeMoveProof> open(Meter meter){opens++;return this;}
+        @Override public void requireSource(NativeMoveProof candidate){fail("empty lane emitted a candidate");}
+        @Override public ExecutionWork work(NativeMoveProof candidate){return candidate.work();}
+        @Override public Optional<NativeMoveProof> next(long allowance){pulls++;return Optional.empty();}
+        @Override public Status status(){return pulls==0?Status.READY:Status.EXHAUSTED;}
+        @Override public void close(){closes++;RetainedOperation.work(closingWork);}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(id);}
+    }
+    private static final class EmptyRanking implements SearchBatches.Ranking<NativeMoveProof> {
+        @Override public double score(NativeMoveProof move){return 0;}
+        @Override public int stage(MoveProvider.Descriptor provider){return 0;}
+        @Override public double providerScore(MoveProvider.Descriptor provider){return 0;}
+        @Override public long contextWork(){return 0;}
+        @Override public void requireSource(NativeMoveProof move){}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
+    }
+    @Test void closingNativeLaneConsumesAllowanceBeforeAnotherLaneCanOpen(){
+        var first=new EmptyLane("first",10);var second=new EmptyLane("second",0);var paid=new Paid();
+        try(var operation=RetainedOperation.open(paid)){
+            var lanes=new StagedIncrementalLanes<>(List.<StagedIncrementalLanes.Source<NativeMoveProof>>of(first,second),new EmptyRanking(),"state");
+            long before=paid.work;
+            assertTrue(lanes.next(10).isEmpty());
+            assertEquals(1,first.opens);assertEquals(1,first.pulls);assertEquals(1,first.closes);
+            assertEquals(0,second.opens,"first lane paid four meter units plus ten native close units; no allowance remains");
+            assertTrue(lanes.workExhausted());assertEquals(10,paid.work-before);
+            assertEquals(6,lanes.workMetrics().totalWorkUnitsV2(),"two ordering units plus four actual lifecycle units");
+            assertTrue(lanes.next(4).isEmpty());assertEquals(1,second.opens);assertEquals(1,second.closes);
+            assertFalse(lanes.workExhausted());assertEquals(10,paid.work-before,"old close work must not be charged again on resume");
+            assertEquals(10,lanes.workMetrics().totalWorkUnitsV2());
+            lanes.close();assertEquals(10,paid.work-before);
+        }
+    }
+    @Test void laneSwitchWithoutObservationScopeKeepsTheExistingAllowance(){
+        var first=new EmptyLane("first",10);var second=new EmptyLane("second",0);
+        var lanes=new StagedIncrementalLanes<>(List.<StagedIncrementalLanes.Source<NativeMoveProof>>of(first,second),new EmptyRanking(),"state");
+        assertTrue(lanes.next(10).isEmpty());assertEquals(1,second.opens);assertFalse(lanes.workExhausted());
+        assertEquals(10,lanes.workMetrics().totalWorkUnitsV2());lanes.close();
+    }
+
 }

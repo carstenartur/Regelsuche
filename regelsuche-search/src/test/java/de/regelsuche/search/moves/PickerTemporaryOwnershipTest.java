@@ -31,12 +31,15 @@ class PickerTemporaryOwnershipTest {
     }
     private static final class Ranking implements SearchBatches.Ranking<Expr> {
         private final Observation observation;
-        Ranking(Observation observation){this.observation=observation;}
+        private final boolean stop;
+        Ranking(Observation observation){this(observation,false);}
+        Ranking(Observation observation,boolean stop){this.observation=observation;this.stop=stop;}
         @Override public double score(Expr move){
             var retained=RetainedGraph.measure(observation.scope).retained();
             if(observation.scoredNodes.isEmpty())observation.firstScoreReferences=retained.references();
             observation.lastScoreReferences=retained.references();
             observation.scoredNodes.add(retained.nodes());
+            if(stop)throw new ScoreStopped();
             return 0; // Stable ties must retain provider order.
         }
         @Override public int stage(MoveProvider.Descriptor descriptor){return 0;}
@@ -57,6 +60,7 @@ class PickerTemporaryOwnershipTest {
                 for(var next=picker.next();next.isPresent();next=picker.next())actual.add(next.orElseThrow());
             }
             assertEquals(List.of(new VariableExpr("first"),new VariableExpr("second"),new VariableExpr("third")),actual);
+            assertEquals(staged?4:3,picker.workMetrics().priorityCandidatesOrdered());
             assertEquals(List.of(3L,3L,3L),observation.scoredNodes,
                 "every scoring callback must observe the whole live batch, including not-yet-ranked siblings");
             assertTrue(observation.lastScoreReferences-observation.firstScoreReferences>=6,
@@ -106,5 +110,19 @@ class PickerTemporaryOwnershipTest {
     }
     @Test void eagerAbortRetainsCompletedProviderWork(){checkAbortedWork(MoveSearch.Scheduling.EAGER_CONTROL);}
     @Test void stagedAbortRetainsCompletedProviderWork(){checkAbortedWork(MoveSearch.Scheduling.STAGED);}
+
+    private static final class ScoreStopped extends RuntimeException {}
+    @Test void stagedAbortDoesNotChargeScoresThatNeverStarted(){
+        var observation=new Observation();
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            var picker=new StagedBatchPicker<>(List.<SearchBatches.Provider<Expr>>of(new Provider()),new Ranking(observation,true));
+            assertThrows(ScoreStopped.class,picker::next);
+            assertEquals(1,observation.scoredNodes.size());
+            assertEquals(2,picker.workMetrics().priorityCandidatesOrdered(),
+                "one provider order plus the first attempted score; two later scores never ran");
+            assertEquals(3,picker.generatedMoves().size(),"the complete generated batch remains available for accounting");
+        }
+    }
 
 }
