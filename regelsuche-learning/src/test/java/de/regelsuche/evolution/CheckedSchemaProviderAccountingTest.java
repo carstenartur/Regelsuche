@@ -76,7 +76,8 @@ class CheckedSchemaProviderAccountingTest {
             assertSame(meter.failure, failure);
             assertNotNull(meter.rootWork, "the actual caller ledger must be held before work begins");
             assertEquals(meter.rootWork.units, meter.afterFailure.getLast());
-            assertEquals(1, meter.afterFailure.stream().filter(n -> n == meter.rootWork.units).count(), "one exceptional settlement");
+            assertEquals(List.of(4L, meter.rootWork.units), meter.afterRootRelease,
+                "the actual root release is followed by exactly one settlement, even if their values coincide");
             if (distinct) assertTrue(List.of(failure.getSuppressed()).contains(meter.closeFailure));
             else assertEquals(0, failure.getSuppressed().length);
             if (abort == Abort.BATCH || abort == Abort.CLOSE)
@@ -117,10 +118,10 @@ class CheckedSchemaProviderAccountingTest {
         CheckedSchemaSupport.Work rootWork, partialWork;
         CheckedSchemaMatcherPlan.ApplicationSteps firstApplication;
         NativeMoveProvider.Batch finished;
-        boolean tripped, repeatClose, batchObserved, sawMatch, partialOwned, sawRejection;
+        boolean tripped, repeatClose, batchObserved, sawMatch, partialOwned, sawRejection, rootSeen;
         RuntimeException closeFailure;
         long firstStart, secondStart, completedPrefix, firstPublished;
-        final List<Long> afterFailure = new ArrayList<>(), afterBatch = new ArrayList<>();
+        final List<Long> afterFailure = new ArrayList<>(), afterBatch = new ArrayList<>(), afterRootRelease = new ArrayList<>();
         ProviderMeter(Abort abort, TypedMoveSearch.State received) {
             this.abort = abort; this.received = received;
             failure = abort == Abort.AST_ERROR || abort == Abort.DOMAIN_ERROR ? new AssertionError("provider observer error")
@@ -134,6 +135,7 @@ class CheckedSchemaProviderAccountingTest {
             else executionWork(units);
         }
         @Override public void executionWork(long units) {
+            if (rootSeen && !rootHeld()) afterRootRelease.add(units);
             if (tripped) {
                 afterFailure.add(units);
                 if (repeatClose && units == 4) { if (closeFailure != null) throw closeFailure; fail(); }
@@ -161,7 +163,7 @@ class CheckedSchemaProviderAccountingTest {
                 for (Object ref : refs(frame)) if (ref instanceof Object[] values) {
                     var items = java.util.Arrays.asList(values);
                     var ledger = items.stream().filter(CheckedSchemaSupport.Work.class::isInstance).map(CheckedSchemaSupport.Work.class::cast).findFirst().orElse(null);
-                    if (items.contains(received)) rootWork = ledger;
+                    if (items.contains(received)) { rootWork = ledger; rootSeen = true; }
                     boolean domain = items.stream().anyMatch(java.util.ArrayDeque.class::isInstance);
                     if (domain && items.contains(received.expression())) {
                         if (rootWork == null) rootWork = ledger; // Observe the unfixed source ledger for RED.
@@ -193,6 +195,12 @@ class CheckedSchemaProviderAccountingTest {
                 }
             }
             return new Snapshot(sourceGrowth, outcome, second);
+        }
+        private boolean rootHeld() {
+            for (Object owner : graph(scope)) if (owner instanceof de.regelsuche.retention.RetainedOperation.Frame frame)
+                for (Object ref : refs(frame)) if (ref instanceof Object[] values)
+                    for (Object value : values) if (value == received) return true;
+            return false;
         }
         private boolean currentAtSource(Object value) {
             return value instanceof Object[] slot && slot.length == 1
