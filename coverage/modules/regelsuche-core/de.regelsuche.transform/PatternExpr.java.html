@@ -74,7 +74,7 @@ public sealed interface PatternExpr extends ExprTemplate
     Expr instantiate(Map&lt;String, Expr&gt; bindings);
 
     record Placeholder(String name) implements PatternExpr,RetainedGraph.View {
-<span class="nc" id="L77">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}</span>
+<span class="fc" id="L77">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}</span>
 
 <span class="fc" id="L79">        public Placeholder {</span>
 <span class="pc bpc" id="L80" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
@@ -103,7 +103,7 @@ public sealed interface PatternExpr extends ExprTemplate
     }
 
     record LiteralNumber(ExactRational value) implements PatternExpr,RetainedGraph.View {
-<span class="nc" id="L106">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(value);}</span>
+<span class="fc" id="L106">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(value);}</span>
 
 <span class="fc" id="L108">        public LiteralNumber {</span>
 <span class="fc" id="L109">            Objects.requireNonNull(value, &quot;value&quot;);</span>
@@ -122,7 +122,7 @@ public sealed interface PatternExpr extends ExprTemplate
     }
 
     record LiteralVariable(String name) implements PatternExpr,RetainedGraph.View {
-<span class="nc" id="L125">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}</span>
+<span class="fc" id="L125">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}</span>
 
 <span class="fc" id="L127">        public LiteralVariable {</span>
 <span class="fc" id="L128">            Objects.requireNonNull(name, &quot;name&quot;);</span>
@@ -149,7 +149,7 @@ public sealed interface PatternExpr extends ExprTemplate
         PatternExpr left,
         PatternExpr right
     ) implements PatternExpr,RetainedGraph.View {
-<span class="nc" id="L152">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operator);v.reference(left);v.reference(right);}</span>
+<span class="fc" id="L152">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operator);v.reference(left);v.reference(right);}</span>
 
 <span class="fc" id="L154">        public Operation {</span>
 <span class="pc bpc" id="L155" title="3 of 6 branches missed.">            if (operator == null || left == null || right == null) {</span>
@@ -182,7 +182,7 @@ public sealed interface PatternExpr extends ExprTemplate
         String name,
         List&lt;PatternExpr&gt; arguments
     ) implements PatternExpr,RetainedGraph.View {
-<span class="nc" id="L185">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);v.reference(arguments);}</span>
+<span class="fc" id="L185">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);v.reference(arguments);}</span>
 
 <span class="fc" id="L187">        public Function {</span>
 <span class="fc" id="L188">            Objects.requireNonNull(name, &quot;name&quot;);</span>

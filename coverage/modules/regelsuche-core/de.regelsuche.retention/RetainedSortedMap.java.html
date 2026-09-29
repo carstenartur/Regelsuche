@@ -20,7 +20,7 @@ public final class RetainedSortedMap&lt;K,V&gt; implements Map&lt;K,V&gt;,Retain
 <span class="nc" id="L20">    @Override public V remove(Object key){throw new UnsupportedOperationException(&quot;immutable map&quot;);}</span>
 <span class="nc" id="L21">    @Override public void putAll(Map&lt;? extends K,? extends V&gt; other){throw new UnsupportedOperationException(&quot;immutable map&quot;);}</span>
 <span class="nc" id="L22">    @Override public void clear(){throw new UnsupportedOperationException(&quot;immutable map&quot;);}</span>
-<span class="nc" id="L23">    @Override public boolean equals(Object other){return values.equals(other);}</span>
+<span class="fc" id="L23">    @Override public boolean equals(Object other){return values.equals(other);}</span>
 <span class="nc" id="L24">    @Override public int hashCode(){return values.hashCode();}</span>
 <span class="nc" id="L25">    @Override public String toString(){return values.toString();}</span>
 }

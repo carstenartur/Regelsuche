@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialNormalizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.canonical</a> &gt; <span class="el_source">PolynomialNormalizer.java</span></div><h1>PolynomialNormalizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.canonical;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -10,7 +11,7 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,7 +29,7 @@ import java.util.TreeMap;
  * normalization work; accepted coefficients are emitted without rounding.&lt;/p&gt;
  */
 public final class PolynomialNormalizer implements RetainedGraph.View {
-<span class="nc" id="L31">    @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L32">    @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
 
     private static final int MAX_EXPANDED_TERMS = 1_000;
     private static final int MAX_COEFFICIENT_BITS = 4_096;
@@ -36,225 +37,426 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
     private final boolean expandCompositePolynomials;
 
     public PolynomialNormalizer() {
-<span class="fc" id="L39">        this(true);</span>
-<span class="fc" id="L40">    }</span>
+<span class="fc" id="L40">        this(true);</span>
+<span class="fc" id="L41">    }</span>
 
-<span class="fc" id="L42">    private PolynomialNormalizer(boolean expandCompositePolynomials) {</span>
-<span class="fc" id="L43">        this.expandCompositePolynomials = expandCompositePolynomials;</span>
-<span class="fc" id="L44">    }</span>
+<span class="fc" id="L43">    private PolynomialNormalizer(boolean expandCompositePolynomials) {</span>
+<span class="fc" id="L44">        this.expandCompositePolynomials = expandCompositePolynomials;</span>
+<span class="fc" id="L45">    }</span>
 
     public static PolynomialNormalizer monomialOnly() {
-<span class="fc" id="L47">        return new PolynomialNormalizer(false);</span>
+<span class="fc" id="L48">        return new PolynomialNormalizer(false);</span>
     }
 
     public Optional&lt;Expr&gt; normalize(Expr expression) {
-<span class="fc" id="L51">        Polynomial polynomial = toPolynomial(expression);</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (polynomial == null) {</span>
-<span class="fc" id="L53">            return Optional.empty();</span>
+<span class="fc" id="L52">        try(var owned=RetainedOperation.retain(this,expression)) {</span>
+<span class="fc" id="L53">            RetainedOperation.work(1);</span>
+<span class="fc" id="L54">            Expr existing=normalizedVariablePower(expression);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if(existing!=null)return RetainedOperation.produced(Optional.of(existing));</span>
+<span class="fc" id="L56">            Expr variableSum=normalizeVariableSum(expression);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if(variableSum!=null)return RetainedOperation.produced(Optional.of(variableSum));</span>
+<span class="fc" id="L58">            Polynomial polynomial = toPolynomial(expression);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (polynomial == null) {</span>
+<span class="fc" id="L60">                return Optional.empty();</span>
+            }
+<span class="fc" id="L62">            try(var value=RetainedOperation.retain(polynomial)) {</span>
+<span class="fc" id="L63">                Expr normalized = polynomial.toExpr();</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                return normalized == null</span>
+<span class="nc" id="L65">                    ? Optional.empty()</span>
+<span class="fc" id="L66">                    : RetainedOperation.produced(Optional.of(normalized));</span>
+            }
+<span class="fc bfc" id="L68" title="All 6 branches covered.">        }</span>
+    }
+
+    /** Positive bounded powers of one variable already have the emitted normal form. */
+    private Expr normalizedVariablePower(Expr expression){
+<span class="fc" id="L73">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">        if(!(expression instanceof BinaryExpr binary) || binary.operator()!=BinaryOperator.POW</span>
+<span class="fc bfc" id="L75" title="All 4 branches covered.">                || !(binary.left() instanceof VariableExpr) || !(binary.right() instanceof NumberExpr number))return null;</span>
+<span class="fc" id="L76">        RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L77" title="All 4 branches covered.">        if(!isNonNegativeInteger(number.value()) || number.value().isZero())return null;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        return number.value().isOne()?binary.left():expression;</span>
+    }
+
+    /** Distinct degree-one terms need only ordering and association, not coefficient maps. */
+    private Expr normalizeVariableSum(Expr expression) {
+<span class="fc" id="L83">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        if (!(expression instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) return null;</span>
+<span class="fc" id="L85">        RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        if (!variableSumNode(binary.left()) || !variableSumNode(binary.right())) return null;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (isNormalizedVariableSum(expression)) return expression;</span>
+<span class="fc" id="L88">        var variables = new ArrayList&lt;VariableExpr&gt;();</span>
+<span class="fc" id="L89">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L90">        RetainedOperation.work(2);</span>
+<span class="fc" id="L91">        pending.addLast(expression);RetainedOperation.work(1);</span>
+<span class="fc" id="L92">        try (var workspace = RetainedOperation.retain(variables, pending)) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (!collectVariableSum(variables, pending)) return null;</span>
+<span class="fc" id="L94">            variables.sort(PolynomialNormalizer::compareVariables);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (int index = 1; index &lt; variables.size(); index++) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                if (compareVariables(variables.get(index - 1), variables.get(index)) == 0) return null;</span>
+            }
+<span class="fc" id="L98">            return leftAssociate(variables, BinaryOperator.ADD);</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">        }</span>
+    }
+
+    /** Recognizes the existing bounded normal form without rebuilding its unchanged ancestors. */
+    private static boolean isNormalizedVariableSum(Expr expression) {
+<span class="fc" id="L104">        Expr remaining = expression;</span>
+<span class="fc" id="L105">        VariableExpr next = null;</span>
+<span class="fc" id="L106">        int terms = 1;</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">        while (remaining instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L108">            RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">            if (!(binary.right() instanceof VariableExpr variable) || ++terms &gt; MAX_EXPANDED_TERMS) return false;</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">            if (next != null &amp;&amp; compareVariables(variable, next) &gt;= 0) return false;</span>
+<span class="fc" id="L111">            next = variable;</span>
+<span class="fc" id="L112">            remaining = binary.left();</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L115" title="2 of 6 branches missed.">        return remaining instanceof VariableExpr variable &amp;&amp; next != null &amp;&amp; compareVariables(variable, next) &lt; 0;</span>
+    }
+
+    private static boolean variableSumNode(Expr expression) {
+<span class="fc" id="L119">        return expression instanceof VariableExpr</span>
+<span class="fc bfc" id="L120" title="All 6 branches covered.">            || expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD;</span>
+    }
+
+    private static boolean collectVariableSum(List&lt;VariableExpr&gt; variables, ArrayDeque&lt;Expr&gt; pending) {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L125">            Expr expression = pending.removeLast();RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L127">                variables.add(variable);RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L128" title="All 4 branches covered.">            } else if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc" id="L129">                pending.addLast(binary.right());pending.addLast(binary.left());RetainedOperation.work(2);</span>
+<span class="fc" id="L130">            } else return false;</span>
+<span class="fc" id="L131">            RetainedOperation.checkpoint();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (variables.size() &gt; MAX_EXPANDED_TERMS) return false;</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return true;</span>
+    }
+
+    private static int compareVariables(VariableExpr left, VariableExpr right) {
+        // A degree-one monomial's existing sortKey is exactly its lossless variable name.
+<span class="fc" id="L139">        return compareText(left.name(),right.name());</span>
+    }
+
+    private static int compareText(String a,String b) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int index = 0; index &lt; Math.min(a.length(), b.length()); index++) {</span>
+<span class="fc" id="L144">            RetainedOperation.work(1);</span>
+<span class="fc" id="L145">            int order = Character.compare(a.charAt(index), b.charAt(index));</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (order != 0) return order;</span>
         }
-<span class="fc" id="L55">        Expr normalized = polynomial.toExpr();</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        return normalized == null</span>
-<span class="nc" id="L57">            ? Optional.empty()</span>
-<span class="fc" id="L58">            : Optional.of(normalized);</span>
+<span class="fc" id="L148">        RetainedOperation.work(1);</span>
+<span class="fc" id="L149">        return Integer.compare(a.length(), b.length());</span>
     }
 
     private Polynomial toPolynomial(Expr expression) {
-<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L63">            return Polynomial.constant(number.value());</span>
+        // normalize owns the complete immutable input throughout this private recursion.
+<span class="fc" id="L154">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L156">            return Polynomial.constant(number.value());</span>
         }
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L66">            return Polynomial.monomial(</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L159">            return Polynomial.monomial(</span>
                 1,
-<span class="fc" id="L68">                Monomial.variable(variable.name()));</span>
+<span class="fc" id="L161">                Monomial.variable(variable.name()));</span>
         }
-<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
-<span class="fc" id="L71">            return null;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L164">            return null;</span>
         }
-<span class="fc bfc" id="L73" title="All 5 branches covered.">        return switch (binary.operator()) {</span>
-<span class="fc" id="L74">            case ADD -&gt; combine(binary.left(), binary.right(), 1);</span>
-<span class="fc" id="L75">            case SUB -&gt; combine(binary.left(), binary.right(), -1);</span>
-<span class="fc" id="L76">            case MUL -&gt; multiply(binary.left(), binary.right());</span>
-<span class="fc" id="L77">            case POW -&gt; power(binary.left(), binary.right());</span>
-<span class="fc" id="L78">            case DIV -&gt; null;</span>
+<span class="fc bfc" id="L166" title="All 5 branches covered.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L167">            case ADD -&gt; combine(binary.left(), binary.right(), 1);</span>
+<span class="fc" id="L168">            case SUB -&gt; combine(binary.left(), binary.right(), -1);</span>
+<span class="fc" id="L169">            case MUL -&gt; multiply(binary.left(), binary.right());</span>
+<span class="fc" id="L170">            case POW -&gt; power(binary.left(), binary.right());</span>
+<span class="fc" id="L171">            case DIV -&gt; null;</span>
         };
     }
+
 
     private Polynomial combine(
         Expr left,
         Expr right,
         int rightSign
     ) {
-<span class="fc" id="L87">        Polynomial leftPolynomial = toPolynomial(left);</span>
-<span class="fc" id="L88">        Polynomial rightPolynomial = toPolynomial(right);</span>
-<span class="fc bfc" id="L89" title="All 4 branches covered.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
-<span class="fc" id="L90">            return null;</span>
-        }
-<span class="fc" id="L92">        return leftPolynomial.add(</span>
-<span class="fc" id="L93">            rightPolynomial.scale(rightSign));</span>
+<span class="fc" id="L181">        Polynomial leftPolynomial = toPolynomial(left);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (leftPolynomial == null) return null;</span>
+<span class="fc" id="L183">        try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {</span>
+<span class="fc" id="L184">            Polynomial rightPolynomial = toPolynomial(right);</span>
+<span class="fc" id="L185">            try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                if (rightPolynomial == null) {</span>
+<span class="fc" id="L187">                    return null;</span>
+                }
+<span class="fc" id="L189">                var scaled=rightPolynomial.scale(rightSign);</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">                if (scaled == null) return null;</span>
+<span class="fc" id="L191">                try(var scaledOwned=RetainedOperation.retain(scaled)){return leftPolynomial.add(scaled);}</span>
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">            }</span>
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">        }</span>
     }
 
     private Polynomial multiply(Expr left, Expr right) {
-<span class="fc" id="L97">        Polynomial leftPolynomial = toPolynomial(left);</span>
-<span class="fc" id="L98">        Polynomial rightPolynomial = toPolynomial(right);</span>
-<span class="fc bfc" id="L99" title="All 4 branches covered.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
-<span class="fc" id="L100">            return null;</span>
-        }
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (!expandCompositePolynomials</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">                &amp;&amp; (!leftPolynomial.isMonomial()</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">                    || !rightPolynomial.isMonomial())) {</span>
-<span class="fc" id="L105">            return null;</span>
-        }
-<span class="fc" id="L107">        return leftPolynomial.multiply(rightPolynomial);</span>
+<span class="fc" id="L197">        Polynomial leftPolynomial = toPolynomial(left);</span>
+<span class="fc bfc" id="L198" title="All 6 branches covered.">        if (leftPolynomial == null || (!expandCompositePolynomials &amp;&amp; !leftPolynomial.isMonomial())) return null;</span>
+<span class="fc" id="L199">        try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {</span>
+<span class="fc" id="L200">            Polynomial rightPolynomial = toPolynomial(right);</span>
+<span class="fc" id="L201">            try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                if (rightPolynomial == null) {</span>
+<span class="fc" id="L203">                    return null;</span>
+                }
+<span class="fc bfc" id="L205" title="All 4 branches covered.">                if (!expandCompositePolynomials &amp;&amp; !rightPolynomial.isMonomial()) {</span>
+<span class="fc" id="L206">                    return null;</span>
+                }
+<span class="fc" id="L208">                return leftPolynomial.multiply(rightPolynomial);</span>
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">            }</span>
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        }</span>
     }
 
     private Polynomial power(Expr base, Expr exponent) {
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (!(exponent instanceof NumberExpr number)</span>
-<span class="fc bfc" id="L112" title="All 2 branches covered.">                || !isNonNegativeInteger(number.value())) {</span>
-<span class="fc" id="L113">            return null;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (!(exponent instanceof NumberExpr number)</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                || !isNonNegativeInteger(number.value())) {</span>
+<span class="fc" id="L216">            return null;</span>
         }
-<span class="fc" id="L115">        int exponentValue = number.value().intValueExact();</span>
+<span class="fc" id="L218">        int exponentValue = number.value().intValueExact();</span>
         // In expression semantics A^0 removes A and is therefore only sound
         // after A is known to be defined and non-zero. Leave this case to the
         // assumption-aware expression canonicalizer instead of folding it as
         // a formal-polynomial identity here.
-<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (exponentValue == 0) {</span>
-<span class="fc" id="L121">            return null;</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (exponentValue == 0) {</span>
+<span class="fc" id="L224">            return null;</span>
         }
-<span class="fc" id="L123">        Polynomial basePolynomial = toPolynomial(base);</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (basePolynomial == null) {</span>
-<span class="fc" id="L125">            return null;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if(base instanceof VariableExpr variable){</span>
+<span class="fc" id="L227">            RetainedOperation.work(1);</span>
+<span class="fc" id="L228">            return Polynomial.monomial(1,Monomial.variable(variable.name(),exponentValue));</span>
         }
-<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (!expandCompositePolynomials</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                &amp;&amp; !basePolynomial.isMonomial()) {</span>
-<span class="fc" id="L129">            return null;</span>
-        }
-<span class="fc" id="L131">        return basePolynomial.pow(exponentValue);</span>
+<span class="fc" id="L230">        Polynomial basePolynomial = toPolynomial(base);</span>
+<span class="fc" id="L231">        try(var baseOwned=RetainedOperation.retain(basePolynomial)) {</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (basePolynomial == null) {</span>
+<span class="fc" id="L233">                return null;</span>
+            }
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (!expandCompositePolynomials</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                    &amp;&amp; !basePolynomial.isMonomial()) {</span>
+<span class="fc" id="L237">                return null;</span>
+            }
+<span class="fc" id="L239">            return basePolynomial.pow(exponentValue);</span>
+<span class="pc bpc" id="L240" title="2 of 4 branches missed.">        }</span>
     }
 
     private boolean isNonNegativeInteger(ExactRational value) {
-<span class="pc bpc" id="L135" title="1 of 4 branches missed.">        return value.isInteger() &amp;&amp; value.signum() &gt;= 0</span>
-<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            &amp;&amp; value.numerator().bitLength() &lt;= 31;</span>
+<span class="fc bfc" id="L244" title="All 4 branches covered.">        return value.isInteger() &amp;&amp; value.signum() &gt;= 0</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            &amp;&amp; value.numerator().bitLength() &lt;= 31;</span>
     }
 
-    private record Monomial(Map&lt;String, Integer&gt; powers) {
-<span class="fc" id="L140">        private Monomial {</span>
-<span class="fc" id="L141">            powers = Collections.unmodifiableMap(</span>
-                new TreeMap&lt;&gt;(powers));
-<span class="fc" id="L143">        }</span>
+<span class="fc" id="L248">    private record Monomial(Map&lt;String, Integer&gt; powers) implements RetainedGraph.View {</span>
+<span class="fc" id="L249">        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(powers);}</span>
+        // Private factories transfer immutable zero/singleton maps or exclusive natural-order TreeMaps.
+        // No caller mutates a transferred powers map; multiply/pow always create distinct accumulators.
 
         private static Monomial constant() {
-<span class="fc" id="L146">            return new Monomial(Map.of());</span>
+<span class="fc" id="L254">            return RetainedOperation.produced(new Monomial(Map.of()));</span>
         }
 
         private static Monomial variable(String name) {
-<span class="fc" id="L150">            return new Monomial(Map.of(name, 1));</span>
+<span class="fc" id="L258">            return variable(name,1);</span>
+        }
+
+        private static Monomial variable(String name,int exponent) {
+<span class="fc" id="L262">            var powers = Map.of(name, exponent);</span>
+<span class="fc" id="L263">            RetainedOperation.work(2); // Actual singleton map creation and its entry.</span>
+<span class="fc" id="L264">            return RetainedOperation.produced(new Monomial(powers));</span>
         }
 
         private Monomial multiply(Monomial other) {
-<span class="fc" id="L154">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
-            for (Map.Entry&lt;String, Integer&gt; entry
-<span class="fc bfc" id="L156" title="All 2 branches covered.">                    : other.powers.entrySet()) {</span>
-                try {
-<span class="fc" id="L158">                    result.merge(</span>
-<span class="fc" id="L159">                        entry.getKey(),</span>
-<span class="fc" id="L160">                        entry.getValue(),</span>
-                        Math::addExact);
-<span class="fc" id="L162">                } catch (ArithmeticException exception) {</span>
-<span class="fc" id="L163">                    return null;</span>
-<span class="fc" id="L164">                }</span>
-<span class="fc" id="L165">            }</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            result.values().removeIf(value -&gt; value == 0);</span>
-<span class="fc" id="L167">            return new Monomial(result);</span>
+<span class="fc" id="L268">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
+<span class="fc" id="L269">            RetainedOperation.work(powers.size());</span>
+<span class="fc" id="L270">            RetainedOperation.work(1);</span>
+<span class="fc" id="L271">            try(var maps=RetainedOperation.retain(this,other,result)) {</span>
+                for (Map.Entry&lt;String, Integer&gt; entry
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                        : other.powers.entrySet()) {</span>
+<span class="fc" id="L274">                    RetainedOperation.work(1);</span>
+                    try {
+<span class="fc" id="L276">                        result.merge(</span>
+<span class="fc" id="L277">                            entry.getKey(),</span>
+<span class="fc" id="L278">                            entry.getValue(),</span>
+                            Math::addExact);
+<span class="fc" id="L280">                    } catch (ArithmeticException exception) {</span>
+<span class="fc" id="L281">                        return null;</span>
+<span class="fc" id="L282">                    }</span>
+<span class="fc" id="L283">                }</span>
+<span class="fc" id="L284">                RetainedOperation.work(result.size());</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                result.values().removeIf(value -&gt; value == 0);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L286">                return RetainedOperation.produced(new Monomial(result));</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">            }</span>
         }
 
         private Monomial pow(int exponent) {
-<span class="nc" id="L171">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
-            for (Map.Entry&lt;String, Integer&gt; entry
-<span class="nc bnc" id="L173" title="All 2 branches missed.">                    : powers.entrySet()) {</span>
-                try {
-<span class="nc" id="L175">                    result.put(</span>
-<span class="nc" id="L176">                        entry.getKey(),</span>
-<span class="nc" id="L177">                        Math.multiplyExact(</span>
-<span class="nc" id="L178">                            entry.getValue(),</span>
-                            exponent));
-<span class="nc" id="L180">                } catch (ArithmeticException exception) {</span>
-<span class="nc" id="L181">                    return null;</span>
-<span class="nc" id="L182">                }</span>
-<span class="nc" id="L183">            }</span>
-<span class="nc" id="L184">            return new Monomial(result);</span>
+<span class="nc" id="L291">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="nc" id="L292">            RetainedOperation.work(1);</span>
+<span class="nc" id="L293">            try(var maps=RetainedOperation.retain(this,result)) {</span>
+                for (Map.Entry&lt;String, Integer&gt; entry
+<span class="nc bnc" id="L295" title="All 2 branches missed.">                        : powers.entrySet()) {</span>
+<span class="nc" id="L296">                    RetainedOperation.work(1);</span>
+                    try {
+<span class="nc" id="L298">                        result.put(</span>
+<span class="nc" id="L299">                            entry.getKey(),</span>
+<span class="nc" id="L300">                            Math.multiplyExact(</span>
+<span class="nc" id="L301">                                entry.getValue(),</span>
+                                exponent));
+<span class="nc" id="L303">                    } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L304">                        return null;</span>
+<span class="nc" id="L305">                    }</span>
+<span class="nc" id="L306">                }</span>
+<span class="nc" id="L307">                return RetainedOperation.produced(new Monomial(result));</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            }</span>
         }
 
         private long degree() {
-<span class="fc" id="L188">            long degree = 0;</span>
-<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int exponent : powers.values()) {</span>
-<span class="fc" id="L190">                degree += exponent;</span>
-<span class="fc" id="L191">            }</span>
-<span class="fc" id="L192">            return degree;</span>
+<span class="fc" id="L312">            long degree = 0;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            for (int exponent : powers.values()) {</span>
+<span class="fc" id="L314">                RetainedOperation.work(1);</span>
+<span class="fc" id="L315">                degree += exponent;</span>
+<span class="fc" id="L316">            }</span>
+<span class="fc" id="L317">            return degree;</span>
         }
 
         private Expr toExpr() {
-<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (powers.isEmpty()) {</span>
-<span class="fc" id="L197">                return new NumberExpr(1);</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (powers.isEmpty()) {</span>
+<span class="fc" id="L322">                return RetainedOperation.produced(new NumberExpr(1));</span>
             }
-<span class="fc" id="L199">            List&lt;Expr&gt; factors = new ArrayList&lt;&gt;();</span>
-            for (Map.Entry&lt;String, Integer&gt; entry
-<span class="fc bfc" id="L201" title="All 2 branches covered.">                    : powers.entrySet()) {</span>
-<span class="fc" id="L202">                Expr variable = new VariableExpr(entry.getKey());</span>
-<span class="fc bfc" id="L203" title="All 2 branches covered.">                factors.add(entry.getValue() == 1</span>
-<span class="fc" id="L204">                    ? variable</span>
-<span class="fc" id="L205">                    : new BinaryExpr(</span>
-                        variable,
-                        BinaryOperator.POW,
-<span class="fc" id="L208">                        new NumberExpr(entry.getValue())));</span>
-<span class="fc" id="L209">            }</span>
-<span class="fc" id="L210">            return leftAssociate(factors, BinaryOperator.MUL);</span>
+<span class="fc" id="L324">            RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            if (powers.size() == 1) {</span>
+<span class="fc" id="L326">                var entry = powers.entrySet().iterator().next();</span>
+<span class="fc" id="L327">                RetainedOperation.work(1);</span>
+<span class="fc" id="L328">                return variablePower(entry.getKey(), entry.getValue());</span>
+            }
+<span class="fc" id="L330">            List&lt;Expr&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L331">            RetainedOperation.work(1);</span>
+<span class="fc" id="L332">            try (var owned = RetainedOperation.retain(this, factors)) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">                for (Map.Entry&lt;String, Integer&gt; entry : powers.entrySet()) {</span>
+<span class="fc" id="L334">                    Expr factor = variablePower(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L335">                    factors.add(factor);</span>
+<span class="fc" id="L336">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L337">                    RetainedOperation.checkpoint();</span>
+<span class="fc" id="L338">                }</span>
+<span class="fc" id="L339">                return leftAssociate(factors, BinaryOperator.MUL);</span>
+            }
         }
 
-        private String sortKey() {
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (powers.isEmpty()) {</span>
-<span class="nc" id="L215">                return &quot;&quot;;</span>
+        private static Expr variablePower(String name, int power) {
+<span class="fc" id="L344">            Expr variable = new VariableExpr(name);</span>
+<span class="fc" id="L345">            RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            if (power == 1) return RetainedOperation.produced(variable);</span>
+<span class="fc" id="L347">            try (var leaf = RetainedOperation.retain(variable)) {</span>
+<span class="fc" id="L348">                var exponent = new NumberExpr(power);</span>
+<span class="fc" id="L349">                RetainedOperation.work(1);</span>
+<span class="fc" id="L350">                try (var number = RetainedOperation.retain(exponent)) {</span>
+<span class="fc" id="L351">                    return RetainedOperation.produced(new BinaryExpr(variable, BinaryOperator.POW, exponent));</span>
+                }
             }
-<span class="fc" id="L217">            StringBuilder builder = new StringBuilder();</span>
-            for (Map.Entry&lt;String, Integer&gt; entry
-<span class="fc bfc" id="L219" title="All 2 branches covered.">                    : powers.entrySet()) {</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">                if (!builder.isEmpty()) {</span>
-<span class="fc" id="L221">                    builder.append('*');</span>
+        }
+
+        private int compareKey(Monomial other) {
+<span class="fc" id="L357">            RetainedOperation.work(1);</span>
+<span class="fc" id="L358">            var keys = new SortKeys(this,other);</span>
+<span class="fc" id="L359">            try(var owned=RetainedOperation.retain(keys)) {</span>
+                try {
+<span class="fc" id="L361">                    keys.leftText=keys.render(this,true);</span>
+<span class="fc" id="L362">                    keys.rightText=keys.render(other,false);</span>
+<span class="nc" id="L363">                } catch(RuntimeException | Error failure) {</span>
+<span class="nc" id="L364">                    try{RetainedOperation.checkpoint();}</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                    catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}</span>
+<span class="nc" id="L366">                    throw failure;</span>
+<span class="fc" id="L367">                }</span>
+<span class="fc" id="L368">                RetainedOperation.checkpoint();</span>
+<span class="fc" id="L369">                return compareText(keys.leftText,keys.rightText);</span>
+            }
+        }
+
+        /** Both keys and their actual copy buffers stay live until comparison completes. */
+        private static final class SortKeys implements RetainedGraph.View {
+            private final Monomial left,right;
+            private char[] leftBuffer,rightBuffer;
+            private String leftText,rightText;
+<span class="fc" id="L378">            private SortKeys(Monomial left,Monomial right){this.left=left;this.right=right;}</span>
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor){
+<span class="fc" id="L380">                visitor.reference(left);visitor.reference(right);</span>
+<span class="fc" id="L381">                visitor.reference(leftBuffer);visitor.reference(rightBuffer);</span>
+<span class="fc" id="L382">                visitor.reference(leftText);visitor.reference(rightText);</span>
+<span class="fc" id="L383">            }</span>
+            private String render(Monomial monomial,boolean first){
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                if(monomial.powers.isEmpty())return &quot;&quot;;</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">                if(monomial.powers.size()==1){</span>
+<span class="fc" id="L387">                    var entry=monomial.powers.entrySet().iterator().next();</span>
+<span class="fc" id="L388">                    RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                    if(entry.getValue()==1)return entry.getKey();</span>
                 }
-<span class="fc" id="L223">                builder.append(entry.getKey());</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">                if (entry.getValue() != 1) {</span>
-<span class="fc" id="L225">                    builder.append('^').append(entry.getValue());</span>
-                }
-<span class="fc" id="L227">            }</span>
-<span class="fc" id="L228">            return builder.toString();</span>
+<span class="fc" id="L391">                int length=keyLength(monomial);</span>
+<span class="fc" id="L392">                char[] buffer=new char[length];</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">                if(first)leftBuffer=buffer;else rightBuffer=buffer;</span>
+<span class="fc" id="L394">                RetainedOperation.work(length+1L);</span>
+<span class="fc" id="L395">                writeKey(monomial,buffer);</span>
+<span class="fc" id="L396">                RetainedOperation.work(length+1L); // completed key copy and String creation</span>
+<span class="fc" id="L397">                return new String(buffer);</span>
+            }
+            private static int keyLength(Monomial monomial){
+<span class="fc" id="L400">                int length=0;</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">                for(var entry:monomial.powers.entrySet()){</span>
+<span class="fc" id="L402">                    RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">                    if(length!=0)length=Math.addExact(length,1);</span>
+<span class="fc" id="L404">                    length=Math.addExact(length,entry.getKey().length());</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">                    if(entry.getValue()!=1)length=Math.addExact(length,1+digits(entry.getValue()));</span>
+<span class="fc" id="L406">                }</span>
+<span class="fc" id="L407">                return length;</span>
+            }
+            private static void writeKey(Monomial monomial,char[] buffer){
+<span class="fc" id="L410">                int position=0;</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">                for(var entry:monomial.powers.entrySet()){</span>
+<span class="fc" id="L412">                    RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">                    if(position!=0){buffer[position++]='*';RetainedOperation.work(1);}</span>
+<span class="fc" id="L414">                    String name=entry.getKey();</span>
+<span class="fc" id="L415">                    name.getChars(0,name.length(),buffer,position);position+=name.length();</span>
+<span class="fc" id="L416">                    RetainedOperation.work(name.length());</span>
+<span class="fc" id="L417">                    int exponent=entry.getValue();</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">                    if(exponent!=1){</span>
+<span class="fc" id="L419">                        buffer[position++]='^';RetainedOperation.work(1);</span>
+<span class="fc" id="L420">                        int end=position+digits(exponent);</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">                        for(int index=end-1;index&gt;=position;index--){</span>
+<span class="fc" id="L422">                            buffer[index]=(char)('0'+exponent%10);exponent/=10;RetainedOperation.work(1);</span>
+                        }
+<span class="fc" id="L424">                        position=end;</span>
+                    }
+<span class="fc" id="L426">                }</span>
+<span class="fc" id="L427">            }</span>
+            private static int digits(int value){
+<span class="fc" id="L429">                int digits=1;</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">                while(value&gt;=10){value/=10;digits++;RetainedOperation.work(1);}</span>
+<span class="fc" id="L431">                RetainedOperation.work(1);return digits;</span>
+            }
         }
     }
 
-    private static final class Polynomial {
-        private static final Comparator&lt;
-<span class="fc" id="L234">            Map.Entry&lt;Monomial, ExactRational&gt;&gt; TERM_ORDER =</span>
-                Comparator
-<span class="fc" id="L236">                    .&lt;Map.Entry&lt;Monomial, ExactRational&gt;&gt;comparingLong(</span>
-<span class="fc" id="L237">                        entry -&gt; entry.getKey().degree())</span>
-<span class="fc" id="L238">                    .reversed()</span>
-<span class="fc" id="L239">                    .thenComparing(</span>
-<span class="fc" id="L240">                        entry -&gt; entry.getKey().sortKey());</span>
+    private static final class Polynomial implements RetainedGraph.View {
+<span class="fc" id="L437">        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(terms);}</span>
+<span class="fc" id="L438">        private static final Comparator&lt;Monomial&gt; TERM_ORDER =</span>
+<span class="fc" id="L439">            Comparator.comparingLong(Monomial::degree).reversed()</span>
+<span class="fc" id="L440">                .thenComparing(Monomial::compareKey);</span>
 
         private final Map&lt;Monomial, ExactRational&gt; terms;
 
-<span class="fc" id="L244">        private Polynomial(Map&lt;Monomial, ExactRational&gt; terms) {</span>
-<span class="fc" id="L245">            this.terms = normalizedTerms(terms);</span>
-<span class="fc" id="L246">        }</span>
+        /** All callers transfer a fresh private accumulator after their existing term-limit checks. */
+<span class="fc" id="L445">        private Polynomial(LinkedHashMap&lt;Monomial, ExactRational&gt; terms) {</span>
+<span class="fc" id="L446">            this.terms = terms;</span>
+<span class="fc" id="L447">            removeZeroTerms();</span>
+<span class="fc" id="L448">        }</span>
 
         private static Polynomial constant(ExactRational value) {
-<span class="fc" id="L249">            return monomial(value, Monomial.constant());</span>
+<span class="fc" id="L451">            return monomial(value, Monomial.constant());</span>
         }
 
         private static Polynomial monomial(
             long coefficient,
             Monomial monomial
         ) {
-<span class="fc" id="L256">            return monomial(</span>
-<span class="fc" id="L257">                ExactRational.integer(coefficient),</span>
+<span class="fc" id="L458">            return monomial(</span>
+<span class="fc" id="L459">                ExactRational.integer(coefficient),</span>
                 monomial);
         }
 
@@ -262,194 +464,239 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             ExactRational coefficient,
             Monomial monomial
         ) {
-<span class="fc" id="L265">            Map&lt;Monomial, ExactRational&gt; result =</span>
+<span class="fc" id="L467">            LinkedHashMap&lt;Monomial, ExactRational&gt; result =</span>
                 new LinkedHashMap&lt;&gt;();
-<span class="fc" id="L267">            result.put(monomial, coefficient);</span>
-<span class="fc" id="L268">            return new Polynomial(result);</span>
+<span class="fc" id="L469">            RetainedOperation.work(1);</span>
+<span class="fc" id="L470">            try(var maps=RetainedOperation.retain(monomial,coefficient,result)) {</span>
+<span class="fc" id="L471">                result.put(monomial, coefficient);RetainedOperation.work(1);</span>
+<span class="fc" id="L472">                return RetainedOperation.produced(new Polynomial(result));</span>
+            }
         }
 
         private Polynomial add(Polynomial other) {
-<span class="fc" id="L272">            Map&lt;Monomial, ExactRational&gt; result =</span>
+<span class="fc" id="L477">            LinkedHashMap&lt;Monomial, ExactRational&gt; result =</span>
                 new LinkedHashMap&lt;&gt;(terms);
-            for (Map.Entry&lt;Monomial, ExactRational&gt; entry
-<span class="fc bfc" id="L275" title="All 2 branches covered.">                    : other.terms.entrySet()) {</span>
-<span class="fc" id="L276">                result.merge(</span>
-<span class="fc" id="L277">                    entry.getKey(),</span>
-<span class="fc" id="L278">                    entry.getValue(),</span>
-                    ExactRational::add);
-<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
-<span class="nc" id="L281">                    return null;</span>
-                }
-<span class="fc" id="L283">            }</span>
-<span class="fc" id="L284">            return new Polynomial(result);</span>
+<span class="fc" id="L479">            RetainedOperation.work(terms.size());</span>
+<span class="fc" id="L480">            RetainedOperation.work(1);</span>
+<span class="fc" id="L481">            try(var maps=RetainedOperation.retain(this,other,result)) {</span>
+                for (Map.Entry&lt;Monomial, ExactRational&gt; entry
+<span class="fc bfc" id="L483" title="All 2 branches covered.">                        : other.terms.entrySet()) {</span>
+<span class="fc" id="L484">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L485">                    result.merge(</span>
+<span class="fc" id="L486">                        entry.getKey(),</span>
+<span class="fc" id="L487">                        entry.getValue(),</span>
+                        ExactRational::add);
+<span class="fc" id="L489">                    RetainedOperation.checkpoint();</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">                    if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
+<span class="fc" id="L491">                        return null;</span>
+                    }
+<span class="fc" id="L493">                }</span>
+<span class="fc" id="L494">                return RetainedOperation.produced(new Polynomial(result));</span>
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">            }</span>
         }
 
         private Polynomial multiply(Polynomial other) {
-<span class="fc" id="L288">            Map&lt;Monomial, ExactRational&gt; result =</span>
+<span class="fc" id="L499">            LinkedHashMap&lt;Monomial, ExactRational&gt; result =</span>
                 new LinkedHashMap&lt;&gt;();
-            for (Map.Entry&lt;Monomial, ExactRational&gt; left
-<span class="fc bfc" id="L291" title="All 2 branches covered.">                    : terms.entrySet()) {</span>
-                for (Map.Entry&lt;Monomial, ExactRational&gt; right
-<span class="fc bfc" id="L293" title="All 2 branches covered.">                        : other.terms.entrySet()) {</span>
-<span class="fc" id="L294">                    Monomial monomial = left.getKey().multiply(</span>
-<span class="fc" id="L295">                        right.getKey());</span>
-<span class="fc bfc" id="L296" title="All 2 branches covered.">                    if (monomial == null) {</span>
-<span class="fc" id="L297">                        return null;</span>
-                    }
-<span class="fc" id="L299">                    ExactRational coefficient =</span>
-<span class="fc" id="L300">                        left.getValue().multiply(right.getValue());</span>
-<span class="pc bpc" id="L301" title="1 of 2 branches missed.">                    if (!withinCoefficientBudget(coefficient)) {</span>
-<span class="nc" id="L302">                        return null;</span>
-                    }
-<span class="fc" id="L304">                    result.merge(</span>
-                        monomial,
-                        coefficient,
-                        ExactRational::add);
-<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                    if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
-<span class="nc" id="L309">                        return null;</span>
-                    }
-<span class="fc" id="L311">                }</span>
-<span class="fc" id="L312">            }</span>
-<span class="fc" id="L313">            return new Polynomial(result);</span>
+<span class="fc" id="L501">            RetainedOperation.work(1);</span>
+<span class="fc" id="L502">            try(var maps=RetainedOperation.retain(this,other,result)) {</span>
+                for (Map.Entry&lt;Monomial, ExactRational&gt; left
+<span class="fc bfc" id="L504" title="All 2 branches covered.">                        : terms.entrySet()) {</span>
+                    for (Map.Entry&lt;Monomial, ExactRational&gt; right
+<span class="fc bfc" id="L506" title="All 2 branches covered.">                            : other.terms.entrySet()) {</span>
+<span class="fc" id="L507">                        Monomial monomial = left.getKey().multiply(</span>
+<span class="fc" id="L508">                            right.getKey());</span>
+<span class="fc" id="L509">                        try(var monomialOwned=RetainedOperation.retain(monomial)) {</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">                            if (monomial == null) {</span>
+<span class="fc" id="L511">                                return null;</span>
+                            }
+<span class="fc" id="L513">                            ExactRational coefficient =</span>
+<span class="fc" id="L514">                                left.getValue().multiply(right.getValue());</span>
+<span class="fc" id="L515">                            RetainedOperation.work(1);</span>
+<span class="fc" id="L516">                            try(var coefficientOwned=RetainedOperation.retain(coefficient)) {</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">                                if (!withinCoefficientBudget(coefficient)) {</span>
+<span class="fc" id="L518">                                    return null;</span>
+                                }
+<span class="fc" id="L520">                                result.merge(</span>
+                                    monomial,
+                                    coefficient,
+                                    ExactRational::add);
+<span class="fc" id="L524">                                RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">                                if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
+<span class="nc" id="L526">                                    return null;</span>
+                                }
+<span class="pc bpc" id="L528" title="2 of 4 branches missed.">                            }</span>
+<span class="pc bpc" id="L529" title="3 of 6 branches missed.">                        }</span>
+<span class="fc" id="L530">                    }</span>
+<span class="fc" id="L531">                }</span>
+<span class="fc" id="L532">                return RetainedOperation.produced(new Polynomial(result));</span>
+<span class="pc bpc" id="L533" title="3 of 6 branches missed.">            }</span>
         }
 
         private Polynomial scale(long factor) {
-<span class="fc bfc" id="L317" title="All 2 branches covered.">            return factor == 1</span>
-<span class="fc" id="L318">                ? this</span>
-<span class="fc" id="L319">                : multiply(monomial(</span>
-                    factor,
-<span class="fc" id="L321">                    Monomial.constant()));</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">            if (factor == 1) return this;</span>
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">            if (factor != -1) return multiply(monomial(factor, Monomial.constant()));</span>
+<span class="fc" id="L539">            var result = new LinkedHashMap&lt;Monomial, ExactRational&gt;();</span>
+<span class="fc" id="L540">            RetainedOperation.work(1);</span>
+<span class="fc" id="L541">            try (var maps = RetainedOperation.retain(this, result)) {</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">                for (var entry : terms.entrySet()) {</span>
+<span class="fc" id="L543">                    var coefficient = entry.getValue().negate();</span>
+<span class="fc" id="L544">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L545">                    try (var scalar = RetainedOperation.retain(coefficient)) {</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">                        if (!withinCoefficientBudget(coefficient)) return null;</span>
+<span class="fc" id="L547">                        result.put(entry.getKey(), coefficient);</span>
+<span class="fc" id="L548">                        RetainedOperation.work(1);</span>
+<span class="fc" id="L549">                        RetainedOperation.checkpoint();</span>
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">                        if (result.size() &gt; MAX_EXPANDED_TERMS) return null;</span>
+<span class="pc bpc" id="L551" title="3 of 4 branches missed.">                    }</span>
+<span class="fc" id="L552">                }</span>
+<span class="fc" id="L553">                return RetainedOperation.produced(new Polynomial(result));</span>
+<span class="pc bpc" id="L554" title="3 of 4 branches missed.">            }</span>
         }
 
         private boolean isMonomial() {
-<span class="fc bfc" id="L325" title="All 2 branches covered.">            return terms.size() &lt;= 1;</span>
+<span class="fc bfc" id="L558" title="All 2 branches covered.">            return terms.size() &lt;= 1;</span>
         }
 
         private Polynomial pow(int exponent) {
-<span class="fc" id="L329">            Polynomial result = monomial(</span>
+<span class="fc" id="L562">            Polynomial result = monomial(</span>
                 1,
-<span class="fc" id="L331">                Monomial.constant());</span>
-<span class="fc" id="L332">            Polynomial factor = this;</span>
-<span class="fc" id="L333">            int remaining = exponent;</span>
-<span class="fc bfc" id="L334" title="All 2 branches covered.">            while (remaining &gt; 0) {</span>
-<span class="fc bfc" id="L335" title="All 2 branches covered.">                if ((remaining &amp; 1) == 1) {</span>
-<span class="fc" id="L336">                    result = result.multiply(factor);</span>
-<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                    if (result == null) {</span>
-<span class="nc" id="L338">                        return null;</span>
+<span class="fc" id="L564">                Monomial.constant());</span>
+<span class="fc" id="L565">            Polynomial factor = this;</span>
+<span class="fc" id="L566">            Object[] current={result,factor};</span>
+<span class="fc" id="L567">            try(var state=RetainedOperation.retain(this,current)) {</span>
+<span class="fc" id="L568">                int remaining = exponent;</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">                while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">                    if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L571">                        result = result.multiply(factor);current[0]=result;RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">                        if (result == null) {</span>
+<span class="nc" id="L573">                            return null;</span>
+                        }
+                    }
+<span class="fc" id="L576">                    remaining &gt;&gt;= 1;</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">                    if (remaining &gt; 0) {</span>
+<span class="fc" id="L578">                        factor = factor.multiply(factor);current[1]=factor;RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">                        if (factor == null) {</span>
+<span class="fc" id="L580">                            return null;</span>
+                        }
                     }
                 }
-<span class="fc" id="L341">                remaining &gt;&gt;= 1;</span>
-<span class="fc bfc" id="L342" title="All 2 branches covered.">                if (remaining &gt; 0) {</span>
-<span class="fc" id="L343">                    factor = factor.multiply(factor);</span>
-<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                    if (factor == null) {</span>
-<span class="nc" id="L345">                        return null;</span>
-                    }
-                }
-            }
-<span class="fc" id="L349">            return result;</span>
+<span class="fc" id="L584">                return RetainedOperation.produced(result);</span>
+<span class="pc bpc" id="L585" title="2 of 4 branches missed.">            }</span>
         }
 
         private static boolean withinCoefficientBudget(ExactRational value) {
-<span class="pc bpc" id="L353" title="1 of 2 branches missed.">            return value.numerator().abs().bitLength() &lt;= MAX_COEFFICIENT_BITS</span>
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                &amp;&amp; value.denominator().bitLength() &lt;= MAX_COEFFICIENT_BITS;</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">            return value.numerator().abs().bitLength() &lt;= MAX_COEFFICIENT_BITS</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">                &amp;&amp; value.denominator().bitLength() &lt;= MAX_COEFFICIENT_BITS;</span>
         }
 
         private Expr toExpr() {
-<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (terms.isEmpty()) {</span>
-<span class="fc" id="L359">                return new NumberExpr(0);</span>
+<span class="fc bfc" id="L594" title="All 2 branches covered.">            if (terms.isEmpty()) {</span>
+<span class="fc" id="L595">                return RetainedOperation.produced(new NumberExpr(0));</span>
             }
-<span class="fc" id="L361">            Expr result = null;</span>
-            for (Map.Entry&lt;Monomial, ExactRational&gt; entry
-<span class="fc bfc" id="L363" title="All 2 branches covered.">                    : orderedTerms()) {</span>
-<span class="fc" id="L364">                ExactRational coefficient = entry.getValue();</span>
-<span class="fc" id="L365">                Expr term = withCoefficient(</span>
-<span class="fc" id="L366">                    coefficient.abs(),</span>
-<span class="fc" id="L367">                    entry.getKey().toExpr());</span>
-<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                if (term == null) {</span>
-<span class="nc" id="L369">                    return null;</span>
-                }
-<span class="fc bfc" id="L371" title="All 2 branches covered.">                if (result == null) {</span>
-<span class="fc bfc" id="L372" title="All 2 branches covered.">                    result = coefficient.signum() &lt; 0</span>
-<span class="fc" id="L373">                        ? new BinaryExpr(</span>
-                            new NumberExpr(0),
-                            BinaryOperator.SUB,
-                            term)
-<span class="fc" id="L377">                        : term;</span>
-<span class="fc bfc" id="L378" title="All 2 branches covered.">                } else if (coefficient.signum() &lt; 0) {</span>
-<span class="fc" id="L379">                    result = new BinaryExpr(</span>
-                        result,
-                        BinaryOperator.SUB,
-                        term);
-                } else {
-<span class="fc" id="L384">                    result = new BinaryExpr(</span>
-                        result,
-                        BinaryOperator.ADD,
-                        term);
-                }
-<span class="fc" id="L389">            }</span>
-<span class="fc" id="L390">            return result;</span>
+<span class="fc" id="L597">            List&lt;Monomial&gt; ordered = orderedTerms();</span>
+<span class="fc" id="L598">            Object[] current = {null};</span>
+<span class="fc" id="L599">            RetainedOperation.work(1);</span>
+<span class="fc" id="L600">            try (var owned = RetainedOperation.retain(this, ordered, current)) {</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">                for (Monomial monomial : ordered) {</span>
+<span class="fc" id="L602">                    ExactRational coefficient = terms.get(monomial);</span>
+<span class="fc" id="L603">                    ExactRational magnitude = coefficient.abs();</span>
+<span class="fc" id="L604">                    RetainedOperation.work(2);</span>
+<span class="fc" id="L605">                    try (var scalar = RetainedOperation.retain(magnitude)) {</span>
+<span class="fc" id="L606">                        Expr base = monomial.toExpr();</span>
+<span class="fc" id="L607">                        try (var renderedBase = RetainedOperation.retain(base)) {</span>
+<span class="fc" id="L608">                            Expr term = withCoefficient(magnitude, base);</span>
+<span class="fc" id="L609">                            try (var renderedTerm = RetainedOperation.retain(term)) {</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">                                if (term == null) return null;</span>
+<span class="fc" id="L611">                                Expr result = (Expr) current[0];</span>
+<span class="fc bfc" id="L612" title="All 2 branches covered.">                                if (result == null) {</span>
+<span class="fc bfc" id="L613" title="All 2 branches covered.">                                    if (coefficient.signum() &lt; 0) {</span>
+<span class="fc" id="L614">                                        var zero = new NumberExpr(0);</span>
+<span class="fc" id="L615">                                        RetainedOperation.work(1);</span>
+<span class="fc" id="L616">                                        try (var leaf = RetainedOperation.retain(zero)) {</span>
+<span class="fc" id="L617">                                            result = RetainedOperation.produced(new BinaryExpr(zero, BinaryOperator.SUB, term));</span>
+                                        }
+<span class="fc" id="L619">                                    } else result = term;</span>
+                                } else {
+<span class="fc" id="L621">                                    result = RetainedOperation.produced(new BinaryExpr(result,</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">                                        coefficient.signum() &lt; 0 ? BinaryOperator.SUB : BinaryOperator.ADD, term));</span>
+                                }
+<span class="fc" id="L624">                                current[0] = result;</span>
+<span class="fc" id="L625">                                RetainedOperation.work(1);</span>
+<span class="fc" id="L626">                                RetainedOperation.checkpoint();</span>
+<span class="nc bnc" id="L627" title="All 2 branches missed.">                            }</span>
+<span class="nc bnc" id="L628" title="All 2 branches missed.">                        }</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">                    }</span>
+<span class="fc" id="L630">                }</span>
+<span class="fc" id="L631">                return RetainedOperation.produced((Expr) current[0]);</span>
+<span class="nc bnc" id="L632" title="All 2 branches missed.">            }</span>
         }
 
-        private List&lt;Map.Entry&lt;Monomial, ExactRational&gt;&gt;
-                orderedTerms() {
-<span class="fc" id="L395">            return terms.entrySet().stream()</span>
-<span class="fc" id="L396">                .sorted(TERM_ORDER)</span>
-<span class="fc" id="L397">                .toList();</span>
+        private List&lt;Monomial&gt; orderedTerms() {
+            // Same stable term order, with owned keys instead of opaque backing Map.Entry views.
+<span class="fc" id="L637">            var ordered = new ArrayList&lt;&gt;(terms.keySet());</span>
+<span class="fc" id="L638">            RetainedOperation.work(terms.size() + 1L);</span>
+<span class="fc" id="L639">            try (var owned = RetainedOperation.retain(this, ordered)) {</span>
+<span class="fc" id="L640">                ordered.sort((left, right) -&gt; {</span>
+<span class="fc" id="L641">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L642">                    return TERM_ORDER.compare(left, right);</span>
+                });
+<span class="fc" id="L644">                return RetainedOperation.produced(ordered);</span>
+            }
         }
 
-        private static Map&lt;Monomial, ExactRational&gt; normalizedTerms(
-            Map&lt;Monomial, ExactRational&gt; source
-        ) {
-<span class="fc" id="L403">            Map&lt;Monomial, ExactRational&gt; normalized =</span>
-                new LinkedHashMap&lt;&gt;();
-            for (Map.Entry&lt;Monomial, ExactRational&gt; entry
-<span class="fc bfc" id="L406" title="All 2 branches covered.">                    : source.entrySet()) {</span>
-<span class="fc bfc" id="L407" title="All 2 branches covered.">                if (!entry.getValue().isZero()) {</span>
-<span class="fc" id="L408">                    normalized.put(</span>
-<span class="fc" id="L409">                        entry.getKey(),</span>
-<span class="fc" id="L410">                        entry.getValue());</span>
+        private void removeZeroTerms() {
+<span class="fc" id="L649">            var entries = terms.entrySet().iterator();</span>
+<span class="fc" id="L650">            boolean observedBeforeRemoval = false;</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">            while (entries.hasNext()) {</span>
+<span class="fc" id="L652">                var entry = entries.next();</span>
+<span class="fc" id="L653">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L654" title="All 2 branches covered.">                if (entry.getValue().isZero()) {</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">                    if (!observedBeforeRemoval) {</span>
+                        // The filled accumulator and new owner are visible before any entries disappear.
+<span class="fc" id="L657">                        RetainedOperation.produced(this);</span>
+<span class="fc" id="L658">                        observedBeforeRemoval = true;</span>
+                    }
+<span class="fc" id="L660">                    entries.remove();</span>
+<span class="fc" id="L661">                    RetainedOperation.work(1);</span>
                 }
-<span class="fc" id="L412">            }</span>
-<span class="fc" id="L413">            return normalized;</span>
-        }
+<span class="fc" id="L663">            }</span>
+<span class="fc" id="L664">        }</span>
+
     }
 
     static Expr exactRationalExpression(ExactRational value) {
-<span class="fc" id="L418">        return new NumberExpr(value);</span>
+<span class="fc" id="L669">        return RetainedOperation.produced(new NumberExpr(value));</span>
     }
 
-    private static Expr withCoefficient(
-        ExactRational coefficient,
-        Expr term
-    ) {
-<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (term instanceof NumberExpr number</span>
-<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                &amp;&amp; number.value().equalsInteger(1)) {</span>
-<span class="fc" id="L427">            return exactRationalExpression(coefficient);</span>
-        }
-<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (coefficient.isOne()) {</span>
-<span class="fc" id="L430">            return term;</span>
-        }
-<span class="fc" id="L432">        Expr exactCoefficient = exactRationalExpression(coefficient);</span>
-<span class="pc bpc" id="L433" title="1 of 2 branches missed.">        return exactCoefficient == null</span>
-<span class="nc" id="L434">            ? null</span>
-<span class="fc" id="L435">            : new BinaryExpr(</span>
-                exactCoefficient,
-                BinaryOperator.MUL,
-                term);
+    private static Expr withCoefficient(ExactRational coefficient, Expr term) {
+<span class="fc" id="L673">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L674" title="All 2 branches covered.">        if (coefficient.isOne()) return term;</span>
+<span class="fc" id="L675">        try (var operands = RetainedOperation.retain(coefficient, term)) {</span>
+<span class="pc bpc" id="L676" title="1 of 4 branches missed.">            if (term instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(1)) {</span>
+<span class="fc" id="L677">                return exactRationalExpression(coefficient);</span>
+            }
+<span class="fc" id="L679">            Expr exactCoefficient = exactRationalExpression(coefficient);</span>
+<span class="fc" id="L680">            try (var leaf = RetainedOperation.retain(exactCoefficient)) {</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">                return exactCoefficient == null ? null</span>
+<span class="fc" id="L682">                    : RetainedOperation.produced(new BinaryExpr(exactCoefficient, BinaryOperator.MUL, term));</span>
+            }
+<span class="fc bfc" id="L684" title="All 2 branches covered.">        }</span>
     }
 
-    private static Expr leftAssociate(
-        List&lt;Expr&gt; expressions,
-        BinaryOperator operator
-    ) {
-<span class="fc" id="L445">        Expr result = expressions.getFirst();</span>
-<span class="fc bfc" id="L446" title="All 2 branches covered.">        for (int index = 1; index &lt; expressions.size(); index++) {</span>
-<span class="fc" id="L447">            result = new BinaryExpr(</span>
-                result,
-                operator,
-<span class="fc" id="L450">                expressions.get(index));</span>
+    private static Expr leftAssociate(List&lt;? extends Expr&gt; expressions, BinaryOperator operator) {
+<span class="fc" id="L688">        RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">        if (expressions.size() == 1) return expressions.getFirst();</span>
+<span class="fc" id="L690">        Object[] current = {expressions.getFirst()};</span>
+<span class="fc" id="L691">        RetainedOperation.work(1);</span>
+<span class="fc" id="L692">        try (var owned = RetainedOperation.retain(expressions, current)) {</span>
+<span class="fc bfc" id="L693" title="All 2 branches covered.">            for (int index = 1; index &lt; expressions.size(); index++) {</span>
+<span class="fc" id="L694">                current[0] = new BinaryExpr((Expr) current[0], operator, expressions.get(index));</span>
+<span class="fc" id="L695">                RetainedOperation.work(2);</span>
+<span class="fc" id="L696">                RetainedOperation.checkpoint();</span>
+            }
+<span class="fc" id="L698">            return RetainedOperation.produced((Expr) current[0]);</span>
         }
-<span class="fc" id="L452">        return result;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -119,7 +119,18 @@ are diagnostic. Explicit exports can retain diagnostic artefacts with
 with its attempted receipt. Production-phase native registration remains refused.
 See [the native qualification boundary](native-expr-qualification.md).
 
-Before this increment can merge, its exact final head must pass the full affected
+[PR #1055](https://github.com/carstenartur/Regelsuche/pull/1055) continues that
+foundation with temporary ownership observation, paid failed attempts, explicit
+fresh-process learned-proof replay and preserved export chronology. Its review
+corrections publish completed list, snapshot and buffer allocations before their
+debit can fail, and preserve the primary failure when frame cleanup repeats it.
+Normal charges, mathematical validation and all partial-qualification flags stay
+unchanged. The ten reproduced review regressions pass with these corrections;
+the affected Java 25 suites pass 1,058 core, 577 search and 1,058 learning tests,
+with no failures, errors or skipped tests. This is local verification, not a
+replacement for the final hosted checks or a completed P04 acceptance.
+
+Before this continuation can merge, its exact final head must pass the full affected
 module suites, unchanged public P03 legacy corpus comparison, independent review
 and all hosted authorities. Earlier green slice CI is intermediate evidence only.
 Remaining P04 work is a follow-up: complete the atomic ownership/work inventory

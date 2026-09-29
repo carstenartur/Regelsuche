@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImmutableRetentionInventory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.retention</a> &gt; <span class="el_source">ImmutableRetentionInventory.java</span></div><h1>ImmutableRetentionInventory.java</h1><pre class="source lang-java linenums">package de.regelsuche.retention;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Private bounded accounting metadata. IDs are never reused before this inventory is closed. */
+final class ImmutableRetentionInventory implements RetainedGraph.View {
+    private final int vertexLimit,wordLimit,childLimit;
+<span class="fc" id="L12">    private final IdentityHashMap&lt;Object,Vertex&gt; index=new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L13">    private final ArrayList&lt;Vertex&gt; rows=new ArrayList&lt;&gt;();</span>
+    private int childSlots,words,liveRows,childArrays,maskArrays;
+<span class="fc" id="L15">    private int firstLive=-1,lastLive=-1;</span>
+<span class="fc" id="L16">    private long metadataSlots=5,metadataObjects=3;</span>
+<span class="fc" id="L17">    ImmutableRetentionInventory(int vertexLimit,int wordLimit,int childLimit){</span>
+<span class="pc bpc" id="L18" title="3 of 6 branches missed.">        if(vertexLimit&lt;1 || wordLimit&lt;1 || childLimit&lt;1)throw new IllegalArgumentException(&quot;nonpositive immutable inventory limit&quot;);</span>
+<span class="fc" id="L19">        this.vertexLimit=vertexLimit;this.wordLimit=wordLimit;this.childLimit=childLimit;</span>
+<span class="fc" id="L20">    }</span>
+<span class="fc" id="L21">    @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(index);visitor.reference(rows);}</span>
+    int cachedVertices(){
+<span class="fc" id="L23">        int count=0;</span>
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        for(int id=firstLive;id&gt;=0;){var row=rows.get(id);id=row.nextLive;if(row.active)count++;}</span>
+<span class="fc" id="L25">        return count;</span>
+    }
+    RetainedGraph.Observation measure(Object root,RetainedGraph.Inventory owner,RetainedGraph.Usage limits){
+<span class="fc" id="L28">        return new InventoryScan(this,owner,limits).measure(root);</span>
+    }
+    private static final class Vertex implements RetainedGraph.View {
+        final int id;Object key;int[] children;long[] mask;int firstWord;
+<span class="fc" id="L32">        int previousLive=-1,nextLive=-1;</span>
+        long nodes,characters,references,aggregateNodes,aggregateCharacters,aggregateReferences;
+        boolean ready,active,building;
+<span class="fc" id="L35">        Vertex(int id,Object key){this.id=id;this.key=key;}</span>
+<span class="fc" id="L36">        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(key);visitor.reference(children);visitor.reference(mask);}</span>
+    }
+    private Vertex reserve(Object value,InventoryScan scan){
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        scan.pay(1);var previous=index.get(value);if(previous!=null)return previous;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if(rows.size()&gt;=vertexLimit)return null;</span>
+<span class="fc" id="L41">        var vertex=new Vertex(rows.size(),value);index.put(value,vertex);rows.add(vertex);liveRows++;</span>
+<span class="fc" id="L42">        vertex.previousLive=lastLive;scan.pay(1);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if(lastLive&lt;0){firstLive=vertex.id;scan.pay(1);}</span>
+<span class="fc" id="L44">        else {rows.get(lastLive).nextLive=vertex.id;scan.pay(2);}</span>
+<span class="fc" id="L45">        lastLive=vertex.id;scan.pay(1);</span>
+<span class="fc" id="L46">        scan.pay(3+metadataDelta(6,1));scan.accountingPeak();return vertex;</span>
+    }
+    private boolean known(Object value){
+<span class="pc bpc" id="L49" title="2 of 8 branches missed.">        return value instanceof Expr || value instanceof ExactRational || value instanceof String</span>
+<span class="pc bpc" id="L50" title="1 of 6 branches missed.">            || value!=null &amp;&amp; value.getClass()==BigInteger.class || value instanceof SymbolId || value instanceof UUID;</span>
+    }
+    private boolean ownsMetadata(Object value,InventoryScan scan){
+<span class="fc" id="L53">        scan.pay(1);</span>
+<span class="fc bfc" id="L54" title="All 6 branches covered.">        if(value==this || value==index || value==rows)return true;</span>
+<span class="pc bpc" id="L55" title="1 of 6 branches missed.">        if(value instanceof Vertex vertex){scan.pay(1);return vertex.id&lt;rows.size() &amp;&amp; rows.get(vertex.id)==vertex;}</span>
+<span class="fc bfc" id="L56" title="All 4 branches covered.">        if(value instanceof int[] || value instanceof long[]){</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            for(int id=firstLive;id&gt;=0;){</span>
+<span class="fc" id="L58">                var row=rows.get(id);id=row.nextLive;scan.pay(2);</span>
+<span class="fc bfc" id="L59" title="All 4 branches covered.">                if(value==row.children || value==row.mask)return true;</span>
+<span class="fc" id="L60">            }</span>
+        }
+<span class="fc" id="L62">        return false;</span>
+    }
+    private boolean eligible(Object value,InventoryScan scan){
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if(known(value))return true;</span>
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">        scan.pay(1);var vertex=index.get(value);return vertex!=null &amp;&amp; vertex.key instanceof List&lt;?&gt;;</span>
+    }
+    private void stage(Object value,ArrayList&lt;Object&gt; children,long nodes,long characters,long references,InventoryScan scan){
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        var vertex=reserve(value,scan);if(vertex==null || vertex.ready)return;</span>
+<span class="fc" id="L70">        scan.markPrimary(vertex.id);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if(children.size()&gt;childLimit-childSlots)return;</span>
+<span class="fc" id="L72">        int[] ids=new int[children.size()];scan.temporarySlots=children.size()+2L;scan.pay(ids.length+1L);</span>
+<span class="fc" id="L73">        vertex.children=ids;childSlots+=ids.length;childArrays++;scan.pay(metadataDelta(ids.length,1));scan.accountingPeak();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for(int i=0;i&lt;children.size();i++){</span>
+<span class="fc" id="L75">            Object child=children.get(i);scan.pay(1);</span>
+<span class="fc bfc" id="L76" title="All 4 branches covered.">            boolean arguments=value instanceof FunctionExpr function &amp;&amp; child==function.arguments();</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">            var next=known(child) || arguments ? reserve(child,scan) : null;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            ids[i]=next==null?-1:next.id;</span>
+        }
+<span class="fc" id="L80">        vertex.nodes=nodes;vertex.characters=characters;vertex.references=references;vertex.ready=true;</span>
+<span class="fc" id="L81">        scan.pay(4);scan.temporarySlots=0;scan.accountingPeak();</span>
+<span class="fc" id="L82">    }</span>
+    private boolean closure(Vertex vertex,InventoryScan scan){
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if(vertex==null || !vertex.ready)return false;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if(vertex.mask!=null)return true;</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if(vertex.building)return false;</span>
+<span class="fc" id="L87">        vertex.building=true;scan.closureSlots+=3;scan.pay(4);scan.accountingPeak();</span>
+        try {
+<span class="fc" id="L89">            int first=vertex.id&gt;&gt;&gt;6,last=first;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for(int child:vertex.children){</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">                scan.pay(1);if(child&lt;0 || !closure(rows.get(child),scan))return false;</span>
+<span class="fc" id="L92">                var nested=rows.get(child);first=Math.min(first,nested.firstWord);last=Math.max(last,nested.firstWord+nested.mask.length-1);</span>
+            }
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            int length=last-first+1;if(length&gt;wordLimit-words)return false;</span>
+<span class="fc" id="L95">            vertex.mask=new long[length];vertex.firstWord=first;words+=length;maskArrays++;</span>
+<span class="fc" id="L96">            scan.pay(length+2L+metadataDelta(length,1));scan.accountingPeak();</span>
+<span class="fc" id="L97">            vertex.mask[(vertex.id&gt;&gt;&gt;6)-first]|=1L&lt;&lt;(vertex.id&amp;63);scan.pay(1);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            for(int child:vertex.children){</span>
+<span class="fc" id="L99">                var nested=rows.get(child);scan.pay(1);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                for(int i=0;i&lt;nested.mask.length;i++){vertex.mask[nested.firstWord-first+i]|=nested.mask[i];scan.pay(1);}</span>
+            }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            for(int i=0;i&lt;vertex.mask.length;i++){</span>
+<span class="fc" id="L103">                long bits=vertex.mask[i];scan.pay(1);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                while(bits!=0){int bit=Long.numberOfTrailingZeros(bits);var member=rows.get(((first+i)&lt;&lt;6)+bit);</span>
+<span class="fc" id="L105">                    vertex.aggregateNodes=Math.addExact(vertex.aggregateNodes,member.nodes);</span>
+<span class="fc" id="L106">                    vertex.aggregateCharacters=Math.addExact(vertex.aggregateCharacters,member.characters);</span>
+<span class="fc" id="L107">                    vertex.aggregateReferences=Math.addExact(vertex.aggregateReferences,member.references);</span>
+<span class="fc" id="L108">                    bits&amp;=bits-1;scan.pay(4);</span>
+<span class="fc" id="L109">                }</span>
+            }
+<span class="fc" id="L111">            return true;</span>
+<span class="fc" id="L112">        } finally {vertex.building=false;scan.closureSlots-=3;scan.pay(4);}</span>
+    }
+    private void prepare(InventoryScan scan){
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for(int id=firstLive;id&gt;=0;){</span>
+<span class="fc" id="L116">            var row=rows.get(id);id=row.nextLive;scan.pay(2);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if(!row.active)closure(row,scan);</span>
+<span class="fc" id="L118">        }</span>
+<span class="fc" id="L119">    }</span>
+    private long unlink(Vertex row){
+<span class="fc" id="L121">        int previous=row.previousLive,next=row.nextLive;long work=2;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if(previous&lt;0){firstLive=next;work++;}</span>
+<span class="fc" id="L123">        else {rows.get(previous).nextLive=next;work+=2;}</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if(next&lt;0){lastLive=previous;work++;}</span>
+<span class="fc" id="L125">        else {rows.get(next).previousLive=previous;work+=2;}</span>
+<span class="fc" id="L126">        row.previousLive=-1;row.nextLive=-1;return work+2;</span>
+    }
+    private long remove(int id){
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        var row=rows.get(id);if(row==null)return 0;</span>
+<span class="fc" id="L130">        index.remove(row.key);liveRows--;long work=2,removedSlots=5,removedObjects=1;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if(row.children!=null){childSlots-=row.children.length;childArrays--;removedSlots+=row.children.length;removedObjects++;work+=3;}</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if(row.mask!=null){words-=row.mask.length;maskArrays--;removedSlots+=row.mask.length;removedObjects++;work+=3;}</span>
+<span class="fc" id="L133">        work=Math.addExact(work,unlink(row));</span>
+<span class="fc" id="L134">        row.key=null;row.children=null;row.mask=null;rows.set(id,null);</span>
+<span class="fc" id="L135">        return Math.addExact(work,4+metadataDelta(-removedSlots,-removedObjects));</span>
+    }
+    private long prune(long[] primary,boolean success){
+<span class="fc" id="L138">        long work=0;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for(int id=firstLive;id&gt;=0;){</span>
+<span class="fc" id="L140">            var row=rows.get(id);int next=row.nextLive;work=Math.addExact(work,2);</span>
+<span class="fc bfc" id="L141" title="All 6 branches covered.">            if(!success || !marked(primary,id) || row.mask==null)work=Math.addExact(work,remove(id));</span>
+<span class="fc" id="L142">            id=next;</span>
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">        return work;</span>
+    }
+    private long activate(){
+<span class="fc" id="L147">        long work=0;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for(int id=firstLive;id&gt;=0;){</span>
+<span class="fc" id="L149">            var row=rows.get(id);id=row.nextLive;work=Math.addExact(work,2);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if(!row.active){row.active=true;work=Math.addExact(work,1);}</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">        return work;</span>
+    }
+    long close(){
+<span class="fc" id="L155">        long work=prune(null,false);work=Math.addExact(work,rows.size()+2L+metadataDelta(-rows.size(),0));</span>
+<span class="fc" id="L156">        rows.clear();index.clear();return work;</span>
+    }
+    private long metadataDelta(long slots,long objects){
+<span class="fc" id="L159">        metadataSlots=Math.addExact(metadataSlots,slots);metadataObjects=Math.addExact(metadataObjects,objects);return 6; // two reads, checked additions and writes</span>
+    }
+<span class="fc" id="L161">    private long metadataReferences(){return metadataSlots;}</span>
+    /** Paid independent counter/formula check at phase boundaries, never on the per-reference hot path. */
+    private void checkMetadataTotals(InventoryScan scan){
+<span class="fc" id="L164">        long live=liveRows,allocated=rows.size(),edges=childSlots,maskWords=words,children=childArrays,masks=maskArrays;</span>
+<span class="fc" id="L165">        long slots=Math.addExact(5,Math.addExact(5L*live,Math.addExact(allocated,Math.addExact(edges,maskWords))));</span>
+<span class="fc" id="L166">        long objects=Math.addExact(3,Math.addExact(live,Math.addExact(children,masks)));</span>
+<span class="fc" id="L167">        scan.pay(18); // six counter reads, size consistency read, eight arithmetic operations, three comparisons</span>
+<span class="pc bpc" id="L168" title="3 of 6 branches missed.">        if(slots!=metadataSlots || objects!=metadataObjects || index.size()!=live)</span>
+<span class="nc" id="L169">            throw new IllegalStateException(&quot;immutable inventory metadata counters disagree&quot;);</span>
+<span class="fc" id="L170">        scan.pay(6);</span>
+<span class="pc bpc" id="L171" title="2 of 12 branches missed.">        if((firstLive&lt;0)!=(liveRows==0) || (lastLive&lt;0)!=(liveRows==0))</span>
+<span class="nc" id="L172">            throw new IllegalStateException(&quot;immutable inventory live chain disagrees&quot;);</span>
+<span class="fc" id="L173">    }</span>
+    private boolean cacheKeys(InventoryScan scan){
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for(int id=firstLive;id&gt;=0;){</span>
+<span class="fc" id="L176">            var row=rows.get(id);id=row.nextLive;scan.pay(2);</span>
+<span class="fc" id="L177">            Object key=row.key;scan.pay(3); // key read and both incoming key edges, already included in M</span>
+<span class="fc" id="L178">            scan.temporarySlots=2;scan.accountingPeak();</span>
+            try {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                if(row.active){scan.hit(key);}</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                else {scan.pay(1);if(!scan.seen.containsKey(key))return false;}</span>
+<span class="fc" id="L182">            }finally{scan.temporarySlots=0;scan.pay(2);}</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        return true;</span>
+    }
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">    private static boolean marked(long[] mask,int id){return (id&gt;&gt;&gt;6)&lt;mask.length &amp;&amp; (mask[id&gt;&gt;&gt;6]&amp;(1L&lt;&lt;(id&amp;63)))!=0;}</span>
+
+    private static final class InventoryScan extends RetainedGraph.Scan implements RetainedGraph.View {
+        final ImmutableRetentionInventory inventory;final RetainedGraph.Inventory owner;final RetainedGraph.Usage limits;
+        long[] primary,cacheOnly;boolean cachePhase,ownerReached,settled,finished,metadataAlias;
+        ArrayList&lt;Object&gt; capture;long temporarySlots,closureSlots,combinedAuxiliaryPeak,scratchPeak;
+        long extraNodes,extraCharacters,extraReferences,extraObjects,hitObjects;
+        Object rejected;boolean failed;
+<span class="fc" id="L194">        InventoryScan(ImmutableRetentionInventory inventory,RetainedGraph.Inventory owner,RetainedGraph.Usage limits){</span>
+<span class="fc" id="L195">            this.inventory=inventory;this.owner=owner;this.limits=Objects.requireNonNull(limits);</span>
+<span class="fc" id="L196">            int length=Math.toIntExact((inventory.vertexLimit+63L)&gt;&gt;&gt;6);primary=new long[length];cacheOnly=new long[length];pay(2L*length+2);accountingPeak();</span>
+<span class="fc" id="L197">        }</span>
+<span class="fc" id="L198">        void pay(long units){work=Math.addExact(work,units);}</span>
+<span class="fc" id="L199">        void markPrimary(int id){primary[id&gt;&gt;&gt;6]|=1L&lt;&lt;(id&amp;63);pay(1);}</span>
+        @Override void accountingPeak(){
+<span class="fc" id="L201">            super.accountingPeak();</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">            if(inventory!=null &amp;&amp; primary!=null){</span>
+<span class="fc" id="L203">                scratchPeak=Math.max(scratchPeak,accountingReferences+7L+primary.length+cacheOnly.length+temporarySlots+closureSlots);</span>
+<span class="fc" id="L204">                combinedAuxiliaryPeak=Math.max(combinedAuxiliaryPeak,</span>
+<span class="fc" id="L205">                Math.addExact(inventory.metadataReferences(),Math.addExact(accountingReferences,7L+primary.length+cacheOnly.length+temporarySlots+closureSlots)));</span>
+            }
+<span class="fc" id="L207">        }</span>
+        @Override public void reference(Object value){
+<span class="fc bfc" id="L209" title="All 6 branches covered.">            if(capture!=null &amp;&amp; value!=null &amp;&amp; !(value instanceof Enum&lt;?&gt;)){</span>
+<span class="fc" id="L210">                capture.add(value);temporarySlots=capture.size()+1L;pay(1);</span>
+            }
+<span class="fc" id="L212">            super.reference(value);</span>
+<span class="fc" id="L213">        }</span>
+        private boolean hit(Object value){
+<span class="fc bfc" id="L215" title="All 4 branches covered.">            pay(1);var vertex=inventory.index.get(value);if(vertex==null || !vertex.active)return false;</span>
+<span class="fc bfc" id="L216" title="All 6 branches covered.">            if(marked(primary,vertex.id) || cachePhase &amp;&amp; marked(cacheOnly,vertex.id)){pay(1);return true;}</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            long[] target=cachePhase?cacheOnly:primary;</span>
+<span class="fc" id="L218">            boolean disjoint=true;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            for(int i=0;i&lt;vertex.mask.length;i++){</span>
+<span class="fc" id="L220">                int word=vertex.firstWord+i;pay(1);</span>
+<span class="fc bfc" id="L221" title="All 4 branches covered.">                if((vertex.mask[i]&amp;(primary[word]|(cachePhase?cacheOnly[word]:0L)))!=0){disjoint=false;break;}</span>
+            }
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if(disjoint){</span>
+<span class="fc" id="L224">                long members=0;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                for(int i=0;i&lt;vertex.mask.length;i++){</span>
+<span class="fc" id="L226">                    target[vertex.firstWord+i]|=vertex.mask[i];members+=Long.bitCount(vertex.mask[i]);pay(2);</span>
+                }
+<span class="fc" id="L228">                nodes=Math.addExact(nodes,vertex.aggregateNodes);characters=Math.addExact(characters,vertex.aggregateCharacters);references=Math.addExact(references,vertex.aggregateReferences);</span>
+<span class="fc" id="L229">                hitObjects=Math.addExact(hitObjects,members);pay(4);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                if(cachePhase){extraNodes=Math.addExact(extraNodes,vertex.aggregateNodes);extraCharacters=Math.addExact(extraCharacters,vertex.aggregateCharacters);extraReferences=Math.addExact(extraReferences,vertex.aggregateReferences);extraObjects=Math.addExact(extraObjects,members);pay(4);}</span>
+<span class="fc" id="L231">                accountingPeak();return true;</span>
+            }
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            for(int i=0;i&lt;vertex.mask.length;i++){</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                int word=vertex.firstWord+i;long known=primary[word]|(cachePhase?cacheOnly[word]:0L);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                long fresh=vertex.mask[i]&amp;~known;target[word]|=cachePhase?vertex.mask[i]&amp;~primary[word]:vertex.mask[i];pay(2);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                while(fresh!=0){int bit=Long.numberOfTrailingZeros(fresh);var member=inventory.rows.get((word&lt;&lt;6)+bit);</span>
+<span class="fc" id="L237">                    nodes=Math.addExact(nodes,member.nodes);characters=Math.addExact(characters,member.characters);references=Math.addExact(references,member.references);hitObjects++;</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                    if(cachePhase){extraNodes=Math.addExact(extraNodes,member.nodes);extraCharacters=Math.addExact(extraCharacters,member.characters);extraReferences=Math.addExact(extraReferences,member.references);extraObjects++;}</span>
+<span class="fc" id="L239">                    fresh&amp;=fresh-1;pay(4);</span>
+<span class="fc" id="L240">                }</span>
+            }
+<span class="fc" id="L242">            accountingPeak();return true;</span>
+        }
+        private void drain(){
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            while(!pending.isEmpty()){</span>
+<span class="fc" id="L246">                Object value=pending.removeFirst();pay(1);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                if(value==owner){</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                    ownerReached|=!cachePhase;</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                    if(seen.put(value,Boolean.TRUE)==null)pay(1);</span>
+<span class="fc" id="L250">                    accountingPeak();continue;</span>
+                }
+<span class="pc bpc" id="L252" title="1 of 4 branches missed.">                if(!cachePhase &amp;&amp; inventory.ownsMetadata(value,this))metadataAlias=true;</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">                if(hit(value))continue;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                if(seen.put(value,Boolean.TRUE)!=null)continue;</span>
+<span class="fc" id="L255">                pay(1);accountingPeak();</span>
+<span class="fc" id="L256">                long beforeNodes=nodes,beforeCharacters=characters,beforeReferences=references;</span>
+<span class="pc bpc" id="L257" title="1 of 6 branches missed.">                boolean staged=!cachePhase &amp;&amp; !metadataAlias &amp;&amp; inventory.eligible(value,this);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                if(staged){capture=new ArrayList&lt;&gt;();pay(1);temporarySlots=1;accountingPeak();}</span>
+                try {
+<span class="fc" id="L260">                    inspect(value);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                    if(staged)inventory.stage(value,capture,nodes-beforeNodes,characters-beforeCharacters,references-beforeReferences,this);</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">                }catch(RetainedGraph.Unmeasured unknown){if(rejected==null)rejected=value;failed=true;}</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                finally {if(capture!=null){pay(capture.size()+1L);capture.clear();capture=null;temporarySlots=0;}}</span>
+<span class="fc" id="L264">            }</span>
+<span class="fc" id="L265">        }</span>
+        RetainedGraph.Observation measure(Object root){
+            try {
+<span class="fc" id="L268">                reference(root);drain();</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                if(metadataAlias)return freshAliasFallback(root);</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                if(!ownerReached)failed=true;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                if(!failed)inventory.prepare(this);</span>
+<span class="fc" id="L272">                inventory.checkMetadataTotals(this);</span>
+<span class="fc" id="L273">                cachePhase=true;</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                if(!inventory.cacheKeys(this))return freshAliasFallback(root);</span>
+<span class="fc" id="L275">                long unionNodes=nodes,unionCharacters=characters,unionReferences=references;</span>
+<span class="fc" id="L276">                var peak=new RetainedGraph.Usage(unionNodes,Math.addExact(unionCharacters,temporaryCharacters),</span>
+<span class="fc" id="L277">                    Math.addExact(unionReferences,combinedAuxiliaryPeak));</span>
+<span class="pc bpc" id="L278" title="1 of 6 branches missed.">                boolean within=peak.nodes()&lt;=limits.nodes() &amp;&amp; peak.characters()&lt;=limits.characters() &amp;&amp; peak.references()&lt;=limits.references();</span>
+<span class="fc bfc" id="L279" title="All 4 branches covered.">                pay(inventory.prune(primary,!failed &amp;&amp; within));</span>
+<span class="fc" id="L280">                inventory.checkMetadataTotals(this);</span>
+<span class="fc" id="L281">                var retained=new RetainedGraph.Usage(unionNodes-extraNodes,unionCharacters-extraCharacters,</span>
+<span class="fc" id="L282">                    Math.addExact(unionReferences-extraReferences,inventory.metadataSlots));</span>
+<span class="fc" id="L283">                long objects=seen.size()+hitObjects-extraObjects+inventory.metadataObjects;</span>
+<span class="fc bfc" id="L284" title="All 4 branches covered.">                if(!failed &amp;&amp; within)pay(inventory.activate());</span>
+<span class="fc" id="L285">                settle();</span>
+<span class="fc" id="L286">                var result=new RetainedGraph.Observation(retained,peak,work,objects);</span>
+<span class="fc" id="L287">                finished=true;</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                if(rejected!=null)throw new RetainedGraph.Unmeasured(rejected,result);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                if(!ownerReached)throw new RetainedGraph.InventoryFailure(&quot;ownership root must reference its immutable inventory&quot;,result);</span>
+<span class="fc" id="L290">                return result;</span>
+            }finally{
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                if(!finished)pay(inventory.prune(null,false));</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">                if(!settled)settle();</span>
+            }
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){
+<span class="fc" id="L297">            visitor.reference(seen);visitor.reference(pending);visitor.reference(null); // base current-object slot</span>
+<span class="fc" id="L298">            visitor.reference(inventory);visitor.reference(owner);visitor.reference(limits);</span>
+<span class="fc" id="L299">            visitor.reference(primary);visitor.reference(cacheOnly);visitor.reference(capture);visitor.reference(rejected);</span>
+<span class="fc" id="L300">        }</span>
+<span class="fc" id="L301">        private record AliasUnion(Object root,RetainedGraph.Inventory owner,InventoryScan scanner) implements RetainedGraph.View {</span>
+<span class="fc" id="L302">            @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(root);visitor.reference(owner);visitor.reference(scanner);}</span>
+        }
+        private RetainedGraph.Observation fresh(Object root){
+<span class="fc" id="L305">            try{return RetainedGraph.measure(root);}</span>
+<span class="fc" id="L306">            catch(RetainedGraph.Unmeasured unknown){failed=true;return unknown.attempted();}</span>
+        }
+        /** Rare public metadata aliases use the unchanged reference scanner, including its real extra cost. */
+        private RetainedGraph.Observation freshAliasFallback(Object root){
+            // Fresh reference scans can stop earlier at an unknown payload. They cannot
+            // erase the nodes/text/slots already visited by the continuing primary scan.
+<span class="fc" id="L312">            long observedNodes=nodes,observedCharacters=Math.addExact(characters,temporaryCharacters);</span>
+<span class="fc" id="L313">            long observedReferences=Math.addExact(references,scratchPeak);pay(5);</span>
+<span class="fc" id="L314">            pay(4);var union=fresh(new AliasUnion(root,owner,this));pay(union.work());</span>
+<span class="fc" id="L315">            long currentScratch=12L+2L*seen.size()+pending.size()+primary.length+cacheOnly.length;</span>
+<span class="fc" id="L316">            var peak=union.peak().maximum(new RetainedGraph.Usage(union.retained().nodes(),union.retained().characters(),</span>
+<span class="fc" id="L317">                Math.addExact(Math.max(0,union.retained().references()-currentScratch),scratchPeak)));</span>
+<span class="fc" id="L318">            peak=peak.maximum(new RetainedGraph.Usage(observedNodes,observedCharacters,observedReferences));</span>
+<span class="fc" id="L319">            union=null;pay(1);</span>
+<span class="fc" id="L320">            pay(inventory.prune(null,false));settle();</span>
+<span class="fc" id="L321">            var remaining=fresh(root);pay(remaining.work());</span>
+            // The first scanner's empty map/queue/backings and seven fields still exist.
+<span class="fc" id="L323">            peak=peak.maximum(new RetainedGraph.Usage(remaining.peak().nodes(),remaining.peak().characters(),Math.addExact(12,remaining.peak().references())));</span>
+<span class="fc" id="L324">            var result=new RetainedGraph.Observation(remaining.retained(),peak,work,remaining.objects());finished=true;</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            if(rejected!=null)throw new RetainedGraph.Unmeasured(rejected,result);</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            if(!ownerReached)throw new RetainedGraph.InventoryFailure(&quot;ownership root must reference its immutable inventory&quot;,result);</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">            if(failed)throw new RetainedGraph.InventoryFailure(&quot;unsupported payload during fresh metadata-alias observation&quot;,result);</span>
+<span class="fc" id="L328">            return result;</span>
+        }
+        long seenObjectsBeforeSettle;
+        private void settle(){
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if(settled)return;seenObjectsBeforeSettle=seen.size();pay(2L*seen.size()+pending.size()+2);seen.clear();pending.clear();primary=null;cacheOnly=null;settled=true;</span>
+<span class="fc" id="L333">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

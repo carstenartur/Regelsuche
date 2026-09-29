@@ -18,7 +18,7 @@ public record RuleDescriptor(
         List&lt;SearchEffect&gt; searchEffects,
         List&lt;ValidationExample&gt; validationExamples,
         List&lt;ValidationExample&gt; counterExamples) implements RetainedGraph.View {
-<span class="nc" id="L21">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(ruleId);v.reference(packId);v.reference(originProject);v.reference(license);v.reference(sourceVersion);v.reference(sourceReference);v.reference(derivationType);v.reference(status);v.reference(riskLevel);v.reference(categories);v.reference(searchEffects);v.reference(validationExamples);v.reference(counterExamples);}</span>
+<span class="fc" id="L21">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(ruleId);v.reference(packId);v.reference(originProject);v.reference(license);v.reference(sourceVersion);v.reference(sourceReference);v.reference(derivationType);v.reference(status);v.reference(riskLevel);v.reference(categories);v.reference(searchEffects);v.reference(validationExamples);v.reference(counterExamples);}</span>
 
 
 <span class="fc" id="L24">    public RuleDescriptor {</span>

@@ -20,160 +20,184 @@ public final class RetainedJson {
 <span class="fc" id="L20">        private Scope(){previous=CURRENT.get();RetainedOperation.work(15);recycler=new Recycler();CURRENT.set(this);}</span>
 <span class="fc" id="L21">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(previous);v.reference(recycler);}</span>
         @Override public void close(){
-<span class="pc bpc" id="L23" title="2 of 4 branches missed.">            if(closed)return;if(CURRENT.get()!=this)throw new IllegalStateException(&quot;JSON scope order&quot;);</span>
+<span class="pc bpc" id="L23" title="1 of 4 branches missed.">            if(closed)return;if(CURRENT.get()!=this)throw new IllegalStateException(&quot;JSON scope order&quot;);</span>
 <span class="fc bfc" id="L24" title="All 2 branches covered.">            closed=true;if(previous==null)CURRENT.remove();else CURRENT.set(previous);</span>
-<span class="fc" id="L25">            var owned=recycler;previous=null;recycler=null;owned.clear();RetainedOperation.work(3);</span>
-<span class="fc" id="L26">        }</span>
+<span class="fc" id="L25">            Throwable primary=null;</span>
+            try {
+<span class="fc" id="L27">                recycler.clear();</span>
+<span class="fc" id="L28">            } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L29">                primary=failure;</span>
+                // Scope still owns the recycler while observing a failed clear.
+<span class="fc" id="L31">                try{RetainedOperation.checkpoint();}</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">                catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}</span>
+<span class="fc" id="L33">                throw failure;</span>
+            } finally {
+<span class="fc" id="L35">                previous=null;recycler=null;</span>
+                // CURRENT/closed and these field resets happened even if clear's debit failed.
+<span class="fc" id="L37">                try{RetainedOperation.work(3);}</span>
+<span class="fc" id="L38">                catch(RuntimeException | Error accounting){</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                    if(primary==null)throw accounting;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                    if(accounting!=primary)primary.addSuppressed(accounting);</span>
+<span class="fc" id="L41">                }</span>
+            }
+<span class="fc" id="L43">        }</span>
     }
-<span class="fc" id="L28">    private static final class Recycler extends BufferRecycler implements RetainedGraph.View {</span>
-<span class="fc" id="L29">        private final ArrayList&lt;Object&gt; leased=new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L45">    private static final class Recycler extends BufferRecycler implements RetainedGraph.View {</span>
+<span class="fc" id="L46">        private final ArrayList&lt;Object&gt; leased=new ArrayList&lt;&gt;();</span>
         @Override public void retainedReferences(RetainedGraph.Visitor v){
-<span class="fc" id="L31">            v.reference(leased);v.reference(_byteBuffers);v.reference(_charBuffers);</span>
-<span class="fc" id="L32">        }</span>
-<span class="fc" id="L33">        @Override protected byte[] balloc(int size){RetainedOperation.work(size);return new byte[size];}</span>
-<span class="fc" id="L34">        @Override protected char[] calloc(int size){RetainedOperation.work(size);return new char[size];}</span>
-<span class="fc" id="L35">        @Override public byte[] allocByteBuffer(int index,int minimum){var b=super.allocByteBuffer(index,minimum);leased.add(b);RetainedOperation.work(2);RetainedOperation.checkpoint();return b;}</span>
-<span class="fc" id="L36">        @Override public char[] allocCharBuffer(int index,int minimum){var b=super.allocCharBuffer(index,minimum);leased.add(b);RetainedOperation.work(2);RetainedOperation.checkpoint();return b;}</span>
+<span class="fc" id="L48">            v.reference(leased);v.reference(_byteBuffers);v.reference(_charBuffers);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        @Override protected byte[] balloc(int size){RetainedOperation.work(size);return new byte[size];}</span>
+<span class="fc" id="L51">        @Override protected char[] calloc(int size){RetainedOperation.work(size);return new char[size];}</span>
+<span class="fc" id="L52">        @Override public byte[] allocByteBuffer(int index,int minimum){var b=super.allocByteBuffer(index,minimum);leased.add(b);RetainedOperation.work(2);RetainedOperation.checkpoint();return b;}</span>
+<span class="fc" id="L53">        @Override public char[] allocCharBuffer(int index,int minimum){var b=super.allocCharBuffer(index,minimum);leased.add(b);RetainedOperation.work(2);RetainedOperation.checkpoint();return b;}</span>
         @Override public void releaseByteBuffer(int index,byte[] buffer){
-<span class="fc" id="L38">            try(var frame=RetainedOperation.retain(buffer)){super.releaseByteBuffer(index,buffer);leased.remove(buffer);RetainedOperation.work(3);RetainedOperation.checkpoint();}</span>
-<span class="fc" id="L39">        }</span>
+<span class="fc" id="L55">            try(var frame=RetainedOperation.retain(buffer)){super.releaseByteBuffer(index,buffer);leased.remove(buffer);RetainedOperation.work(3);RetainedOperation.checkpoint();}</span>
+<span class="fc" id="L56">        }</span>
         @Override public void releaseCharBuffer(int index,char[] buffer){
-<span class="fc" id="L41">            try(var frame=RetainedOperation.retain(buffer)){super.releaseCharBuffer(index,buffer);leased.remove(buffer);RetainedOperation.work(3);RetainedOperation.checkpoint();}</span>
-<span class="fc" id="L42">        }</span>
+<span class="fc" id="L58">            try(var frame=RetainedOperation.retain(buffer)){super.releaseCharBuffer(index,buffer);leased.remove(buffer);RetainedOperation.work(3);RetainedOperation.checkpoint();}</span>
+<span class="fc" id="L59">        }</span>
         void clear(){
-<span class="fc" id="L44">            long slots=_byteBuffers.length()+_charBuffers.length()+leased.size();</span>
-<span class="fc bfc" id="L45" title="All 2 branches covered.">            for(int i=0;i&lt;_byteBuffers.length();i++)_byteBuffers.set(i,null);</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">            for(int i=0;i&lt;_charBuffers.length();i++)_charBuffers.set(i,null);</span>
-<span class="fc" id="L47">            leased.clear();RetainedOperation.work(slots);</span>
-<span class="fc" id="L48">        }</span>
+<span class="fc" id="L61">            long slots=_byteBuffers.length()+_charBuffers.length()+leased.size();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for(int i=0;i&lt;_byteBuffers.length();i++)_byteBuffers.set(i,null);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            for(int i=0;i&lt;_charBuffers.length();i++)_charBuffers.set(i,null);</span>
+<span class="fc" id="L64">            leased.clear();RetainedOperation.work(slots);</span>
+<span class="fc" id="L65">        }</span>
     }
     /** Copies all existing configuration once; historical calls use the original Jackson implementations. */
     public static final class Factory extends JsonFactory {
-<span class="fc" id="L52">        public Factory(JsonFactory source){super(source,source.getCodec());}</span>
+<span class="fc" id="L69">        public Factory(JsonFactory source){super(source,source.getCodec());}</span>
         @Override protected IOContext _createContext(ContentReference content,boolean managed){
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if(!active())return super._createContext(content,managed);</span>
-<span class="fc" id="L55">            return new Context(_streamReadConstraints,_streamWriteConstraints,_errorReportConfiguration,</span>
-<span class="fc" id="L56">                CURRENT.get().recycler,content,managed);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if(!active())return super._createContext(content,managed);</span>
+<span class="fc" id="L72">            return new Context(_streamReadConstraints,_streamWriteConstraints,_errorReportConfiguration,</span>
+<span class="fc" id="L73">                CURRENT.get().recycler,content,managed);</span>
         }
         @Override protected JsonGenerator _createGenerator(Writer out,IOContext context)throws IOException{
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if(!active())return super._createGenerator(out,context);</span>
-<span class="fc" id="L60">            try(var held=RetainedOperation.retain(context,out)) {</span>
-<span class="fc" id="L61">            var generator=new Characters(context,_generatorFeatures,_objectCodec,out,_quoteChar);</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if(_maximumNonEscapedChar&gt;0)generator.setHighestNonEscapedChar(_maximumNonEscapedChar);</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if(_characterEscapes!=null)generator.setCharacterEscapes(_characterEscapes);</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            if(_rootValueSeparator!=DEFAULT_ROOT_VALUE_SEPARATOR)generator.setRootValueSeparator(_rootValueSeparator);</span>
-<span class="fc" id="L65">            return RetainedOperation.produced(generator);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if(!active())return super._createGenerator(out,context);</span>
+<span class="fc" id="L77">            try(var held=RetainedOperation.retain(context,out)) {</span>
+<span class="fc" id="L78">            var generator=new Characters(context,_generatorFeatures,_objectCodec,out,_quoteChar);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if(_maximumNonEscapedChar&gt;0)generator.setHighestNonEscapedChar(_maximumNonEscapedChar);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if(_characterEscapes!=null)generator.setCharacterEscapes(_characterEscapes);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if(_rootValueSeparator!=DEFAULT_ROOT_VALUE_SEPARATOR)generator.setRootValueSeparator(_rootValueSeparator);</span>
+<span class="fc" id="L82">            return RetainedOperation.produced(generator);</span>
             }
         }
         @Override protected JsonGenerator _createUTF8Generator(OutputStream out,IOContext context)throws IOException{
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if(!active())return super._createUTF8Generator(out,context);</span>
-<span class="fc" id="L70">            try(var held=RetainedOperation.retain(context,out)) {</span>
-<span class="fc" id="L71">            var generator=new Bytes(context,_generatorFeatures,_objectCodec,out,_quoteChar);</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if(_maximumNonEscapedChar&gt;0)generator.setHighestNonEscapedChar(_maximumNonEscapedChar);</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if(_characterEscapes!=null)generator.setCharacterEscapes(_characterEscapes);</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if(_rootValueSeparator!=DEFAULT_ROOT_VALUE_SEPARATOR)generator.setRootValueSeparator(_rootValueSeparator);</span>
-<span class="fc" id="L75">            return RetainedOperation.produced(generator);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if(!active())return super._createUTF8Generator(out,context);</span>
+<span class="fc" id="L87">            try(var held=RetainedOperation.retain(context,out)) {</span>
+<span class="fc" id="L88">            var generator=new Bytes(context,_generatorFeatures,_objectCodec,out,_quoteChar);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if(_maximumNonEscapedChar&gt;0)generator.setHighestNonEscapedChar(_maximumNonEscapedChar);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if(_characterEscapes!=null)generator.setCharacterEscapes(_characterEscapes);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if(_rootValueSeparator!=DEFAULT_ROOT_VALUE_SEPARATOR)generator.setRootValueSeparator(_rootValueSeparator);</span>
+<span class="fc" id="L92">            return RetainedOperation.produced(generator);</span>
             }
         }
     }
     private static final class Context extends IOContext implements RetainedGraph.View {
         Context(StreamReadConstraints read,StreamWriteConstraints write,ErrorReportConfiguration errors,Recycler recycler,ContentReference content,boolean managed){
-<span class="fc" id="L81">            super(read,write,errors,recycler,content,managed);markBufferRecyclerReleased();RetainedOperation.work(1);</span>
-<span class="fc" id="L82">        }</span>
+<span class="fc" id="L98">            super(read,write,errors,recycler,content,managed);markBufferRecyclerReleased();RetainedOperation.work(1);</span>
+<span class="fc" id="L99">        }</span>
         @Override public void retainedReferences(RetainedGraph.Visitor v){
             // Constraint/error metadata is pre-existing immutable factory infrastructure. Raw owner is actual.
-<span class="fc" id="L85">            v.reference(_contentReference);v.reference(_sourceRef);v.reference(_bufferRecycler);</span>
-<span class="fc" id="L86">            v.reference(_readIOBuffer);v.reference(_writeEncodingBuffer);v.reference(_base64Buffer);</span>
-<span class="fc" id="L87">            v.reference(_tokenCBuffer);v.reference(_concatCBuffer);v.reference(_nameCopyBuffer);</span>
-<span class="fc" id="L88">            v.reference(null);v.reference(null);v.reference(null);v.reference(null);</span>
-<span class="fc" id="L89">        }</span>
+<span class="fc" id="L102">            v.reference(_contentReference);v.reference(_sourceRef);v.reference(_bufferRecycler);</span>
+<span class="fc" id="L103">            v.reference(_readIOBuffer);v.reference(_writeEncodingBuffer);v.reference(_base64Buffer);</span>
+<span class="fc" id="L104">            v.reference(_tokenCBuffer);v.reference(_concatCBuffer);v.reference(_nameCopyBuffer);</span>
+<span class="fc" id="L105">            v.reference(null);v.reference(null);v.reference(null);v.reference(null);</span>
+<span class="fc" id="L106">        }</span>
     }
     private static final class WriteContext extends JsonWriteContext implements RetainedGraph.View {
-<span class="fc" id="L92">        WriteContext(int type,WriteContext parent,DupDetector duplicates,Object value){super(type,parent,duplicates,value);RetainedOperation.work(1);}</span>
-<span class="nc" id="L93">        @Override public JsonWriteContext createChildArrayContext(){return createChildArrayContext(null);}</span>
-<span class="nc" id="L94">        @Override public JsonWriteContext createChildArrayContext(Object value){return child(TYPE_ARRAY,value);}</span>
-<span class="nc" id="L95">        @Override public JsonWriteContext createChildObjectContext(){return createChildObjectContext(null);}</span>
-<span class="fc" id="L96">        @Override public JsonWriteContext createChildObjectContext(Object value){return child(TYPE_OBJECT,value);}</span>
+<span class="fc" id="L109">        WriteContext(int type,WriteContext parent,DupDetector duplicates,Object value){super(type,parent,duplicates,value);RetainedOperation.work(1);}</span>
+<span class="nc" id="L110">        @Override public JsonWriteContext createChildArrayContext(){return createChildArrayContext(null);}</span>
+<span class="nc" id="L111">        @Override public JsonWriteContext createChildArrayContext(Object value){return child(TYPE_ARRAY,value);}</span>
+<span class="nc" id="L112">        @Override public JsonWriteContext createChildObjectContext(){return createChildObjectContext(null);}</span>
+<span class="fc" id="L113">        @Override public JsonWriteContext createChildObjectContext(Object value){return child(TYPE_OBJECT,value);}</span>
         private JsonWriteContext child(int type,Object value){
-<span class="pc bpc" id="L98" title="2 of 4 branches missed.">            if(_child==null)_child=new WriteContext(type,this,_dups==null?null:_dups.child(),value);else _child.reset(type,value);</span>
-<span class="fc" id="L99">            RetainedOperation.work(1);return _child;</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">            if(_child==null)_child=new WriteContext(type,this,_dups==null?null:_dups.child(),value);else _child.reset(type,value);</span>
+<span class="fc" id="L116">            RetainedOperation.work(1);return _child;</span>
         }
-<span class="fc" id="L101">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_parent);v.reference(_child);v.reference(_dups);v.reference(_currentName);v.reference(_currentValue);}</span>
+<span class="fc" id="L118">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_parent);v.reference(_child);v.reference(_dups);v.reference(_currentName);v.reference(_currentValue);}</span>
     }
     private static final class Characters extends WriterBasedJsonGenerator implements RetainedGraph.View {
-<span class="fc" id="L104">        Characters(IOContext context,int features,ObjectCodec codec,Writer out,char quote){super(context,features,codec,out,quote);_writeContext=new WriteContext(JsonStreamContext.TYPE_ROOT,null,_writeContext.getDupDetector(),null);}</span>
+<span class="fc" id="L121">        Characters(IOContext context,int features,ObjectCodec codec,Writer out,char quote){super(context,features,codec,out,quote);_writeContext=new WriteContext(JsonStreamContext.TYPE_ROOT,null,_writeContext.getDupDetector(),null);}</span>
         @Override public void retainedReferences(RetainedGraph.Visitor v){
-<span class="fc" id="L106">            v.reference(_writer);v.reference(_outputBuffer);v.reference(_entityBuffer);v.reference(_copyBuffer);v.reference(_currentEscape);</span>
-<span class="fc" id="L107">            v.reference(_ioContext);v.reference(_writeContext);v.reference(_outputEscapes);</span>
-<span class="fc" id="L108">            v.reference(null);v.reference(null);v.reference(null);v.reference(null); // pre-existing codec/configuration metadata</span>
-<span class="fc" id="L109">        }</span>
+<span class="fc" id="L123">            v.reference(_writer);v.reference(_outputBuffer);v.reference(_entityBuffer);v.reference(_copyBuffer);v.reference(_currentEscape);</span>
+<span class="fc" id="L124">            v.reference(_ioContext);v.reference(_writeContext);v.reference(_outputEscapes);</span>
+<span class="fc" id="L125">            v.reference(null);v.reference(null);v.reference(null);v.reference(null); // pre-existing codec/configuration metadata</span>
+<span class="fc" id="L126">        }</span>
     }
     private static final class Bytes extends UTF8JsonGenerator implements RetainedGraph.View {
-<span class="fc" id="L112">        Bytes(IOContext context,int features,ObjectCodec codec,OutputStream out,char quote){super(context,features,codec,out,quote);_writeContext=new WriteContext(JsonStreamContext.TYPE_ROOT,null,_writeContext.getDupDetector(),null);}</span>
+<span class="fc" id="L129">        Bytes(IOContext context,int features,ObjectCodec codec,OutputStream out,char quote){super(context,features,codec,out,quote);_writeContext=new WriteContext(JsonStreamContext.TYPE_ROOT,null,_writeContext.getDupDetector(),null);}</span>
         @Override public void retainedReferences(RetainedGraph.Visitor v){
-<span class="fc" id="L114">            v.reference(_outputStream);v.reference(_outputBuffer);v.reference(_charBuffer);v.reference(_entityBuffer);</span>
-<span class="fc" id="L115">            v.reference(_ioContext);v.reference(_writeContext);v.reference(_outputEscapes);</span>
-<span class="fc" id="L116">            v.reference(null);v.reference(null);v.reference(null);v.reference(null);</span>
-<span class="fc" id="L117">        }</span>
+<span class="fc" id="L131">            v.reference(_outputStream);v.reference(_outputBuffer);v.reference(_charBuffer);v.reference(_entityBuffer);</span>
+<span class="fc" id="L132">            v.reference(_ioContext);v.reference(_writeContext);v.reference(_outputEscapes);</span>
+<span class="fc" id="L133">            v.reference(null);v.reference(null);v.reference(null);v.reference(null);</span>
+<span class="fc" id="L134">        }</span>
     }
-<span class="pc bpc" id="L119" title="1 of 2 branches missed.">    public static ObjectNode object(ObjectMapper mapper){return active()?new ObjectValue():mapper.createObjectNode();}</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">    public static ObjectNode object(ObjectMapper mapper){return active()?new ObjectValue():mapper.createObjectNode();}</span>
+    /** Existing strict mapper/reader, with explicitly owned containers at the import boundary.
+     * Parser-internal temporaries are not yet a complete native inventory. */
+    public static JsonNode readTree(ObjectMapper mapper,String input)throws JsonProcessingException{
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        return active()?mapper.reader().with(NODES).readTree(input):mapper.readTree(input);</span>
+    }
     private static final class NodeFactory extends JsonNodeFactory implements RetainedGraph.View {
-<span class="nc" id="L121">        @Override public ObjectNode objectNode(){return new ObjectValue();}</span>
-<span class="nc" id="L122">        @Override public ArrayNode arrayNode(){return new ArrayValue();}</span>
-<span class="fc" id="L123">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L143">        @Override public ObjectNode objectNode(){return new ObjectValue();}</span>
+<span class="fc" id="L144">        @Override public ArrayNode arrayNode(){return new ArrayValue();}</span>
+<span class="fc" id="L145">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
     }
-<span class="fc" id="L125">    private static final NodeFactory NODES=new NodeFactory();</span>
+<span class="fc" id="L147">    private static final NodeFactory NODES=new NodeFactory();</span>
     private static final class ObjectValue extends ObjectNode implements RetainedGraph.View {
-<span class="fc" id="L127">        ObjectValue(){super(NODES,new LinkedHashMap&lt;&gt;());RetainedOperation.work(2);}</span>
-<span class="fc" id="L128">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(_children);}</span>
+<span class="fc" id="L149">        ObjectValue(){super(NODES,new LinkedHashMap&lt;&gt;());RetainedOperation.work(2);}</span>
+<span class="fc" id="L150">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(_children);}</span>
     }
     private static final class ArrayValue extends ArrayNode implements RetainedGraph.View {
         private final ArrayList&lt;JsonNode&gt; owned;
-<span class="nc" id="L132">        ArrayValue(){this(new ArrayList&lt;&gt;());}</span>
-<span class="nc" id="L133">        private ArrayValue(ArrayList&lt;JsonNode&gt; values){super(NODES,values);owned=values;RetainedOperation.work(2);}</span>
-<span class="nc" id="L134">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(owned);v.reference(owned);}</span>
+<span class="fc" id="L154">        ArrayValue(){this(new ArrayList&lt;&gt;());}</span>
+<span class="fc" id="L155">        private ArrayValue(ArrayList&lt;JsonNode&gt; values){super(NODES,values);owned=values;RetainedOperation.work(2);}</span>
+<span class="fc" id="L156">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(owned);v.reference(owned);}</span>
     }
-<span class="fc" id="L136">    private static final class TextOutput extends Writer implements RetainedGraph.View {</span>
-<span class="fc" id="L137">        private char[] buffer=new char[32];private int size;</span>
-<span class="fc" id="L138">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(buffer);v.reference(lock);}</span>
+<span class="fc" id="L158">    private static final class TextOutput extends Writer implements RetainedGraph.View {</span>
+<span class="fc" id="L159">        private char[] buffer=new char[32];private int size;</span>
+<span class="fc" id="L160">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(buffer);v.reference(lock);}</span>
         @Override public void write(char[] input,int offset,int length){
-<span class="fc" id="L140">            int needed=Math.addExact(size,length);</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">            if(needed&gt;buffer.length){</span>
-<span class="fc" id="L142">                var old=buffer;var replacement=new char[Math.max(needed,Math.multiplyExact(buffer.length,2))];</span>
-<span class="fc" id="L143">                try(var frame=RetainedOperation.retain(old,replacement)){RetainedOperation.work(Math.addExact(replacement.length,size));System.arraycopy(old,0,replacement,0,size);buffer=replacement;}</span>
+<span class="fc" id="L162">            int needed=Math.addExact(size,length);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if(needed&gt;buffer.length){</span>
+<span class="fc" id="L164">                var old=buffer;var replacement=new char[Math.max(needed,Math.multiplyExact(buffer.length,2))];</span>
+<span class="fc" id="L165">                try(var frame=RetainedOperation.retainCompleted(replacement.length,old,replacement)){</span>
+<span class="fc" id="L166">                    System.arraycopy(old,0,replacement,0,size);RetainedOperation.work(size);buffer=replacement;</span>
+                }
             }
-<span class="fc" id="L145">            System.arraycopy(input,offset,buffer,size,length);size=needed;RetainedOperation.work(length);RetainedOperation.checkpoint();</span>
-<span class="fc" id="L146">        }</span>
-<span class="fc" id="L147">        String value(){RetainedOperation.work(size);return RetainedOperation.produced(new String(buffer,0,size));}</span>
-<span class="fc" id="L148">        @Override public void flush(){}</span>
-<span class="fc" id="L149">        @Override public void close(){}</span>
+<span class="fc" id="L169">            System.arraycopy(input,offset,buffer,size,length);size=needed;RetainedOperation.work(length);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L170">        }</span>
+<span class="fc" id="L171">        String value(){RetainedOperation.work(size);return RetainedOperation.produced(new String(buffer,0,size));}</span>
+<span class="fc" id="L172">        @Override public void flush(){}</span>
+<span class="fc" id="L173">        @Override public void close(){}</span>
     }
     private static final class ByteOutput extends ByteArrayOutputStream implements RetainedGraph.View {
-<span class="fc" id="L152">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(buf);}</span>
+<span class="fc" id="L176">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(buf);}</span>
         @Override public synchronized void write(byte[] input,int offset,int length){
-<span class="fc" id="L154">            var old=buf;</span>
-<span class="fc" id="L155">            try(var frame=RetainedOperation.retain(old)){</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">                super.write(input,offset,length);RetainedOperation.work(length+(old==buf?0L:Math.addExact(old.length,buf.length)));RetainedOperation.checkpoint();</span>
+<span class="fc" id="L178">            var old=buf;</span>
+<span class="fc" id="L179">            try(var frame=RetainedOperation.retain(old)){</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                super.write(input,offset,length);RetainedOperation.work(length+(old==buf?0L:Math.addExact(old.length,buf.length)));RetainedOperation.checkpoint();</span>
             }
-<span class="fc" id="L158">        }</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">        @Override public synchronized void write(int value){var old=buf;try(var frame=RetainedOperation.retain(old)){super.write(value);RetainedOperation.work(1+(old==buf?0L:Math.addExact(old.length,buf.length)));RetainedOperation.checkpoint();}}</span>
-<span class="fc" id="L160">        byte[] value(){RetainedOperation.work(count);return RetainedOperation.produced(toByteArray());}</span>
+<span class="fc" id="L182">        }</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        @Override public synchronized void write(int value){var old=buf;try(var frame=RetainedOperation.retain(old)){super.write(value);RetainedOperation.work(1+(old==buf?0L:Math.addExact(old.length,buf.length)));RetainedOperation.checkpoint();}}</span>
+<span class="fc" id="L184">        byte[] value(){RetainedOperation.work(count);return RetainedOperation.produced(toByteArray());}</span>
     }
     public static String writeString(ObjectMapper mapper,Object value)throws IOException{
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if(!active())return mapper.writeValueAsString(value);</span>
-<span class="fc" id="L164">        var output=new TextOutput();RetainedOperation.work(33);</span>
-<span class="fc" id="L165">        try(var frame=RetainedOperation.retain(value,output)){</span>
-<span class="fc" id="L166">            try(var generator=mapper.getFactory().createGenerator(output);var held=RetainedOperation.retain(generator)){</span>
-<span class="fc" id="L167">                mapper.writeValue(generator,value);generator.flush();RetainedOperation.checkpoint();return output.value();</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if(!active())return mapper.writeValueAsString(value);</span>
+<span class="fc" id="L188">        var output=new TextOutput();RetainedOperation.work(33);</span>
+<span class="fc" id="L189">        try(var frame=RetainedOperation.retain(value,output)){</span>
+<span class="fc" id="L190">            try(var generator=mapper.getFactory().createGenerator(output);var held=RetainedOperation.retain(generator)){</span>
+<span class="fc" id="L191">                mapper.writeValue(generator,value);generator.flush();RetainedOperation.checkpoint();return output.value();</span>
             }
         }
     }
     public static byte[] writeBytes(ObjectMapper mapper,Object value)throws IOException{
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if(!active())return mapper.writeValueAsBytes(value);</span>
-<span class="fc" id="L173">        var output=new ByteOutput();RetainedOperation.work(33);</span>
-<span class="fc" id="L174">        try(var frame=RetainedOperation.retain(value,output)){</span>
-<span class="fc" id="L175">            try(var generator=mapper.getFactory().createGenerator(output);var held=RetainedOperation.retain(generator)){</span>
-<span class="fc" id="L176">                mapper.writeValue(generator,value);generator.flush();RetainedOperation.checkpoint();return output.value();</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if(!active())return mapper.writeValueAsBytes(value);</span>
+<span class="fc" id="L197">        var output=new ByteOutput();RetainedOperation.work(33);</span>
+<span class="fc" id="L198">        try(var frame=RetainedOperation.retain(value,output)){</span>
+<span class="fc" id="L199">            try(var generator=mapper.getFactory().createGenerator(output);var held=RetainedOperation.retain(generator)){</span>
+<span class="fc" id="L200">                mapper.writeValue(generator,value);generator.flush();RetainedOperation.checkpoint();return output.value();</span>
             }
         }
     }

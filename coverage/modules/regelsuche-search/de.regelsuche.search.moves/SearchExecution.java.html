@@ -90,12 +90,14 @@ public final class SearchExecution {
     }
     record Result&lt;S,M,V,A&gt;(MoveSearch.Outcome outcome,List&lt;Step&lt;S,M,V&gt;&gt; witness,List&lt;Event&lt;S,M,V&gt;&gt; events,
             Set&lt;S&gt; reachedStates,List&lt;S&gt; deadEndStates,MoveSearch.Metrics metrics,boolean completeBoundedRelation,
-            Map&lt;S,A&gt; stateAssessments,List&lt;Object&gt; pickerReceipts,List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts) implements RetainedGraph.View {
-<span class="fc" id="L94">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);v.reference(batchCursorReceipts);}</span>
-<span class="fc" id="L95">        Result {</span>
-<span class="fc" id="L96">            witness=List.copyOf(witness);events=List.copyOf(events);reachedStates=Set.copyOf(reachedStates);</span>
-<span class="fc" id="L97">            deadEndStates=List.copyOf(deadEndStates);stateAssessments=Map.copyOf(stateAssessments);pickerReceipts=List.copyOf(pickerReceipts);batchCursorReceipts=List.copyOf(batchCursorReceipts);</span>
-<span class="fc" id="L98">        }</span>
+            Map&lt;S,A&gt; stateAssessments,List&lt;Object&gt; pickerReceipts,List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts,
+            List&lt;S&gt; assessmentOrder,List&lt;S&gt; reachedOrder) implements RetainedGraph.View {
+<span class="fc" id="L95">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);v.reference(batchCursorReceipts);v.reference(assessmentOrder);v.reference(reachedOrder);}</span>
+<span class="fc" id="L96">        Result {</span>
+<span class="fc" id="L97">            witness=List.copyOf(witness);events=List.copyOf(events);reachedStates=Set.copyOf(reachedStates);</span>
+<span class="fc" id="L98">            deadEndStates=List.copyOf(deadEndStates);stateAssessments=Map.copyOf(stateAssessments);pickerReceipts=List.copyOf(pickerReceipts);batchCursorReceipts=List.copyOf(batchCursorReceipts);</span>
+<span class="fc" id="L99">            assessmentOrder=List.copyOf(assessmentOrder);reachedOrder=List.copyOf(reachedOrder);</span>
+<span class="fc" id="L100">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

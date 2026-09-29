@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstRewriteTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">AstRewriteTransport.java</span></div><h1>AstRewriteTransport.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
@@ -12,7 +13,7 @@ import java.util.Objects;
 
 /** Explicit typed primitive boundary. Construction of a step is not proof of its validity. */
 public final class AstRewriteTransport implements RetainedGraph.View {
-<span class="nc" id="L15">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(engine);}</span>
+<span class="nc" id="L16">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(engine);}</span>
 
     public static final String REVISION = &quot;regelsuche.ast-rewrite-transport/v1&quot;;
     public static final int MAXIMUM_NODES = 10_000;
@@ -23,34 +24,34 @@ public final class AstRewriteTransport implements RetainedGraph.View {
     public record Step(Expr source, Expr target, String rule, RewriteKind kind,
             boolean mayIncreaseComplexity, int estimatedCostDelta, boolean equivalencePreservingByConstruction,
             List&lt;String&gt; assumptions, String packId, String license) implements RetainedGraph.View {
-<span class="nc" id="L26">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(rule);v.reference(kind);v.reference(assumptions);v.reference(packId);v.reference(license);}</span>
+<span class="fc" id="L27">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(rule);v.reference(kind);v.reference(assumptions);v.reference(packId);v.reference(license);}</span>
 
-<span class="fc" id="L28">        public Step {</span>
-<span class="fc" id="L29">            requireBounded(source);</span>
-<span class="fc" id="L30">            requireBounded(target);</span>
-<span class="fc" id="L31">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="pc bpc" id="L32" title="5 of 10 branches missed.">            if (rule == null || rule.isBlank() || packId == null || packId.isBlank()</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                    || license == null || license.isBlank()) {</span>
-<span class="nc" id="L34">                throw new IllegalArgumentException(&quot;rule and attribution must be present&quot;);</span>
+<span class="fc" id="L29">        public Step {</span>
+<span class="fc" id="L30">            requireBounded(source);</span>
+<span class="fc" id="L31">            requireBounded(target);</span>
+<span class="fc" id="L32">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L33" title="5 of 10 branches missed.">            if (rule == null || rule.isBlank() || packId == null || packId.isBlank()</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                    || license == null || license.isBlank()) {</span>
+<span class="nc" id="L35">                throw new IllegalArgumentException(&quot;rule and attribution must be present&quot;);</span>
             }
-<span class="fc" id="L36">            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
-<span class="fc" id="L37">        }</span>
+<span class="fc" id="L37">            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc" id="L38">        }</span>
     }
 
     private final PreparedAstRewriteTransformationEngine engine;
 
     public AstRewriteTransport(List&lt;RewriteRule&gt; rules, int maximumGrowth, int maximumCandidates) {
-<span class="fc" id="L43">        this(rules, maximumGrowth, maximumCandidates, false);</span>
-<span class="fc" id="L44">    }</span>
+<span class="fc" id="L44">        this(rules, maximumGrowth, maximumCandidates, false);</span>
+<span class="fc" id="L45">    }</span>
 
-<span class="fc" id="L46">    AstRewriteTransport(List&lt;RewriteRule&gt; rules, int maximumGrowth, int maximumCandidates, boolean indexed) {</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;positive candidate bound required&quot;);</span>
-<span class="fc" id="L48">        engine = new PreparedAstRewriteTransformationEngine(rules, maximumGrowth, maximumCandidates, indexed);</span>
-<span class="fc" id="L49">    }</span>
+<span class="fc" id="L47">    AstRewriteTransport(List&lt;RewriteRule&gt; rules, int maximumGrowth, int maximumCandidates, boolean indexed) {</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;positive candidate bound required&quot;);</span>
+<span class="fc" id="L49">        engine = new PreparedAstRewriteTransformationEngine(rules, maximumGrowth, maximumCandidates, indexed);</span>
+<span class="fc" id="L50">    }</span>
 
     /** Generate with actual producer ASTs. Neither source nor result is formatted and reparsed here. */
     public List&lt;Step&gt; generate(Expr source) {
-<span class="fc" id="L53">        return engine.transformAst(source);</span>
+<span class="fc" id="L54">        return engine.transformAst(source);</span>
     }
 
     /**
@@ -59,44 +60,62 @@ public final class AstRewriteTransport implements RetainedGraph.View {
      * or the truth of their retained side conditions.
      */
     public Expr replay(Expr source, List&lt;Step&gt; steps) {
-<span class="fc" id="L62">        requireBounded(source);</span>
-<span class="fc" id="L63">        Objects.requireNonNull(steps, &quot;steps&quot;);</span>
-<span class="pc bpc" id="L64" title="1 of 4 branches missed.">        if (steps.isEmpty() || steps.size() &gt; MAXIMUM_TRACE_STEPS) {</span>
-<span class="fc" id="L65">            throw new IllegalArgumentException(&quot;require 1 through 64 primitive steps&quot;);</span>
+<span class="fc" id="L63">        requireBounded(source);</span>
+<span class="fc" id="L64">        Objects.requireNonNull(steps, &quot;steps&quot;);</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (steps.isEmpty() || steps.size() &gt; MAXIMUM_TRACE_STEPS) {</span>
+<span class="fc" id="L66">            throw new IllegalArgumentException(&quot;require 1 through 64 primitive steps&quot;);</span>
         }
-<span class="fc" id="L67">        var retained = List.copyOf(steps);</span>
-<span class="fc" id="L68">        Expr current = source;</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (var step : retained) {</span>
-<span class="fc bfc" id="L70" title="All 4 branches covered.">            if (!current.equals(step.source()) || !generate(current).contains(step)) {</span>
-<span class="fc" id="L71">                throw new IllegalArgumentException(&quot;AST step differs from source-bound primitive regeneration&quot;);</span>
+<span class="fc" id="L68">        var retained = List.copyOf(steps);</span>
+<span class="fc" id="L69">        Expr current = source;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (var step : retained) {</span>
+<span class="fc bfc" id="L71" title="All 4 branches covered.">            if (!current.equals(step.source()) || !generate(current).contains(step)) {</span>
+<span class="fc" id="L72">                throw new IllegalArgumentException(&quot;AST step differs from source-bound primitive regeneration&quot;);</span>
             }
-<span class="fc" id="L73">            current = step.target();</span>
-<span class="fc" id="L74">        }</span>
-<span class="fc" id="L75">        return current;</span>
+<span class="fc" id="L74">            current = step.target();</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        return current;</span>
     }
 
-<span class="fc" id="L78">    private record Node(Expr expression, int depth) {}</span>
+<span class="fc" id="L79">    private record Node(Expr expression, int depth) implements RetainedGraph.View {</span>
+<span class="fc" id="L80">        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(expression);}</span>
+    }
 
     static void requireBounded(Expr root) {
-<span class="fc" id="L81">        Objects.requireNonNull(root, &quot;expression&quot;);</span>
-<span class="fc" id="L82">        var pending = new ArrayDeque&lt;Node&gt;();</span>
-<span class="fc" id="L83">        pending.push(new Node(root, 0));</span>
-<span class="fc" id="L84">        int nodes = 0;</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L86">            var node = pending.pop();</span>
-<span class="pc bpc" id="L87" title="1 of 4 branches missed.">            if (++nodes &gt; MAXIMUM_NODES || node.depth() &gt; MAXIMUM_DEPTH) {</span>
-<span class="fc" id="L88">                throw new IllegalArgumentException(&quot;AST transport structural limit exceeded&quot;);</span>
-            }
-<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (node.expression() instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L91">                pending.push(new Node(binary.right(), node.depth() + 1));</span>
-<span class="fc" id="L92">                pending.push(new Node(binary.left(), node.depth() + 1));</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">            } else if (node.expression() instanceof FunctionExpr function) {</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">                if (function.arguments().size() &gt; MAXIMUM_NODES - nodes) {</span>
-<span class="fc" id="L95">                    throw new IllegalArgumentException(&quot;AST transport argument limit exceeded&quot;);</span>
+<span class="fc" id="L84">        Objects.requireNonNull(root, &quot;expression&quot;);</span>
+<span class="fc" id="L85">        var pending = new ArrayDeque&lt;Node&gt;();</span>
+<span class="fc" id="L86">        Node[] current = {null};</span>
+<span class="fc" id="L87">        try (var retained = RetainedOperation.retainCompleted(2, root, pending, current)) {</span>
+<span class="fc" id="L88">            pending.push(new Node(root, 0));</span>
+<span class="fc" id="L89">            RetainedOperation.work(1);</span>
+<span class="fc" id="L90">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L91">            int nodes = 0;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            while (!pending.isEmpty()) {</span>
+                // Move an already-owned Node from the queue into one stable current slot.
+                // Dropping the previous Node cannot grow the retained graph; no fresh Frame is needed.
+<span class="fc" id="L95">                current[0] = pending.pop();</span>
+<span class="fc" id="L96">                RetainedOperation.work(2);</span>
+<span class="fc" id="L97">                Node node = current[0];</span>
+<span class="fc" id="L98">                RetainedOperation.validation(1);</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">                if (++nodes &gt; MAXIMUM_NODES || node.depth() &gt; MAXIMUM_DEPTH) {</span>
+<span class="fc" id="L100">                    throw new IllegalArgumentException(&quot;AST transport structural limit exceeded&quot;);</span>
                 }
-<span class="fc bfc" id="L97" title="All 2 branches covered.">                for (var argument : function.arguments()) pending.push(new Node(argument, node.depth() + 1));</span>
-            }
-<span class="fc" id="L99">        }</span>
-<span class="fc" id="L100">    }</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                if (node.expression() instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L103">                    pending.push(new Node(binary.right(), node.depth() + 1));</span>
+<span class="fc" id="L104">                    pending.push(new Node(binary.left(), node.depth() + 1));</span>
+<span class="fc" id="L105">                    RetainedOperation.work(2);</span>
+<span class="fc" id="L106">                    RetainedOperation.checkpoint();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                } else if (node.expression() instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                    if (function.arguments().size() &gt; MAXIMUM_NODES - nodes) {</span>
+<span class="fc" id="L109">                        throw new IllegalArgumentException(&quot;AST transport argument limit exceeded&quot;);</span>
+                    }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                    for (var argument : function.arguments()) {</span>
+<span class="fc" id="L112">                        pending.push(new Node(argument, node.depth() + 1));</span>
+<span class="fc" id="L113">                        RetainedOperation.work(1);</span>
+<span class="fc" id="L114">                    }</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                    if (!function.arguments().isEmpty()) RetainedOperation.checkpoint();</span>
+                }
+<span class="fc" id="L117">            }</span>
+        }
+<span class="fc" id="L119">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

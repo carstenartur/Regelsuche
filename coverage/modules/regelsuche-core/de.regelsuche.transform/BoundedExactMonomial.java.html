@@ -203,24 +203,25 @@ record BoundedExactMonomial(ExactRational coefficient, Map&lt;String, Integer&gt
     }
 
     /** Shared by every inference/pre-filter in one matcher invocation. */
-<span class="fc" id="L206">    static final class Budget {</span>
+<span class="fc" id="L206">    static final class Budget implements de.regelsuche.retention.RetainedGraph.View {</span>
         private static final int MAX_VISITS = 10_000;
         private static final int MAX_DEPTH = 128;
         private static final int MAX_COEFFICIENT_BITS = 4_096;
 <span class="fc" id="L210">        private int remaining = MAX_VISITS;</span>
+<span class="nc" id="L211">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) { }</span>
 
         private void visit(int depth) {
-<span class="fc bfc" id="L213" title="All 4 branches covered.">            if (depth &gt; MAX_DEPTH || remaining-- &lt;= 0) {</span>
-<span class="fc" id="L214">                throw new LimitExceeded(&quot;ALGEBRAIC_WORK_LIMIT&quot;);</span>
+<span class="fc bfc" id="L214" title="All 4 branches covered.">            if (depth &gt; MAX_DEPTH || remaining-- &lt;= 0) {</span>
+<span class="fc" id="L215">                throw new LimitExceeded(&quot;ALGEBRAIC_WORK_LIMIT&quot;);</span>
             }
-<span class="fc" id="L216">        }</span>
+<span class="fc" id="L217">        }</span>
 
         private void coefficientBits(long numerator, long denominator) {
-<span class="fc" id="L219">            visit(0);</span>
-<span class="fc bfc" id="L220" title="All 4 branches covered.">            if (numerator &gt; MAX_COEFFICIENT_BITS || denominator &gt; MAX_COEFFICIENT_BITS) {</span>
-<span class="fc" id="L221">                throw new LimitExceeded(&quot;ALGEBRAIC_COEFFICIENT_LIMIT&quot;);</span>
+<span class="fc" id="L220">            visit(0);</span>
+<span class="fc bfc" id="L221" title="All 4 branches covered.">            if (numerator &gt; MAX_COEFFICIENT_BITS || denominator &gt; MAX_COEFFICIENT_BITS) {</span>
+<span class="fc" id="L222">                throw new LimitExceeded(&quot;ALGEBRAIC_COEFFICIENT_LIMIT&quot;);</span>
             }
-<span class="fc" id="L223">        }</span>
+<span class="fc" id="L224">        }</span>
     }
 
     static final class LimitExceeded extends RuntimeException {
@@ -228,9 +229,9 @@ record BoundedExactMonomial(ExactRational coefficient, Map&lt;String, Integer&gt
         final String code;
 
         private LimitExceeded(String code) {
-<span class="fc" id="L231">            super(code, null, false, false);</span>
-<span class="fc" id="L232">            this.code = code;</span>
-<span class="fc" id="L233">        }</span>
+<span class="fc" id="L232">            super(code, null, false, false);</span>
+<span class="fc" id="L233">            this.code = code;</span>
+<span class="fc" id="L234">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

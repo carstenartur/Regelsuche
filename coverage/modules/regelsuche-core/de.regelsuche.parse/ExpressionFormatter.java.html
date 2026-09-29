@@ -7,63 +7,75 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
 public final class ExpressionFormatter {
-<span class="fc" id="L16">    private static final java.math.BigInteger NUMERIC_SYNTAX_LIMIT = java.math.BigInteger.TEN.pow(</span>
+<span class="fc" id="L18">    private static final java.math.BigInteger NUMERIC_SYNTAX_LIMIT = java.math.BigInteger.TEN.pow(</span>
         de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS);
+<span class="fc" id="L20">    private static final java.math.BigInteger NEGATIVE_NUMERIC_SYNTAX_LIMIT = NUMERIC_SYNTAX_LIMIT.negate();</span>
     private ExpressionFormatter() {
     }
 
     public static String format(Expr expr) {
-<span class="fc" id="L22">        return formatMeasured(expr, units -&gt; { });</span>
+<span class="fc" id="L25">        return formatMeasured(expr, NativeEmission.INSTANCE);</span>
     }
 
-    /** Charges emitted code units before appending each formatter fragment. */
+    /**
+     * Delegates emitted code units before appending each fragment. Native observation
+     * additionally pays workspace, allocation and copying; it does not charge the
+     * delegated emission again. An active native scope requires an audited callback view.
+     */
     public static String formatMeasured(Expr expr, java.util.function.LongConsumer emittedCodeUnits) {
-<span class="fc" id="L27">        Output builder = new Output(emittedCodeUnits);</span>
-<span class="fc" id="L28">        append(</span>
-<span class="fc" id="L29">            Objects.requireNonNull(expr, &quot;expr&quot;),</span>
-            0,
-            builder);
-<span class="fc" id="L32">        return builder.toString();</span>
+<span class="fc" id="L34">        Objects.requireNonNull(expr, &quot;expr&quot;);</span>
+<span class="fc" id="L35">        Objects.requireNonNull(emittedCodeUnits, &quot;emittedCodeUnits&quot;);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L37">            try (var input = RetainedOperation.retain(expr, emittedCodeUnits)) {</span>
+<span class="fc" id="L38">                emit(emittedCodeUnits, variable.name().length());</span>
+<span class="fc" id="L39">                RetainedOperation.work(1);</span>
+<span class="fc" id="L40">                return variable.name();</span>
+            }
+        }
+<span class="fc" id="L43">        Output builder = new Output(expr, emittedCodeUnits);</span>
+<span class="fc" id="L44">        try (var output = RetainedOperation.retain(builder)) {</span>
+<span class="fc" id="L45">            append(builder);</span>
+<span class="fc" id="L46">            return builder.value();</span>
+        }
     }
 
     public static String format(Equation equation) {
-<span class="fc" id="L36">        Objects.requireNonNull(equation, &quot;equation&quot;);</span>
-<span class="fc" id="L37">        Output builder = new Output(units -&gt; { });</span>
-<span class="fc" id="L38">        append(equation.left(), 0, builder);</span>
-<span class="fc" id="L39">        builder.append(&quot; = &quot;);</span>
-<span class="fc" id="L40">        append(equation.right(), 0, builder);</span>
-<span class="fc" id="L41">        return builder.toString();</span>
+<span class="fc" id="L51">        Objects.requireNonNull(equation, &quot;equation&quot;);</span>
+<span class="fc" id="L52">        Output builder = new Output(equation, NativeEmission.INSTANCE);</span>
+<span class="fc" id="L53">        try (var output = RetainedOperation.retain(builder)) {</span>
+<span class="fc" id="L54">            append(builder);</span>
+<span class="fc" id="L55">            return builder.value();</span>
+        }
     }
 
-    private static void append(
-        Expr expression,
-        int parentPrecedence,
-        Output builder
-    ) {
-<span class="fc" id="L49">        Deque&lt;Action&gt; pending = new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L50">        pending.push(new FormatExpression(</span>
-            expression,
-            parentPrecedence));
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L54">            Action action = pending.pop();</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (action instanceof AppendText text) {</span>
-<span class="fc" id="L56">                builder.append(text.value());</span>
+    private static void append(Output builder) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        while (!builder.pending.isEmpty()) {</span>
+<span class="fc" id="L61">            Action action = builder.pending.pop();</span>
+<span class="fc" id="L62">            builder.current = action;</span>
+<span class="fc" id="L63">            RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (action instanceof AppendText text) {</span>
+<span class="fc" id="L65">                builder.appendOwned(text.value());</span>
             } else {
-<span class="fc" id="L58">                FormatExpression format = (FormatExpression) action;</span>
-<span class="fc" id="L59">                schedule(</span>
-<span class="fc" id="L60">                    format.expression(),</span>
-<span class="fc" id="L61">                    format.parentPrecedence(),</span>
-                    pending,
-                    builder);
+<span class="fc" id="L67">                FormatExpression format = (FormatExpression) action;</span>
+<span class="fc" id="L68">                schedule(format.expression(), format.parentPrecedence(), builder.pending, builder);</span>
             }
-<span class="fc" id="L65">        }</span>
-<span class="fc" id="L66">    }</span>
+<span class="fc" id="L70">            builder.current = null;</span>
+<span class="fc" id="L71">            RetainedOperation.work(1);</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">    }</span>
+
+    private static void push(Deque&lt;Action&gt; pending, Action action) {
+<span class="fc" id="L76">        pending.push(action);</span>
+<span class="fc" id="L77">        RetainedOperation.work(1);</span>
+<span class="fc" id="L78">    }</span>
 
     private static void schedule(
         Expr expression,
@@ -71,25 +83,27 @@ public final class ExpressionFormatter {
         Deque&lt;Action&gt; pending,
         Output builder
     ) {
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L75">            appendNumber(number, parentPrecedence, builder);</span>
-<span class="fc" id="L76">            return;</span>
-        }
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L79">            builder.append(variable.name());</span>
-<span class="fc" id="L80">            return;</span>
-        }
-<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="fc" id="L83">            scheduleFunction(function, pending, builder);</span>
-<span class="fc" id="L84">            return;</span>
-        }
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L87">            scheduleBinary(binary, parentPrecedence, pending, builder);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L87">            appendNumber(number, parentPrecedence, builder);</span>
 <span class="fc" id="L88">            return;</span>
         }
-<span class="nc" id="L90">        throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L91">            builder.appendOwned(variable.name());</span>
+<span class="fc" id="L92">            return;</span>
+        }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L95">            scheduleFunction(function, pending, builder);</span>
+<span class="fc" id="L96">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L97">            return;</span>
+        }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L100">            scheduleBinary(binary, parentPrecedence, pending, builder);</span>
+<span class="fc" id="L101">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L102">            return;</span>
+        }
+<span class="nc" id="L104">        throw new IllegalArgumentException(</span>
             &quot;unsupported expression type: &quot;
-<span class="nc" id="L92">                + expression.getClass().getName());</span>
+<span class="nc" id="L106">                + expression.getClass().getName());</span>
     }
 
     private static void appendNumber(
@@ -97,40 +111,100 @@ public final class ExpressionFormatter {
         int parentPrecedence,
         Output builder
     ) {
-<span class="fc" id="L100">        var value = number.value();</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!withinNumericSyntaxLimits(value)) {</span>
-<span class="fc" id="L102">            throw new IllegalArgumentException(&quot;Numeric leaf exceeds parser digit limits&quot;);</span>
+<span class="fc" id="L114">        var value = number.value();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (!withinNumericSyntaxLimits(value)) {</span>
+<span class="fc" id="L116">            throw new IllegalArgumentException(&quot;Numeric leaf exceeds parser digit limits&quot;);</span>
         }
-        String formatted;
-<span class="fc" id="L105">        boolean fraction = false;</span>
-<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (value.isInteger()) {</span>
-<span class="fc" id="L107">            formatted = value.numerator().toString();</span>
-        } else try {
-<span class="fc" id="L109">            var decimal = value.toBigDecimal(java.math.MathContext.UNLIMITED).stripTrailingZeros();</span>
-<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (decimal.scale() &gt; de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {</span>
-<span class="fc" id="L111">                throw new ArithmeticException(&quot;render using integer fraction syntax&quot;);</span>
-            }
-<span class="fc" id="L113">            formatted = decimal.toPlainString();</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (formatted.replace(&quot;-&quot;, &quot;&quot;).replace(&quot;.&quot;, &quot;&quot;).length()</span>
-                    &gt; de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {
-<span class="fc" id="L116">                throw new ArithmeticException(&quot;render using integer fraction syntax&quot;);</span>
-            }
-<span class="fc" id="L118">        } catch (ArithmeticException repeatingDecimal) {</span>
-<span class="fc" id="L119">            formatted = value.numerator() + &quot; / &quot; + value.denominator();</span>
-<span class="fc" id="L120">            fraction = true;</span>
-<span class="fc" id="L121">        }</span>
-<span class="fc bfc" id="L122" title="All 8 branches covered.">        if ((value.signum() &lt; 0 &amp;&amp; parentPrecedence &gt; 0)</span>
-                || (fraction &amp;&amp; parentPrecedence &gt; 0)) {
-<span class="fc" id="L124">            builder.append('(').append(formatted).append(')');</span>
-        } else {
-<span class="fc" id="L126">            builder.append(formatted);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (value.isInteger()) {</span>
+<span class="fc" id="L119">            String formatted = value.numerator().toString();</span>
+            // Publish the produced text before its debit can fail, or a callback can run.
+<span class="fc bfc" id="L121" title="All 4 branches covered.">            builder.append(formatted, value.signum() &lt; 0 &amp;&amp; parentPrecedence &gt; 0,</span>
+<span class="fc" id="L122">                formatted.length() + 1L);</span>
+<span class="fc" id="L123">            return;</span>
         }
-<span class="fc" id="L128">    }</span>
+<span class="fc" id="L125">        RetainedOperation.work(3); // scratch owner and the two decimal operands</span>
+<span class="fc" id="L126">        var conversion = new NumberConversion(value);</span>
+<span class="fc" id="L127">        try (var scratch = RetainedOperation.retain(conversion)) {</span>
+            try {
+<span class="fc" id="L129">                conversion.format(value);</span>
+<span class="nc" id="L130">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L131">                try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L132">                catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                    if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="nc" id="L134">                }</span>
+<span class="nc" id="L135">                throw failure;</span>
+<span class="fc" id="L136">            }</span>
+            // append's checkpoint observes all actual conversion temporaries together.
+<span class="fc" id="L138">            builder.append(conversion.formatted,</span>
+<span class="fc bfc" id="L139" title="All 6 branches covered.">                (value.signum() &lt; 0 || conversion.fraction) &amp;&amp; parentPrecedence &gt; 0, 0);</span>
+        }
+<span class="fc" id="L141">    }</span>
 
     /** Whether integer/fraction syntax can represent both components within parser limits. */
     public static boolean withinNumericSyntaxLimits(de.regelsuche.scalar.ExactRational value) {
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        return value.numerator().abs().compareTo(NUMERIC_SYNTAX_LIMIT) &lt; 0</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            &amp;&amp; value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) &lt; 0;</span>
+<span class="fc" id="L145">        RetainedOperation.work(2); // sign and numerator comparison, without allocating abs()</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        boolean numeratorFits = value.numerator().signum() &lt; 0</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            ? value.numerator().compareTo(NEGATIVE_NUMERIC_SYNTAX_LIMIT) &gt; 0</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            : value.numerator().compareTo(NUMERIC_SYNTAX_LIMIT) &lt; 0;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (!numeratorFits) return false;</span>
+<span class="fc" id="L150">        RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        return value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) &lt; 0;</span>
+    }
+
+    /** One bounded conversion owns its actual operands and all still-live results. */
+    private static final class NumberConversion implements RetainedGraph.View {
+        private final java.math.BigDecimal numerator;
+        private final java.math.BigDecimal denominator;
+        private java.math.BigDecimal quotient, decimal;
+        private String plain, numeratorText, denominatorText, formatted;
+        private boolean fraction;
+
+<span class="fc" id="L162">        private NumberConversion(de.regelsuche.scalar.ExactRational value) {</span>
+<span class="fc" id="L163">            numerator = new java.math.BigDecimal(value.numerator());</span>
+<span class="fc" id="L164">            denominator = new java.math.BigDecimal(value.denominator());</span>
+<span class="fc" id="L165">        }</span>
+
+        private void format(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L168">            RetainedOperation.work(1); // the attempted division is paid even if it repeats</span>
+            try {
+<span class="fc" id="L170">                quotient = numerator.divide(denominator, java.math.MathContext.UNLIMITED);</span>
+<span class="fc" id="L171">            } catch (ArithmeticException repeatingDecimal) {</span>
+                // Only the exact library division is caught, never accounting failures.
+<span class="fc" id="L173">                fraction = true;</span>
+<span class="fc" id="L174">            }</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (!fraction) {</span>
+<span class="fc" id="L176">                RetainedOperation.work(1);</span>
+<span class="fc" id="L177">                decimal = quotient.stripTrailingZeros();</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                if (decimal.scale() &lt;= de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {</span>
+<span class="fc" id="L179">                    plain = decimal.toPlainString();</span>
+<span class="fc" id="L180">                    RetainedOperation.work(plain.length() + 1L);</span>
+<span class="fc" id="L181">                    int digits = 0;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                    for (int index = 0; index &lt; plain.length(); index++) {</span>
+<span class="fc" id="L183">                        char item = plain.charAt(index);</span>
+<span class="fc" id="L184">                        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L185" title="All 4 branches covered.">                        if (item != '-' &amp;&amp; item != '.') digits++;</span>
+                    }
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                    if (digits &lt;= de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {</span>
+<span class="fc" id="L188">                        formatted = plain;</span>
+<span class="fc" id="L189">                        return;</span>
+                    }
+                }
+<span class="fc" id="L192">                fraction = true;</span>
+            }
+<span class="fc" id="L194">            numeratorText = value.numerator().toString();</span>
+<span class="fc" id="L195">            RetainedOperation.work(numeratorText.length() + 1L);</span>
+<span class="fc" id="L196">            denominatorText = value.denominator().toString();</span>
+<span class="fc" id="L197">            RetainedOperation.work(denominatorText.length() + 1L);</span>
+<span class="fc" id="L198">            formatted = numeratorText + &quot; / &quot; + denominatorText;</span>
+<span class="fc" id="L199">            RetainedOperation.work(formatted.length() + 1L);</span>
+<span class="fc" id="L200">        }</span>
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L203">            visitor.reference(numerator); visitor.reference(denominator);</span>
+<span class="fc" id="L204">            visitor.reference(quotient); visitor.reference(decimal);</span>
+<span class="fc" id="L205">            visitor.reference(plain); visitor.reference(numeratorText);</span>
+<span class="fc" id="L206">            visitor.reference(denominatorText); visitor.reference(formatted);</span>
+<span class="fc" id="L207">        }</span>
     }
 
     private static void scheduleFunction(
@@ -138,20 +212,20 @@ public final class ExpressionFormatter {
         Deque&lt;Action&gt; pending,
         Output builder
     ) {
-<span class="fc" id="L141">        builder.append(function.name()).append('(');</span>
-<span class="fc" id="L142">        pending.push(new AppendText(&quot;)&quot;));</span>
-<span class="fc" id="L143">        List&lt;Expr&gt; arguments = function.arguments();</span>
-<span class="fc" id="L144">        for (int index = arguments.size() - 1;</span>
-<span class="fc bfc" id="L145" title="All 2 branches covered.">                index &gt;= 0;</span>
-<span class="fc" id="L146">                index--) {</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (index &lt; arguments.size() - 1) {</span>
-<span class="fc" id="L148">                pending.push(new AppendText(&quot;, &quot;));</span>
+<span class="fc" id="L215">        builder.appendOwned(function.name()).append('(');</span>
+<span class="fc" id="L216">        push(pending, new AppendText(&quot;)&quot;));</span>
+<span class="fc" id="L217">        List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="fc" id="L218">        for (int index = arguments.size() - 1;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                index &gt;= 0;</span>
+<span class="fc" id="L220">                index--) {</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            if (index &lt; arguments.size() - 1) {</span>
+<span class="fc" id="L222">                push(pending, new AppendText(&quot;, &quot;));</span>
             }
-<span class="fc" id="L150">            pending.push(new FormatExpression(</span>
-<span class="fc" id="L151">                arguments.get(index),</span>
+<span class="fc" id="L224">            push(pending, new FormatExpression(</span>
+<span class="fc" id="L225">                arguments.get(index),</span>
                 0));
         }
-<span class="fc" id="L154">    }</span>
+<span class="fc" id="L228">    }</span>
 
     private static void scheduleBinary(
         BinaryExpr binary,
@@ -159,81 +233,191 @@ public final class ExpressionFormatter {
         Deque&lt;Action&gt; pending,
         Output builder
     ) {
-<span class="fc" id="L162">        BinaryOperator operator = binary.operator();</span>
-<span class="fc" id="L163">        int precedence = operator.precedence();</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        boolean parenthesized = precedence &lt; parentPrecedence;</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (parenthesized) {</span>
-<span class="fc" id="L166">            builder.append('(');</span>
-<span class="fc" id="L167">            pending.push(new AppendText(&quot;)&quot;));</span>
+<span class="fc" id="L236">        BinaryOperator operator = binary.operator();</span>
+<span class="fc" id="L237">        int precedence = operator.precedence();</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        boolean parenthesized = precedence &lt; parentPrecedence;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (parenthesized) {</span>
+<span class="fc" id="L240">            builder.append('(');</span>
+<span class="fc" id="L241">            push(pending, new AppendText(&quot;)&quot;));</span>
         }
 
-<span class="fc bfc" id="L170" title="All 2 branches covered.">        int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;</span>
-<span class="fc bfc" id="L171" title="All 4 branches covered.">        int rightAdjust = switch (operator) {</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;</span>
+<span class="fc bfc" id="L245" title="All 4 branches covered.">        int rightAdjust = switch (operator) {</span>
             // Equal-precedence powers associate to the right. Lowering this
             // to MUL/DIV precedence would turn x^(A*B) into x^A*B.
-<span class="fc" id="L174">            case POW -&gt; 0;</span>
-<span class="fc" id="L175">            case DIV, SUB -&gt; 1;</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">            case MUL -&gt; isDivision(binary.right()) ? 1 : 0;</span>
-<span class="fc" id="L177">            default -&gt; 0;</span>
+<span class="fc" id="L248">            case POW -&gt; 0;</span>
+<span class="fc" id="L249">            case DIV, SUB -&gt; 1;</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            case MUL -&gt; isDivision(binary.right()) ? 1 : 0;</span>
+<span class="fc" id="L251">            default -&gt; 0;</span>
         };
-<span class="fc" id="L179">        pending.push(new FormatExpression(</span>
-<span class="fc" id="L180">            binary.right(),</span>
+<span class="fc" id="L253">        push(pending, new FormatExpression(</span>
+<span class="fc" id="L254">            binary.right(),</span>
             precedence + rightAdjust));
-<span class="fc" id="L182">        pending.push(new AppendText(</span>
-<span class="fc" id="L183">            &quot; &quot; + operator.symbol() + &quot; &quot;));</span>
-<span class="fc" id="L184">        pending.push(new FormatExpression(</span>
-<span class="fc" id="L185">            binary.left(),</span>
+<span class="fc bfc" id="L256" title="All 5 branches covered.">        push(pending, new AppendText(switch (operator) {</span>
+<span class="fc" id="L257">            case ADD -&gt; &quot; + &quot;; case SUB -&gt; &quot; - &quot;; case MUL -&gt; &quot; * &quot;;</span>
+<span class="fc" id="L258">            case DIV -&gt; &quot; / &quot;; case POW -&gt; &quot; ^ &quot;;</span>
+        }));
+<span class="fc" id="L260">        push(pending, new FormatExpression(</span>
+<span class="fc" id="L261">            binary.left(),</span>
             precedence + leftAdjust));
-<span class="fc" id="L187">    }</span>
+<span class="fc" id="L263">    }</span>
 
     private static boolean isDivision(Expr expression) {
-<span class="fc" id="L190">        return expression instanceof BinaryExpr binary</span>
-<span class="fc bfc" id="L191" title="All 4 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.DIV;</span>
+<span class="fc" id="L266">        return expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L267" title="All 4 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.DIV;</span>
     }
 
-    private static final class Output {
-<span class="fc" id="L195">        private final StringBuilder text = new StringBuilder();</span>
+<span class="fc" id="L270">    private enum NativeEmission implements java.util.function.LongConsumer, RetainedGraph.View {</span>
+<span class="fc" id="L271">        INSTANCE;</span>
+<span class="fc" id="L272">        @Override public void accept(long units) { RetainedOperation.work(units); }</span>
+<span class="fc" id="L273">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
+    }
+
+    private static void emit(java.util.function.LongConsumer callback, long units) {
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (callback == NativeEmission.INSTANCE) {</span>
+            // This closed implementation only updates the existing work counter.
+<span class="fc" id="L279">            callback.accept(units);</span>
+<span class="fc" id="L280">            return;</span>
+        }
+        try {
+<span class="fc" id="L283">            callback.accept(units);</span>
+<span class="fc" id="L284">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L285">            try { RetainedOperation.checkpoint(); }</span>
+<span class="fc" id="L286">            catch (RuntimeException | Error observation) {</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L288">            }</span>
+<span class="fc" id="L289">            throw failure;</span>
+<span class="fc" id="L290">        }</span>
+<span class="fc" id="L291">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L292">    }</span>
+
+    private static final class Output implements RetainedGraph.View {
+        private final Object input;
+<span class="fc" id="L296">        private char[] text = new char[16];</span>
+        private int size;
+<span class="fc" id="L298">        private final Deque&lt;Action&gt; pending = new ArrayDeque&lt;&gt;();</span>
+        private Action current;
+        private String fragment;
         private final java.util.function.LongConsumer emittedCodeUnits;
 
-<span class="fc" id="L198">        private Output(java.util.function.LongConsumer emittedCodeUnits) {</span>
-<span class="fc" id="L199">            this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, &quot;emittedCodeUnits&quot;);</span>
-<span class="fc" id="L200">        }</span>
+<span class="fc" id="L303">        private Output(Object input, java.util.function.LongConsumer emittedCodeUnits) {</span>
+<span class="fc" id="L304">            this.input = input;</span>
+<span class="fc" id="L305">            this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, &quot;emittedCodeUnits&quot;);</span>
+<span class="fc" id="L306">            RetainedOperation.work(19);</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (input instanceof Expr expression) {</span>
+<span class="fc" id="L308">                push(pending, new FormatExpression(expression, 0));</span>
+            } else {
+<span class="fc" id="L310">                Equation equation = (Equation) input;</span>
+<span class="fc" id="L311">                push(pending, new FormatExpression(equation.right(), 0));</span>
+<span class="fc" id="L312">                push(pending, new AppendText(&quot; = &quot;));</span>
+<span class="fc" id="L313">                push(pending, new FormatExpression(equation.left(), 0));</span>
+            }
+<span class="fc" id="L315">        }</span>
 
-        private Output append(String value) {
-<span class="fc" id="L203">            emittedCodeUnits.accept(value.length());</span>
-<span class="fc" id="L204">            text.append(value);</span>
-<span class="fc" id="L205">            return this;</span>
+        /** Only source names or the current AppendText value enter here; their owner stays live. */
+        private Output appendOwned(String value) {
+<span class="fc" id="L319">            emit(emittedCodeUnits, value.length());</span>
+<span class="fc" id="L320">            ensureCapacity(value.length());</span>
+<span class="fc" id="L321">            value.getChars(0, value.length(), text, size);</span>
+<span class="fc" id="L322">            size += value.length();</span>
+<span class="fc" id="L323">            RetainedOperation.work(1);</span>
+<span class="fc" id="L324">            return this;</span>
         }
+
+        private Output append(String value, boolean parenthesized, long conversionWork) {
+<span class="fc" id="L328">            fragment = value;</span>
+<span class="fc" id="L329">            boolean observationAttempted = false;</span>
+            try {
+<span class="fc" id="L331">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                if (conversionWork != 0) RetainedOperation.work(conversionWork);</span>
+<span class="fc" id="L333">                observationAttempted = true;</span>
+<span class="fc" id="L334">                RetainedOperation.checkpoint();</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">                if (parenthesized) append('(');</span>
+<span class="fc" id="L336">                emit(emittedCodeUnits, value.length());</span>
+<span class="fc" id="L337">                ensureCapacity(value.length());</span>
+<span class="fc" id="L338">                value.getChars(0, value.length(), text, size);</span>
+<span class="fc" id="L339">                size += value.length();</span>
+<span class="fc" id="L340">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                if (parenthesized) append(')');</span>
+<span class="fc" id="L342">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">                if (!observationAttempted) {</span>
+<span class="fc" id="L344">                    try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L345">                    catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                        if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L347">                    }</span>
+                }
+<span class="fc" id="L349">                try { clearFragment(); }</span>
+<span class="fc" id="L350">                catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">                    if (cleanup != failure) failure.addSuppressed(cleanup);</span>
+<span class="fc" id="L352">                }</span>
+<span class="fc" id="L353">                throw failure;</span>
+<span class="fc" id="L354">            }</span>
+<span class="fc" id="L355">            clearFragment();</span>
+<span class="fc" id="L356">            return this;</span>
+        }
+
+        private void clearFragment() {
+<span class="fc" id="L360">            fragment = null;</span>
+<span class="fc" id="L361">            RetainedOperation.work(1);</span>
+<span class="fc" id="L362">        }</span>
 
         private Output append(char value) {
-<span class="fc" id="L209">            emittedCodeUnits.accept(1);</span>
-<span class="fc" id="L210">            text.append(value);</span>
-<span class="fc" id="L211">            return this;</span>
+<span class="fc" id="L365">            emit(emittedCodeUnits, 1);</span>
+<span class="fc" id="L366">            ensureCapacity(1);</span>
+<span class="fc" id="L367">            text[size++] = value;</span>
+<span class="fc" id="L368">            RetainedOperation.work(1);</span>
+<span class="fc" id="L369">            return this;</span>
         }
 
-        @Override
-        public String toString() {
-<span class="fc" id="L216">            return text.toString();</span>
+        private void ensureCapacity(int additional) {
+<span class="fc" id="L373">            int needed = Math.addExact(size, additional);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (needed &lt;= text.length) return;</span>
+<span class="fc" id="L375">            var old = text;</span>
+<span class="fc" id="L376">            var replacement = new char[Math.max(needed, Math.addExact(Math.multiplyExact(old.length, 2), 2))];</span>
+<span class="fc" id="L377">            RetainedOperation.work(replacement.length);</span>
+<span class="fc" id="L378">            try (var growth = RetainedOperation.retain(old, replacement)) {</span>
+<span class="fc" id="L379">                System.arraycopy(old, 0, replacement, 0, size);</span>
+<span class="fc" id="L380">                text = replacement;</span>
+<span class="fc" id="L381">                RetainedOperation.work(size + 1L);</span>
+            }
+<span class="fc" id="L383">        }</span>
+
+        private String value() {
+<span class="fc" id="L386">            RetainedOperation.work(size);</span>
+<span class="fc" id="L387">            return RetainedOperation.produced(new String(text, 0, size));</span>
         }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L391">            visitor.reference(input);</span>
+<span class="fc" id="L392">            visitor.reference(text);</span>
+<span class="fc" id="L393">            visitor.reference(emittedCodeUnits);</span>
+<span class="fc" id="L394">            visitor.reference(pending);</span>
+<span class="fc" id="L395">            visitor.reference(current);</span>
+<span class="fc" id="L396">            visitor.reference(fragment);</span>
+<span class="fc" id="L397">        }</span>
     }
 
-    private sealed interface Action
+    private sealed interface Action extends RetainedGraph.View
             permits AppendText, FormatExpression {
     }
 
     private record AppendText(String value) implements Action {
-<span class="fc" id="L225">        private AppendText {</span>
-<span class="fc" id="L226">            Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L227">        }</span>
+<span class="fc" id="L405">        private AppendText {</span>
+<span class="fc" id="L406">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L407">            RetainedOperation.work(1);</span>
+<span class="fc" id="L408">        }</span>
+<span class="fc" id="L409">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(value); }</span>
     }
 
     private record FormatExpression(
         Expr expression,
         int parentPrecedence
     ) implements Action {
-<span class="fc" id="L234">        private FormatExpression {</span>
-<span class="fc" id="L235">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L236">        }</span>
+<span class="fc" id="L416">        private FormatExpression {</span>
+<span class="fc" id="L417">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L418">            RetainedOperation.work(1);</span>
+<span class="fc" id="L419">        }</span>
+<span class="fc" id="L420">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(expression); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

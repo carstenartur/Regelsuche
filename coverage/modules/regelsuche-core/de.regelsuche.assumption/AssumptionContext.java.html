@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssumptionContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">AssumptionContext.java</span></div><h1>AssumptionContext.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -12,40 +13,53 @@ import java.util.Set;
  * &lt;p&gt;The context dedupes assumptions by their expression text so a rule that
  * fires multiple times along a path only contributes its assumption once.&lt;/p&gt;
  */
-<span class="fc" id="L15">public final class AssumptionContext {</span>
-<span class="fc" id="L16">    private final Set&lt;String&gt; known = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L17">    private final List&lt;Assumption&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L16">public final class AssumptionContext implements RetainedGraph.View {</span>
+<span class="fc" id="L17">    @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(known); visitor.reference(assumptions); }</span>
+<span class="fc" id="L18">    private final Set&lt;String&gt; known = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L19">    private final List&lt;Assumption&gt; assumptions = new ArrayList&lt;&gt;();</span>
 
     public void add(Assumption assumption) {
-<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if (assumption == null) {</span>
-<span class="nc" id="L21">            return;</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (assumption == null) {</span>
+<span class="nc" id="L23">            return;</span>
         }
-<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (known.add(assumption.expression())) {</span>
-<span class="fc" id="L24">            assumptions.add(assumption);</span>
+<span class="fc" id="L25">        try (var owned = RetainedOperation.retain(this, assumption)) {</span>
+<span class="fc" id="L26">            boolean added = known.add(assumption.expression());</span>
+<span class="fc" id="L27">            RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (added) {</span>
+<span class="fc" id="L29">                assumptions.add(assumption);</span>
+<span class="fc" id="L30">                RetainedOperation.work(1);</span>
+            }
+<span class="fc" id="L32">            RetainedOperation.checkpoint();</span>
         }
-<span class="fc" id="L26">    }</span>
+<span class="fc" id="L34">    }</span>
 
     public void addAll(List&lt;Assumption&gt; additions) {
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (additions == null) {</span>
-<span class="nc" id="L30">            return;</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (additions == null) {</span>
+<span class="nc" id="L38">            return;</span>
         }
-<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (Assumption assumption : additions) {</span>
-<span class="fc" id="L33">            add(assumption);</span>
-<span class="fc" id="L34">        }</span>
-<span class="fc" id="L35">    }</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (Assumption assumption : additions) {</span>
+<span class="fc" id="L41">            RetainedOperation.work(1);</span>
+<span class="fc" id="L42">            add(assumption);</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">    }</span>
 
     /** @return immutable snapshot of the accumulated assumptions. */
     public List&lt;Assumption&gt; snapshot() {
-<span class="fc" id="L39">        return Collections.unmodifiableList(new ArrayList&lt;&gt;(assumptions));</span>
+<span class="fc" id="L48">        try (var owned = RetainedOperation.retain(this)) {</span>
+<span class="fc" id="L49">            var snapshot = List.copyOf(assumptions);</span>
+<span class="fc" id="L50">            try (var copy = RetainedOperation.retainCompleted(assumptions.size() + 1L, snapshot)) {</span>
+<span class="fc" id="L51">                return snapshot;</span>
+            }
+        }
     }
 
     public boolean isEmpty() {
-<span class="fc" id="L43">        return assumptions.isEmpty();</span>
+<span class="fc" id="L57">        return assumptions.isEmpty();</span>
     }
 
     @Override
     public String toString() {
-<span class="nc" id="L48">        return assumptions.toString();</span>
+<span class="nc" id="L62">        return assumptions.toString();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

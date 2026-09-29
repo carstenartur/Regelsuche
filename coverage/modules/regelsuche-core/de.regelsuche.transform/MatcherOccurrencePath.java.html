@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatcherOccurrencePath.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">MatcherOccurrencePath.java</span></div><h1>MatcherOccurrencePath.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import java.util.List;
+
+/** The existing dotted occurrence format, assembled without intermediate prefix strings. */
+final class MatcherOccurrencePath {
+    private MatcherOccurrencePath() { }
+
+    static String render(List&lt;Integer&gt; path) {
+<span class="fc" id="L12">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        if (path.isEmpty()) return &quot;root&quot;;</span>
+<span class="fc" id="L14">        var assembly = new Assembly(path);</span>
+<span class="fc" id="L15">        try (var owned = RetainedOperation.retainCompleted(1,assembly)) {</span>
+            try {
+<span class="fc" id="L17">                int length = path.size() - 1;</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">                for (int index : path) length = Math.addExact(length,decimalDigits(index));</span>
+<span class="fc" id="L19">                assembly.buffer = new char[length];</span>
+<span class="fc" id="L20">                RetainedOperation.work(1L + length);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                for (int index : path) assembly.append(index);</span>
+<span class="fc" id="L22">                assembly.output = new String(assembly.buffer);</span>
+<span class="fc" id="L23">                RetainedOperation.work(1L + length);</span>
+<span class="fc" id="L24">                RetainedOperation.checkpoint();</span>
+<span class="fc" id="L25">                return assembly.output;</span>
+<span class="fc" id="L26">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L27">                try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L28">                catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">                    if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L30">                }</span>
+<span class="fc" id="L31">                throw failure;</span>
+            }
+        }
+    }
+
+    private static int decimalDigits(int value) {
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (value &lt; 0) throw new IllegalArgumentException(&quot;negative occurrence index&quot;);</span>
+<span class="fc" id="L38">        int digits = 1;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (; value &gt;= 10; value /= 10) digits++;</span>
+<span class="fc" id="L40">        RetainedOperation.work(1L + digits);</span>
+<span class="fc" id="L41">        return digits;</span>
+    }
+
+    private static final class Assembly implements RetainedGraph.View {
+        private final List&lt;Integer&gt; path;
+        private char[] buffer;
+        private String output;
+        private int offset;
+
+<span class="fc" id="L50">        private Assembly(List&lt;Integer&gt; path) { this.path = path; }</span>
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L53">            visitor.reference(path); visitor.reference(buffer); visitor.reference(output);</span>
+<span class="fc" id="L54">        }</span>
+
+        private void append(int value) {
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (offset &gt; 0) {</span>
+<span class="fc" id="L58">                buffer[offset++] = '.';</span>
+<span class="fc" id="L59">                RetainedOperation.work(1);</span>
+            }
+<span class="fc" id="L61">            int digits = decimalDigits(value);</span>
+<span class="fc" id="L62">            int end = offset + digits;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            for (int cursor = end - 1; cursor &gt;= offset; cursor--) {</span>
+<span class="fc" id="L64">                buffer[cursor] = (char) ('0' + value % 10);</span>
+<span class="fc" id="L65">                value /= 10;</span>
+            }
+<span class="fc" id="L67">            offset = end;</span>
+<span class="fc" id="L68">            RetainedOperation.work(3L * digits + 1);</span>
+<span class="fc" id="L69">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

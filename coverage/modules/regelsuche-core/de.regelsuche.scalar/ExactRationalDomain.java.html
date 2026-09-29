@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  * approximate values are outside this domain.&lt;/p&gt;
  */
 public final class ExactRationalDomain implements RetainedGraph.View {
-<span class="nc" id="L26">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(limits);}</span>
+<span class="fc" id="L26">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(limits);}</span>
 
     public static final String DOMAIN_ID =
         &quot;regelsuche.exact-rational-scalar/v1&quot;;
@@ -331,7 +331,7 @@ public final class ExactRationalDomain implements RetainedGraph.View {
         int maxDigits,
         int maxDecimalScale
     ) implements RetainedGraph.View {
-<span class="nc" id="L334">    @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L334">    @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
 
 <span class="fc" id="L336">        public Limits {</span>
 <span class="pc bpc" id="L337" title="5 of 14 branches missed.">            if (maxLiteralCharacters &lt; 1</span>

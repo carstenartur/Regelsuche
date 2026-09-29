@@ -279,7 +279,7 @@ public record ExactRational(
 
     /** Explicitly rounded projection for numerical diagnostics, never equality. */
     public BigDecimal toBigDecimal(MathContext context) {
-<span class="fc" id="L282">        return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);</span>
+<span class="nc" id="L282">        return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);</span>
     }
 
     /** A root exists here only when both integer components are perfect squares. */

@@ -14,7 +14,7 @@ public record RecognitionProfile(
     Set&lt;String&gt; recognitionRuleIds,
     int maxEquivalenceDepth
 ) implements RetainedGraph.View {
-<span class="nc" id="L17">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(associativeOperators);v.reference(commutativeOperators);v.reference(recognitionRuleIds);}</span>
+<span class="fc" id="L17">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(associativeOperators);v.reference(commutativeOperators);v.reference(recognitionRuleIds);}</span>
 
     public RecognitionProfile(Set&lt;BinaryOperator&gt; associativeOperators, Set&lt;BinaryOperator&gt; commutativeOperators) {
 <span class="fc" id="L20">        this(associativeOperators, commutativeOperators, false, Set.of(), 0);</span>

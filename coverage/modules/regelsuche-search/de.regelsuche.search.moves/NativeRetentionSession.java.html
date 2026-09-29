@@ -4,80 +4,103 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.search.program.AstExpressionValidation;
 
-/** One run's paid ownership observations; no strong registry survives a scan or session close. */
+/** One run's paid ownership observations; the uneconomic inventory prototype remains opt-in. */
 final class NativeRetentionSession implements de.regelsuche.retention.RetainedOperation.Sink {
     private final NativeMoveSearch.Problem problem;
     private final SearchExpressionStore store;
     private final SearchExpressionStore.Limits limits;
+    private RetainedGraph.Inventory inventory;
+    private final RetainedGraph.Usage inventoryLimits;
     private RetainedGraph.View kernel;
+    private RetainedGraph.View finalSelection;
+    private RetainedGraph.View replayExecution;
     private TypedSourceOnlySearch.Objective externalObjective;
     private boolean lastObservationComplete;
     private de.regelsuche.retention.RetainedOperation operation;
     private long executionWork;
     private long validationWork,retentionWork,peakNodes,peakCharacters,peakReferences;
-<span class="fc" id="L18">    private boolean complete=true;</span>
-<span class="fc" id="L19">    private String detail=&quot;&quot;;</span>
-<span class="fc" id="L20">    NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){</span>
-<span class="fc" id="L21">        this.problem=problem;this.store=store;this.limits=limits;</span>
-<span class="fc" id="L22">    }</span>
-<span class="fc" id="L23">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(detail);v.reference(operation);v.reference(externalObjective);}</span>
-<span class="fc" id="L24">    void externalObjective(TypedSourceOnlySearch.Objective objective){executionWork(1);externalObjective=objective;}</span>
-<span class="fc" id="L25">    void ownership(RetainedGraph.View root){kernel=root;}</span>
-<span class="fc" id="L26">    void operation(de.regelsuche.retention.RetainedOperation scope){operation=scope;}</span>
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">    @Override public void executionWork(long units){if(units&lt;0)throw new IllegalArgumentException(&quot;negative native work&quot;);executionWork=Math.addExact(executionWork,units);}</span>
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">    @Override public void validationWork(long units){if(units&lt;0)throw new IllegalArgumentException(&quot;negative validation work&quot;);validationWork=Math.addExact(validationWork,units);}</span>
-<span class="fc" id="L29">    void validate(Expr expression){AstExpressionValidation.inspect(expression);}</span>
-<span class="fc" id="L30">    long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}</span>
-<span class="fc" id="L31">    @Override public long observedWork(){return work();}</span>
-<span class="fc" id="L32">    boolean complete(){return complete;}</span>
-<span class="fc" id="L33">    @Override public void checkpoint(){observe(this,true);}</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">    void incomplete(String reason){complete=false;if(detail.isEmpty())detail=reason;}</span>
-<span class="nc" id="L35">    void fail(String reason){incomplete(reason);throw new SearchExecution.ResourceLimit();}</span>
+<span class="fc" id="L22">    private boolean complete=true;</span>
+<span class="fc" id="L23">    private String detail=&quot;&quot;;</span>
+    NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){
+<span class="fc" id="L25">        this(problem,store,limits,false);</span>
+<span class="fc" id="L26">    }</span>
+    /** Package-local prototype control; ordinary native searches use the paid fresh scanner. */
+<span class="fc" id="L28">    NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits,boolean useInventory){</span>
+<span class="fc" id="L29">        this.problem=problem;this.store=store;this.limits=limits;</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        inventory=useInventory?new RetainedGraph.Inventory():null;</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        inventoryLimits=useInventory?new RetainedGraph.Usage(limits.nodes(),limits.characters(),limits.references()):null;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        retentionWork=useInventory?6:0; // actual inventory/backend/containers and limit value only</span>
+<span class="fc" id="L33">    }</span>
+<span class="fc" id="L34">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(finalSelection);v.reference(replayExecution);v.reference(detail);v.reference(operation);v.reference(externalObjective);v.reference(inventory);v.reference(inventoryLimits);}</span>
+<span class="fc" id="L35">    void externalObjective(TypedSourceOnlySearch.Objective objective){executionWork(1);externalObjective=objective;}</span>
+<span class="fc" id="L36">    void ownership(RetainedGraph.View root){kernel=root;executionWork(1);}</span>
+    /** Completed output replaces frontier scratch; replay owns its live environment and optional selection. */
+    void completed(RetainedGraph.View result,RetainedGraph.View selection,RetainedGraph.View execution){
+<span class="fc" id="L39">        ownership(result);finalSelection=selection;replayExecution=execution;executionWork(2);</span>
+<span class="fc" id="L40">    }</span>
+<span class="fc" id="L41">    void operation(de.regelsuche.retention.RetainedOperation scope){operation=scope;}</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">    @Override public void executionWork(long units){if(units&lt;0)throw new IllegalArgumentException(&quot;negative native work&quot;);executionWork=Math.addExact(executionWork,units);}</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">    @Override public void validationWork(long units){if(units&lt;0)throw new IllegalArgumentException(&quot;negative validation work&quot;);validationWork=Math.addExact(validationWork,units);}</span>
+<span class="fc" id="L44">    void validate(Expr expression){AstExpressionValidation.inspect(expression);}</span>
+<span class="fc" id="L45">    long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}</span>
+<span class="fc" id="L46">    @Override public long observedWork(){return work();}</span>
+<span class="fc" id="L47">    boolean complete(){return complete;}</span>
+<span class="fc" id="L48">    @Override public void checkpoint(){observe(this,true);}</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">    void incomplete(String reason){complete=false;if(detail.isEmpty())detail=reason;}</span>
+<span class="nc" id="L50">    void fail(String reason){incomplete(reason);throw new SearchExecution.ResourceLimit();}</span>
     private RetainedGraph.Observation observe(Object root,boolean enforce){
-<span class="fc" id="L37">        RetainedGraph.Observation measured;lastObservationComplete=true;</span>
-<span class="fc" id="L38">        try { measured=RetainedGraph.measure(root); }</span>
-<span class="fc" id="L39">        catch(RetainedGraph.Unmeasured unknown) {</span>
-<span class="fc bfc" id="L40" title="All 2 branches covered.">            measured=unknown.attempted();lastObservationComplete=false;complete=false;if(detail.isEmpty())detail=&quot;NATIVE_RETENTION_UNSUPPORTED:&quot;+unknown.getMessage();</span>
-<span class="fc" id="L41">        }</span>
-<span class="fc" id="L42">        retentionWork=Math.addExact(retentionWork,measured.work());</span>
-<span class="fc" id="L43">        peakNodes=Math.max(peakNodes,measured.peak().nodes());peakCharacters=Math.max(peakCharacters,measured.peak().characters());</span>
-<span class="fc" id="L44">        peakReferences=Math.max(peakReferences,measured.peak().references());</span>
-<span class="fc bfc" id="L45" title="All 6 branches covered.">        if(peakNodes&gt;limits.nodes() || peakCharacters&gt;limits.characters() || peakReferences&gt;limits.references()) {</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">            complete=false;if(detail.isEmpty())detail=&quot;NATIVE_RETENTION_EXHAUSTED&quot;;</span>
+<span class="fc" id="L52">        RetainedGraph.Observation measured;lastObservationComplete=true;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        try { measured=inventory==null?RetainedGraph.measure(root):inventory.measure(root,inventoryLimits); }</span>
+<span class="fc" id="L54">        catch(RetainedGraph.Unmeasured unknown) {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            measured=unknown.attempted();lastObservationComplete=false;complete=false;if(detail.isEmpty())detail=&quot;NATIVE_RETENTION_UNSUPPORTED:&quot;+unknown.getMessage();</span>
         }
-<span class="fc bfc" id="L48" title="All 4 branches covered.">        if(enforce &amp;&amp; !complete)throw new SearchExecution.ResourceLimit();</span>
-<span class="fc" id="L49">        return measured;</span>
+<span class="nc" id="L57">        catch(RetainedGraph.InventoryFailure missingOwner) {</span>
+<span class="nc" id="L58">            measured=missingOwner.attempted();lastObservationComplete=false;complete=false;</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            if(detail.isEmpty())detail=&quot;NATIVE_RETENTION_UNSUPPORTED:&quot;+missingOwner.getMessage();</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        retentionWork=Math.addExact(retentionWork,measured.work());</span>
+<span class="fc" id="L62">        peakNodes=Math.max(peakNodes,measured.peak().nodes());peakCharacters=Math.max(peakCharacters,measured.peak().characters());</span>
+<span class="fc" id="L63">        peakReferences=Math.max(peakReferences,measured.peak().references());</span>
+<span class="fc bfc" id="L64" title="All 6 branches covered.">        if(peakNodes&gt;limits.nodes() || peakCharacters&gt;limits.characters() || peakReferences&gt;limits.references()) {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            complete=false;if(detail.isEmpty())detail=&quot;NATIVE_RETENTION_EXHAUSTED&quot;;</span>
+        }
+<span class="fc bfc" id="L67" title="All 4 branches covered.">        if(enforce &amp;&amp; !complete)throw new SearchExecution.ResourceLimit();</span>
+<span class="fc" id="L68">        return measured;</span>
     }
-<span class="fc" id="L51">    private record Handoff(NativeRetentionSession session,RetainedGraph.View output) implements RetainedGraph.View {</span>
-<span class="fc" id="L52">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(session);v.reference(output);}</span>
+<span class="fc" id="L70">    private record Handoff(NativeRetentionSession session,RetainedGraph.View output) implements RetainedGraph.View {</span>
+<span class="fc" id="L71">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(session);v.reference(output);}</span>
     }
-<span class="fc" id="L54">    private record ExternalInputs(NativeMoveSearch.Problem problem,TypedSourceOnlySearch.Objective objective) implements RetainedGraph.View {</span>
-<span class="fc" id="L55">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(objective);}</span>
+<span class="fc" id="L73">    private record ExternalInputs(NativeMoveSearch.Problem problem,TypedSourceOnlySearch.Objective objective) implements RetainedGraph.View {</span>
+<span class="fc" id="L74">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(objective);}</span>
     }
-<span class="fc" id="L57">    void finish(NativeMoveSearch.Result result){finish(result,result);}</span>
+<span class="fc" id="L76">    void finish(NativeMoveSearch.Result result){finish(result,result);}</span>
     void finish(NativeMoveSearch.Result result,RetainedGraph.View output){
-<span class="fc" id="L59">        executionWork(5);</span>
-<span class="fc" id="L60">        var receipt=new NativeMoveSearch.Accounting();result.accounting=receipt;</span>
-<span class="fc" id="L61">        update(receipt,0,0,0);</span>
-<span class="fc" id="L62">        observe(new Handoff(this,output),false);</span>
-<span class="fc" id="L63">        store.close();kernel=null;</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if(operation!=null)operation.close();operation=null;executionWork(2);</span>
-<span class="fc" id="L65">        executionWork(7);</span>
-<span class="fc" id="L66">        var external=observe(new ExternalInputs(problem,externalObjective),false);</span>
-<span class="fc" id="L67">        receipt.external(external.retained(),lastObservationComplete);externalObjective=null;</span>
-<span class="fc" id="L68">        update(receipt,0,0,0);</span>
-<span class="fc" id="L69">        String measuredDetail=detail;</span>
-<span class="fc" id="L70">        var retained=observe(output,false).retained();</span>
-<span class="fc" id="L71">        update(receipt,retained.nodes(),retained.characters(),retained.references());</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if(!measuredDetail.equals(detail)) {</span>
-<span class="nc" id="L73">            retained=observe(output,false).retained();</span>
-<span class="nc" id="L74">            update(receipt,retained.nodes(),retained.characters(),retained.references());</span>
+<span class="fc" id="L78">        executionWork(5);</span>
+<span class="fc" id="L79">        var receipt=new NativeMoveSearch.Accounting();result.accounting=receipt;</span>
+<span class="fc" id="L80">        update(receipt,0,0,0);</span>
+<span class="fc" id="L81">        observe(new Handoff(this,output),false);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if(inventory!=null){</span>
+<span class="fc" id="L83">            retentionWork=Math.addExact(retentionWork,inventory.close());inventory=null;</span>
+<span class="fc" id="L84">            retentionWork=Math.addExact(retentionWork,1);</span>
         }
-<span class="fc" id="L76">    }</span>
+<span class="fc" id="L86">        store.close();kernel=null;finalSelection=null;replayExecution=null;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if(operation!=null)operation.close();operation=null;executionWork(4);</span>
+<span class="fc" id="L88">        executionWork(7);</span>
+<span class="fc" id="L89">        var external=observe(new ExternalInputs(problem,externalObjective),false);</span>
+<span class="fc" id="L90">        receipt.external(external.retained(),lastObservationComplete);externalObjective=null;</span>
+<span class="fc" id="L91">        update(receipt,0,0,0);</span>
+<span class="fc" id="L92">        String measuredDetail=detail;</span>
+<span class="fc" id="L93">        var retained=observe(output,false).retained();</span>
+<span class="fc" id="L94">        update(receipt,retained.nodes(),retained.characters(),retained.references());</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if(!measuredDetail.equals(detail)) {</span>
+<span class="nc" id="L96">            retained=observe(output,false).retained();</span>
+<span class="nc" id="L97">            update(receipt,retained.nodes(),retained.characters(),retained.references());</span>
+        }
+<span class="fc" id="L99">    }</span>
     private void update(NativeMoveSearch.Accounting receipt,long nodes,long characters,long references){
-<span class="fc" id="L78">        executionWork(13);</span>
-<span class="fc" id="L79">        receipt.update(validationWork,executionWork,store.work(),retentionWork,peakNodes,peakCharacters,peakReferences,</span>
+<span class="fc" id="L101">        executionWork(13);</span>
+<span class="fc" id="L102">        receipt.update(validationWork,executionWork,store.work(),retentionWork,peakNodes,peakCharacters,peakReferences,</span>
             nodes,characters,references,complete,detail);
-<span class="fc" id="L81">    }</span>
+<span class="fc" id="L104">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

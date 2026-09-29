@@ -16,7 +16,7 @@ import java.util.Objects;
  * (e.g. {@code &quot;b != 0&quot;} or {@code &quot;x &gt; 0&quot;}).&lt;/p&gt;
  */
 public record Assumption(Kind kind, String expression, List&lt;String&gt; symbols) implements de.regelsuche.retention.RetainedGraph.View {
-<span class="nc" id="L19">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(kind);v.reference(expression);v.reference(symbols);}</span>
+<span class="fc" id="L19">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(kind);v.reference(expression);v.reference(symbols);}</span>
 <span class="fc" id="L20">    public Assumption {</span>
 <span class="fc" id="L21">        Objects.requireNonNull(kind, &quot;kind&quot;);</span>
 <span class="pc bpc" id="L22" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
