@@ -637,14 +637,18 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         try (var retained = RetainedOperation.retainCompleted(1,replay);
                 var json = RetainedJson.open(); var jsonOwner = RetainedOperation.retain(json)) {
             try {
-                replay.run();
+                try { replay.run(); }
+                catch (ReplayRejected rejected) { replay.rejection=rejected.getMessage(); }
+                // Semantic rejection is data until all observations and closes succeed.
+                // Otherwise a cleanup failure could be suppressed on a discarded rejection.
                 RetainedOperation.checkpoint();
-                return replay.checked;
             } catch (RuntimeException | Error failure) {
                 observeImportFailure(failure);
                 throw failure;
             }
         }
+        if (replay.rejection!=null) throw new ReplayRejected(replay.rejection);
+        return replay.checked;
     }
 
     /** Actual decoded/intermediate owners shared by legacy verification and explicit import. */
@@ -658,13 +662,14 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         private TreeMap<String,Expr> substitutions;
         private Expr decoded;
         private VerifiedApplication checked;
+        private String rejection;
         BindingReplay(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
             this.source=source;this.binding=binding;this.work=work;
         }
         @Override public void retainedReferences(RetainedGraph.Visitor v) {
             v.reference(CheckedLearnedSchemaModel.this);v.reference(source);v.reference(binding);v.reference(work);
             v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);
-            v.reference(decoded);v.reference(checked);
+            v.reference(decoded);v.reference(checked);v.reference(rejection);
         }
         void run() {
             data = read(binding.canonicalEvidenceJson());
@@ -684,23 +689,25 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 throw new ReplayRejected("CHECKED_SCHEMA_WRONG_SOURCE");
             array(data.get("path"), bounds.maximumDepth());
             path = new ArrayList<>();
+            RetainedOperation.work(2);
             for (var part : data.get("path")) {
                 if (!part.isInt() || part.intValue() < 0 || part.intValue() > 1)
                     throw new ReplayRejected("CHECKED_SCHEMA_INVALID_PATH");
                 path.add(part.intValue());
+                RetainedOperation.work(1);
             }
-            RetainedOperation.work(path.size()+2L);
             RetainedOperation.checkpoint();
             checked = replayOccurrence(schema,source.expression(),encodedSource,path,()->{
                 substitutions = new TreeMap<>();
+                RetainedOperation.work(1);
                 array(data.get("bindings"), 16);
                 for (var value : data.get("bindings")) {
                     fields(value, "name", "expression");
                     decoded = CODEC.decodeExpression(text(value, "expression"));
                     domain(decoded, bounds, work);
-                    if (substitutions.put(text(value, "name"), decoded) != null)
-                        throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
+                    var previous = substitutions.put(text(value, "name"), decoded);
                     RetainedOperation.work(2);
+                    if (previous != null) throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
                     RetainedOperation.checkpoint();
                 }
                 return substitutions;
@@ -728,11 +735,27 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         if(occurrence.isEmpty())throw new ReplayRejected("CHECKED_SCHEMA_ABSENT_OCCURRENCE");
         var outcome=match(schema,occurrence.orElseThrow());work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());
         if(!outcome.complete() || !outcome.matched())throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
-        var substitutions=bindings.get();
-        if(!substitutions.equals(outcome.matches().getFirst().bindings()))throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
-        var applicationWork=new Work();
-        try{return apply(schema,source,encodedSource,path,substitutions,applicationWork);}
-        finally{work.add(applicationWork.units);}
+        // The returned matcher outcome is still needed after decoding the supplied bindings.
+        // Keep both graphs, inner work and the completed application through their handoff.
+        var pending = new Object[4];
+        try (var retained=RetainedOperation.retainCompleted(5,outcome,schema,source,encodedSource,path,work,pending)) {
+            try {
+                try {
+                    var substitutions=bindings.get();pending[0]=substitutions;
+                    if(!substitutions.equals(outcome.matches().getFirst().bindings()))
+                        throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
+                    var applicationWork=new Work();pending[1]=applicationWork;
+                    try { pending[2]=apply(schema,source,encodedSource,path,substitutions,applicationWork); }
+                    finally { work.add(applicationWork.units); }
+                } catch (ReplayRejected rejected) { pending[3]=rejected.getMessage(); }
+                RetainedOperation.checkpoint();
+            } catch (RuntimeException | Error failure) {
+                observeImportFailure(failure);
+                throw failure;
+            }
+        }
+        if (pending[3]!=null) throw new ReplayRejected((String)pending[3]);
+        return (VerifiedApplication) pending[2];
     }
     public NativeVerifier nativeVerifier() {return new IndependentNativeVerifier();}
     private final class IndependentNativeVerifier implements NativeVerifier,RetainedGraph.View {
