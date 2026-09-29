@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadConstraints;
@@ -179,15 +180,23 @@ final class CheckedSchemaSupport {
         }
     }
 
-    private record Node(Expr value, int depth) {}
+    private record Node(Expr value, int depth) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(value);}
+    }
     /** Total rational polynomial syntax: no functions, variable denominators or variable/negative powers. */
     static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
         var pending = new ArrayDeque<Node>();
         pending.push(new Node(root, 0));
+        var current = new Node[1];
+        // Queue/backing, root wrapper/insertion and the actual current slot.
+        try (var retained=RetainedOperation.retainCompleted(6,root,bounds,work,pending,current)) {
+        try {
         int count = 0;
         while (!pending.isEmpty()) {
-            var node = pending.pop();
+            var node = current[0] = pending.pop();
+            // The caller owns this visited-work ledger, including a failed prefix.
             work.add(1);
+            RetainedOperation.work(2);
             if (++count > bounds.maximumExpressionNodes() || node.depth() > bounds.maximumDepth()) {
                 throw new IllegalArgumentException("checked scalar polynomial structure limit");
             }
@@ -207,10 +216,22 @@ final class CheckedSchemaSupport {
                         throw new IllegalArgumentException("checked scalar power needs bounded nonnegative literal exponent");
                     }
                     pending.push(new Node(binary.right(), node.depth() + 1));
+                    RetainedOperation.work(2);
                     pending.push(new Node(binary.left(), node.depth() + 1));
+                    RetainedOperation.work(2);
+                    RetainedOperation.checkpoint();
                 }
                 default -> throw new IllegalArgumentException("outside checked scalar rational polynomial domain");
             }
+        }
+        RetainedOperation.checkpoint();
+        } catch (RuntimeException | Error failure) {
+            try { RetainedOperation.checkpoint(); }
+            catch (RuntimeException | Error observation) {
+                if (observation != failure) failure.addSuppressed(observation);
+            }
+            throw failure;
+        }
         }
     }
 
