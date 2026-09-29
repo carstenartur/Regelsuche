@@ -274,7 +274,7 @@ class CheckedLearnedSchemaModelTest {
     }
 
     @Test void actualSelectedWitnessImportsInAnotherJvmWithoutTrainingOrSearchingAgain(
-            @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+            @org.junit.jupiter.api.io.TempDir(cleanup=org.junit.jupiter.api.io.CleanupMode.ON_SUCCESS) java.nio.file.Path directory) throws Exception {
         var learned=CheckedLearnedSchemaModel.learn(formation);
         var restored=CheckedLearnedSchemaModel.load(learned.toCanonicalJson(),formation.inventory().contentHash());
         Expr source=nestedImportSource();
@@ -324,6 +324,9 @@ class CheckedLearnedSchemaModelTest {
                 .put("formationWork",restored.formationWork()).put("searchObservedWork",selected.totalWork())
                 .put("exportObservedWork",exported.accounting().work()).put("accountingComplete",false);
             System.out.println("P04_IMPORTED_WITNESS "+mapper.writeValueAsString(report));
+        } catch (Exception | Error failure) {
+            System.err.println("P04_FAILED_IMPORT_FILES "+directory);
+            throw failure;
         } finally {
             if (process.isAlive()) process.destroyForcibly();
             assertTrue(process.waitFor(5,java.util.concurrent.TimeUnit.SECONDS),"fresh import process did not terminate");
