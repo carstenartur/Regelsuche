@@ -2,8 +2,9 @@ package example;
 
 import de.regelsuche.sdk.discovery.DiscoveryBudgets;
 import de.regelsuche.sdk.discovery.DiscoveryDomainCatalog;
-import de.regelsuche.sdk.discovery.DiscoveryRun;
 import de.regelsuche.sdk.discovery.RegelsucheDiscovery;
+import example.GeometricSequenceDomainProvider.Input;
+import java.util.List;
 
 public final class GeometricSequenceExample {
     private GeometricSequenceExample() {
@@ -15,13 +16,17 @@ public final class GeometricSequenceExample {
             GeometricSequenceDomainProvider.DOMAIN_ID,
             GeometricSequenceDomainProvider.REVISION
         ).orElseThrow();
+        var input = new Input(List.of(2L, 4L, 8L, 16L), List.of(32L, 64L), 6);
 
+        // A dynamic ServiceLoader catalog is the explicit serialized boundary.
+        // Keep its host-observed provenance; do not replace this registration with a new domain.
+        // Ordinary statically typed Java calls use forDomain(typedDomain()), as in the README.
         var run = RegelsucheDiscovery
             .forRegistration(registration)
             .campaign("external-geometric-sequence-demo")
             .seed(
                 "powers-of-two",
-                "observed=2,4,8,16;holdout=32,64;maxMultiplier=6",
+                GeometricSequenceDomainProvider.INPUT_CODEC.encode(input),
                 "external-java25-example"
             )
             .budget(DiscoveryBudgets.small())

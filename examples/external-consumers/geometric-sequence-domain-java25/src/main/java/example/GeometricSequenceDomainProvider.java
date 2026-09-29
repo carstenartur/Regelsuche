@@ -8,6 +8,8 @@ import de.regelsuche.discovery.domain.DiscoveryDomain.ObjectiveAssessment;
 import de.regelsuche.discovery.domain.DiscoveryDomain.Successor;
 import de.regelsuche.sdk.discovery.DiscoveryDomainBuilder;
 import de.regelsuche.sdk.discovery.DiscoveryDomainProvider;
+import de.regelsuche.sdk.discovery.DiscoveryInputCodec;
+import de.regelsuche.sdk.discovery.TypedDiscoveryDomain;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,8 @@ public final class GeometricSequenceDomainProvider
         implements DiscoveryDomainProvider {
     public static final String DOMAIN_ID = "example-geometric-sequence";
     public static final String REVISION = "v1";
+    public static final DiscoveryInputCodec<Input> INPUT_CODEC =
+        DiscoveryInputCodec.of(Input::payload, Input::parse);
 
     @Override
     public String id() {
@@ -33,10 +37,16 @@ public final class GeometricSequenceDomainProvider
         return List.of(domain());
     }
 
+    /** Preferred Java entry point: the input type is part of the domain binding. */
+    public static TypedDiscoveryDomain<Input, Plan, Plan, Certificate> typedDomain() {
+        return TypedDiscoveryDomain.of(domain(), INPUT_CODEC);
+    }
+
+    /** Serialized seed entry point retained for ServiceLoader and existing evidence. */
     public static DiscoveryDomain<Plan, Plan, Certificate> domain() {
         return DiscoveryDomainBuilder.<Plan, Plan, Certificate>domain(
                 DOMAIN_ID, REVISION)
-            .generator(seed -> List.of(new Plan(1, Input.parse(seed.payload()))))
+            .generator(seed -> List.of(new Plan(1, INPUT_CODEC.decode(seed.payload()))))
             .stateCodec(Plan::canonical)
             .invariant("valid-input", plan -> plan.input().valid()
                 ? InvariantResult.pass()
@@ -145,13 +155,31 @@ public final class GeometricSequenceDomainProvider
                 + ";maxMultiplier=" + maxMultiplier;
         }
 
+        /** Preserve the historical seed syntax; canonical() is the separate state representation. */
+        String payload() {
+            return "observed=" + csv(observed) + ";holdout=" + csv(holdout)
+                + ";maxMultiplier=" + maxMultiplier;
+        }
+
+        private static String csv(List<Long> values) {
+            return values.stream().map(Object::toString)
+                .collect(java.util.stream.Collectors.joining(","));
+        }
+
         static Input parse(String payload) {
-            Map<String, String> values = java.util.Arrays.stream(payload.split(";"))
-                .map(part -> part.split("=", 2))
-                .filter(parts -> parts.length == 2)
-                .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                    parts -> parts[0].trim(),
-                    parts -> parts[1].trim()));
+            java.util.Objects.requireNonNull(payload, "payload");
+            Map<String, String> values = new java.util.LinkedHashMap<>();
+            var knownFields = java.util.Set.of("observed", "holdout", "maxMultiplier");
+            for (String part : payload.split(";", -1)) {
+                String[] field = part.split("=", 2);
+                String key = field[0].trim();
+                if (field.length != 2 || !knownFields.contains(key)) {
+                    throw new IllegalArgumentException("Unknown or malformed sequence input field: " + key);
+                }
+                if (values.putIfAbsent(key, field[1].trim()) != null) {
+                    throw new IllegalArgumentException("Duplicate sequence input field: " + key);
+                }
+            }
             return new Input(
                 csv(values.get("observed")),
                 csv(values.get("holdout")),
@@ -161,7 +189,7 @@ public final class GeometricSequenceDomainProvider
         private static List<Long> csv(String value) {
             return value == null || value.isBlank()
                 ? List.of()
-                : java.util.Arrays.stream(value.split(","))
+                : java.util.Arrays.stream(value.split(",", -1))
                     .map(String::trim)
                     .map(Long::parseLong)
                     .toList();
