@@ -42,6 +42,17 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     @Override public void executionWork(long units){if(units<0)throw new IllegalArgumentException("negative native work");executionWork=Math.addExact(executionWork,units);}
     @Override public void validationWork(long units){if(units<0)throw new IllegalArgumentException("negative validation work");validationWork=Math.addExact(validationWork,units);}
     void validate(Expr expression){AstExpressionValidation.inspect(expression);}
+    /** Initial exhaustion still leaves the existing kernel responsible for the paid failed result. */
+    void validateInputs() {
+        try {
+            validate(problem.source());
+            if (problem.context().goal() != null) validate(problem.context().goal());
+        } catch (SearchExecution.ResourceLimit exhausted) {
+            if (complete) throw exhausted;
+            // The next kernel initialization checkpoint observes the incomplete session.
+            // Direct validation/ownership work already belongs to this same ledger.
+        }
+    }
     long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}
     @Override public long observedWork(){return work();}
     boolean complete(){return complete;}

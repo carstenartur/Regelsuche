@@ -248,7 +248,7 @@ public final class NativeMoveSearch {
         try(var store=new SearchExpressionStore(limits)) {
             var accounting=new NativeRetentionSession(problem,store,limits);
             try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {
-                accounting.operation(operation);accounting.externalObjective(objective);accounting.validate(problem.source());
+                accounting.operation(operation);accounting.externalObjective(objective);accounting.validateInputs();
                 var execution=new Execution(problem,store,accounting);
                 var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                     .search(execution,continuation,selection);
@@ -269,7 +269,7 @@ public final class NativeMoveSearch {
             var accounting=new NativeRetentionSession(problem,store,limits);
             try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {
             accounting.operation(operation);
-            accounting.validate(problem.source());if(problem.context().goal()!=null)accounting.validate(problem.context().goal());
+            accounting.validateInputs();
             var execution=new Execution(problem,store,accounting);
             var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(execution,continuation,null);

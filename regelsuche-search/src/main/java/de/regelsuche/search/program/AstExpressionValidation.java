@@ -13,6 +13,10 @@ public final class AstExpressionValidation {
     public static final class InvalidExpression extends IllegalArgumentException {
         public InvalidExpression(String reason) { super(reason); }
     }
+    /** Private provenance: public observer exceptions never become validator rejections. */
+    private static final class RejectedSyntax extends RuntimeException {
+        RejectedSyntax(String reason) { super(reason); }
+    }
     public record Inspection(long nodes, long textCharacters, long canonicalBytes,long canonicalCharacters) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {}
         public long work() { return Math.addExact(nodes, textCharacters); }
@@ -53,7 +57,7 @@ public final class AstExpressionValidation {
                 try {
                     result = history == null ? inspectExpression() : inspectHistory();
                     RetainedOperation.work(2); // Result allocation and publication in the owner.
-                } catch (InvalidExpression invalid) {
+                } catch (RejectedSyntax invalid) {
                     // A syntax rejection cannot hide a later technical observation/close failure.
                     rejection = invalid.getMessage();
                     RetainedOperation.work(1);
@@ -78,7 +82,7 @@ public final class AstExpressionValidation {
         }
         private Inspection inspectExpression() {
             long bytes = Math.addExact(27L + CompiledAstReplayCodec.EXPRESSION_SCHEMA.length(), this.expression(source, 0));
-            if (bytes > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new InvalidExpression("invalid AST replay byte length");
+            if (bytes > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new RejectedSyntax("invalid AST replay byte length");
             return new Inspection(this.nodes, this.characters, bytes,bytes-this.extraUtf8Bytes);
         }
         private Inspection inspectHistory() {
@@ -96,7 +100,7 @@ public final class AstExpressionValidation {
             for (int i = 0; i < history.steps().size(); i++) {
                 var step = history.steps().get(i);
                 if (step.assumptions().size() > CompiledAstReplayCodec.MAXIMUM_ASSUMPTIONS)
-                    throw new InvalidExpression("too many AST replay assumptions");
+                    throw new RejectedSyntax("too many AST replay assumptions");
                 bytes = Math.addExact(bytes, "{\"rule\":\"\",\"kind\":\"\",\"mayIncreaseComplexity\":,\"estimatedCostDelta\":,\"equivalencePreservingByConstruction\":,\"assumptions\":[],\"packId\":\"\",\"license\":\"\"}".length()
                     + this.text(step.rule()) + step.kind().name().length() + (step.mayIncreaseComplexity() ? 4 : 5)
                     + integerCharacters(step.estimatedCostDelta()) + (step.equivalencePreservingByConstruction() ? 4 : 5)
@@ -104,19 +108,19 @@ public final class AstExpressionValidation {
                 for (int j = 0; j < step.assumptions().size(); j++)
                     bytes = Math.addExact(bytes, 2 + this.text(step.assumptions().get(j)) + (j == 0 ? 0 : 1));
             }
-            if (bytes > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new InvalidExpression("invalid AST replay byte length");
+            if (bytes > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new RejectedSyntax("invalid AST replay byte length");
             return new Inspection(nodes, this.characters, bytes, bytes - this.extraUtf8Bytes);
         }
         long expression(Expr expression, int depth) {
             Objects.requireNonNull(expression);
             RetainedOperation.validation(1);
             if (++nodes > AstRewriteTransport.MAXIMUM_NODES || depth > AstRewriteTransport.MAXIMUM_DEPTH)
-                throw new InvalidExpression("AST replay structural limit exceeded");
+                throw new RejectedSyntax("AST replay structural limit exceeded");
             return switch (expression) {
                 case NumberExpr number -> {
                     if (number.value().numerator().bitLength() > 4 * CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS
                             || number.value().denominator().bitLength() > 4 * CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS)
-                        throw new InvalidExpression("AST replay numeric literal is too large");
+                        throw new RejectedSyntax("AST replay numeric literal is too large");
                     yield 28 + generatedText(number.value().canonicalText());
                 }
                 case VariableExpr variable -> variable.symbol().isPresent()
@@ -125,7 +129,7 @@ public final class AstExpressionValidation {
                     + expression(binary.left(), depth + 1) + expression(binary.right(), depth + 1);
                 case FunctionExpr function -> {
                     if (function.arguments().size() > AstRewriteTransport.MAXIMUM_NODES - nodes)
-                        throw new InvalidExpression("AST replay argument count exceeded");
+                        throw new RejectedSyntax("AST replay argument count exceeded");
                     long size = 44 + text(function.name());
                     for (int i = 0; i < function.arguments().size(); i++)
                         size = Math.addExact(size, expression(function.arguments().get(i), depth + 1) + (i == 0 ? 0 : 1));
@@ -153,18 +157,18 @@ public final class AstExpressionValidation {
         private long inspectText(String value) {
             RetainedOperation.validation(value==null?0:value.length());
             if (value == null || value.isBlank() || value.length() > CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS)
-                throw new InvalidExpression("invalid or oversized AST replay text");
+                throw new RejectedSyntax("invalid or oversized AST replay text");
             characters = Math.addExact(characters, value.length());
-            if (characters > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new InvalidExpression("AST replay text limit exceeded");
+            if (characters > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new RejectedSyntax("AST replay text limit exceeded");
             long bytes = 0;
             for (int i = 0; i < value.length(); i++) {
                 char c = value.charAt(i);
                 if (Character.isHighSurrogate(c)) {
-                    if (++i == value.length() || !Character.isLowSurrogate(value.charAt(i))) throw new InvalidExpression("unpaired Unicode surrogate");
+                    if (++i == value.length() || !Character.isLowSurrogate(value.charAt(i))) throw new RejectedSyntax("unpaired Unicode surrogate");
                     // Jackson byte output escapes each supplementary UTF-16 code unit; String output retains the pair.
                     if (byteGenerator) bytes += 12;
                     else { bytes += 4; extraUtf8Bytes += 2; }
-                } else if (Character.isLowSurrogate(c)) throw new InvalidExpression("unpaired Unicode surrogate");
+                } else if (Character.isLowSurrogate(c)) throw new RejectedSyntax("unpaired Unicode surrogate");
                 else if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\b' || c == '\f') bytes += 2;
                 else if (c < 32) bytes += 6;
                 else { int size=c < 128 ? 1 : c < 2048 ? 2 : 3;bytes+=size;extraUtf8Bytes+=size-1; }
