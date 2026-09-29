@@ -143,10 +143,11 @@ class AstExpressionValidationTest {
         for (boolean identical : List.of(true, false)) {
             var sink = new Observation(); var primary = new AssertionError("validation observer");
             var secondary = identical ? primary : new AssertionError("close observer");
+            boolean[] failed = {false};
             try (var scope = RetainedOperation.open(sink)) {
                 sink.scope = scope;
-                sink.validate = units -> { if (units == 3) throw primary; };
-                sink.charge = units -> { if (units == 4) throw secondary; };
+                sink.validate = units -> { if (units == 3) { failed[0] = true; throw primary; } };
+                sink.charge = units -> { if (failed[0] && units == 4) throw secondary; };
                 assertSame(primary, assertThrows(AssertionError.class, () -> AstExpressionValidation.inspect(NumberExpr.exact("1/3"))));
                 assertEquals(4, sink.validation);
                 assertArrayEquals(identical ? new Throwable[0] : new Throwable[]{secondary}, primary.getSuppressed());
