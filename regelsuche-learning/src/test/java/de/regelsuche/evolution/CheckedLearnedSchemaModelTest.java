@@ -356,6 +356,11 @@ class CheckedLearnedSchemaModelTest {
         assertImportFailure(ImportMeter.Abort.CLOSE);
     }
 
+    @Test void semanticRejectionCannotHideObservationOrCleanupFailures() {
+        assertImportFailure(ImportMeter.Abort.REJECT_OBSERVATION);
+        assertImportFailure(ImportMeter.Abort.REJECT_CLOSE);
+    }
+
     @Test void successfulImportDelegatesItsReceiptWithoutAlsoSettlingItLocally() {
         var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
         var binding=applicationBinding(model,source);var meter=new ImportMeter(ImportMeter.Abort.NONE);
@@ -374,29 +379,33 @@ class CheckedLearnedSchemaModelTest {
     private static void assertImportFailure(ImportMeter.Abort kind) {
         var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
         var binding=applicationBinding(model,source);var meter=new ImportMeter(kind);
+        boolean rejected=kind==ImportMeter.Abort.REJECT_OBSERVATION || kind==ImportMeter.Abort.REJECT_CLOSE;
+        Expr receivedSource=rejected?parse("991"):source;
+        meter.rejectedSource=rejected?CODEC.encodeExpression(receivedSource):null;
         try (var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),binding,
+            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(receivedSource),binding,
                 TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)));
             assertSame(meter.failure,thrown);
             assertTrue(meter.work.units>1,"domain and concrete replay work was already accumulated");
             assertEquals(meter.work.units,meter.afterFailure.getLast());
             assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count(),"one settlement only");
-            assertTrue(meter.afterFailure.stream().anyMatch(units->units==4),"closing owners remains paid");
-            assertEquals(kind!=ImportMeter.Abort.BINDINGS,meter.sawResult);
+            assertTrue(meter.failedDebit==4 || meter.afterFailure.stream().anyMatch(units->units==4),"closing owners remains paid, including the failing close itself");
+            assertEquals(kind==ImportMeter.Abort.RESULT || kind==ImportMeter.Abort.CLOSE,meter.sawResult);
         }
         assertFalse(de.regelsuche.retention.RetainedJson.active());
         assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
     }
 
     private static final class ImportMeter implements RetainedOperation.Sink {
-        enum Abort { NONE, BINDINGS, RESULT, CLOSE }
+        enum Abort { NONE, BINDINGS, RESULT, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE }
         final Abort abort;RetainedOperation scope;CheckedSchemaSupport.Work work;IllegalArgumentException failure;
-        boolean sawBindings,sawResult;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
+        long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
         ImportMeter(Abort abort){this.abort=abort;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
         @Override public void validationWork(long amount){executionWork(amount);}
         @Override public void executionWork(long amount) {
+            directWork=Math.addExact(directWork,amount);
             if (failure!=null) {afterFailure.add(amount);return;}
             var owners=owners();
             if (sawResult) afterResult.add(amount);
@@ -405,13 +414,27 @@ class CheckedLearnedSchemaModelTest {
                 && !map.isEmpty() && map.values().stream().allMatch(item->item instanceof Expr));
             if ((abort==Abort.BINDINGS && bindings && work!=null && work.units>1)
                     || (abort==Abort.RESULT && result)
-                    || (abort==Abort.CLOSE && sawResult && amount==4)) {
-                failure=new IllegalArgumentException("injected import "+abort);throw failure;
+                    || (abort==Abort.CLOSE && sawResult && amount==4)
+                    || (abort==Abort.REJECT_CLOSE && sawRejection && amount==4)) {
+                failedDebit=amount;failure=new IllegalArgumentException("injected import "+abort);throw failure;
             }
         }
         @Override public void checkpoint() {
-            RetainedGraph.measure(scope);
+            retentionWork=Math.addExact(retentionWork,RetainedGraph.measure(scope).work());
             var owners=owners();
+            if (rejectedSource!=null) for (Object owner:owners) {
+                if (owner instanceof RetainedGraph.View view && owner.getClass().getSimpleName().equals("BindingReplay")) {
+                    var direct=new ArrayList<Object>();
+                    view.retainedReferences(new RetainedGraph.Visitor() {
+                        @Override public void reference(Object value){direct.add(value);}
+                        @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+                    });
+                    sawRejection|=direct.contains(rejectedSource);
+                }
+            }
+            if (failure==null && abort==Abort.REJECT_OBSERVATION && sawRejection) {
+                failure=new IllegalArgumentException("injected rejected import observation");throw failure;
+            }
             sawBindings|=owners.stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
                 && !map.isEmpty() && map.values().stream().allMatch(item->item instanceof Expr));
             sawResult|=owners.stream().anyMatch(value->value instanceof NativeVerification);
