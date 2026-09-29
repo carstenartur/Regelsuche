@@ -44,7 +44,7 @@ final class CheckedSchemaSupport {
         if (value == null || value.isEmpty() || value.length() > MAXIMUM_JSON_CHARACTERS) {
             throw new IllegalArgumentException("checked schema JSON size limit");
         }
-        try { return JSON.readTree(value); }
+        try { return de.regelsuche.retention.RetainedJson.readTree(JSON,value); }
         catch (JsonProcessingException exception) { throw new IllegalArgumentException("invalid checked schema JSON", exception); }
     }
 

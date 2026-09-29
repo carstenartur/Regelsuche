@@ -8,6 +8,16 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.transform.ExactTheoryEvidence;
+import de.regelsuche.transform.NativeExactTheoryEvidence;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -261,6 +271,180 @@ class CheckedLearnedSchemaModelTest {
         assertEquals(target, result.incumbent().expression());
         assertTrue(result.incumbent().capabilities().isEmpty());
         assertTrue(result.witness().getFirst().move().capabilityDelta().isEmpty());
+    }
+
+    @Test void exportedApplicationIsDataUntilFreshModelReplaysTheEntireBinding() {
+        var learned=CheckedLearnedSchemaModel.learn(formation);
+        Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(learned,source);
+        var imported=CheckedLearnedSchemaModel.load(learned.toCanonicalJson(),formation.inventory().contentHash());
+        assertThrows(IllegalArgumentException.class,()->ExactTheoryEvidence.fromVerified(binding));
+        assertThrows(IllegalArgumentException.class,()->NativeExactTheoryEvidence.fromVerified(binding));
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var result=imported.replayApplication(state(source),binding,context);
+        assertTrue(result.accepted());assertTrue(result.work()>0);assertTrue(imported.loadWork()>0);
+        assertEquals(imported.nativeProviders().getFirst().descriptor().id(),result.ruleId());
+        var proof=assertInstanceOf(NativeMoveProof.Exact.class,result.checkedProof());
+        assertEquals(binding,proof.evidence().exportLegacy().binding());
+        var move=new NativeSearchMove(proof,imported.nativeProviders().getFirst().descriptor(),0,Set.of());
+        assertTrue(NativeVerifier.registered(imported.nativeProviders()).verify(state(source),move,context).accepted());
+        assertEquals(imported.verifier().verify(state(source),move.exportLegacy(),context),result.exportLegacy());
+    }
+
+    @Test void importedBindingRejectsEveryAlteredPublicIdentityAndRetainsAttemptedWork() throws Exception {
+        var model=CheckedLearnedSchemaModel.learn(formation);
+        Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(model,source);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var mapper=new ObjectMapper();
+        var values=mapper.valueToTree(binding);
+        for (String field:List.of("sourceExpression","transformedExpression","theoryStepId","evidenceHash",
+                "receiptArtifactId","runArtifactId","canonicalWorkUnits")) {
+            var copy=((ObjectNode)values).deepCopy();
+            if (field.equals("canonicalWorkUnits")) copy.put(field,binding.canonicalWorkUnits()+1);
+            else if (field.endsWith("Hash") || field.endsWith("ArtifactId")) copy.put(field,"sha256:"+"0".repeat(64));
+            else if (field.endsWith("Expression")) copy.put(field,CODEC.encodeExpression(parse("991")));
+            else copy.put(field,"forged-theory");
+            var rejected=model.replayApplication(state(source),mapper.treeToValue(copy,ExactTheoryEvidence.Binding.class),context);
+            assertRejectedImport(rejected,field);
+        }
+        assertRejectedImport(model.replayApplication(state(parse("(x+y)*(x-y)+z*z")),binding,context),"changed receiving source");
+        for (String field:List.of("schema","checkerRevision","inventorySemanticsHash","modelId","schemaId",
+                "proofHash","domain","source","target","applicationWork")) {
+            var data=(ObjectNode)mapper.readTree(binding.canonicalEvidenceJson());
+            if (field.equals("applicationWork")) data.put(field,binding.canonicalWorkUnits()+1);
+            else data.put(field,"forged");
+            assertRejectedImport(model.replayApplication(state(source),withEvidence(binding,data.toString()),context),field);
+        }
+        var data=(ObjectNode)mapper.readTree(binding.canonicalEvidenceJson());
+        data.putArray("path").add(0).add(0).add(0).add(0);
+        assertRejectedImport(model.replayApplication(state(source),withEvidence(binding,data.toString()),context),"absent occurrence");
+        data=(ObjectNode)mapper.readTree(binding.canonicalEvidenceJson());data.putArray("path").add(2);
+        assertRejectedImport(model.replayApplication(state(source),withEvidence(binding,data.toString()),context),"invalid path");
+        data=(ObjectNode)mapper.readTree(binding.canonicalEvidenceJson());
+        ((com.fasterxml.jackson.databind.node.ArrayNode)data.get("bindings")).add(data.get("bindings").get(0).deepCopy());
+        assertRejectedImport(model.replayApplication(state(source),withEvidence(binding,data.toString()),context),"duplicate binding");
+        data=(ObjectNode)mapper.readTree(binding.canonicalEvidenceJson());
+        ((ObjectNode)data.get("bindings").get(0)).put("expression",CODEC.encodeExpression(parse("991")));
+        assertRejectedImport(model.replayApplication(state(source),withEvidence(binding,data.toString()),context),"forged binding");
+    }
+
+    @Test void importDoesNotInferPrerequisitesFromTheReceivedModel() {
+        var model=CheckedLearnedSchemaModel.learn(formation).requiring(List.of("x > 0"));
+        Expr source=parse("(x+y)*(x-y)+y*y");
+        var context=TypedMoveSearch.Context.sourceOnly(List.of("x > 0"),MoveContext.Phase.FROZEN_EVALUATION);
+        var move=model.nativeProviders().getFirst().candidates(state(source),context).moves().getFirst();
+        var binding=((NativeMoveProof.Exact)move.proof()).evidence().exportLegacy().binding();
+        var imported=CheckedLearnedSchemaModel.load(model.toCanonicalJson(),formation.inventory().contentHash());
+        assertRejectedImport(imported.replayApplication(state(source),binding,
+            TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)),"missing prerequisite");
+        assertTrue(imported.replayApplication(state(source),binding,context).accepted());
+    }
+
+    @Test void malformedImportCannotRelaxTheExistingStrictParser() {
+        var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(model,source);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        for (String json:List.of("{",binding.canonicalEvidenceJson()+" {}","{\"schema\":\"a\",\"schema\":\"b\"}",
+                "[".repeat(150)," ".repeat(CheckedSchemaSupport.MAXIMUM_JSON_CHARACTERS)+"{}"))
+            assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),withEvidence(binding,json),context));
+    }
+
+    @Test void interruptedImportSettlesUnreturnedReplayWorkAndPreservesOriginalIllegalArgumentFailure() {
+        assertImportFailure(ImportMeter.Abort.BINDINGS);
+        assertImportFailure(ImportMeter.Abort.RESULT);
+        assertImportFailure(ImportMeter.Abort.CLOSE);
+    }
+
+    @Test void successfulImportDelegatesItsReceiptWithoutAlsoSettlingItLocally() {
+        var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(model,source);var meter=new ImportMeter(ImportMeter.Abort.NONE);
+        try (var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var result=model.replayApplication(state(source),binding,
+                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+            assertTrue(result.accepted());assertTrue(meter.sawResult);assertTrue(meter.sawBindings);
+            assertEquals(result.work(),meter.work.units);
+            assertEquals(List.of(4L),meter.afterResult,"the final frame close is direct work; the receipt is only delegated");
+        }
+        assertFalse(de.regelsuche.retention.RetainedJson.active());
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
+    private static void assertImportFailure(ImportMeter.Abort kind) {
+        var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(model,source);var meter=new ImportMeter(kind);
+        try (var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),binding,
+                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)));
+            assertSame(meter.failure,thrown);
+            assertTrue(meter.work.units>1,"domain and concrete replay work was already accumulated");
+            assertEquals(meter.work.units,meter.afterFailure.getLast());
+            assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count(),"one settlement only");
+            assertTrue(meter.afterFailure.stream().anyMatch(units->units==4),"closing owners remains paid");
+            assertEquals(kind!=ImportMeter.Abort.BINDINGS,meter.sawResult);
+        }
+        assertFalse(de.regelsuche.retention.RetainedJson.active());
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
+    private static final class ImportMeter implements RetainedOperation.Sink {
+        enum Abort { NONE, BINDINGS, RESULT, CLOSE }
+        final Abort abort;RetainedOperation scope;CheckedSchemaSupport.Work work;IllegalArgumentException failure;
+        boolean sawBindings,sawResult;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
+        ImportMeter(Abort abort){this.abort=abort;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
+        @Override public void validationWork(long amount){executionWork(amount);}
+        @Override public void executionWork(long amount) {
+            if (failure!=null) {afterFailure.add(amount);return;}
+            var owners=owners();
+            if (sawResult) afterResult.add(amount);
+            boolean result=owners.stream().anyMatch(value->value instanceof NativeVerification);
+            boolean bindings=owners.stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
+                && !map.isEmpty() && map.values().stream().allMatch(item->item instanceof Expr));
+            if ((abort==Abort.BINDINGS && bindings && work!=null && work.units>1)
+                    || (abort==Abort.RESULT && result)
+                    || (abort==Abort.CLOSE && sawResult && amount==4)) {
+                failure=new IllegalArgumentException("injected import "+abort);throw failure;
+            }
+        }
+        @Override public void checkpoint() {
+            RetainedGraph.measure(scope);
+            var owners=owners();
+            sawBindings|=owners.stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
+                && !map.isEmpty() && map.values().stream().allMatch(item->item instanceof Expr));
+            sawResult|=owners.stream().anyMatch(value->value instanceof NativeVerification);
+        }
+        private Set<Object> owners() {
+            var queue=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
+            var visitor=new RetainedGraph.Visitor() {
+                @Override public void reference(Object value){if(value!=null)queue.add(value);}
+                @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+            };
+            visitor.reference(scope);
+            while (!queue.isEmpty()) {
+                Object value=queue.remove();if(!seen.add(value))continue;
+                if (work==null && value instanceof CheckedSchemaSupport.Work candidate) work=candidate;
+                if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
+                else if (value instanceof Object[] array) for(Object item:array)visitor.reference(item);
+                else if (value instanceof Collection<?> items) items.forEach(visitor::reference);
+                else if (value instanceof Map<?,?> map) map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
+            }
+            return seen;
+        }
+    }
+
+    private static ExactTheoryEvidence.Binding applicationBinding(CheckedLearnedSchemaModel model,Expr source) {
+        return ((de.regelsuche.transform.TransformationProvenance.ExactTheoryStep)moves(model,source).getFirst().provenance()).evidence().binding();
+    }
+    private static ExactTheoryEvidence.Binding withEvidence(ExactTheoryEvidence.Binding binding,String json) {
+        return new ExactTheoryEvidence.Binding(binding.sourceExpression(),binding.transformedExpression(),binding.theoryStepId(),
+            SchematicProofPlan.hash(json),binding.receiptArtifactId(),binding.runArtifactId(),binding.canonicalWorkUnits(),json);
+    }
+    private static void assertRejectedImport(NativeVerification rejected,String detail) {
+        assertFalse(rejected.accepted(),detail);assertTrue(rejected.work()>0,detail);
+        assertNull(rejected.checkedProof(),detail);assertNull(rejected.ruleId(),detail);
     }
 
     private static Expr balancedTree(int nodes) {

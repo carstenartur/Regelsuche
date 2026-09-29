@@ -117,6 +117,11 @@ public final class RetainedJson {
         }
     }
     public static ObjectNode object(ObjectMapper mapper){return active()?new ObjectValue():mapper.createObjectNode();}
+    /** Existing strict mapper/reader, with explicitly owned containers at the import boundary.
+     * Parser-internal temporaries are not yet a complete native inventory. */
+    public static JsonNode readTree(ObjectMapper mapper,String input)throws JsonProcessingException{
+        return active()?mapper.reader().with(NODES).readTree(input):mapper.readTree(input);
+    }
     private static final class NodeFactory extends JsonNodeFactory implements RetainedGraph.View {
         @Override public ObjectNode objectNode(){return new ObjectValue();}
         @Override public ArrayNode arrayNode(){return new ArrayValue();}

@@ -9,6 +9,26 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RetainedJsonTest {
+    @Test void importReaderKeepsStrictConfigurationAndExposesActualDecodedContainers()throws Exception{
+        var mapper=new ObjectMapper(com.fasterxml.jackson.core.JsonFactory.builder()
+            .enable(com.fasterxml.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+        String input="{\"nested\":[{\"value\":\"𐐀é\"},7,true,null]}";
+        var expected=mapper.readTree(input);
+        try(var scope=RetainedJson.open()){
+            var actual=RetainedJson.readTree(mapper,input);
+            assertEquals(expected,actual);
+            assertInstanceOf(RetainedGraph.View.class,actual);
+            assertInstanceOf(RetainedGraph.View.class,actual.get("nested"));
+            assertTrue(RetainedGraph.measure(actual).retained().characters()>0);
+            assertThrows(com.fasterxml.jackson.core.JsonProcessingException.class,
+                ()->RetainedJson.readTree(mapper,"{\"x\":1,\"x\":2}"));
+            assertThrows(com.fasterxml.jackson.core.JsonProcessingException.class,
+                ()->RetainedJson.readTree(mapper,input+" {}"));
+        }
+        assertFalse(RetainedJson.active());
+        assertEquals(com.fasterxml.jackson.databind.node.ObjectNode.class,RetainedJson.readTree(mapper,input).getClass());
+    }
     private static final class GrowthAbort extends RuntimeException {}
     private static List<Object> references(RetainedGraph.View view){
         var values=new ArrayList<Object>();

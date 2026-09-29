@@ -1,6 +1,8 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.retention.RetainedJson;
 import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -572,40 +574,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 }
                 if (!(move.provenance() instanceof TransformationProvenance.ExactTheoryStep step)
                         || !move.ruleId().equals(descriptor.id())) return rejected(work, "CHECKED_SCHEMA_PROVENANCE_REQUIRED");
-                var bound = step.evidence().binding();
-                JsonNode data = read(bound.canonicalEvidenceJson());
-                fields(data, "schema", "checkerRevision", "inventorySemanticsHash", "modelId", "schemaId", "proofHash",
-                    "domain", "source", "target", "path", "bindings", "applicationWork");
-                if (!APPLICATION_REVISION.equals(text(data, "schema")) || !CHECKER_REVISION.equals(text(data, "checkerRevision"))
-                        || !inventorySemanticsHash.equals(text(data, "inventorySemanticsHash"))
-                        || !descriptor.id().equals(text(data, "modelId")) || !DOMAIN.equals(text(data, "domain"))) {
-                    return rejected(work, "CHECKED_SCHEMA_STALE_SEMANTICS");
-                }
-                Schema schema = byId.get(text(data, "schemaId"));
-                if (schema == null) return rejected(work, "CHECKED_SCHEMA_UNREGISTERED");
-                domain(source.expression(), bounds, work);
-                String encodedSource = CODEC.encodeExpression(source.expression());
-                if (!encodedSource.equals(text(data, "source")) || !encodedSource.equals(bound.sourceExpression())) {
-                    return rejected(work, "CHECKED_SCHEMA_WRONG_SOURCE");
-                }
-                array(data.get("path"), bounds.maximumDepth());
-                var path = new ArrayList<Integer>();
-                for (var part : data.get("path")) {
-                    if (!part.isInt() || part.intValue() < 0 || part.intValue() > 1) return rejected(work, "CHECKED_SCHEMA_INVALID_PATH");
-                    path.add(part.intValue());
-                }
-                var checked=replayOccurrence(schema,source.expression(),encodedSource,path,()->{
-                var substitutions = new TreeMap<String, Expr>();
-                array(data.get("bindings"), 16);
-                for (var value : data.get("bindings")) {
-                    fields(value, "name", "expression");
-                    Expr ast = CODEC.decodeExpression(text(value, "expression"));
-                    domain(ast, bounds, work);
-                    if (substitutions.put(text(value, "name"), ast) != null) throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
-                }
-                    return substitutions;
-                },work);
-                if (checked == null) return rejected(work, "CHECKED_SCHEMA_UNCHANGED");
+                var checked = replayBinding(source, step.evidence().binding(), work);
                 var expected = SearchMove.from(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(checked)), descriptor, move.generationCost());
                 // StateValue assesses capabilities after mathematical admission. MoveSearch overwrites
                 // provider-supplied deltas with that assessment before retaining the witness. These
@@ -618,6 +587,134 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             catch (IllegalArgumentException unsupported) { return rejected(work, "CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED"); }
         };
     }
+    /**
+     * Rechecks exported application data against this independently proved model and the caller's
+     * source/prerequisites. The entire regenerated binding must agree before a private native
+     * capability is issued. This receipt authorizes one application, not a search history or budget.
+     * Returned work is delegated to the caller once. Under an active native observation scope,
+     * unreturned work is settled locally, including failed frame closes. Malformed/unsupported
+     * input throws IllegalArgumentException; observation/resource failures retain their identity.
+     */
+    public NativeVerification replayApplication(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
+            TypedMoveSearch.Context context) {
+        var work = new Work();
+        work.add(1);
+        var results = new Object[2];
+        try (var retained = RetainedOperation.retainCompleted(4,this,source,binding,context,work,results)) {
+            try {
+                try {
+                    if (!NativeMoveProvider.carries(requiredAssumptions,source,context))
+                        throw new ReplayRejected("CHECKED_SCHEMA_PREREQUISITES_MISSING");
+                    var checked = replayBinding(source,binding,work);
+                    results[0] = checked;
+                    if (!checked.binding().equals(binding))
+                        throw new ReplayRejected("CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
+                    var proof = new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));
+                    results[1] = new NativeVerification(true,work.units,proof,descriptor.id(),
+                        "CHECKED_SCHEMA_OCCURRENCE_VERIFIED");
+                } catch (ReplayRejected rejected) {
+                    results[1] = nativeRejected(work,rejected.getMessage());
+                }
+                RetainedOperation.work(2);
+                RetainedOperation.checkpoint();
+                return (NativeVerification) results[1];
+            } catch (RuntimeException | Error failure) {
+                observeImportFailure(failure);
+                throw failure;
+            }
+        } catch (RuntimeException | Error failure) {
+            // A result lost at frame close was not delegated, even if mathematically accepted.
+            try { RetainedOperation.work(work.units); }
+            catch (RuntimeException | Error accounting) {
+                if (accounting != failure) failure.addSuppressed(accounting);
+            }
+            throw failure;
+        }
+    }
+
+    private VerifiedApplication replayBinding(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
+        var replay = new BindingReplay(source,binding,work);
+        try (var retained = RetainedOperation.retainCompleted(1,replay);
+                var json = RetainedJson.open(); var jsonOwner = RetainedOperation.retain(json)) {
+            try {
+                replay.run();
+                RetainedOperation.checkpoint();
+                return replay.checked;
+            } catch (RuntimeException | Error failure) {
+                observeImportFailure(failure);
+                throw failure;
+            }
+        }
+    }
+
+    /** Actual decoded/intermediate owners shared by legacy verification and explicit import. */
+    private final class BindingReplay implements RetainedGraph.View {
+        private final TypedMoveSearch.State source;
+        private final ExactTheoryEvidence.Binding binding;
+        private final Work work;
+        private JsonNode data;
+        private String encodedSource;
+        private ArrayList<Integer> path;
+        private TreeMap<String,Expr> substitutions;
+        private Expr decoded;
+        private VerifiedApplication checked;
+        BindingReplay(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
+            this.source=source;this.binding=binding;this.work=work;
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v) {
+            v.reference(CheckedLearnedSchemaModel.this);v.reference(source);v.reference(binding);v.reference(work);
+            v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);
+            v.reference(decoded);v.reference(checked);
+        }
+        void run() {
+            data = read(binding.canonicalEvidenceJson());
+            RetainedOperation.work(1);
+            RetainedOperation.checkpoint();
+            fields(data, "schema", "checkerRevision", "inventorySemanticsHash", "modelId", "schemaId", "proofHash",
+                "domain", "source", "target", "path", "bindings", "applicationWork");
+            if (!APPLICATION_REVISION.equals(text(data, "schema")) || !CHECKER_REVISION.equals(text(data, "checkerRevision"))
+                    || !inventorySemanticsHash.equals(text(data, "inventorySemanticsHash"))
+                    || !descriptor.id().equals(text(data, "modelId")) || !DOMAIN.equals(text(data, "domain")))
+                throw new ReplayRejected("CHECKED_SCHEMA_STALE_SEMANTICS");
+            Schema schema = byId.get(text(data, "schemaId"));
+            if (schema == null) throw new ReplayRejected("CHECKED_SCHEMA_UNREGISTERED");
+            domain(source.expression(), bounds, work);
+            encodedSource = CODEC.encodeExpression(source.expression());
+            if (!encodedSource.equals(text(data, "source")) || !encodedSource.equals(binding.sourceExpression()))
+                throw new ReplayRejected("CHECKED_SCHEMA_WRONG_SOURCE");
+            array(data.get("path"), bounds.maximumDepth());
+            path = new ArrayList<>();
+            for (var part : data.get("path")) {
+                if (!part.isInt() || part.intValue() < 0 || part.intValue() > 1)
+                    throw new ReplayRejected("CHECKED_SCHEMA_INVALID_PATH");
+                path.add(part.intValue());
+            }
+            RetainedOperation.work(path.size()+2L);
+            RetainedOperation.checkpoint();
+            checked = replayOccurrence(schema,source.expression(),encodedSource,path,()->{
+                substitutions = new TreeMap<>();
+                array(data.get("bindings"), 16);
+                for (var value : data.get("bindings")) {
+                    fields(value, "name", "expression");
+                    decoded = CODEC.decodeExpression(text(value, "expression"));
+                    domain(decoded, bounds, work);
+                    if (substitutions.put(text(value, "name"), decoded) != null)
+                        throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
+                    RetainedOperation.work(2);
+                    RetainedOperation.checkpoint();
+                }
+                return substitutions;
+            },work);
+            if (checked == null) throw new ReplayRejected("CHECKED_SCHEMA_UNCHANGED");
+        }
+    }
+    private static void observeImportFailure(Throwable failure) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+
     private static final class ReplayRejected extends IllegalArgumentException {
         ReplayRejected(String reason){super(reason);}
     }
