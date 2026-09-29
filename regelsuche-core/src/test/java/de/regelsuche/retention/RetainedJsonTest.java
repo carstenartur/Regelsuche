@@ -29,6 +29,100 @@ class RetainedJsonTest {
         assertFalse(RetainedJson.active());
         assertEquals(com.fasterxml.jackson.databind.node.ObjectNode.class,RetainedJson.readTree(mapper,input).getClass());
     }
+    @Test void scopeCloseKeepsItsActualRecyclerUntilClearAndPaysItsExistingCostsOnce()throws Exception {
+        assertScopeClose(CloseMeter.Abort.NONE,false,false);
+    }
+    @Test void failedClearDebitStillPaysTheCompletedScopeTransition()throws Exception {
+        assertScopeClose(CloseMeter.Abort.CLEAR,false,false);
+    }
+    @Test void failedClearErrorStillPaysTheCompletedScopeTransition()throws Exception {
+        assertScopeClose(CloseMeter.Abort.CLEAR_ERROR,false,false);
+    }
+    @Test void repeatedClearObservationAndFinalPaymentFailureKeepsOriginalIdentity()throws Exception {
+        assertScopeClose(CloseMeter.Abort.CLEAR,true,false);
+    }
+    @Test void distinctObservationAndFinalPaymentFailuresRemainSuppressed()throws Exception {
+        assertScopeClose(CloseMeter.Abort.CLEAR,true,true);
+    }
+    @Test void finalScopePaymentFailureStillReleasesAllReferencesAndRestoresOuterScope()throws Exception {
+        assertScopeClose(CloseMeter.Abort.FINAL,false,false);
+    }
+    private static void assertScopeClose(CloseMeter.Abort abort,boolean laterFailures,boolean distinct)throws Exception {
+        var mapper=new ObjectMapper(new RetainedJson.Factory(new JsonFactory()));
+        var meter=new CloseMeter(abort,laterFailures,distinct);
+        try(var operation=RetainedOperation.open(meter)) {
+            meter.operation=operation;
+            try(var outer=RetainedJson.open()) {
+                var inner=RetainedJson.open();meter.json=inner;
+                try {
+                    String text="actual\noutput𐐀".repeat(20);
+                    assertEquals(new ObjectMapper().writeValueAsString(text),RetainedJson.writeString(mapper,text));
+                    meter.recycler=assertInstanceOf(RetainedGraph.View.class,references(inner).get(1));
+                    var owned=references(meter.recycler);
+                    meter.slots=((List<?>)owned.get(0)).size()
+                        +((java.util.concurrent.atomic.AtomicReferenceArray<?>)owned.get(1)).length()
+                        +((java.util.concurrent.atomic.AtomicReferenceArray<?>)owned.get(2)).length();
+                    assertTrue(meter.slots>3);assertTrue(RetainedGraph.measure(inner).retained().characters()>0,"actual output buffers were leased and returned to this recycler");
+                    meter.armed=true;
+                    if(abort==CloseMeter.Abort.NONE)inner.close();
+                    else {
+                        var thrown=assertThrows(Throwable.class,inner::close);
+                        assertSame(meter.failure,thrown);
+                        if(distinct)assertArrayEquals(new Throwable[]{meter.observationFailure,meter.paymentFailure},thrown.getSuppressed());
+                        else assertEquals(0,thrown.getSuppressed().length);
+                    }
+                    assertEquals(List.of(meter.slots,3L),meter.payments,"clear work plus the already completed scope transition, including failed debits");
+                    assertTrue(meter.ownedAtClear,"Scope must still reference its actual recycler during clear payment");
+                    if(abort==CloseMeter.Abort.CLEAR || abort==CloseMeter.Abort.CLEAR_ERROR)
+                        assertTrue(meter.ownedAtFailureObservation,"observe the failed clear before releasing the recycler owner");
+                    inner.close();assertEquals(List.of(meter.slots,3L),meter.payments,"repeated close is free and inert");
+                    assertEquals(0,RetainedGraph.measure(inner).retained().characters());
+                    assertTrue(references(inner).stream().allMatch(java.util.Objects::isNull));
+                } finally {
+                    meter.armed=false;inner.close();
+                }
+                assertTrue(RetainedJson.active(),"the same outer scope remains active after failed inner close");
+                meter.json=outer;
+                assertEquals("\"outer\"",RetainedJson.writeString(mapper,"outer"));
+            }
+            assertFalse(RetainedJson.active());assertEquals(0,RetainedGraph.measure(meter.json).retained().characters());
+        }
+        assertEquals(0,RetainedGraph.measure(meter.operation).retained().characters());
+    }
+    private static final class CloseMeter implements RetainedOperation.Sink {
+        enum Abort { NONE,CLEAR,CLEAR_ERROR,FINAL }
+        final Abort abort;final boolean laterFailures;final Throwable failure,observationFailure,paymentFailure;
+        RetainedOperation operation;RetainedJson.Scope json;RetainedGraph.View recycler;
+        long slots;boolean armed,failed,ownedAtClear,ownedAtFailureObservation;
+        final List<Long> payments=new ArrayList<>();
+        CloseMeter(Abort abort,boolean laterFailures,boolean distinct) {
+            this.abort=abort;this.laterFailures=laterFailures;
+            failure=abort==Abort.CLEAR_ERROR?new AssertionError("JSON clear error"):new IllegalStateException("JSON close "+abort);
+            observationFailure=distinct?new IllegalArgumentException("JSON failure observation"):failure;
+            paymentFailure=distinct?new IllegalArgumentException("JSON final payment"):failure;
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operation);v.reference(json);}
+        @Override public void validationWork(long amount){executionWork(amount);}
+        @Override public void executionWork(long amount) {
+            if(!armed)return;
+            payments.add(amount);
+            if(amount==slots) {
+                ownedAtClear=references(json).get(1)==recycler;
+                if(abort==Abort.CLEAR || abort==Abort.CLEAR_ERROR){failed=true;raise(failure);}
+            }
+            if(amount==3 && (abort==Abort.FINAL || failed && laterFailures))raise(failed?paymentFailure:failure);
+        }
+        @Override public void checkpoint() {
+            if(!armed || !failed)return;
+            RetainedGraph.measure(this);
+            ownedAtFailureObservation=references(json).get(1)==recycler;
+            if(laterFailures)raise(observationFailure);
+        }
+        private static void raise(Throwable failure) {
+            if(failure instanceof RuntimeException runtime)throw runtime;
+            throw (Error)failure;
+        }
+    }
     private static final class GrowthAbort extends RuntimeException {}
     private static List<Object> references(RetainedGraph.View view){
         var values=new ArrayList<Object>();
