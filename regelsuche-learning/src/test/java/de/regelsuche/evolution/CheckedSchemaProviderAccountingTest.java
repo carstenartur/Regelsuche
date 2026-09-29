@@ -44,7 +44,7 @@ class CheckedSchemaProviderAccountingTest {
         var json = new ObjectMapper();
         try (var golden = getClass().getResourceAsStream("checked-schema-provider-v1-gold.json")) {
             assertNotNull(golden);
-            assertEquals(json.readTree(golden), json.valueToTree(observations),
+            assertEquals(json.readTree(golden), json.readTree(json.writeValueAsString(observations)),
                 "frozen on production 6d76d790 before changing the provider ledger");
         }
     }
