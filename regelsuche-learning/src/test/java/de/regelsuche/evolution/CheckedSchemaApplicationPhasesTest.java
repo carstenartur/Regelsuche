@@ -151,6 +151,26 @@ class CheckedSchemaApplicationPhasesTest {
         assertDomainAbort(DomainMeter.Abort.CLOSE,7);
     }
 
+    @Test void repeatedSameCloseFailureCannotReplaceTheOriginalDomainAbort() {
+        assertRepeatedDomainClose(false);
+    }
+    @Test void distinctCloseFailureIsSuppressedOnTheOriginalDomainAbort() {
+        assertRepeatedDomainClose(true);
+    }
+    private static void assertRepeatedDomainClose(boolean distinct) {
+        var work=new CheckedSchemaSupport.Work();var meter=new DomainMeter(work,DomainMeter.Abort.GROWTH_DEBIT);
+        meter.throwOnClose=true;
+        if(distinct)meter.closeFailure=new IllegalStateException("additional domain close failure");
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var thrown=assertThrows(IllegalArgumentException.class,()->CheckedSchemaSupport.domain(domainSource(),model.bounds(),work));
+            assertSame(meter.failure,thrown,"the resource observer may reuse its original exception instance");
+            assertEquals(1,work.units);assertTrue(meter.afterFailure.contains(4L));
+            assertEquals(distinct?List.of(meter.closeFailure):List.of(),List.of(thrown.getSuppressed()));
+        }
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
     private static void assertDomainAbort(DomainMeter.Abort abort,long visits) {
         var work=new CheckedSchemaSupport.Work();var meter=new DomainMeter(work,abort);
         try(var scope=RetainedOperation.open(meter)) {
@@ -201,7 +221,7 @@ class CheckedSchemaApplicationPhasesTest {
     private static final class DomainMeter implements RetainedOperation.Sink {
         enum Abort { NONE,GROWTH_DEBIT,GROWTH_CHECKPOINT,CLOSE }
         final CheckedSchemaSupport.Work work;final Abort abort;RetainedOperation scope;
-        IllegalArgumentException failure;Expr lastCurrent;
+        IllegalArgumentException failure;RuntimeException closeFailure;boolean throwOnClose;Expr lastCurrent;
         long directWork,failedDebit;boolean sawPendingAndCurrent,sawCompletion,sawFailedOwners;
         final List<Long> afterCompletion=new ArrayList<>(),afterFailure=new ArrayList<>();
         DomainMeter(CheckedSchemaSupport.Work work,Abort abort){this.work=work;this.abort=abort;}
@@ -209,7 +229,11 @@ class CheckedSchemaApplicationPhasesTest {
         @Override public void validationWork(long units){executionWork(units);}
         @Override public void executionWork(long units) {
             directWork=Math.addExact(directWork,units);
-            if(failure!=null){afterFailure.add(units);return;}
+            if(failure!=null){
+                afterFailure.add(units);
+                if(throwOnClose && units==4)throw closeFailure==null?failure:closeFailure;
+                return;
+            }
             if(sawCompletion)afterCompletion.add(units);
             var snapshot=snapshot();
             if((abort==Abort.GROWTH_DEBIT && snapshot.grown()) || (abort==Abort.CLOSE && sawCompletion && units==4)) {
