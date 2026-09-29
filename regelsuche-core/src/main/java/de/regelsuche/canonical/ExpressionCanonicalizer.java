@@ -1,6 +1,7 @@
 package de.regelsuche.canonical;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import static de.regelsuche.assumption.ExpressionDefinedness.canElideWithoutDomainLoss;
 
@@ -113,6 +114,21 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
      * (the default for general-purpose hashing).
      */
     public Expr canonicalize(Expr expression, AssumptionContext context) {
+        try (var owned = RetainedOperation.retain(this, expression, context)) {
+            return canonicalizeOwned(expression, context);
+        }
+    }
+
+    private Expr canonicalizeChild(Expr expression, AssumptionContext context) {
+        // Only the exact implementation can bypass virtual recursion under its known outer owner.
+        return getClass() == ExpressionCanonicalizer.class
+            ? canonicalizeOwned(expression, context)
+            : canonicalize(expression, context);
+    }
+
+    private Expr canonicalizeOwned(Expr expression, AssumptionContext context) {
+        // The public boundary owns the complete immutable input throughout private recursion.
+        RetainedOperation.validation(1);
         if (expression instanceof BinaryExpr binaryExpr) {
             Optional<Expr> polynomial = polynomialNormalizer.normalize(binaryExpr);
             if (polynomial.isPresent()) {
@@ -126,178 +142,261 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
             };
         }
         if (expression instanceof FunctionExpr functionExpr) {
-            List<Expr> normalised = new ArrayList<>(functionExpr.arguments().size());
-            for (Expr argument : functionExpr.arguments()) {
-                normalised.add(canonicalize(argument, context));
-            }
-            return new FunctionExpr(functionExpr.name(), normalised);
+            return canonicalizeFunction(functionExpr, context);
         }
         return expression;
     }
 
-    private Expr canonicalizeAddition(BinaryExpr expression, AssumptionContext context) {
-        List<SignedTerm> terms = new ArrayList<>();
-        collectTerms(expression, 1, terms);
-        Map<String, TermBucket> buckets = new LinkedHashMap<>();
-        List<SignedTerm> normalizedTerms = new ArrayList<>();
-        for (SignedTerm signedTerm : terms) {
-            Expr normalized = canonicalize(signedTerm.term(), context);
-
-            // Normalizing a non-additive term may expose a signed polynomial
-            // as a fresh ADD/SUB tree, for example
-            // 2*a*(0-b) -> 0-2*a*b. Fold that newly visible sign into this
-            // same addition pass instead of requiring a second canonicalize().
-            normalizedTerms.clear();
-            collectTerms(normalized, signedTerm.sign(), normalizedTerms);
-            for (SignedTerm normalizedTerm : normalizedTerms) {
-                Coefficient coefficient = coefficientOf(normalizedTerm.term());
-                ExactRational value = normalizedTerm.sign() < 0
-                    ? coefficient.value().negate()
-                    : coefficient.value();
-                if (value.isZero()) {
-                    continue;
-                }
-                String key = ExpressionFormatter.format(coefficient.term());
-                buckets.computeIfAbsent(
-                    key,
-                    ignored -> new TermBucket(coefficient.term()))
-                    .add(value);
-            }
+    private Expr canonicalizeFunction(FunctionExpr function, AssumptionContext context) {
+        for (int index = 0; index < function.arguments().size(); index++) {
+            Expr original = function.arguments().get(index);
+            Expr normalized = canonicalizeChild(original, context);
+            RetainedOperation.work(1);
+            if (normalized != original) return rebuildFunction(function, context, index, normalized);
         }
-
-        List<TermBucket> retained = new ArrayList<>();
-        for (TermBucket bucket : buckets.values()) {
-            if (!bucket.coefficient().isZero()
-                    || !canElideWithoutDomainLoss(bucket.term(), context)) {
-                retained.add(bucket);
-            }
-        }
-        List<TermBucket> ordered = retained.stream()
-            .sorted(ExpressionCanonicalizer::compareMonomials)
-            .toList();
-        if (ordered.isEmpty()) {
-            return new NumberExpr(0);
-        }
-
-        List<SignedTerm> rendered = new ArrayList<>();
-        for (TermBucket bucket : ordered) {
-            if (bucket.coefficient().isZero()) {
-                appendContributions(rendered, bucket);
-                continue;
-            }
-
-            rendered.add(new SignedTerm(bucket.coefficient().signum(),
-                withCoefficient(bucket.term(), bucket.coefficient().abs())));
-        }
-
-        Expr result = null;
-        for (SignedTerm renderedTerm : rendered) {
-            if (result == null) {
-                result = renderedTerm.sign() < 0
-                    ? new BinaryExpr(
-                        new NumberExpr(0),
-                        BinaryOperator.SUB,
-                        renderedTerm.term())
-                    : renderedTerm.term();
-            } else if (renderedTerm.sign() < 0) {
-                result = new BinaryExpr(
-                    result,
-                    BinaryOperator.SUB,
-                    renderedTerm.term());
-            } else {
-                result = new BinaryExpr(
-                    result,
-                    BinaryOperator.ADD,
-                    renderedTerm.term());
-            }
-        }
-        return result == null ? new NumberExpr(0) : result;
+        return function;
     }
 
-    private void appendContributions(
-        List<SignedTerm> rendered,
-        TermBucket bucket
-    ) {
-        for (ExactRational contribution : bucket.contributions()) {
-            Expr fallback = withCoefficient(
-                bucket.term(), contribution.abs());
-            rendered.add(new SignedTerm(
-                contribution.signum(), fallback));
+    /** The first changed child makes the argument accumulator necessary; earlier siblings stay shared. */
+    private Expr rebuildFunction(FunctionExpr function, AssumptionContext context, int changedIndex, Expr changed) {
+        try (var changedChild = RetainedOperation.retain(changed)) {
+            List<Expr> normalized = new ArrayList<>(function.arguments().size());
+            RetainedOperation.work(1);
+            try (var arguments = RetainedOperation.retain(normalized)) {
+                for (int index = 0; index < changedIndex; index++) {
+                    normalized.add(function.arguments().get(index));
+                    RetainedOperation.work(1);
+                }
+                normalized.add(changed);
+                RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
+                for (int index = changedIndex + 1; index < function.arguments().size(); index++) {
+                    normalized.add(canonicalizeChild(function.arguments().get(index), context));
+                    RetainedOperation.work(1);
+                    RetainedOperation.checkpoint();
+                }
+                var result = new FunctionExpr(function.name(), normalized);
+                RetainedOperation.work(normalized.size());
+                return RetainedOperation.produced(result);
+            }
+        }
+    }
+
+    private Expr canonicalizeAddition(BinaryExpr expression, AssumptionContext context) {
+        List<SignedTerm> terms = new ArrayList<>();
+        RetainedOperation.work(1);
+        try (var collected = RetainedOperation.retain(terms)) {
+            collectTerms(expression, 1, terms);
+            Map<String, TermBucket> buckets = new LinkedHashMap<>();
+            List<SignedTerm> normalizedTerms = new ArrayList<>();
+            RetainedOperation.work(2);
+            try (var accumulation = RetainedOperation.retain(buckets, normalizedTerms)) {
+                for (SignedTerm signedTerm : terms) {
+                    Expr normalized = canonicalizeChild(signedTerm.term(), context);
+                    try (var rewritten = RetainedOperation.retain(normalized)) {
+                        // A fresh ADD/SUB from normalization joins this same signed addition pass.
+                        RetainedOperation.work(normalizedTerms.size());
+                        normalizedTerms.clear();
+                        collectTerms(normalized, signedTerm.sign(), normalizedTerms);
+                        for (SignedTerm normalizedTerm : normalizedTerms) {
+                            Coefficient coefficient = coefficientOf(normalizedTerm.term());
+                            try (var extracted = RetainedOperation.retain(coefficient)) {
+                                ExactRational value = normalizedTerm.sign() < 0
+                                    ? coefficient.value().negate() : coefficient.value();
+                                RetainedOperation.work(1);
+                                try (var scalar = RetainedOperation.retain(value)) {
+                                    if (value.isZero()) continue;
+                                    String key = ExpressionFormatter.format(coefficient.term());
+                                    try (var formatted = RetainedOperation.retain(key)) {
+                                        var bucket = buckets.computeIfAbsent(key, ignored -> new TermBucket(coefficient.term()));
+                                        RetainedOperation.work(1);
+                                        bucket.add(value);
+                                        RetainedOperation.checkpoint();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                List<TermBucket> retained = new ArrayList<>();
+                RetainedOperation.work(1);
+                try (var selected = RetainedOperation.retain(retained)) {
+                    for (TermBucket bucket : buckets.values()) {
+                        RetainedOperation.work(1);
+                        if (!bucket.coefficient().isZero() || !canElideWithoutDomainLoss(bucket.term(), context)) {
+                            retained.add(bucket);
+                            RetainedOperation.work(1);
+                            RetainedOperation.checkpoint();
+                        }
+                    }
+                    var ordered = new ArrayList<>(retained);
+                    RetainedOperation.work(retained.size() + 1L);
+                    try (var sorted = RetainedOperation.retain(ordered)) {
+                        ordered.sort(ExpressionCanonicalizer::compareMonomials);
+                        if (ordered.isEmpty()) return RetainedOperation.produced(new NumberExpr(0));
+                        List<SignedTerm> rendered = new ArrayList<>();
+                        RetainedOperation.work(1);
+                        try (var output = RetainedOperation.retain(rendered)) {
+                            for (TermBucket bucket : ordered) {
+                                if (bucket.coefficient().isZero()) {
+                                    appendContributions(rendered, bucket);
+                                    continue;
+                                }
+                                var magnitude = bucket.coefficient().abs();
+                                RetainedOperation.work(1);
+                                try (var scalar = RetainedOperation.retain(magnitude)) {
+                                    rendered.add(new SignedTerm(bucket.coefficient().signum(), withCoefficient(bucket.term(), magnitude)));
+                                    RetainedOperation.work(2);
+                                    RetainedOperation.checkpoint();
+                                }
+                            }
+                            Object[] current = {null};
+                            RetainedOperation.work(1);
+                            try (var result = RetainedOperation.retain(current)) {
+                                for (SignedTerm renderedTerm : rendered) {
+                                    Expr previous = (Expr) current[0];
+                                    if (previous == null) {
+                                        current[0] = renderedTerm.sign() < 0
+                                            ? new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, renderedTerm.term())
+                                            : renderedTerm.term();
+                                    } else current[0] = new BinaryExpr(previous,
+                                        renderedTerm.sign() < 0 ? BinaryOperator.SUB : BinaryOperator.ADD, renderedTerm.term());
+                                    RetainedOperation.work(2);
+                                    RetainedOperation.checkpoint();
+                                }
+                                return RetainedOperation.produced(current[0] == null ? new NumberExpr(0) : (Expr) current[0]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void appendContributions(List<SignedTerm> rendered, TermBucket bucket) {
+        var contributions = bucket.contributions();
+        try (var sorted = RetainedOperation.retain(rendered, bucket, contributions)) {
+            for (ExactRational contribution : contributions) {
+                var magnitude = contribution.abs();
+                RetainedOperation.work(1);
+                try (var scalar = RetainedOperation.retain(magnitude)) {
+                    Expr fallback = withCoefficient(bucket.term(), magnitude);
+                    rendered.add(new SignedTerm(contribution.signum(), fallback));
+                    RetainedOperation.work(2);
+                    RetainedOperation.checkpoint();
+                }
+            }
         }
     }
 
     private Expr canonicalizeMultiplication(BinaryExpr expression, AssumptionContext context) {
         List<Expr> factors = new ArrayList<>();
-        collectFactors(expression, factors);
-        AssumptionContext factorContext = context == null ? null : new AssumptionContext();
-        ExactRational numeric = ExactRational.ONE;
-        Map<String, FactorBucket> buckets = new LinkedHashMap<>();
-        for (Expr factor : factors) {
-            Expr normalized = canonicalize(factor, factorContext);
-            if (normalized instanceof NumberExpr numberExpr) {
-                numeric = numeric.multiply(numberExpr.value());
-                continue;
+        RetainedOperation.work(1);
+        try (var collected = RetainedOperation.retain(factors)) {
+            collectFactors(expression, factors);
+            AssumptionContext factorContext = context == null ? null : new AssumptionContext();
+            Object[] numeric = {ExactRational.ONE};
+            Map<String, FactorBucket> buckets = new LinkedHashMap<>();
+            RetainedOperation.work(3);
+            try (var accumulation = RetainedOperation.retain(factorContext, numeric, buckets)) {
+                for (Expr factor : factors) {
+                    Expr normalized = canonicalizeChild(factor, factorContext);
+                    try (var rewritten = RetainedOperation.retain(normalized)) {
+                        if (normalized instanceof NumberExpr numberExpr) {
+                            numeric[0] = ((ExactRational) numeric[0]).multiply(numberExpr.value());
+                            RetainedOperation.work(1);
+                            RetainedOperation.checkpoint();
+                            continue;
+                        }
+                        Power power = asPower(normalized);
+                        try (var extracted = RetainedOperation.retain(power)) {
+                            String key = ExpressionFormatter.format(power.base());
+                            try (var formatted = RetainedOperation.retain(key)) {
+                                FactorBucket bucket = buckets.computeIfAbsent(key, ignored -> new FactorBucket(power.base()));
+                                RetainedOperation.work(1);
+                                RetainedOperation.checkpoint();
+                                // Preserve the original product when the exact exponent sum leaves its range.
+                                if (!bucket.add(power.exponent())) return expression;
+                            }
+                        }
+                    }
+                }
+                if (context != null) {
+                    var assumptions = factorContext.snapshot();
+                    try (var committed = RetainedOperation.retain(assumptions)) {
+                        context.addAll(assumptions);
+                    }
+                }
+                List<Expr> ordered = new ArrayList<>();
+                RetainedOperation.work(1);
+                try (var output = RetainedOperation.retain(ordered)) {
+                    var coefficient = (ExactRational) numeric[0];
+                    if (!coefficient.isOne() || buckets.isEmpty()) {
+                        ordered.add(PolynomialNormalizer.exactRationalExpression(coefficient));
+                        RetainedOperation.work(1);
+                        RetainedOperation.checkpoint();
+                    }
+                    var selected = new ArrayList<FactorBucket>();
+                    RetainedOperation.work(1);
+                    try (var sorted = RetainedOperation.retain(selected)) {
+                        for (var bucket : buckets.values()) {
+                            RetainedOperation.work(1);
+                            if (bucket.exponent() != 0) {
+                                selected.add(bucket);
+                                RetainedOperation.work(1);
+                                RetainedOperation.checkpoint();
+                            }
+                        }
+                        selected.sort((left, right) -> compareFormatted(left.base(), right.base()));
+                        for (var bucket : selected) {
+                            if (bucket.exponent() == 1) {
+                                ordered.add(bucket.base());
+                                RetainedOperation.work(1);
+                            } else {
+                                var exponent = new NumberExpr(bucket.exponent());
+                                RetainedOperation.work(1);
+                                try (var leaf = RetainedOperation.retain(exponent)) {
+                                    ordered.add(new BinaryExpr(bucket.base(), BinaryOperator.POW, exponent));
+                                    RetainedOperation.work(2);
+                                }
+                            }
+                            RetainedOperation.checkpoint();
+                        }
+                    }
+                    if (ordered.isEmpty()) return RetainedOperation.produced(new NumberExpr(1));
+                    return leftAssociate(ordered, BinaryOperator.MUL);
+                }
             }
-            Power power = asPower(normalized);
-            String key = ExpressionFormatter.format(power.base());
-            FactorBucket bucket = buckets.computeIfAbsent(
-                key,
-                ignored -> new FactorBucket(power.base()));
-            if (!bucket.add(power.exponent())) {
-                // Keep the product when its exact exponent sum leaves the
-                // supported range; wrapping could turn it into 1 or a pole.
-                return expression;
-            }
         }
-        if (context != null) {
-            // Commit only assumptions from reductions retained in the result.
-            context.addAll(factorContext.snapshot());
-        }
-
-        List<Expr> ordered = new ArrayList<>();
-        if (!numeric.isOne() || buckets.isEmpty()) {
-            ordered.add(PolynomialNormalizer.exactRationalExpression(numeric));
-        }
-
-        buckets.values().stream()
-            .filter(bucket -> bucket.exponent() != 0)
-            .sorted((left, right) -> ExpressionFormatter.format(left.base())
-                .compareTo(ExpressionFormatter.format(right.base())))
-            .forEach(bucket -> ordered.add(bucket.exponent() == 1
-                ? bucket.base()
-                : new BinaryExpr(
-                    bucket.base(),
-                    BinaryOperator.POW,
-                    new NumberExpr(bucket.exponent()))));
-        if (ordered.isEmpty()) {
-            return new NumberExpr(1);
-        }
-        return leftAssociate(ordered, BinaryOperator.MUL);
     }
 
     private Expr canonicalizePower(BinaryExpr expression, AssumptionContext context) {
-        Expr base = canonicalize(expression.left(), context);
-        Expr exponent = canonicalize(expression.right(), context);
-        if (isNumber(exponent, 0)) {
-            Expr retained = new BinaryExpr(base, BinaryOperator.POW, exponent);
-            if (!canElideWithoutDomainLoss(base, context)) {
-                return retained;
+        Expr base = canonicalizeChild(expression.left(), context);
+        try (var left = RetainedOperation.retain(base)) {
+            Expr exponent = canonicalizeChild(expression.right(), context);
+            try (var right = RetainedOperation.retain(exponent)) {
+                if (isNumber(exponent, 0)) {
+                    Expr retained = new BinaryExpr(base, BinaryOperator.POW, exponent);
+                    RetainedOperation.work(1);
+                    try (var candidate = RetainedOperation.retain(retained)) {
+                        if (!canElideWithoutDomainLoss(base, context)) return retained;
+                        if (base instanceof NumberExpr number) {
+                            return !number.value().equalsInteger(0) ? RetainedOperation.produced(new NumberExpr(1)) : retained;
+                        }
+                        if (context == null) return retained;
+                        String formatted = ExpressionFormatter.format(base);
+                        try (var text = RetainedOperation.retain(formatted)) {
+                            context.add(Assumption.nonZero(formatted));
+                            RetainedOperation.work(2);
+                            RetainedOperation.checkpoint();
+                        }
+                        return RetainedOperation.produced(new NumberExpr(1));
+                    }
+                }
+                if (isNumber(exponent, 1)) return base;
+                return RetainedOperation.produced(new BinaryExpr(base, BinaryOperator.POW, exponent));
             }
-            if (base instanceof NumberExpr number) {
-                return !number.value().equalsInteger(0)
-                    ? new NumberExpr(1)
-                    : retained;
-            }
-            if (context == null) {
-                return retained;
-            }
-            context.add(Assumption.nonZero(ExpressionFormatter.format(base)));
-            return new NumberExpr(1);
         }
-        if (isNumber(exponent, 1)) {
-            return base;
-        }
-        return new BinaryExpr(base, BinaryOperator.POW, exponent);
     }
 
     /**
@@ -312,32 +411,43 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
      * </ul>
      */
     private Expr canonicalizeDivision(BinaryExpr expression, AssumptionContext context) {
-        Expr numerator = canonicalize(expression.left(), context);
-        Expr denominator = canonicalize(expression.right(), context);
-        if (numerator instanceof NumberExpr a && denominator instanceof NumberExpr b
-                && !b.value().isZero()) {
-            return new NumberExpr(a.value().divide(b.value()));
+        Expr numerator = canonicalizeChild(expression.left(), context);
+        try (var left = RetainedOperation.retain(numerator)) {
+            Expr denominator = canonicalizeChild(expression.right(), context);
+            try (var right = RetainedOperation.retain(denominator)) {
+                if (numerator instanceof NumberExpr a && denominator instanceof NumberExpr b && !b.value().isZero()) {
+                    var quotient = a.value().divide(b.value());
+                    RetainedOperation.work(1);
+                    try (var scalar = RetainedOperation.retain(quotient)) {
+                        return RetainedOperation.produced(new NumberExpr(quotient));
+                    }
+                }
+                if (context != null && !isNumber(denominator, 0) && !isNumber(denominator, 1)) {
+                    String denomText = ExpressionFormatter.format(denominator);
+                    try (var text = RetainedOperation.retain(denomText)) {
+                        if (isNumber(numerator, 0)) {
+                            context.add(Assumption.nonZero(denomText));
+                            RetainedOperation.work(1);
+                            return RetainedOperation.produced(new NumberExpr(0));
+                        }
+                        if (numerator.equals(denominator)) {
+                            context.add(Assumption.nonZero(denomText));
+                            RetainedOperation.work(1);
+                            return RetainedOperation.produced(new NumberExpr(1));
+                        }
+                        Expr cancelled = cancelDivisor(numerator, denominator);
+                        try (var cancellation = RetainedOperation.retain(cancelled)) {
+                            if (cancelled != null) {
+                                context.add(Assumption.nonZero(denomText));
+                                RetainedOperation.work(1);
+                                return cancelled;
+                            }
+                        }
+                    }
+                }
+                return RetainedOperation.produced(new BinaryExpr(numerator, BinaryOperator.DIV, denominator));
+            }
         }
-        if (context != null && !isNumber(denominator, 0) && !isNumber(denominator, 1)) {
-            String denomText = ExpressionFormatter.format(denominator);
-            // 0 / d -> 0 (d ≠ 0)
-            if (isNumber(numerator, 0)) {
-                context.add(Assumption.nonZero(denomText));
-                return new NumberExpr(0);
-            }
-            // d / d -> 1 (d ≠ 0)
-            if (numerator.equals(denominator)) {
-                context.add(Assumption.nonZero(denomText));
-                return new NumberExpr(1);
-            }
-            // (a*d) / d -> a  and  (d*a) / d -> a  (d ≠ 0)
-            Expr cancelled = cancelDivisor(numerator, denominator);
-            if (cancelled != null) {
-                context.add(Assumption.nonZero(denomText));
-                return cancelled;
-            }
-        }
-        return new BinaryExpr(numerator, BinaryOperator.DIV, denominator);
     }
 
     /**
@@ -347,27 +457,30 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
      * {@code null} when no cancellation is possible.
      */
     private Expr cancelDivisor(Expr numerator, Expr denominator) {
-        if (!(numerator instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.MUL) {
-            return null;
-        }
+        if (!(numerator instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.MUL) return null;
         List<Expr> factors = new ArrayList<>();
-        collectFactors(binary, factors);
-        boolean removed = false;
-        List<Expr> remaining = new ArrayList<>();
-        for (Expr factor : factors) {
-            if (!removed && factor.equals(denominator)) {
-                removed = true;
-                continue;
+        RetainedOperation.work(1);
+        try (var collected = RetainedOperation.retain(numerator, denominator, factors)) {
+            collectFactors(binary, factors);
+            boolean removed = false;
+            List<Expr> remaining = new ArrayList<>();
+            RetainedOperation.work(1);
+            try (var result = RetainedOperation.retain(remaining)) {
+                for (Expr factor : factors) {
+                    RetainedOperation.work(1);
+                    if (!removed && factor.equals(denominator)) {
+                        removed = true;
+                        continue;
+                    }
+                    remaining.add(factor);
+                    RetainedOperation.work(1);
+                    RetainedOperation.checkpoint();
+                }
+                if (!removed) return null;
+                if (remaining.isEmpty()) return RetainedOperation.produced(new NumberExpr(1));
+                return leftAssociate(remaining, BinaryOperator.MUL);
             }
-            remaining.add(factor);
         }
-        if (!removed) {
-            return null;
-        }
-        if (remaining.isEmpty()) {
-            return new NumberExpr(1);
-        }
-        return leftAssociate(remaining, BinaryOperator.MUL);
     }
 
     /**
@@ -381,8 +494,18 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
         if (leftDegree != rightDegree) {
             return Long.compare(rightDegree, leftDegree); // higher degree first
         }
-        return ExpressionFormatter.format(left.term())
-            .compareTo(ExpressionFormatter.format(right.term()));
+        return compareFormatted(left.term(), right.term());
+    }
+
+    private static int compareFormatted(Expr left, Expr right) {
+        String leftText = ExpressionFormatter.format(left);
+        try (var first = RetainedOperation.retain(leftText)) {
+            String rightText = ExpressionFormatter.format(right);
+            try (var second = RetainedOperation.retain(rightText)) {
+                RetainedOperation.work(1);
+                return leftText.compareTo(rightText);
+            }
+        }
     }
 
     /**
@@ -394,6 +517,7 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
      * total.
      */
     static long monomialDegree(Expr expression) {
+        RetainedOperation.validation(1);
         if (expression instanceof NumberExpr) {
             return 0;
         }
@@ -416,6 +540,7 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
     }
 
     private void collectTerms(Expr expression, int sign, List<SignedTerm> terms) {
+        RetainedOperation.validation(1);
         if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.ADD) {
             collectTerms(binaryExpr.left(), sign, terms);
             collectTerms(binaryExpr.right(), sign, terms);
@@ -424,15 +549,20 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
             collectTerms(binaryExpr.right(), -sign, terms);
         } else if (!isNumber(expression, 0)) {
             terms.add(new SignedTerm(sign, expression));
+            RetainedOperation.work(2);
+            RetainedOperation.checkpoint();
         }
     }
 
     private void collectFactors(Expr expression, List<Expr> factors) {
+        RetainedOperation.validation(1);
         if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.MUL) {
             collectFactors(binaryExpr.left(), factors);
             collectFactors(binaryExpr.right(), factors);
         } else if (!isNumber(expression, 1)) {
             factors.add(expression);
+            RetainedOperation.work(1);
+            RetainedOperation.checkpoint();
         }
     }
 
@@ -442,37 +572,38 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
                 && product.left() instanceof NumberExpr numberExpr) {
             ExactRational exact = numberExpr.value();
             if (!exact.isZero()) {
-                return new Coefficient(exact, product.right());
+                return RetainedOperation.produced(new Coefficient(exact, product.right()));
             }
         }
         if (expression instanceof NumberExpr numberExpr) {
-            return new Coefficient(numberExpr.value(), new NumberExpr(1));
+            return RetainedOperation.produced(new Coefficient(numberExpr.value(), new NumberExpr(1)));
         }
-        return new Coefficient(ExactRational.ONE, expression);
+        return RetainedOperation.produced(new Coefficient(ExactRational.ONE, expression));
     }
 
-    private Expr withCoefficient(
-        Expr term,
-        ExactRational coefficient
-    ) {
-        if (isNumber(term, 1)) {
-            return PolynomialNormalizer.exactRationalExpression(
-                coefficient);
+    private Expr withCoefficient(Expr term, ExactRational coefficient) {
+        try (var operands = RetainedOperation.retain(term, coefficient)) {
+            RetainedOperation.work(1);
+            if (isNumber(term, 1)) return PolynomialNormalizer.exactRationalExpression(coefficient);
+            if (coefficient.isOne()) return term;
+            Expr numeric = PolynomialNormalizer.exactRationalExpression(coefficient);
+            try (var scalar = RetainedOperation.retain(numeric)) {
+                return RetainedOperation.produced(new BinaryExpr(numeric, BinaryOperator.MUL, term));
+            }
         }
-        if (coefficient.isOne()) {
-            return term;
-        }
-        Expr numeric = PolynomialNormalizer.exactRationalExpression(
-                coefficient);
-        return new BinaryExpr(numeric, BinaryOperator.MUL, term);
     }
 
     private Expr leftAssociate(List<Expr> expressions, BinaryOperator operator) {
-        Expr result = expressions.getFirst();
-        for (int i = 1; i < expressions.size(); i++) {
-            result = new BinaryExpr(result, operator, expressions.get(i));
+        Object[] current = {expressions.getFirst()};
+        RetainedOperation.work(1);
+        try (var result = RetainedOperation.retain(expressions, current)) {
+            for (int i = 1; i < expressions.size(); i++) {
+                current[0] = new BinaryExpr((Expr) current[0], operator, expressions.get(i));
+                RetainedOperation.work(2);
+                RetainedOperation.checkpoint();
+            }
+            return RetainedOperation.produced((Expr) current[0]);
         }
-        return result;
     }
 
     private Power asPower(Expr expression) {
@@ -481,10 +612,10 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
                 && power.right() instanceof NumberExpr exponent) {
             int exactExponent = nonNegativeInteger(exponent.value());
             if (exactExponent > 0) {
-                return new Power(power.left(), exactExponent);
+                return RetainedOperation.produced(new Power(power.left(), exactExponent));
             }
         }
-        return new Power(expression, 1);
+        return RetainedOperation.produced(new Power(expression, 1));
     }
 
     private static int nonNegativeInteger(ExactRational value) {
@@ -526,16 +657,20 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
         }
     }
 
-    private record SignedTerm(int sign, Expr term) {
+    private record SignedTerm(int sign, Expr term) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(term); }
     }
 
-    private record Coefficient(ExactRational value, Expr term) {
+    private record Coefficient(ExactRational value, Expr term) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(value); visitor.reference(term); }
     }
 
-    private record Power(Expr base, int exponent) {
+    private record Power(Expr base, int exponent) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(base); }
     }
 
-    private static final class TermBucket {
+    private static final class TermBucket implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(term); visitor.reference(contributions); visitor.reference(coefficient); }
         private final Expr term;
         private final List<ExactRational> contributions = new ArrayList<>();
         private ExactRational coefficient = ExactRational.ZERO;
@@ -545,8 +680,12 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
         }
 
         private void add(ExactRational value) {
-            coefficient = coefficient.add(value);
-            contributions.add(value);
+            try (var operands = RetainedOperation.retain(this, value, coefficient)) {
+                coefficient = coefficient.add(value);
+                contributions.add(value);
+                RetainedOperation.work(2);
+                RetainedOperation.checkpoint();
+            }
         }
 
         private Expr term() {
@@ -558,11 +697,17 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
         }
 
         private List<ExactRational> contributions() {
-            return contributions.stream().sorted().toList();
+            var sorted = new ArrayList<>(contributions);
+            RetainedOperation.work(contributions.size() + 1L);
+            try (var owned = RetainedOperation.retain(this, sorted)) {
+                sorted.sort((left, right) -> { RetainedOperation.work(1); return left.compareTo(right); });
+                return RetainedOperation.produced(sorted);
+            }
         }
     }
 
-    private static final class FactorBucket {
+    private static final class FactorBucket implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(base); }
         private final Expr base;
         private int exponent;
 
@@ -571,6 +716,7 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
         }
 
         private boolean add(int value) {
+            RetainedOperation.work(1);
             if (value > Integer.MAX_VALUE - exponent) {
                 return false;
             }

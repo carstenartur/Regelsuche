@@ -7,6 +7,8 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -15,54 +17,64 @@ import java.util.Objects;
 public final class ExpressionFormatter {
     private static final java.math.BigInteger NUMERIC_SYNTAX_LIMIT = java.math.BigInteger.TEN.pow(
         de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS);
+    private static final java.math.BigInteger NEGATIVE_NUMERIC_SYNTAX_LIMIT = NUMERIC_SYNTAX_LIMIT.negate();
     private ExpressionFormatter() {
     }
 
     public static String format(Expr expr) {
-        return formatMeasured(expr, units -> { });
+        return formatMeasured(expr, NativeEmission.INSTANCE);
     }
 
-    /** Charges emitted code units before appending each formatter fragment. */
+    /**
+     * Delegates emitted code units before appending each fragment. Native observation
+     * additionally pays workspace, allocation and copying; it does not charge the
+     * delegated emission again. An active native scope requires an audited callback view.
+     */
     public static String formatMeasured(Expr expr, java.util.function.LongConsumer emittedCodeUnits) {
-        Output builder = new Output(emittedCodeUnits);
-        append(
-            Objects.requireNonNull(expr, "expr"),
-            0,
-            builder);
-        return builder.toString();
+        Objects.requireNonNull(expr, "expr");
+        Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
+        if (expr instanceof VariableExpr variable) {
+            try (var input = RetainedOperation.retain(expr, emittedCodeUnits)) {
+                emit(emittedCodeUnits, variable.name().length());
+                RetainedOperation.work(1);
+                return variable.name();
+            }
+        }
+        Output builder = new Output(expr, emittedCodeUnits);
+        try (var output = RetainedOperation.retain(builder)) {
+            append(builder);
+            return builder.value();
+        }
     }
 
     public static String format(Equation equation) {
         Objects.requireNonNull(equation, "equation");
-        Output builder = new Output(units -> { });
-        append(equation.left(), 0, builder);
-        builder.append(" = ");
-        append(equation.right(), 0, builder);
-        return builder.toString();
+        Output builder = new Output(equation, NativeEmission.INSTANCE);
+        try (var output = RetainedOperation.retain(builder)) {
+            append(builder);
+            return builder.value();
+        }
     }
 
-    private static void append(
-        Expr expression,
-        int parentPrecedence,
-        Output builder
-    ) {
-        Deque<Action> pending = new ArrayDeque<>();
-        pending.push(new FormatExpression(
-            expression,
-            parentPrecedence));
-        while (!pending.isEmpty()) {
-            Action action = pending.pop();
+    private static void append(Output builder) {
+        while (!builder.pending.isEmpty()) {
+            Action action = builder.pending.pop();
+            builder.current = action;
+            RetainedOperation.work(2);
             if (action instanceof AppendText text) {
-                builder.append(text.value());
+                builder.appendOwned(text.value());
             } else {
                 FormatExpression format = (FormatExpression) action;
-                schedule(
-                    format.expression(),
-                    format.parentPrecedence(),
-                    pending,
-                    builder);
+                schedule(format.expression(), format.parentPrecedence(), builder.pending, builder);
             }
+            builder.current = null;
+            RetainedOperation.work(1);
         }
+    }
+
+    private static void push(Deque<Action> pending, Action action) {
+        pending.push(action);
+        RetainedOperation.work(1);
     }
 
     private static void schedule(
@@ -76,15 +88,17 @@ public final class ExpressionFormatter {
             return;
         }
         if (expression instanceof VariableExpr variable) {
-            builder.append(variable.name());
+            builder.appendOwned(variable.name());
             return;
         }
         if (expression instanceof FunctionExpr function) {
             scheduleFunction(function, pending, builder);
+            RetainedOperation.checkpoint();
             return;
         }
         if (expression instanceof BinaryExpr binary) {
             scheduleBinary(binary, parentPrecedence, pending, builder);
+            RetainedOperation.checkpoint();
             return;
         }
         throw new IllegalArgumentException(
@@ -101,36 +115,96 @@ public final class ExpressionFormatter {
         if (!withinNumericSyntaxLimits(value)) {
             throw new IllegalArgumentException("Numeric leaf exceeds parser digit limits");
         }
-        String formatted;
-        boolean fraction = false;
         if (value.isInteger()) {
-            formatted = value.numerator().toString();
-        } else try {
-            var decimal = value.toBigDecimal(java.math.MathContext.UNLIMITED).stripTrailingZeros();
-            if (decimal.scale() > de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {
-                throw new ArithmeticException("render using integer fraction syntax");
-            }
-            formatted = decimal.toPlainString();
-            if (formatted.replace("-", "").replace(".", "").length()
-                    > de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {
-                throw new ArithmeticException("render using integer fraction syntax");
-            }
-        } catch (ArithmeticException repeatingDecimal) {
-            formatted = value.numerator() + " / " + value.denominator();
-            fraction = true;
+            String formatted = value.numerator().toString();
+            // Publish the produced text before its debit can fail, or a callback can run.
+            builder.append(formatted, value.signum() < 0 && parentPrecedence > 0,
+                formatted.length() + 1L);
+            return;
         }
-        if ((value.signum() < 0 && parentPrecedence > 0)
-                || (fraction && parentPrecedence > 0)) {
-            builder.append('(').append(formatted).append(')');
-        } else {
-            builder.append(formatted);
+        RetainedOperation.work(3); // scratch owner and the two decimal operands
+        var conversion = new NumberConversion(value);
+        try (var scratch = RetainedOperation.retain(conversion)) {
+            try {
+                conversion.format(value);
+            } catch (RuntimeException | Error failure) {
+                try { RetainedOperation.checkpoint(); }
+                catch (RuntimeException | Error observation) {
+                    if (observation != failure) failure.addSuppressed(observation);
+                }
+                throw failure;
+            }
+            // append's checkpoint observes all actual conversion temporaries together.
+            builder.append(conversion.formatted,
+                (value.signum() < 0 || conversion.fraction) && parentPrecedence > 0, 0);
         }
     }
 
     /** Whether integer/fraction syntax can represent both components within parser limits. */
     public static boolean withinNumericSyntaxLimits(de.regelsuche.scalar.ExactRational value) {
-        return value.numerator().abs().compareTo(NUMERIC_SYNTAX_LIMIT) < 0
-            && value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
+        RetainedOperation.work(2); // sign and numerator comparison, without allocating abs()
+        boolean numeratorFits = value.numerator().signum() < 0
+            ? value.numerator().compareTo(NEGATIVE_NUMERIC_SYNTAX_LIMIT) > 0
+            : value.numerator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
+        if (!numeratorFits) return false;
+        RetainedOperation.work(1);
+        return value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
+    }
+
+    /** One bounded conversion owns its actual operands and all still-live results. */
+    private static final class NumberConversion implements RetainedGraph.View {
+        private final java.math.BigDecimal numerator;
+        private final java.math.BigDecimal denominator;
+        private java.math.BigDecimal quotient, decimal;
+        private String plain, numeratorText, denominatorText, formatted;
+        private boolean fraction;
+
+        private NumberConversion(de.regelsuche.scalar.ExactRational value) {
+            numerator = new java.math.BigDecimal(value.numerator());
+            denominator = new java.math.BigDecimal(value.denominator());
+        }
+
+        private void format(de.regelsuche.scalar.ExactRational value) {
+            RetainedOperation.work(1); // the attempted division is paid even if it repeats
+            try {
+                quotient = numerator.divide(denominator, java.math.MathContext.UNLIMITED);
+            } catch (ArithmeticException repeatingDecimal) {
+                // Only the exact library division is caught, never accounting failures.
+                fraction = true;
+            }
+            if (!fraction) {
+                RetainedOperation.work(1);
+                decimal = quotient.stripTrailingZeros();
+                if (decimal.scale() <= de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {
+                    plain = decimal.toPlainString();
+                    RetainedOperation.work(plain.length() + 1L);
+                    int digits = 0;
+                    for (int index = 0; index < plain.length(); index++) {
+                        char item = plain.charAt(index);
+                        RetainedOperation.work(1);
+                        if (item != '-' && item != '.') digits++;
+                    }
+                    if (digits <= de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {
+                        formatted = plain;
+                        return;
+                    }
+                }
+                fraction = true;
+            }
+            numeratorText = value.numerator().toString();
+            RetainedOperation.work(numeratorText.length() + 1L);
+            denominatorText = value.denominator().toString();
+            RetainedOperation.work(denominatorText.length() + 1L);
+            formatted = numeratorText + " / " + denominatorText;
+            RetainedOperation.work(formatted.length() + 1L);
+        }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(numerator); visitor.reference(denominator);
+            visitor.reference(quotient); visitor.reference(decimal);
+            visitor.reference(plain); visitor.reference(numeratorText);
+            visitor.reference(denominatorText); visitor.reference(formatted);
+        }
     }
 
     private static void scheduleFunction(
@@ -138,16 +212,16 @@ public final class ExpressionFormatter {
         Deque<Action> pending,
         Output builder
     ) {
-        builder.append(function.name()).append('(');
-        pending.push(new AppendText(")"));
+        builder.appendOwned(function.name()).append('(');
+        push(pending, new AppendText(")"));
         List<Expr> arguments = function.arguments();
         for (int index = arguments.size() - 1;
                 index >= 0;
                 index--) {
             if (index < arguments.size() - 1) {
-                pending.push(new AppendText(", "));
+                push(pending, new AppendText(", "));
             }
-            pending.push(new FormatExpression(
+            push(pending, new FormatExpression(
                 arguments.get(index),
                 0));
         }
@@ -164,7 +238,7 @@ public final class ExpressionFormatter {
         boolean parenthesized = precedence < parentPrecedence;
         if (parenthesized) {
             builder.append('(');
-            pending.push(new AppendText(")"));
+            push(pending, new AppendText(")"));
         }
 
         int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;
@@ -176,12 +250,14 @@ public final class ExpressionFormatter {
             case MUL -> isDivision(binary.right()) ? 1 : 0;
             default -> 0;
         };
-        pending.push(new FormatExpression(
+        push(pending, new FormatExpression(
             binary.right(),
             precedence + rightAdjust));
-        pending.push(new AppendText(
-            " " + operator.symbol() + " "));
-        pending.push(new FormatExpression(
+        push(pending, new AppendText(switch (operator) {
+            case ADD -> " + "; case SUB -> " - "; case MUL -> " * ";
+            case DIV -> " / "; case POW -> " ^ ";
+        }));
+        push(pending, new FormatExpression(
             binary.left(),
             precedence + leftAdjust));
     }
@@ -191,40 +267,146 @@ public final class ExpressionFormatter {
             && binary.operator() == BinaryOperator.DIV;
     }
 
-    private static final class Output {
-        private final StringBuilder text = new StringBuilder();
+    private enum NativeEmission implements java.util.function.LongConsumer, RetainedGraph.View {
+        INSTANCE;
+        @Override public void accept(long units) { RetainedOperation.work(units); }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+    }
+
+    private static void emit(java.util.function.LongConsumer callback, long units) {
+        if (callback == NativeEmission.INSTANCE) {
+            // This closed implementation only updates the existing work counter.
+            callback.accept(units);
+            return;
+        }
+        try {
+            callback.accept(units);
+        } catch (RuntimeException | Error failure) {
+            try { RetainedOperation.checkpoint(); }
+            catch (RuntimeException | Error observation) {
+                if (observation != failure) failure.addSuppressed(observation);
+            }
+            throw failure;
+        }
+        RetainedOperation.checkpoint();
+    }
+
+    private static final class Output implements RetainedGraph.View {
+        private final Object input;
+        private char[] text = new char[16];
+        private int size;
+        private final Deque<Action> pending = new ArrayDeque<>();
+        private Action current;
+        private String fragment;
         private final java.util.function.LongConsumer emittedCodeUnits;
 
-        private Output(java.util.function.LongConsumer emittedCodeUnits) {
+        private Output(Object input, java.util.function.LongConsumer emittedCodeUnits) {
+            this.input = input;
             this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
+            RetainedOperation.work(19);
+            if (input instanceof Expr expression) {
+                push(pending, new FormatExpression(expression, 0));
+            } else {
+                Equation equation = (Equation) input;
+                push(pending, new FormatExpression(equation.right(), 0));
+                push(pending, new AppendText(" = "));
+                push(pending, new FormatExpression(equation.left(), 0));
+            }
         }
 
-        private Output append(String value) {
-            emittedCodeUnits.accept(value.length());
-            text.append(value);
+        /** Only source names or the current AppendText value enter here; their owner stays live. */
+        private Output appendOwned(String value) {
+            emit(emittedCodeUnits, value.length());
+            ensureCapacity(value.length());
+            value.getChars(0, value.length(), text, size);
+            size += value.length();
+            RetainedOperation.work(1);
             return this;
+        }
+
+        private Output append(String value, boolean parenthesized, long conversionWork) {
+            fragment = value;
+            boolean observationAttempted = false;
+            try {
+                RetainedOperation.work(1);
+                if (conversionWork != 0) RetainedOperation.work(conversionWork);
+                observationAttempted = true;
+                RetainedOperation.checkpoint();
+                if (parenthesized) append('(');
+                emit(emittedCodeUnits, value.length());
+                ensureCapacity(value.length());
+                value.getChars(0, value.length(), text, size);
+                size += value.length();
+                RetainedOperation.work(1);
+                if (parenthesized) append(')');
+            } catch (RuntimeException | Error failure) {
+                if (!observationAttempted) {
+                    try { RetainedOperation.checkpoint(); }
+                    catch (RuntimeException | Error observation) {
+                        if (observation != failure) failure.addSuppressed(observation);
+                    }
+                }
+                try { clearFragment(); }
+                catch (RuntimeException | Error cleanup) {
+                    if (cleanup != failure) failure.addSuppressed(cleanup);
+                }
+                throw failure;
+            }
+            clearFragment();
+            return this;
+        }
+
+        private void clearFragment() {
+            fragment = null;
+            RetainedOperation.work(1);
         }
 
         private Output append(char value) {
-            emittedCodeUnits.accept(1);
-            text.append(value);
+            emit(emittedCodeUnits, 1);
+            ensureCapacity(1);
+            text[size++] = value;
+            RetainedOperation.work(1);
             return this;
         }
 
-        @Override
-        public String toString() {
-            return text.toString();
+        private void ensureCapacity(int additional) {
+            int needed = Math.addExact(size, additional);
+            if (needed <= text.length) return;
+            var old = text;
+            var replacement = new char[Math.max(needed, Math.addExact(Math.multiplyExact(old.length, 2), 2))];
+            RetainedOperation.work(replacement.length);
+            try (var growth = RetainedOperation.retain(old, replacement)) {
+                System.arraycopy(old, 0, replacement, 0, size);
+                text = replacement;
+                RetainedOperation.work(size + 1L);
+            }
+        }
+
+        private String value() {
+            RetainedOperation.work(size);
+            return RetainedOperation.produced(new String(text, 0, size));
+        }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(input);
+            visitor.reference(text);
+            visitor.reference(emittedCodeUnits);
+            visitor.reference(pending);
+            visitor.reference(current);
+            visitor.reference(fragment);
         }
     }
 
-    private sealed interface Action
+    private sealed interface Action extends RetainedGraph.View
             permits AppendText, FormatExpression {
     }
 
     private record AppendText(String value) implements Action {
         private AppendText {
             Objects.requireNonNull(value, "value");
+            RetainedOperation.work(1);
         }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(value); }
     }
 
     private record FormatExpression(
@@ -233,6 +415,8 @@ public final class ExpressionFormatter {
     ) implements Action {
         private FormatExpression {
             Objects.requireNonNull(expression, "expression");
+            RetainedOperation.work(1);
         }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(expression); }
     }
 }

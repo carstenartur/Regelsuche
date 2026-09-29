@@ -5,6 +5,72 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class RetainedOperationTest {
+    @Test void producedValueRemainsObservableWhenItsOwnDebitFails() {
+        class Sink implements RetainedOperation.Sink {
+            RetainedOperation scope;
+            boolean failCharge;
+            long observedCharacters;
+            final ArithmeticException original = new ArithmeticException("produced value charge failure");
+            @Override public void executionWork(long units) {
+                if (failCharge && units == 1) { failCharge = false; throw original; }
+            }
+            @Override public void validationWork(long units) { }
+            @Override public void checkpoint() {
+                observedCharacters = Math.max(observedCharacters, RetainedGraph.measure(scope).retained().characters());
+            }
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+        }
+        var sink = new Sink();
+        try (var scope = RetainedOperation.open(sink)) {
+            sink.scope = scope;
+            try (var outer = RetainedOperation.retain("outer")) {
+                var produced = new char[64];
+                sink.failCharge = true;
+                assertSame(sink.original, assertThrows(ArithmeticException.class,
+                    () -> RetainedOperation.produced(produced)));
+                assertEquals(69, sink.observedCharacters,
+                    "the actual produced buffer and existing outer value overlap on failure");
+                assertEquals(5, RetainedGraph.measure(scope).retained().characters());
+                assertSame(produced, RetainedOperation.produced(produced),
+                    "a subsequent handoff uses the restored enclosing observation");
+            }
+        }
+        assertEquals(0, RetainedGraph.measure(sink.scope).retained().characters());
+    }
+
+    @Test void failedFrameAcquisitionStillObservesTheActualValuesAndRestoresItsOwner() {
+        class Sink implements RetainedOperation.Sink {
+            RetainedOperation scope;
+            boolean failCharge;
+            long observedCharacters;
+            final ArithmeticException original = new ArithmeticException("acquisition charge failure");
+            @Override public void executionWork(long units) {
+                if (failCharge && units == 2) { failCharge = false; throw original; }
+            }
+            @Override public void validationWork(long units) { }
+            @Override public void checkpoint() {
+                observedCharacters = Math.max(observedCharacters, RetainedGraph.measure(scope).retained().characters());
+            }
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+        }
+        var sink = new Sink();
+        try (var scope = RetainedOperation.open(sink)) {
+            sink.scope = scope;
+            try (var outer = RetainedOperation.retain("outer")) {
+                var numerator = new java.math.BigDecimal("123.45");
+                var denominator = new java.math.BigDecimal("67.89");
+                sink.failCharge = true;
+                assertSame(sink.original, assertThrows(ArithmeticException.class,
+                    () -> RetainedOperation.retain(numerator, denominator)));
+                assertTrue(sink.observedCharacters >= 16,
+                    "outer text and both actual allocated decimal operands overlap before cleanup");
+                assertEquals(5, RetainedGraph.measure(scope).retained().characters(),
+                    "the failed inner frame releases its values and restores the live outer frame");
+            }
+        }
+        assertEquals(0, RetainedGraph.measure(sink.scope).retained().characters());
+    }
+
     private static final class FailingCharge implements RetainedOperation.Sink {
         final int throwAt;
         int calls;

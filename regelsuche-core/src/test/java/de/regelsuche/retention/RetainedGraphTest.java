@@ -6,6 +6,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RetainedGraphTest {
+    @Test void sharedOwnersKeepAllReferenceSlotsWithoutQueuingTheSameObjectRepeatedly() {
+        class Shared implements RetainedGraph.View {
+            final String text = "shared";
+            long aliasesStillQueued = -1;
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+                var scan = (RetainedGraph.Scan) visitor;
+                aliasesStillQueued = scan.pending.stream().filter(value -> value == this).count();
+                visitor.reference(text);
+            }
+        }
+        var shared = new Shared();
+        Object[] actualSlots = new Object[1_000];
+        java.util.Arrays.fill(actualSlots, shared);
+        var observed = RetainedGraph.measure(actualSlots);
+        assertEquals(new RetainedGraph.Usage(0, 6, 1_002), observed.retained(),
+            "the array's thousand actual slots remain paid and retained");
+        assertEquals(3, observed.objects(), "array, shared owner and text are distinct actual objects");
+        assertEquals(0, shared.aliasesStillQueued,
+            "a shared immutable or mutable owner needs only one pending traversal entry");
+        assertTrue(observed.work() < 1_100, "reference visits remain linear while redundant queue removals disappear");
+        assertTrue(observed.peak().references() < 1_100,
+            "the scanner must actually avoid the thousand duplicate queue entries");
+    }
+
     private enum DescribedEnum implements RetainedGraph.View {
         VALUE;
         final ArrayList<Expr> values=new ArrayList<>();
@@ -37,15 +61,16 @@ class RetainedGraphTest {
         assertEquals(new RetainedGraph.Usage(2,1,9),both.retained());
         assertEquals(4,both.objects(),"list, binary, leaf and name; the global enum is borrowed");
         assertTrue(both.peak().references()>both.retained().references(),"the audit's identity table and traversal also occupy slots");
-        assertEquals(27,both.work());assertEquals(new RetainedGraph.Usage(2,1,23),both.peak());
+        assertEquals(25,both.work(),"two duplicate leaf queue removals no longer occur");
+        assertEquals(new RetainedGraph.Usage(2,1,23),both.peak());
         roots.clear();roots.add(leaf);
         var released=RetainedGraph.measure(roots);
         assertEquals(new RetainedGraph.Usage(1,1,5),released.retained());
         assertEquals(3,released.objects());assertEquals(17,released.work(),"every new traversal remains paid");
-        assertEquals(new RetainedGraph.Usage(1,1,16),released.peak());
+        assertEquals(new RetainedGraph.Usage(1,1,17),released.peak(),"admission now owns the identity entry while the unique object is still queued");
         roots.clear();var empty=RetainedGraph.measure(roots);
         assertEquals(new RetainedGraph.Usage(0,0,2),empty.retained());assertEquals(1,empty.objects());
-        assertEquals(6,empty.work());assertEquals(new RetainedGraph.Usage(0,0,9),empty.peak());
+        assertEquals(6,empty.work());assertEquals(new RetainedGraph.Usage(0,0,10),empty.peak());
     }
     @Test void explicitCyclicViewsTerminateAndKeepTheirReferenceSlot() {
         class Link implements RetainedGraph.View {
@@ -54,7 +79,7 @@ class RetainedGraphTest {
         }
         var cycle=RetainedGraph.measure(new Link());
         assertEquals(new RetainedGraph.Usage(0,0,2),cycle.retained());
-        assertEquals(1,cycle.objects());assertEquals(7,cycle.work());
+        assertEquals(1,cycle.objects());assertEquals(6,cycle.work(),"the self-reference retains its slot without another queue removal");
     }
     @Test void containerViewsAndComparatorsCannotHideTheirBackingOwners() {
         var backing=new ArrayList<Object>();backing.add(new VariableExpr("retained outside visible range"));
@@ -71,6 +96,23 @@ class RetainedGraphTest {
         assertEquals(30,measured.retained().characters());
         assertEquals(60,measured.peak().characters(),"retained scalar and live decimal conversion overlap");
         assertTrue(measured.work()>=30);
+    }
+    @Test void exactDecimalScalarsExposeTheirCanonicalRepresentationAndInspectionWork() {
+        var decimal=new java.math.BigDecimal("12.50");
+        var measured=RetainedGraph.measure(decimal);
+        assertEquals(5,measured.retained().characters());
+        assertTrue(measured.peak().characters()>=5);
+        assertTrue(measured.work()>5);
+        assertEquals(measured,RetainedGraph.measure(decimal),"a warmed library rendering cache cannot change the logical scalar contract");
+    }
+    @Test void opaqueBigDecimalSubclassCannotHideAnOwnedExpressionGraph() {
+        class CapturingDecimal extends java.math.BigDecimal {
+            final Expr retained;
+            CapturingDecimal(Expr retained){super("1.5");this.retained=retained;}
+        }
+        var rejected=assertThrows(RetainedGraph.Unmeasured.class,
+            ()->RetainedGraph.measure(new CapturingDecimal(new VariableExpr("captured"))));
+        assertTrue(rejected.attempted().work()>0);
     }
     @Test void immutableSortedOwnerKeepsOrderAndExposesItsActualBackingGraph() {
         var map=RetainedSortedMap.copyOf(java.util.Map.of("b",new VariableExpr("b"),"a",new VariableExpr("a")));

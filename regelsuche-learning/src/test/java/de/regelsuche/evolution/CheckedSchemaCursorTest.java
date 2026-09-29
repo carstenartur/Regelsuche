@@ -171,20 +171,47 @@ class CheckedSchemaCursorTest {
         assertEquals(0,transport.total(),"checked schema generation, selection, admission and final replay must stay native");
         }
         boolean abandoned=false;var observedBudgets=new ArrayList<String>();
+        long previousBudget=0, unpaidBudget=0, paidBudget=-1;
         for(long budget:List.of(8L,128L,1024L,2048L,4096L,8192L,16384L,32768L,65536L,131072L,262144L,524288L)) {
-            var limited=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
-                MoveSearch.Scheduling.STAGED_INCREMENTAL,new MoveSearch.Budget(0,1,100000,10,budget)),SearchContinuationContract.PATH_SENSITIVE);
-            observedBudgets.add(budget+":"+limited.observedOutcome()+":"+limited.totalWork()+":"+limited.cursorReceipts().stream().flatMap(expansion->expansion.lanes().stream()).filter(lane->lane.cursor()!=null).map(lane->lane.cursor().work().prepaidApplications().toString()).toList());
-            for(var expansion:limited.cursorReceipts())for(var lane:expansion.lanes())if(lane.cursor()!=null) {
-                assertTrue(lane.cursor().closed());var prepaid=lane.cursor().work().prepaidApplications();
-                if(prepaid.abandonedApplications()>0) {
-                    abandoned=true;assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.observedOutcome());
-                    assertTrue(prepaid.chargedUnits()>0);assertEquals(0,prepaid.openApplications());
-                    assertTrue(limited.metrics().totalWork()>=prepaid.chargedUnits());
-                }
+            var probe=probeNativeSuspension(provider,source,context,budget,observedBudgets);
+            abandoned|=probe.abandoned();
+            if(paidBudget<0 && probe.paid()) {
+                unpaidBudget=previousBudget;paidBudget=budget;
             }
+            previousBudget=budget;
+        }
+        // New measured work can shift a narrow paid phase between coarse samples.
+        // Refine only their first unpaid/paid interval, with the same real provider
+        // and maximum budget. A concrete abandoned paid application is still required.
+        for(int refinements=0;!abandoned && paidBudget-unpaidBudget>1 && refinements<19;refinements++) {
+            long budget=unpaidBudget+(paidBudget-unpaidBudget)/2;
+            var probe=probeNativeSuspension(provider,source,context,budget,observedBudgets);
+            abandoned|=probe.abandoned();
+            if(probe.paid())paidBudget=budget;else unpaidBudget=budget;
         }
         assertTrue(abandoned,"a bounded real search must expose the paid suspended phase at cleanup: "+observedBudgets);
+    }
+
+    private record NativeSuspensionProbe(boolean paid,boolean abandoned) { }
+
+    private static NativeSuspensionProbe probeNativeSuspension(NativeMoveProvider provider,Expr source,
+            TypedMoveSearch.Context context,long budget,List<String> observedBudgets) {
+        var limited=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED_INCREMENTAL,new MoveSearch.Budget(0,1,100000,10,budget)),SearchContinuationContract.PATH_SENSITIVE);
+        observedBudgets.add(budget+":"+limited.observedOutcome()+":"+limited.totalWork()+":"+limited.cursorReceipts().stream().flatMap(expansion->expansion.lanes().stream()).filter(lane->lane.cursor()!=null).map(lane->lane.cursor().work().prepaidApplications().toString()).toList());
+        boolean paid=false,abandoned=false;
+        for(var expansion:limited.cursorReceipts())for(var lane:expansion.lanes())if(lane.cursor()!=null) {
+            assertTrue(lane.cursor().closed());var prepaid=lane.cursor().work().prepaidApplications();
+            assertEquals(0,prepaid.openApplications());
+            paid|=prepaid.chargedUnits()>0;
+            if(prepaid.abandonedApplications()>0) {
+                abandoned=true;assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.observedOutcome());
+                assertTrue(prepaid.chargedUnits()>0);assertEquals(0,prepaid.openApplications());
+                assertTrue(limited.metrics().totalWork()>=prepaid.chargedUnits());
+                System.out.println("P04_PAID_SUSPENSION budget="+budget+" total="+limited.totalWork()+" prepaid="+prepaid);
+            }
+        }
+        return new NativeSuspensionProbe(paid,abandoned);
     }
 
     @Test void firstPullDoesNotInstantiateTheSecondRealLearnedOccurrence() {

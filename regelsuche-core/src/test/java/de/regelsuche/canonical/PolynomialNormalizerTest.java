@@ -3,10 +3,17 @@ package de.regelsuche.canonical;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionContext;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.symbol.SymbolId;
+import java.util.UUID;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -18,6 +25,74 @@ import org.junit.jupiter.api.Timeout;
 class PolynomialNormalizerTest {
     private final ExpressionParser parser = new ExpressionParser();
     private final PolynomialNormalizer normalizer = new PolynomialNormalizer();
+
+    @Test void equalDegreeTermsKeepTheExistingLexicalKeyOrderForPrefixesAndLargePowers(){
+        assertEquals("a * z + aa * y",normalize("aa*y+a*z"));
+        assertEquals("x ^ 10 * y ^ 2 + x ^ 2 * y ^ 10",normalize("x^2*y^10+x^10*y^2"));
+        assertEquals("a * b ^ 2147483647 + a ^ 2147483647 * b",
+            normalize("a^2147483647*b+a*b^2147483647"));
+        var first=VariableExpr.scoped(new SymbolId(new UUID(0,17),1));
+        var second=VariableExpr.scoped(new SymbolId(new UUID(0,17),2));
+        var product=new BinaryExpr(first,BinaryOperator.MUL,second);
+        var square=new BinaryExpr(first,BinaryOperator.POW,new NumberExpr(2));
+        assertEquals(new BinaryExpr(product,BinaryOperator.ADD,square),
+            normalizer.normalize(new BinaryExpr(square,BinaryOperator.ADD,product)).orElseThrow());
+    }
+
+    @Test void alreadyNormalVariablePowersReuseTheirImmutableProducerTree(){
+        var scoped=VariableExpr.scoped(new SymbolId(new UUID(3,7),11));
+        for(var variable:List.of(new VariableExpr("x"),scoped))
+            for(int exponent:List.of(2,3,17,31,Integer.MAX_VALUE)){
+                var expression=new BinaryExpr(variable,BinaryOperator.POW,new NumberExpr(exponent));
+                for(var service:List.of(normalizer,PolynomialNormalizer.monomialOnly())){
+                    var result=service.normalize(expression).orElseThrow();
+                    assertEquals(expression,result);
+                    assertSame(expression,result,"an already normal variable power needs no rebuilt AST or polynomial workspace");
+                }
+            }
+    }
+    @Test void unitPowerReusesItsVariableWithoutAdmittingOtherExponentDomains(){
+        var x=new VariableExpr("x");
+        assertSame(x,normalizer.normalize(new BinaryExpr(x,BinaryOperator.POW,new NumberExpr(1))).orElseThrow());
+        for(String exponent:List.of("0","-1","1/2","2147483648"))
+            assertTrue(normalizer.normalize(new BinaryExpr(x,BinaryOperator.POW,NumberExpr.exact(exponent))).isEmpty(),exponent);
+        assertEquals(parse("4"),normalizer.normalize(parse("2^2")).orElseThrow());
+        assertTrue(normalizer.normalize(parse("sin(x)^2")).isEmpty());
+        assertEquals(parse("x^4"),normalizer.normalize(parse("(x^2)^2")).orElseThrow());
+    }
+    @Test void nestedVariablePowersKeepExactDegreesAndTheExistingOverflowBoundary(){
+        for(var service:List.of(normalizer,PolynomialNormalizer.monomialOnly())){
+            assertEquals(parse("x^3*y^3"),service.normalize(parse("x^2*y^3*x")).orElseThrow());
+            assertEquals(parse("x^2147483647"),service.normalize(parse("x^2147483646*x")).orElseThrow());
+            assertTrue(service.normalize(parse("x^2147483647*x")).isEmpty());
+        }
+    }
+    @Test void distinctVariableSumsKeepOrderAssociationAndSymbolIdentity(){
+        for(var service:List.of(normalizer,PolynomialNormalizer.monomialOnly())){
+            for(String expression:List.of("a+(b+c)","c+(b+a)","(b+a)+c","a+(aa+ab)")){
+                var expected=expression.contains("aa")?parse("a+aa+ab"):parse("a+b+c");
+                assertEquals(expected,service.normalize(parse(expression)).orElseThrow());
+            }
+            var first=VariableExpr.scoped(new SymbolId(new UUID(0,7),1));
+            var second=VariableExpr.scoped(new SymbolId(new UUID(0,7),2));
+            assertEquals(new BinaryExpr(first,BinaryOperator.ADD,second),
+                service.normalize(new BinaryExpr(second,BinaryOperator.ADD,first)).orElseThrow());
+            assertEquals(parse("2*x+y"),service.normalize(parse("x+(y+x)")).orElseThrow());
+            assertEquals(parse("x+y+1"),service.normalize(parse("y+(1+x)")).orElseThrow());
+        }
+    }
+    @Test void variableSumShortcutPreservesTheGeneralTermLimitAndDuplicateFallback(){
+        var variables=new java.util.ArrayList<Expr>();
+        for(int i=0;i<1001;i++)variables.add(new VariableExpr("v"+i));
+        assertTrue(normalizer.normalize(balancedSum(variables.subList(0,1000))).isPresent());
+        assertTrue(normalizer.normalize(balancedSum(variables)).isEmpty());
+        assertEquals(parse("1001*x"),normalizer.normalize(balancedSum(java.util.Collections.nCopies(1001,new VariableExpr("x")))).orElseThrow());
+    }
+    private static Expr balancedSum(List<? extends Expr> expressions){
+        if(expressions.size()==1)return expressions.getFirst();
+        int split=expressions.size()/2;
+        return new BinaryExpr(balancedSum(expressions.subList(0,split)),BinaryOperator.ADD,balancedSum(expressions.subList(split,expressions.size())));
+    }
 
     @Test
     void collectsGlobalLikeTermsAfterExpansion() {
@@ -45,6 +120,14 @@ class PolynomialNormalizerTest {
     void combinesDecimalCoefficientsExactly() {
         assertEquals("0.3 * x", normalize("0.1*x + 0.2*x"));
         assertEquals("0", normalize("0.3*x - 0.1*x - 0.2*x"));
+    }
+
+    @Test void subtractionKeepsItsCoefficientLimitAndExactSigns(){
+        assertEquals("x - 0.5 * y",normalize("(2*x - y) - (x - 0.5*y)"));
+        var atLimit=new NumberExpr(de.regelsuche.scalar.ExactRational.integer(java.math.BigInteger.ONE.shiftLeft(4095)));
+        var outside=new BinaryExpr(atLimit,BinaryOperator.ADD,atLimit);
+        assertTrue(normalizer.normalize(new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,outside)).isEmpty());
+        assertTrue(normalizer.normalize(new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,atLimit)).isPresent());
     }
 
     @Test

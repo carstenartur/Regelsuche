@@ -4,7 +4,6 @@ import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,13 +12,32 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /** Declarative, nestable matcher algebra independent of {@link ExprTemplate}. */
-public sealed interface ExprMatcher
+public sealed interface ExprMatcher extends MatcherDescriptor.Source
     permits ExprMatcher.Any, ExprMatcher.LiteralNumber,
         ExprMatcher.LiteralVariable, ExprMatcher.NumberProperty,
         ExprMatcher.Pattern, ExprMatcher.Bind, ExprMatcher.AllOf,
         ExprMatcher.AnyOf, ExprMatcher.Not, ExprMatcher.Operation,
         ExprMatcher.Function, ExprMatcher.Contains,
         ExprMatcher.Equivalent, ExprMatcher.Where {
+
+    @Override default void retainedReferences(RetainedGraph.Visitor visitor) {
+        switch (this) {
+            case Any ignored -> { }
+            case LiteralNumber literal -> visitor.reference(literal.value());
+            case LiteralVariable literal -> visitor.reference(literal.name());
+            case NumberProperty property -> visitor.reference(property.kind());
+            case Pattern pattern -> { visitor.reference(pattern.pattern()); visitor.reference(pattern.recognitionProfile()); }
+            case Bind bind -> { visitor.reference(bind.name()); visitor.reference(bind.matcher()); visitor.reference(bind.equalityProfile()); }
+            case AllOf all -> visitor.reference(all.matchers());
+            case AnyOf any -> visitor.reference(any.matchers());
+            case Not not -> visitor.reference(not.matcher());
+            case Operation operation -> { visitor.reference(operation.operator()); visitor.reference(operation.left()); visitor.reference(operation.right()); }
+            case Function function -> { visitor.reference(function.name()); visitor.reference(function.arguments()); }
+            case Contains contains -> visitor.reference(contains.matcher());
+            case Equivalent equivalent -> { visitor.reference(equivalent.recognitionProfile()); visitor.reference(equivalent.matcher()); }
+            case Where where -> { visitor.reference(where.matcher()); visitor.reference(where.constraint()); }
+        }
+    }
 
     default MatchOutcome match(Expr expression) {
         return match(expression, MatchOptions.defaults());
@@ -154,7 +172,8 @@ public sealed interface ExprMatcher
         int maxResults,
         int maxSteps,
         int maxPatternBranches
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(representativeProvider); }
         public MatchOptions {
             representativeProvider = representativeProvider == null
                 ? EquivalentExpressionProvider.identity()
@@ -186,16 +205,18 @@ public sealed interface ExprMatcher
         }
     }
 
-    enum MatchStatus {
+    enum MatchStatus implements RetainedGraph.View {
         MATCHED,
         NOT_MATCHED,
-        INCONCLUSIVE
+        INCONCLUSIVE;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
     }
 
-    enum RecognitionStrength {
+    enum RecognitionStrength implements RetainedGraph.View {
         EXACT,
         EQUIVALENCE_AWARE,
         BOUNDED_REPRESENTATIVE;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
 
         static RecognitionStrength strongest(
             RecognitionStrength left,
@@ -211,7 +232,11 @@ public sealed interface ExprMatcher
         int representativeIndex,
         RecognitionStrength recognitionStrength,
         List<String> trace
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(bindings); visitor.reference(representative);
+            visitor.reference(recognitionStrength); visitor.reference(trace);
+        }
         public MatchResult {
             Objects.requireNonNull(bindings, "bindings");
             bindings = de.regelsuche.retention.RetainedSortedMap.copyOf(bindings);
@@ -227,7 +252,10 @@ public sealed interface ExprMatcher
         }
     }
 
-    record MatchDiagnostic(String code, String matcherDescriptor) {
+    record MatchDiagnostic(String code, String matcherDescriptor) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(code); visitor.reference(matcherDescriptor);
+        }
         public MatchDiagnostic {
             code = requireText(code, "code");
             matcherDescriptor = requireText(
@@ -240,7 +268,10 @@ public sealed interface ExprMatcher
         List<MatchDiagnostic> diagnostics,
         int evaluatedSteps,
         int patternBranches
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(matches); visitor.reference(diagnostics);
+        }
         public MatchOutcome {
             matches = List.copyOf(Objects.requireNonNull(matches, "matches"));
             diagnostics = List.copyOf(
@@ -272,7 +303,7 @@ public sealed interface ExprMatcher
     record Any() implements ExprMatcher {
         @Override
         public String canonicalDescriptor() {
-            return descriptor("any");
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -283,7 +314,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("literal-number", value.canonicalText());
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -294,14 +325,15 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("literal-variable", name);
+            return MatcherDescriptor.render(this);
         }
     }
 
-    enum NumberPropertyKind {
+    enum NumberPropertyKind implements RetainedGraph.View {
         NUMBER_LITERAL,
         INTEGER_LITERAL,
-        NON_ZERO_NUMBER_LITERAL
+        NON_ZERO_NUMBER_LITERAL;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
     }
 
     record NumberProperty(NumberPropertyKind kind) implements ExprMatcher {
@@ -311,15 +343,14 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("number-property", kind.name());
+            return MatcherDescriptor.render(this);
         }
     }
 
     record Pattern(
         PatternExpr pattern,
         RecognitionProfile recognitionProfile
-    ) implements ExprMatcher,RetainedGraph.View {
-        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(pattern);v.reference(recognitionProfile);}
+    ) implements ExprMatcher {
         public Pattern {
             pattern = Objects.requireNonNull(pattern, "pattern");
             recognitionProfile = recognitionProfile == null
@@ -329,11 +360,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "pattern",
-                pattern.toString(),
-                profileDescriptor(recognitionProfile)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -352,12 +379,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "bind",
-                name,
-                matcher.canonicalDescriptor(),
-                profileDescriptor(equalityProfile)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -368,7 +390,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("all-of", matcherDescriptors(matchers));
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -379,7 +401,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("any-of", matcherDescriptors(matchers));
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -390,7 +412,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("not", matcher.canonicalDescriptor());
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -407,12 +429,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "operation",
-                operator.name(),
-                left.canonicalDescriptor(),
-                right.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -427,11 +444,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "function",
-                name,
-                matcherDescriptors(arguments)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -442,7 +455,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("contains", matcher.canonicalDescriptor());
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -459,11 +472,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "equivalent",
-                profileDescriptor(recognitionProfile),
-                matcher.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -478,16 +487,18 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "where",
-                matcher.canonicalDescriptor(),
-                constraint.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
-    sealed interface Constraint permits BindingMatches, SameAs {
+    sealed interface Constraint extends MatcherDescriptor.Source permits BindingMatches, SameAs {
         String canonicalDescriptor();
+        @Override default void retainedReferences(RetainedGraph.Visitor visitor) {
+            switch (this) {
+                case BindingMatches binding -> { visitor.reference(binding.bindingName()); visitor.reference(binding.matcher()); }
+                case SameAs same -> { visitor.reference(same.leftBinding()); visitor.reference(same.rightBinding()); visitor.reference(same.recognitionProfile()); }
+            }
+        }
     }
 
     record BindingMatches(
@@ -501,11 +512,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "binding-matches",
-                bindingName,
-                matcher.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -524,12 +531,7 @@ public sealed interface ExprMatcher
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "same-as",
-                leftBinding,
-                rightBinding,
-                profileDescriptor(recognitionProfile)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -544,50 +546,6 @@ public sealed interface ExprMatcher
         return values.stream()
             .map(value -> Objects.requireNonNull(value, field + " entry"))
             .toList();
-    }
-
-    private static String matcherDescriptors(List<ExprMatcher> matchers) {
-        return descriptor(
-            "matcher-list",
-            matchers.stream()
-                .map(ExprMatcher::canonicalDescriptor)
-                .toArray(String[]::new)
-        );
-    }
-
-    private static String profileDescriptor(RecognitionProfile profile) {
-        return descriptor(
-            "recognition-profile",
-            descriptor(
-                "associative",
-                profile.associativeOperators().stream()
-                    .map(Enum::name).sorted().toArray(String[]::new)
-            ),
-            descriptor(
-                "commutative",
-                profile.commutativeOperators().stream()
-                    .map(Enum::name).sorted().toArray(String[]::new)
-            ),
-            Boolean.toString(profile.inferAlgebraicBindings()),
-            descriptor(
-                "recognition-rules",
-                profile.recognitionRuleIds().stream()
-                    .sorted().toArray(String[]::new)
-            ),
-            Integer.toString(profile.maxEquivalenceDepth())
-        );
-    }
-
-    private static String descriptor(String type, String... fields) {
-        StringBuilder result = new StringBuilder();
-        appendField(result, requireText(type, "type"));
-        Arrays.stream(fields).forEach(field ->
-            appendField(result, Objects.requireNonNull(field, "field")));
-        return result.toString();
-    }
-
-    private static void appendField(StringBuilder result, String field) {
-        result.append(field.length()).append(':').append(field);
     }
 
     private static String requireText(String value, String field) {

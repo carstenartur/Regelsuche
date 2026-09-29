@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class NativeSourceOnlySearchTest {
     private static final long BUDGET=1_000_000;
     private static final class Counter implements RetainedGraph.View {
-        int value;
+        int value;boolean inspectFinalRoot,completedRoot,selectionRetained,executionRetained;
         @Override public void retainedReferences(RetainedGraph.Visitor v){}
     }
     private enum Objective implements TypedSourceOnlySearch.Objective,RetainedGraph.View {
@@ -26,9 +26,43 @@ class NativeSourceOnlySearchTest {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(primitive);v.reference(checks);}
         @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move,TypedMoveSearch.Context context){
             var verified=primitive.verify(state,move,context);
-            if(++checks.value!=2 || finalMode==0)return verified;
+            if(++checks.value==2 && checks.inspectFinalRoot){
+                try(var frame=de.regelsuche.retention.RetainedOperation.retain()){
+                    var scope=directReferences(frame).stream().filter(de.regelsuche.retention.RetainedOperation.class::isInstance)
+                        .map(de.regelsuche.retention.RetainedOperation.class::cast).findFirst().orElseThrow();
+                    var owner=directReferences(scope).stream().filter(NativeRetentionSession.class::isInstance)
+                        .map(NativeRetentionSession.class::cast).findFirst().orElseThrow();
+                    checks.completedRoot=directReferences(owner).stream().anyMatch(SearchExecution.Result.class::isInstance);
+                    checks.selectionRetained=directReferences(owner).stream().anyMatch(MoveSearchObjective.class::isInstance);
+                    checks.executionRetained=directReferences(owner).stream().anyMatch(SearchExecution.Environment.class::isInstance);
+                }
+            }
+            if(checks.value!=2 || finalMode==0)return verified;
             return finalMode==1?new NativeVerification(false,37,null,null,"deliberate final rejection"):
                 new NativeVerification(true,1001,verified.checkedProof(),verified.ruleId(),verified.reason());
+        }
+    }
+    private static List<Object> directReferences(RetainedGraph.View view){
+        var values=new ArrayList<Object>();
+        view.retainedReferences(new RetainedGraph.Visitor(){
+            @Override public void reference(Object value){values.add(value);}
+            @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+        });
+        return values;
+    }
+    @Test void finalReplayOwnsTheCompletedResultAfterReleasingClosedFrontierScratch(){
+        for(boolean sourceOnly:List.of(false,true)){
+            var checks=new Counter();checks.inspectFinalRoot=true;var problem=problem(checks,0,BUDGET);
+            NativeMoveSearch.Result result;RetainedGraph.View output;
+            if(sourceOnly){
+                var quality=new NativeMoveSearch().searchUntil(problem,Objective.QUALITY,1,SearchContinuationContract.PATH_SENSITIVE);
+                result=quality.search();output=quality;
+            }else{result=new NativeMoveSearch().search(target(problem),SearchContinuationContract.PATH_SENSITIVE);output=result;}
+            assertEquals(2,checks.value);assertTrue(result.replayWork()>0);assertEquals(1,result.witness().size());
+            assertTrue(checks.completedRoot,"the actual final checker must see the immutable complete result as the direct ownership root");
+            assertEquals(sourceOnly,checks.selectionRetained,"source-only final replay must keep its separately selected incumbent and witness owned");
+            assertTrue(checks.executionRetained,"the live replay environment wrapper and its outgoing references must remain owned");
+            assertEquals(RetainedGraph.measure(output).retained(),result.accounting().resultRetained());
         }
     }
     @Test void sourceOnlyQualityPaysAFreshIndependentReplayBeforeAnyExport() {
@@ -80,10 +114,12 @@ class NativeSourceOnlySearchTest {
         assertFalse(failure.rejected().accepted());assertTrue(failure.attempted().totalWork()>37);
     }
     @Test void bestBudgetUsesTheSameObjectiveWithoutEarlyQualityStop() {
-        var checks=new Counter();
+        var checks=new Counter();checks.inspectFinalRoot=true;
         var result=new NativeMoveSearch().searchBest(problem(checks,0,BUDGET),Objective.BEST,SearchContinuationContract.PATH_SENSITIVE);
         assertNotEquals(MoveSearch.Outcome.QUALITY_REACHED,result.search().observedOutcome());
         assertEquals(Long.MIN_VALUE,result.outputScore());assertEquals(1,result.witness().size());assertEquals(2,checks.value);
+        assertTrue(checks.completedRoot);assertTrue(checks.selectionRetained);assertTrue(checks.executionRetained);
+        assertEquals(RetainedGraph.measure(result).retained(),result.search().accounting().resultRetained());
     }
     private static NativeMoveSearch.Problem target(NativeMoveSearch.Problem sourceOnly){
         return new NativeMoveSearch.Problem(sourceOnly.source(),TypedMoveSearch.Context.frozen(((BinaryExpr)sourceOnly.source()).left()),

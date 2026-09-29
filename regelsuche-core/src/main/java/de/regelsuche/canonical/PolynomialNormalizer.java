@@ -1,6 +1,7 @@
 package de.regelsuche.canonical;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -10,7 +11,7 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,17 +49,109 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
     }
 
     public Optional<Expr> normalize(Expr expression) {
-        Polynomial polynomial = toPolynomial(expression);
-        if (polynomial == null) {
-            return Optional.empty();
+        try(var owned=RetainedOperation.retain(this,expression)) {
+            RetainedOperation.work(1);
+            Expr existing=normalizedVariablePower(expression);
+            if(existing!=null)return RetainedOperation.produced(Optional.of(existing));
+            Expr variableSum=normalizeVariableSum(expression);
+            if(variableSum!=null)return RetainedOperation.produced(Optional.of(variableSum));
+            Polynomial polynomial = toPolynomial(expression);
+            if (polynomial == null) {
+                return Optional.empty();
+            }
+            try(var value=RetainedOperation.retain(polynomial)) {
+                Expr normalized = polynomial.toExpr();
+                return normalized == null
+                    ? Optional.empty()
+                    : RetainedOperation.produced(Optional.of(normalized));
+            }
         }
-        Expr normalized = polynomial.toExpr();
-        return normalized == null
-            ? Optional.empty()
-            : Optional.of(normalized);
+    }
+
+    /** Positive bounded powers of one variable already have the emitted normal form. */
+    private Expr normalizedVariablePower(Expr expression){
+        RetainedOperation.work(1);
+        if(!(expression instanceof BinaryExpr binary) || binary.operator()!=BinaryOperator.POW
+                || !(binary.left() instanceof VariableExpr) || !(binary.right() instanceof NumberExpr number))return null;
+        RetainedOperation.work(2);
+        if(!isNonNegativeInteger(number.value()) || number.value().isZero())return null;
+        return number.value().isOne()?binary.left():expression;
+    }
+
+    /** Distinct degree-one terms need only ordering and association, not coefficient maps. */
+    private Expr normalizeVariableSum(Expr expression) {
+        RetainedOperation.work(1);
+        if (!(expression instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) return null;
+        RetainedOperation.work(2);
+        if (!variableSumNode(binary.left()) || !variableSumNode(binary.right())) return null;
+        if (isNormalizedVariableSum(expression)) return expression;
+        var variables = new ArrayList<VariableExpr>();
+        var pending = new ArrayDeque<Expr>();
+        RetainedOperation.work(2);
+        pending.addLast(expression);RetainedOperation.work(1);
+        try (var workspace = RetainedOperation.retain(variables, pending)) {
+            if (!collectVariableSum(variables, pending)) return null;
+            variables.sort(PolynomialNormalizer::compareVariables);
+            for (int index = 1; index < variables.size(); index++) {
+                if (compareVariables(variables.get(index - 1), variables.get(index)) == 0) return null;
+            }
+            return leftAssociate(variables, BinaryOperator.ADD);
+        }
+    }
+
+    /** Recognizes the existing bounded normal form without rebuilding its unchanged ancestors. */
+    private static boolean isNormalizedVariableSum(Expr expression) {
+        Expr remaining = expression;
+        VariableExpr next = null;
+        int terms = 1;
+        while (remaining instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD) {
+            RetainedOperation.work(1);
+            if (!(binary.right() instanceof VariableExpr variable) || ++terms > MAX_EXPANDED_TERMS) return false;
+            if (next != null && compareVariables(variable, next) >= 0) return false;
+            next = variable;
+            remaining = binary.left();
+        }
+        RetainedOperation.work(1);
+        return remaining instanceof VariableExpr variable && next != null && compareVariables(variable, next) < 0;
+    }
+
+    private static boolean variableSumNode(Expr expression) {
+        return expression instanceof VariableExpr
+            || expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD;
+    }
+
+    private static boolean collectVariableSum(List<VariableExpr> variables, ArrayDeque<Expr> pending) {
+        while (!pending.isEmpty()) {
+            Expr expression = pending.removeLast();RetainedOperation.work(1);
+            if (expression instanceof VariableExpr variable) {
+                variables.add(variable);RetainedOperation.work(1);
+            } else if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD) {
+                pending.addLast(binary.right());pending.addLast(binary.left());RetainedOperation.work(2);
+            } else return false;
+            RetainedOperation.checkpoint();
+            if (variables.size() > MAX_EXPANDED_TERMS) return false;
+        }
+        return true;
+    }
+
+    private static int compareVariables(VariableExpr left, VariableExpr right) {
+        // A degree-one monomial's existing sortKey is exactly its lossless variable name.
+        return compareText(left.name(),right.name());
+    }
+
+    private static int compareText(String a,String b) {
+        for (int index = 0; index < Math.min(a.length(), b.length()); index++) {
+            RetainedOperation.work(1);
+            int order = Character.compare(a.charAt(index), b.charAt(index));
+            if (order != 0) return order;
+        }
+        RetainedOperation.work(1);
+        return Integer.compare(a.length(), b.length());
     }
 
     private Polynomial toPolynomial(Expr expression) {
+        // normalize owns the complete immutable input throughout this private recursion.
+        RetainedOperation.work(1);
         if (expression instanceof NumberExpr number) {
             return Polynomial.constant(number.value());
         }
@@ -79,32 +172,42 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         };
     }
 
+
     private Polynomial combine(
         Expr left,
         Expr right,
         int rightSign
     ) {
         Polynomial leftPolynomial = toPolynomial(left);
-        Polynomial rightPolynomial = toPolynomial(right);
-        if (leftPolynomial == null || rightPolynomial == null) {
-            return null;
+        if (leftPolynomial == null) return null;
+        try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {
+            Polynomial rightPolynomial = toPolynomial(right);
+            try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {
+                if (rightPolynomial == null) {
+                    return null;
+                }
+                var scaled=rightPolynomial.scale(rightSign);
+                if (scaled == null) return null;
+                try(var scaledOwned=RetainedOperation.retain(scaled)){return leftPolynomial.add(scaled);}
+            }
         }
-        return leftPolynomial.add(
-            rightPolynomial.scale(rightSign));
     }
 
     private Polynomial multiply(Expr left, Expr right) {
         Polynomial leftPolynomial = toPolynomial(left);
-        Polynomial rightPolynomial = toPolynomial(right);
-        if (leftPolynomial == null || rightPolynomial == null) {
-            return null;
+        if (leftPolynomial == null || (!expandCompositePolynomials && !leftPolynomial.isMonomial())) return null;
+        try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {
+            Polynomial rightPolynomial = toPolynomial(right);
+            try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {
+                if (rightPolynomial == null) {
+                    return null;
+                }
+                if (!expandCompositePolynomials && !rightPolynomial.isMonomial()) {
+                    return null;
+                }
+                return leftPolynomial.multiply(rightPolynomial);
+            }
         }
-        if (!expandCompositePolynomials
-                && (!leftPolynomial.isMonomial()
-                    || !rightPolynomial.isMonomial())) {
-            return null;
-        }
-        return leftPolynomial.multiply(rightPolynomial);
     }
 
     private Polynomial power(Expr base, Expr exponent) {
@@ -120,15 +223,21 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         if (exponentValue == 0) {
             return null;
         }
+        if(base instanceof VariableExpr variable){
+            RetainedOperation.work(1);
+            return Polynomial.monomial(1,Monomial.variable(variable.name(),exponentValue));
+        }
         Polynomial basePolynomial = toPolynomial(base);
-        if (basePolynomial == null) {
-            return null;
+        try(var baseOwned=RetainedOperation.retain(basePolynomial)) {
+            if (basePolynomial == null) {
+                return null;
+            }
+            if (!expandCompositePolynomials
+                    && !basePolynomial.isMonomial()) {
+                return null;
+            }
+            return basePolynomial.pow(exponentValue);
         }
-        if (!expandCompositePolynomials
-                && !basePolynomial.isMonomial()) {
-            return null;
-        }
-        return basePolynomial.pow(exponentValue);
     }
 
     private boolean isNonNegativeInteger(ExactRational value) {
@@ -136,57 +245,73 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             && value.numerator().bitLength() <= 31;
     }
 
-    private record Monomial(Map<String, Integer> powers) {
-        private Monomial {
-            powers = Collections.unmodifiableMap(
-                new TreeMap<>(powers));
-        }
+    private record Monomial(Map<String, Integer> powers) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(powers);}
+        // Private factories transfer immutable zero/singleton maps or exclusive natural-order TreeMaps.
+        // No caller mutates a transferred powers map; multiply/pow always create distinct accumulators.
 
         private static Monomial constant() {
-            return new Monomial(Map.of());
+            return RetainedOperation.produced(new Monomial(Map.of()));
         }
 
         private static Monomial variable(String name) {
-            return new Monomial(Map.of(name, 1));
+            return variable(name,1);
+        }
+
+        private static Monomial variable(String name,int exponent) {
+            var powers = Map.of(name, exponent);
+            RetainedOperation.work(2); // Actual singleton map creation and its entry.
+            return RetainedOperation.produced(new Monomial(powers));
         }
 
         private Monomial multiply(Monomial other) {
             Map<String, Integer> result = new TreeMap<>(powers);
-            for (Map.Entry<String, Integer> entry
-                    : other.powers.entrySet()) {
-                try {
-                    result.merge(
-                        entry.getKey(),
-                        entry.getValue(),
-                        Math::addExact);
-                } catch (ArithmeticException exception) {
-                    return null;
+            RetainedOperation.work(powers.size());
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,other,result)) {
+                for (Map.Entry<String, Integer> entry
+                        : other.powers.entrySet()) {
+                    RetainedOperation.work(1);
+                    try {
+                        result.merge(
+                            entry.getKey(),
+                            entry.getValue(),
+                            Math::addExact);
+                    } catch (ArithmeticException exception) {
+                        return null;
+                    }
                 }
+                RetainedOperation.work(result.size());
+                result.values().removeIf(value -> value == 0);RetainedOperation.checkpoint();
+                return RetainedOperation.produced(new Monomial(result));
             }
-            result.values().removeIf(value -> value == 0);
-            return new Monomial(result);
         }
 
         private Monomial pow(int exponent) {
             Map<String, Integer> result = new TreeMap<>();
-            for (Map.Entry<String, Integer> entry
-                    : powers.entrySet()) {
-                try {
-                    result.put(
-                        entry.getKey(),
-                        Math.multiplyExact(
-                            entry.getValue(),
-                            exponent));
-                } catch (ArithmeticException exception) {
-                    return null;
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,result)) {
+                for (Map.Entry<String, Integer> entry
+                        : powers.entrySet()) {
+                    RetainedOperation.work(1);
+                    try {
+                        result.put(
+                            entry.getKey(),
+                            Math.multiplyExact(
+                                entry.getValue(),
+                                exponent));
+                    } catch (ArithmeticException exception) {
+                        return null;
+                    }
                 }
+                return RetainedOperation.produced(new Monomial(result));
             }
-            return new Monomial(result);
         }
 
         private long degree() {
             long degree = 0;
             for (int exponent : powers.values()) {
+                RetainedOperation.work(1);
                 degree += exponent;
             }
             return degree;
@@ -194,55 +319,132 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
 
         private Expr toExpr() {
             if (powers.isEmpty()) {
-                return new NumberExpr(1);
+                return RetainedOperation.produced(new NumberExpr(1));
+            }
+            RetainedOperation.work(1);
+            if (powers.size() == 1) {
+                var entry = powers.entrySet().iterator().next();
+                RetainedOperation.work(1);
+                return variablePower(entry.getKey(), entry.getValue());
             }
             List<Expr> factors = new ArrayList<>();
-            for (Map.Entry<String, Integer> entry
-                    : powers.entrySet()) {
-                Expr variable = new VariableExpr(entry.getKey());
-                factors.add(entry.getValue() == 1
-                    ? variable
-                    : new BinaryExpr(
-                        variable,
-                        BinaryOperator.POW,
-                        new NumberExpr(entry.getValue())));
+            RetainedOperation.work(1);
+            try (var owned = RetainedOperation.retain(this, factors)) {
+                for (Map.Entry<String, Integer> entry : powers.entrySet()) {
+                    Expr factor = variablePower(entry.getKey(), entry.getValue());
+                    factors.add(factor);
+                    RetainedOperation.work(1);
+                    RetainedOperation.checkpoint();
+                }
+                return leftAssociate(factors, BinaryOperator.MUL);
             }
-            return leftAssociate(factors, BinaryOperator.MUL);
         }
 
-        private String sortKey() {
-            if (powers.isEmpty()) {
-                return "";
-            }
-            StringBuilder builder = new StringBuilder();
-            for (Map.Entry<String, Integer> entry
-                    : powers.entrySet()) {
-                if (!builder.isEmpty()) {
-                    builder.append('*');
-                }
-                builder.append(entry.getKey());
-                if (entry.getValue() != 1) {
-                    builder.append('^').append(entry.getValue());
+        private static Expr variablePower(String name, int power) {
+            Expr variable = new VariableExpr(name);
+            RetainedOperation.work(1);
+            if (power == 1) return RetainedOperation.produced(variable);
+            try (var leaf = RetainedOperation.retain(variable)) {
+                var exponent = new NumberExpr(power);
+                RetainedOperation.work(1);
+                try (var number = RetainedOperation.retain(exponent)) {
+                    return RetainedOperation.produced(new BinaryExpr(variable, BinaryOperator.POW, exponent));
                 }
             }
-            return builder.toString();
+        }
+
+        private int compareKey(Monomial other) {
+            RetainedOperation.work(1);
+            var keys = new SortKeys(this,other);
+            try(var owned=RetainedOperation.retain(keys)) {
+                try {
+                    keys.leftText=keys.render(this,true);
+                    keys.rightText=keys.render(other,false);
+                } catch(RuntimeException | Error failure) {
+                    try{RetainedOperation.checkpoint();}
+                    catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}
+                    throw failure;
+                }
+                RetainedOperation.checkpoint();
+                return compareText(keys.leftText,keys.rightText);
+            }
+        }
+
+        /** Both keys and their actual copy buffers stay live until comparison completes. */
+        private static final class SortKeys implements RetainedGraph.View {
+            private final Monomial left,right;
+            private char[] leftBuffer,rightBuffer;
+            private String leftText,rightText;
+            private SortKeys(Monomial left,Monomial right){this.left=left;this.right=right;}
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor){
+                visitor.reference(left);visitor.reference(right);
+                visitor.reference(leftBuffer);visitor.reference(rightBuffer);
+                visitor.reference(leftText);visitor.reference(rightText);
+            }
+            private String render(Monomial monomial,boolean first){
+                if(monomial.powers.isEmpty())return "";
+                if(monomial.powers.size()==1){
+                    var entry=monomial.powers.entrySet().iterator().next();
+                    RetainedOperation.work(1);
+                    if(entry.getValue()==1)return entry.getKey();
+                }
+                int length=keyLength(monomial);
+                char[] buffer=new char[length];
+                if(first)leftBuffer=buffer;else rightBuffer=buffer;
+                RetainedOperation.work(length+1L);
+                writeKey(monomial,buffer);
+                RetainedOperation.work(length+1L); // completed key copy and String creation
+                return new String(buffer);
+            }
+            private static int keyLength(Monomial monomial){
+                int length=0;
+                for(var entry:monomial.powers.entrySet()){
+                    RetainedOperation.work(1);
+                    if(length!=0)length=Math.addExact(length,1);
+                    length=Math.addExact(length,entry.getKey().length());
+                    if(entry.getValue()!=1)length=Math.addExact(length,1+digits(entry.getValue()));
+                }
+                return length;
+            }
+            private static void writeKey(Monomial monomial,char[] buffer){
+                int position=0;
+                for(var entry:monomial.powers.entrySet()){
+                    RetainedOperation.work(1);
+                    if(position!=0){buffer[position++]='*';RetainedOperation.work(1);}
+                    String name=entry.getKey();
+                    name.getChars(0,name.length(),buffer,position);position+=name.length();
+                    RetainedOperation.work(name.length());
+                    int exponent=entry.getValue();
+                    if(exponent!=1){
+                        buffer[position++]='^';RetainedOperation.work(1);
+                        int end=position+digits(exponent);
+                        for(int index=end-1;index>=position;index--){
+                            buffer[index]=(char)('0'+exponent%10);exponent/=10;RetainedOperation.work(1);
+                        }
+                        position=end;
+                    }
+                }
+            }
+            private static int digits(int value){
+                int digits=1;
+                while(value>=10){value/=10;digits++;RetainedOperation.work(1);}
+                RetainedOperation.work(1);return digits;
+            }
         }
     }
 
-    private static final class Polynomial {
-        private static final Comparator<
-            Map.Entry<Monomial, ExactRational>> TERM_ORDER =
-                Comparator
-                    .<Map.Entry<Monomial, ExactRational>>comparingLong(
-                        entry -> entry.getKey().degree())
-                    .reversed()
-                    .thenComparing(
-                        entry -> entry.getKey().sortKey());
+    private static final class Polynomial implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(terms);}
+        private static final Comparator<Monomial> TERM_ORDER =
+            Comparator.comparingLong(Monomial::degree).reversed()
+                .thenComparing(Monomial::compareKey);
 
         private final Map<Monomial, ExactRational> terms;
 
-        private Polynomial(Map<Monomial, ExactRational> terms) {
-            this.terms = normalizedTerms(terms);
+        /** All callers transfer a fresh private accumulator after their existing term-limit checks. */
+        private Polynomial(LinkedHashMap<Monomial, ExactRational> terms) {
+            this.terms = terms;
+            removeZeroTerms();
         }
 
         private static Polynomial constant(ExactRational value) {
@@ -262,63 +464,94 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             ExactRational coefficient,
             Monomial monomial
         ) {
-            Map<Monomial, ExactRational> result =
+            LinkedHashMap<Monomial, ExactRational> result =
                 new LinkedHashMap<>();
-            result.put(monomial, coefficient);
-            return new Polynomial(result);
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(monomial,coefficient,result)) {
+                result.put(monomial, coefficient);RetainedOperation.work(1);
+                return RetainedOperation.produced(new Polynomial(result));
+            }
         }
 
         private Polynomial add(Polynomial other) {
-            Map<Monomial, ExactRational> result =
+            LinkedHashMap<Monomial, ExactRational> result =
                 new LinkedHashMap<>(terms);
-            for (Map.Entry<Monomial, ExactRational> entry
-                    : other.terms.entrySet()) {
-                result.merge(
-                    entry.getKey(),
-                    entry.getValue(),
-                    ExactRational::add);
-                if (result.size() > MAX_EXPANDED_TERMS) {
-                    return null;
-                }
-            }
-            return new Polynomial(result);
-        }
-
-        private Polynomial multiply(Polynomial other) {
-            Map<Monomial, ExactRational> result =
-                new LinkedHashMap<>();
-            for (Map.Entry<Monomial, ExactRational> left
-                    : terms.entrySet()) {
-                for (Map.Entry<Monomial, ExactRational> right
+            RetainedOperation.work(terms.size());
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,other,result)) {
+                for (Map.Entry<Monomial, ExactRational> entry
                         : other.terms.entrySet()) {
-                    Monomial monomial = left.getKey().multiply(
-                        right.getKey());
-                    if (monomial == null) {
-                        return null;
-                    }
-                    ExactRational coefficient =
-                        left.getValue().multiply(right.getValue());
-                    if (!withinCoefficientBudget(coefficient)) {
-                        return null;
-                    }
+                    RetainedOperation.work(1);
                     result.merge(
-                        monomial,
-                        coefficient,
+                        entry.getKey(),
+                        entry.getValue(),
                         ExactRational::add);
+                    RetainedOperation.checkpoint();
                     if (result.size() > MAX_EXPANDED_TERMS) {
                         return null;
                     }
                 }
+                return RetainedOperation.produced(new Polynomial(result));
             }
-            return new Polynomial(result);
+        }
+
+        private Polynomial multiply(Polynomial other) {
+            LinkedHashMap<Monomial, ExactRational> result =
+                new LinkedHashMap<>();
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,other,result)) {
+                for (Map.Entry<Monomial, ExactRational> left
+                        : terms.entrySet()) {
+                    for (Map.Entry<Monomial, ExactRational> right
+                            : other.terms.entrySet()) {
+                        Monomial monomial = left.getKey().multiply(
+                            right.getKey());
+                        try(var monomialOwned=RetainedOperation.retain(monomial)) {
+                            if (monomial == null) {
+                                return null;
+                            }
+                            ExactRational coefficient =
+                                left.getValue().multiply(right.getValue());
+                            RetainedOperation.work(1);
+                            try(var coefficientOwned=RetainedOperation.retain(coefficient)) {
+                                if (!withinCoefficientBudget(coefficient)) {
+                                    return null;
+                                }
+                                result.merge(
+                                    monomial,
+                                    coefficient,
+                                    ExactRational::add);
+                                RetainedOperation.work(1);RetainedOperation.checkpoint();
+                                if (result.size() > MAX_EXPANDED_TERMS) {
+                                    return null;
+                                }
+                            }
+                        }
+                    }
+                }
+                return RetainedOperation.produced(new Polynomial(result));
+            }
         }
 
         private Polynomial scale(long factor) {
-            return factor == 1
-                ? this
-                : multiply(monomial(
-                    factor,
-                    Monomial.constant()));
+            if (factor == 1) return this;
+            if (factor != -1) return multiply(monomial(factor, Monomial.constant()));
+            var result = new LinkedHashMap<Monomial, ExactRational>();
+            RetainedOperation.work(1);
+            try (var maps = RetainedOperation.retain(this, result)) {
+                for (var entry : terms.entrySet()) {
+                    var coefficient = entry.getValue().negate();
+                    RetainedOperation.work(1);
+                    try (var scalar = RetainedOperation.retain(coefficient)) {
+                        if (!withinCoefficientBudget(coefficient)) return null;
+                        result.put(entry.getKey(), coefficient);
+                        RetainedOperation.work(1);
+                        RetainedOperation.checkpoint();
+                        if (result.size() > MAX_EXPANDED_TERMS) return null;
+                    }
+                }
+                return RetainedOperation.produced(new Polynomial(result));
+            }
         }
 
         private boolean isMonomial() {
@@ -330,23 +563,26 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
                 1,
                 Monomial.constant());
             Polynomial factor = this;
-            int remaining = exponent;
-            while (remaining > 0) {
-                if ((remaining & 1) == 1) {
-                    result = result.multiply(factor);
-                    if (result == null) {
-                        return null;
+            Object[] current={result,factor};
+            try(var state=RetainedOperation.retain(this,current)) {
+                int remaining = exponent;
+                while (remaining > 0) {
+                    if ((remaining & 1) == 1) {
+                        result = result.multiply(factor);current[0]=result;RetainedOperation.work(1);RetainedOperation.checkpoint();
+                        if (result == null) {
+                            return null;
+                        }
+                    }
+                    remaining >>= 1;
+                    if (remaining > 0) {
+                        factor = factor.multiply(factor);current[1]=factor;RetainedOperation.work(1);RetainedOperation.checkpoint();
+                        if (factor == null) {
+                            return null;
+                        }
                     }
                 }
-                remaining >>= 1;
-                if (remaining > 0) {
-                    factor = factor.multiply(factor);
-                    if (factor == null) {
-                        return null;
-                    }
-                }
+                return RetainedOperation.produced(result);
             }
-            return result;
         }
 
         private static boolean withinCoefficientBudget(ExactRational value) {
@@ -356,99 +592,110 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
 
         private Expr toExpr() {
             if (terms.isEmpty()) {
-                return new NumberExpr(0);
+                return RetainedOperation.produced(new NumberExpr(0));
             }
-            Expr result = null;
-            for (Map.Entry<Monomial, ExactRational> entry
-                    : orderedTerms()) {
-                ExactRational coefficient = entry.getValue();
-                Expr term = withCoefficient(
-                    coefficient.abs(),
-                    entry.getKey().toExpr());
-                if (term == null) {
-                    return null;
+            List<Monomial> ordered = orderedTerms();
+            Object[] current = {null};
+            RetainedOperation.work(1);
+            try (var owned = RetainedOperation.retain(this, ordered, current)) {
+                for (Monomial monomial : ordered) {
+                    ExactRational coefficient = terms.get(monomial);
+                    ExactRational magnitude = coefficient.abs();
+                    RetainedOperation.work(2);
+                    try (var scalar = RetainedOperation.retain(magnitude)) {
+                        Expr base = monomial.toExpr();
+                        try (var renderedBase = RetainedOperation.retain(base)) {
+                            Expr term = withCoefficient(magnitude, base);
+                            try (var renderedTerm = RetainedOperation.retain(term)) {
+                                if (term == null) return null;
+                                Expr result = (Expr) current[0];
+                                if (result == null) {
+                                    if (coefficient.signum() < 0) {
+                                        var zero = new NumberExpr(0);
+                                        RetainedOperation.work(1);
+                                        try (var leaf = RetainedOperation.retain(zero)) {
+                                            result = RetainedOperation.produced(new BinaryExpr(zero, BinaryOperator.SUB, term));
+                                        }
+                                    } else result = term;
+                                } else {
+                                    result = RetainedOperation.produced(new BinaryExpr(result,
+                                        coefficient.signum() < 0 ? BinaryOperator.SUB : BinaryOperator.ADD, term));
+                                }
+                                current[0] = result;
+                                RetainedOperation.work(1);
+                                RetainedOperation.checkpoint();
+                            }
+                        }
+                    }
                 }
-                if (result == null) {
-                    result = coefficient.signum() < 0
-                        ? new BinaryExpr(
-                            new NumberExpr(0),
-                            BinaryOperator.SUB,
-                            term)
-                        : term;
-                } else if (coefficient.signum() < 0) {
-                    result = new BinaryExpr(
-                        result,
-                        BinaryOperator.SUB,
-                        term);
-                } else {
-                    result = new BinaryExpr(
-                        result,
-                        BinaryOperator.ADD,
-                        term);
-                }
+                return RetainedOperation.produced((Expr) current[0]);
             }
-            return result;
         }
 
-        private List<Map.Entry<Monomial, ExactRational>>
-                orderedTerms() {
-            return terms.entrySet().stream()
-                .sorted(TERM_ORDER)
-                .toList();
+        private List<Monomial> orderedTerms() {
+            // Same stable term order, with owned keys instead of opaque backing Map.Entry views.
+            var ordered = new ArrayList<>(terms.keySet());
+            RetainedOperation.work(terms.size() + 1L);
+            try (var owned = RetainedOperation.retain(this, ordered)) {
+                ordered.sort((left, right) -> {
+                    RetainedOperation.work(1);
+                    return TERM_ORDER.compare(left, right);
+                });
+                return RetainedOperation.produced(ordered);
+            }
         }
 
-        private static Map<Monomial, ExactRational> normalizedTerms(
-            Map<Monomial, ExactRational> source
-        ) {
-            Map<Monomial, ExactRational> normalized =
-                new LinkedHashMap<>();
-            for (Map.Entry<Monomial, ExactRational> entry
-                    : source.entrySet()) {
-                if (!entry.getValue().isZero()) {
-                    normalized.put(
-                        entry.getKey(),
-                        entry.getValue());
+        private void removeZeroTerms() {
+            var entries = terms.entrySet().iterator();
+            boolean observedBeforeRemoval = false;
+            while (entries.hasNext()) {
+                var entry = entries.next();
+                RetainedOperation.work(1);
+                if (entry.getValue().isZero()) {
+                    if (!observedBeforeRemoval) {
+                        // The filled accumulator and new owner are visible before any entries disappear.
+                        RetainedOperation.produced(this);
+                        observedBeforeRemoval = true;
+                    }
+                    entries.remove();
+                    RetainedOperation.work(1);
                 }
             }
-            return normalized;
         }
+
     }
 
     static Expr exactRationalExpression(ExactRational value) {
-        return new NumberExpr(value);
+        return RetainedOperation.produced(new NumberExpr(value));
     }
 
-    private static Expr withCoefficient(
-        ExactRational coefficient,
-        Expr term
-    ) {
-        if (term instanceof NumberExpr number
-                && number.value().equalsInteger(1)) {
-            return exactRationalExpression(coefficient);
+    private static Expr withCoefficient(ExactRational coefficient, Expr term) {
+        RetainedOperation.work(1);
+        if (coefficient.isOne()) return term;
+        try (var operands = RetainedOperation.retain(coefficient, term)) {
+            if (term instanceof NumberExpr number && number.value().equalsInteger(1)) {
+                return exactRationalExpression(coefficient);
+            }
+            Expr exactCoefficient = exactRationalExpression(coefficient);
+            try (var leaf = RetainedOperation.retain(exactCoefficient)) {
+                return exactCoefficient == null ? null
+                    : RetainedOperation.produced(new BinaryExpr(exactCoefficient, BinaryOperator.MUL, term));
+            }
         }
-        if (coefficient.isOne()) {
-            return term;
-        }
-        Expr exactCoefficient = exactRationalExpression(coefficient);
-        return exactCoefficient == null
-            ? null
-            : new BinaryExpr(
-                exactCoefficient,
-                BinaryOperator.MUL,
-                term);
     }
 
-    private static Expr leftAssociate(
-        List<Expr> expressions,
-        BinaryOperator operator
-    ) {
-        Expr result = expressions.getFirst();
-        for (int index = 1; index < expressions.size(); index++) {
-            result = new BinaryExpr(
-                result,
-                operator,
-                expressions.get(index));
+    private static Expr leftAssociate(List<? extends Expr> expressions, BinaryOperator operator) {
+        RetainedOperation.work(1);
+        if (expressions.size() == 1) return expressions.getFirst();
+        Object[] current = {expressions.getFirst()};
+        RetainedOperation.work(1);
+        try (var owned = RetainedOperation.retain(expressions, current)) {
+            for (int index = 1; index < expressions.size(); index++) {
+                current[0] = new BinaryExpr((Expr) current[0], operator, expressions.get(index));
+                RetainedOperation.work(2);
+                RetainedOperation.checkpoint();
+            }
+            return RetainedOperation.produced((Expr) current[0]);
         }
-        return result;
     }
 }

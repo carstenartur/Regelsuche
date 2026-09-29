@@ -24,16 +24,35 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
     public static void validation(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.validationWork(units);}
     /** Retains the actual mutable collections/objects, so later checkpoints observe their current fields. */
     public static Frame retain(Object... values){
+        return acquire(values,0);
+    }
+    /** Publish actual completed allocations before settling their work and observing the frame. */
+    public static Frame retainCompleted(long completedWork,Object... values){
+        if(completedWork<0)throw new IllegalArgumentException("negative completed work");
+        return acquire(values,completedWork);
+    }
+    private static Frame acquire(Object[] values,long producedWork){
         var scope=CURRENT.get();if(scope==null)return null;
-        var frame=new Frame(scope,values);scope.sink.executionWork(2);scope.current=frame;
-        try { scope.sink.checkpoint();return frame; }
+        var frame=new Frame(scope,values);scope.current=frame;
+        boolean observationAttempted=false;
+        try {
+            if(producedWork!=0)scope.sink.executionWork(producedWork);
+            scope.sink.executionWork(2);
+            observationAttempted=true;scope.sink.checkpoint();return frame;
+        }
         catch(RuntimeException | Error failure){
-            try{frame.close();}catch(RuntimeException | Error cleanup){failure.addSuppressed(cleanup);}
+            // Values were already allocated by the caller: a failed acquisition
+            // debit must still observe their ownership before restoring the parent.
+            if(!observationAttempted) {
+                try{scope.sink.checkpoint();}
+                catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}
+            }
+            try{frame.close();}catch(RuntimeException | Error cleanup){if(cleanup!=failure)failure.addSuppressed(cleanup);}
             throw failure;
         }
     }
     public static void checkpoint(){var scope=CURRENT.get();if(scope!=null)scope.sink.checkpoint();}
-    public static <T> T produced(T value){work(1);try(var frame=retain(value)){return value;}}
+    public static <T> T produced(T value){try(var frame=acquire(new Object[]{value},1)){return value;}}
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(previous);v.reference(sink);v.reference(current);}
     @Override public void close(){
         if(closed)return;

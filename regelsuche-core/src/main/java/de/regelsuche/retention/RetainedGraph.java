@@ -3,6 +3,7 @@ package de.regelsuche.retention;
 import de.regelsuche.ast.*;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.symbol.SymbolId;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 
@@ -10,7 +11,9 @@ import java.util.*;
  * Explicit logical ownership, not JVM bytes. Each described field/collection entry is a slot;
  * collection backing storage contributes one slot. Only exact audited owning container classes are supported;
  * wrappers/views/subclasses and opaque comparators are rejected. Scalars use canonical decimal characters;
- * BigInteger conversion text is paid and overlaps the retained scalar in the peak. Null fields still occupy slots. Shared objects
+ * BigInteger/BigDecimal conversion text is paid and overlaps the retained scalar in the peak,
+ * independent of library rendering caches. This is a logical scalar rule, not a heap layout estimate.
+ * Null fields still occupy slots. Shared objects
  * count once by identity. Only explicitly audited stateless enum types are borrowed; enum Views are traversed. No reflection or retained registry.
  */
 public final class RetainedGraph {
@@ -50,32 +53,67 @@ public final class RetainedGraph {
     public record Observation(Usage retained,Usage peak,long work,long objects) {}
     public static final class Unmeasured extends IllegalArgumentException {
         private final Observation attempted;
-        private Unmeasured(Object payload,Observation attempted){super("unsupported retention payload: "+payload.getClass().getName());this.attempted=attempted;}
+        Unmeasured(Object payload,Observation attempted){super("unsupported retention payload: "+payload.getClass().getName());this.attempted=attempted;}
         public Observation attempted(){return attempted;}
     }
     /** Each invocation pays fresh traversal/index work and drops all strong bookkeeping references. */
     public static Observation measure(Object root) {
-        var scan=new Scan();
+        var scan=new Scan(true);
         try {
             scan.reference(root);
             while(!scan.pending.isEmpty()) {
                 Object value=scan.pending.removeFirst();scan.work=Math.addExact(scan.work,1);
-                if(scan.seen.put(value,Boolean.TRUE)!=null)continue;
-                scan.work=Math.addExact(scan.work,1);scan.accountingPeak();scan.inspect(value);
+                scan.accountingPeak();scan.inspect(value);
             }
             return scan.observation();
         } finally { scan.pending.clear();scan.seen.clear(); }
     }
-    private static final class Scan implements Visitor {
+    /** Bounded per-session immutable accounting data; never mathematical verification authority. */
+    public static final class Inventory implements View {
+        private ImmutableRetentionInventory data;
+        public Inventory(int vertexLimit, int wordLimit, int childLimit) {
+            data=new ImmutableRetentionInventory(vertexLimit,wordLimit,childLimit);
+        }
+        public Inventory(){this(1_024,4_096,4_096);}
+        /** The primary ownership root must contain an actual edge to this inventory. */
+        public Observation measure(Object ownershipRoot) {
+            return measure(ownershipRoot,new Usage(Long.MAX_VALUE,Long.MAX_VALUE,Long.MAX_VALUE));
+        }
+        public Observation measure(Object ownershipRoot, Usage limits) {
+            if(data==null)throw new IllegalStateException("closed immutable inventory");
+            return data.measure(ownershipRoot,this,limits);
+        }
+        public int cachedVertices(){return data==null?0:data.cachedVertices();}
+        /** Paid logical release; repeated close performs no additional operation. */
+        public long close(){if(data==null)return 0;long work=data.close();data=null;return Math.addExact(work,1);}
+        @Override public void retainedReferences(Visitor visitor){visitor.reference(data);}
+    }
+    public static final class InventoryFailure extends IllegalArgumentException {
+        private final Observation attempted;
+        InventoryFailure(String message,Observation attempted){super(message);this.attempted=attempted;}
+        public Observation attempted(){return attempted;}
+    }
+
+    static class Scan implements Visitor {
+        private final boolean admitWhenQueued;
         final IdentityHashMap<Object,Boolean> seen=new IdentityHashMap<>();
         final ArrayDeque<Object> pending=new ArrayDeque<>();
         long nodes,characters,references,work,accountingReferences=5,temporaryCharacters;
+        Scan(){this(false);} // The optional inventory has its own cache-aware admission loop.
+        Scan(boolean admitWhenQueued){this.admitWhenQueued=admitWhenQueued;}
         @Override public void requireExact(Object value,Class<?> auditedType){
             if(value.getClass()!=auditedType)throw new Unmeasured(value,observation());
         }
         @Override public void reference(Object value){
             references=Math.addExact(references,1);work=Math.addExact(work,1);
-            if(value!=null && !borrowedEnum(value))pending.addLast(value);
+            if(value!=null && !borrowedEnum(value)) {
+                if(!admitWhenQueued)pending.addLast(value);
+                else if(seen.put(value,Boolean.TRUE)==null) {
+                    // Every reference slot and lookup remains paid. Only the first
+                    // encounter acquires an identity entry and a pending traversal.
+                    work=Math.addExact(work,1);pending.addLast(value);
+                }
+            }
             accountingPeak();
         }
         void accountingPeak(){
@@ -84,6 +122,7 @@ public final class RetainedGraph {
         }
         void inspect(Object value){
             switch(value) {
+                case Equation equation -> { reference(equation.left());reference(equation.right()); }
                 case BinaryExpr binary -> { node();reference(binary.left());reference(binary.operator());reference(binary.right()); }
                 case FunctionExpr function -> { node();reference(function.name());reference(function.arguments()); }
                 case VariableExpr variable -> { node();reference(variable.name());reference(variable.symbol().orElse(null)); }
@@ -95,15 +134,18 @@ public final class RetainedGraph {
                 case com.fasterxml.jackson.databind.node.DoubleNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.DoubleNode.class -> {}
                 case com.fasterxml.jackson.databind.node.BooleanNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.BooleanNode.class -> {}
                 case com.fasterxml.jackson.databind.node.NullNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.NullNode.class -> {}
+                case Optional<?> optional -> reference(optional.orElse(null));
                 case String text -> characters=Math.addExact(characters,text.length());
                 case StringBuilder text -> {reference(null);characters=Math.addExact(characters,text.length());}
                 case ExactRational rational -> { reference(rational.numerator());reference(rational.denominator()); }
                 case BigInteger integer -> {
                     if(integer.getClass()!=BigInteger.class)throw new Unmeasured(integer,observation());
-                    String decimal=integer.toString();int digits=decimal.length();
-                    characters=Math.addExact(characters,digits);temporaryCharacters=Math.max(temporaryCharacters,digits);
-                    accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
-                    work=Math.addExact(work,Math.addExact(digits,2L)); // conversion scan and temporary reference acquisition/release
+                    scalarText(integer.toString());
+                }
+                case BigDecimal decimal -> {
+                    if(decimal.getClass()!=BigDecimal.class)throw new Unmeasured(decimal,observation());
+                    // Canonical exponent notation also bounds inspection for extreme scales.
+                    scalarText(decimal.toString());
                 }
                 case SymbolId symbol -> reference(symbol.namespace());
                 // The exact ThreadLocal key has no strong value field; values belong to the thread map.
@@ -138,6 +180,12 @@ public final class RetainedGraph {
                 default -> throw new Unmeasured(value,observation());
             }
         }
+        void scalarText(String decimal){
+            int digits=decimal.length();
+            characters=Math.addExact(characters,digits);temporaryCharacters=Math.max(temporaryCharacters,digits);
+            accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
+            work=Math.addExact(work,Math.addExact(digits,2L)); // conversion scan and temporary reference acquisition/release
+        }
         void node(){nodes=Math.addExact(nodes,1);}
         boolean standardContainer(Object value){
             Class<?> type=value.getClass();
@@ -163,7 +211,8 @@ public final class RetainedGraph {
             // Both paths leave through measure's finally. Settle each occupied identity slot and
             // pending traversal slot before publishing the receipt; none can survive the call.
             long settledWork=Math.addExact(work,Math.addExact(2L*seen.size(),pending.size()));
-            return new Observation(retained,new Usage(nodes,Math.addExact(characters,temporaryCharacters),Math.addExact(references,accountingReferences)),settledWork,seen.size());
+            long inspected=admitWhenQueued?seen.size()-pending.size():seen.size();
+            return new Observation(retained,new Usage(nodes,Math.addExact(characters,temporaryCharacters),Math.addExact(references,accountingReferences)),settledWork,inspected);
         }
     }
 }

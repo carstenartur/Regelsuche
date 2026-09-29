@@ -206,72 +206,130 @@ public final class PreparedAstRewriteTransformationEngine
     }
 
     private List<RewriteResult> rewriteEverywhere(Expr subtree, boolean retainLegacyHash) {
-        List<RewriteResult> results = new ArrayList<>();
-        try(var retained=retainLegacyHash?null:RetainedOperation.retain(this,subtree,results)) {
-        String subtreeHash = null;
-        for (RewriteRule rule : ruleIndex == null ? rules : ruleIndex.candidates(subtree)) {
-            Expr rewritten = applyIfMatched(rule, subtree);
-            if (!retainLegacyHash && rewritten != null) AstRewriteTransport.requireBounded(rewritten);
-            if (rewritten == null || rewritten.equals(subtree)) {
-                continue;
-            }
-            if (retainLegacyHash && subtreeHash == null) {
-                subtreeHash = stableHash(subtree);
-            }
-            results.add(new RewriteResult(
-                rule,
-                rewritten,
-                subtreeHash,
-                rule.assumptions(subtree)
-            ));
-        }
-
-        if (subtree instanceof BinaryExpr binaryExpr) {
-            for (RewriteResult leftRewrite :
-                    rewriteEverywhere(binaryExpr.left(), retainLegacyHash)) {
-                results.add(new RewriteResult(
-                    leftRewrite.rule(),
-                    new BinaryExpr(
-                        leftRewrite.expression(),
-                        binaryExpr.operator(),
-                        binaryExpr.right()
-                    ),
-                    leftRewrite.sourceSubtreeHash(),
-                    leftRewrite.assumptions()
-                ));
-            }
-            for (RewriteResult rightRewrite :
-                    rewriteEverywhere(binaryExpr.right(), retainLegacyHash)) {
-                results.add(new RewriteResult(
-                    rightRewrite.rule(),
-                    new BinaryExpr(
-                        binaryExpr.left(),
-                        binaryExpr.operator(),
-                        rightRewrite.expression()
-                    ),
-                    rightRewrite.sourceSubtreeHash(),
-                    rightRewrite.assumptions()
-                ));
-            }
-        } else if (subtree instanceof FunctionExpr functionExpr) {
-            List<Expr> arguments = functionExpr.arguments();
-            for (int index = 0; index < arguments.size(); index++) {
-                final int position = index;
-                for (RewriteResult argumentRewrite :
-                        rewriteEverywhere(arguments.get(index), retainLegacyHash)) {
-                    List<Expr> replaced = new ArrayList<>(arguments);
-                    replaced.set(position, argumentRewrite.expression());
-                    results.add(new RewriteResult(
-                        argumentRewrite.rule(),
-                        new FunctionExpr(functionExpr.name(), replaced),
-                        argumentRewrite.sourceSubtreeHash(),
-                        argumentRewrite.assumptions()
-                    ));
+        List<RewriteResult> results = retainLegacyHash ? new ArrayList<>() : null;
+        RetainedOperation.Frame owned = null;
+        try {
+            String subtreeHash = null;
+            for (RewriteRule rule : ruleIndex == null ? rules : ruleIndex.candidates(subtree)) {
+                Expr rewritten = applyIfMatched(rule, subtree);
+                if (!retainLegacyHash && rewritten != null) AstRewriteTransport.requireBounded(rewritten);
+                if (rewritten == null || rewritten.equals(subtree)) continue;
+                if (retainLegacyHash && subtreeHash == null) subtreeHash = stableHash(subtree);
+                if (results == null) {
+                    results = new ArrayList<>();
+                    owned = RetainedOperation.retainCompleted(1, results, rewritten);
+                }
+                results.add(new RewriteResult(rule, rewritten, subtreeHash, rule.assumptions(subtree)));
+                if (!retainLegacyHash) {
+                    RetainedOperation.work(2);
+                    RetainedOperation.checkpoint();
                 }
             }
+            if (subtree instanceof BinaryExpr binaryExpr) {
+                results = rewriteBinaryChildren(binaryExpr, retainLegacyHash, results);
+            } else if (subtree instanceof FunctionExpr functionExpr) {
+                results = rewriteFunctionArguments(functionExpr, retainLegacyHash, results);
+            }
+            return results == null ? List.of() : results;
+        } catch (RuntimeException | Error failure) {
+            var release = owned;
+            owned = null;
+            releaseAfterFailure(release, failure);
+            throw failure;
+        } finally {
+            if (owned != null) owned.close();
         }
-        if(!retainLegacyHash)RetainedOperation.checkpoint();
-        return results;
+    }
+
+    private List<RewriteResult> rewriteBinaryChildren(BinaryExpr binaryExpr, boolean retainLegacyHash,
+            List<RewriteResult> results) {
+        RetainedOperation.Frame owned = null;
+        try {
+            var leftRewrites = rewriteEverywhere(binaryExpr.left(), retainLegacyHash);
+            if (results == null && !leftRewrites.isEmpty()) {
+                results = new ArrayList<>();
+                owned = RetainedOperation.retainCompleted(1, results, leftRewrites);
+            }
+            try (var child = retainLegacyHash || leftRewrites.isEmpty() ? null : RetainedOperation.retain(leftRewrites)) {
+
+                for (RewriteResult rewrite : leftRewrites) {
+                    results.add(new RewriteResult(rewrite.rule(),
+                        new BinaryExpr(rewrite.expression(), binaryExpr.operator(), binaryExpr.right()),
+                        rewrite.sourceSubtreeHash(), rewrite.assumptions()));
+                    if (!retainLegacyHash) { RetainedOperation.work(2); RetainedOperation.checkpoint(); }
+                }
+            }
+            var rightRewrites = rewriteEverywhere(binaryExpr.right(), retainLegacyHash);
+            if (results == null && !rightRewrites.isEmpty()) {
+                results = new ArrayList<>();
+                owned = RetainedOperation.retainCompleted(1, results, rightRewrites);
+            }
+            try (var child = retainLegacyHash || rightRewrites.isEmpty() ? null : RetainedOperation.retain(rightRewrites)) {
+
+                for (RewriteResult rewrite : rightRewrites) {
+                    results.add(new RewriteResult(rewrite.rule(),
+                        new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rewrite.expression()),
+                        rewrite.sourceSubtreeHash(), rewrite.assumptions()));
+                    if (!retainLegacyHash) { RetainedOperation.work(2); RetainedOperation.checkpoint(); }
+                }
+            }
+            return results;
+        } catch (RuntimeException | Error failure) {
+            var release = owned;
+            owned = null;
+            releaseAfterFailure(release, failure);
+            throw failure;
+        } finally {
+            if (owned != null) owned.close();
+        }
+    }
+
+    private List<RewriteResult> rewriteFunctionArguments(FunctionExpr functionExpr, boolean retainLegacyHash,
+            List<RewriteResult> results) {
+        RetainedOperation.Frame owned = null;
+        try {
+            List<Expr> arguments = functionExpr.arguments();
+            for (int index = 0; index < arguments.size(); index++) {
+                var argumentRewrites = rewriteEverywhere(arguments.get(index), retainLegacyHash);
+                if (results == null && !argumentRewrites.isEmpty()) {
+                    results = new ArrayList<>();
+                    owned = RetainedOperation.retainCompleted(1, results, argumentRewrites);
+                }
+                try (var child = retainLegacyHash || argumentRewrites.isEmpty() ? null : RetainedOperation.retain(argumentRewrites)) {
+
+                    for (RewriteResult rewrite : argumentRewrites) {
+                        appendFunctionRewrite(functionExpr, index, rewrite, retainLegacyHash, results);
+                    }
+                }
+            }
+            return results;
+        } catch (RuntimeException | Error failure) {
+            var release = owned;
+            owned = null;
+            releaseAfterFailure(release, failure);
+            throw failure;
+        } finally {
+            if (owned != null) owned.close();
+        }
+    }
+
+    private static void releaseAfterFailure(RetainedOperation.Frame owned, Throwable failure) {
+        if (owned == null) return;
+        try { owned.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (cleanup != failure) failure.addSuppressed(cleanup);
+        }
+    }
+
+    private void appendFunctionRewrite(FunctionExpr functionExpr, int position, RewriteResult rewrite,
+            boolean retainLegacyHash, List<RewriteResult> results) {
+        List<Expr> replaced = new ArrayList<>(functionExpr.arguments());
+        try (var argumentsHeld = retainLegacyHash ? null : RetainedOperation.retainCompleted(replaced.size(), replaced)) {
+            replaced.set(position, rewrite.expression());
+            if (!retainLegacyHash) RetainedOperation.work(1);
+            results.add(new RewriteResult(rewrite.rule(), new FunctionExpr(functionExpr.name(), replaced),
+                rewrite.sourceSubtreeHash(), rewrite.assumptions()));
+            if (!retainLegacyHash) { RetainedOperation.work(replaced.size()+2L); RetainedOperation.checkpoint(); }
         }
     }
 
@@ -298,10 +356,12 @@ public final class PreparedAstRewriteTransformationEngine
     }
 
     int canonicalAstNodeCount(Expr expression) {
-        return count(canonicalizer.canonicalize(expression));
+        var canonical=canonicalizer.canonicalize(expression);
+        try(var retained=RetainedOperation.retain(expression,canonical)){return count(canonical);}
     }
 
     private static int count(Expr expression) {
+        RetainedOperation.validation(1);
         if (expression instanceof BinaryExpr binaryExpr) {
             return 1 + count(binaryExpr.left()) + count(binaryExpr.right());
         }

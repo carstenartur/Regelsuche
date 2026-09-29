@@ -1,0 +1,295 @@
+[
+  {
+    "id": "(x+y)*(x-y)+y*y",
+    "work": {
+      "engineInvocations": 1,
+      "programNodeVisits": 0,
+      "sourceInvocations": 1,
+      "sourceCandidates": 2,
+      "composedCandidates": 0,
+      "requirementEvaluations": 0,
+      "requirementRejections": 0,
+      "priorityCandidatesOrdered": 0,
+      "prunedCandidates": 0,
+      "repeatIterations": 0,
+      "repeatEndpoints": 0,
+      "alternativeSelections": 0,
+      "alternativesSkipped": 0,
+      "duplicateCandidatesDropped": 0,
+      "candidateWork": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 2,
+        "exactTheoryWorkUnits": 34
+      },
+      "delegatedMechanicalWorkUnits": 30
+    },
+    "complete": true,
+    "candidates": [
+      {
+        "rule": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"x\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}}",
+        "generationCost": 34,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 9
+        }
+      },
+      {
+        "rule": "checked-schema:sha256:4fda53360af2a35fbec697eae68a2209c170db336cc20b23cc4140e86480398c",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"x\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"y\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"y\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}}}",
+        "generationCost": 34,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 25
+        }
+      }
+    ]
+  },
+  {
+    "id": "((a+b)*(a-b)+b*b)+((c+d)*(c-d)+d*d)",
+    "work": {
+      "engineInvocations": 1,
+      "programNodeVisits": 0,
+      "sourceInvocations": 1,
+      "sourceCandidates": 4,
+      "composedCandidates": 0,
+      "requirementEvaluations": 0,
+      "requirementRejections": 0,
+      "priorityCandidatesOrdered": 0,
+      "prunedCandidates": 0,
+      "repeatIterations": 0,
+      "repeatEndpoints": 0,
+      "alternativeSelections": 0,
+      "alternativesSkipped": 0,
+      "duplicateCandidatesDropped": 0,
+      "candidateWork": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 4,
+        "exactTheoryWorkUnits": 120
+      },
+      "delegatedMechanicalWorkUnits": 63
+    },
+    "complete": true,
+    "candidates": [
+      {
+        "rule": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}},\"right\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"d\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}}}}",
+        "generationCost": 69,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 22
+        }
+      },
+      {
+        "rule": "checked-schema:sha256:4fda53360af2a35fbec697eae68a2209c170db336cc20b23cc4140e86480398c",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"b\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"b\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"d\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}}}}",
+        "generationCost": 69,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 38
+        }
+      },
+      {
+        "rule": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"b\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}}}",
+        "generationCost": 69,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 22
+        }
+      },
+      {
+        "rule": "checked-schema:sha256:4fda53360af2a35fbec697eae68a2209c170db336cc20b23cc4140e86480398c",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"b\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"d\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"d\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}}}}",
+        "generationCost": 69,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 38
+        }
+      }
+    ]
+  },
+  {
+    "id": "x+17",
+    "work": {
+      "engineInvocations": 1,
+      "programNodeVisits": 0,
+      "sourceInvocations": 1,
+      "sourceCandidates": 0,
+      "composedCandidates": 0,
+      "requirementEvaluations": 0,
+      "requirementRejections": 0,
+      "priorityCandidatesOrdered": 0,
+      "prunedCandidates": 0,
+      "repeatIterations": 0,
+      "repeatEndpoints": 0,
+      "alternativeSelections": 0,
+      "alternativesSkipped": 0,
+      "duplicateCandidatesDropped": 0,
+      "candidateWork": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 0,
+        "exactTheoryWorkUnits": 0
+      },
+      "delegatedMechanicalWorkUnits": 11
+    },
+    "complete": true,
+    "candidates": []
+  },
+  {
+    "id": "x/0",
+    "work": {
+      "engineInvocations": 1,
+      "programNodeVisits": 0,
+      "sourceInvocations": 1,
+      "sourceCandidates": 0,
+      "composedCandidates": 0,
+      "requirementEvaluations": 0,
+      "requirementRejections": 0,
+      "priorityCandidatesOrdered": 0,
+      "prunedCandidates": 0,
+      "repeatIterations": 0,
+      "repeatEndpoints": 0,
+      "alternativeSelections": 0,
+      "alternativesSkipped": 0,
+      "duplicateCandidatesDropped": 0,
+      "candidateWork": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 0,
+        "exactTheoryWorkUnits": 0
+      },
+      "delegatedMechanicalWorkUnits": 3
+    },
+    "complete": false,
+    "candidates": []
+  },
+  {
+    "id": "missing-prerequisite",
+    "work": {
+      "engineInvocations": 1,
+      "programNodeVisits": 0,
+      "sourceInvocations": 1,
+      "sourceCandidates": 0,
+      "composedCandidates": 0,
+      "requirementEvaluations": 0,
+      "requirementRejections": 0,
+      "priorityCandidatesOrdered": 0,
+      "prunedCandidates": 0,
+      "repeatIterations": 0,
+      "repeatEndpoints": 0,
+      "alternativeSelections": 0,
+      "alternativesSkipped": 0,
+      "duplicateCandidatesDropped": 0,
+      "candidateWork": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 0,
+        "exactTheoryWorkUnits": 0
+      },
+      "delegatedMechanicalWorkUnits": 1
+    },
+    "complete": true,
+    "candidates": []
+  },
+  {
+    "id": "selected-schema",
+    "work": {
+      "engineInvocations": 1,
+      "programNodeVisits": 0,
+      "sourceInvocations": 1,
+      "sourceCandidates": 2,
+      "composedCandidates": 0,
+      "requirementEvaluations": 0,
+      "requirementRejections": 0,
+      "priorityCandidatesOrdered": 0,
+      "prunedCandidates": 0,
+      "repeatIterations": 0,
+      "repeatEndpoints": 0,
+      "alternativeSelections": 0,
+      "alternativesSkipped": 0,
+      "duplicateCandidatesDropped": 0,
+      "candidateWork": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 2,
+        "exactTheoryWorkUnits": 44
+      },
+      "delegatedMechanicalWorkUnits": 53
+    },
+    "complete": false,
+    "candidates": [
+      {
+        "rule": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}},\"right\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"d\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}}}}",
+        "generationCost": 57,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 22
+        }
+      },
+      {
+        "rule": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"b\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}}}",
+        "generationCost": 57,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 22
+        }
+      }
+    ]
+  },
+  {
+    "id": "one-schema-per-site",
+    "work": {
+      "engineInvocations": 1,
+      "programNodeVisits": 0,
+      "sourceInvocations": 1,
+      "sourceCandidates": 2,
+      "composedCandidates": 0,
+      "requirementEvaluations": 0,
+      "requirementRejections": 0,
+      "priorityCandidatesOrdered": 0,
+      "prunedCandidates": 0,
+      "repeatIterations": 0,
+      "repeatEndpoints": 0,
+      "alternativeSelections": 0,
+      "alternativesSkipped": 0,
+      "duplicateCandidatesDropped": 0,
+      "candidateWork": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 2,
+        "exactTheoryWorkUnits": 44
+      },
+      "delegatedMechanicalWorkUnits": 53
+    },
+    "complete": false,
+    "candidates": [
+      {
+        "rule": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}},\"right\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"d\"},\"right\":{\"type\":\"variable\",\"name\":\"d\"}}}}}",
+        "generationCost": 57,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 22
+        }
+      },
+      {
+        "rule": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+        "target": "{\"schema\":\"regelsuche.typed-move-expression/v1\",\"expression\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"binary\",\"operator\":\"ADD\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}},\"right\":{\"type\":\"binary\",\"operator\":\"SUB\",\"left\":{\"type\":\"variable\",\"name\":\"a\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"MUL\",\"left\":{\"type\":\"variable\",\"name\":\"b\"},\"right\":{\"type\":\"variable\",\"name\":\"b\"}}},\"right\":{\"type\":\"binary\",\"operator\":\"POW\",\"left\":{\"type\":\"variable\",\"name\":\"c\"},\"right\":{\"type\":\"number\",\"value\":\"2\"}}}}",
+        "generationCost": 57,
+        "work": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 22
+        }
+      }
+    ]
+  }
+]

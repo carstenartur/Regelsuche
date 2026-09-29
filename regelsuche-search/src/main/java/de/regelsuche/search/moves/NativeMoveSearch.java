@@ -183,10 +183,14 @@ public final class NativeMoveSearch {
             var reached=new HashSet<MoveState>();var dead=new ArrayList<MoveState>();
             var expansions=new ArrayList<StagedIncrementalMoveExecution.Expansion>();
             try(var retained=de.regelsuche.retention.RetainedOperation.retain(assessments,witness,events,reached,dead,expansions)) {
-                for(var e:result.stateAssessments().entrySet()){assessments.put(export(e.getKey()),export(e.getValue()));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                for(var state:result.assessmentOrder()){
+                    var assessment=result.stateAssessments().get(state);
+                    de.regelsuche.retention.RetainedOperation.work(1);
+                    assessments.put(export(state),export(assessment));de.regelsuche.retention.RetainedOperation.checkpoint();
+                }
                 for(var step:result.witness()){witness.add(new MoveSearch.WitnessStep(export(step.source()),export(step.target()),step.move().exportLegacy(),step.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}
                 for(var event:result.events()){events.add(new MoveSearch.Event(export(event.source()),export(event.target()),event.move().exportLegacy(),event.decision(),event.verification()==null?null:event.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}
-                for(var state:result.reachedStates()){reached.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                for(var state:result.reachedOrder()){reached.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
                 for(var state:result.deadEndStates()){dead.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
                 if(incrementalProviders!=null)for(var receipt:cursorReceipts()){expansions.add(new StagedIncrementalMoveExecution.Expansion(export(receipt.source()),receipt.closed(),receipt.lanes()));de.regelsuche.retention.RetainedOperation.checkpoint();}
                 de.regelsuche.retention.RetainedOperation.work(assessments.size()+witness.size()+events.size()+reached.size()+dead.size()+expansions.size()+7L);
@@ -248,6 +252,7 @@ public final class NativeMoveSearch {
                 var execution=new Execution(problem,store,accounting);
                 var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                     .search(execution,continuation,selection);
+                accounting.completed(searched,selection,execution);
                 var replay=selection.incumbent()==null?new Replay(0,null):
                     replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
                 var result=new Result(problem,searched,replay.work());
@@ -268,6 +273,7 @@ public final class NativeMoveSearch {
             var execution=new Execution(problem,store,accounting);
             var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(execution,continuation,null);
+            accounting.completed(searched,null,execution);
             var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
                 ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
             var result=new Result(problem,searched,replay.work());accounting.finish(result);

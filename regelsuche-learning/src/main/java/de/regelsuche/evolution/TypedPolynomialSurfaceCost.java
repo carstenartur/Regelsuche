@@ -9,6 +9,11 @@ import java.util.Objects;
 /** The external surface objective, not an algebraic simplifier or a CPU estimate. */
 final class TypedPolynomialSurfaceCost {
     private TypedPolynomialSurfaceCost() { }
+    private static final class Emission implements java.util.function.LongConsumer, de.regelsuche.retention.RetainedGraph.View {
+        private long units;
+        @Override public void accept(long amount) { units = Math.addExact(units, amount); }
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) { }
+    }
     static TypedSourceOnlySearch.Score evaluate(Expr expression) {
         var pending = new ArrayDeque<Expr>();
         pending.push(Objects.requireNonNull(expression, "expression"));
@@ -22,9 +27,9 @@ final class TypedPolynomialSurfaceCost {
             } else if (next instanceof NumberExpr number) {
                 // A typed rational leaf may print as a decimal, a fraction, or a negative.
                 // Inspect only its surface spelling; never format/reparse whole states.
-                long[] emitted = {0};
-                String spelling = ExpressionFormatter.formatMeasured(number, n -> emitted[0] = Math.addExact(emitted[0], n));
-                work = Math.addExact(work, Math.addExact(emitted[0], spelling.length()));
+                var emitted = new Emission();
+                String spelling = ExpressionFormatter.formatMeasured(number, emitted);
+                work = Math.addExact(work, Math.addExact(emitted.units, spelling.length()));
                 for (int i = 0; i < spelling.length(); i++) {
                     if (spelling.charAt(i) == '-' || spelling.charAt(i) == '/') cost = Math.addExact(cost, 1);
                 }

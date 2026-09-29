@@ -22,7 +22,24 @@ public final class RetainedJson {
         @Override public void close(){
             if(closed)return;if(CURRENT.get()!=this)throw new IllegalStateException("JSON scope order");
             closed=true;if(previous==null)CURRENT.remove();else CURRENT.set(previous);
-            var owned=recycler;previous=null;recycler=null;owned.clear();RetainedOperation.work(3);
+            Throwable primary=null;
+            try {
+                recycler.clear();
+            } catch(RuntimeException | Error failure) {
+                primary=failure;
+                // Scope still owns the recycler while observing a failed clear.
+                try{RetainedOperation.checkpoint();}
+                catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}
+                throw failure;
+            } finally {
+                previous=null;recycler=null;
+                // CURRENT/closed and these field resets happened even if clear's debit failed.
+                try{RetainedOperation.work(3);}
+                catch(RuntimeException | Error accounting){
+                    if(primary==null)throw accounting;
+                    if(accounting!=primary)primary.addSuppressed(accounting);
+                }
+            }
         }
     }
     private static final class Recycler extends BufferRecycler implements RetainedGraph.View {
@@ -117,6 +134,11 @@ public final class RetainedJson {
         }
     }
     public static ObjectNode object(ObjectMapper mapper){return active()?new ObjectValue():mapper.createObjectNode();}
+    /** Existing strict mapper/reader, with explicitly owned containers at the import boundary.
+     * Parser-internal temporaries are not yet a complete native inventory. */
+    public static JsonNode readTree(ObjectMapper mapper,String input)throws JsonProcessingException{
+        return active()?mapper.reader().with(NODES).readTree(input):mapper.readTree(input);
+    }
     private static final class NodeFactory extends JsonNodeFactory implements RetainedGraph.View {
         @Override public ObjectNode objectNode(){return new ObjectValue();}
         @Override public ArrayNode arrayNode(){return new ArrayValue();}
@@ -140,7 +162,9 @@ public final class RetainedJson {
             int needed=Math.addExact(size,length);
             if(needed>buffer.length){
                 var old=buffer;var replacement=new char[Math.max(needed,Math.multiplyExact(buffer.length,2))];
-                try(var frame=RetainedOperation.retain(old,replacement)){RetainedOperation.work(Math.addExact(replacement.length,size));System.arraycopy(old,0,replacement,0,size);buffer=replacement;}
+                try(var frame=RetainedOperation.retainCompleted(replacement.length,old,replacement)){
+                    System.arraycopy(old,0,replacement,0,size);RetainedOperation.work(size);buffer=replacement;
+                }
             }
             System.arraycopy(input,offset,buffer,size,length);size=needed;RetainedOperation.work(length);RetainedOperation.checkpoint();
         }

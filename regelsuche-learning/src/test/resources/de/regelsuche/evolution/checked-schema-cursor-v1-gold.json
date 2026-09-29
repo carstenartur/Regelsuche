@@ -1,0 +1,139 @@
+[
+  {
+    "source": "(x+y)*(x-y)+y*y",
+    "status": "INCONCLUSIVE",
+    "work": {
+      "operations": {
+        "LOAD": 12,
+        "MATCH": 49,
+        "PULL": 1
+      },
+      "mathematics": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 1,
+        "exactTheoryWorkUnits": 9
+      },
+      "prepaidApplications": {
+        "revision": "regelsuche.prepaid-application-work/v1",
+        "chargedUnits": 9,
+        "phaseCalls": {
+          "EVIDENCE": 1,
+          "INSTANTIATION": 1,
+          "SUBSTITUTION_DOMAIN": 2,
+          "TARGET_DOMAIN": 1
+        },
+        "phaseWork": {
+          "EVIDENCE": 0,
+          "INSTANTIATION": 4,
+          "SUBSTITUTION_DOMAIN": 2,
+          "TARGET_DOMAIN": 3
+        },
+        "completedMathematics": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 1,
+          "exactTheoryWorkUnits": 9
+        },
+        "openApplications": 0,
+        "abandonedApplications": 0
+      }
+    },
+    "candidates": 1
+  },
+  {
+    "source": "((a+b)*(a-b)+b*b)+((c+d)*(c-d)+d*d)",
+    "status": "INCONCLUSIVE",
+    "work": {
+      "operations": {
+        "LOAD": 24,
+        "MATCH": 123,
+        "PULL": 2
+      },
+      "mathematics": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 2,
+        "exactTheoryWorkUnits": 44
+      },
+      "prepaidApplications": {
+        "revision": "regelsuche.prepaid-application-work/v1",
+        "chargedUnits": 44,
+        "phaseCalls": {
+          "EVIDENCE": 2,
+          "INSTANTIATION": 2,
+          "SUBSTITUTION_DOMAIN": 4,
+          "TARGET_DOMAIN": 2
+        },
+        "phaseWork": {
+          "EVIDENCE": 0,
+          "INSTANTIATION": 10,
+          "SUBSTITUTION_DOMAIN": 4,
+          "TARGET_DOMAIN": 30
+        },
+        "completedMathematics": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 2,
+          "exactTheoryWorkUnits": 44
+        },
+        "openApplications": 0,
+        "abandonedApplications": 0
+      }
+    },
+    "candidates": 2
+  },
+  {
+    "source": "x+17",
+    "status": "INCONCLUSIVE",
+    "work": {
+      "operations": {
+        "LOAD": 4,
+        "MATCH": 11
+      },
+      "mathematics": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 0,
+        "exactTheoryWorkUnits": 0
+      },
+      "prepaidApplications": {
+        "revision": "regelsuche.prepaid-application-work/v1",
+        "chargedUnits": 0,
+        "phaseCalls": {},
+        "phaseWork": {},
+        "completedMathematics": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 0,
+          "exactTheoryWorkUnits": 0
+        },
+        "openApplications": 0,
+        "abandonedApplications": 0
+      }
+    },
+    "candidates": 0
+  },
+  {
+    "source": "x/0",
+    "status": "INCONCLUSIVE",
+    "work": {
+      "operations": {
+        "LOAD": 2
+      },
+      "mathematics": {
+        "primitiveRewrites": 0,
+        "exactTheorySteps": 0,
+        "exactTheoryWorkUnits": 0
+      },
+      "prepaidApplications": {
+        "revision": "regelsuche.prepaid-application-work/v1",
+        "chargedUnits": 0,
+        "phaseCalls": {},
+        "phaseWork": {},
+        "completedMathematics": {
+          "primitiveRewrites": 0,
+          "exactTheorySteps": 0,
+          "exactTheoryWorkUnits": 0
+        },
+        "openApplications": 0,
+        "abandonedApplications": 0
+      }
+    },
+    "candidates": 0
+  }
+]

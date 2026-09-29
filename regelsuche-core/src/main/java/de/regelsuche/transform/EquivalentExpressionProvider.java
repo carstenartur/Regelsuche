@@ -1,6 +1,7 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.retention.RetainedGraph;
 import java.util.List;
 
 /**
@@ -15,6 +16,14 @@ public interface EquivalentExpressionProvider {
     List<Expr> representatives(Expr expression, RecognitionProfile profile);
 
     static EquivalentExpressionProvider identity() {
-        return (expression, profile) -> List.of(expression);
+        return Identity.INSTANCE;
+    }
+
+    enum Identity implements EquivalentExpressionProvider, RetainedGraph.View {
+        INSTANCE;
+        @Override public List<Expr> representatives(Expr expression, RecognitionProfile profile) {
+            return List.of(expression);
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
     }
 }

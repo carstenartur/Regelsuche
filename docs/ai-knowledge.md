@@ -157,6 +157,21 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted predecessor for the P04 continuation (2026-09-29)
+
+The baseline advances to accepted main `ab48fb0a47eec12cb63c30de253de50d2a72db1c`,
+tree `2116235600621cec8410f49903926b36ad7d5365`, after PR #1056. All six hosted
+authorities, `Checkout-local ciCheck` and CodeQL passed. A fresh clean standalone
+checkout passed the complete unchanged old-baseline `aiKnowledgeCheck` with the
+pinned v0.1.10 extractor: 668865 estimated tokens, +13180 against 655685, below
+the unchanged 15000 allowance; all eight coverage controls and seventeen hotspot
+checks passed. The [provenance and independent review](../ai-knowledge/baseline-history/2026-09-29-mainab48fb0a-provenance.json)
+bind source, tool, policy and raw artifact hashes. The baseline is byte-identical
+to the [accepted snapshot](../ai-knowledge/baseline-history/2026-09-29-mainab48fb0a-metrics-snapshot.json).
+The [failed PR #1055 trend](../ai-knowledge/baseline-history/2026-09-29-pr1055-928d78e5-rejected-trend.json)
+remains retained and supplies no baseline values. This updates the accepted
+predecessor only; it does not qualify the continuation or complete P04.
+
 ### Accepted predecessor for work-replacement P04 (2026-09-28)
 
 The current baseline is the exact generated snapshot of accepted P03 main

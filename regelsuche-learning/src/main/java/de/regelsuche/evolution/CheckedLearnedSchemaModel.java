@@ -1,6 +1,8 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.retention.RetainedJson;
 import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -346,7 +348,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         @Override public Descriptor descriptor() { return descriptor; }
         @Override public Batch candidates(MoveState state, MoveContext context) {
             var work = new Work();
-            work.add(1);
+            work.add(3);
             if (!context.carries(requiredAssumptions, state)) return batch(List.of(), work, true);
             Expr source;
             try {
@@ -359,55 +361,91 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             return batch(generated.applications().stream().map(application->Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application))).toList(),work,generated.complete());
         }
         private ApplicationBatch generate(Expr source,String encodedSource,Work work) {
-            var pending = new ArrayDeque<Occurrence>();
-            pending.push(new Occurrence(source, List.of()));
-            var candidates = new ArrayList<VerifiedApplication>();
-            int matched = 0;
-            boolean complete = allSchemasIncluded;
-            outer: while (!pending.isEmpty()) {
-                var occurrence = pending.pop();
-                work.add(1);
-                var relevant = index.getOrDefault(shape(occurrence.expression()), List.of());
-                var wildcard = index.getOrDefault("P", List.of());
-                if (!wildcard.isEmpty()) {
-                    var combined = new ArrayList<>(relevant);
-                    combined.addAll(wildcard);
-                    relevant = combined;
-                }
-                if (relevant.size() > maximumSchemasPerOccurrence) complete = false;
-                for (int i = 0; i < Math.min(relevant.size(), maximumSchemasPerOccurrence); i++) {
-                    if (matched++ >= bounds.maximumMatchAttempts() || candidates.size() >= bounds.maximumCandidates()) {
-                        complete = false;
-                        break outer;
+            return new Generation(source,encodedSource,work).run();
+        }
+        /** Actual shared eager traversal, including unfinished and already completed applications. */
+        private final class Generation implements RetainedGraph.View {
+            private final Expr source;
+            private final String encodedSource;
+            private final Work work;
+            private final ArrayDeque<Occurrence> pending=new ArrayDeque<>();
+            private final ArrayList<VerifiedApplication> candidates=new ArrayList<>();
+            private Occurrence occurrence;
+            private List<Schema> relevant;
+            private ExprMatcher.MatchOutcome outcome;
+            private Work applicationWork;
+            private VerifiedApplication application;
+            private ApplicationBatch result;
+            private int matched;
+            private boolean complete=allSchemasIncluded;
+            Generation(Expr source,String encodedSource,Work work){this.source=source;this.encodedSource=encodedSource;this.work=work;}
+            @Override public void retainedReferences(RetainedGraph.Visitor v) {
+                v.reference(IndexedProvider.this);v.reference(source);v.reference(encodedSource);v.reference(work);
+                v.reference(pending);v.reference(candidates);v.reference(occurrence);v.reference(relevant);
+                v.reference(outcome);v.reference(applicationWork);v.reference(application);v.reference(result);
+            }
+            ApplicationBatch run() {
+                var retained=RetainedOperation.retainCompleted(5,this);
+                Throwable primary=null;
+                try {
+                    pending.push(new Occurrence(source,List.of()));RetainedOperation.work(2);
+                    traverse();
+                    result=new ApplicationBatch(List.copyOf(candidates),complete);
+                    RetainedOperation.work(candidates.size()+2L);RetainedOperation.checkpoint();
+                    return result;
+                } catch(RuntimeException | Error failure) {
+                    primary=failure;observeImportFailure(failure);throw failure;
+                } finally {closeReplayFrame(retained,primary);}
+            }
+            private void traverse() {
+                outer: while(!pending.isEmpty()) {
+                    occurrence=pending.pop();work.add(1);RetainedOperation.work(2);
+                    relevant=index.getOrDefault(shape(occurrence.expression()),List.of());
+                    RetainedOperation.work(1);
+                    var wildcard=index.getOrDefault("P",List.of());
+                    if(!wildcard.isEmpty()) {
+                        var combined=new ArrayList<>(relevant);relevant=combined;
+                        RetainedOperation.work(combined.size()+2L);
+                        combined.addAll(wildcard);RetainedOperation.work(wildcard.size());
                     }
-                    Schema schema = relevant.get(i);
-                    var outcome = match(schema, occurrence.expression());
-                    work.add((long) outcome.evaluatedSteps() + outcome.patternBranches());
-                    if (!outcome.complete()) complete = false;
-                    if (!outcome.matched()) continue;
-                    var applicationWork = new Work();
-                    try {
-                        var application = apply(schema, source, encodedSource, occurrence.path(),
-                            outcome.matches().getFirst().bindings(), applicationWork);
-                        if (application != null) candidates.add(application);
-                        else work.add(applicationWork.units);
-                    } catch (IllegalArgumentException unsupported) {
-                        // Failed/unchanged applications have no execution edge whose receipt could carry this work.
-                        work.add(applicationWork.units + 1);
-                        complete = false;
+                    if(relevant.size()>maximumSchemasPerOccurrence)complete=false;
+                    for(int i=0;i<Math.min(relevant.size(),maximumSchemasPerOccurrence);i++) {
+                        if(matched++>=bounds.maximumMatchAttempts() || candidates.size()>=bounds.maximumCandidates()) {
+                            complete=false;break outer;
+                        }
+                        Schema schema=relevant.get(i);
+                        outcome=match(schema,occurrence.expression());
+                        work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());
+                        RetainedOperation.work(1);
+                        if(!outcome.complete())complete=false;
+                        if(outcome.matched())applyAt(schema);
                     }
-                }
-                if (occurrence.expression() instanceof BinaryExpr binary) {
-                    pending.push(new Occurrence(binary.right(), child(occurrence.path(), 1)));
-                    pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));
+                    if(occurrence.expression() instanceof BinaryExpr binary) {
+                        pending.push(new Occurrence(binary.right(),child(occurrence.path(),1)));RetainedOperation.work(2);
+                        pending.push(new Occurrence(binary.left(),child(occurrence.path(),0)));RetainedOperation.work(2);
+                    }
+                    RetainedOperation.checkpoint();
                 }
             }
-            return new ApplicationBatch(List.copyOf(candidates),complete);
+            private void applyAt(Schema schema) {
+                applicationWork=new Work();application=null;RetainedOperation.work(2);
+                try {
+                    application=apply(schema,source,encodedSource,occurrence.path(),outcome.matches().getFirst().bindings(),applicationWork);
+                } catch(DomainRejected unsupported) {
+                    work.add(1);complete=false;
+                } finally {
+                    // Every actual attempt is caller-owned, including successful work whose batch may never return.
+                    work.add(applicationWork.units);
+                }
+                if(application!=null) {
+                    candidates.add(application);work.add(1); // Existing sourceCandidates event, not an additional normal charge.
+                    RetainedOperation.work(2);
+                }
+            }
         }
         private Batch batch(List<Transformation> transformations, Work work, boolean complete) {
             var candidateWork = transformations.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);
-            var metrics = new TransformationWorkMetrics(1, 0, 1, transformations.size(), 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, candidateWork).withDelegatedMechanicalWork(work.units);
+            var metrics = batchMetrics(work,transformations.size(),candidateWork);
             return new Batch(transformations.stream().map(transformation -> SearchMove.from(transformation,
                 descriptor, metrics.totalWorkUnits())).toList(), metrics, complete);
         }
@@ -424,22 +462,66 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.EXACT;}
         @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
         @Override public Batch candidates(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
-            var work=new Work();work.add(1);
-            if(!NativeMoveProvider.carries(requiredAssumptions,state,context))return nativeBatch(new ApplicationBatch(List.of(),true),work);
+            var work=new Work();work.add(3); // Original unit plus the existing engine/source events.
             try {
-                if(AstExpressionValidation.inspect(state.expression()).canonicalCharacters()>262144)
-                    throw new IllegalArgumentException("schema source transport size limit");
-                work.add(1);domain(state.expression(),bounds,work);
-            } catch(IllegalArgumentException unsupported){return nativeBatch(new ApplicationBatch(List.of(),false),work);}
-            return nativeBatch(index.generate(state.expression(),null,work),work);
+                var pending=new Object[2];
+                var retained=RetainedOperation.retainCompleted(3,this,state,context,work,pending);
+                Throwable primary=null;
+                try {
+                    ApplicationBatch generated;
+                    if(!NativeMoveProvider.carries(requiredAssumptions,state,context))generated=new ApplicationBatch(List.of(),true);
+                    else {
+                        try {
+                            if(AstExpressionValidation.inspect(state.expression()).canonicalCharacters()>262144)
+                                throw new AstExpressionValidation.InvalidExpression("schema source transport size limit");
+                            work.add(1);domain(state.expression(),bounds,work);
+                            generated=index.generate(state.expression(),null,work);
+                        } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {
+                            generated=new ApplicationBatch(List.of(),false);
+                        }
+                    }
+                    var build=new NativeBatchBuild(generated,work);pending[0]=build;RetainedOperation.work(1);
+                    pending[1]=build.finish();RetainedOperation.work(1);RetainedOperation.checkpoint();
+                } catch(RuntimeException | Error failure) {
+                    primary=failure;observeImportFailure(failure);throw failure;
+                } finally {closeReplayFrame(retained,primary);}
+                return (Batch)pending[1];
+            } catch(RuntimeException | Error failure) {
+                // A receipt lost during publication or close delegated nothing to its caller.
+                try {RetainedOperation.work(work.units);}
+                catch(RuntimeException | Error accounting){if(accounting!=failure)failure.addSuppressed(accounting);}
+                throw failure;
+            }
         }
         NativeVerifier independentVerifier(){return CheckedLearnedSchemaModel.this.nativeVerifier();}
     }
-    private NativeMoveProvider.Batch nativeBatch(ApplicationBatch batch,Work work) {
-        var proofs=batch.applications().stream().map(application->new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(application))).toList();
-        var mathematical=proofs.stream().map(NativeMoveProof::work).reduce(ExecutionWork.ZERO,ExecutionWork::plus);
-        var metrics=new TransformationWorkMetrics(1,0,1,proofs.size(),0,0,0,0,0,0,0,0,0,0,mathematical).withDelegatedMechanicalWork(work.units);
-        return new NativeMoveProvider.Batch(proofs.stream().map(proof->new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList(),metrics,batch.complete());
+    private static TransformationWorkMetrics batchMetrics(Work work,int count,ExecutionWork mathematical) {
+        long delegated=Math.subtractExact(Math.subtractExact(work.units,mathematical.canonicalWorkUnits()),Math.addExact(2L,count));
+        return new TransformationWorkMetrics(1,0,1,count,0,0,0,0,0,0,0,0,0,0,mathematical).withDelegatedMechanicalWork(delegated);
+    }
+    /** The root provider owner keeps these actual lists while the same native batch is assembled. */
+    private final class NativeBatchBuild implements RetainedGraph.View {
+        private final ApplicationBatch applications;
+        private final Work work;
+        private List<NativeMoveProof.Exact> proofs;
+        private ExecutionWork mathematical;
+        private TransformationWorkMetrics metrics;
+        private List<NativeSearchMove> moves;
+        NativeBatchBuild(ApplicationBatch applications,Work work){this.applications=applications;this.work=work;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v) {
+            v.reference(CheckedLearnedSchemaModel.this);v.reference(applications);v.reference(work);
+            v.reference(proofs);v.reference(mathematical);v.reference(metrics);v.reference(moves);
+        }
+        NativeMoveProvider.Batch finish() {
+            proofs=applications.applications().stream().map(application->new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(application))).toList();
+            RetainedOperation.work(proofs.size()+1L);
+            mathematical=proofs.stream().map(NativeMoveProof::work).reduce(ExecutionWork.ZERO,ExecutionWork::plus);
+            RetainedOperation.work(proofs.size()+1L);
+            metrics=batchMetrics(work,proofs.size(),mathematical);RetainedOperation.work(1);
+            moves=proofs.stream().map(proof->new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList();
+            RetainedOperation.work(proofs.size()+1L);
+            return new NativeMoveProvider.Batch(moves,metrics,applications.complete());
+        }
     }
 
     private record Occurrence(Expr expression, List<Integer> path)  implements RetainedGraph.View {
@@ -472,9 +554,24 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     }
     private VerifiedApplication apply(Schema schema, Expr source, String encodedSource,
             List<Integer> path, Map<String, Expr> substitutions, Work work) {
-        var application = new CheckedApplication(schema, source, encodedSource, path, substitutions, work);
-        while (!application.done()) application.advance();
-        return application.verified;
+        var pending=new Object[3];
+        var retained=RetainedOperation.retainCompleted(4,this,schema,source,encodedSource,path,substitutions,work,pending);
+        Throwable primary=null;
+        try {
+            try {
+                var application=new CheckedApplication(schema,source,encodedSource,path,substitutions,work);
+                pending[0]=application;RetainedOperation.work(1);
+                while(!application.done())application.advance();
+                pending[1]=application.verified;RetainedOperation.work(1);
+            } catch(DomainRejected rejected) {
+                pending[2]=rejected.getMessage();RetainedOperation.work(1);
+            }
+            RetainedOperation.checkpoint();
+        } catch(RuntimeException | Error failure) {
+            primary=failure;observeImportFailure(failure);throw failure;
+        } finally {closeReplayFrame(retained,primary);}
+        if(pending[2]!=null)throw new DomainRejected((String)pending[2]);
+        return (VerifiedApplication)pending[1];
     }
 
     /** The eager provider, lazy cursor and independent concrete verifier all execute these same checks. */
@@ -498,8 +595,15 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             this.schema = schema; this.source = source; this.encodedSource = encodedSource;
             this.path = path; this.substitutions = substitutions; this.work = work;
             substitutionDomains = List.copyOf(substitutions.values());
-            de.regelsuche.retention.RetainedOperation.work(substitutionDomains.size()+1L);
-            phase = substitutionIndex<substitutionDomains.size() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;
+            // Publish this actual partially constructed owner before charging the already copied list.
+            var retained=RetainedOperation.retainCompleted(substitutionDomains.size()+1L,this);
+            Throwable primary=null;
+            try {
+                phase = substitutionIndex<substitutionDomains.size() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;
+                RetainedOperation.work(1);
+            } catch(RuntimeException | Error failure) {
+                primary=failure;observeImportFailure(failure);throw failure;
+            } finally {closeReplayFrame(retained,primary);}
         }
         @Override public ApplicationPhase phase() { return phase; }
         @Override public boolean done() { return done; }
@@ -572,40 +676,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 }
                 if (!(move.provenance() instanceof TransformationProvenance.ExactTheoryStep step)
                         || !move.ruleId().equals(descriptor.id())) return rejected(work, "CHECKED_SCHEMA_PROVENANCE_REQUIRED");
-                var bound = step.evidence().binding();
-                JsonNode data = read(bound.canonicalEvidenceJson());
-                fields(data, "schema", "checkerRevision", "inventorySemanticsHash", "modelId", "schemaId", "proofHash",
-                    "domain", "source", "target", "path", "bindings", "applicationWork");
-                if (!APPLICATION_REVISION.equals(text(data, "schema")) || !CHECKER_REVISION.equals(text(data, "checkerRevision"))
-                        || !inventorySemanticsHash.equals(text(data, "inventorySemanticsHash"))
-                        || !descriptor.id().equals(text(data, "modelId")) || !DOMAIN.equals(text(data, "domain"))) {
-                    return rejected(work, "CHECKED_SCHEMA_STALE_SEMANTICS");
-                }
-                Schema schema = byId.get(text(data, "schemaId"));
-                if (schema == null) return rejected(work, "CHECKED_SCHEMA_UNREGISTERED");
-                domain(source.expression(), bounds, work);
-                String encodedSource = CODEC.encodeExpression(source.expression());
-                if (!encodedSource.equals(text(data, "source")) || !encodedSource.equals(bound.sourceExpression())) {
-                    return rejected(work, "CHECKED_SCHEMA_WRONG_SOURCE");
-                }
-                array(data.get("path"), bounds.maximumDepth());
-                var path = new ArrayList<Integer>();
-                for (var part : data.get("path")) {
-                    if (!part.isInt() || part.intValue() < 0 || part.intValue() > 1) return rejected(work, "CHECKED_SCHEMA_INVALID_PATH");
-                    path.add(part.intValue());
-                }
-                var checked=replayOccurrence(schema,source.expression(),encodedSource,path,()->{
-                var substitutions = new TreeMap<String, Expr>();
-                array(data.get("bindings"), 16);
-                for (var value : data.get("bindings")) {
-                    fields(value, "name", "expression");
-                    Expr ast = CODEC.decodeExpression(text(value, "expression"));
-                    domain(ast, bounds, work);
-                    if (substitutions.put(text(value, "name"), ast) != null) throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
-                }
-                    return substitutions;
-                },work);
-                if (checked == null) return rejected(work, "CHECKED_SCHEMA_UNCHANGED");
+                var checked = replayBinding(source, step.evidence().binding(), work);
                 var expected = SearchMove.from(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(checked)), descriptor, move.generationCost());
                 // StateValue assesses capabilities after mathematical admission. MoveSearch overwrites
                 // provider-supplied deltas with that assessment before retaining the witness. These
@@ -618,6 +689,179 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             catch (IllegalArgumentException unsupported) { return rejected(work, "CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED"); }
         };
     }
+    /**
+     * Rechecks exported application data against this independently proved model and the caller's
+     * source/prerequisites. The entire regenerated binding must agree before a private native
+     * capability is issued. This receipt authorizes one application, not a search history or budget.
+     * Returned work is delegated to the caller once. Under an active native observation scope,
+     * unreturned work is settled locally, including failed frame closes. Malformed/unsupported
+     * input throws IllegalArgumentException; observation/resource failures retain their identity.
+     */
+    public NativeVerification replayApplication(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
+            TypedMoveSearch.Context context) {
+        var work = new Work();
+        work.add(1);
+        try {
+            var results = new Object[2];
+            var retained = RetainedOperation.retainCompleted(4,this,source,binding,context,work,results);
+            Throwable primary=null;
+            try {
+                try {
+                    if (!NativeMoveProvider.carries(requiredAssumptions,source,context))
+                        throw new ReplayRejected("CHECKED_SCHEMA_PREREQUISITES_MISSING");
+                    var checked = replayBinding(source,binding,work);
+                    results[0] = checked;
+                    if (!checked.binding().equals(binding))
+                        throw new ReplayRejected("CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
+                    var proof = new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));
+                    results[1] = new NativeVerification(true,work.units,proof,descriptor.id(),
+                        "CHECKED_SCHEMA_OCCURRENCE_VERIFIED");
+                } catch (ReplayRejected rejected) {
+                    results[1] = nativeRejected(work,rejected.getMessage());
+                }
+                RetainedOperation.work(2);
+                RetainedOperation.checkpoint();
+            } catch (RuntimeException | Error failure) {
+                primary=failure;
+                observeImportFailure(failure);
+                throw failure;
+            } finally {
+                closeReplayFrame(retained,primary);
+            }
+            return (NativeVerification) results[1];
+        } catch (RuntimeException | Error failure) {
+            // A result lost at frame close was not delegated, even if mathematically accepted.
+            try { RetainedOperation.work(work.units); }
+            catch (RuntimeException | Error accounting) {
+                if (accounting != failure) failure.addSuppressed(accounting);
+            }
+            throw failure;
+        }
+    }
+
+    private VerifiedApplication replayBinding(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
+        var replay = new BindingReplay(source,binding,work);
+        RetainedOperation.Frame retained=null,jsonOwner=null;
+        Throwable failure=null;
+        try {
+            retained=RetainedOperation.retainCompleted(1,replay);
+            replay.json=RetainedJson.open();
+            RetainedOperation.work(1);
+            jsonOwner=RetainedOperation.retain(replay.json);
+            try { replay.run(); }
+            catch (ReplayRejected | DomainRejected rejected) {
+                replay.rejection=rejected.getMessage();replay.domainRejected=rejected instanceof DomainRejected;
+                RetainedOperation.work(2);
+            }
+            // No semantic exception can own a technical error that an outer caller discards.
+            RetainedOperation.checkpoint();
+        } catch (RuntimeException | Error primary) {
+            failure=primary;
+            observeImportFailure(primary);
+        } finally {
+            // Continue releasing every successful acquisition after a failed close.
+            // The JSON scope stays an actual replay field even if acquiring its frame fails.
+            try { if(jsonOwner!=null)jsonOwner.close(); }
+            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }
+            try { if(replay.json!=null)replay.json.close(); }
+            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }
+            try { if(retained!=null)retained.close(); }
+            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }
+        }
+        if(failure instanceof RuntimeException runtime)throw runtime;
+        if(failure instanceof Error error)throw error;
+        if(replay.rejection!=null) {
+            if(replay.domainRejected)throw new DomainRejected(replay.rejection);
+            throw new ReplayRejected(replay.rejection);
+        }
+        return replay.checked;
+    }
+
+    /** Actual decoded/intermediate owners shared by legacy verification and explicit import. */
+    private final class BindingReplay implements RetainedGraph.View {
+        private final TypedMoveSearch.State source;
+        private final ExactTheoryEvidence.Binding binding;
+        private final Work work;
+        private JsonNode data;
+        private String encodedSource;
+        private ArrayList<Integer> path;
+        private TreeMap<String,Expr> substitutions;
+        private Expr decoded;
+        private VerifiedApplication checked;
+        private RetainedJson.Scope json;
+        private String rejection;
+        private boolean domainRejected;
+        BindingReplay(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
+            this.source=source;this.binding=binding;this.work=work;
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v) {
+            v.reference(CheckedLearnedSchemaModel.this);v.reference(source);v.reference(binding);v.reference(work);
+            v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);
+            v.reference(decoded);v.reference(checked);v.reference(rejection);v.reference(json);
+        }
+        void run() {
+            data = read(binding.canonicalEvidenceJson());
+            RetainedOperation.work(1);
+            RetainedOperation.checkpoint();
+            fields(data, "schema", "checkerRevision", "inventorySemanticsHash", "modelId", "schemaId", "proofHash",
+                "domain", "source", "target", "path", "bindings", "applicationWork");
+            if (!APPLICATION_REVISION.equals(text(data, "schema")) || !CHECKER_REVISION.equals(text(data, "checkerRevision"))
+                    || !inventorySemanticsHash.equals(text(data, "inventorySemanticsHash"))
+                    || !descriptor.id().equals(text(data, "modelId")) || !DOMAIN.equals(text(data, "domain")))
+                throw new ReplayRejected("CHECKED_SCHEMA_STALE_SEMANTICS");
+            Schema schema = byId.get(text(data, "schemaId"));
+            if (schema == null) throw new ReplayRejected("CHECKED_SCHEMA_UNREGISTERED");
+            domain(source.expression(), bounds, work);
+            encodedSource = CODEC.encodeExpression(source.expression());
+            if (!encodedSource.equals(text(data, "source")) || !encodedSource.equals(binding.sourceExpression()))
+                throw new ReplayRejected("CHECKED_SCHEMA_WRONG_SOURCE");
+            array(data.get("path"), bounds.maximumDepth());
+            path = new ArrayList<>();
+            RetainedOperation.work(2);
+            for (var part : data.get("path")) {
+                if (!part.isInt() || part.intValue() < 0 || part.intValue() > 1)
+                    throw new ReplayRejected("CHECKED_SCHEMA_INVALID_PATH");
+                path.add(part.intValue());
+                RetainedOperation.work(1);
+            }
+            RetainedOperation.checkpoint();
+            checked = replayOccurrence(schema,source.expression(),encodedSource,path,()->{
+                substitutions = new TreeMap<>();
+                RetainedOperation.work(1);
+                array(data.get("bindings"), 16);
+                for (var value : data.get("bindings")) {
+                    fields(value, "name", "expression");
+                    decoded = CODEC.decodeExpression(text(value, "expression"));
+                    domain(decoded, bounds, work);
+                    var previous = substitutions.put(text(value, "name"), decoded);
+                    RetainedOperation.work(2);
+                    if (previous != null) throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
+                    RetainedOperation.checkpoint();
+                }
+                return substitutions;
+            },work);
+            if (checked == null) throw new ReplayRejected("CHECKED_SCHEMA_UNCHANGED");
+        }
+    }
+    private static void observeImportFailure(Throwable failure) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+    private static Throwable appendReplayFailure(Throwable primary,Throwable cleanup) {
+        if(primary==null)return cleanup;
+        if(cleanup!=primary)primary.addSuppressed(cleanup);
+        return primary;
+    }
+    private static void closeReplayFrame(RetainedOperation.Frame frame,Throwable primary) {
+        try { if(frame!=null)frame.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if(primary==null)throw cleanup;
+            if(cleanup!=primary)primary.addSuppressed(cleanup);
+        }
+    }
+
     private static final class ReplayRejected extends IllegalArgumentException {
         ReplayRejected(String reason){super(reason);}
     }
@@ -631,11 +875,36 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         if(occurrence.isEmpty())throw new ReplayRejected("CHECKED_SCHEMA_ABSENT_OCCURRENCE");
         var outcome=match(schema,occurrence.orElseThrow());work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());
         if(!outcome.complete() || !outcome.matched())throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
-        var substitutions=bindings.get();
-        if(!substitutions.equals(outcome.matches().getFirst().bindings()))throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
-        var applicationWork=new Work();
-        try{return apply(schema,source,encodedSource,path,substitutions,applicationWork);}
-        finally{work.add(applicationWork.units);}
+        // The returned matcher outcome is still needed after decoding the supplied bindings.
+        // Keep both graphs, inner work and the completed application through their handoff.
+        var pending = new Object[5];
+        var retained=RetainedOperation.retainCompleted(6,outcome,schema,source,encodedSource,path,work,pending);
+        Throwable primary=null;
+        try {
+            try {
+                var substitutions=bindings.get();pending[0]=substitutions;
+                if(!substitutions.equals(outcome.matches().getFirst().bindings()))
+                    throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
+                var applicationWork=new Work();pending[1]=applicationWork;
+                try { pending[2]=apply(schema,source,encodedSource,path,substitutions,applicationWork); }
+                finally { work.add(applicationWork.units); }
+            } catch (ReplayRejected | DomainRejected rejected) {
+                pending[3]=rejected.getMessage();pending[4]=rejected instanceof DomainRejected;
+                RetainedOperation.work(2);
+            }
+            RetainedOperation.checkpoint();
+        } catch (RuntimeException | Error failure) {
+            primary=failure;
+            observeImportFailure(failure);
+            throw failure;
+        } finally {
+            closeReplayFrame(retained,primary);
+        }
+        if (pending[3]!=null) {
+            if(Boolean.TRUE.equals(pending[4]))throw new DomainRejected((String)pending[3]);
+            throw new ReplayRejected((String)pending[3]);
+        }
+        return (VerifiedApplication) pending[2];
     }
     public NativeVerifier nativeVerifier() {return new IndependentNativeVerifier();}
     private final class IndependentNativeVerifier implements NativeVerifier,RetainedGraph.View {
@@ -643,28 +912,57 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
             var work=new Work();work.add(1);
             try {
-                if(!NativeMoveProvider.carries(requiredAssumptions,source,context) || !NativeMoveProvider.carries(move.assumptions(),source,context))
-                    return nativeRejected(work,"CHECKED_SCHEMA_PREREQUISITES_MISSING");
-                if(!(move.proof() instanceof NativeMoveProof.Exact exact) || !move.ruleId().equals(descriptor.id())
-                    || !(exact.evidence().binding().observation() instanceof ApplicationData data))return nativeRejected(work,"CHECKED_SCHEMA_PROVENANCE_REQUIRED");
-                if(!APPLICATION_REVISION.equals(data.revision()) || !CHECKER_REVISION.equals(data.checkerRevision())
-                    || !inventorySemanticsHash.equals(data.inventorySemanticsHash()) || !descriptor.id().equals(data.modelId()) || !DOMAIN.equals(data.domain()))
-                    return nativeRejected(work,"CHECKED_SCHEMA_STALE_SEMANTICS");
-                var schema=byId.get(data.schemaId());if(schema==null)return nativeRejected(work,"CHECKED_SCHEMA_UNREGISTERED");
-                domain(source.expression(),bounds,work);
-                if(!source.expression().equals(data.source()) || !source.expression().equals(exact.source()))return nativeRejected(work,"CHECKED_SCHEMA_WRONG_SOURCE");
-                var checked=replayOccurrence(schema,source.expression(),null,data.path(),()->{
-                    if(data.substitutions().size()>16)throw new IllegalArgumentException("schema binding count limit");
-                    data.substitutions().values().forEach(value->domain(value,bounds,work));return data.substitutions();
-                },work);
-                if(checked==null)return nativeRejected(work,"CHECKED_SCHEMA_UNCHANGED");
-                var proof=new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));
-                var expected=new NativeSearchMove(proof,descriptor,move.generationCost(),Set.of());
-                boolean accepted=expected.equals(move.withCapabilityDelta(Set.of()));
-                return new NativeVerification(accepted,work.units,accepted?proof:null,accepted?move.ruleId():null,
-                    accepted?"CHECKED_SCHEMA_OCCURRENCE_VERIFIED":"CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
-            } catch(ReplayRejected rejected){return nativeRejected(work,rejected.getMessage());}
-            catch(IllegalArgumentException unsupported){return nativeRejected(work,"CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED");}
+                var pending=new Object[5];
+                var retained=RetainedOperation.retainCompleted(7,CheckedLearnedSchemaModel.this,source,move,context,work,pending);
+                Throwable primary=null;
+                try {
+                    try { pending[4]=check(source,move,context,work,pending); }
+                    catch(ReplayRejected rejected){pending[4]=nativeRejected(work,rejected.getMessage());}
+                    catch(DomainRejected unsupported){pending[4]=nativeRejected(work,"CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED");}
+                    // Publish before paying: a receipt lost on either this debit or final close
+                    // has not delegated any Work to the caller.
+                    RetainedOperation.work(2);
+                    RetainedOperation.checkpoint();
+                } catch(RuntimeException | Error failure) {
+                    primary=failure;observeImportFailure(failure);throw failure;
+                } finally {
+                    closeReplayFrame(retained,primary);
+                }
+                return (NativeVerification)pending[4];
+            } catch(RuntimeException | Error failure) {
+                try { RetainedOperation.work(work.units); }
+                catch(RuntimeException | Error accounting) {
+                    if(accounting!=failure)failure.addSuppressed(accounting);
+                }
+                throw failure;
+            }
+        }
+        private NativeVerification check(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context,
+                Work work,Object[] pending) {
+            if(!NativeMoveProvider.carries(requiredAssumptions,source,context) || !NativeMoveProvider.carries(move.assumptions(),source,context))
+                return nativeRejected(work,"CHECKED_SCHEMA_PREREQUISITES_MISSING");
+            if(!(move.proof() instanceof NativeMoveProof.Exact exact) || !move.ruleId().equals(descriptor.id())
+                || !(exact.evidence().binding().observation() instanceof ApplicationData data))return nativeRejected(work,"CHECKED_SCHEMA_PROVENANCE_REQUIRED");
+            if(!APPLICATION_REVISION.equals(data.revision()) || !CHECKER_REVISION.equals(data.checkerRevision())
+                || !inventorySemanticsHash.equals(data.inventorySemanticsHash()) || !descriptor.id().equals(data.modelId()) || !DOMAIN.equals(data.domain()))
+                return nativeRejected(work,"CHECKED_SCHEMA_STALE_SEMANTICS");
+            var schema=byId.get(data.schemaId());if(schema==null)return nativeRejected(work,"CHECKED_SCHEMA_UNREGISTERED");
+            domain(source.expression(),bounds,work);
+            if(!source.expression().equals(data.source()) || !source.expression().equals(exact.source()))return nativeRejected(work,"CHECKED_SCHEMA_WRONG_SOURCE");
+            var checked=replayOccurrence(schema,source.expression(),null,data.path(),()->{
+                if(data.substitutions().size()>16)throw new ReplayRejected("CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED");
+                data.substitutions().values().forEach(value->domain(value,bounds,work));return data.substitutions();
+            },work);
+            pending[0]=checked;RetainedOperation.work(1);
+            if(checked==null)return nativeRejected(work,"CHECKED_SCHEMA_UNCHANGED");
+            var proof=new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));
+            pending[1]=proof;RetainedOperation.work(2);
+            var expected=new NativeSearchMove(proof,descriptor,move.generationCost(),Set.of());
+            pending[2]=expected;RetainedOperation.work(2);
+            pending[3]=move.withCapabilityDelta(Set.of());RetainedOperation.work(2);
+            boolean accepted=expected.equals(pending[3]);
+            return new NativeVerification(accepted,work.units,accepted?proof:null,accepted?move.ruleId():null,
+                accepted?"CHECKED_SCHEMA_OCCURRENCE_VERIFIED":"CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
         }
     }
     private static NativeVerification nativeRejected(Work work,String detail){return new NativeVerification(false,work.units,null,null,detail);}
