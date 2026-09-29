@@ -992,6 +992,33 @@ class CheckedLearnedSchemaModelTest {
             }
         }
 
+        @Test void nativeCursorMakesProgressWithSmallPositiveAllowanceAndARealPaidObserver() {
+            var plan=CheckedSchemaMatcherPlan.prepare(model,1,Map.of(),Set.of(selected));
+            for(long allowance:List.of(1L,2L,4L)) {
+                Expr source=parse(MULTIPLE);
+                var payment=new IncrementalProviderContract.Meter(IncrementalProviderContract.NATIVE_PREPAID_REVISION);
+                var cursor=CheckedSchemaCursor.nativeSource(plan,source,payment);
+                var meter=new CursorMeter(CursorFault.NONE,source,false);meter.trackWork=true;
+                try(var operation=RetainedOperation.open(meter)) {
+                    meter.scope=operation;
+                    try(var held=RetainedOperation.retain(cursor)) {
+                        long before=meter.observedWork();assertTrue(cursor.next(0).isEmpty());assertEquals(before,meter.observedWork());
+                        int emitted=0;
+                        for(int pulls=0;pulls<500;pulls++) {
+                            long paid=payment.work().metrics().totalWorkUnitsV2();
+                            if(cursor.next(allowance).isPresent())emitted++;
+                            assertTrue(payment.work().metrics().totalWorkUnitsV2()>paid,
+                                "every positive pull must execute an existing paid action, not just reopen an owner frame");
+                            if(cursor.status()==IncrementalProviderContract.Status.INCONCLUSIVE)break;
+                            assertTrue(pulls<499,"fixed positive allowance must eventually finish the same cursor");
+                        }
+                        assertEquals(2,emitted);assertTrue(meter.observedWork()>before);
+                        cursor.close();
+                    }
+                }
+            }
+        }
+
         @Test void cursorDoesNotSwallowAstObserverArguments() { assertCursorAbort(CursorFault.AST,false); }
         @Test void cursorAstObserverErrorIsTerminal() { assertCursorAbort(CursorFault.AST,true); }
         @Test void cursorDomainFailureRetainsInitializationWork() { assertCursorAbort(CursorFault.DOMAIN,false); }
@@ -1036,19 +1063,20 @@ class CheckedLearnedSchemaModelTest {
             }
             assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
         }
-        enum CursorFault { AST,DOMAIN,CONSTRUCTOR,SUBSTITUTION,TARGET,TOTAL,RESULT,CLOSE }
+        enum CursorFault { NONE,AST,DOMAIN,CONSTRUCTOR,SUBSTITUTION,TARGET,TOTAL,RESULT,CLOSE }
         private static final class CursorMeter implements RetainedOperation.Sink {
             final CursorFault fault;final Expr source;final Throwable failure;
-            RetainedOperation scope;boolean armed,tripped,closing;
+            RetainedOperation scope;boolean armed,tripped,closing,trackWork;long observed;
             CheckedSchemaSupport.Work applicationWork,domainWork;
             CursorMeter(CursorFault fault,Expr source,boolean error) {
                 this.fault=fault;this.source=source;
                 failure=error?new AssertionError("cursor observer error"):new IllegalArgumentException("cursor observer "+fault);
             }
             @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
-            @Override public long observedWork(){if(armed && !tripped && fault==CursorFault.TOTAL)trip();return 0;}
-            @Override public void validationWork(long units){if(armed && !tripped && fault==CursorFault.AST)trip();}
+            @Override public long observedWork(){if(armed && !tripped && fault==CursorFault.TOTAL)trip();return trackWork?observed:0;}
+            @Override public void validationWork(long units){observed+=units;if(armed && !tripped && fault==CursorFault.AST)trip();}
             @Override public void executionWork(long units) {
+                observed+=units;
                 if(!armed || tripped)return;
                 var seen=graph(scope);CheckedSchemaMatcherPlan.ApplicationSteps application=null;
                 for(Object value:seen)if(value instanceof CheckedSchemaMatcherPlan.ApplicationSteps steps) {
@@ -1077,7 +1105,7 @@ class CheckedLearnedSchemaModelTest {
                             && application.phase()==IncrementalProviderContract.ApplicationPhase.TARGET_DOMAIN))trip();
             }
             @Override public void checkpoint(){
-                RetainedGraph.measure(scope);
+                observed+=RetainedGraph.measure(scope).work();
                 if(armed && !tripped && fault==CursorFault.RESULT && graph(scope).stream().anyMatch(NativeMoveProof.class::isInstance))trip();
             }
             private void trip(){tripped=true;if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;}
