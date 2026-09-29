@@ -255,7 +255,7 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
     @Override public Status status() { return status; }
     @Override public void close() {
         if(status==Status.CLOSED)return;
-        try {RetainedOperation.work(pending.size()+10L);}
+        try {RetainedOperation.work(pending.size()+11L);}
         catch(RuntimeException | Error failure) {observeFailure(failure);throw failure;}
         finally {
             pending.clear();occurrence=null;relevant=null;
