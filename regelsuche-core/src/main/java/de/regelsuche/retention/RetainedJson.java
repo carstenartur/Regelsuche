@@ -22,7 +22,24 @@ public final class RetainedJson {
         @Override public void close(){
             if(closed)return;if(CURRENT.get()!=this)throw new IllegalStateException("JSON scope order");
             closed=true;if(previous==null)CURRENT.remove();else CURRENT.set(previous);
-            var owned=recycler;previous=null;recycler=null;owned.clear();RetainedOperation.work(3);
+            Throwable primary=null;
+            try {
+                recycler.clear();
+            } catch(RuntimeException | Error failure) {
+                primary=failure;
+                // Scope still owns the recycler while observing a failed clear.
+                try{RetainedOperation.checkpoint();}
+                catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}
+                throw failure;
+            } finally {
+                previous=null;recycler=null;
+                // CURRENT/closed and these field resets happened even if clear's debit failed.
+                try{RetainedOperation.work(3);}
+                catch(RuntimeException | Error accounting){
+                    if(primary==null)throw accounting;
+                    if(accounting!=primary)primary.addSuppressed(accounting);
+                }
+            }
         }
     }
     private static final class Recycler extends BufferRecycler implements RetainedGraph.View {
