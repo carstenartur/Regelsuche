@@ -348,7 +348,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         @Override public Descriptor descriptor() { return descriptor; }
         @Override public Batch candidates(MoveState state, MoveContext context) {
             var work = new Work();
-            work.add(1);
+            work.add(3);
             if (!context.carries(requiredAssumptions, state)) return batch(List.of(), work, true);
             Expr source;
             try {
@@ -361,55 +361,91 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             return batch(generated.applications().stream().map(application->Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application))).toList(),work,generated.complete());
         }
         private ApplicationBatch generate(Expr source,String encodedSource,Work work) {
-            var pending = new ArrayDeque<Occurrence>();
-            pending.push(new Occurrence(source, List.of()));
-            var candidates = new ArrayList<VerifiedApplication>();
-            int matched = 0;
-            boolean complete = allSchemasIncluded;
-            outer: while (!pending.isEmpty()) {
-                var occurrence = pending.pop();
-                work.add(1);
-                var relevant = index.getOrDefault(shape(occurrence.expression()), List.of());
-                var wildcard = index.getOrDefault("P", List.of());
-                if (!wildcard.isEmpty()) {
-                    var combined = new ArrayList<>(relevant);
-                    combined.addAll(wildcard);
-                    relevant = combined;
-                }
-                if (relevant.size() > maximumSchemasPerOccurrence) complete = false;
-                for (int i = 0; i < Math.min(relevant.size(), maximumSchemasPerOccurrence); i++) {
-                    if (matched++ >= bounds.maximumMatchAttempts() || candidates.size() >= bounds.maximumCandidates()) {
-                        complete = false;
-                        break outer;
+            return new Generation(source,encodedSource,work).run();
+        }
+        /** Actual shared eager traversal, including unfinished and already completed applications. */
+        private final class Generation implements RetainedGraph.View {
+            private final Expr source;
+            private final String encodedSource;
+            private final Work work;
+            private final ArrayDeque<Occurrence> pending=new ArrayDeque<>();
+            private final ArrayList<VerifiedApplication> candidates=new ArrayList<>();
+            private Occurrence occurrence;
+            private List<Schema> relevant;
+            private ExprMatcher.MatchOutcome outcome;
+            private Work applicationWork;
+            private VerifiedApplication application;
+            private ApplicationBatch result;
+            private int matched;
+            private boolean complete=allSchemasIncluded;
+            Generation(Expr source,String encodedSource,Work work){this.source=source;this.encodedSource=encodedSource;this.work=work;}
+            @Override public void retainedReferences(RetainedGraph.Visitor v) {
+                v.reference(IndexedProvider.this);v.reference(source);v.reference(encodedSource);v.reference(work);
+                v.reference(pending);v.reference(candidates);v.reference(occurrence);v.reference(relevant);
+                v.reference(outcome);v.reference(applicationWork);v.reference(application);v.reference(result);
+            }
+            ApplicationBatch run() {
+                var retained=RetainedOperation.retainCompleted(5,this);
+                Throwable primary=null;
+                try {
+                    pending.push(new Occurrence(source,List.of()));RetainedOperation.work(2);
+                    traverse();
+                    result=new ApplicationBatch(List.copyOf(candidates),complete);
+                    RetainedOperation.work(candidates.size()+2L);RetainedOperation.checkpoint();
+                    return result;
+                } catch(RuntimeException | Error failure) {
+                    primary=failure;observeImportFailure(failure);throw failure;
+                } finally {closeReplayFrame(retained,primary);}
+            }
+            private void traverse() {
+                outer: while(!pending.isEmpty()) {
+                    occurrence=pending.pop();work.add(1);RetainedOperation.work(2);
+                    relevant=index.getOrDefault(shape(occurrence.expression()),List.of());
+                    RetainedOperation.work(1);
+                    var wildcard=index.getOrDefault("P",List.of());
+                    if(!wildcard.isEmpty()) {
+                        var combined=new ArrayList<>(relevant);relevant=combined;
+                        RetainedOperation.work(combined.size()+2L);
+                        combined.addAll(wildcard);RetainedOperation.work(wildcard.size());
                     }
-                    Schema schema = relevant.get(i);
-                    var outcome = match(schema, occurrence.expression());
-                    work.add((long) outcome.evaluatedSteps() + outcome.patternBranches());
-                    if (!outcome.complete()) complete = false;
-                    if (!outcome.matched()) continue;
-                    var applicationWork = new Work();
-                    try {
-                        var application = apply(schema, source, encodedSource, occurrence.path(),
-                            outcome.matches().getFirst().bindings(), applicationWork);
-                        if (application != null) candidates.add(application);
-                        else work.add(applicationWork.units);
-                    } catch (IllegalArgumentException unsupported) {
-                        // Failed/unchanged applications have no execution edge whose receipt could carry this work.
-                        work.add(applicationWork.units + 1);
-                        complete = false;
+                    if(relevant.size()>maximumSchemasPerOccurrence)complete=false;
+                    for(int i=0;i<Math.min(relevant.size(),maximumSchemasPerOccurrence);i++) {
+                        if(matched++>=bounds.maximumMatchAttempts() || candidates.size()>=bounds.maximumCandidates()) {
+                            complete=false;break outer;
+                        }
+                        Schema schema=relevant.get(i);
+                        outcome=match(schema,occurrence.expression());
+                        work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());
+                        RetainedOperation.work(1);
+                        if(!outcome.complete())complete=false;
+                        if(outcome.matched())applyAt(schema);
                     }
-                }
-                if (occurrence.expression() instanceof BinaryExpr binary) {
-                    pending.push(new Occurrence(binary.right(), child(occurrence.path(), 1)));
-                    pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));
+                    if(occurrence.expression() instanceof BinaryExpr binary) {
+                        pending.push(new Occurrence(binary.right(),child(occurrence.path(),1)));RetainedOperation.work(2);
+                        pending.push(new Occurrence(binary.left(),child(occurrence.path(),0)));RetainedOperation.work(2);
+                    }
+                    RetainedOperation.checkpoint();
                 }
             }
-            return new ApplicationBatch(List.copyOf(candidates),complete);
+            private void applyAt(Schema schema) {
+                applicationWork=new Work();application=null;RetainedOperation.work(2);
+                try {
+                    application=apply(schema,source,encodedSource,occurrence.path(),outcome.matches().getFirst().bindings(),applicationWork);
+                } catch(DomainRejected unsupported) {
+                    work.add(1);complete=false;
+                } finally {
+                    // Every actual attempt is caller-owned, including successful work whose batch may never return.
+                    work.add(applicationWork.units);
+                }
+                if(application!=null) {
+                    candidates.add(application);work.add(1); // Existing sourceCandidates event, not an additional normal charge.
+                    RetainedOperation.work(2);
+                }
+            }
         }
         private Batch batch(List<Transformation> transformations, Work work, boolean complete) {
             var candidateWork = transformations.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);
-            var metrics = new TransformationWorkMetrics(1, 0, 1, transformations.size(), 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, candidateWork).withDelegatedMechanicalWork(work.units);
+            var metrics = batchMetrics(work,transformations.size(),candidateWork);
             return new Batch(transformations.stream().map(transformation -> SearchMove.from(transformation,
                 descriptor, metrics.totalWorkUnits())).toList(), metrics, complete);
         }
@@ -426,22 +462,66 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.EXACT;}
         @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
         @Override public Batch candidates(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
-            var work=new Work();work.add(1);
-            if(!NativeMoveProvider.carries(requiredAssumptions,state,context))return nativeBatch(new ApplicationBatch(List.of(),true),work);
+            var work=new Work();work.add(3); // Original unit plus the existing engine/source events.
             try {
-                if(AstExpressionValidation.inspect(state.expression()).canonicalCharacters()>262144)
-                    throw new IllegalArgumentException("schema source transport size limit");
-                work.add(1);domain(state.expression(),bounds,work);
-            } catch(IllegalArgumentException unsupported){return nativeBatch(new ApplicationBatch(List.of(),false),work);}
-            return nativeBatch(index.generate(state.expression(),null,work),work);
+                var pending=new Object[2];
+                var retained=RetainedOperation.retainCompleted(3,this,state,context,work,pending);
+                Throwable primary=null;
+                try {
+                    ApplicationBatch generated;
+                    if(!NativeMoveProvider.carries(requiredAssumptions,state,context))generated=new ApplicationBatch(List.of(),true);
+                    else {
+                        try {
+                            if(AstExpressionValidation.inspect(state.expression()).canonicalCharacters()>262144)
+                                throw new AstExpressionValidation.InvalidExpression("schema source transport size limit");
+                            work.add(1);domain(state.expression(),bounds,work);
+                            generated=index.generate(state.expression(),null,work);
+                        } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {
+                            generated=new ApplicationBatch(List.of(),false);
+                        }
+                    }
+                    var build=new NativeBatchBuild(generated,work);pending[0]=build;RetainedOperation.work(1);
+                    pending[1]=build.finish();RetainedOperation.work(1);RetainedOperation.checkpoint();
+                } catch(RuntimeException | Error failure) {
+                    primary=failure;observeImportFailure(failure);throw failure;
+                } finally {closeReplayFrame(retained,primary);}
+                return (Batch)pending[1];
+            } catch(RuntimeException | Error failure) {
+                // A receipt lost during publication or close delegated nothing to its caller.
+                try {RetainedOperation.work(work.units);}
+                catch(RuntimeException | Error accounting){if(accounting!=failure)failure.addSuppressed(accounting);}
+                throw failure;
+            }
         }
         NativeVerifier independentVerifier(){return CheckedLearnedSchemaModel.this.nativeVerifier();}
     }
-    private NativeMoveProvider.Batch nativeBatch(ApplicationBatch batch,Work work) {
-        var proofs=batch.applications().stream().map(application->new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(application))).toList();
-        var mathematical=proofs.stream().map(NativeMoveProof::work).reduce(ExecutionWork.ZERO,ExecutionWork::plus);
-        var metrics=new TransformationWorkMetrics(1,0,1,proofs.size(),0,0,0,0,0,0,0,0,0,0,mathematical).withDelegatedMechanicalWork(work.units);
-        return new NativeMoveProvider.Batch(proofs.stream().map(proof->new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList(),metrics,batch.complete());
+    private static TransformationWorkMetrics batchMetrics(Work work,int count,ExecutionWork mathematical) {
+        long delegated=Math.subtractExact(Math.subtractExact(work.units,mathematical.canonicalWorkUnits()),Math.addExact(2L,count));
+        return new TransformationWorkMetrics(1,0,1,count,0,0,0,0,0,0,0,0,0,0,mathematical).withDelegatedMechanicalWork(delegated);
+    }
+    /** The root provider owner keeps these actual lists while the same native batch is assembled. */
+    private final class NativeBatchBuild implements RetainedGraph.View {
+        private final ApplicationBatch applications;
+        private final Work work;
+        private List<NativeMoveProof.Exact> proofs;
+        private ExecutionWork mathematical;
+        private TransformationWorkMetrics metrics;
+        private List<NativeSearchMove> moves;
+        NativeBatchBuild(ApplicationBatch applications,Work work){this.applications=applications;this.work=work;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v) {
+            v.reference(CheckedLearnedSchemaModel.this);v.reference(applications);v.reference(work);
+            v.reference(proofs);v.reference(mathematical);v.reference(metrics);v.reference(moves);
+        }
+        NativeMoveProvider.Batch finish() {
+            proofs=applications.applications().stream().map(application->new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(application))).toList();
+            RetainedOperation.work(proofs.size()+1L);
+            mathematical=proofs.stream().map(NativeMoveProof::work).reduce(ExecutionWork.ZERO,ExecutionWork::plus);
+            RetainedOperation.work(proofs.size()+1L);
+            metrics=batchMetrics(work,proofs.size(),mathematical);RetainedOperation.work(1);
+            moves=proofs.stream().map(proof->new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList();
+            RetainedOperation.work(proofs.size()+1L);
+            return new NativeMoveProvider.Batch(moves,metrics,applications.complete());
+        }
     }
 
     private record Occurrence(Expr expression, List<Integer> path)  implements RetainedGraph.View {
@@ -474,9 +554,24 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     }
     private VerifiedApplication apply(Schema schema, Expr source, String encodedSource,
             List<Integer> path, Map<String, Expr> substitutions, Work work) {
-        var application = new CheckedApplication(schema, source, encodedSource, path, substitutions, work);
-        while (!application.done()) application.advance();
-        return application.verified;
+        var pending=new Object[3];
+        var retained=RetainedOperation.retainCompleted(4,this,schema,source,encodedSource,path,substitutions,work,pending);
+        Throwable primary=null;
+        try {
+            try {
+                var application=new CheckedApplication(schema,source,encodedSource,path,substitutions,work);
+                pending[0]=application;RetainedOperation.work(1);
+                while(!application.done())application.advance();
+                pending[1]=application.verified;RetainedOperation.work(1);
+            } catch(DomainRejected rejected) {
+                pending[2]=rejected.getMessage();RetainedOperation.work(1);
+            }
+            RetainedOperation.checkpoint();
+        } catch(RuntimeException | Error failure) {
+            primary=failure;observeImportFailure(failure);throw failure;
+        } finally {closeReplayFrame(retained,primary);}
+        if(pending[2]!=null)throw new DomainRejected((String)pending[2]);
+        return (VerifiedApplication)pending[1];
     }
 
     /** The eager provider, lazy cursor and independent concrete verifier all execute these same checks. */
@@ -500,8 +595,15 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             this.schema = schema; this.source = source; this.encodedSource = encodedSource;
             this.path = path; this.substitutions = substitutions; this.work = work;
             substitutionDomains = List.copyOf(substitutions.values());
-            de.regelsuche.retention.RetainedOperation.work(substitutionDomains.size()+1L);
-            phase = substitutionIndex<substitutionDomains.size() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;
+            // Publish this actual partially constructed owner before charging the already copied list.
+            var retained=RetainedOperation.retainCompleted(substitutionDomains.size()+1L,this);
+            Throwable primary=null;
+            try {
+                phase = substitutionIndex<substitutionDomains.size() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;
+                RetainedOperation.work(1);
+            } catch(RuntimeException | Error failure) {
+                primary=failure;observeImportFailure(failure);throw failure;
+            } finally {closeReplayFrame(retained,primary);}
         }
         @Override public ApplicationPhase phase() { return phase; }
         @Override public boolean done() { return done; }
