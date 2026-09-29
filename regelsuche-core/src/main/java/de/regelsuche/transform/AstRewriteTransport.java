@@ -84,8 +84,7 @@ public final class AstRewriteTransport implements RetainedGraph.View {
         Objects.requireNonNull(root, "expression");
         var pending = new ArrayDeque<Node>();
         Node[] current = {null};
-        RetainedOperation.work(2);
-        try (var retained = RetainedOperation.retain(root, pending, current)) {
+        try (var retained = RetainedOperation.retainCompleted(2, root, pending, current)) {
             pending.push(new Node(root, 0));
             RetainedOperation.work(1);
             RetainedOperation.checkpoint();

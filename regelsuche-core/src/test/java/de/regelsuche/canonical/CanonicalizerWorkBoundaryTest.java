@@ -12,9 +12,9 @@ class CanonicalizerWorkBoundaryTest {
     private static final class Stop extends RuntimeException {}
     private static final class Sink implements RetainedOperation.Sink {
         final Boundary boundary;RetainedOperation scope;FunctionExpr source,expectedFunction;
-        long work,lastCheckpoint,atBoundary;List<?> snapshot;
+        long work,lastCheckpoint,atBoundary;List<?> snapshot;boolean failSnapshotDebit,armed;
         Sink(Boundary boundary){this.boundary=boundary;}
-        @Override public void executionWork(long units){work=Math.addExact(work,units);}
+        @Override public void executionWork(long units){work=Math.addExact(work,units);if(armed){armed=false;throw new Stop();}}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
         @Override public void checkpoint(){
@@ -42,6 +42,7 @@ class CanonicalizerWorkBoundaryTest {
                 else if(value instanceof BinaryExpr binary){visitor.reference(binary.left());visitor.reference(binary.right());}
             }
             if(foundSnapshot!=null){if(snapshot==foundSnapshot)stop=true;else snapshot=foundSnapshot;}
+            if(failSnapshotDebit && !armed && snapshot==null)armed=true;
             if(stop){atBoundary=work-lastCheckpoint;throw new Stop();}
             lastCheckpoint=work;
         }
@@ -74,5 +75,15 @@ class CanonicalizerWorkBoundaryTest {
         try(var scope=RetainedOperation.open(sink)){sink.scope=scope;assertThrows(Stop.class,()->new ExpressionCanonicalizer().canonicalize(source,context));}
         assertEquals(10,sink.atBoundary,"two finished snapshot frames and one caller frame; no second list copy");
         assertNotNull(sink.snapshot);assertTrue(context.isEmpty());released(sink);
+    }
+    @Test void failedSnapshotCopyDebitStillObservesTheImmutableCopy(){
+        var context=new AssumptionContext();var assumption=Assumption.nonZero("x");context.add(assumption);
+        var sink=new Sink(Boundary.SNAPSHOT);sink.failSnapshotDebit=true;
+        try(var scope=RetainedOperation.open(sink)){
+            sink.scope=scope;
+            assertThrows(Stop.class,context::snapshot);
+            assertEquals(List.of(assumption),sink.snapshot,"the completed immutable copy is observable when its own debit fails");
+        }
+        released(sink);
     }
 }

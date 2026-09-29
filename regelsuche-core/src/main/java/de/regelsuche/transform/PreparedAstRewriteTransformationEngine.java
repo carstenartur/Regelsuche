@@ -217,8 +217,7 @@ public final class PreparedAstRewriteTransformationEngine
                 if (retainLegacyHash && subtreeHash == null) subtreeHash = stableHash(subtree);
                 if (results == null) {
                     results = new ArrayList<>();
-                    RetainedOperation.work(1);
-                    owned = RetainedOperation.retain(results, rewritten);
+                    owned = RetainedOperation.retainCompleted(1, results, rewritten);
                 }
                 results.add(new RewriteResult(rule, rewritten, subtreeHash, rule.assumptions(subtree)));
                 if (!retainLegacyHash) {
@@ -233,10 +232,10 @@ public final class PreparedAstRewriteTransformationEngine
             }
             return results == null ? List.of() : results;
         } catch (RuntimeException | Error failure) {
-            try (var release = owned) {
-                owned = null;
-                throw failure;
-            }
+            var release = owned;
+            owned = null;
+            releaseAfterFailure(release, failure);
+            throw failure;
         } finally {
             if (owned != null) owned.close();
         }
@@ -249,8 +248,7 @@ public final class PreparedAstRewriteTransformationEngine
             var leftRewrites = rewriteEverywhere(binaryExpr.left(), retainLegacyHash);
             if (results == null && !leftRewrites.isEmpty()) {
                 results = new ArrayList<>();
-                RetainedOperation.work(1);
-                owned = RetainedOperation.retain(results, leftRewrites);
+                owned = RetainedOperation.retainCompleted(1, results, leftRewrites);
             }
             try (var child = retainLegacyHash || leftRewrites.isEmpty() ? null : RetainedOperation.retain(leftRewrites)) {
 
@@ -264,8 +262,7 @@ public final class PreparedAstRewriteTransformationEngine
             var rightRewrites = rewriteEverywhere(binaryExpr.right(), retainLegacyHash);
             if (results == null && !rightRewrites.isEmpty()) {
                 results = new ArrayList<>();
-                RetainedOperation.work(1);
-                owned = RetainedOperation.retain(results, rightRewrites);
+                owned = RetainedOperation.retainCompleted(1, results, rightRewrites);
             }
             try (var child = retainLegacyHash || rightRewrites.isEmpty() ? null : RetainedOperation.retain(rightRewrites)) {
 
@@ -278,10 +275,10 @@ public final class PreparedAstRewriteTransformationEngine
             }
             return results;
         } catch (RuntimeException | Error failure) {
-            try (var release = owned) {
-                owned = null;
-                throw failure;
-            }
+            var release = owned;
+            owned = null;
+            releaseAfterFailure(release, failure);
+            throw failure;
         } finally {
             if (owned != null) owned.close();
         }
@@ -296,8 +293,7 @@ public final class PreparedAstRewriteTransformationEngine
                 var argumentRewrites = rewriteEverywhere(arguments.get(index), retainLegacyHash);
                 if (results == null && !argumentRewrites.isEmpty()) {
                     results = new ArrayList<>();
-                    RetainedOperation.work(1);
-                    owned = RetainedOperation.retain(results, argumentRewrites);
+                    owned = RetainedOperation.retainCompleted(1, results, argumentRewrites);
                 }
                 try (var child = retainLegacyHash || argumentRewrites.isEmpty() ? null : RetainedOperation.retain(argumentRewrites)) {
 
@@ -308,20 +304,27 @@ public final class PreparedAstRewriteTransformationEngine
             }
             return results;
         } catch (RuntimeException | Error failure) {
-            try (var release = owned) {
-                owned = null;
-                throw failure;
-            }
+            var release = owned;
+            owned = null;
+            releaseAfterFailure(release, failure);
+            throw failure;
         } finally {
             if (owned != null) owned.close();
+        }
+    }
+
+    private static void releaseAfterFailure(RetainedOperation.Frame owned, Throwable failure) {
+        if (owned == null) return;
+        try { owned.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (cleanup != failure) failure.addSuppressed(cleanup);
         }
     }
 
     private void appendFunctionRewrite(FunctionExpr functionExpr, int position, RewriteResult rewrite,
             boolean retainLegacyHash, List<RewriteResult> results) {
         List<Expr> replaced = new ArrayList<>(functionExpr.arguments());
-        if (!retainLegacyHash) RetainedOperation.work(replaced.size());
-        try (var argumentsHeld = retainLegacyHash ? null : RetainedOperation.retain(replaced)) {
+        try (var argumentsHeld = retainLegacyHash ? null : RetainedOperation.retainCompleted(replaced.size(), replaced)) {
             replaced.set(position, rewrite.expression());
             if (!retainLegacyHash) RetainedOperation.work(1);
             results.add(new RewriteResult(rewrite.rule(), new FunctionExpr(functionExpr.name(), replaced),

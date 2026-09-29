@@ -13,11 +13,27 @@ class RewriteTemporaryOwnershipTest {
         boolean canonicalThree,replacedArguments,emptyMutableBatch;
         List<Expr> abortAtCopiedArguments;List<?> abortedArguments;long previousCheckpointWork,copyCheckpointWork;
         Expr abortAtResult;boolean batchAborted;final BatchLimit primary=new BatchLimit();
+        boolean repeatPrimaryOnCleanup,repeatedCleanupInjected;int precedingCleanupFrames;
+        boolean failQueueDebit,queueAndSlotAtFailedDebit;
+        String failAllocationIn;int allocationUnits;boolean allocationDebitFailed,allocationAtFailedDebit;
         final List<CleanupLimit> cleanupFailures=new ArrayList<>();
         final Set<RetainedOperation.Frame> frames=Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units){
             execution=Math.addExact(execution,units);
-            if(batchAborted && units==4){var cleanup=new CleanupLimit();cleanupFailures.add(cleanup);throw cleanup;}
+            if(failQueueDebit && units==2){failQueueDebit=false;throw primary;}
+            if(failAllocationIn!=null && units==allocationUnits && Arrays.stream(Thread.currentThread().getStackTrace())
+                    .filter(frame->frame.getClassName().equals(PreparedAstRewriteTransformationEngine.class.getName())
+                        || frame.getClassName().equals(AstRewriteTransport.class.getName()))
+                    .findFirst().filter(frame->frame.getClassName().equals(PreparedAstRewriteTransformationEngine.class.getName())
+                        && failAllocationIn.equals(frame.getMethodName())).isPresent()){
+                failAllocationIn=null;allocationDebitFailed=true;throw primary;
+            }
+            if(batchAborted && units==4){if(repeatPrimaryOnCleanup){
+                    if(precedingCleanupFrames-- > 0)return;
+                    repeatPrimaryOnCleanup=false;repeatedCleanupInjected=true;throw primary;
+                }
+                if(repeatedCleanupInjected)return;
+                var cleanup=new CleanupLimit();cleanupFailures.add(cleanup);throw cleanup;}
         }
         @Override public void validationWork(long units){validation=Math.addExact(validation,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -26,6 +42,7 @@ class RewriteTemporaryOwnershipTest {
             RetainedGraph.measure(scope);
             var pending=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
             var expressions=new ArrayList<FunctionExpr>();var argumentLists=new ArrayList<List<?>>();int results=0;
+            boolean actualQueue=false,actualSlot=false;
             boolean completedTarget=false;
             var visitor=new RetainedGraph.Visitor(){
                 @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
@@ -34,7 +51,18 @@ class RewriteTemporaryOwnershipTest {
             visitor.reference(scope);
             while(!pending.isEmpty()){
                 var value=pending.removeFirst();if(!seen.add(value))continue;
-                if(value instanceof RetainedOperation.Frame frame)frames.add(frame);
+                if(value instanceof RetainedOperation.Frame frame){
+                    frames.add(frame);
+                    var refs=new ArrayList<Object>();frame.retainedReferences(new RetainedGraph.Visitor(){
+                        @Override public void reference(Object item){refs.add(item);}
+                        @Override public void requireExact(Object item,Class<?> type){assertEquals(type,item.getClass());}
+                    });
+                    if(allocationDebitFailed && refs.get(2) instanceof Object[] held && held.length==2
+                            && held[0] instanceof ArrayList<?> list && list.isEmpty()
+                            && (held[1] instanceof Expr || held[1] instanceof List<?>))allocationAtFailedDebit=true;
+                }
+                if(value instanceof ArrayDeque<?>)actualQueue=true;
+                if(value instanceof Object[] array && array.getClass().getComponentType().getSimpleName().equals("Node"))actualSlot=true;
                 if(value instanceof ArrayList<?> list && list.isEmpty())emptyMutableBatch=true;
                 if(value instanceof NumberExpr number && number.equals(new NumberExpr(3)))canonicalThree=true;
                 if(value instanceof ArrayDeque<?> queue && queue.stream().allMatch(RetainedGraph.View.class::isInstance))queueWidth=Math.max(queueWidth,queue.size());
@@ -55,11 +83,13 @@ class RewriteTemporaryOwnershipTest {
                 else if(value instanceof Map<?,?> map)map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
                 else if(value instanceof Object[] array)for(var item:array)visitor.reference(item);
             }
+            if(actualQueue && actualSlot)queueAndSlotAtFailedDebit=true;
             if(completedTarget){batchAborted=true;throw primary;}
-            if(abortAtCopiedArguments!=null && argumentLists.stream().anyMatch(abortAtCopiedArguments::equals)) {
+            if(abortAtCopiedArguments!=null && (allocationUnits==0 || allocationDebitFailed)
+                    && argumentLists.stream().anyMatch(abortAtCopiedArguments::equals)) {
                 abortedArguments=argumentLists.stream().filter(abortAtCopiedArguments::equals).findFirst().orElseThrow();
                 copyCheckpointWork=execution-previousCheckpointWork;
-                throw new CopyLimit();
+                if(allocationUnits==0)throw new CopyLimit();
             }
             previousCheckpointWork=execution;
             simultaneousResults=Math.max(simultaneousResults,results);
@@ -74,6 +104,16 @@ class RewriteTemporaryOwnershipTest {
         assertAll(()->assertEquals(4,observation.validation,"each actual visited AST occurrence pays validation"),
             ()->assertEquals(3,observation.queueWidth,"all three actual pending children must be retained simultaneously"));
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes(),"closed traversal releases its AST queue");
+    }
+    @Test void failedInitialBoundedTraversalDebitStillObservesQueueAndSlot(){
+        var observation=new Observation();observation.failQueueDebit=true;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertSame(observation.primary,assertThrows(BatchLimit.class,
+                ()->AstRewriteTransport.requireBounded(new VariableExpr("x"))));
+            assertTrue(observation.queueAndSlotAtFailedDebit,"the allocated queue and slot overlap at the failed debit");
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
     @Test void rejectedDepthKeepsAttemptedValidationAndReleasesTheQueue(){
         Expr root=new VariableExpr("x");for(int i=0;i<129;i++)root=new BinaryExpr(root,BinaryOperator.ADD,new NumberExpr(0));
@@ -105,16 +145,21 @@ class RewriteTemporaryOwnershipTest {
     private static final class BatchLimit extends RuntimeException {}
     private static final class CleanupLimit extends RuntimeException {}
     private static void assertOriginalFailureSurvivesCleanup(Expr source,Expr target){
+        assertOriginalFailureSurvivesCleanup(source,target,false);
+    }
+    private static void assertOriginalFailureSurvivesCleanup(Expr source,Expr target,boolean sameFailure){
         var a=PatternExpr.var("A");
         var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
         var transport=new AstRewriteTransport(List.of(zero),32,32);
         var expected=transport.generate(source);assertEquals(1,expected.size());assertEquals(target,expected.getFirst().target());
-        var observation=new Observation();observation.abortAtResult=target;RuntimeException thrown;
+        var observation=new Observation();observation.abortAtResult=target;observation.repeatPrimaryOnCleanup=sameFailure;
+        observation.precedingCleanupFrames=target instanceof FunctionExpr ? 2 : target instanceof BinaryExpr ? 1 : 0;
+        RuntimeException thrown;
         try(var scope=RetainedOperation.open(observation)){
             observation.scope=scope;thrown=assertThrows(RuntimeException.class,()->transport.generate(source));
         }
         assertTrue(observation.batchAborted,"the real filled candidate batch reached the failing checkpoint");
-        assertFalse(observation.cleanupFailures.isEmpty(),"actual frame release also failed after releasing ownership");
+        if(!sameFailure)assertFalse(observation.cleanupFailures.isEmpty(),"actual frame release also failed after releasing ownership");
         assertEquals(new RetainedGraph.Usage(0,0,4),RetainedGraph.measure(observation.scope).retained());
         for(var frame:observation.frames)
             assertEquals(new RetainedGraph.Usage(0,0,4),RetainedGraph.measure(frame).retained());
@@ -135,6 +180,59 @@ class RewriteTemporaryOwnershipTest {
         var x=new VariableExpr("x");var y=new VariableExpr("y");
         var child=new BinaryExpr(x,BinaryOperator.ADD,new NumberExpr(0));
         assertOriginalFailureSurvivesCleanup(new FunctionExpr("f",List.of(child,y)),new FunctionExpr("f",List.of(x,y)));
+    }
+    @Test void repeatedPrimaryFailureDuringDirectReleaseIsNotSelfSuppressed(){
+        var x=new VariableExpr("x");
+        assertOriginalFailureSurvivesCleanup(new BinaryExpr(x,BinaryOperator.ADD,new NumberExpr(0)),x,true);
+    }
+    @Test void repeatedPrimaryFailureDuringBinaryReleaseIsNotSelfSuppressed(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");
+        assertOriginalFailureSurvivesCleanup(new BinaryExpr(new BinaryExpr(x,BinaryOperator.ADD,new NumberExpr(0)),BinaryOperator.MUL,y),
+            new BinaryExpr(x,BinaryOperator.MUL,y),true);
+    }
+    @Test void repeatedPrimaryFailureDuringFunctionReleaseIsNotSelfSuppressed(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");
+        assertOriginalFailureSurvivesCleanup(new FunctionExpr("f",List.of(new BinaryExpr(x,BinaryOperator.ADD,new NumberExpr(0)),y)),
+            new FunctionExpr("f",List.of(x,y)),true);
+    }
+    private static void assertFailedResultAllocationDebit(String method,Expr source){
+        var a=PatternExpr.var("A");
+        var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
+        var transport=new AstRewriteTransport(List.of(zero),32,32);
+        var observation=new Observation();observation.failAllocationIn=method;observation.allocationUnits=1;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertSame(observation.primary,assertThrows(BatchLimit.class,()->transport.generate(source)));
+            assertTrue(observation.allocationAtFailedDebit,"the newly allocated result list must be owned when its debit fails");
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+        assertEquals(1,transport.generate(source).size());
+    }
+    @Test void failedDirectResultListDebitObservesItsActualAllocation(){
+        assertFailedResultAllocationDebit("rewriteEverywhere",
+            new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new NumberExpr(0)));
+    }
+    @Test void failedBinaryChildResultListDebitObservesItsActualAllocation(){
+        assertFailedResultAllocationDebit("rewriteBinaryChildren",
+            new BinaryExpr(new VariableExpr("y"),BinaryOperator.MUL,
+                new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new NumberExpr(0))));
+    }
+    @Test void failedFunctionChildResultListDebitObservesItsActualAllocation(){
+        assertFailedResultAllocationDebit("rewriteFunctionArguments",
+            new FunctionExpr("f",List.of(new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new NumberExpr(0)))));
+    }
+    @Test void failedArgumentCopyDebitObservesItsActualMutableList(){
+        var a=PatternExpr.var("A");var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
+        var arguments=List.<Expr>of(new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new NumberExpr(0)),new VariableExpr("y"),new VariableExpr("z"));
+        var observation=new Observation();observation.failAllocationIn="appendFunctionRewrite";observation.allocationUnits=arguments.size();
+        observation.abortAtCopiedArguments=arguments;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertSame(observation.primary,assertThrows(BatchLimit.class,
+                ()->new AstRewriteTransport(List.of(zero),32,32).generate(new FunctionExpr("f",arguments))));
+            assertEquals(arguments,observation.abortedArguments,"the copied argument list remains observable at the failed debit");
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
     @Test void argumentCopyIsPaidBeforeItsOwnershipCheckpointCanAbort(){
         var a=PatternExpr.var("A");

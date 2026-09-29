@@ -135,9 +135,9 @@ class RetainedJsonTest {
     private static final class GrowthMeter implements RetainedOperation.Sink {
         RetainedOperation operation;RetainedJson.Scope json;
         long execution,previousCheckpoint,paidGrowth,characters;
-        boolean abort=true,writerOwnsOld,replacementUnwritten;
+        boolean abort=true,failGrowthDebit,writerOwnsOld,replacementUnwritten;
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operation);v.reference(json);}
-        @Override public void executionWork(long amount){execution=Math.addExact(execution,amount);}
+        @Override public void executionWork(long amount){execution=Math.addExact(execution,amount);if(failGrowthDebit && amount==82){failGrowthDebit=false;throw new GrowthAbort();}}
         @Override public void validationWork(long amount){}
         @Override public void checkpoint(){
             var observation=RetainedGraph.measure(this);
@@ -183,6 +183,22 @@ class RetainedJsonTest {
         }
         assertEquals(0,RetainedGraph.measure(meter.operation).retained().characters());
         assertEquals(84,paidAtAbort,"82 allocated characters and two frame operations were already completed");
+    }
+    @Test void failedTextGrowthDebitObservesBothAllocatedBuffers()throws Exception{
+        var mapper=new ObjectMapper(new RetainedJson.Factory(new JsonFactory()));
+        var meter=new GrowthMeter();meter.abort=false;meter.failGrowthDebit=true;
+        try(var operation=RetainedOperation.open(meter)){
+            meter.operation=operation;
+            try(var json=RetainedJson.open()){
+                meter.json=json;
+                assertThrows(GrowthAbort.class,()->RetainedJson.writeString(mapper,"A".repeat(80)));
+                assertTrue(meter.writerOwnsOld);
+                assertTrue(meter.replacementUnwritten);
+                assertTrue(meter.characters>=114,"the old and new buffers overlap at failed allocation debit");
+                assertEquals("\""+"A".repeat(80)+"\"",RetainedJson.writeString(mapper,"A".repeat(80)));
+            }
+            assertEquals(0,RetainedGraph.measure(meter.json).retained().characters());
+        }
     }
     private static final class Meter implements RetainedOperation.Sink {
         RetainedOperation operation;RetainedJson.Scope json;long work,peak;long maximum=Long.MAX_VALUE;

@@ -47,8 +47,9 @@ public final class AssumptionContext implements RetainedGraph.View {
     public List<Assumption> snapshot() {
         try (var owned = RetainedOperation.retain(this)) {
             var snapshot = List.copyOf(assumptions);
-            RetainedOperation.work(assumptions.size());
-            return RetainedOperation.produced(snapshot);
+            try (var copy = RetainedOperation.retainCompleted(assumptions.size() + 1L, snapshot)) {
+                return snapshot;
+            }
         }
     }
 
