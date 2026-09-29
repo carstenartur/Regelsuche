@@ -961,6 +961,34 @@ class CheckedLearnedSchemaModelTest {
             }
         }
     
+        @Test void cursorNormalReceiptsMatchTheHistoricalPrepaidContract() throws Exception {
+            var observations=new ArrayList<Object>();
+            var plan=CheckedSchemaMatcherPlan.prepare(model,1,Map.of(),Set.of(selected));
+            for(String text:List.of(SINGLE,MULTIPLE,"x+17","x/0")) {
+                var nativeMeter=new IncrementalProviderContract.Meter(IncrementalProviderContract.NATIVE_PREPAID_REVISION);
+                var legacyMeter=new IncrementalProviderContract.Meter(IncrementalProviderContract.PREPAID_REVISION);
+                var nativeSource=CheckedSchemaCursor.nativeSource(plan,parse(text),nativeMeter);
+                var legacySource=CheckedSchemaCursor.legacy(plan,CODEC.encodeExpression(parse(text)),legacyMeter);
+                var nativeMoves=new ArrayList<de.regelsuche.transform.Transformation>();
+                var legacyMoves=new ArrayList<de.regelsuche.transform.Transformation>();
+                assertTrue(nativeSource.next(0).isEmpty());assertEquals(0,nativeMeter.work().metrics().totalWorkUnitsV2());
+                for(int pulls=0;pulls<1000;pulls++) {
+                    nativeSource.next(2).ifPresent(proof->nativeMoves.add(proof.exportLegacy()));
+                    legacySource.next(2).ifPresent(legacyMoves::add);
+                    assertEquals(legacySource.status(),nativeSource.status());
+                    assertEquals(legacyMeter.work(),nativeMeter.work());
+                    if(nativeSource.status()==IncrementalProviderContract.Status.EXHAUSTED
+                            || nativeSource.status()==IncrementalProviderContract.Status.INCONCLUSIVE)break;
+                    assertTrue(pulls<999,"bounded full drain must terminate");
+                }
+                assertEquals(legacyMoves,nativeMoves);
+                observations.add(Map.of("source",text,"status",nativeSource.status(),"work",nativeMeter.work(),"candidates",nativeMoves.size()));
+                nativeSource.close();legacySource.close();
+                assertEquals(legacyMeter.work(),nativeMeter.work());
+            }
+            System.out.println("P04_CURSOR_GOLD "+new ObjectMapper().writeValueAsString(observations));
+        }
+
         @Test void sourceObserverArgumentFailureRemainsTechnical() { assertAbort(Abort.DOMAIN_ARGUMENT, false, false); }
         @Test void sourceObserverRuntimeFailureRetainsItsWork() { assertAbort(Abort.DOMAIN_RUNTIME, false, false); }
         @Test void sourceObserverErrorRetainsItsWork() { assertAbort(Abort.DOMAIN_ERROR, false, false); }
