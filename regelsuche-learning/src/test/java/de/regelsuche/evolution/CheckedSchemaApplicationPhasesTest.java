@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.ast.*;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import de.regelsuche.transform.Transformation;
@@ -120,6 +123,144 @@ class CheckedSchemaApplicationPhasesTest {
             assertTrue(prepaid(cursor).path("chargedUnits").asLong() >= 512);
             assertTrue(prepaid(cursor).path("phaseWork").path("TARGET_DOMAIN").asLong() >= 512);
             assertEquals(0, prepaid(cursor).path("phaseCalls").path("EVIDENCE").asLong());
+        }
+    }
+
+    @Test void domainKeepsItsActualPendingQueueAndCurrentNodeUntilCompletion() {
+        Expr source=domainSource();var work=new CheckedSchemaSupport.Work();
+        var meter=new DomainMeter(work,DomainMeter.Abort.NONE);
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            CheckedSchemaSupport.domain(source,model.bounds(),work);
+            assertEquals(7,work.units,"each source occurrence retains its one delegated visit");
+            assertTrue(meter.sawPendingAndCurrent,"the queue and removed current wrapper overlap");
+            assertTrue(meter.sawCompletion,"completion is observed while the last current node is held");
+            assertTrue(meter.directWork>7,"queue/frame mechanics remain separate paid work");
+            assertEquals(List.of(4L),meter.afterCompletion,"only owner close follows completion, not a second delegation of visited work");
+        }
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
+    @Test void domainDebitAbortObservesAlreadyPublishedQueueGrowthAndPreservesVisitedWork() {
+        assertDomainAbort(DomainMeter.Abort.GROWTH_DEBIT,1);
+    }
+    @Test void domainObservationAbortKeepsTheOriginalFailureAndReleasesItsFrame() {
+        assertDomainAbort(DomainMeter.Abort.GROWTH_CHECKPOINT,1);
+    }
+    @Test void domainFinalCloseFailureKeepsAllCompletedVisitedWork() {
+        assertDomainAbort(DomainMeter.Abort.CLOSE,7);
+    }
+
+    private static void assertDomainAbort(DomainMeter.Abort abort,long visits) {
+        var work=new CheckedSchemaSupport.Work();var meter=new DomainMeter(work,abort);
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var thrown=assertThrows(IllegalArgumentException.class,()->CheckedSchemaSupport.domain(domainSource(),model.bounds(),work));
+            assertSame(meter.failure,thrown);
+            assertEquals(visits,work.units,"the caller-owned ledger retains exactly the visited prefix");
+            if(abort!=DomainMeter.Abort.CLOSE) assertTrue(meter.sawFailedOwners,"observe the live queue/current before release");
+            assertTrue(meter.failedDebit==4 || meter.afterFailure.contains(4L),"cleanup remains paid");
+        }
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
+    @Test void rejectedDomainObservesTheActualOutOfDomainCurrentNode() {
+        Expr source=new FunctionExpr("sin",List.of(new VariableExpr("x")));
+        var work=new CheckedSchemaSupport.Work();var meter=new DomainMeter(work,DomainMeter.Abort.NONE);
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var rejected=assertThrows(IllegalArgumentException.class,()->CheckedSchemaSupport.domain(source,model.bounds(),work));
+            assertEquals("outside checked scalar rational polynomial domain",rejected.getMessage());
+            assertEquals(1,work.units);assertSame(source,meter.lastCurrent);
+        }
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
+    @Test void domainOwnershipDoesNotAlterExactScopedSyntaxOrFiniteValidationBoundaries() {
+        Expr scoped=VariableExpr.scoped(new de.regelsuche.symbol.SymbolId(new UUID(0,113),7));
+        var work=new CheckedSchemaSupport.Work();
+        CheckedSchemaSupport.domain(new BinaryExpr(scoped,BinaryOperator.ADD,NumberExpr.exact("1/3")),model.bounds(),work);
+        assertEquals(3,work.units);
+        for(String source:List.of("x/0","x/y","x^(-1)","x^33")) {
+            var rejectedWork=new CheckedSchemaSupport.Work();
+            assertThrows(IllegalArgumentException.class,()->CheckedSchemaSupport.domain(
+                new ExpressionParser().parseExactTerm(source).expression(),model.bounds(),rejectedWork),source);
+            assertEquals(1,rejectedWork.units,source);
+        }
+        var b=model.bounds();var bounded=new CheckedLearnedSchemaModel.Bounds(3,b.maximumPatternNodes(),b.maximumDepth(),
+            b.maximumCoefficientBits(),b.maximumExponent(),b.maximumExamples(),b.maximumPairAttempts(),b.maximumSchemas(),
+            b.maximumMatchAttempts(),b.maximumCandidates());
+        var rejectedWork=new CheckedSchemaSupport.Work();
+        assertThrows(IllegalArgumentException.class,()->CheckedSchemaSupport.domain(domainSource(),bounded,rejectedWork));
+        assertEquals(4,rejectedWork.units,"the first out-of-bounds visit stays paid");
+    }
+
+    private static Expr domainSource() {
+        return new ExpressionParser().parseExactTerm("(a+b)*(c+d)").expression();
+    }
+    private static final class DomainMeter implements RetainedOperation.Sink {
+        enum Abort { NONE,GROWTH_DEBIT,GROWTH_CHECKPOINT,CLOSE }
+        final CheckedSchemaSupport.Work work;final Abort abort;RetainedOperation scope;
+        IllegalArgumentException failure;Expr lastCurrent;
+        long directWork,failedDebit;boolean sawPendingAndCurrent,sawCompletion,sawFailedOwners;
+        final List<Long> afterCompletion=new ArrayList<>(),afterFailure=new ArrayList<>();
+        DomainMeter(CheckedSchemaSupport.Work work,Abort abort){this.work=work;this.abort=abort;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
+        @Override public void validationWork(long units){executionWork(units);}
+        @Override public void executionWork(long units) {
+            directWork=Math.addExact(directWork,units);
+            if(failure!=null){afterFailure.add(units);return;}
+            if(sawCompletion)afterCompletion.add(units);
+            var snapshot=snapshot();
+            if((abort==Abort.GROWTH_DEBIT && snapshot.grown()) || (abort==Abort.CLOSE && sawCompletion && units==4)) {
+                failedDebit=units;failure=new IllegalArgumentException("injected domain "+abort);throw failure;
+            }
+        }
+        @Override public void checkpoint() {
+            RetainedGraph.measure(scope);var snapshot=snapshot();
+            sawPendingAndCurrent|=snapshot.grown();
+            if(snapshot.current()!=null)lastCurrent=snapshot.current();
+            sawCompletion|=snapshot.current()!=null && snapshot.pending()==0;
+            sawFailedOwners|=failure!=null && snapshot.current()!=null;
+            if(failure==null && abort==Abort.GROWTH_CHECKPOINT && snapshot.grown()) {
+                failure=new IllegalArgumentException("injected domain observation");throw failure;
+            }
+        }
+        private Snapshot snapshot() {
+            var pending=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
+            var visitor=new RetainedGraph.Visitor() {
+                @Override public void reference(Object value){if(value!=null)pending.add(value);}
+                @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+            };
+            visitor.reference(scope);Object current=null;int waiting=-1;
+            while(!pending.isEmpty()) {
+                Object value=pending.remove();if(!seen.add(value))continue;
+                if(value instanceof RetainedGraph.View view)view.retainedReferences(visitor);
+                else if(value instanceof Object[] array) {
+                    if(array.length==1 && domainNode(array[0]))current=array[0];
+                    for(Object item:array)visitor.reference(item);
+                } else if(value instanceof Collection<?> collection) {
+                    if(value instanceof ArrayDeque<?> deque && deque.stream().allMatch(DomainMeter::domainNode))waiting=deque.size();
+                    collection.forEach(visitor::reference);
+                }
+            }
+            Expr expression=null;
+            if(current instanceof RetainedGraph.View view) {
+                var refs=new ArrayList<Object>();
+                view.retainedReferences(new RetainedGraph.Visitor() {
+                    @Override public void reference(Object value){refs.add(value);}
+                    @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+                });
+                expression=(Expr)refs.stream().filter(value->value instanceof Expr).findFirst().orElseThrow();
+            }
+            return new Snapshot(waiting,expression);
+        }
+        private static boolean domainNode(Object value) {
+            return value!=null && value.getClass().getEnclosingClass()==CheckedSchemaSupport.class
+                && value.getClass().getSimpleName().equals("Node");
+        }
+        private record Snapshot(int pending,Expr current) {
+            boolean grown(){return pending>=2 && current!=null;}
         }
     }
 
