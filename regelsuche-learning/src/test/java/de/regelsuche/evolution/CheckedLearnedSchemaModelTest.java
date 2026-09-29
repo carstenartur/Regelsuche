@@ -489,6 +489,39 @@ class CheckedLearnedSchemaModelTest {
         assertImportFailure(ImportMeter.Abort.CLOSE);
     }
 
+    @Test void importPreservesRepeatedFailureAcrossBindingAndJsonFrameCloses() { assertImportCleanup(ImportMeter.Abort.BINDINGS,false); }
+    @Test void importPreservesRepeatedFailureAtTheResultFrameClose() { assertImportCleanup(ImportMeter.Abort.RESULT,false); }
+    @Test void importAcquisitionFailureStillClosesTheAlreadyOpenedJsonScope() { assertImportCleanup(ImportMeter.Abort.JSON_OWNER_ACQUIRE,false); }
+    @Test void importClosesAllResourcesDespiteDistinctJsonAndFrameFailures() { assertImportCleanup(ImportMeter.Abort.BINDINGS,true); }
+
+    private static void assertImportCleanup(ImportMeter.Abort abort,boolean distinct) {
+        var learned=CheckedLearnedSchemaModel.learn(formation);
+        var model=CheckedLearnedSchemaModel.load(learned.toCanonicalJson(),learned.inventoryHash());
+        Expr source=parse("(x+y)*(x-y)+y*y");var binding=applicationBinding(model,source);
+        var meter=new ImportMeter(abort);meter.repeatClose=true;
+        if(distinct) {
+            meter.closeFailure=new IllegalStateException("additional imported frame close failure");
+            meter.jsonFailure=new IllegalStateException("additional JSON release failure");
+        }
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),binding,
+                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)));
+            assertSame(meter.failure,thrown,"later close attempts must preserve the original technical error");
+            assertNotNull(meter.work);assertEquals(meter.work.units,meter.afterFailure.getLast());
+            assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count());
+            if(abort!=ImportMeter.Abort.RESULT)
+                assertTrue(meter.afterFailure.stream().filter(units->units==4).count()>=3,"every acquired frame is released despite earlier close errors");
+            if(distinct) {
+                assertTrue(List.of(thrown.getSuppressed()).contains(meter.closeFailure));
+                assertTrue(List.of(thrown.getSuppressed()).contains(meter.jsonFailure));
+                assertTrue(meter.jsonFailureThrown,"the JSON scope release itself was reached");
+            } else assertEquals(0,thrown.getSuppressed().length);
+        }
+        assertFalse(de.regelsuche.retention.RetainedJson.active());
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
     @Test void semanticRejectionCannotHideObservationFailures() {
         assertImportFailure(ImportMeter.Abort.REJECT_OBSERVATION);
     }
@@ -561,15 +594,24 @@ class CheckedLearnedSchemaModelTest {
     }
 
     private static final class ImportMeter implements RetainedOperation.Sink {
-        enum Abort { NONE, BINDINGS, RESULT, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE }
+        enum Abort { NONE, BINDINGS, RESULT, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE, JSON_OWNER_ACQUIRE }
         final Abort abort;RetainedOperation scope;CheckedSchemaSupport.Work work;IllegalArgumentException failure;
+        boolean repeatClose,jsonFailureThrown;RuntimeException closeFailure,jsonFailure;
         int pathAllocations,pathInsertions,duplicateInsertions;Expr duplicateValue;long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection,sawBindingsWithOutcome;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
         ImportMeter(Abort abort){this.abort=abort;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
         @Override public void validationWork(long amount){executionWork(amount);}
         @Override public void executionWork(long amount) {
             directWork=Math.addExact(directWork,amount);
-            if (failure!=null) {afterFailure.add(amount);return;}
+            if (failure!=null) {
+                afterFailure.add(amount);
+                if(repeatClose && amount==4)throw closeFailure==null?failure:closeFailure;
+                if(jsonFailure!=null && !jsonFailureThrown && !de.regelsuche.retention.RetainedJson.active()
+                        && !bindingReplayReferences(owners()).isEmpty()) {
+                    jsonFailureThrown=true;throw jsonFailure;
+                }
+                return;
+            }
             var owners=owners();
             for (Object value:bindingReplayReferences(owners)) {
                 if (value instanceof ArrayList<?> path) {
@@ -586,7 +628,9 @@ class CheckedLearnedSchemaModelTest {
             if ((abort==Abort.BINDINGS && bindings && work!=null && work.units>1)
                     || (abort==Abort.RESULT && result)
                     || (abort==Abort.CLOSE && sawResult && amount==4)
-                    || (abort==Abort.REJECT_CLOSE && sawRejection && amount==4)) {
+                    || (abort==Abort.REJECT_CLOSE && sawRejection && amount==4)
+                    || (abort==Abort.JSON_OWNER_ACQUIRE && amount==2 && owners.stream().anyMatch(value->
+                        value instanceof Object[] values && values.length==1 && values[0] instanceof de.regelsuche.retention.RetainedJson.Scope))) {
                 failedDebit=amount;failure=new IllegalArgumentException("injected import "+abort);throw failure;
             }
         }
@@ -692,6 +736,12 @@ class CheckedLearnedSchemaModelTest {
     }
 
     @Test void importedSubstitutionDomainRejectionCannotHideOccurrenceCloseFailure() throws Exception {
+        assertImportedSubstitutionClose(VerifierMeter.Abort.OCCURRENCE_REJECT_CLOSE);
+    }
+    @Test void importedDomainRejectionCannotHideTheLaterBindingOwnerCloseFailure() throws Exception {
+        assertImportedSubstitutionClose(VerifierMeter.Abort.BINDING_REJECT_CLOSE);
+    }
+    private static void assertImportedSubstitutionClose(VerifierMeter.Abort abort) throws Exception {
         var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
         var binding=applicationBinding(model,source);var data=(ObjectNode)new ObjectMapper().readTree(binding.canonicalEvidenceJson());
         ((ObjectNode)data.get("bindings").get(0)).put("expression",CODEC.encodeExpression(parse("x/0")));
@@ -699,7 +749,7 @@ class CheckedLearnedSchemaModelTest {
         var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
         var semantic=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),invalid,context));
         assertEquals("checked scalar division needs nonzero literal denominator",semantic.getMessage());
-        var meter=new VerifierMeter(VerifierMeter.Abort.OCCURRENCE_REJECT_CLOSE,source,null);
+        var meter=new VerifierMeter(abort,source,null);
         try(var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
             var thrown=assertThrows(Throwable.class,()->model.replayApplication(state(source),invalid,context));
@@ -738,7 +788,7 @@ class CheckedLearnedSchemaModelTest {
 
     /** Observes actual frame values; a nested application ledger cannot stand in for the verifier ledger. */
     private static final class VerifierMeter implements RetainedOperation.Sink {
-        enum Abort { NONE,SOURCE_RUNTIME,SOURCE_ARGUMENT,SOURCE_ERROR,RESULT,CLOSE,REJECT_OBSERVATION,REJECT_CLOSE,SUBSTITUTION,OCCURRENCE_REJECT_CLOSE,TARGET_REJECT_CLOSE }
+        enum Abort { NONE,SOURCE_RUNTIME,SOURCE_ARGUMENT,SOURCE_ERROR,RESULT,CLOSE,REJECT_OBSERVATION,REJECT_CLOSE,SUBSTITUTION,OCCURRENCE_REJECT_CLOSE,TARGET_REJECT_CLOSE,BINDING_REJECT_CLOSE }
         final Abort abort;final Expr received;final NativeSearchMove proposal;final Throwable failure;
         RetainedOperation scope;CheckedSchemaSupport.Work work;RuntimeException closeFailure;
         boolean tripped,repeatClose,sawRoot,sawResult,resultCheckpoint,sawRejectedDomain,sawTargetDomain,sawOutcome;
@@ -769,7 +819,8 @@ class CheckedLearnedSchemaModelTest {
                     || (abort==Abort.REJECT_CLOSE && sawRejectedDomain && amount==4)
                     || (abort==Abort.SUBSTITUTION && snapshot.substitution())
                     || (abort==Abort.OCCURRENCE_REJECT_CLOSE && sawRejectedDomain && sawOutcome && !snapshot.outcome() && amount==4)
-                    || (abort==Abort.TARGET_REJECT_CLOSE && sawTargetDomain && sawOutcome && !snapshot.outcome() && amount==4)) {
+                    || (abort==Abort.TARGET_REJECT_CLOSE && sawTargetDomain && sawOutcome && !snapshot.outcome() && amount==4)
+                    || (abort==Abort.BINDING_REJECT_CLOSE && sawRejectedDomain && sawOutcome && !snapshot.bindingReplay() && amount==4)) {
                 tripped=true;fail();
             }
         }
@@ -836,9 +887,9 @@ class CheckedLearnedSchemaModelTest {
                         && binary.right().equals(new NumberExpr(0));
                 }
             }
-            return new Snapshot(sourceGrowth,substitution,receipt,outcome);
+            return new Snapshot(sourceGrowth,substitution,receipt,outcome,seen.stream().anyMatch(value->value.getClass().getSimpleName().equals("BindingReplay")));
         }
-        private record Snapshot(boolean sourceGrowth,boolean substitution,boolean receipt,boolean outcome) {}
+        private record Snapshot(boolean sourceGrowth,boolean substitution,boolean receipt,boolean outcome,boolean bindingReplay) {}
     }
 
     private static ExactTheoryEvidence.Binding applicationBinding(CheckedLearnedSchemaModel model,Expr source) {
