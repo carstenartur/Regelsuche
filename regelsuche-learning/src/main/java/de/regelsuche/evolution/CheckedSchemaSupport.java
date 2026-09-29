@@ -183,47 +183,59 @@ final class CheckedSchemaSupport {
     private record Node(Expr value, int depth) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(value);}
     }
+    /** Only explicit mathematical-domain guards use this category; observers do not. */
+    static final class DomainRejected extends IllegalArgumentException {
+        DomainRejected(String reason){super(reason);}
+    }
     /** Total rational polynomial syntax: no functions, variable denominators or variable/negative powers. */
     static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
         var pending = new ArrayDeque<Node>();
         pending.push(new Node(root, 0));
         var current = new Node[1];
-        // Queue/backing, root wrapper/insertion and the actual current slot.
-        var retained=RetainedOperation.retainCompleted(6,root,bounds,work,pending,current);
+        var rejection = new String[1];
+        // Queue/backing, root wrapper/insertion and actual current/rejection slots.
+        var retained=RetainedOperation.retainCompleted(8,root,bounds,work,pending,current,rejection);
         Throwable primary=null;
         try {
-            int count = 0;
-            while (!pending.isEmpty()) {
-                var node = current[0] = pending.pop();
-                // The caller owns this visited-work ledger, including a failed prefix.
-                work.add(1);
-                RetainedOperation.work(2);
-                if (++count > bounds.maximumExpressionNodes() || node.depth() > bounds.maximumDepth()) {
-                    throw new IllegalArgumentException("checked scalar polynomial structure limit");
-                }
-                switch (node.value()) {
-                    case NumberExpr number -> literal(number.value(), bounds);
-                    case VariableExpr variable -> {
-                        if (variable.name().length() > 128) throw new IllegalArgumentException("checked symbol size limit");
+            try {
+                int count = 0;
+                while (!pending.isEmpty()) {
+                    var node = current[0] = pending.pop();
+                    // The caller owns this visited-work ledger, including a failed prefix.
+                    work.add(1);
+                    RetainedOperation.work(2);
+                    if (++count > bounds.maximumExpressionNodes() || node.depth() > bounds.maximumDepth()) {
+                        throw new DomainRejected("checked scalar polynomial structure limit");
                     }
-                    case BinaryExpr binary -> {
-                        if (binary.operator() == BinaryOperator.DIV && (!(binary.right() instanceof NumberExpr number)
-                                || number.value().numerator().signum() == 0)) {
-                            throw new IllegalArgumentException("checked scalar division needs nonzero literal denominator");
+                    switch (node.value()) {
+                        case NumberExpr number -> literal(number.value(), bounds);
+                        case VariableExpr variable -> {
+                            if (variable.name().length() > 128) throw new DomainRejected("checked symbol size limit");
                         }
-                        if (binary.operator() == BinaryOperator.POW && (!(binary.right() instanceof NumberExpr number)
-                                || !number.value().isInteger() || number.value().numerator().signum() < 0
-                                || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) > 0)) {
-                            throw new IllegalArgumentException("checked scalar power needs bounded nonnegative literal exponent");
+                        case BinaryExpr binary -> {
+                            if (binary.operator() == BinaryOperator.DIV && (!(binary.right() instanceof NumberExpr number)
+                                    || number.value().numerator().signum() == 0)) {
+                                throw new DomainRejected("checked scalar division needs nonzero literal denominator");
+                            }
+                            if (binary.operator() == BinaryOperator.POW && (!(binary.right() instanceof NumberExpr number)
+                                    || !number.value().isInteger() || number.value().numerator().signum() < 0
+                                    || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) > 0)) {
+                                throw new DomainRejected("checked scalar power needs bounded nonnegative literal exponent");
+                            }
+                            pending.push(new Node(binary.right(), node.depth() + 1));
+                            RetainedOperation.work(2);
+                            pending.push(new Node(binary.left(), node.depth() + 1));
+                            RetainedOperation.work(2);
+                            RetainedOperation.checkpoint();
                         }
-                        pending.push(new Node(binary.right(), node.depth() + 1));
-                        RetainedOperation.work(2);
-                        pending.push(new Node(binary.left(), node.depth() + 1));
-                        RetainedOperation.work(2);
-                        RetainedOperation.checkpoint();
+                        default -> throw new DomainRejected("outside checked scalar rational polynomial domain");
                     }
-                    default -> throw new IllegalArgumentException("outside checked scalar rational polynomial domain");
                 }
+            } catch (DomainRejected rejected) {
+                // A semantic rejection cannot carry a technical failure that a caller discards.
+                // Keep it as owned data until observation and release have both succeeded.
+                rejection[0]=rejected.getMessage();
+                RetainedOperation.work(1);
             }
             RetainedOperation.checkpoint();
         } catch (RuntimeException | Error failure) {
@@ -242,12 +254,13 @@ final class CheckedSchemaSupport {
                 if(cleanup!=primary)primary.addSuppressed(cleanup);
             }
         }
+        if(rejection[0]!=null)throw new DomainRejected(rejection[0]);
     }
 
     private static void literal(ExactRational value, CheckedLearnedSchemaModel.Bounds bounds) {
         if (value.numerator().abs().bitLength() > bounds.maximumCoefficientBits()
                 || value.denominator().bitLength() > bounds.maximumCoefficientBits()) {
-            throw new IllegalArgumentException("checked rational literal size limit");
+            throw new DomainRejected("checked rational literal size limit");
         }
     }
 
