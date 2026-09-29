@@ -9,6 +9,10 @@ import java.util.function.LongConsumer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import java.util.stream.Stream;
 
 class AstExpressionValidationTest {
     @Test void canonicalSizeCountsEveryTagSeparatorEscapeAndUtf8ByteWithoutCreatingJson() {
@@ -194,35 +198,41 @@ class AstExpressionValidationTest {
     }
 
     private enum FailurePhase { VALIDATION, GENERATED_TEXT, GENERATED_OBSERVATION, RESULT_PUBLICATION }
-    @Test void observerOriginInvalidExpressionKeepsItsIdentityEvenWithANullMessage() {
-        for (var phase : FailurePhase.values()) for (String message : Arrays.asList(null, "observer rejection"))
-                for (boolean failClose : List.of(false, true)) {
-            var source = NumberExpr.exact("1/3"); var sink = new Observation();
-            var failure = new AstExpressionValidation.InvalidExpression(message);
-            var close = new ArithmeticException("distinct close"); boolean[] failed = {false};
-            try (var scope = RetainedOperation.open(sink)) {
-                sink.scope = scope;
-                sink.validate = units -> {
-                    if (phase == FailurePhase.VALIDATION && units == 3) { failed[0] = true; throw failure; }
-                };
-                sink.check = values -> {
-                    if (!failed[0] && phase == FailurePhase.GENERATED_OBSERVATION && hasText(values, "1/3")) {
-                        failed[0] = true; throw failure;
-                    }
-                };
-                sink.charge = units -> {
-                    if (failClose && failed[0] && units == 4 && !owns(sink.references(), source)) throw close;
-                    boolean produced = phase == FailurePhase.GENERATED_TEXT && hasText(sink.references(), "1/3");
-                    boolean result = phase == FailurePhase.RESULT_PUBLICATION && sink.references().stream()
-                        .anyMatch(AstExpressionValidation.Inspection.class::isInstance);
-                    if (!failed[0] && (produced || result)) { failed[0] = true; throw failure; }
-                };
-                assertSame(failure, assertThrows(AstExpressionValidation.InvalidExpression.class,
-                    () -> AstExpressionValidation.inspect(source)), phase.toString());
-                assertArrayEquals(failClose ? new Throwable[]{close} : new Throwable[0], failure.getSuppressed());
-                assertFalse(owns(sink.references(), source));
-                sink.charge = units -> {}; sink.check = values -> {};
-            }
+    private static Stream<Arguments> observerFailureCases() {
+        return Arrays.stream(FailurePhase.values()).flatMap(phase ->
+            Arrays.<String>asList(null, "observer rejection").stream().flatMap(message ->
+                Stream.of(false, true).map(failClose -> Arguments.of(phase, message, failClose))));
+    }
+
+    @ParameterizedTest(name = "{0}, message={1}, closeFailure={2}")
+    @MethodSource("observerFailureCases")
+    void observerOriginInvalidExpressionKeepsItsIdentityEvenWithANullMessage(
+            FailurePhase phase, String message, boolean failClose) {
+        var source = NumberExpr.exact("1/3"); var sink = new Observation();
+        var failure = new AstExpressionValidation.InvalidExpression(message);
+        var close = new ArithmeticException("distinct close"); boolean[] failed = {false};
+        try (var scope = RetainedOperation.open(sink)) {
+            sink.scope = scope;
+            sink.validate = units -> {
+                if (phase == FailurePhase.VALIDATION && units == 3) { failed[0] = true; throw failure; }
+            };
+            sink.check = values -> {
+                if (!failed[0] && phase == FailurePhase.GENERATED_OBSERVATION && hasText(values, "1/3")) {
+                    failed[0] = true; throw failure;
+                }
+            };
+            sink.charge = units -> {
+                if (failClose && failed[0] && units == 4 && !owns(sink.references(), source)) throw close;
+                boolean produced = phase == FailurePhase.GENERATED_TEXT && hasText(sink.references(), "1/3");
+                boolean result = phase == FailurePhase.RESULT_PUBLICATION && sink.references().stream()
+                    .anyMatch(AstExpressionValidation.Inspection.class::isInstance);
+                if (!failed[0] && (produced || result)) { failed[0] = true; throw failure; }
+            };
+            assertSame(failure, assertThrows(AstExpressionValidation.InvalidExpression.class,
+                () -> AstExpressionValidation.inspect(source)), phase.toString());
+            assertArrayEquals(failClose ? new Throwable[]{close} : new Throwable[0], failure.getSuppressed());
+            assertFalse(owns(sink.references(), source));
+            sink.charge = units -> {}; sink.check = values -> {};
         }
     }
 
