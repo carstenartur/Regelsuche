@@ -195,7 +195,8 @@ class AstExpressionValidationTest {
 
     private enum FailurePhase { VALIDATION, GENERATED_TEXT, GENERATED_OBSERVATION, RESULT_PUBLICATION }
     @Test void observerOriginInvalidExpressionKeepsItsIdentityEvenWithANullMessage() {
-        for (var phase : FailurePhase.values()) for (String message : Arrays.asList(null, "observer rejection")) {
+        for (var phase : FailurePhase.values()) for (String message : Arrays.asList(null, "observer rejection"))
+                for (boolean failClose : List.of(false, true)) {
             var source = NumberExpr.exact("1/3"); var sink = new Observation();
             var failure = new AstExpressionValidation.InvalidExpression(message);
             var close = new ArithmeticException("distinct close"); boolean[] failed = {false};
@@ -205,12 +206,12 @@ class AstExpressionValidationTest {
                     if (phase == FailurePhase.VALIDATION && units == 3) { failed[0] = true; throw failure; }
                 };
                 sink.check = values -> {
-                    if (phase == FailurePhase.GENERATED_OBSERVATION && hasText(values, "1/3")) {
+                    if (!failed[0] && phase == FailurePhase.GENERATED_OBSERVATION && hasText(values, "1/3")) {
                         failed[0] = true; throw failure;
                     }
                 };
                 sink.charge = units -> {
-                    if (failed[0] && units == 4 && !owns(sink.references(), source)) throw close;
+                    if (failClose && failed[0] && units == 4 && !owns(sink.references(), source)) throw close;
                     boolean produced = phase == FailurePhase.GENERATED_TEXT && hasText(sink.references(), "1/3");
                     boolean result = phase == FailurePhase.RESULT_PUBLICATION && sink.references().stream()
                         .anyMatch(AstExpressionValidation.Inspection.class::isInstance);
@@ -218,7 +219,7 @@ class AstExpressionValidationTest {
                 };
                 assertSame(failure, assertThrows(AstExpressionValidation.InvalidExpression.class,
                     () -> AstExpressionValidation.inspect(source)), phase.toString());
-                assertArrayEquals(new Throwable[]{close}, failure.getSuppressed());
+                assertArrayEquals(failClose ? new Throwable[]{close} : new Throwable[0], failure.getSuppressed());
                 assertFalse(owns(sink.references(), source));
                 sink.charge = units -> {}; sink.check = values -> {};
             }
