@@ -1023,11 +1023,11 @@ class CheckedLearnedSchemaModelTest {
                         assertTrue(cursor.next(100000).isEmpty());assertEquals(paid,payment.work(),"no restart or repeated payment after technical failure");
                         if(fault==CursorFault.DOMAIN) assertEquals(meter.domainWork.units,payment.work().operations().get("LOAD"));
                         if(fault==CursorFault.CONSTRUCTOR) {
-                            assertTrue(payment.work().prepaid().phaseCalls().isEmpty());
-                            assertEquals(1,payment.work().prepaid().openApplications());
+                            assertTrue(payment.work().prepaidApplications().phaseCalls().isEmpty());
+                            assertEquals(1,payment.work().prepaidApplications().openApplications());
                         }
                         if(fault==CursorFault.SUBSTITUTION || fault==CursorFault.TARGET)
-                            assertEquals(meter.applicationWork.units,payment.work().prepaid().chargedUnits());
+                            assertEquals(meter.applicationWork.units,payment.work().prepaidApplications().chargedUnits());
                         if(fault==CursorFault.RESULT)assertEquals(1,payment.work().mathematics().exactTheorySteps());
                     }
                     meter.armed=false;cursor.close();
