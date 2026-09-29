@@ -1,0 +1,312 @@
+{
+  "schema": "regelsuche.pr1055-integration/v1",
+  "repository": "carstenartur/Regelsuche",
+  "pullRequest": 1055,
+  "integratedAt": "2026-09-29T09:42:52Z",
+  "qualifiedHead": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+  "qualifiedTree": "3b90d3bb3f5056cb43050825dc2794e029d25be2",
+  "mergeCommit": "c9709bf4ec421ed42bee4bf157f841a3c6b33096",
+  "mainTree": "3b90d3bb3f5056cb43050825dc2794e029d25be2",
+  "mainParents": [
+    "ab48fb0a47eec12cb63c30de253de50d2a72db1c",
+    "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+  ],
+  "treeEqualityVerified": true,
+  "localEqualTreeHead": "f7fd207fec9a131e65c5e13cbd8b36e4b44d469f",
+  "localTests": {
+    "core": 1058,
+    "search": 577,
+    "learning": 1058,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "prefixedReviewRegressionRun": {
+    "tests": 34,
+    "expectedFailures": 10,
+    "unchangedOldHead": "928d78e5ad3191fc5a2fd8890852786093ea40ea"
+  },
+  "legacyComparison": {
+    "jvms": 2,
+    "filesPerJvm": 15,
+    "byteEqualComparisons": 30,
+    "reportSha256": "32d5930f0d89b43eea08fa9127a4238f3e887f198974cc83d74fe9396fb47260",
+    "evidenceCommit": "22a4a8d7dab817f3608422eed13c615be33b98a6"
+  },
+  "independentReview": {
+    "corrections": "No outstanding Critical/Important findings in scoped code review.",
+    "finalIntegration": "No concrete new blocker found for explicitly experimental partial P04 tree; full P04 acceptance is not claimed."
+  },
+  "checks": [
+    {
+      "id": 109348335995,
+      "name": "Publish generated reports",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109348335995"
+    },
+    {
+      "id": 109348193719,
+      "name": "Checkout-local ciCheck",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109348193719"
+    },
+    {
+      "id": 109333200274,
+      "name": "CodeQL",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/runs/109333200274"
+    },
+    {
+      "id": 109332971104,
+      "name": "Retained JMH precision study v2 analysis",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332971104"
+    },
+    {
+      "id": 109332970099,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332970099"
+    },
+    {
+      "id": 109332970032,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332970032"
+    },
+    {
+      "id": 109332969956,
+      "name": "Retained JMH precision study analysis",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332969956"
+    },
+    {
+      "id": 109332968864,
+      "name": "Isolated SymPy runtime authority",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332968864"
+    },
+    {
+      "id": 109332968680,
+      "name": "Checkout-local Gradle authority",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332968680"
+    },
+    {
+      "id": 109332968664,
+      "name": "Typed source-only learning comparison",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332968664"
+    },
+    {
+      "id": 109332968643,
+      "name": "External polynomial comparison",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332968643"
+    },
+    {
+      "id": 109332968608,
+      "name": "Complete Maven product and Docker authority",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332968608"
+    },
+    {
+      "id": 109332968399,
+      "name": "Isolated JMH authority",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546165824/job/109332968399"
+    },
+    {
+      "id": 109332960630,
+      "name": "Analyze (javascript-typescript)",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546161740/job/109332960630"
+    },
+    {
+      "id": 109332960590,
+      "name": "Analyze (java-kotlin)",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546161740/job/109332960590"
+    },
+    {
+      "id": 109332960459,
+      "name": "Analyze (actions)",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546161740/job/109332960459"
+    },
+    {
+      "id": 109332960264,
+      "name": "Analyze (python)",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546161740/job/109332960264"
+    },
+    {
+      "id": 109332947236,
+      "name": "submit-maven",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546157691/job/109332947236"
+    },
+    {
+      "id": 109332945539,
+      "name": "submit-gradle",
+      "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/36546157260/job/109332945539"
+    }
+  ],
+  "reviewThreads": [
+    {
+      "id": "PRRT_kwDOSiJVMM6m-ujk",
+      "resolved": true
+    },
+    {
+      "id": "PRRT_kwDOSiJVMM6m-ukH",
+      "resolved": true
+    },
+    {
+      "id": "PRRT_kwDOSiJVMM6m-ukY",
+      "resolved": true
+    },
+    {
+      "id": "PRRT_kwDOSiJVMM6m-uk6",
+      "resolved": true
+    },
+    {
+      "id": "PRRT_kwDOSiJVMM6m-ulW",
+      "resolved": true
+    },
+    {
+      "id": "PRRT_kwDOSiJVMM6m-ulk",
+      "resolved": true
+    },
+    {
+      "id": "PRRT_kwDOSiJVMM6m-ulx",
+      "resolved": true
+    },
+    {
+      "id": "PRRT_kwDOSiJVMM6m-ul_",
+      "resolved": true
+    }
+  ],
+  "hostedArtifacts": {
+    "source": "GitHub API metadata; archive bytes not downloaded or independently rehashed",
+    "run": 36546165824,
+    "items": [
+      {
+        "id": 11024970274,
+        "name": "quality-acceptance-evidence",
+        "bytes": 29166684,
+        "digest": "sha256:cf6f4603719494bb6d040dbcf6cde0f095bfe1ab244e7d7fe8d1e62824a70a2a",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      },
+      {
+        "id": 11024665957,
+        "name": "repository-verification",
+        "bytes": 400161948,
+        "digest": "sha256:9e13f019117363ffd9332ca3079d366538740e5b0bb276df52c17fb248815b97",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      },
+      {
+        "id": 11024635665,
+        "name": "coverage-verification",
+        "bytes": 2304,
+        "digest": "sha256:780a26bf5e9836b10391d21c217cb3b04c51514152a3bb63dc2cb859109ee791",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      },
+      {
+        "id": 11023249119,
+        "name": "jmh-verification",
+        "bytes": 35620,
+        "digest": "sha256:e32ce1d56c6d6818ccd94872c08fe6442b3f83b7b8675d0db7b8abe1b19d2835",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      },
+      {
+        "id": 11023116739,
+        "name": "maven-product-verification",
+        "bytes": 3280404,
+        "digest": "sha256:fd22359d17d72505a9bfe0a75cf378a3e26b0c4304687723e83b16a77d57b5e8",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      },
+      {
+        "id": 11023100015,
+        "name": "sympy-runtime-verification",
+        "bytes": 376076,
+        "digest": "sha256:430bae7358a46565b61453bce8e68060ba3c4541f10b8a5c0a31bedf8e376f45",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      },
+      {
+        "id": 11022189460,
+        "name": "typed-external-polynomial-2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+        "bytes": 20490424,
+        "digest": "sha256:a1d86cc458bec78acc16c379fe349b267e3802767b75c5308f14ad4ea23dad7d",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      },
+      {
+        "id": 11021284907,
+        "name": "external-polynomial-comparison-2aa5ee849087a3ffb0972b5b410b1d58a710e2a7",
+        "bytes": 496924,
+        "digest": "sha256:bbe8c4b99c13bda3468c9b2878e4bc965be9af2f941b0d350b58ebbd60246857",
+        "head": "2aa5ee849087a3ffb0972b5b410b1d58a710e2a7"
+      }
+    ]
+  },
+  "postMergeWorkflows": {
+    "workflow_runs": []
+  },
+  "boundary": {
+    "p04Complete": false,
+    "nativeCoverage": "PARTIAL_ATOMIC_INVENTORY",
+    "nativePublicOutcome": "INCONCLUSIVE",
+    "nativeWithinBudget": false,
+    "productionNativeAllowed": false,
+    "learningAdvantageClaimed": false,
+    "remainingPackages": [
+      "P04 total accounting qualification",
+      "P05",
+      "P06",
+      "P07",
+      "P08",
+      "P09",
+      "P10",
+      "P11",
+      "P12"
+    ]
+  }
+}
