@@ -88,11 +88,14 @@ class MatcherAttemptOwnershipTest {
             var adopted = Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
             for (Object owner : graph) {
                 if (matcherType(owner,"Session") || matcherType(owner,"StateLists")) {
-                    adopted.addAll(references((RetainedGraph.View) owner));
+                    for (Object reference : references((RetainedGraph.View) owner)) {
+                        adopted.add(reference);
+                        if (reference instanceof List<?> list) adopted.addAll(list);
+                    }
                 }
             }
             return graph.stream().anyMatch(value -> value instanceof List<?> list && list.size() == 1
-                && stateHasTrace(list.getFirst(),trace) && !adopted.contains(list));
+                && stateHasTrace(list.getFirst(),trace) && !adopted.contains(list) && !adopted.contains(list.getFirst()));
         }
 
         private boolean excludedResult(Set<Object> graph) {
