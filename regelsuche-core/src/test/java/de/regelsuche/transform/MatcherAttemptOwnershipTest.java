@@ -18,6 +18,7 @@ class MatcherAttemptOwnershipTest {
         HandoffAbort failure;
         boolean abortHandoff, abortResult, abortResultClose, sawAttemptWithTrace, sawFailedAttempt, sawOutcome;
         boolean sawAttemptWithResultList, sawFailedResultList;
+        boolean abortSingle, abortExcluded, sawSingleHandoff, sawExcludedResult;
         String trace;
         final List<Long> failedDebits = new ArrayList<>();
 
@@ -27,7 +28,9 @@ class MatcherAttemptOwnershipTest {
                 var snapshot = snapshot();
                 if ((abortHandoff && snapshot.returnedMatch())
                         || (abortResult && snapshot.returnedMatch() && snapshot.resultList())
-                        || (abortResultClose && sawAttemptWithResultList && units == 4)) {
+                        || (abortResultClose && sawAttemptWithResultList && units == 4)
+                        || (abortSingle && snapshot.singletonHandoff())
+                        || (abortExcluded && snapshot.excludedResult())) {
                     failure = new HandoffAbort(); throw failure;
                 }
             }
@@ -43,6 +46,8 @@ class MatcherAttemptOwnershipTest {
             sawFailedAttempt |= failure != null && snapshot.returnedMatch();
             sawFailedResultList |= failure != null && snapshot.resultList();
             sawOutcome |= snapshot.outcome();
+            sawSingleHandoff |= snapshot.singletonHandoff();
+            sawExcludedResult |= snapshot.excludedResult();
         }
 
         private Snapshot snapshot() {
@@ -61,16 +66,7 @@ class MatcherAttemptOwnershipTest {
                 lowLevel |= value.getClass().getEnclosingClass() == EquivalenceAwarePatternMatcher.class
                     && value.getClass().getSimpleName().equals("MatchSearch");
                 if (value instanceof RetainedGraph.View view) {
-                    if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
-                            && value.getClass().getSimpleName().equals("State")) {
-                        var references = new ArrayList<Object>();
-                        view.retainedReferences(new RetainedGraph.Visitor() {
-                            @Override public void reference(Object item) { references.add(item); }
-                            @Override public void requireExact(Object item,Class<?> type) { assertEquals(type,item.getClass()); }
-                        });
-                        traced |= trace != null && references.stream()
-                            .anyMatch(item -> item instanceof List<?> list && list.contains(trace));
-                    }
+                    traced |= stateHasTrace(value,trace);
                     view.retainedReferences(visitor);
                 } else if (value instanceof Object[] array) {
                     for (Object item : array) visitor.reference(item);
@@ -84,11 +80,119 @@ class MatcherAttemptOwnershipTest {
                     map.forEach((key,item) -> { visitor.reference(key); visitor.reference(item); });
                 }
             }
-            return new Snapshot(matched && !lowLevel,traced,outcome,resultList);
+            return new Snapshot(matched && !lowLevel,traced,outcome,resultList,singletonHandoff(seen),excludedResult(seen));
+        }
+
+        private boolean singletonHandoff(Set<Object> graph) {
+            if (trace == null) return false;
+            var adopted = Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
+            for (Object owner : graph) {
+                if (matcherType(owner,"Session") || matcherType(owner,"StateLists")) {
+                    adopted.addAll(references((RetainedGraph.View) owner));
+                }
+            }
+            return graph.stream().anyMatch(value -> value instanceof List<?> list && list.size() == 1
+                && stateHasTrace(list.getFirst(),trace) && !adopted.contains(list));
+        }
+
+        private boolean excludedResult(Set<Object> graph) {
+            return graph.stream().filter(value -> matcherType(value,"StateLists"))
+                .flatMap(value -> references((RetainedGraph.View) value).stream())
+                .anyMatch(value -> value instanceof List<?> list && list.size() == 1
+                    && stateHasTrace(list.getFirst(),"any"));
         }
     }
 
-    private record Snapshot(boolean returnedMatch,boolean tracedState,boolean outcome,boolean resultList) { }
+    private record Snapshot(boolean returnedMatch,boolean tracedState,boolean outcome,boolean resultList,
+                            boolean singletonHandoff,boolean excludedResult) { }
+
+    private static boolean matcherType(Object value,String name) {
+        return value != null && value.getClass().getEnclosingClass() == ExprMatcherEngine.class
+            && value.getClass().getSimpleName().equals(name);
+    }
+    private static boolean stateHasTrace(Object value,String trace) {
+        return trace != null && matcherType(value,"State") && references((RetainedGraph.View) value).stream()
+            .anyMatch(item -> item instanceof List<?> list && list.contains(trace));
+    }
+    private static List<Object> references(RetainedGraph.View view) {
+        var values = new ArrayList<Object>();
+        view.retainedReferences(new RetainedGraph.Visitor() {
+            @Override public void reference(Object value) { values.add(value); }
+            @Override public void requireExact(Object value,Class<?> type) { assertEquals(type,value.getClass()); }
+        });
+        return values;
+    }
+
+    @Test void anyPublishesItsActualSingletonBeforeCallerAdoption() {
+        verifySingleton(ExprMatcher.any(),"x","any");
+    }
+    @Test void literalNumberPublishesItsActualSingletonBeforeCallerAdoption() {
+        verifySingleton(ExprMatcher.literalNumber(3),"3","literal-number");
+    }
+    @Test void literalVariablePublishesItsActualSingletonBeforeCallerAdoption() {
+        verifySingleton(ExprMatcher.literalVariable("x"),"x","literal-variable");
+    }
+    @Test void numberPropertyPublishesItsActualSingletonBeforeCallerAdoption() {
+        verifySingleton(ExprMatcher.integerLiteral(),"3","number-property:INTEGER_LITERAL");
+    }
+    @Test void successfulNegationPublishesItsActualSingletonBeforeCallerAdoption() {
+        verifySingleton(ExprMatcher.not(ExprMatcher.literalVariable("y")),"x","not");
+    }
+    @Test void sameAsPublishesItsActualSingletonBeforeCallerAdoption() {
+        var matcher = ExprMatcher.where(ExprMatcher.allOf(ExprMatcher.bind("A",ExprMatcher.any()),
+            ExprMatcher.bind("B",ExprMatcher.any())),ExprMatcher.sameAs("A","B"));
+        verifySingleton(matcher,"x","same-as");
+    }
+    private static void verifySingleton(ExprMatcher matcher,String source,String trace) {
+        Expr input = new ExpressionParser().parseTerm(source);
+        var expected = matcher.match(input); assertTrue(expected.matched()); assertTrue(expected.complete());
+        var observation = new Observation(); observation.trace = trace;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope; assertEquals(expected,matcher.match(input));
+        }
+        assertTrue(observation.sawSingleHandoff,"the actual trace-bearing singleton must be owned before its caller adopts it");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void failedSingletonPublicationObservesItsListAndSettlesTheUnreturnedStepOnce() {
+        var observation = new Observation(); observation.trace = "any"; observation.abortSingle = true;
+        verifyDirectAbort(ExprMatcher.any(),observation,1);
+        assertTrue(observation.sawSingleHandoff);
+    }
+    @Test void negationOwnsTheReturnedExcludedResultDuringItsDecision() {
+        var observation = new Observation();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = ExprMatcher.not(ExprMatcher.any()).match(new ExpressionParser().parseTerm("x"));
+            assertFalse(result.matched()); assertTrue(result.complete()); assertEquals(2,result.evaluatedSteps());
+        }
+        assertTrue(observation.sawExcludedResult);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void failedNegationDecisionKeepsItsExcludedResultAndSettlesBothStepsOnce() {
+        var observation = new Observation(); observation.abortExcluded = true;
+        verifyDirectAbort(ExprMatcher.not(ExprMatcher.any()),observation,2);
+        assertTrue(observation.sawExcludedResult);
+    }
+    private static void verifyDirectAbort(ExprMatcher matcher,Observation observation,long delegated) {
+        Expr input = new ExpressionParser().parseTerm("x");
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(HandoffAbort.class,() -> matcher.match(input));
+            assertSame(observation.failure,failure); assertFalse(observation.sawOutcome);
+            assertEquals(delegated,observation.failedDebits.getLast());
+            assertEquals(1,observation.failedDebits.stream().filter(value -> value == delegated).count());
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void negationPreservesInconclusiveChildrenAndNestedNegation() {
+        Expr input = new ExpressionParser().parseTerm("x");
+        var limited = ExprMatcher.not(ExprMatcher.any()).match(input,new ExprMatcher.MatchOptions(null,64,1,100));
+        assertFalse(limited.matched()); assertFalse(limited.complete());
+        assertEquals(List.of("MATCH_STEP_LIMIT"),limited.diagnostics().stream().map(ExprMatcher.MatchDiagnostic::code).toList());
+        var nested = ExprMatcher.not(ExprMatcher.not(ExprMatcher.any())).match(input);
+        assertTrue(nested.matched()); assertTrue(nested.complete()); assertEquals(3,nested.evaluatedSteps());
+        assertEquals(List.of("not"),nested.matches().getFirst().trace());
+    }
 
     private static ExprMatcher matcher(boolean reorder) {
         return reorder
