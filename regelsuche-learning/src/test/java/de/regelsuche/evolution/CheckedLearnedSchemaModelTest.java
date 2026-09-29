@@ -273,6 +273,132 @@ class CheckedLearnedSchemaModelTest {
         assertTrue(result.witness().getFirst().move().capabilityDelta().isEmpty());
     }
 
+    @Test void actualSelectedWitnessImportsInAnotherJvmWithoutTrainingOrSearchingAgain(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        var learned=CheckedLearnedSchemaModel.learn(formation);
+        var restored=CheckedLearnedSchemaModel.load(learned.toCanonicalJson(),formation.inventory().contentHash());
+        Expr source=nestedImportSource();
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var problem=new NativeMoveSearch.Problem(source,context,restored.nativeProviders(),MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(0,1,100000,10,10_000_000));
+        var selected=new NativeMoveSearch().searchUntil(problem,NativeTestObservation.Objective.DEPTH,0,
+            SearchContinuationContract.PATH_SENSITIVE);
+        assertEquals(MoveSearch.Outcome.QUALITY_REACHED,selected.search().observedOutcome());
+        assertEquals(1,selected.witness().size());
+        var exact=assertInstanceOf(NativeMoveProof.Exact.class,selected.witness().getFirst().move().proof());
+        assertEquals(nestedImportTarget(),exact.target());
+        var data=assertInstanceOf(CheckedLearnedSchemaModel.ApplicationData.class,exact.evidence().binding().observation());
+        assertFalse(data.path().isEmpty());assertEquals(List.of(1),data.path());
+        assertEquals(source,data.source());
+        var exported=selected.search().exportLegacy(10_000_000,SearchExpressionStore.Limits.DEFAULT);
+        assertTrue(exported.artifactAvailable(),exported.accounting().detail());
+        assertFalse(exported.complete(),"this witness test does not promote partial P04 accounting");
+        var binding=((de.regelsuche.transform.TransformationProvenance.ExactTheoryStep)
+            exported.projection().witness().getFirst().move().provenance()).evidence().binding();
+        assertEquals(exact.evidence().exportLegacy().binding(),binding);
+        var mapper=new ObjectMapper();
+        var artifact=mapper.createObjectNode().put("model",restored.toCanonicalJson()).put("source",CODEC.encodeExpression(source));
+        artifact.set("binding",mapper.valueToTree(binding));
+        byte[] bytes=mapper.writeValueAsBytes(artifact);
+        var input=directory.resolve("selected-witness.json");java.nio.file.Files.write(input,bytes);
+        var output=directory.resolve("import-report.json");var errors=directory.resolve("import-errors.txt");
+        var process=new ProcessBuilder(java.nio.file.Path.of(System.getProperty("java.home"),"bin","java").toString(),
+            "-cp",importClasspath(),ImportWorker.class.getName(),input.toString())
+            .redirectOutput(output.toFile()).redirectError(errors.toFile()).start();
+        try {
+            assertTrue(process.waitFor(45,java.util.concurrent.TimeUnit.SECONDS),"fresh proof import timed out");
+            assertEquals(0,process.exitValue(),()->{
+                try{return java.nio.file.Files.readString(errors);}catch(java.io.IOException failure){return failure.toString();}
+            });
+            var report=mapper.readTree(java.nio.file.Files.readAllBytes(output));
+            assertEquals(process.pid(),report.get("pid").longValue());
+            assertNotEquals(ProcessHandle.current().pid(),report.get("pid").longValue());
+            assertEquals(byteHash(bytes),report.get("artifactHash").textValue());
+            assertEquals(importWorkerHash(),report.get("workerHash").textValue());
+            assertEquals(CODEC.encodeExpression(source),report.get("source").textValue());
+            assertEquals(CODEC.encodeExpression(nestedImportTarget()),report.get("target").textValue());
+            assertTrue(report.get("accepted").booleanValue());assertTrue(report.get("registeredAccepted").booleanValue());
+            for(String phase:List.of("loadWork","replayWork","registeredWork","directIncludingDelegatedWork","retentionWork"))
+                assertTrue(report.get(phase).longValue()>0,phase);
+            ((ObjectNode)report).put("producerPid",ProcessHandle.current().pid()).put("artifactBytes",bytes.length)
+                .put("formationWork",restored.formationWork()).put("searchObservedWork",selected.totalWork())
+                .put("exportObservedWork",exported.accounting().work()).put("accountingComplete",false);
+            System.out.println("P04_IMPORTED_WITNESS "+mapper.writeValueAsString(report));
+        } finally {
+            if (process.isAlive()) process.destroyForcibly();
+            assertTrue(process.waitFor(5,java.util.concurrent.TimeUnit.SECONDS),"fresh import process did not terminate");
+        }
+    }
+
+    /** Data consumer only: no learner, search call, candidate enumeration or original capability. */
+    public static final class ImportWorker {
+        public static void main(String[] args) throws Exception {
+            var path=java.nio.file.Path.of(args[0]);
+            if(java.nio.file.Files.size(path)>CheckedSchemaSupport.MAXIMUM_JSON_CHARACTERS)
+                throw new IllegalArgumentException("import envelope limit");
+            byte[] bytes=java.nio.file.Files.readAllBytes(path);
+            var envelope=CheckedSchemaSupport.read(new String(bytes,java.nio.charset.StandardCharsets.UTF_8));
+            CheckedSchemaSupport.fields(envelope,"model","source","binding");
+            // Receiver-owned development fixture, never an expectation copied from the artifact.
+            String expectedInventory=TraceStrategyTransferExample.inventory().contentHash();
+            var model=CheckedLearnedSchemaModel.load(CheckedSchemaSupport.text(envelope,"model"),expectedInventory);
+            var binding=CheckedSchemaSupport.JSON.treeToValue(envelope.get("binding"),ExactTheoryEvidence.Binding.class);
+            Expr source=CODEC.decodeExpression(CheckedSchemaSupport.text(envelope,"source"));
+            assertEquals(nestedImportSource(),source);
+            var state=state(source);
+            var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+            var providers=model.nativeProviders();var verifier=NativeVerifier.registered(providers);
+            var meter=new ImportMeter(ImportMeter.Abort.NONE);NativeVerification replay,registered;
+            var results=new Object[3];
+            try(var scope=RetainedOperation.open(meter)) {
+                meter.scope=scope;
+                try(var held=RetainedOperation.retain(model,state,context,binding,providers,verifier,results)) {
+                    replay=model.replayApplication(state,binding,context);results[0]=replay;
+                    meter.executionWork(replay.work()); // exactly one delegation of the returned receipt
+                    assertTrue(replay.accepted());
+                    var move=new NativeSearchMove(replay.checkedProof(),providers.getFirst().descriptor(),0,Set.of());results[1]=move;
+                    registered=verifier.verify(state,move,context);results[2]=registered;
+                    meter.executionWork(registered.work());
+                    assertTrue(registered.accepted());RetainedOperation.checkpoint();
+                }
+            }
+            assertFalse(de.regelsuche.retention.RetainedJson.active());
+            assertEquals(nestedImportTarget(),replay.checkedProof().target());
+            var report=new ObjectMapper().createObjectNode().put("pid",ProcessHandle.current().pid())
+                .put("artifactHash",byteHash(bytes)).put("workerHash",importWorkerHash())
+                .put("source",CODEC.encodeExpression(source)).put("target",CODEC.encodeExpression(replay.checkedProof().target()))
+                .put("accepted",replay.accepted()).put("registeredAccepted",registered.accepted())
+                .put("loadWork",model.loadWork()).put("replayWork",replay.work()).put("registeredWork",registered.work())
+                .put("directIncludingDelegatedWork",meter.directWork).put("retentionWork",meter.retentionWork);
+            System.out.println(report);
+        }
+    }
+    private static Expr importBase() {
+        return new BinaryExpr(VariableExpr.scoped(new SymbolId(new UUID(0,91),2)),ADD,NumberExpr.exact("1/3"));
+    }
+    private static Expr nestedImportSource() {
+        Expr a=importBase(),b=VariableExpr.scoped(new SymbolId(new UUID(0,91),3));
+        Expr cancellation=new BinaryExpr(new BinaryExpr(new BinaryExpr(a,ADD,b),MUL,new BinaryExpr(a,SUB,b)),ADD,new BinaryExpr(b,MUL,b));
+        return new BinaryExpr(new NumberExpr(7),MUL,cancellation);
+    }
+    private static Expr nestedImportTarget() {
+        return new BinaryExpr(new NumberExpr(7),MUL,new BinaryExpr(importBase(),POW,new NumberExpr(2)));
+    }
+    private static String importClasspath() throws Exception {
+        var entries=new java.util.LinkedHashSet<String>();entries.add(System.getProperty("java.class.path"));
+        for(ClassLoader loader=ImportWorker.class.getClassLoader();loader!=null;loader=loader.getParent())
+            if(loader instanceof java.net.URLClassLoader urls)for(var url:urls.getURLs())entries.add(java.nio.file.Path.of(url.toURI()).toString());
+        return String.join(java.io.File.pathSeparator,entries);
+    }
+    private static String importWorkerHash() throws Exception {
+        try(var input=ImportWorker.class.getResourceAsStream("CheckedLearnedSchemaModelTest$ImportWorker.class")) {
+            return byteHash(java.util.Objects.requireNonNull(input).readAllBytes());
+        }
+    }
+    private static String byteHash(byte[] bytes) throws Exception {
+        return "sha256:"+java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+    }
+
     @Test void exportedApplicationIsDataUntilFreshModelReplaysTheEntireBinding() {
         var learned=CheckedLearnedSchemaModel.learn(formation);
         Expr source=parse("(x+y)*(x-y)+y*y");
