@@ -169,4 +169,26 @@ class AstExpressionValidationTest {
         }
     }
 
+    @Test void completeHistoryAndGeneratedIntermediateTextAreOwnedWithoutJsonTransport() {
+        var source = new VariableExpr("x"); var target = NumberExpr.exact("1/3");
+        var step = new de.regelsuche.transform.AstRewriteTransport.Step(source, target, "rule",
+            de.regelsuche.transform.RewriteKind.SIMPLIFY, false, 0, true, List.of("x > 0"), "pack", "license");
+        var history = new CompiledAstRewriteProgram.Candidate("program", List.of("stage"), List.of(step));
+        var sink = new Observation(); boolean[] generated = {false};
+        long bytes = new CompiledAstReplayCodec().encode(history).length;
+        try (var transport = AstTransportObservation.open(); var scope = RetainedOperation.open(sink)) {
+            sink.scope = scope;
+            sink.validate = units -> {
+                assertTrue(owns(sink.references(), history), "the whole original history must remain owned");
+                generated[0] |= hasText(sink.references(), "1/3");
+            };
+            var result = AstExpressionValidation.inspectHistory(history);
+            assertTrue(generated[0]);
+            assertEquals(bytes, result.canonicalBytes());
+            assertEquals(result.work(), sink.validation);
+            assertEquals(0, transport.total());
+            assertFalse(owns(sink.references(), history));
+        }
+    }
+
 }
