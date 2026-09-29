@@ -47,7 +47,7 @@ class CheckedSchemaProviderAccountingTest {
     private static Observation observe(String id, CheckedLearnedSchemaModel checked, String text, int maximum, Set<String> included) {
         Expr source = parse(text);
         var legacy = checked.providers(maximum, Map.of(), included).getFirst()
-            .candidates(MoveState.root(CODEC.encodeExpression(source)), MoveContext.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION));
+            .candidates(MoveState.root(CODEC.encodeExpression(source)), MoveContext.frozen("unused"));
         var nativeBatch = checked.nativeProviders(maximum, Map.of(), included).getFirst().candidates(state(source), CONTEXT);
         assertEquals(legacy.work(), nativeBatch.work(), id);
         assertEquals(legacy.complete(), nativeBatch.complete(), id);
