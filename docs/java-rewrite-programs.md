@@ -63,22 +63,18 @@ defined for every composition node.
 
 ```java
 import static de.regelsuche.search.program.RewritePrograms.*;
+import de.regelsuche.search.program.RewriteProgram;
 
 RewriteProgram safeAlgebra = prune(
-    "bounded-safe-algebra",
     prioritize(
-        "cheap-first",
         require(
-            "equivalence-only",
             firstApplicable(
-                "macro-before-primitives",
-                source("learned-macros", macroEngine),
+                source(macroEngine),
                 sequence(
-                    "normalize-then-factor",
-                    source("normalization", normalizationEngine),
-                    source("factorization", factorizationEngine)
+                    source(normalizationEngine),
+                    source(factorizationEngine)
                 ),
-                source("ordinary-rules", ordinaryRuleEngine)
+                source(ordinaryRuleEngine)
             ),
             "equivalence preserving by construction",
             equivalencePreserving()
@@ -88,7 +84,7 @@ RewriteProgram safeAlgebra = prune(
     ),
     40,
     "search profile candidate budget"
-);
+).named("bounded-safe-algebra");
 
 RewriteTraceCollector trace = new RewriteTraceCollector();
 TransformationEngine engine = new ProgrammedTransformationEngine(
@@ -103,6 +99,26 @@ List<SearchState> states = new BestFirstSearchStrategy().search(problem);
 
 The program remains ordinary Java: refactoring, type checking, navigation,
 breakpoints and tests work without a custom parser or editor plugin.
+
+Methods and engine objects select behavior. The remaining strings are a root
+identity and human-readable descriptions, not names looked up to select a
+procedure. The overloads without IDs build an immutable `RewritePrograms.Draft`;
+`named(...)` materializes the existing IR with deterministic child-position IDs.
+Reusing one draft at two positions does not create duplicate IDs. Existing
+explicit-ID overloads remain available for persisted plans and source locations.
+See [Type-safe Java integration](type-safe-java-integration.md) for migration.
+
+Rule ordering also accepts actual objects:
+
+```java
+var ordering = preferRules(normalizationRule, factorizationRule);
+```
+
+Those arguments are `RewriteRule` objects, including plugin and learned rules.
+Duplicate or missing identities are rejected; unlisted candidates are retained.
+Text imports can resolve IDs with `RuleRegistry.requireRule(...)` before choosing
+an order. The legacy `preferRuleOrder(List<String>)` is only an unchecked wire-ID
+boundary, not the preferred Java entry point.
 
 ## Exact-theory example
 
@@ -119,6 +135,10 @@ BudgetedTransformationSourceProgramExecution execution =
         availableMathematicalWorkUnits
     );
 ```
+
+Here the string is an explicit trace identity; the source object selects the
+operation. The explicit-ID overload also retains the precise `BudgetedSource`
+return type required by this entry point.
 
 The result preserves `CANDIDATES`, `NO_MATCH` and `BUDGET_INCONCLUSIVE` as
 separate states. Each successful candidate reports zero primitive rewrites and

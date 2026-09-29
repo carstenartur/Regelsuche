@@ -40,8 +40,10 @@ class ReadmeShowcaseDocumentationTest {
         assertAppearsBeforeQuickstart(readme, quickstart, "firstApplicable(");
         assertAppearsBeforeQuickstart(readme, quickstart, "docs/java-discovery-sdk.md");
         assertAppearsBeforeQuickstart(
-            readme, quickstart, "GeometricSequenceDomainProvider.domain()"
+            readme, quickstart, "GeometricSequenceDomainProvider.typedDomain()"
         );
+        assertAppearsBeforeQuickstart(readme, quickstart, "var input = new Input(");
+        assertAppearsBeforeQuickstart(readme, quickstart, ".seed(\"powers-of-two\", input,");
         assertAppearsBeforeQuickstart(
             readme, quickstart, "assertThat(run).isConfirmed().hasContentAddressedEvidence()"
         );

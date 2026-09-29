@@ -11,6 +11,24 @@ import java.util.Objects;
 public final class RuleRegistry {
     private final Map<String, MutableRuleRegistration> rules = new LinkedHashMap<>();
 
+    /** Registers and returns the exact typed object for subsequent Java selection. */
+    public <R extends RewriteRule> R registerAndGet(R rule) {
+        register(rule);
+        return rule;
+    }
+
+    /**
+     * Resolves a wire identity at an import boundary. Unknown identities are errors,
+     * not silent no-ops. Registration is not a statement of mathematical trust.
+     */
+    public RewriteRule requireRule(String id) {
+        MutableRuleRegistration registration = rules.get(Objects.requireNonNull(id, "id"));
+        if (registration == null) {
+            throw new IllegalArgumentException("Unknown rule id: " + id);
+        }
+        return registration.rule;
+    }
+
     public void register(RewriteRule rule) {
         register(rule, "plugin", "", List.of(), List.of());
     }

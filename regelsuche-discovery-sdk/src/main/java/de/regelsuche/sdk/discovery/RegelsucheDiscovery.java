@@ -17,11 +17,18 @@ public final class RegelsucheDiscovery {
     private RegelsucheDiscovery() {
     }
 
-    /** Starts a fluent request for the supplied domain. */
+    /** Starts a fluent request for the supplied domain at the serialized seed boundary. */
     public static <S, C, K> Request<S, C, K> forDomain(
             DiscoveryDomain<S, C, K> domain
     ) {
         return new Request<>(domain);
+    }
+
+    /** Starts a Java request whose input type is fixed by the selected domain. */
+    public static <I, S, C, K> TypedRequest<I, S, C, K> forDomain(
+            TypedDiscoveryDomain<I, S, C, K> domain
+    ) {
+        return new TypedRequest<>(Objects.requireNonNull(domain, "domain"));
     }
 
     /**
@@ -44,7 +51,43 @@ public final class RegelsucheDiscovery {
         return DiscoveryDomainCatalog.load();
     }
 
-    /** Mutable request builder for one execution; not thread-safe. */
+    /**
+     * Typed Java input builder. Deliberately has no Object or serialized-seed overload:
+     * input types cannot be widened by a generic seed method. Not thread-safe.
+     */
+    public static final class TypedRequest<I, S, C, K> {
+        private final Request<S, C, K> request;
+        private final DiscoveryInputCodec<I> inputCodec;
+
+        private TypedRequest(TypedDiscoveryDomain<I, S, C, K> domain) {
+            request = new Request<>(domain.domain());
+            inputCodec = domain.inputCodec();
+        }
+
+        public TypedRequest<I, S, C, K> campaign(String value) {
+            request.campaign(value);
+            return this;
+        }
+
+        /** Snapshots the input into the existing content-addressed seed format. */
+        public TypedRequest<I, S, C, K> seed(String seedId, I input, String sourceReference) {
+            String payload = Objects.requireNonNull(
+                inputCodec.encode(Objects.requireNonNull(input, "input")), "encoded payload");
+            request.seed(seedId, payload, sourceReference);
+            return this;
+        }
+
+        public TypedRequest<I, S, C, K> budget(DiscoveryBudget value) {
+            request.budget(value);
+            return this;
+        }
+
+        public DiscoveryRun<C, K> run() {
+            return request.run();
+        }
+    }
+
+    /** Mutable request builder for serialized seeds; not thread-safe. */
     public static final class Request<S, C, K> {
         private final DiscoveryDomain<S, C, K> domain;
         private String campaignId;
@@ -67,7 +110,10 @@ public final class RegelsucheDiscovery {
             return this;
         }
 
-        /** Creates a content-addressed seed for this domain. */
+        /**
+         * Creates a content-addressed seed at the text import boundary.
+         * Prefer the TypedDiscoveryDomain overload of forDomain for ordinary Java calls.
+         */
         public Request<S, C, K> seed(
                 String seedId,
                 String payload,
