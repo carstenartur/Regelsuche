@@ -192,6 +192,18 @@ class CheckedLearnedSchemaModelTest {
     }
 
     @Test void failedInstantiationStillPaysForTheVisitedTargetValidationWork() throws Exception {
+        var model = checkedExpansionModel();
+        Expr unmatched = new BinaryExpr(parse("x+1"), ADD, balancedTree(507));
+        Expr rejected = new BinaryExpr(parse("x+0"), ADD, balancedTree(507));
+        var provider = model.providers().getFirst();
+        var baseline = provider.candidates(MoveState.root(CODEC.encodeExpression(unmatched)), MoveContext.frozen("unused"));
+        var attempted = provider.candidates(MoveState.root(CODEC.encodeExpression(rejected)), MoveContext.frozen("unused"));
+        assertTrue(attempted.moves().isEmpty());
+        assertTrue(attempted.work().totalWorkUnitsV2() >= baseline.work().totalWorkUnitsV2() + 512,
+            "the target exceeds 512 nodes, so its already visited nodes must remain in rejected-work accounting");
+    }
+
+    private static CheckedLearnedSchemaModel checkedExpansionModel() throws Exception {
         // A coherent, independently true expansion exercises the rejection path; it is never a stored learned template.
         var original = CheckedLearnedSchemaModel.learn(formation);
         var tree = (ObjectNode) new ObjectMapper().readTree(original.toCanonicalJson());
@@ -205,15 +217,7 @@ class CheckedLearnedSchemaModelTest {
         schema.set("source", CheckedSchemaSupport.pattern(sourcePattern));
         schema.set("target", CheckedSchemaSupport.pattern(targetPattern));
         tree.putArray("schemas").add(schema);
-        var model = CheckedLearnedSchemaModel.load(tree.toString(), original.inventoryHash());
-        Expr unmatched = new BinaryExpr(parse("x+1"), ADD, balancedTree(507));
-        Expr rejected = new BinaryExpr(parse("x+0"), ADD, balancedTree(507));
-        var provider = model.providers().getFirst();
-        var baseline = provider.candidates(MoveState.root(CODEC.encodeExpression(unmatched)), MoveContext.frozen("unused"));
-        var attempted = provider.candidates(MoveState.root(CODEC.encodeExpression(rejected)), MoveContext.frozen("unused"));
-        assertTrue(attempted.moves().isEmpty());
-        assertTrue(attempted.work().totalWorkUnitsV2() >= baseline.work().totalWorkUnitsV2() + 512,
-            "the target exceeds 512 nodes, so its already visited nodes must remain in rejected-work accounting");
+        return CheckedLearnedSchemaModel.load(tree.toString(), original.inventoryHash());
     }
 
     @Test void enormousPersistedBoundsAreRejectedAsInvalidArtifacts() throws Exception {
@@ -573,7 +577,7 @@ class CheckedLearnedSchemaModelTest {
                     if (amount==1 && path.equals(List.of(0))) pathInsertions++;
                 }
                 if (amount==2 && duplicateValue!=null && value instanceof java.util.TreeMap<?,?> map
-                        && map.containsValue(duplicateValue)) duplicateInsertions++;
+                        && map.containsValue(duplicateValue) && !owners.contains("CHECKED_SCHEMA_DUPLICATE_BINDING")) duplicateInsertions++;
             }
             if (sawResult) afterResult.add(amount);
             boolean result=owners.stream().anyMatch(value->value instanceof NativeVerification);
@@ -707,12 +711,37 @@ class CheckedLearnedSchemaModelTest {
         assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
     }
 
+    @Test void importedTargetDomainRejectionCannotHideOccurrenceCloseFailure() throws Exception {
+        var model=checkedExpansionModel();Expr replacement=balancedTree(509);
+        Expr source=new BinaryExpr(replacement,ADD,new NumberExpr(0));
+        var binding=applicationBinding(model,parse("x+0"));
+        var data=(ObjectNode)new ObjectMapper().readTree(binding.canonicalEvidenceJson());
+        String encodedSource=CODEC.encodeExpression(source);data.put("source",encodedSource);
+        ((ObjectNode)data.get("bindings").get(0)).put("expression",CODEC.encodeExpression(replacement));
+        String json=data.toString();
+        var invalid=new ExactTheoryEvidence.Binding(encodedSource,binding.transformedExpression(),binding.theoryStepId(),
+            SchematicProofPlan.hash(json),binding.receiptArtifactId(),binding.runArtifactId(),binding.canonicalWorkUnits(),json);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var semantic=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),invalid,context));
+        assertEquals("checked scalar polynomial structure limit",semantic.getMessage(),"source has 511 nodes; only the 513-node generated target is out of domain");
+        var meter=new VerifierMeter(VerifierMeter.Abort.TARGET_REJECT_CLOSE,source,null);
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var thrown=assertThrows(Throwable.class,()->model.replayApplication(state(source),invalid,context));
+            assertSame(meter.failure,thrown);assertTrue(meter.sawTargetDomain);assertTrue(meter.sawOutcome);
+            assertEquals(meter.work.units,meter.afterFailure.getLast());
+            assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count());
+        }
+        assertFalse(de.regelsuche.retention.RetainedJson.active());
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
     /** Observes actual frame values; a nested application ledger cannot stand in for the verifier ledger. */
     private static final class VerifierMeter implements RetainedOperation.Sink {
-        enum Abort { NONE,SOURCE_RUNTIME,SOURCE_ARGUMENT,SOURCE_ERROR,RESULT,CLOSE,REJECT_OBSERVATION,REJECT_CLOSE,SUBSTITUTION,OCCURRENCE_REJECT_CLOSE }
+        enum Abort { NONE,SOURCE_RUNTIME,SOURCE_ARGUMENT,SOURCE_ERROR,RESULT,CLOSE,REJECT_OBSERVATION,REJECT_CLOSE,SUBSTITUTION,OCCURRENCE_REJECT_CLOSE,TARGET_REJECT_CLOSE }
         final Abort abort;final Expr received;final NativeSearchMove proposal;final Throwable failure;
         RetainedOperation scope;CheckedSchemaSupport.Work work;RuntimeException closeFailure;
-        boolean tripped,repeatClose,sawRoot,sawResult,resultCheckpoint,sawRejectedDomain,sawOutcome;
+        boolean tripped,repeatClose,sawRoot,sawResult,resultCheckpoint,sawRejectedDomain,sawTargetDomain,sawOutcome;
         final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
         VerifierMeter(Abort abort,Expr received,NativeSearchMove proposal) {
             this.abort=abort;this.received=received;this.proposal=proposal;
@@ -739,7 +768,8 @@ class CheckedLearnedSchemaModelTest {
                     || (abort==Abort.CLOSE && resultCheckpoint && amount==4)
                     || (abort==Abort.REJECT_CLOSE && sawRejectedDomain && amount==4)
                     || (abort==Abort.SUBSTITUTION && snapshot.substitution())
-                    || (abort==Abort.OCCURRENCE_REJECT_CLOSE && sawRejectedDomain && sawOutcome && !snapshot.outcome() && amount==4)) {
+                    || (abort==Abort.OCCURRENCE_REJECT_CLOSE && sawRejectedDomain && sawOutcome && !snapshot.outcome() && amount==4)
+                    || (abort==Abort.TARGET_REJECT_CLOSE && sawTargetDomain && sawOutcome && !snapshot.outcome() && amount==4)) {
                 tripped=true;fail();
             }
         }
@@ -777,11 +807,13 @@ class CheckedLearnedSchemaModelTest {
                     @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
                 });
                 for(Object ref:direct)if(ref instanceof Object[] values) {
-                    CheckedSchemaSupport.Work ledger=null;boolean boundary=false,source=false;Expr current=null;int waiting=-1;
+                    CheckedSchemaSupport.Work ledger=null;boolean boundary=false,source=false,target=false;Expr current=null;int waiting=-1;
                     for(Object value:values) {
                         if(value instanceof CheckedSchemaSupport.Work candidate)ledger=candidate;
                         boundary|=proposal==null?value instanceof ExactTheoryEvidence.Binding:value==proposal;
                         source|=value==received;
+                        target|=value instanceof BinaryExpr binary && binary.operator()==ADD
+                            && binary.left().equals(received) && binary.right().equals(new NumberExpr(0));
                         if(value instanceof ArrayDeque<?> deque)waiting=deque.size();
                         if(value instanceof Object[] slot && slot.length==1 && slot[0] instanceof RetainedGraph.View node
                                 && slot[0].getClass().getEnclosingClass()==CheckedSchemaSupport.class
@@ -799,6 +831,7 @@ class CheckedLearnedSchemaModelTest {
                     if(work==null && source && waiting>=0)work=ledger;
                     sourceGrowth|=source && current==received && waiting>0;
                     substitution|=!source && current!=null && outcome;
+                    sawTargetDomain|=target && current!=null && waiting>=0;
                     sawRejectedDomain|=current instanceof BinaryExpr binary && binary.operator()==DIV
                         && binary.right().equals(new NumberExpr(0));
                 }
