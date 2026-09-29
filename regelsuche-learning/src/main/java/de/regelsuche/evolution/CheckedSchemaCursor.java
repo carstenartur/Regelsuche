@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 import de.regelsuche.search.moves.IncrementalProviderContract.Meter;
 import de.regelsuche.search.moves.IncrementalProviderContract.Operation;
@@ -26,7 +27,7 @@ import java.util.Optional;
 
 /** One retained match/application at most; never traverses or instantiates later sites eagerly. */
 final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
-        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(plan);v.reference(encodedSource);v.reference(meter);v.reference(pending);v.reference(source);v.reference(occurrence);v.reference(relevant);v.reference(matchedEntry);v.reference(bindings);v.reference(application);v.reference(applicationWork);v.reference(payment);v.reference(ready);v.reference(result);v.reference(mathematics);v.reference(status);}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(plan);v.reference(encodedSource);v.reference(meter);v.reference(pending);v.reference(source);v.reference(occurrence);v.reference(relevant);v.reference(matchedEntry);v.reference(bindings);v.reference(application);v.reference(applicationWork);v.reference(initializationWork);v.reference(payment);v.reference(ready);v.reference(result);v.reference(mathematics);v.reference(status);}
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private record Occurrence(Expr expression, List<Integer> path)  implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(expression);v.reference(path);}
@@ -43,6 +44,7 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
     private Map<String, Expr> bindings;
     private CheckedSchemaMatcherPlan.ApplicationSteps application;
     private Work applicationWork;
+    private Work initializationWork;
     private PrepaidApplication payment;
     private T ready;
     private final Function<CheckedSchemaMatcherPlan.ApplicationSteps,T> result;
@@ -80,7 +82,26 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
     @Override public Optional<T> next(long allowance) {
         if (allowance < 0) throw new IllegalArgumentException("negative schema allowance");
         if (terminal()) return Optional.empty();
-        long before = total();
+        if (allowance == 0) { status=Status.LIMIT;return Optional.empty(); }
+        try {
+            long before=total();
+            var returned=new Object[1];
+            var held=RetainedOperation.retainCompleted(2,this,returned);
+            Throwable primary=null;
+            try {
+                returned[0]=pull(allowance,before);RetainedOperation.work(1);RetainedOperation.checkpoint();
+            } catch(RuntimeException | Error failure) {
+                primary=failure;observeFailure(failure);throw failure;
+            } finally {closeFrame(held,primary);}
+            @SuppressWarnings("unchecked") var result=(Optional<T>)returned[0];
+            return result;
+        } catch(RuntimeException | Error failure) {
+            // Covers total(), construction, reconciliation, result publication and final owner release.
+            complete=false;status=Status.FAILED;
+            throw failure;
+        }
+    }
+    private Optional<T> pull(long allowance,long before) {
         while (total() - before < allowance) {
             status = Status.READY;
             if (ready != null) return emit();
@@ -96,24 +117,49 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         status = Status.LIMIT;
         return Optional.empty();
     }
-    private boolean terminal() { return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.CLOSED; }
+    private boolean terminal() { return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.FAILED || status == Status.CLOSED; }
     private long total() { return Math.addExact(meter.work().metrics().totalWorkUnitsV2(),
         encodedSource==null?de.regelsuche.retention.RetainedOperation.observedWork():0); }
     private void initialize() {
-        initialized = true;
-        var work = new Work();
-        work.add(1);
+        initialized=true;initializationWork=new Work();initializationWork.add(1);
+        Throwable primary=null;
         try {
-            if(encodedSource!=null) {
+            var held=RetainedOperation.retainCompleted(1,this);
+            Throwable bodyFailure=null;
+            try {
+                try {
+                    if(loadSource()) {
+                        domain(source,plan.bounds(),initializationWork);
+                        pending.push(new Occurrence(source,List.of()));
+                    } else {complete=false;status=Status.INCONCLUSIVE;}
+                } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {
+                    complete=false;status=Status.INCONCLUSIVE;
+                }
+            } catch(RuntimeException | Error failure) {
+                bodyFailure=failure;observeFailure(failure);throw failure;
+            } finally {closeFrame(held,bodyFailure);}
+        } catch(RuntimeException | Error failure) {
+            primary=failure;throw failure;
+        } finally {
+            // Existing LOAD receipt remains the sole owner even after failed acquisition/close.
+            try {meter.charge(Operation.LOAD,initializationWork.units);initializationWork=null;}
+            catch(RuntimeException | Error paymentFailure) {
+                if(primary==null)throw paymentFailure;
+                if(paymentFailure!=primary)primary.addSuppressed(paymentFailure);
+            }
+        }
+    }
+    private boolean loadSource() {
+        if(encodedSource!=null) {
+            // Historical codec boundary; native calls do not enter or generalize this catch.
+            try {
                 if(encodedSource.length()>262144)throw new IllegalArgumentException("schema source transport size limit");
-                source=CODEC.decodeExpression(encodedSource);
-            } else if(AstExpressionValidation.inspect(source).canonicalCharacters()>262144)
-                throw new IllegalArgumentException("schema source transport size limit");
-            domain(source, plan.bounds(), work);
-            pending.push(new Occurrence(source, List.of()));
-        } catch (IllegalArgumentException unsupported) {
-            complete = false; status = Status.INCONCLUSIVE;
-        } finally { meter.charge(Operation.LOAD, work.units); }
+                source=CODEC.decodeExpression(encodedSource);return true;
+            } catch(IllegalArgumentException unsupported){return false;}
+        }
+        if(AstExpressionValidation.inspect(source).canonicalCharacters()>262144)
+            throw new AstExpressionValidation.InvalidExpression("schema source transport size limit");
+        return true;
     }
     private void advance() {
         meter.charge(Operation.MATCH, 1);
@@ -153,12 +199,20 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         long before = applicationWork.units;
         var phase = application.phase();
         boolean failed = false;
+        Throwable primary=null;
         try {
-            application.advance();
-        } catch (IllegalArgumentException unsupported) {
-            meter.charge(Operation.MATCH, 1); complete = false; failed = true;
+            try { application.advance(); }
+            catch(DomainRejected unsupported) { complete=false;failed=true; }
+            if(failed)meter.charge(Operation.MATCH,1);
+        } catch(RuntimeException | Error failure) {
+            primary=failure;throw failure;
         } finally {
-            meter.prepay(payment, phase, applicationWork.units - before);
+            // A real phase is charged once, including its failed visited prefix. Construction is not a phase.
+            try {meter.prepay(payment,phase,applicationWork.units-before);}
+            catch(RuntimeException | Error paymentFailure) {
+                if(primary==null)throw paymentFailure;
+                if(paymentFailure!=primary)primary.addSuppressed(paymentFailure);
+            }
         }
         if (failed) meter.abandon(payment);
         else if (application.done()) {
@@ -196,9 +250,24 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
     }
     @Override public Status status() { return status; }
     @Override public void close() {
-        de.regelsuche.retention.RetainedOperation.work(pending.size()+10L);
-        pending.clear(); occurrence = null; relevant = null;
-        clearApplication(); ready = null; source = null;
-        status = Status.CLOSED;
+        if(status==Status.CLOSED)return;
+        try {RetainedOperation.work(pending.size()+10L);}
+        catch(RuntimeException | Error failure) {observeFailure(failure);throw failure;}
+        finally {
+            pending.clear();occurrence=null;relevant=null;
+            clearApplication();ready=null;source=null;initializationWork=null;
+            status=Status.CLOSED;
+        }
+    }
+    private static void observeFailure(Throwable primary) {
+        try {RetainedOperation.checkpoint();}
+        catch(RuntimeException | Error observation){if(observation!=primary)primary.addSuppressed(observation);}
+    }
+    private static void closeFrame(RetainedOperation.Frame frame,Throwable primary) {
+        try {if(frame!=null)frame.close();}
+        catch(RuntimeException | Error cleanup) {
+            if(primary==null)throw cleanup;
+            if(cleanup!=primary)primary.addSuppressed(cleanup);
+        }
     }
 }
