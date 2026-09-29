@@ -1028,6 +1028,73 @@ class CheckedLearnedSchemaModelTest {
         @Test void cursorTotalObservationFailureIsTerminal() { assertCursorAbort(CursorFault.TOTAL,false); }
         @Test void cursorCompletedCandidateObservationFailureIsTerminal() { assertCursorAbort(CursorFault.RESULT,false); }
         @Test void cursorCloseDebitFailureStillReleasesMutableOwnership() { assertCursorAbort(CursorFault.CLOSE,false); }
+        @Test void cursorPaysInitializationAfterOwnerAcquisitionFailure() { assertCursorAbort(CursorFault.LOAD_ACQUIRE,false); }
+        @Test void cursorPaysInitializationAfterOwnerCloseFailure() { assertCursorAbort(CursorFault.LOAD_CLOSE,false); }
+        @Test void cursorPullCloseFailureCannotReturnOrRestartACandidate() { assertCursorAbort(CursorFault.PULL_CLOSE,false); }
+        @Test void cursorSubstitutionErrorStillPrepaysTheVisitedPrefix() { assertCursorAbort(CursorFault.SUBSTITUTION,true); }
+        @Test void managedCursorKeepsTheFailedReceiptAndAbandonsItsExistingTicket() {
+            var plan=CheckedSchemaMatcherPlan.prepare(model,1,Map.of(),Set.of(selected));Expr source=parse(MULTIPLE);
+            var cursor=plan.nativeProvider().openSession(state(source),CONTEXT);
+            var meter=new CursorMeter(CursorFault.SUBSTITUTION,source,false);
+            try(var operation=RetainedOperation.open(meter)) {
+                meter.scope=operation;
+                try(var held=RetainedOperation.retain(cursor)) {
+                    meter.armed=true;assertTrue(cursor.next(100000).isEmpty());
+                    var failed=cursor.snapshot();assertEquals(IncrementalProviderContract.Status.FAILED,failed.status());
+                    assertFalse(failed.accountingComplete());assertEquals(0,failed.emittedCandidates());
+                    assertEquals(meter.applicationWork.units,failed.work().prepaidApplications().chargedUnits());
+                    assertEquals(0,failed.work().prepaidApplications().openApplications());
+                    assertEquals(1,failed.work().prepaidApplications().abandonedApplications());
+                    assertTrue(cursor.next(100000).isEmpty());assertEquals(failed,cursor.snapshot());
+                    meter.armed=false;cursor.close();assertTrue(cursor.snapshot().closed());
+                    assertFalse(graph(meter.delegate).contains(source));
+                }
+            }
+        }
+        @Test void cursorPreservesRepeatedPrimaryFailureOnClose() { assertCursorRepeatedClose(false); }
+        @Test void cursorSuppressesDistinctCloseFailure() { assertCursorRepeatedClose(true); }
+        private static void assertCursorRepeatedClose(boolean distinct) {
+            var plan=CheckedSchemaMatcherPlan.prepare(model,1,Map.of(),Set.of(selected));Expr source=parse(MULTIPLE);
+            var payment=new IncrementalProviderContract.Meter(IncrementalProviderContract.NATIVE_PREPAID_REVISION);
+            var cursor=CheckedSchemaCursor.nativeSource(plan,source,payment);
+            var meter=new CursorMeter(CursorFault.SUBSTITUTION,source,false);meter.repeatClose=true;
+            if(distinct)meter.closeFailure=new IllegalStateException("secondary cursor close");
+            try(var operation=RetainedOperation.open(meter)) {
+                meter.scope=operation;
+                try(var held=RetainedOperation.retain(cursor)) {
+                    meter.armed=true;var failure=assertThrows(Throwable.class,()->cursor.next(100000));
+                    assertSame(meter.failure,failure);
+                    if(distinct)assertTrue(List.of(failure.getSuppressed()).contains(meter.closeFailure));
+                    else assertEquals(0,failure.getSuppressed().length);
+                    assertEquals(meter.applicationWork.units,payment.work().prepaidApplications().chargedUnits());
+                    assertEquals(IncrementalProviderContract.Status.FAILED,cursor.status());
+                    meter.armed=false;cursor.close();
+                }
+            }
+        }
+        @Test void nativeCursorDistinguishesRealTargetRejectionFromItsLaterTechnicalFailure() throws Exception {
+            var expanded=checkedExpansionModel(model);
+            var plan=CheckedSchemaMatcherPlan.prepare(expanded,1,Map.of(),Set.of(expanded.schemas().getFirst().id()));
+            Expr source=new BinaryExpr(balancedTree(509),ADD,new NumberExpr(0));
+            var controlPayment=new IncrementalProviderContract.Meter(IncrementalProviderContract.NATIVE_PREPAID_REVISION);
+            var control=CheckedSchemaCursor.nativeSource(plan,source,controlPayment);
+            assertTrue(control.next(100000).isEmpty());assertEquals(IncrementalProviderContract.Status.INCONCLUSIVE,control.status());
+            assertEquals(0,controlPayment.work().mathematics().exactTheorySteps());
+            assertEquals(1,controlPayment.work().prepaidApplications().abandonedApplications());control.close();
+            var payment=new IncrementalProviderContract.Meter(IncrementalProviderContract.NATIVE_PREPAID_REVISION);
+            var cursor=CheckedSchemaCursor.nativeSource(plan,source,payment);
+            var meter=new CursorMeter(CursorFault.TARGET_REJECT,source,false);
+            try(var operation=RetainedOperation.open(meter)) {
+                meter.scope=operation;
+                try(var held=RetainedOperation.retain(cursor)) {
+                    meter.armed=true;assertSame(meter.failure,assertThrows(Throwable.class,()->cursor.next(100000)));
+                    assertTrue(meter.sawTargetRejection);assertEquals(IncrementalProviderContract.Status.FAILED,cursor.status());
+                    assertEquals(controlPayment.work().prepaidApplications(),payment.work().prepaidApplications());
+                    meter.armed=false;cursor.close();
+                }
+            }
+        }
+
         private static void assertCursorAbort(CursorFault fault,boolean error) {
             var plan=CheckedSchemaMatcherPlan.prepare(model,1,Map.of(),Set.of(selected));
             Expr source=parse(MULTIPLE);
@@ -1040,7 +1107,10 @@ class CheckedLearnedSchemaModelTest {
                     meter.armed=true;
                     if(fault==CursorFault.CLOSE) {
                         meter.armed=false;cursor.next(2);meter.armed=true;meter.closing=true;
+                        long pending=refs((RetainedGraph.View)cursor).stream().filter(java.util.ArrayDeque.class::isInstance)
+                            .mapToLong(value->((java.util.ArrayDeque<?>)value).size()).sum();
                         assertSame(meter.failure,assertThrows(Throwable.class,cursor::close));
+                        assertEquals(pending+11,meter.failedDebit,"pay all eleven cleared references/status fields plus pending entries");
                         assertEquals(IncrementalProviderContract.Status.CLOSED,cursor.status());
                         assertFalse(graph(cursor).contains(source),"the actual source/pending graph is released despite the debit fault");
                     } else {
@@ -1048,14 +1118,16 @@ class CheckedLearnedSchemaModelTest {
                         assertEquals(IncrementalProviderContract.Status.FAILED,cursor.status());
                         var paid=payment.work();
                         assertTrue(cursor.next(100000).isEmpty());assertEquals(paid,payment.work(),"no restart or repeated payment after technical failure");
-                        if(fault==CursorFault.DOMAIN) assertEquals(meter.domainWork.units,payment.work().operations().get("LOAD"));
+                        if(fault==CursorFault.DOMAIN || fault==CursorFault.LOAD_ACQUIRE || fault==CursorFault.LOAD_CLOSE) assertEquals(meter.domainWork.units,payment.work().operations().get("LOAD"));
                         if(fault==CursorFault.CONSTRUCTOR) {
                             assertTrue(payment.work().prepaidApplications().phaseCalls().isEmpty());
                             assertEquals(1,payment.work().prepaidApplications().openApplications());
                         }
                         if(fault==CursorFault.SUBSTITUTION || fault==CursorFault.TARGET)
                             assertEquals(meter.applicationWork.units,payment.work().prepaidApplications().chargedUnits());
-                        if(fault==CursorFault.RESULT)assertEquals(1,payment.work().mathematics().exactTheorySteps());
+                        if(fault==CursorFault.RESULT || fault==CursorFault.PULL_CLOSE)assertEquals(1,payment.work().mathematics().exactTheorySteps());
+                        if(fault==CursorFault.SUBSTITUTION)assertEquals(Map.of("SUBSTITUTION_DOMAIN",1L),payment.work().prepaidApplications().phaseCalls());
+                        if(fault==CursorFault.TARGET)assertEquals(Map.of("SUBSTITUTION_DOMAIN",2L,"INSTANTIATION",1L,"TARGET_DOMAIN",1L),payment.work().prepaidApplications().phaseCalls());
                     }
                     meter.armed=false;cursor.close();
                     assertFalse(graph(cursor).contains(source));
@@ -1063,10 +1135,11 @@ class CheckedLearnedSchemaModelTest {
             }
             assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
         }
-        enum CursorFault { NONE,AST,DOMAIN,CONSTRUCTOR,SUBSTITUTION,TARGET,TOTAL,RESULT,CLOSE }
+        enum CursorFault { NONE,AST,DOMAIN,CONSTRUCTOR,SUBSTITUTION,TARGET,TOTAL,RESULT,CLOSE,LOAD_ACQUIRE,LOAD_CLOSE,PULL_CLOSE,TARGET_REJECT }
         private static final class CursorMeter implements RetainedOperation.Sink {
             final CursorFault fault;final Expr source;final Throwable failure;
-            RetainedOperation scope;boolean armed,tripped,closing,trackWork;long observed;
+            RetainedOperation scope;boolean armed,tripped,closing,trackWork,repeatClose,sawTargetRejection;long observed,failedDebit;
+            RuntimeException closeFailure;CheckedSchemaCursor<?> delegate;RetainedOperation.Frame returnedOwner;
             CheckedSchemaSupport.Work applicationWork,domainWork;
             CursorMeter(CursorFault fault,Expr source,boolean error) {
                 this.fault=fault;this.source=source;
@@ -1077,8 +1150,17 @@ class CheckedLearnedSchemaModelTest {
             @Override public void validationWork(long units){observed+=units;if(armed && !tripped && fault==CursorFault.AST)trip();}
             @Override public void executionWork(long units) {
                 observed+=units;
-                if(!armed || tripped)return;
+                if(!armed)return;
+                if(tripped) {if(repeatClose && units==4){if(closeFailure!=null)throw closeFailure;fail();}return;}
                 var seen=graph(scope);CheckedSchemaMatcherPlan.ApplicationSteps application=null;
+                long queued=0;CheckedSchemaSupport.Work initializing=null;
+                for(Object value:seen)if(value instanceof CheckedSchemaCursor<?> cursor) {
+                    delegate=cursor;
+                    initializing=refs(cursor).stream().filter(CheckedSchemaSupport.Work.class::isInstance)
+                        .map(CheckedSchemaSupport.Work.class::cast).findFirst().orElse(null);
+                    queued=refs(cursor).stream().filter(java.util.ArrayDeque.class::isInstance).mapToLong(item->((java.util.ArrayDeque<?>)item).size()).sum();
+                }
+                if(initializing!=null && (fault==CursorFault.LOAD_ACQUIRE || fault==CursorFault.LOAD_CLOSE))domainWork=initializing;
                 for(Object value:seen)if(value instanceof CheckedSchemaMatcherPlan.ApplicationSteps steps) {
                     application=steps;applicationWork=refs((RetainedGraph.View)steps).stream()
                         .filter(CheckedSchemaSupport.Work.class::isInstance).map(CheckedSchemaSupport.Work.class::cast).findFirst().orElseThrow();
@@ -1087,6 +1169,7 @@ class CheckedLearnedSchemaModelTest {
                 for(Object value:seen)if(value instanceof RetainedOperation.Frame frame)
                     for(Object ref:refs(frame))if(ref instanceof Object[] values) {
                         var items=java.util.Arrays.asList(values);
+                        for(Object item:values)if(item instanceof Object[] slot && slot.length==1 && slot[0] instanceof java.util.Optional<?> result && result.isPresent())returnedOwner=frame;
                         boolean current=items.stream().anyMatch(item->item instanceof Object[] slot && slot.length==1 && slot[0]!=null
                             && slot[0].getClass().getEnclosingClass()==CheckedSchemaSupport.class && slot[0].getClass().getSimpleName().equals("Node"));
                         if(current) {
@@ -1097,7 +1180,11 @@ class CheckedLearnedSchemaModelTest {
                             domainVisited|=items.contains(applicationWork);
                         }
                     }
+                failedDebit=units;
                 if((fault==CursorFault.DOMAIN && sourceVisited) || (fault==CursorFault.CLOSE && closing)
+                        || (fault==CursorFault.LOAD_ACQUIRE && initializing!=null && initializing.units==1)
+                        || (fault==CursorFault.LOAD_CLOSE && initializing!=null && queued>0 && units==4)
+                        || (fault==CursorFault.PULL_CLOSE && returnedOwner!=null && !seen.contains(returnedOwner) && units==4)
                         || (fault==CursorFault.CONSTRUCTOR && application!=null && application.phase()==null)
                         || (fault==CursorFault.SUBSTITUTION && domainVisited && application!=null
                             && application.phase()==IncrementalProviderContract.ApplicationPhase.SUBSTITUTION_DOMAIN)
@@ -1106,9 +1193,16 @@ class CheckedLearnedSchemaModelTest {
             }
             @Override public void checkpoint(){
                 observed+=RetainedGraph.measure(scope).work();
-                if(armed && !tripped && fault==CursorFault.RESULT && graph(scope).stream().anyMatch(NativeMoveProof.class::isInstance))trip();
+                var seen=graph(scope);
+                if(fault==CursorFault.TARGET_REJECT) {
+                    sawTargetRejection|=seen.stream().anyMatch(value->value instanceof String[] reason && reason.length==1 && reason[0]!=null);
+                    boolean domain=seen.stream().anyMatch(value->value.getClass().getEnclosingClass()==CheckedSchemaSupport.class && value.getClass().getSimpleName().equals("Node"));
+                    if(armed && !tripped && sawTargetRejection && !domain)trip();
+                }
+                if(armed && !tripped && fault==CursorFault.RESULT && seen.stream().anyMatch(NativeMoveProof.class::isInstance))trip();
             }
-            private void trip(){tripped=true;if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;}
+            private void trip(){tripped=true;fail();}
+            private void fail(){if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;}
         }
 
         @Test void sourceObserverArgumentFailureRemainsTechnical() { assertAbort(Abort.DOMAIN_ARGUMENT, false, false); }
