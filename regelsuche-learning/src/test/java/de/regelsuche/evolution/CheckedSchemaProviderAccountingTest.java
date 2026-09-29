@@ -63,6 +63,26 @@ class CheckedSchemaProviderAccountingTest {
     @Test void constructorPublishesTheActualPartialApplicationBeforeItsCopyDebit() { assertAbort(Abort.CONSTRUCTOR, false, false); }
     @Test void laterApplicationAbortRetainsCompletedMathematicsAndTheCandidateEvent() { assertAbort(Abort.SECOND_APPLICATION, false, false); }
 
+    @Test void targetRejectionCannotHideTheApplyOwnerObservationFailure() throws Exception { assertTargetAbort(Abort.TARGET_REJECT_OBSERVATION); }
+    @Test void targetRejectionCannotHideTheApplyOwnerCloseFailure() throws Exception { assertTargetAbort(Abort.TARGET_REJECT_CLOSE); }
+    private static void assertTargetAbort(Abort abort) throws Exception {
+        var checked=CheckedLearnedSchemaModelTest.checkedExpansionModel(model);
+        Expr source=new de.regelsuche.ast.BinaryExpr(CheckedLearnedSchemaModelTest.balancedTree(509),
+            de.regelsuche.ast.BinaryOperator.ADD,new de.regelsuche.ast.NumberExpr(0));
+        var received=state(source);var meter=new ProviderMeter(abort,received);
+        var provider=checked.nativeProviders().getFirst();
+        var rejected=provider.candidates(received,CONTEXT);
+        assertTrue(rejected.moves().isEmpty());assertFalse(rejected.complete());
+        try(var scope=de.regelsuche.retention.RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            assertSame(meter.failure,assertThrows(Throwable.class,()->provider.candidates(received,CONTEXT)));
+            assertNotNull(meter.rejectedApplyOwner,"the actual apply owner has already retained the target-domain reason");
+            assertEquals(List.of(4L,meter.rootWork.units),meter.afterRootRelease);
+            assertTrue(meter.rootWork.units>512,"the rejected target validation stays in the inclusive attempt ledger");
+        }
+        assertEquals(0,de.regelsuche.retention.RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
     private static void assertAbort(Abort abort, boolean repeat, boolean distinct) {
         boolean invalid = abort == Abort.REJECT_OBSERVATION || abort == Abort.REJECT_CLOSE;
         Expr source = parse(invalid ? "x/0" : MULTIPLE);
@@ -111,13 +131,14 @@ class CheckedSchemaProviderAccountingTest {
     }
 
     enum Abort { NONE, AST_ARGUMENT, AST_ERROR, DOMAIN_ARGUMENT, DOMAIN_RUNTIME, DOMAIN_ERROR,
-        BATCH, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE, CONSTRUCTOR, SECOND_APPLICATION }
+        BATCH, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE, CONSTRUCTOR, SECOND_APPLICATION, TARGET_REJECT_OBSERVATION, TARGET_REJECT_CLOSE }
     private static final class ProviderMeter implements de.regelsuche.retention.RetainedOperation.Sink {
         final Abort abort; final TypedMoveSearch.State received; final Throwable failure;
         de.regelsuche.retention.RetainedOperation scope;
         CheckedSchemaSupport.Work rootWork, partialWork;
         CheckedSchemaMatcherPlan.ApplicationSteps firstApplication;
         NativeMoveProvider.Batch finished;
+        de.regelsuche.retention.RetainedOperation.Frame rejectedApplyOwner;
         boolean tripped, repeatClose, batchObserved, sawMatch, partialOwned, sawRejection, rootSeen;
         RuntimeException closeFailure;
         long firstStart, secondStart, completedPrefix, firstPublished;
@@ -148,11 +169,13 @@ class CheckedSchemaProviderAccountingTest {
                     || (abort == Abort.CLOSE && batchObserved && units == 4)
                     || (abort == Abort.REJECT_CLOSE && sawRejection && units == 4)
                     || (abort == Abort.CONSTRUCTOR && sawMatch && units == 3 && (partialOwned || !current.outcome))
-                    || (abort == Abort.SECOND_APPLICATION && current.second && partialWork.units > 0)) trip();
+                    || (abort == Abort.SECOND_APPLICATION && current.second && partialWork.units > 0)
+                    || (abort == Abort.TARGET_REJECT_CLOSE && rejectedApplyOwner != null && !current.applyHeld && units == 4)) trip();
         }
         @Override public void checkpoint() {
-            de.regelsuche.retention.RetainedGraph.measure(scope); snapshot();
-            if (!tripped && abort == Abort.REJECT_OBSERVATION && sawRejection) trip();
+            de.regelsuche.retention.RetainedGraph.measure(scope); var current=snapshot();
+            if (!tripped && ((abort == Abort.REJECT_OBSERVATION && sawRejection)
+                    || (abort == Abort.TARGET_REJECT_OBSERVATION && current.applyHeld))) trip();
             batchObserved |= finished != null;
         }
         private void trip() { tripped = true; fail(); }
@@ -164,6 +187,9 @@ class CheckedSchemaProviderAccountingTest {
                     var items = java.util.Arrays.asList(values);
                     var ledger = items.stream().filter(CheckedSchemaSupport.Work.class::isInstance).map(CheckedSchemaSupport.Work.class::cast).findFirst().orElse(null);
                     if (items.contains(received)) { rootWork = ledger; rootSeen = true; }
+                    for(Object value:values) if(value instanceof Object[] slot && slot.length==3
+                            && slot[0] instanceof CheckedSchemaMatcherPlan.ApplicationSteps && slot[2] instanceof String)
+                        rejectedApplyOwner=frame;
                     boolean domain = items.stream().anyMatch(java.util.ArrayDeque.class::isInstance);
                     if (domain && items.contains(received.expression())) {
                         if (rootWork == null) rootWork = ledger; // Observe the unfixed source ledger for RED.
@@ -194,7 +220,7 @@ class CheckedSchemaProviderAccountingTest {
                     completedPrefix = data.applicationWork(); firstPublished = rootWork.units;
                 }
             }
-            return new Snapshot(sourceGrowth, outcome, second);
+            return new Snapshot(sourceGrowth, outcome, second, seen.contains(rejectedApplyOwner));
         }
         private boolean rootHeld() {
             for (Object owner : graph(scope)) if (owner instanceof de.regelsuche.retention.RetainedOperation.Frame frame)
@@ -208,7 +234,7 @@ class CheckedSchemaProviderAccountingTest {
                 && slot[0].getClass().getEnclosingClass() == CheckedSchemaSupport.class
                 && slot[0].getClass().getSimpleName().equals("Node") && refs(node).getFirst() == received.expression();
         }
-        private record Snapshot(boolean sourceGrowth, boolean outcome, boolean second) {}
+        private record Snapshot(boolean sourceGrowth, boolean outcome, boolean second, boolean applyHeld) {}
     }
     private static List<Object> refs(de.regelsuche.retention.RetainedGraph.View view) {
         var values = new ArrayList<Object>();

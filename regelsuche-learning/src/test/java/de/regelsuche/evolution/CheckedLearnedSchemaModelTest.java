@@ -210,8 +210,10 @@ class CheckedLearnedSchemaModelTest {
     }
 
     private static CheckedLearnedSchemaModel checkedExpansionModel() throws Exception {
+        return checkedExpansionModel(CheckedLearnedSchemaModel.learn(formation));
+    }
+    static CheckedLearnedSchemaModel checkedExpansionModel(CheckedLearnedSchemaModel original) throws Exception {
         // A coherent, independently true expansion exercises the rejection path; it is never a stored learned template.
-        var original = CheckedLearnedSchemaModel.learn(formation);
         var tree = (ObjectNode) new ObjectMapper().readTree(original.toCanonicalJson());
         var sourcePattern = de.regelsuche.transform.PatternExpr.op(ADD,
             de.regelsuche.transform.PatternExpr.var("P0"), de.regelsuche.transform.PatternExpr.num(0));
@@ -910,7 +912,7 @@ class CheckedLearnedSchemaModelTest {
         assertNull(rejected.checkedProof(),detail);assertNull(rejected.ruleId(),detail);
     }
 
-    private static Expr balancedTree(int nodes) {
+    static Expr balancedTree(int nodes) {
         if (nodes == 1) return new VariableExpr("q");
         int left = (nodes - 1) / 2;
         if (left % 2 == 0) left--;
