@@ -2,20 +2,108 @@
 
 import de.regelsuche.search.program.RewriteProgram.NodeMetadata;
 import de.regelsuche.search.program.RewriteProgram.SourceLocation;
+import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.IntStream;
 
 /** Fluent factories for Java-internal rewrite programs. */
 public final class RewritePrograms {
     private RewritePrograms() {
     }
 
+    /** Selects the actual engine; no string is interpreted as a procedure name. */
+    public static Draft source(TransformationEngine engine) {
+<span class="fc" id="L24">        Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L25">        return new Draft(id -&gt; source(id, engine));</span>
+    }
+
+    public static Draft budgetedSource(BudgetedTransformationSource source) {
+<span class="nc" id="L29">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="nc" id="L30">        return new Draft(id -&gt; budgetedSource(id, source));</span>
+    }
+
+    public static Draft choice(Draft... alternatives) {
+<span class="fc" id="L34">        return compose(alternatives, RewriteProgram.Choice::new);</span>
+    }
+
+    public static Draft firstApplicable(Draft... alternatives) {
+<span class="fc" id="L38">        return compose(alternatives, RewriteProgram.FirstApplicable::new);</span>
+    }
+
+    public static Draft sequence(Draft... steps) {
+<span class="fc" id="L42">        return compose(steps, RewriteProgram.Sequence::new);</span>
+    }
+
+    public static Draft repeat(int maxIterations, Draft body) {
+<span class="fc" id="L46">        return repeat(1, maxIterations, body);</span>
+    }
+
+    public static Draft repeat(int minIterations, int maxIterations, Draft body) {
+<span class="fc" id="L50">        Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L51">        return new Draft(id -&gt; repeat(id, minIterations, maxIterations, body.named(id + &quot;/0&quot;)));</span>
+    }
+
+    public static Draft require(Draft body, String description, Predicate&lt;RewriteCandidate&gt; condition) {
+<span class="fc" id="L55">        Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L56">        Objects.requireNonNull(condition, &quot;condition&quot;);</span>
+<span class="fc" id="L57">        return new Draft(id -&gt; require(id, body.named(id + &quot;/0&quot;), description, condition));</span>
+    }
+
+    public static Draft prioritize(Draft body, String description, Comparator&lt;RewriteCandidate&gt; comparator) {
+<span class="fc" id="L61">        Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L62">        Objects.requireNonNull(comparator, &quot;comparator&quot;);</span>
+<span class="fc" id="L63">        return new Draft(id -&gt; prioritize(id, body.named(id + &quot;/0&quot;), description, comparator));</span>
+    }
+
+    public static Draft prune(Draft body, int maxCandidates, String reason) {
+<span class="fc" id="L67">        Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L68">        return new Draft(id -&gt; prune(id, body.named(id + &quot;/0&quot;), maxCandidates, reason));</span>
+    }
+
+    /**
+     * Immutable construction recipe for the existing typed IR, not a second interpreter.
+     * Finalizing assigns deterministic IDs from the root name and child positions.
+     * Reusing a draft in two positions yields different IDs, without counters or UUIDs.
+     */
+    public static final class Draft {
+        private final Function&lt;String, RewriteProgram&gt; factory;
+
+<span class="fc" id="L79">        private Draft(Function&lt;String, RewriteProgram&gt; factory) {</span>
+<span class="fc" id="L80">            this.factory = factory;</span>
+<span class="fc" id="L81">        }</span>
+
+        /** Names the root for tracing/evidence; the name never selects behavior. */
+        public RewriteProgram named(String id) {
+<span class="fc" id="L85">            NodeMetadata.named(id); // Validate before constructing descendants.</span>
+<span class="fc" id="L86">            return factory.apply(id);</span>
+        }
+    }
+
+    private static Draft compose(
+            Draft[] values,
+            BiFunction&lt;NodeMetadata, List&lt;RewriteProgram&gt;, RewriteProgram&gt; constructor
+    ) {
+<span class="fc" id="L94">        List&lt;Draft&gt; children = List.of(Objects.requireNonNull(values, &quot;programs&quot;));</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (children.isEmpty()) {</span>
+<span class="fc" id="L96">            throw new IllegalArgumentException(&quot;programs must not be empty&quot;);</span>
+        }
+<span class="fc" id="L98">        return new Draft(id -&gt; constructor.apply(NodeMetadata.named(id),</span>
+<span class="fc" id="L99">            IntStream.range(0, children.size())</span>
+<span class="fc" id="L100">                .mapToObj(index -&gt; children.get(index).named(id + &quot;/&quot; + index))</span>
+<span class="fc" id="L101">                .toList()));</span>
+    }
+
+    /** Explicit stable-ID form, retained for persisted programs and import adapters. */
     public static RewriteProgram source(String id, TransformationEngine engine) {
-<span class="fc" id="L18">        return new RewriteProgram.Source(NodeMetadata.named(id), engine);</span>
+<span class="fc" id="L106">        return new RewriteProgram.Source(NodeMetadata.named(id), engine);</span>
     }
 
     public static RewriteProgram source(
@@ -24,15 +112,15 @@ public final class RewritePrograms {
         SourceLocation location,
         TransformationEngine engine
     ) {
-<span class="fc" id="L27">        return new RewriteProgram.Source(new NodeMetadata(id, label, location), engine);</span>
+<span class="fc" id="L115">        return new RewriteProgram.Source(new NodeMetadata(id, label, location), engine);</span>
     }
 
     public static RewriteProgram.BudgetedSource budgetedSource(
         String id,
         BudgetedTransformationSource source
     ) {
-<span class="fc" id="L34">        return new RewriteProgram.BudgetedSource(</span>
-<span class="fc" id="L35">            NodeMetadata.named(id),</span>
+<span class="fc" id="L122">        return new RewriteProgram.BudgetedSource(</span>
+<span class="fc" id="L123">            NodeMetadata.named(id),</span>
             source);
     }
 
@@ -42,21 +130,21 @@ public final class RewritePrograms {
         SourceLocation location,
         BudgetedTransformationSource source
     ) {
-<span class="fc" id="L45">        return new RewriteProgram.BudgetedSource(</span>
+<span class="fc" id="L133">        return new RewriteProgram.BudgetedSource(</span>
             new NodeMetadata(id, label, location),
             source);
     }
 
     public static RewriteProgram choice(String id, RewriteProgram... alternatives) {
-<span class="fc" id="L51">        return new RewriteProgram.Choice(NodeMetadata.named(id), programs(alternatives));</span>
+<span class="fc" id="L139">        return new RewriteProgram.Choice(NodeMetadata.named(id), programs(alternatives));</span>
     }
 
     public static RewriteProgram firstApplicable(String id, RewriteProgram... alternatives) {
-<span class="fc" id="L55">        return new RewriteProgram.FirstApplicable(NodeMetadata.named(id), programs(alternatives));</span>
+<span class="fc" id="L143">        return new RewriteProgram.FirstApplicable(NodeMetadata.named(id), programs(alternatives));</span>
     }
 
     public static RewriteProgram sequence(String id, RewriteProgram... steps) {
-<span class="fc" id="L59">        return new RewriteProgram.Sequence(NodeMetadata.named(id), programs(steps));</span>
+<span class="fc" id="L147">        return new RewriteProgram.Sequence(NodeMetadata.named(id), programs(steps));</span>
     }
 
     public static RewriteProgram repeat(
@@ -64,7 +152,7 @@ public final class RewritePrograms {
         int maxIterations,
         RewriteProgram body
     ) {
-<span class="fc" id="L67">        return repeat(id, 1, maxIterations, body);</span>
+<span class="fc" id="L155">        return repeat(id, 1, maxIterations, body);</span>
     }
 
     public static RewriteProgram repeat(
@@ -73,8 +161,8 @@ public final class RewritePrograms {
         int maxIterations,
         RewriteProgram body
     ) {
-<span class="fc" id="L76">        return new RewriteProgram.Repeat(</span>
-<span class="fc" id="L77">            NodeMetadata.named(id), body, minIterations, maxIterations);</span>
+<span class="fc" id="L164">        return new RewriteProgram.Repeat(</span>
+<span class="fc" id="L165">            NodeMetadata.named(id), body, minIterations, maxIterations);</span>
     }
 
     public static RewriteProgram require(
@@ -83,8 +171,8 @@ public final class RewritePrograms {
         String description,
         Predicate&lt;RewriteCandidate&gt; condition
     ) {
-<span class="fc" id="L86">        return new RewriteProgram.Require(</span>
-<span class="fc" id="L87">            NodeMetadata.named(id), body, description, condition);</span>
+<span class="fc" id="L174">        return new RewriteProgram.Require(</span>
+<span class="fc" id="L175">            NodeMetadata.named(id), body, description, condition);</span>
     }
 
     public static RewriteProgram prioritize(
@@ -93,8 +181,8 @@ public final class RewritePrograms {
         String description,
         Comparator&lt;RewriteCandidate&gt; comparator
     ) {
-<span class="fc" id="L96">        return new RewriteProgram.Prioritize(</span>
-<span class="fc" id="L97">            NodeMetadata.named(id), body, description, comparator);</span>
+<span class="fc" id="L184">        return new RewriteProgram.Prioritize(</span>
+<span class="fc" id="L185">            NodeMetadata.named(id), body, description, comparator);</span>
     }
 
     public static RewriteProgram prune(
@@ -103,41 +191,70 @@ public final class RewritePrograms {
         int maxCandidates,
         String reason
     ) {
-<span class="fc" id="L106">        return new RewriteProgram.Prune(</span>
-<span class="fc" id="L107">            NodeMetadata.named(id), body, maxCandidates, reason);</span>
+<span class="fc" id="L194">        return new RewriteProgram.Prune(</span>
+<span class="fc" id="L195">            NodeMetadata.named(id), body, maxCandidates, reason);</span>
     }
 
     public static Comparator&lt;RewriteCandidate&gt; byEstimatedCostThenRule() {
-<span class="fc" id="L111">        return Comparator</span>
-<span class="fc" id="L112">            .comparingInt((RewriteCandidate candidate) -&gt;</span>
-<span class="fc" id="L113">                candidate.toTransformation().estimatedCostDelta())</span>
-<span class="pc" id="L114">            .thenComparing(candidate -&gt; candidate.toTransformation().rule())</span>
-<span class="fc" id="L115">            .thenComparing(RewriteCandidate::outputExpression)</span>
-<span class="fc" id="L116">            .thenComparing(RewriteCandidate::orderingKey);</span>
+<span class="fc" id="L199">        return Comparator</span>
+<span class="fc" id="L200">            .comparingInt((RewriteCandidate candidate) -&gt;</span>
+<span class="fc" id="L201">                candidate.toTransformation().estimatedCostDelta())</span>
+<span class="pc" id="L202">            .thenComparing(candidate -&gt; candidate.toTransformation().rule())</span>
+<span class="fc" id="L203">            .thenComparing(RewriteCandidate::outputExpression)</span>
+<span class="fc" id="L204">            .thenComparing(RewriteCandidate::orderingKey);</span>
     }
 
+    /** Prefers concrete rule objects, including plugin and learned rules. */
+    public static Comparator&lt;RewriteCandidate&gt; preferRules(RewriteRule... rules) {
+<span class="fc" id="L209">        return preferRules(List.of(Objects.requireNonNull(rules, &quot;rules&quot;)));</span>
+    }
+
+    /**
+     * Snapshots the stable identities of actual rule objects. This orders candidates;
+     * it neither registers rules nor grants applicability or mathematical authority.
+     */
+    public static Comparator&lt;RewriteCandidate&gt; preferRules(List&lt;? extends RewriteRule&gt; rules) {
+<span class="fc" id="L217">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
+<span class="fc" id="L218">        var seen = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L219">        List&lt;String&gt; ids = rules.stream().map(rule -&gt; {</span>
+<span class="fc" id="L220">            String id = Objects.requireNonNull(rule, &quot;rule&quot;).id();</span>
+<span class="fc bfc" id="L221" title="All 4 branches covered.">            if (id == null || id.isBlank()) {</span>
+<span class="fc" id="L222">                throw new IllegalArgumentException(&quot;preferred rule must have a non-blank identity&quot;);</span>
+            }
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            if (!seen.add(id)) {</span>
+<span class="fc" id="L225">                throw new IllegalArgumentException(&quot;duplicate preferred rule identity: &quot; + id);</span>
+            }
+<span class="fc" id="L227">            return id;</span>
+<span class="fc" id="L228">        }).toList();</span>
+<span class="fc" id="L229">        return preferRuleOrder(ids);</span>
+    }
+
+    /**
+     * Legacy wire-ID boundary. Java callers should use preferRules with actual rules;
+     * text importers must resolve IDs against their registry before calling this method.
+     */
     public static Comparator&lt;RewriteCandidate&gt; preferRuleOrder(List&lt;String&gt; ruleIds) {
-<span class="nc" id="L120">        List&lt;String&gt; preferred = List.copyOf(Objects.requireNonNull(ruleIds, &quot;ruleIds&quot;));</span>
-<span class="nc" id="L121">        return Comparator</span>
-<span class="nc" id="L122">            .comparingInt((RewriteCandidate candidate) -&gt; {</span>
-<span class="nc" id="L123">                int index = preferred.indexOf(candidate.lastStep().rule());</span>
-<span class="nc bnc" id="L124" title="All 2 branches missed.">                return index &lt; 0 ? Integer.MAX_VALUE : index;</span>
+<span class="fc" id="L237">        List&lt;String&gt; preferred = List.copyOf(Objects.requireNonNull(ruleIds, &quot;ruleIds&quot;));</span>
+<span class="fc" id="L238">        return Comparator</span>
+<span class="fc" id="L239">            .comparingInt((RewriteCandidate candidate) -&gt; {</span>
+<span class="fc" id="L240">                int index = preferred.indexOf(candidate.lastStep().rule());</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                return index &lt; 0 ? Integer.MAX_VALUE : index;</span>
             })
-<span class="nc" id="L126">            .thenComparing(candidate -&gt; candidate.lastStep().rule())</span>
-<span class="nc" id="L127">            .thenComparing(RewriteCandidate::outputExpression)</span>
-<span class="nc" id="L128">            .thenComparing(RewriteCandidate::orderingKey);</span>
+<span class="pc" id="L243">            .thenComparing(candidate -&gt; candidate.lastStep().rule())</span>
+<span class="fc" id="L244">            .thenComparing(RewriteCandidate::outputExpression)</span>
+<span class="fc" id="L245">            .thenComparing(RewriteCandidate::orderingKey);</span>
     }
 
     public static Predicate&lt;RewriteCandidate&gt; equivalencePreserving() {
-<span class="fc" id="L132">        return candidate -&gt; candidate.steps().stream()</span>
-<span class="fc" id="L133">            .allMatch(step -&gt; step.equivalencePreservingByConstruction());</span>
+<span class="fc" id="L249">        return candidate -&gt; candidate.steps().stream()</span>
+<span class="fc" id="L250">            .allMatch(step -&gt; step.equivalencePreservingByConstruction());</span>
     }
 
     private static List&lt;RewriteProgram&gt; programs(RewriteProgram[] values) {
-<span class="fc" id="L137">        Objects.requireNonNull(values, &quot;values&quot;);</span>
-<span class="fc" id="L138">        return Arrays.stream(values)</span>
-<span class="fc" id="L139">            .map(value -&gt; Objects.requireNonNull(value, &quot;program&quot;))</span>
-<span class="fc" id="L140">            .toList();</span>
+<span class="fc" id="L254">        Objects.requireNonNull(values, &quot;values&quot;);</span>
+<span class="fc" id="L255">        return Arrays.stream(values)</span>
+<span class="fc" id="L256">            .map(value -&gt; Objects.requireNonNull(value, &quot;program&quot;))</span>
+<span class="fc" id="L257">            .toList();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

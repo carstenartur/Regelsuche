@@ -17,11 +17,18 @@ public final class RegelsucheDiscovery {
     private RegelsucheDiscovery() {
     }
 
-    /** Starts a fluent request for the supplied domain. */
+    /** Starts a fluent request for the supplied domain at the serialized seed boundary. */
     public static &lt;S, C, K&gt; Request&lt;S, C, K&gt; forDomain(
             DiscoveryDomain&lt;S, C, K&gt; domain
     ) {
 <span class="fc" id="L24">        return new Request&lt;&gt;(domain);</span>
+    }
+
+    /** Starts a Java request whose input type is fixed by the selected domain. */
+    public static &lt;I, S, C, K&gt; TypedRequest&lt;I, S, C, K&gt; forDomain(
+            TypedDiscoveryDomain&lt;I, S, C, K&gt; domain
+    ) {
+<span class="fc" id="L31">        return new TypedRequest&lt;&gt;(Objects.requireNonNull(domain, &quot;domain&quot;));</span>
     }
 
     /**
@@ -30,104 +37,143 @@ public final class RegelsucheDiscovery {
      * degrading the evidence contract.
      */
     public static Request&lt;?, ?, ?&gt; forRegistration(DiscoveryDomainCatalog.Registration registration) {
-<span class="fc" id="L33">        var checked = Objects.requireNonNull(registration, &quot;registration&quot;);</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (checked.artifact().isEmpty()) {</span>
-<span class="fc" id="L35">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L40">        var checked = Objects.requireNonNull(registration, &quot;registration&quot;);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (checked.artifact().isEmpty()) {</span>
+<span class="fc" id="L42">            throw new IllegalArgumentException(</span>
                 &quot;registration must carry host-observed provider artifact provenance&quot;
             );
         }
-<span class="fc" id="L39">        return forDomain(checked.domain());</span>
+<span class="fc" id="L46">        return forDomain(checked.domain());</span>
     }
 
     /** Loads discovery-domain providers visible to the context class loader. */
     public static DiscoveryDomainCatalog loadDomains() {
-<span class="nc" id="L44">        return DiscoveryDomainCatalog.load();</span>
+<span class="nc" id="L51">        return DiscoveryDomainCatalog.load();</span>
     }
 
-    /** Mutable request builder for one execution; not thread-safe. */
+    /**
+     * Typed Java input builder. Deliberately has no Object or serialized-seed overload:
+     * input types cannot be widened by a generic seed method. Not thread-safe.
+     */
+    public static final class TypedRequest&lt;I, S, C, K&gt; {
+        private final Request&lt;S, C, K&gt; request;
+        private final DiscoveryInputCodec&lt;I&gt; inputCodec;
+
+<span class="fc" id="L62">        private TypedRequest(TypedDiscoveryDomain&lt;I, S, C, K&gt; domain) {</span>
+<span class="fc" id="L63">            request = new Request&lt;&gt;(domain.domain());</span>
+<span class="fc" id="L64">            inputCodec = domain.inputCodec();</span>
+<span class="fc" id="L65">        }</span>
+
+        public TypedRequest&lt;I, S, C, K&gt; campaign(String value) {
+<span class="fc" id="L68">            request.campaign(value);</span>
+<span class="fc" id="L69">            return this;</span>
+        }
+
+        /** Snapshots the input into the existing content-addressed seed format. */
+        public TypedRequest&lt;I, S, C, K&gt; seed(String seedId, I input, String sourceReference) {
+<span class="fc" id="L74">            String payload = Objects.requireNonNull(</span>
+<span class="fc" id="L75">                inputCodec.encode(Objects.requireNonNull(input, &quot;input&quot;)), &quot;encoded payload&quot;);</span>
+<span class="fc" id="L76">            request.seed(seedId, payload, sourceReference);</span>
+<span class="fc" id="L77">            return this;</span>
+        }
+
+        public TypedRequest&lt;I, S, C, K&gt; budget(DiscoveryBudget value) {
+<span class="fc" id="L81">            request.budget(value);</span>
+<span class="fc" id="L82">            return this;</span>
+        }
+
+        public DiscoveryRun&lt;C, K&gt; run() {
+<span class="fc" id="L86">            return request.run();</span>
+        }
+    }
+
+    /** Mutable request builder for serialized seeds; not thread-safe. */
     public static final class Request&lt;S, C, K&gt; {
         private final DiscoveryDomain&lt;S, C, K&gt; domain;
         private String campaignId;
         private DiscoverySeed seed;
-<span class="fc" id="L52">        private DiscoveryBudget budget = DiscoveryBudgets.small();</span>
+<span class="fc" id="L95">        private DiscoveryBudget budget = DiscoveryBudgets.small();</span>
 
-<span class="fc" id="L54">        private Request(DiscoveryDomain&lt;S, C, K&gt; domain) {</span>
-<span class="fc" id="L55">            this.domain = Objects.requireNonNull(domain, &quot;domain&quot;);</span>
-<span class="fc" id="L56">        }</span>
+<span class="fc" id="L97">        private Request(DiscoveryDomain&lt;S, C, K&gt; domain) {</span>
+<span class="fc" id="L98">            this.domain = Objects.requireNonNull(domain, &quot;domain&quot;);</span>
+<span class="fc" id="L99">        }</span>
 
         /** Sets the stable run/campaign identity retained in evidence. */
         public Request&lt;S, C, K&gt; campaign(String value) {
-<span class="fc" id="L60">            this.campaignId = requireText(value, &quot;campaignId&quot;);</span>
-<span class="fc" id="L61">            return this;</span>
+<span class="fc" id="L103">            this.campaignId = requireText(value, &quot;campaignId&quot;);</span>
+<span class="fc" id="L104">            return this;</span>
         }
 
         /** Uses a fully constructed seed. */
         public Request&lt;S, C, K&gt; seed(DiscoverySeed value) {
-<span class="fc" id="L66">            this.seed = Objects.requireNonNull(value, &quot;seed&quot;);</span>
-<span class="fc" id="L67">            return this;</span>
+<span class="fc" id="L109">            this.seed = Objects.requireNonNull(value, &quot;seed&quot;);</span>
+<span class="fc" id="L110">            return this;</span>
         }
 
-        /** Creates a content-addressed seed for this domain. */
+        /**
+         * Creates a content-addressed seed at the text import boundary.
+         * Prefer the TypedDiscoveryDomain overload of forDomain for ordinary Java calls.
+         */
         public Request&lt;S, C, K&gt; seed(
                 String seedId,
                 String payload,
                 String sourceReference
         ) {
-<span class="fc" id="L76">            this.seed = DiscoverySeed.create(</span>
+<span class="fc" id="L122">            this.seed = DiscoverySeed.create(</span>
                 seedId,
-<span class="fc" id="L78">                domain.domainId(),</span>
+<span class="fc" id="L124">                domain.domainId(),</span>
                 payload,
                 sourceReference
             );
-<span class="fc" id="L82">            return this;</span>
+<span class="fc" id="L128">            return this;</span>
         }
 
         /** Replaces the documented small default budget. */
         public Request&lt;S, C, K&gt; budget(DiscoveryBudget value) {
-<span class="fc" id="L87">            this.budget = Objects.requireNonNull(value, &quot;budget&quot;);</span>
-<span class="fc" id="L88">            return this;</span>
+<span class="fc" id="L133">            this.budget = Objects.requireNonNull(value, &quot;budget&quot;);</span>
+<span class="fc" id="L134">            return this;</span>
         }
 
         /** Executes the request synchronously. */
         public DiscoveryRun&lt;C, K&gt; run() {
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (campaignId == null) {</span>
-<span class="nc" id="L94">                throw new IllegalStateException(&quot;campaignId is required&quot;);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (campaignId == null) {</span>
+<span class="fc" id="L140">                throw new IllegalStateException(&quot;campaignId is required&quot;);</span>
             }
-<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (seed == null) {</span>
-<span class="nc" id="L97">                throw new IllegalStateException(&quot;seed is required&quot;);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (seed == null) {</span>
+<span class="fc" id="L143">                throw new IllegalStateException(&quot;seed is required&quot;);</span>
             }
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (!domain.domainId().equals(seed.domainId())) {</span>
-<span class="nc" id="L100">                throw new IllegalStateException(</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (!domain.domainId().equals(seed.domainId())) {</span>
+<span class="nc" id="L146">                throw new IllegalStateException(</span>
                     &quot;seed domain does not match the selected domain&quot;
                 );
             }
-<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (domain instanceof ProviderDomain&lt;?, ?, ?&gt; registered) registered.validateArtifact();</span>
-<span class="fc" id="L105">            DomainDiscoveryRunner.RunResult&lt;C, K&gt; result =</span>
-<span class="fc" id="L106">                new DomainDiscoveryRunner().run(</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (domain instanceof ProviderDomain&lt;?, ?, ?&gt; registered) registered.validateArtifact();</span>
+<span class="fc" id="L151">            DomainDiscoveryRunner.RunResult&lt;C, K&gt; result =</span>
+<span class="fc" id="L152">                new DomainDiscoveryRunner().run(</span>
                     campaignId,
                     domain,
                     seed,
                     budget
                 );
-<span class="fc" id="L112">            String replayCampaign = campaignId;</span>
-<span class="fc" id="L113">            DiscoverySeed replaySeed = seed;</span>
-<span class="fc" id="L114">            DiscoveryBudget replayBudget = budget;</span>
-<span class="fc" id="L115">            return new DiscoveryRun&lt;&gt;(</span>
-<span class="fc" id="L116">                result.selectedCandidate(),</span>
-<span class="fc" id="L117">                result.selectedCertificate(),</span>
-<span class="fc" id="L118">                result.evidence(),</span>
-<span class="fc" id="L119">                domain.candidateCodec(),</span>
-<span class="fc" id="L120">                domain.certificateCodec(),</span>
-<span class="fc" id="L121">                () -&gt; RegelsucheDiscovery.forDomain(domain).campaign(replayCampaign)</span>
-<span class="fc" id="L122">                    .seed(replaySeed).budget(replayBudget).run()</span>
+<span class="fc" id="L158">            String replayCampaign = campaignId;</span>
+<span class="fc" id="L159">            DiscoverySeed replaySeed = seed;</span>
+<span class="fc" id="L160">            DiscoveryBudget replayBudget = budget;</span>
+<span class="fc" id="L161">            return new DiscoveryRun&lt;&gt;(</span>
+<span class="fc" id="L162">                result.selectedCandidate(),</span>
+<span class="fc" id="L163">                result.selectedCertificate(),</span>
+<span class="fc" id="L164">                result.evidence(),</span>
+<span class="fc" id="L165">                domain.candidateCodec(),</span>
+<span class="fc" id="L166">                domain.certificateCodec(),</span>
+<span class="fc" id="L167">                () -&gt; RegelsucheDiscovery.forDomain(domain).campaign(replayCampaign)</span>
+<span class="fc" id="L168">                    .seed(replaySeed).budget(replayBudget).run()</span>
             );
         }
 
         private static String requireText(String value, String name) {
-<span class="pc bpc" id="L127" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L128">                throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L174">                throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
             }
-<span class="fc" id="L130">            return value;</span>
+<span class="fc" id="L176">            return value;</span>
         }
     }
 }

@@ -93,8 +93,8 @@ public sealed interface RewriteProgram permits
 <span class="fc" id="L93">        public Repeat {</span>
 <span class="fc" id="L94">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
 <span class="fc" id="L95">            Objects.requireNonNull(body, &quot;body&quot;);</span>
-<span class="pc bpc" id="L96" title="2 of 4 branches missed.">            if (minIterations &lt; 1 || maxIterations &lt; minIterations) {</span>
-<span class="nc" id="L97">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">            if (minIterations &lt; 1 || maxIterations &lt; minIterations) {</span>
+<span class="fc" id="L97">                throw new IllegalArgumentException(</span>
                     &quot;repeat requires 1 &lt;= minIterations &lt;= maxIterations&quot;);
             }
 <span class="fc" id="L100">        }</span>
@@ -140,8 +140,8 @@ public sealed interface RewriteProgram permits
 <span class="fc" id="L140">        public Prune {</span>
 <span class="fc" id="L141">            Objects.requireNonNull(metadata, &quot;metadata&quot;);</span>
 <span class="fc" id="L142">            Objects.requireNonNull(body, &quot;body&quot;);</span>
-<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (maxCandidates &lt; 1) {</span>
-<span class="nc" id="L144">                throw new IllegalArgumentException(&quot;maxCandidates must be positive&quot;);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (maxCandidates &lt; 1) {</span>
+<span class="fc" id="L144">                throw new IllegalArgumentException(&quot;maxCandidates must be positive&quot;);</span>
             }
 <span class="fc" id="L146">            reason = requireText(reason, &quot;reason&quot;);</span>
 <span class="fc" id="L147">        }</span>
@@ -199,8 +199,8 @@ public sealed interface RewriteProgram permits
     }
 
     private static String requireText(String value, String name) {
-<span class="pc bpc" id="L202" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L203">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L202" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L203">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
 <span class="fc" id="L205">        return value;</span>
     }
