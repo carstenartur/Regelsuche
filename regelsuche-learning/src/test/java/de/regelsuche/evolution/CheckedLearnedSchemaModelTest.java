@@ -628,6 +628,186 @@ class CheckedLearnedSchemaModelTest {
         }
     }
 
+    @Test void nativeVerifierPaysUnreturnedWorkOnSourceDomainAbort() { assertNativeVerifierAbort(VerifierMeter.Abort.SOURCE_RUNTIME,false,false); }
+    @Test void nativeVerifierDoesNotMisclassifyAnObserverArgumentError() { assertNativeVerifierAbort(VerifierMeter.Abort.SOURCE_ARGUMENT,false,false); }
+    @Test void nativeVerifierPaysUnreturnedWorkOnSourceDomainError() { assertNativeVerifierAbort(VerifierMeter.Abort.SOURCE_ERROR,false,false); }
+    @Test void nativeVerifierPaysAReceiptLostAtPublication() { assertNativeVerifierAbort(VerifierMeter.Abort.RESULT,false,false); }
+    @Test void nativeVerifierPaysAReceiptLostAtFinalClose() { assertNativeVerifierAbort(VerifierMeter.Abort.CLOSE,false,false); }
+    @Test void nativeVerifierPreservesRepeatedFailureAtEveryClose() { assertNativeVerifierAbort(VerifierMeter.Abort.SOURCE_ARGUMENT,true,false); }
+    @Test void nativeVerifierSuppressesDistinctCloseFailure() { assertNativeVerifierAbort(VerifierMeter.Abort.SOURCE_ARGUMENT,true,true); }
+    @Test void nativeVerifierKeepsTechnicalFailureAfterSemanticDomainRejection() { assertNativeVerifierAbort(VerifierMeter.Abort.REJECT_OBSERVATION,false,false); }
+    @Test void nativeVerifierKeepsCloseFailureAfterSemanticDomainRejection() { assertNativeVerifierAbort(VerifierMeter.Abort.REJECT_CLOSE,false,false); }
+    @Test void nativeVerifierKeepsRepeatedFailureAcrossOccurrenceReplay() { assertNativeVerifierAbort(VerifierMeter.Abort.SUBSTITUTION,true,false); }
+
+    private static void assertNativeVerifierAbort(VerifierMeter.Abort abort,boolean repeatClose,boolean distinctClose) {
+        var learned=CheckedLearnedSchemaModel.learn(formation);
+        var model=CheckedLearnedSchemaModel.load(learned.toCanonicalJson(),learned.inventoryHash());
+        Expr source=parse("(x+y)*(x-y)+y*y");
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var providers=model.nativeProviders();var verifier=NativeVerifier.registered(providers);
+        var proposal=providers.getFirst().candidates(state(source),context).moves().getFirst();
+        boolean rejected=abort==VerifierMeter.Abort.REJECT_OBSERVATION || abort==VerifierMeter.Abort.REJECT_CLOSE;
+        Expr received=rejected?parse("x/0"):source;
+        var meter=new VerifierMeter(abort,received,proposal);meter.repeatClose=repeatClose;
+        if(distinctClose)meter.closeFailure=new IllegalStateException("separate native verifier close failure");
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var thrown=assertThrows(Throwable.class,()->verifier.verify(state(received),proposal,context));
+            assertSame(meter.failure,thrown,"a technical failure is neither a rejection receipt nor a new self-suppression error");
+            assertNotNull(meter.work);assertTrue(meter.work.units>1);
+            assertEquals(meter.work.units,meter.afterFailure.getLast(),"unreturned root Work is settled after all frames close");
+            assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count(),"one settlement, separate from direct observation work");
+            assertTrue(meter.sawRoot,"the actual receiving state/proposal and verifier Work have an owner");
+            assertEquals(abort==VerifierMeter.Abort.RESULT || abort==VerifierMeter.Abort.CLOSE,meter.sawResult);
+            if(distinctClose)assertTrue(List.of(thrown.getSuppressed()).contains(meter.closeFailure));
+            else assertEquals(0,thrown.getSuppressed().length,"repeating the same failure does not create a suppressed copy");
+        }
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
+    @Test void nativeVerifierDelegatesAcceptedAndRejectedWorkOnlyInItsReceipt() {
+        var learned=CheckedLearnedSchemaModel.learn(formation);
+        var model=CheckedLearnedSchemaModel.load(learned.toCanonicalJson(),learned.inventoryHash());
+        Expr source=parse("(x+y)*(x-y)+y*y");
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var providers=model.nativeProviders();var verifier=NativeVerifier.registered(providers);
+        var proposal=providers.getFirst().candidates(state(source),context).moves().getFirst();
+        for(Expr received:List.of(source,parse("x/0"))) {
+            var meter=new VerifierMeter(VerifierMeter.Abort.NONE,received,proposal);
+            try(var scope=RetainedOperation.open(meter)) {
+                meter.scope=scope;var receipt=verifier.verify(state(received),proposal,context);
+                assertEquals(received==source,receipt.accepted());assertTrue(meter.sawRoot);assertTrue(meter.sawResult);
+                assertEquals(receipt.work(),meter.work.units);
+                assertEquals(List.of(4L),meter.afterResult,"normal close only; delegated Work is not also locally settled");
+                if(received!=source) {
+                    assertEquals("CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED",receipt.reason());
+                    assertEquals(2,receipt.work());assertNull(receipt.checkedProof());assertNull(receipt.ruleId());
+                }
+            }
+        }
+    }
+
+    @Test void importedSubstitutionDomainRejectionCannotHideOccurrenceCloseFailure() throws Exception {
+        var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(model,source);var data=(ObjectNode)new ObjectMapper().readTree(binding.canonicalEvidenceJson());
+        ((ObjectNode)data.get("bindings").get(0)).put("expression",CODEC.encodeExpression(parse("x/0")));
+        var invalid=withEvidence(binding,data.toString());
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var semantic=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),invalid,context));
+        assertEquals("checked scalar division needs nonzero literal denominator",semantic.getMessage());
+        var meter=new VerifierMeter(VerifierMeter.Abort.OCCURRENCE_REJECT_CLOSE,source,null);
+        try(var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            var thrown=assertThrows(Throwable.class,()->model.replayApplication(state(source),invalid,context));
+            assertSame(meter.failure,thrown);assertTrue(meter.sawRejectedDomain);assertTrue(meter.sawOutcome);
+            assertEquals(meter.work.units,meter.afterFailure.getLast());
+            assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count());
+        }
+        assertFalse(de.regelsuche.retention.RetainedJson.active());
+        assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+    }
+
+    /** Observes actual frame values; a nested application ledger cannot stand in for the verifier ledger. */
+    private static final class VerifierMeter implements RetainedOperation.Sink {
+        enum Abort { NONE,SOURCE_RUNTIME,SOURCE_ARGUMENT,SOURCE_ERROR,RESULT,CLOSE,REJECT_OBSERVATION,REJECT_CLOSE,SUBSTITUTION,OCCURRENCE_REJECT_CLOSE }
+        final Abort abort;final Expr received;final NativeSearchMove proposal;final Throwable failure;
+        RetainedOperation scope;CheckedSchemaSupport.Work work;RuntimeException closeFailure;
+        boolean tripped,repeatClose,sawRoot,sawResult,resultCheckpoint,sawRejectedDomain,sawOutcome;
+        final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
+        VerifierMeter(Abort abort,Expr received,NativeSearchMove proposal) {
+            this.abort=abort;this.received=received;this.proposal=proposal;
+            failure=abort==Abort.SOURCE_RUNTIME?new IllegalStateException("native verifier resource abort"):
+                abort==Abort.SOURCE_ERROR?new AssertionError("native verifier resource error"):
+                new IllegalArgumentException("native verifier observation "+abort);
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
+        @Override public void validationWork(long amount){executionWork(amount);}
+        @Override public void executionWork(long amount) {
+            if(tripped) {
+                afterFailure.add(amount);
+                if(repeatClose && amount==4) {
+                    if(closeFailure!=null)throw closeFailure;
+                    fail();
+                }
+                return;
+            }
+            var snapshot=snapshot();
+            if(resultCheckpoint)afterResult.add(amount);
+            boolean sourceAbort=(abort==Abort.SOURCE_RUNTIME || abort==Abort.SOURCE_ARGUMENT || abort==Abort.SOURCE_ERROR)
+                && snapshot.sourceGrowth();
+            if(sourceAbort || (abort==Abort.RESULT && snapshot.receipt())
+                    || (abort==Abort.CLOSE && resultCheckpoint && amount==4)
+                    || (abort==Abort.REJECT_CLOSE && sawRejectedDomain && amount==4)
+                    || (abort==Abort.SUBSTITUTION && snapshot.substitution())
+                    || (abort==Abort.OCCURRENCE_REJECT_CLOSE && sawRejectedDomain && sawOutcome && !snapshot.outcome() && amount==4)) {
+                tripped=true;fail();
+            }
+        }
+        @Override public void checkpoint() {
+            RetainedGraph.measure(scope);var snapshot=snapshot();
+            if(!tripped && abort==Abort.REJECT_OBSERVATION && sawRejectedDomain) {tripped=true;fail();}
+            resultCheckpoint|=snapshot.receipt();
+        }
+        private void fail() {
+            if(failure instanceof RuntimeException exception)throw exception;
+            throw (Error)failure;
+        }
+        private Snapshot snapshot() {
+            var queue=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
+            var visitor=new RetainedGraph.Visitor() {
+                @Override public void reference(Object value){if(value!=null)queue.add(value);}
+                @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+            };
+            visitor.reference(scope);
+            while(!queue.isEmpty()) {
+                Object value=queue.remove();if(!seen.add(value))continue;
+                if(value instanceof RetainedGraph.View view)view.retainedReferences(visitor);
+                else if(value instanceof Object[] array)for(Object item:array)visitor.reference(item);
+                else if(value instanceof Collection<?> items)items.forEach(visitor::reference);
+                else if(value instanceof Map<?,?> map)map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
+            }
+            boolean sourceGrowth=false,substitution=false;
+            boolean outcome=seen.stream().anyMatch(value->value instanceof de.regelsuche.transform.ExprMatcher.MatchOutcome);
+            boolean receipt=seen.stream().anyMatch(value->value instanceof NativeVerification);
+            sawResult|=receipt;sawOutcome|=outcome;
+            for(Object owner:seen)if(owner instanceof RetainedOperation.Frame frame) {
+                var direct=new ArrayList<Object>();
+                frame.retainedReferences(new RetainedGraph.Visitor() {
+                    @Override public void reference(Object value){direct.add(value);}
+                    @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+                });
+                for(Object ref:direct)if(ref instanceof Object[] values) {
+                    CheckedSchemaSupport.Work ledger=null;boolean boundary=false,source=false;Expr current=null;int waiting=-1;
+                    for(Object value:values) {
+                        if(value instanceof CheckedSchemaSupport.Work candidate)ledger=candidate;
+                        boundary|=proposal==null?value instanceof ExactTheoryEvidence.Binding:value==proposal;
+                        source|=value==received;
+                        if(value instanceof ArrayDeque<?> deque)waiting=deque.size();
+                        if(value instanceof Object[] slot && slot.length==1 && slot[0] instanceof RetainedGraph.View node
+                                && slot[0].getClass().getEnclosingClass()==CheckedSchemaSupport.class
+                                && slot[0].getClass().getSimpleName().equals("Node")) {
+                            var refs=new ArrayList<Object>();
+                            node.retainedReferences(new RetainedGraph.Visitor() {
+                                @Override public void reference(Object item){refs.add(item);}
+                                @Override public void requireExact(Object item,Class<?> type){assertEquals(type,item.getClass());}
+                            });
+                            current=(Expr)refs.getFirst();
+                        }
+                    }
+                    if(boundary && ledger!=null){work=ledger;sawRoot=true;}
+                    // Baseline domain frames allow a RED test to observe unpaid Work before the root owner exists.
+                    if(work==null && source && waiting>=0)work=ledger;
+                    sourceGrowth|=source && current==received && waiting>0;
+                    substitution|=!source && current!=null && outcome;
+                    sawRejectedDomain|=current instanceof BinaryExpr binary && binary.operator()==DIV
+                        && binary.right().equals(new NumberExpr(0));
+                }
+            }
+            return new Snapshot(sourceGrowth,substitution,receipt,outcome);
+        }
+        private record Snapshot(boolean sourceGrowth,boolean substitution,boolean receipt,boolean outcome) {}
+    }
+
     private static ExactTheoryEvidence.Binding applicationBinding(CheckedLearnedSchemaModel model,Expr source) {
         return ((de.regelsuche.transform.TransformationProvenance.ExactTheoryStep)moves(model,source).getFirst().provenance()).evidence().binding();
     }
