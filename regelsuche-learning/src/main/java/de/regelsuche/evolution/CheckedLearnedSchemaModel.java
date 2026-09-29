@@ -599,8 +599,10 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             TypedMoveSearch.Context context) {
         var work = new Work();
         work.add(1);
-        var results = new Object[2];
-        try (var retained = RetainedOperation.retainCompleted(4,this,source,binding,context,work,results)) {
+        try {
+            var results = new Object[2];
+            var retained = RetainedOperation.retainCompleted(4,this,source,binding,context,work,results);
+            Throwable primary=null;
             try {
                 try {
                     if (!NativeMoveProvider.carries(requiredAssumptions,source,context))
@@ -617,11 +619,14 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 }
                 RetainedOperation.work(2);
                 RetainedOperation.checkpoint();
-                return (NativeVerification) results[1];
             } catch (RuntimeException | Error failure) {
+                primary=failure;
                 observeImportFailure(failure);
                 throw failure;
+            } finally {
+                closeReplayFrame(retained,primary);
             }
+            return (NativeVerification) results[1];
         } catch (RuntimeException | Error failure) {
             // A result lost at frame close was not delegated, even if mathematically accepted.
             try { RetainedOperation.work(work.units); }
@@ -634,20 +639,39 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
 
     private VerifiedApplication replayBinding(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
         var replay = new BindingReplay(source,binding,work);
-        try (var retained = RetainedOperation.retainCompleted(1,replay);
-                var json = RetainedJson.open(); var jsonOwner = RetainedOperation.retain(json)) {
-            try {
-                try { replay.run(); }
-                catch (ReplayRejected rejected) { replay.rejection=rejected.getMessage(); }
-                // Semantic rejection is data until all observations and closes succeed.
-                // Otherwise a cleanup failure could be suppressed on a discarded rejection.
-                RetainedOperation.checkpoint();
-            } catch (RuntimeException | Error failure) {
-                observeImportFailure(failure);
-                throw failure;
+        RetainedOperation.Frame retained=null,jsonOwner=null;
+        Throwable failure=null;
+        try {
+            retained=RetainedOperation.retainCompleted(1,replay);
+            replay.json=RetainedJson.open();
+            RetainedOperation.work(1);
+            jsonOwner=RetainedOperation.retain(replay.json);
+            try { replay.run(); }
+            catch (ReplayRejected | DomainRejected rejected) {
+                replay.rejection=rejected.getMessage();replay.domainRejected=rejected instanceof DomainRejected;
+                RetainedOperation.work(2);
             }
+            // No semantic exception can own a technical error that an outer caller discards.
+            RetainedOperation.checkpoint();
+        } catch (RuntimeException | Error primary) {
+            failure=primary;
+            observeImportFailure(primary);
+        } finally {
+            // Continue releasing every successful acquisition after a failed close.
+            // The JSON scope stays an actual replay field even if acquiring its frame fails.
+            try { if(jsonOwner!=null)jsonOwner.close(); }
+            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }
+            try { if(replay.json!=null)replay.json.close(); }
+            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }
+            try { if(retained!=null)retained.close(); }
+            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }
         }
-        if (replay.rejection!=null) throw new ReplayRejected(replay.rejection);
+        if(failure instanceof RuntimeException runtime)throw runtime;
+        if(failure instanceof Error error)throw error;
+        if(replay.rejection!=null) {
+            if(replay.domainRejected)throw new DomainRejected(replay.rejection);
+            throw new ReplayRejected(replay.rejection);
+        }
         return replay.checked;
     }
 
@@ -662,14 +686,16 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         private TreeMap<String,Expr> substitutions;
         private Expr decoded;
         private VerifiedApplication checked;
+        private RetainedJson.Scope json;
         private String rejection;
+        private boolean domainRejected;
         BindingReplay(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
             this.source=source;this.binding=binding;this.work=work;
         }
         @Override public void retainedReferences(RetainedGraph.Visitor v) {
             v.reference(CheckedLearnedSchemaModel.this);v.reference(source);v.reference(binding);v.reference(work);
             v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);
-            v.reference(decoded);v.reference(checked);v.reference(rejection);
+            v.reference(decoded);v.reference(checked);v.reference(rejection);v.reference(json);
         }
         void run() {
             data = read(binding.canonicalEvidenceJson());
@@ -720,6 +746,11 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         catch (RuntimeException | Error observation) {
             if (observation != failure) failure.addSuppressed(observation);
         }
+    }
+    private static Throwable appendReplayFailure(Throwable primary,Throwable cleanup) {
+        if(primary==null)return cleanup;
+        if(cleanup!=primary)primary.addSuppressed(cleanup);
+        return primary;
     }
     private static void closeReplayFrame(RetainedOperation.Frame frame,Throwable primary) {
         try { if(frame!=null)frame.close(); }
