@@ -102,7 +102,11 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         }
     }
     private Optional<T> pull(long allowance,long before) {
-        while (total() - before < allowance) {
+        // A positive pull must advance one existing atomic action, even if its owner setup
+        // already exhausted the allowance. Its entire overrun remains charged from before.
+        boolean first=true;
+        while (first || total() - before < allowance) {
+            first=false;
             status = Status.READY;
             if (ready != null) return emit();
             if (!initialized) initialize();
