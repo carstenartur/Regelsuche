@@ -166,7 +166,7 @@ class CheckedSchemaProviderAccountingTest {
                     if (domain && items.contains(received.expression())) {
                         if (rootWork == null) rootWork = ledger; // Observe the unfixed source ledger for RED.
                         sourceGrowth |= items.stream().anyMatch(item -> item instanceof java.util.ArrayDeque<?> queue && !queue.isEmpty())
-                            && ledger != null && ledger.units > 2;
+                            && items.stream().anyMatch(this::currentAtSource);
                     }
                 }
             }
@@ -193,6 +193,12 @@ class CheckedSchemaProviderAccountingTest {
                 }
             }
             return new Snapshot(sourceGrowth, outcome, second);
+        }
+        private boolean currentAtSource(Object value) {
+            return value instanceof Object[] slot && slot.length == 1
+                && slot[0] instanceof de.regelsuche.retention.RetainedGraph.View node
+                && slot[0].getClass().getEnclosingClass() == CheckedSchemaSupport.class
+                && slot[0].getClass().getSimpleName().equals("Node") && refs(node).getFirst() == received.expression();
         }
         private record Snapshot(boolean sourceGrowth, boolean outcome, boolean second) {}
     }

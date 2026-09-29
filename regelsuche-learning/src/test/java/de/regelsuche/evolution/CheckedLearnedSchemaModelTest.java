@@ -199,6 +199,12 @@ class CheckedLearnedSchemaModelTest {
         var baseline = provider.candidates(MoveState.root(CODEC.encodeExpression(unmatched)), MoveContext.frozen("unused"));
         var attempted = provider.candidates(MoveState.root(CODEC.encodeExpression(rejected)), MoveContext.frozen("unused"));
         assertTrue(attempted.moves().isEmpty());
+        var nativeProvider=model.nativeProviders().getFirst();
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var nativeBaseline=nativeProvider.candidates(state(unmatched),context);
+        var nativeAttempt=nativeProvider.candidates(state(rejected),context);
+        assertEquals(baseline.work(),nativeBaseline.work());assertEquals(attempted.work(),nativeAttempt.work());
+        assertTrue(nativeAttempt.moves().isEmpty());assertFalse(nativeAttempt.complete());
         assertTrue(attempted.work().totalWorkUnitsV2() >= baseline.work().totalWorkUnitsV2() + 512,
             "the target exceeds 512 nodes, so its already visited nodes must remain in rejected-work accounting");
     }

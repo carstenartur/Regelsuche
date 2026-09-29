@@ -97,6 +97,13 @@ class CheckedSchemaApplicationPhasesTest {
             de.regelsuche.transform.PatternExpr.op(de.regelsuche.ast.BinaryOperator.ADD, b, a));
         var p = CheckedSchemaMatcherPlan.prepare(checked, 1, Map.of(), Set.of(checked.schemas().getFirst().id()));
         var source = MoveState.root(new CompiledAstReplayCodec().encodeExpression(new ExpressionParser().parseTerm("x+x")));
+        var legacy=checked.providers().getFirst().candidates(source,MoveContext.frozen("unused"));
+        var nativeState=new TypedMoveSearch.State(new ExpressionParser().parseTerm("x+x"),0,0,"",List.of(),Set.of(),0);
+        var nativeBatch=checked.nativeProviders().getFirst().candidates(nativeState,
+            TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+        assertTrue(nativeBatch.moves().isEmpty());assertTrue(nativeBatch.complete());
+        assertEquals(legacy.work(),nativeBatch.work());assertTrue(nativeBatch.work().delegatedMechanicalWorkUnits()>0);
+        assertEquals(de.regelsuche.transform.ExecutionWork.ZERO,nativeBatch.work().candidateWork());
         try (var cursor = p.provider().openSession(source, MoveContext.frozen("unused"))) {
             assertTrue(cursor.next(100000).isEmpty());
             assertTrue(cursor.snapshot().complete());
