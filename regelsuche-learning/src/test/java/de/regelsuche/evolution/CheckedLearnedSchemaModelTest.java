@@ -361,6 +361,33 @@ class CheckedLearnedSchemaModelTest {
         assertImportFailure(ImportMeter.Abort.REJECT_CLOSE);
     }
 
+    @Test void invalidPathRetainsPaidAllocationAndItsAlreadyAppendedPrefix() throws Exception {
+        var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(model,source);var data=(ObjectNode)new ObjectMapper().readTree(binding.canonicalEvidenceJson());
+        data.putArray("path").add(0).add(2);var meter=new ImportMeter(ImportMeter.Abort.NONE);
+        observeRejectedBuild(model,source,withEvidence(binding,data.toString()),meter);
+        assertAll(()->assertEquals(1,meter.pathAllocations,"owned path allocation is paid before invalid part"),
+            ()->assertEquals(1,meter.pathInsertions,"the valid prefix insertion is paid before invalid part"));
+    }
+
+    @Test void duplicateBindingRetainsThePaidMapInsertionBeforeRejection() throws Exception {
+        var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
+        var binding=applicationBinding(model,source);var data=(ObjectNode)new ObjectMapper().readTree(binding.canonicalEvidenceJson());
+        var duplicate=((ObjectNode)data.get("bindings").get(0)).deepCopy().put("expression",CODEC.encodeExpression(parse("991")));
+        ((com.fasterxml.jackson.databind.node.ArrayNode)data.get("bindings")).add(duplicate);
+        var meter=new ImportMeter(ImportMeter.Abort.NONE);meter.duplicateValue=parse("991");
+        observeRejectedBuild(model,source,withEvidence(binding,data.toString()),meter);
+        assertEquals(1,meter.duplicateInsertions,"the replacing map insertion remains paid despite duplicate rejection");
+    }
+
+    private static void observeRejectedBuild(CheckedLearnedSchemaModel model,Expr source,ExactTheoryEvidence.Binding binding,ImportMeter meter) {
+        try (var scope=RetainedOperation.open(meter)) {
+            meter.scope=scope;
+            assertRejectedImport(model.replayApplication(state(source),binding,
+                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)),"partial import build");
+        }
+    }
+
     @Test void successfulImportDelegatesItsReceiptWithoutAlsoSettlingItLocally() {
         var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
         var binding=applicationBinding(model,source);var meter=new ImportMeter(ImportMeter.Abort.NONE);
@@ -400,7 +427,7 @@ class CheckedLearnedSchemaModelTest {
     private static final class ImportMeter implements RetainedOperation.Sink {
         enum Abort { NONE, BINDINGS, RESULT, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE }
         final Abort abort;RetainedOperation scope;CheckedSchemaSupport.Work work;IllegalArgumentException failure;
-        long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
+        int pathAllocations,pathInsertions,duplicateInsertions;Expr duplicateValue;long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
         ImportMeter(Abort abort){this.abort=abort;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
         @Override public void validationWork(long amount){executionWork(amount);}
@@ -408,6 +435,14 @@ class CheckedLearnedSchemaModelTest {
             directWork=Math.addExact(directWork,amount);
             if (failure!=null) {afterFailure.add(amount);return;}
             var owners=owners();
+            for (Object value:bindingReplayReferences(owners)) {
+                if (value instanceof ArrayList<?> path) {
+                    if (amount==2 && path.isEmpty()) pathAllocations++;
+                    if (amount==1 && path.equals(List.of(0))) pathInsertions++;
+                }
+                if (amount==2 && duplicateValue!=null && value instanceof java.util.TreeMap<?,?> map
+                        && map.containsValue(duplicateValue)) duplicateInsertions++;
+            }
             if (sawResult) afterResult.add(amount);
             boolean result=owners.stream().anyMatch(value->value instanceof NativeVerification);
             boolean bindings=owners.stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
@@ -422,22 +457,23 @@ class CheckedLearnedSchemaModelTest {
         @Override public void checkpoint() {
             retentionWork=Math.addExact(retentionWork,RetainedGraph.measure(scope).work());
             var owners=owners();
-            if (rejectedSource!=null) for (Object owner:owners) {
-                if (owner instanceof RetainedGraph.View view && owner.getClass().getSimpleName().equals("BindingReplay")) {
-                    var direct=new ArrayList<Object>();
-                    view.retainedReferences(new RetainedGraph.Visitor() {
-                        @Override public void reference(Object value){direct.add(value);}
-                        @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
-                    });
-                    sawRejection|=direct.contains(rejectedSource);
-                }
-            }
+            sawRejection|=rejectedSource!=null && bindingReplayReferences(owners).contains(rejectedSource);
             if (failure==null && abort==Abort.REJECT_OBSERVATION && sawRejection) {
                 failure=new IllegalArgumentException("injected rejected import observation");throw failure;
             }
             sawBindings|=owners.stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
                 && !map.isEmpty() && map.values().stream().allMatch(item->item instanceof Expr));
             sawResult|=owners.stream().anyMatch(value->value instanceof NativeVerification);
+        }
+        private static List<Object> bindingReplayReferences(Set<Object> owners) {
+            var direct=new ArrayList<Object>();
+            for (Object owner:owners) if (owner instanceof RetainedGraph.View view
+                    && owner.getClass().getSimpleName().equals("BindingReplay"))
+                view.retainedReferences(new RetainedGraph.Visitor() {
+                    @Override public void reference(Object value){direct.add(value);}
+                    @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+                });
+            return direct;
         }
         private Set<Object> owners() {
             var queue=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
