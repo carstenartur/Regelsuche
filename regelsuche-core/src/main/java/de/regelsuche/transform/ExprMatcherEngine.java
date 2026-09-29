@@ -317,6 +317,7 @@ final class ExprMatcherEngine {
                 RetainedOperation.work(1);
                 lists.current = evaluate(not.matcher(),expression,state,session,atRoot);
                 RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
                 boolean excluded = !lists.current.isEmpty();
                 RetainedOperation.work(1);
                 if (excluded) return List.of();
