@@ -85,23 +85,23 @@ final class ExprMatcherEngine {
             return List.of();
         }
         if (matcher instanceof ExprMatcher.Any) {
-            return List.of(state.traced("any"));
+            return singleton(state.traced("any"));
         }
         if (matcher instanceof ExprMatcher.LiteralNumber literal) {
             return expression instanceof NumberExpr number
                     && number.value().equals(literal.value())
-                ? List.of(state.traced("literal-number"))
+                ? singleton(state.traced("literal-number"))
                 : List.of();
         }
         if (matcher instanceof ExprMatcher.LiteralVariable literal) {
             return expression instanceof VariableExpr variable
                     && variable.name().equals(literal.name())
-                ? List.of(state.traced("literal-variable"))
+                ? singleton(state.traced("literal-variable"))
                 : List.of();
         }
         if (matcher instanceof ExprMatcher.NumberProperty property) {
             return matchesNumberProperty(expression, property.kind())
-                ? List.of(state.traced(
+                ? singleton(state.traced(
                     MatcherTrace.text("number-property:",property.kind().name())))
                 : List.of();
         }
@@ -310,14 +310,27 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        int diagnosticCount = session.diagnostics.size();
-        List<State> excluded = evaluate(
-            not.matcher(), expression, state, session, atRoot);
-        if (!excluded.isEmpty()
-                || session.diagnostics.size() > diagnosticCount) {
-            return List.of();
+        var lists = new StateLists();
+        try (var owned = RetainedOperation.retainCompleted(1,not,expression,state,session,lists)) {
+            try {
+                int diagnosticCount = session.diagnostics.size();
+                RetainedOperation.work(1);
+                lists.current = evaluate(not.matcher(),expression,state,session,atRoot);
+                RetainedOperation.work(1);
+                boolean excluded = !lists.current.isEmpty();
+                RetainedOperation.work(1);
+                if (excluded) return List.of();
+                boolean inconclusive = session.diagnostics.size() > diagnosticCount;
+                RetainedOperation.work(2);
+                if (inconclusive) return List.of();
+                lists.result = singleton(state.traced("not"));
+                RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
+                return lists.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
         }
-        return List.of(state.traced("not"));
     }
 
     private static List<State> matchOperation(
@@ -538,10 +551,18 @@ final class ExprMatcherEngine {
             sameAs
         );
         return strength != null
-            ? List.of(state
+            ? singleton(state
                 .withStrength(strength)
                 .traced("same-as"))
             : List.of();
+    }
+
+    /** Own and pay a newly produced result list before its caller can adopt it. */
+    private static List<State> singleton(State state) {
+        List<State> result = List.of(state);
+        try (var owned = RetainedOperation.retainCompleted(2,state,result)) {
+            return result;
+        }
     }
 
     /** Returns the existing recognition strength, or null for no match; no result wrapper is allocated. */
