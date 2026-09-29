@@ -189,49 +189,58 @@ final class CheckedSchemaSupport {
         pending.push(new Node(root, 0));
         var current = new Node[1];
         // Queue/backing, root wrapper/insertion and the actual current slot.
-        try (var retained=RetainedOperation.retainCompleted(6,root,bounds,work,pending,current)) {
+        var retained=RetainedOperation.retainCompleted(6,root,bounds,work,pending,current);
+        Throwable primary=null;
         try {
-        int count = 0;
-        while (!pending.isEmpty()) {
-            var node = current[0] = pending.pop();
-            // The caller owns this visited-work ledger, including a failed prefix.
-            work.add(1);
-            RetainedOperation.work(2);
-            if (++count > bounds.maximumExpressionNodes() || node.depth() > bounds.maximumDepth()) {
-                throw new IllegalArgumentException("checked scalar polynomial structure limit");
-            }
-            switch (node.value()) {
-                case NumberExpr number -> literal(number.value(), bounds);
-                case VariableExpr variable -> {
-                    if (variable.name().length() > 128) throw new IllegalArgumentException("checked symbol size limit");
+            int count = 0;
+            while (!pending.isEmpty()) {
+                var node = current[0] = pending.pop();
+                // The caller owns this visited-work ledger, including a failed prefix.
+                work.add(1);
+                RetainedOperation.work(2);
+                if (++count > bounds.maximumExpressionNodes() || node.depth() > bounds.maximumDepth()) {
+                    throw new IllegalArgumentException("checked scalar polynomial structure limit");
                 }
-                case BinaryExpr binary -> {
-                    if (binary.operator() == BinaryOperator.DIV && (!(binary.right() instanceof NumberExpr number)
-                            || number.value().numerator().signum() == 0)) {
-                        throw new IllegalArgumentException("checked scalar division needs nonzero literal denominator");
+                switch (node.value()) {
+                    case NumberExpr number -> literal(number.value(), bounds);
+                    case VariableExpr variable -> {
+                        if (variable.name().length() > 128) throw new IllegalArgumentException("checked symbol size limit");
                     }
-                    if (binary.operator() == BinaryOperator.POW && (!(binary.right() instanceof NumberExpr number)
-                            || !number.value().isInteger() || number.value().numerator().signum() < 0
-                            || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) > 0)) {
-                        throw new IllegalArgumentException("checked scalar power needs bounded nonnegative literal exponent");
+                    case BinaryExpr binary -> {
+                        if (binary.operator() == BinaryOperator.DIV && (!(binary.right() instanceof NumberExpr number)
+                                || number.value().numerator().signum() == 0)) {
+                            throw new IllegalArgumentException("checked scalar division needs nonzero literal denominator");
+                        }
+                        if (binary.operator() == BinaryOperator.POW && (!(binary.right() instanceof NumberExpr number)
+                                || !number.value().isInteger() || number.value().numerator().signum() < 0
+                                || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) > 0)) {
+                            throw new IllegalArgumentException("checked scalar power needs bounded nonnegative literal exponent");
+                        }
+                        pending.push(new Node(binary.right(), node.depth() + 1));
+                        RetainedOperation.work(2);
+                        pending.push(new Node(binary.left(), node.depth() + 1));
+                        RetainedOperation.work(2);
+                        RetainedOperation.checkpoint();
                     }
-                    pending.push(new Node(binary.right(), node.depth() + 1));
-                    RetainedOperation.work(2);
-                    pending.push(new Node(binary.left(), node.depth() + 1));
-                    RetainedOperation.work(2);
-                    RetainedOperation.checkpoint();
+                    default -> throw new IllegalArgumentException("outside checked scalar rational polynomial domain");
                 }
-                default -> throw new IllegalArgumentException("outside checked scalar rational polynomial domain");
             }
-        }
-        RetainedOperation.checkpoint();
+            RetainedOperation.checkpoint();
         } catch (RuntimeException | Error failure) {
+            primary=failure;
             try { RetainedOperation.checkpoint(); }
             catch (RuntimeException | Error observation) {
                 if (observation != failure) failure.addSuppressed(observation);
             }
             throw failure;
-        }
+        } finally {
+            // A resource observer may throw the same object again on close. Avoid
+            // try-with-resources self-suppression replacing the original failure.
+            try { if(retained!=null)retained.close(); }
+            catch (RuntimeException | Error cleanup) {
+                if(primary==null)throw cleanup;
+                if(cleanup!=primary)primary.addSuppressed(cleanup);
+            }
         }
     }
 
