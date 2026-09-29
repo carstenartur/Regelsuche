@@ -356,8 +356,10 @@ class CheckedLearnedSchemaModelTest {
         assertImportFailure(ImportMeter.Abort.CLOSE);
     }
 
-    @Test void semanticRejectionCannotHideObservationOrCleanupFailures() {
+    @Test void semanticRejectionCannotHideObservationFailures() {
         assertImportFailure(ImportMeter.Abort.REJECT_OBSERVATION);
+    }
+    @Test void semanticRejectionCannotHideCleanupFailures() {
         assertImportFailure(ImportMeter.Abort.REJECT_CLOSE);
     }
 
@@ -396,6 +398,7 @@ class CheckedLearnedSchemaModelTest {
             var result=model.replayApplication(state(source),binding,
                 TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
             assertTrue(result.accepted());assertTrue(meter.sawResult);assertTrue(meter.sawBindings);
+            assertTrue(meter.sawBindingsWithOutcome,"the returned match outcome remains owned throughout binding decoding");
             assertEquals(result.work(),meter.work.units);
             assertEquals(List.of(4L),meter.afterResult,"the final frame close is direct work; the receipt is only delegated");
         }
@@ -427,7 +430,7 @@ class CheckedLearnedSchemaModelTest {
     private static final class ImportMeter implements RetainedOperation.Sink {
         enum Abort { NONE, BINDINGS, RESULT, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE }
         final Abort abort;RetainedOperation scope;CheckedSchemaSupport.Work work;IllegalArgumentException failure;
-        int pathAllocations,pathInsertions,duplicateInsertions;Expr duplicateValue;long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
+        int pathAllocations,pathInsertions,duplicateInsertions;Expr duplicateValue;long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection,sawBindingsWithOutcome;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
         ImportMeter(Abort abort){this.abort=abort;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
         @Override public void validationWork(long amount){executionWork(amount);}
@@ -445,7 +448,7 @@ class CheckedLearnedSchemaModelTest {
             }
             if (sawResult) afterResult.add(amount);
             boolean result=owners.stream().anyMatch(value->value instanceof NativeVerification);
-            boolean bindings=owners.stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
+            boolean bindings=bindingReplayReferences(owners).stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
                 && !map.isEmpty() && map.values().stream().allMatch(item->item instanceof Expr));
             if ((abort==Abort.BINDINGS && bindings && work!=null && work.units>1)
                     || (abort==Abort.RESULT && result)
@@ -461,8 +464,10 @@ class CheckedLearnedSchemaModelTest {
             if (failure==null && abort==Abort.REJECT_OBSERVATION && sawRejection) {
                 failure=new IllegalArgumentException("injected rejected import observation");throw failure;
             }
-            sawBindings|=owners.stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
+            boolean bindings=bindingReplayReferences(owners).stream().anyMatch(value->value instanceof java.util.TreeMap<?,?> map
                 && !map.isEmpty() && map.values().stream().allMatch(item->item instanceof Expr));
+            sawBindings|=bindings;
+            sawBindingsWithOutcome|=bindings && owners.stream().anyMatch(value->value instanceof de.regelsuche.transform.ExprMatcher.MatchOutcome);
             sawResult|=owners.stream().anyMatch(value->value instanceof NativeVerification);
         }
         private static List<Object> bindingReplayReferences(Set<Object> owners) {
