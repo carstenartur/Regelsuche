@@ -986,7 +986,101 @@ class CheckedLearnedSchemaModelTest {
                 nativeSource.close();legacySource.close();
                 assertEquals(legacyMeter.work(),nativeMeter.work());
             }
-            System.out.println("P04_CURSOR_GOLD "+new ObjectMapper().writeValueAsString(observations));
+            var json=new ObjectMapper();
+            try(var golden=getClass().getResourceAsStream("checked-schema-cursor-v1-gold.json")) {
+                assertNotNull(golden);assertEquals(json.readTree(golden),json.readTree(json.writeValueAsString(observations)));
+            }
+        }
+
+        @Test void cursorDoesNotSwallowAstObserverArguments() { assertCursorAbort(CursorFault.AST,false); }
+        @Test void cursorAstObserverErrorIsTerminal() { assertCursorAbort(CursorFault.AST,true); }
+        @Test void cursorDomainFailureRetainsInitializationWork() { assertCursorAbort(CursorFault.DOMAIN,false); }
+        @Test void cursorConstructorFailureDoesNotInventAPhaseOrRestart() { assertCursorAbort(CursorFault.CONSTRUCTOR,false); }
+        @Test void cursorSubstitutionFailureRetainsActualPrepayment() { assertCursorAbort(CursorFault.SUBSTITUTION,false); }
+        @Test void cursorTargetFailureRetainsActualPrepayment() { assertCursorAbort(CursorFault.TARGET,false); }
+        @Test void cursorTotalObservationFailureIsTerminal() { assertCursorAbort(CursorFault.TOTAL,false); }
+        @Test void cursorCompletedCandidateObservationFailureIsTerminal() { assertCursorAbort(CursorFault.RESULT,false); }
+        @Test void cursorCloseDebitFailureStillReleasesMutableOwnership() { assertCursorAbort(CursorFault.CLOSE,false); }
+        private static void assertCursorAbort(CursorFault fault,boolean error) {
+            var plan=CheckedSchemaMatcherPlan.prepare(model,1,Map.of(),Set.of(selected));
+            Expr source=parse(MULTIPLE);
+            var payment=new IncrementalProviderContract.Meter(IncrementalProviderContract.NATIVE_PREPAID_REVISION);
+            var cursor=CheckedSchemaCursor.nativeSource(plan,source,payment);
+            var meter=new CursorMeter(fault,source,error);
+            try(var operation=RetainedOperation.open(meter)) {
+                meter.scope=operation;
+                try(var held=RetainedOperation.retain(cursor)) {
+                    meter.armed=true;
+                    if(fault==CursorFault.CLOSE) {
+                        meter.armed=false;cursor.next(2);meter.armed=true;meter.closing=true;
+                        assertSame(meter.failure,assertThrows(Throwable.class,cursor::close));
+                        assertEquals(IncrementalProviderContract.Status.CLOSED,cursor.status());
+                        assertFalse(graph(cursor).contains(source),"the actual source/pending graph is released despite the debit fault");
+                    } else {
+                        assertSame(meter.failure,assertThrows(Throwable.class,()->cursor.next(100000)));
+                        assertEquals(IncrementalProviderContract.Status.FAILED,cursor.status());
+                        var paid=payment.work();
+                        assertTrue(cursor.next(100000).isEmpty());assertEquals(paid,payment.work(),"no restart or repeated payment after technical failure");
+                        if(fault==CursorFault.DOMAIN) assertEquals(meter.domainWork.units,payment.work().operations().get("LOAD"));
+                        if(fault==CursorFault.CONSTRUCTOR) {
+                            assertTrue(payment.work().prepaid().phaseCalls().isEmpty());
+                            assertEquals(1,payment.work().prepaid().openApplications());
+                        }
+                        if(fault==CursorFault.SUBSTITUTION || fault==CursorFault.TARGET)
+                            assertEquals(meter.applicationWork.units,payment.work().prepaid().chargedUnits());
+                        if(fault==CursorFault.RESULT)assertEquals(1,payment.work().mathematics().exactTheorySteps());
+                    }
+                    meter.armed=false;cursor.close();
+                    assertFalse(graph(cursor).contains(source));
+                }
+            }
+            assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+        }
+        enum CursorFault { AST,DOMAIN,CONSTRUCTOR,SUBSTITUTION,TARGET,TOTAL,RESULT,CLOSE }
+        private static final class CursorMeter implements RetainedOperation.Sink {
+            final CursorFault fault;final Expr source;final Throwable failure;
+            RetainedOperation scope;boolean armed,tripped,closing;
+            CheckedSchemaSupport.Work applicationWork,domainWork;
+            CursorMeter(CursorFault fault,Expr source,boolean error) {
+                this.fault=fault;this.source=source;
+                failure=error?new AssertionError("cursor observer error"):new IllegalArgumentException("cursor observer "+fault);
+            }
+            @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
+            @Override public long observedWork(){if(armed && !tripped && fault==CursorFault.TOTAL)trip();return 0;}
+            @Override public void validationWork(long units){if(armed && !tripped && fault==CursorFault.AST)trip();}
+            @Override public void executionWork(long units) {
+                if(!armed || tripped)return;
+                var seen=graph(scope);CheckedSchemaMatcherPlan.ApplicationSteps application=null;
+                for(Object value:seen)if(value instanceof CheckedSchemaMatcherPlan.ApplicationSteps steps) {
+                    application=steps;applicationWork=refs((RetainedGraph.View)steps).stream()
+                        .filter(CheckedSchemaSupport.Work.class::isInstance).map(CheckedSchemaSupport.Work.class::cast).findFirst().orElseThrow();
+                }
+                boolean domainVisited=false,sourceVisited=false;
+                for(Object value:seen)if(value instanceof RetainedOperation.Frame frame)
+                    for(Object ref:refs(frame))if(ref instanceof Object[] values) {
+                        var items=java.util.Arrays.asList(values);
+                        boolean current=items.stream().anyMatch(item->item instanceof Object[] slot && slot.length==1 && slot[0]!=null
+                            && slot[0].getClass().getEnclosingClass()==CheckedSchemaSupport.class && slot[0].getClass().getSimpleName().equals("Node"));
+                        if(current) {
+                            if(items.contains(source)) {
+                                sourceVisited=true;domainWork=items.stream().filter(CheckedSchemaSupport.Work.class::isInstance)
+                                    .map(CheckedSchemaSupport.Work.class::cast).findFirst().orElseThrow();
+                            }
+                            domainVisited|=items.contains(applicationWork);
+                        }
+                    }
+                if((fault==CursorFault.DOMAIN && sourceVisited) || (fault==CursorFault.CLOSE && closing)
+                        || (fault==CursorFault.CONSTRUCTOR && application!=null && application.phase()==null)
+                        || (fault==CursorFault.SUBSTITUTION && domainVisited && application!=null
+                            && application.phase()==IncrementalProviderContract.ApplicationPhase.SUBSTITUTION_DOMAIN)
+                        || (fault==CursorFault.TARGET && domainVisited && application!=null
+                            && application.phase()==IncrementalProviderContract.ApplicationPhase.TARGET_DOMAIN))trip();
+            }
+            @Override public void checkpoint(){
+                RetainedGraph.measure(scope);
+                if(armed && !tripped && fault==CursorFault.RESULT && graph(scope).stream().anyMatch(NativeMoveProof.class::isInstance))trip();
+            }
+            private void trip(){tripped=true;if(failure instanceof RuntimeException runtime)throw runtime;throw (Error)failure;}
         }
 
         @Test void sourceObserverArgumentFailureRemainsTechnical() { assertAbort(Abort.DOMAIN_ARGUMENT, false, false); }
