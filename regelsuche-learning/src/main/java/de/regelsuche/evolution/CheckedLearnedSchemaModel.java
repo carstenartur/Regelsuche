@@ -778,8 +778,8 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
             var work=new Work();work.add(1);
-            var pending=new Object[5];
             try {
+                var pending=new Object[5];
                 var retained=RetainedOperation.retainCompleted(7,CheckedLearnedSchemaModel.this,source,move,context,work,pending);
                 Throwable primary=null;
                 try {

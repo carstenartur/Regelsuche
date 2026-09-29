@@ -213,15 +213,7 @@ final class CheckedSchemaSupport {
                             if (variable.name().length() > 128) throw new DomainRejected("checked symbol size limit");
                         }
                         case BinaryExpr binary -> {
-                            if (binary.operator() == BinaryOperator.DIV && (!(binary.right() instanceof NumberExpr number)
-                                    || number.value().numerator().signum() == 0)) {
-                                throw new DomainRejected("checked scalar division needs nonzero literal denominator");
-                            }
-                            if (binary.operator() == BinaryOperator.POW && (!(binary.right() instanceof NumberExpr number)
-                                    || !number.value().isInteger() || number.value().numerator().signum() < 0
-                                    || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) > 0)) {
-                                throw new DomainRejected("checked scalar power needs bounded nonnegative literal exponent");
-                            }
+                            binaryDomain(binary,bounds);
                             pending.push(new Node(binary.right(), node.depth() + 1));
                             RetainedOperation.work(2);
                             pending.push(new Node(binary.left(), node.depth() + 1));
@@ -255,6 +247,18 @@ final class CheckedSchemaSupport {
             }
         }
         if(rejection[0]!=null)throw new DomainRejected(rejection[0]);
+    }
+
+    private static void binaryDomain(BinaryExpr binary, CheckedLearnedSchemaModel.Bounds bounds) {
+        if (binary.operator() == BinaryOperator.DIV && (!(binary.right() instanceof NumberExpr number)
+                || number.value().numerator().signum() == 0)) {
+            throw new DomainRejected("checked scalar division needs nonzero literal denominator");
+        }
+        if (binary.operator() == BinaryOperator.POW && (!(binary.right() instanceof NumberExpr number)
+                || !number.value().isInteger() || number.value().numerator().signum() < 0
+                || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) > 0)) {
+            throw new DomainRejected("checked scalar power needs bounded nonnegative literal exponent");
+        }
     }
 
     private static void literal(ExactRational value, CheckedLearnedSchemaModel.Bounds bounds) {
