@@ -193,4 +193,36 @@ class AstExpressionValidationTest {
         }
     }
 
+    private enum FailurePhase { VALIDATION, GENERATED_TEXT, GENERATED_OBSERVATION, RESULT_PUBLICATION }
+    @Test void observerOriginInvalidExpressionKeepsItsIdentityEvenWithANullMessage() {
+        for (var phase : FailurePhase.values()) for (String message : Arrays.asList(null, "observer rejection")) {
+            var source = NumberExpr.exact("1/3"); var sink = new Observation();
+            var failure = new AstExpressionValidation.InvalidExpression(message);
+            var close = new ArithmeticException("distinct close"); boolean[] failed = {false};
+            try (var scope = RetainedOperation.open(sink)) {
+                sink.scope = scope;
+                sink.validate = units -> {
+                    if (phase == FailurePhase.VALIDATION && units == 3) { failed[0] = true; throw failure; }
+                };
+                sink.check = values -> {
+                    if (phase == FailurePhase.GENERATED_OBSERVATION && hasText(values, "1/3")) {
+                        failed[0] = true; throw failure;
+                    }
+                };
+                sink.charge = units -> {
+                    if (failed[0] && units == 4 && !owns(sink.references(), source)) throw close;
+                    boolean produced = phase == FailurePhase.GENERATED_TEXT && hasText(sink.references(), "1/3");
+                    boolean result = phase == FailurePhase.RESULT_PUBLICATION && sink.references().stream()
+                        .anyMatch(AstExpressionValidation.Inspection.class::isInstance);
+                    if (!failed[0] && (produced || result)) { failed[0] = true; throw failure; }
+                };
+                assertSame(failure, assertThrows(AstExpressionValidation.InvalidExpression.class,
+                    () -> AstExpressionValidation.inspect(source)), phase.toString());
+                assertArrayEquals(new Throwable[]{close}, failure.getSuppressed());
+                assertFalse(owns(sink.references(), source));
+                sink.charge = units -> {}; sink.check = values -> {};
+            }
+        }
+    }
+
 }
