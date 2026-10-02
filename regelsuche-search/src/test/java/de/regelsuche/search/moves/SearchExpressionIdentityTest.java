@@ -123,6 +123,100 @@ class SearchExpressionIdentityTest {
         }
     }
 
+    @Test void repeatedScalarIdentitiesDoNotMultiplyEncodingStorageOrHashWork() {
+        var integer = BigInteger.ONE.shiftLeft(8192).add(BigInteger.ONE);
+        var rational = new ExactRational(integer, BigInteger.ONE);
+        var arguments = new ArrayList<Expr>();
+        for (int i = 0; i < 256; i++) arguments.add(new NumberExpr(rational));
+        var expression = new FunctionExpr("f", arguments);
+        long sourceCharacters = RetainedGraph.measure(expression).retained().characters();
+        try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
+            var sink = new IndexSink(store);
+            try (var operation = RetainedOperation.open(sink)) {
+                sink.operation = operation;
+                SearchExpressionIdentity.hash(store, expression);
+                assertTrue(sink.peak.characters() <= sourceCharacters + integer.toByteArray().length + 1,
+                    "only one encoding per scalar identity may be retained");
+                assertTrue(store.work() < 20_000, "the shared scalar hash must also be reused");
+                assertEquals(0, RetainedGraph.measure(sink).retained().characters());
+            } finally { sink.operation = null; }
+        }
+    }
+
+    @Test void differentlySharedDagsEnforceScratchBoundsBeforeExpandingAllPairs() {
+        var expressions = differentlySharedDags(5);
+        var limits = new SearchExpressionStore.Limits(10_000, 100_000, 6_000, 1);
+        long sourceReferences = RetainedGraph.measure(expressions).retained().references();
+        assertTrue(sourceReferences < limits.references());
+        try (var store = new SearchExpressionStore(limits)) {
+            var sink = new IndexSink(store);
+            try (var operation = RetainedOperation.open(sink)) {
+                sink.operation = operation;
+                assertThrows(SearchExpressionStore.LimitExceeded.class,
+                    () -> SearchExpressionIdentity.same(store, expressions.get(0), expressions.get(1)));
+                assertTrue(sink.peak.references() >= limits.references(), "rejected scratch must be observed before release");
+                assertTrue(sink.peak.references() < limits.references() + sourceReferences + 100,
+                    "scratch must stop at its local limit, not after the whole pair graph");
+                assertTrue(store.work() > 0);
+                assertEquals(0, store.statistics().liveNodes());
+                assertEquals(0, RetainedGraph.measure(sink).retained().nodes());
+            } finally { sink.operation = null; }
+            assertThrows(SearchExpressionStore.LimitExceeded.class,
+                () -> SearchExpressionIdentity.same(store, expressions.get(0), expressions.get(1)),
+                "the local bound must also work without an observer");
+        }
+    }
+
+    @Test void cancellationAfterPopulatingHashOrComparisonScratchPreservesFailureAndOwnership() {
+        assertPopulatedCancellation(false);
+        assertPopulatedCancellation(true);
+    }
+
+    private static void assertPopulatedCancellation(boolean comparison) {
+        try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
+            var expected = store.intern(chain(20));
+            var before = store.statistics();
+            long workBefore = store.work();
+            var sink = new IndexSink(store);
+            try (var operation = RetainedOperation.open(sink)) {
+                sink.operation = operation;
+                sink.abortAtCheckpoint = 2;
+                var failure = assertThrows(IndexAbort.class, () -> {
+                    if (comparison) SearchExpressionIdentity.same(store, chain(20), chain(20));
+                    else store.intern(chain(20));
+                });
+                assertSame(sink.failure, failure);
+                assertTrue(sink.peak.references() > sink.firstReferences + 100, "cancellation observes populated scratch");
+                assertTrue(store.work() > workBefore + 100, "completed traversal and cleanup are paid");
+                assertEquals(before, store.statistics());
+                assertEquals(before.liveNodes(), RetainedGraph.measure(sink).retained().nodes(), "temporary trees are released");
+                sink.abortAtCheckpoint = Integer.MAX_VALUE;
+                assertSame(expected, store.intern(chain(20)));
+            } finally { sink.operation = null; }
+        }
+    }
+
+    private static List<Expr> differentlySharedDags(int depth) {
+        var leaves = new ArrayList<Expr>();
+        for (int i = 0; i < 1 << depth; i++) leaves.add(dag(depth));
+        Expr left = balancedTree(leaves);
+        leaves.clear();
+        for (int i = 0; i < 1 << depth; i++) leaves.add(new VariableExpr("x"));
+        Expr right = balancedTree(leaves);
+        for (int i = 0; i < depth; i++) right = new BinaryExpr(right, BinaryOperator.ADD, right);
+        return List.of(left, right);
+    }
+
+    private static Expr balancedTree(List<Expr> leaves) {
+        while (leaves.size() > 1) {
+            var next = new ArrayList<Expr>();
+            for (int i = 0; i < leaves.size(); i += 2)
+                next.add(new BinaryExpr(leaves.get(i), BinaryOperator.ADD, leaves.get(i + 1)));
+            leaves = next;
+        }
+        return leaves.getFirst();
+    }
+
     private static long hitWork(Expr first, Expr equal) {
         try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var expected = store.intern(first);
@@ -148,15 +242,18 @@ class SearchExpressionIdentityTest {
         RetainedOperation operation;
         RetainedGraph.Usage peak = new RetainedGraph.Usage(0, 0, 0);
         boolean abort, checkpointFailed;
+        int checkpoints, abortAtCheckpoint = Integer.MAX_VALUE;
+        long firstReferences;
         IndexSink(SearchExpressionStore store) { this.store = store; }
         @Override public void retainedReferences(RetainedGraph.Visitor v) { v.reference(store); v.reference(operation); }
-        @Override public void executionWork(long units) { if (abort && checkpointFailed) throw failure; }
+        @Override public void executionWork(long units) { if ((abort || checkpoints >= abortAtCheckpoint) && checkpointFailed) throw failure; }
         @Override public void validationWork(long units) {}
         @Override public void checkpoint() {
             var observed = RetainedGraph.measure(this).retained();
+            if (++checkpoints == 1) firstReferences = observed.references();
             peak = new RetainedGraph.Usage(Math.max(peak.nodes(), observed.nodes()),
                 Math.max(peak.characters(), observed.characters()), Math.max(peak.references(), observed.references()));
-            if (abort) { checkpointFailed = true; throw failure; }
+            if (abort || checkpoints >= abortAtCheckpoint) { checkpointFailed = true; throw failure; }
         }
     }
 

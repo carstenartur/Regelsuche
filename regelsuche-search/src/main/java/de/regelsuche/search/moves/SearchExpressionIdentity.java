@@ -11,18 +11,20 @@ import java.util.IdentityHashMap;
 final class SearchExpressionIdentity implements RetainedGraph.View {
     private final SearchExpressionStore store;
     private final Expr left, right;
-    // Append-only ownership makes the final observation dominate every scratch
-    // state in this atomic operation. This avoids rescanning the entire search
-    // graph at each child edge; the extra retained frames/buffers are real and paid.
+    // Monotone ownership between bounded checkpoints preserves intermediate peaks
+    // without rescanning the whole search at each edge. Local limits also apply
+    // when there is no enclosing search observer.
+    private static final int CHECKPOINT_GROWTH = 256;
     private final ArrayList<HashFrame> hashing = new ArrayList<>();
     private final IdentityHashMap<Expr, Integer> hashes = new IdentityHashMap<>();
     private final ArrayList<Pair> comparing = new ArrayList<>();
     private final IdentityHashMap<Expr, IdentityHashMap<Expr, Boolean>> pairs = new IdentityHashMap<>();
-    private final ArrayList<byte[]> encodings = new ArrayList<>();
+    private final IdentityHashMap<BigInteger, EncodedInteger> encodings = new IdentityHashMap<>();
     private HashFrame currentHash;
     private Pair current;
-    private byte[] leftBytes, rightBytes;
-    private long pairEntries;
+    private EncodedInteger pendingEncoding;
+    private long pairEntries, encodingBytes;
+    private int growthSinceCheckpoint;
 
     private SearchExpressionIdentity(SearchExpressionStore store, Expr left, Expr right) {
         this.store = store; this.left = left; this.right = right;
@@ -37,7 +39,7 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
             retained = RetainedOperation.retain(identity);
             return identity.hash();
         } catch (RuntimeException | Error thrown) { failure = thrown; throw thrown; }
-        finally { identity.release(); close(retained, failure); }
+        finally { identity.finish(retained, failure); }
     }
 
     static boolean same(SearchExpressionStore store, Expr left, Expr right) {
@@ -50,17 +52,18 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
             retained = RetainedOperation.retain(identity);
             return identity.same();
         } catch (RuntimeException | Error thrown) { failure = thrown; throw thrown; }
-        finally { identity.release(); close(retained, failure); }
+        finally { identity.finish(retained, failure); }
     }
 
     @Override public void retainedReferences(RetainedGraph.Visitor v) {
         v.reference(store); v.reference(left); v.reference(right); v.reference(hashing); v.reference(hashes);
         v.reference(comparing); v.reference(pairs); v.reference(encodings); v.reference(currentHash);
-        v.reference(current); v.reference(leftBytes); v.reference(rightBytes);
+        v.reference(current); v.reference(pendingEncoding);
     }
 
     private int hash() {
         currentHash = new HashFrame(left, null); hashing.add(currentHash); store.pay(3);
+        grew();
         while (currentHash != null) {
             var frame = currentHash; store.pay(1);
             if (!frame.initialized) {
@@ -71,10 +74,12 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
                 Integer known = hashes.get(child); store.pay(2);
                 if (known == null) {
                     currentHash = new HashFrame(child, frame); hashing.add(currentHash); store.pay(3);
+                    grew();
                 }
                 else { frame.hash = mix(frame.hash, known); frame.nextChild++; store.pay(2); }
             } else {
                 hashes.put(frame.expression, frame.hash); currentHash = frame.parent; store.pay(2);
+                grew();
             }
         }
         RetainedOperation.checkpoint();
@@ -93,19 +98,22 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
 
     private boolean same() {
         comparing.add(new Pair(left, right)); store.pay(2);
+        grew();
         for (int position = 0; position < comparing.size(); position++) {
             current = comparing.get(position); store.pay(2);
             Expr a = current.left(), b = current.right();
             if (a == b) continue;
             var row = pairs.get(a); store.pay(1);
-            if (row == null) { row = new IdentityHashMap<>(); pairs.put(a, row); store.pay(2); }
+            if (row == null) { row = new IdentityHashMap<>(); pairs.put(a, row); store.pay(2); grew(); }
             store.pay(1);
             if (row.put(b, Boolean.TRUE) != null) continue;
             pairEntries++; store.pay(1);
+            grew();
             // Every new identity pair checks its label and schedules all children.
             if (!sameLabel(a, b)) { RetainedOperation.checkpoint(); return false; }
             for (int i = 0; i < children(a); i++) {
                 comparing.add(new Pair(child(a, i), child(b, i))); store.pay(4);
+                grew();
             }
         }
         RetainedOperation.checkpoint();
@@ -140,23 +148,44 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
         return true;
     }
     private int integerHash(BigInteger value) {
-        requireScalar(value);
-        leftBytes = value.toByteArray(); encodings.add(leftBytes); store.pay(2L + leftBytes.length);
-        int hash = 0;
-        for (byte valueByte : leftBytes) { hash = mix(hash, valueByte); store.pay(1); }
-        leftBytes = null; store.pay(1);
-        return hash;
+        var encoded = encoding(value); store.pay(1);
+        if (!encoded.hashed) {
+            for (byte valueByte : encoded.bytes) { encoded.hash = mix(encoded.hash, valueByte); store.pay(1); }
+            encoded.hashed = true; store.pay(1);
+        }
+        return encoded.hash;
     }
     private boolean sameInteger(BigInteger a, BigInteger b) {
         store.pay(1);
         if (a == b) return true;
-        requireScalar(a); requireScalar(b);
-        leftBytes = a.toByteArray(); encodings.add(leftBytes); store.pay(2L + leftBytes.length);
-        rightBytes = b.toByteArray(); encodings.add(rightBytes); store.pay(2L + rightBytes.length);
-        boolean equal = leftBytes.length == rightBytes.length;
-        for (int i = 0; equal && i < leftBytes.length; i++) { store.pay(1); equal = leftBytes[i] == rightBytes[i]; }
-        leftBytes = null; rightBytes = null; store.pay(2);
+        var leftEncoding = encoding(a); var rightEncoding = encoding(b);
+        boolean equal = leftEncoding.bytes.length == rightEncoding.bytes.length;
+        for (int i = 0; equal && i < leftEncoding.bytes.length; i++) {
+            store.pay(1); equal = leftEncoding.bytes[i] == rightEncoding.bytes[i];
+        }
         return equal;
+    }
+    private EncodedInteger encoding(BigInteger value) {
+        requireScalar(value);
+        var known = encodings.get(value); store.pay(1);
+        if (known != null) return known;
+        pendingEncoding = new EncodedInteger(value.toByteArray());
+        store.pay(2L + pendingEncoding.bytes.length);
+        encodings.put(value, pendingEncoding); store.pay(1);
+        encodingBytes = Math.addExact(encodingBytes, pendingEncoding.bytes.length);
+        grew();
+        return pendingEncoding;
+    }
+    private void grew() {
+        // Lower bound from actual scratch slots; the enclosing observer still
+        // measures the complete ownership graph, including its own scan storage.
+        long references = 3L * hashing.size() + 2L * hashes.size() + 3L * comparing.size()
+            + 3L * pairs.size() + 2L * pairEntries + 3L * encodings.size();
+        store.checkIndexScratch(references, encodingBytes);
+        if (++growthSinceCheckpoint >= CHECKPOINT_GROWTH) {
+            growthSinceCheckpoint = 0;
+            RetainedOperation.checkpoint();
+        }
     }
     private void requireScalar(BigInteger value) {
         store.pay(1);
@@ -174,10 +203,25 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
         };
     }
     private void release() {
-        store.pay(Math.addExact(4L + hashing.size() + comparing.size() + encodings.size(),
-            Math.addExact(2L * hashes.size(), Math.addExact(2L * pairs.size(), 2L * pairEntries))));
-        hashing.clear(); hashes.clear(); comparing.clear(); pairs.clear(); encodings.clear();
-        currentHash = null; current = null; leftBytes = null; rightBytes = null;
+        try {
+            store.pay(Math.addExact(3L + hashing.size() + comparing.size() + 2L * encodings.size(),
+                Math.addExact(2L * hashes.size(), Math.addExact(2L * pairs.size(), 2L * pairEntries))));
+        } finally {
+            hashing.clear(); hashes.clear(); comparing.clear(); pairs.clear(); encodings.clear();
+            currentHash = null; current = null; pendingEncoding = null;
+        }
+    }
+    private void finish(RetainedOperation.Frame retained, Throwable failure) {
+        if (failure != null && retained != null) {
+            // An exceptional exit may precede the next batch/terminal observation.
+            try { RetainedOperation.checkpoint(); }
+            catch (RuntimeException | Error observation) { if (observation != failure) failure.addSuppressed(observation); }
+        }
+        try { release(); }
+        catch (RuntimeException | Error cleanup) {
+            if (failure == null) { failure = cleanup; throw cleanup; }
+            if (cleanup != failure) failure.addSuppressed(cleanup);
+        } finally { close(retained, failure); }
     }
     private static void close(RetainedOperation.Frame retained, Throwable failure) {
         if (retained == null) return;
@@ -197,5 +241,12 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
     }
     private record Pair(Expr left, Expr right) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v) { v.reference(left); v.reference(right); }
+    }
+    private static final class EncodedInteger implements RetainedGraph.View {
+        final byte[] bytes;
+        int hash;
+        boolean hashed;
+        EncodedInteger(byte[] bytes) { this.bytes = bytes; }
+        @Override public void retainedReferences(RetainedGraph.Visitor v) { v.reference(bytes); }
     }
 }

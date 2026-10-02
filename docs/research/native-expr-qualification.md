@@ -75,12 +75,18 @@ and eviction never recursively hash an expression. An index limit of zero
 does no structural index work. Index references include bucket keys/values,
 backing slots and members; eviction still leaves the owned roots alive.
 
-Each index operation keeps its actual scratch ownership append-only until its
-final observation, then releases it. The terminal scratch graph therefore
-contains every earlier frame, comparison pair and encoding buffer: the final
-peak observation does not require a full search-graph scan for every child
-edge. This deliberately retains more local scratch during the atomic operation;
-those retained objects, their peak and their eventual release remain paid.
+Each index operation keeps its actual scratch ownership append-only, with a
+full observation after at most 256 scratch-growth events and at completion.
+At each growth event, a constant-time check rejects scratch reference
+slots or encoding bytes exceeding the store's finite limits; this lower-bound
+guard also runs without an enclosing observer. Exceptional exits observe still
+live scratch before releasing it, preserving the original failure. These local
+checks do not replace the enclosing observer's full ownership/scan accounting.
+Exact-integer encodings and their hashes are reused by scalar object identity
+within that operation, avoiding repeated buffers for shared rational values.
+All frames, comparison pairs, memo entries, guards, observations and release
+remain paid. No full search-graph scan is required at every child edge; these
+logical limits still make no fixed JVM heap-size guarantee.
 
 V5 is deliberately a new measurement revision: extra paid work and scratch
 observations can exhaust a previously sufficient diagnostic budget. It does

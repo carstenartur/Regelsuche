@@ -36,6 +36,10 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
     private int indexEntries;
     public long work(){return work;}
     void pay(long units){work=Math.addExact(work,units);}
+    void checkIndexScratch(long references, long characters) {
+        pay(1);
+        if (references > limits.references() || characters > limits.characters()) throw new LimitExceeded();
+    }
 
     public SearchExpressionStore(Limits limits) { this.limits = Objects.requireNonNull(limits); }
 
@@ -44,11 +48,8 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         int hash = 0;
         if (limits.indexEntries() > 0) {
             hash = SearchExpressionIdentity.hash(this, expression);
-            var bucket = index.get(hash); pay(1);
-            if (bucket != null) for (int i = 0; i < bucket.size(); i++) {
-                var existing = bucket.get(i); pay(1);
-                if (SearchExpressionIdentity.same(this, expression, existing.expression)) return existing;
-            }
+            var existing = findIndexed(hash, expression);
+            if (existing != null) return existing;
         }
         var added = new IdentityHashMap<Expr, Boolean>();
         var addedText=new IdentityHashMap<Object,Boolean>();
@@ -82,40 +83,56 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
             de.regelsuche.retention.RetainedOperation.checkpoint();
         }
         addedReferences=Math.addExact(addedReferences,2L*addedText.size());
-        int nextIndexSize = Math.min(limits.indexEntries(), indexEntries + 1);
-        SearchExpressionRef evicted = indexEntries > 0 && indexEntries == limits.indexEntries()
-            ? roots.get(roots.size() - indexEntries) : null;
-        int nextBuckets = index.size();
-        if (limits.indexEntries() > 0) {
-            pay(1); if (!index.containsKey(hash)) nextBuckets++;
-            if (evicted != null && evicted.structuralHash != hash) {
-                pay(1); if (index.get(evicted.structuralHash).size() == 1) nextBuckets--;
-            }
-        }
+        SearchExpressionRef evicted = oldestIndexedRoot();
         long nextReferences = Math.addExact(references, addedReferences);
         long nextCharacters = Math.addExact(characters, addedCharacters);
         long nextNodes = Math.addExact(nodes.size(), added.size());
-        long withIndex = Math.addExact(nextReferences, indexReferences(nextIndexSize, nextBuckets));
+        long withIndex = Math.addExact(nextReferences, indexReferencesAfterInsertion(hash, evicted));
         if (nextNodes > limits.nodes() || nextCharacters > limits.characters() || withIndex > limits.references()) throw new LimitExceeded();
         // Validation/arithmetic precedes mutation, including rejection under total live retention pressure.
         var reference = new SearchExpressionRef(this, expression, hash);
         pay(Math.addExact(Math.addExact(added.size(),addedText.size()),1));nodes.putAll(added);textValues.putAll(addedText); roots.add(reference); references = nextReferences; characters = nextCharacters;
-        if (limits.indexEntries() > 0) {
-            if (evicted != null) {
-                var bucket = index.get(evicted.structuralHash); pay(1);
-                pay(bucket.size()); bucket.remove(0); // FIFO within a collision bucket, including shifted slots
-                if (bucket.isEmpty()) { index.remove(evicted.structuralHash); pay(1); }
-                indexEntries--; evictions = Math.addExact(evictions, 1);
-            }
-            var bucket = index.get(hash); pay(1);
-            if (bucket == null) { bucket = new ArrayList<>(); index.put(hash, bucket); pay(2); }
-            bucket.add(reference); indexEntries++; pay(1);
-        }
+        index(reference, evicted);
         peakNodes = Math.max(peakNodes, nextNodes); peakCharacters = Math.max(peakCharacters, characters);
         peakReferences = Math.max(peakReferences, withIndex);
         de.regelsuche.retention.RetainedOperation.checkpoint();
         return reference;
         } finally {pay(Math.addExact(2L*added.size(),Math.addExact(2L*addedText.size(),pending.size())));added.clear();addedText.clear();pending.clear();}
+    }
+    private SearchExpressionRef findIndexed(int hash, Expr expression) {
+        var bucket = index.get(hash); pay(1);
+        if (bucket == null) return null;
+        for (int i = 0; i < bucket.size(); i++) {
+            var existing = bucket.get(i); pay(1);
+            if (SearchExpressionIdentity.same(this, expression, existing.expression)) return existing;
+        }
+        return null;
+    }
+    private SearchExpressionRef oldestIndexedRoot() {
+        return indexEntries > 0 && indexEntries == limits.indexEntries()
+            ? roots.get(roots.size() - indexEntries) : null;
+    }
+    private long indexReferencesAfterInsertion(int hash, SearchExpressionRef evicted) {
+        if (limits.indexEntries() == 0) return 0;
+        int nextIndexSize = Math.min(limits.indexEntries(), indexEntries + 1);
+        int nextBuckets = index.size();
+        pay(1); if (!index.containsKey(hash)) nextBuckets++;
+        if (evicted != null && evicted.structuralHash != hash) {
+            pay(1); if (index.get(evicted.structuralHash).size() == 1) nextBuckets--;
+        }
+        return indexReferences(nextIndexSize, nextBuckets);
+    }
+    private void index(SearchExpressionRef reference, SearchExpressionRef evicted) {
+        if (limits.indexEntries() == 0) return;
+        if (evicted != null) {
+            var bucket = index.get(evicted.structuralHash); pay(1);
+            pay(bucket.size()); bucket.remove(0); // FIFO within a collision bucket, including shifted slots
+            if (bucket.isEmpty()) { index.remove(evicted.structuralHash); pay(1); }
+            indexEntries--; evictions = Math.addExact(evictions, 1);
+        }
+        var bucket = index.get(reference.structuralHash); pay(1);
+        if (bucket == null) { bucket = new ArrayList<>(); index.put(reference.structuralHash, bucket); pay(2); }
+        bucket.add(reference); indexEntries++; pay(1);
     }
     private long text(Object value,IdentityHashMap<Object,Boolean> added) {
         pay(1);if(textValues.containsKey(value))return 0;
