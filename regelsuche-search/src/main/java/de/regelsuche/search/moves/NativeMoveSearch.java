@@ -8,7 +8,7 @@ import java.util.*;
 
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
-    public static final String REVISION = "regelsuche.native-expr-move-search/v4-partial-atomic-inventory";
+    public static final String REVISION = "regelsuche.native-expr-move-search/v5-partial-structural-index";
     /** Fixed release coverage, independent of mathematical proof validity or observed resource limits. */
     public enum Coverage { PARTIAL_ATOMIC_INVENTORY }
     public static Coverage coverage(){return Coverage.PARTIAL_ATOMIC_INVENTORY;}

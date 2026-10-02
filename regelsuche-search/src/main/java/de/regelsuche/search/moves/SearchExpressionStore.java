@@ -25,22 +25,31 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         public LimitExceeded() { super("NATIVE_RETENTION_EXHAUSTED"); }
     }
     private final Limits limits;
-    private final LinkedHashMap<Expr, SearchExpressionRef> index = new LinkedHashMap<>();
+    // Integer keys keep recursive Expr.hashCode/equals outside collection internals.
+    private final LinkedHashMap<Integer, ArrayList<SearchExpressionRef>> index = new LinkedHashMap<>();
     private final ArrayList<SearchExpressionRef> roots = new ArrayList<>();
     private final IdentityHashMap<Expr, Boolean> nodes = new IdentityHashMap<>();
     private final IdentityHashMap<Object,Boolean> textValues=new IdentityHashMap<>();
     private long characters, references, peakNodes, peakCharacters, peakReferences, evictions;
     private boolean closed;
     private long work;
+    private int indexEntries;
     public long work(){return work;}
-    private void pay(long units){work=Math.addExact(work,units);}
+    void pay(long units){work=Math.addExact(work,units);}
 
     public SearchExpressionStore(Limits limits) { this.limits = Objects.requireNonNull(limits); }
 
     public SearchExpressionRef intern(Expr expression) {
         requireOpen(); Objects.requireNonNull(expression);pay(1);
-        var existing = index.get(expression); // HashMap confirms full immutable Expr equality after hashing.
-        if (existing != null) return existing;
+        int hash = 0;
+        if (limits.indexEntries() > 0) {
+            hash = SearchExpressionIdentity.hash(this, expression);
+            var bucket = index.get(hash); pay(1);
+            if (bucket != null) for (int i = 0; i < bucket.size(); i++) {
+                var existing = bucket.get(i); pay(1);
+                if (SearchExpressionIdentity.same(this, expression, existing.expression)) return existing;
+            }
+        }
         var added = new IdentityHashMap<Expr, Boolean>();
         var addedText=new IdentityHashMap<Object,Boolean>();
         var pending = new ArrayDeque<Expr>(); pending.push(expression);pay(1);
@@ -73,20 +82,34 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
             de.regelsuche.retention.RetainedOperation.checkpoint();
         }
         addedReferences=Math.addExact(addedReferences,2L*addedText.size());
-        int nextIndexSize = Math.min(limits.indexEntries(), index.size() + 1);
+        int nextIndexSize = Math.min(limits.indexEntries(), indexEntries + 1);
+        SearchExpressionRef evicted = indexEntries > 0 && indexEntries == limits.indexEntries()
+            ? roots.get(roots.size() - indexEntries) : null;
+        int nextBuckets = index.size();
+        if (limits.indexEntries() > 0) {
+            pay(1); if (!index.containsKey(hash)) nextBuckets++;
+            if (evicted != null && evicted.structuralHash != hash) {
+                pay(1); if (index.get(evicted.structuralHash).size() == 1) nextBuckets--;
+            }
+        }
         long nextReferences = Math.addExact(references, addedReferences);
         long nextCharacters = Math.addExact(characters, addedCharacters);
         long nextNodes = Math.addExact(nodes.size(), added.size());
-        long withIndex = Math.addExact(nextReferences, 2L * nextIndexSize);
+        long withIndex = Math.addExact(nextReferences, indexReferences(nextIndexSize, nextBuckets));
         if (nextNodes > limits.nodes() || nextCharacters > limits.characters() || withIndex > limits.references()) throw new LimitExceeded();
         // Validation/arithmetic precedes mutation, including rejection under total live retention pressure.
-        var reference = new SearchExpressionRef(this, expression);
+        var reference = new SearchExpressionRef(this, expression, hash);
         pay(Math.addExact(Math.addExact(added.size(),addedText.size()),1));nodes.putAll(added);textValues.putAll(addedText); roots.add(reference); references = nextReferences; characters = nextCharacters;
         if (limits.indexEntries() > 0) {
-            if (index.size() == limits.indexEntries()) {
-                pay(1);index.remove(index.keySet().iterator().next()); evictions = Math.addExact(evictions, 1);
+            if (evicted != null) {
+                var bucket = index.get(evicted.structuralHash); pay(1);
+                pay(bucket.size()); bucket.remove(0); // FIFO within a collision bucket, including shifted slots
+                if (bucket.isEmpty()) { index.remove(evicted.structuralHash); pay(1); }
+                indexEntries--; evictions = Math.addExact(evictions, 1);
             }
-            pay(1);index.put(expression, reference);
+            var bucket = index.get(hash); pay(1);
+            if (bucket == null) { bucket = new ArrayList<>(); index.put(hash, bucket); pay(2); }
+            bucket.add(reference); indexEntries++; pay(1);
         }
         peakNodes = Math.max(peakNodes, nextNodes); peakCharacters = Math.max(peakCharacters, characters);
         peakReferences = Math.max(peakReferences, withIndex);
@@ -109,9 +132,10 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         return reference.expression;
     }
     public Statistics statistics() {
-        return new Statistics(nodes.size(), characters, Math.addExact(references, 2L * index.size()),
-            peakNodes, peakCharacters, peakReferences, index.size(), evictions);
+        return new Statistics(nodes.size(), characters, Math.addExact(references, indexReferences(indexEntries, index.size())),
+            peakNodes, peakCharacters, peakReferences, indexEntries, evictions);
     }
+    private static long indexReferences(int entries, int buckets) { return Math.addExact(entries, 3L * buckets); } // key/value, bucket backing slot, members
     private void requireOpen() { if (closed) throw new IllegalStateException("expression session is closed"); }
-    @Override public void close() { if(closed)return;pay(Math.addExact(roots.size(),Math.addExact(2L*index.size(),Math.addExact(2L*nodes.size(),2L*textValues.size()))));closed = true; index.clear(); roots.clear(); nodes.clear();textValues.clear(); characters = 0; references = 0; }
+    @Override public void close() { if(closed)return;pay(Math.addExact(roots.size(),Math.addExact(indexReferences(indexEntries,index.size()),Math.addExact(2L*nodes.size(),2L*textValues.size()))));closed = true; index.clear(); indexEntries=0; roots.clear(); nodes.clear();textValues.clear(); characters = 0; references = 0; }
 }

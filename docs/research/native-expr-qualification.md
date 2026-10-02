@@ -9,7 +9,7 @@ supplied trusted verifier has the same responsibility as the old verifier hook.
 Exact schema capabilities remain private and bind the checked model/application.
 
 The current search revision is
-`regelsuche.native-expr-move-search/v4-partial-atomic-inventory`; output uses
+`regelsuche.native-expr-move-search/v5-partial-structural-index`; output uses
 `regelsuche.native-legacy-export/v2-partial-atomic-inventory`. Both have the fixed
 coverage `PARTIAL_ATOMIC_INVENTORY`. There is no option or test switch that promotes
 them to complete accounting.
@@ -55,3 +55,37 @@ result/receipt assembly overlaps. It must then pass the complete native public
 P03 differential, fresh module suites, independent full review and exact-head CI
 before a new revision may claim total accounting. No performance, learning or
 P05 proof-reuse claim is made by this foundation.
+
+## V5: paid structural store index
+
+The optional `SearchExpressionStore` index now hashes and compares expressions
+iteratively. Per-operation identity memoization visits shared DAG nodes/pairs
+without expanding all occurrences; the scratch maps, frames and exact-scalar
+byte encodings are exposed to the existing paid retention observer. Integer
+hash buckets only select candidates: full structural comparison still decides
+identity, including scoped symbols, grouping, ordered arguments and exact
+rationals. AST equality and the historical entry points are unchanged.
+
+Storage work includes visited labels, child/memo/queue operations, inspected
+name characters, exact integer encoding bytes and byte comparisons, collision
+probes, bucket shifts and scratch release. These are declared logical units,
+not CPU instructions or JVM bytes. A hash is computed once per lookup and
+saved on the resulting session reference for eviction; collection insertion
+and eviction never recursively hash an expression. An index limit of zero
+does no structural index work. Index references include bucket keys/values,
+backing slots and members; eviction still leaves the owned roots alive.
+
+Each index operation keeps its actual scratch ownership append-only until its
+final observation, then releases it. The terminal scratch graph therefore
+contains every earlier frame, comparison pair and encoding buffer: the final
+peak observation does not require a full search-graph scan for every child
+edge. This deliberately retains more local scratch during the atomic operation;
+those retained objects, their peak and their eventual release remain paid.
+
+V5 is deliberately a new measurement revision: extra paid work and scratch
+observations can exhaust a previously sufficient diagnostic budget. It does
+not retroactively qualify V4, change old receipts, or claim an economic gain.
+Frontier/goal/replay equality outside this store and the other atomic regions
+listed above remain outside this slice. The public completion flags remain
+false. Deep-store tests are not a claim that every downstream AST consumer is
+stack-safe.
