@@ -7,5 +7,8 @@ public final class SearchExpressionRef implements de.regelsuche.retention.Retain
     @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(owner);v.reference(expression);}
     final SearchExpressionStore owner;
     final Expr expression;
-    SearchExpressionRef(SearchExpressionStore owner, Expr expression) { this.owner = owner; this.expression = expression; }
+    final int structuralHash;
+    SearchExpressionRef(SearchExpressionStore owner, Expr expression, int structuralHash) {
+        this.owner = owner; this.expression = expression; this.structuralHash = structuralHash;
+    }
 }
