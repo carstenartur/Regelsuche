@@ -76,7 +76,7 @@ does no structural index work. Index references include bucket keys/values,
 backing slots and members; eviction still leaves the owned roots alive.
 
 Each index operation keeps its actual scratch ownership append-only, with a
-full observation after at most 256 scratch-growth events and at completion.
+full observation after at most 4096 scratch-growth events and at completion.
 At each growth event, a constant-time check rejects scratch reference
 slots or encoding bytes exceeding the store's finite limits; this lower-bound
 guard also runs without an enclosing observer. Exceptional exits observe still

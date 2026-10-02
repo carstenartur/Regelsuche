@@ -14,7 +14,7 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
     // Monotone ownership between bounded checkpoints preserves intermediate peaks
     // without rescanning the whole search at each edge. Local limits also apply
     // when there is no enclosing search observer.
-    private static final int CHECKPOINT_GROWTH = 256;
+    private static final int CHECKPOINT_GROWTH = 4096;
     private final ArrayList<HashFrame> hashing = new ArrayList<>();
     private final IdentityHashMap<Expr, Integer> hashes = new IdentityHashMap<>();
     private final ArrayList<Pair> comparing = new ArrayList<>();
