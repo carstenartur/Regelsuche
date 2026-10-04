@@ -14,6 +14,30 @@ import org.junit.jupiter.api.Test;
 
 class RecoverySafetyRegressionTest {
     @Test
+    void primitiveLiteralCastsAreProvedExactlyAtJavaNarrowingBoundaries() {
+        for (var kind:List.of(NumericKind.BYTE,NumericKind.SHORT,NumericKind.CHAR)) {
+            for (int value:List.of(-65537,-32769,-129,-1,0,127,255,32768,65535,65536)) {
+                Expr literal=switch(kind) {
+                    case BYTE -> JavaExpressions.literal((byte)value);
+                    case SHORT -> JavaExpressions.literal((short)value);
+                    case CHAR -> JavaExpressions.literal((char)value);
+                    default -> throw new AssertionError();
+                };
+                var source=new JointComputationPlan(Map.of(),Map.of(),List.of(new JointComputationPlan.Output("out",kind.type(),literal)));
+                var target=source.withOutputs(List.of(JavaExpressions.cast(NumericKind.INT,kind,JavaExpressions.literal(value))));
+                var request=OptimizationContractTest.request(source,SafetyProfile.PRESERVE_JAVA);
+                assertInstanceOf(VerificationResult.Verified.class,new ComputationOptimizer().verify(request,target,CancellationToken.NONE));
+                assertEquals(ComputationOptimizer.prepare(source).execute(Map.of()),ComputationOptimizer.prepare(target).execute(Map.of()));
+            }
+        }
+        var source=OptimizationContractTest.plan(NumericKind.INT,JavaExpressions.literal(256));
+        var narrowed=JavaExpressions.cast(NumericKind.BYTE,NumericKind.INT,
+            JavaExpressions.cast(NumericKind.INT,NumericKind.BYTE,JavaExpressions.literal(256)));
+        assertInstanceOf(VerificationResult.Refuted.class,new ComputationOptimizer().verify(
+            OptimizationContractTest.request(source,SafetyProfile.PRESERVE_JAVA),source.withOutputs(List.of(narrowed)),CancellationToken.NONE));
+    }
+
+    @Test
     void candidateDiscardsAHostileBackendEvenWhenItsPreparedStructureIsIdentical() {
         var source = new JointComputationPlan(Map.of("x", NumericKind.INT.type()), Map.of(),
             List.of(new JointComputationPlan.Output("out", NumericKind.INT.type(),

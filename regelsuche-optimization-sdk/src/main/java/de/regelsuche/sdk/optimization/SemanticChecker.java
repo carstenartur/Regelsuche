@@ -100,6 +100,12 @@ final class SemanticChecker {
             work.charge(1); Expr a=left.get(i), b=right.get(i);
             var kind=NumericKind.fromType(source.outputs().get(i).type());
             if (a.equals(b)) { methods.add("TYPED_STRUCTURAL_IDENTITY"); continue; }
+            if (kind!=NumericKind.BIG_INTEGER) {
+                var literalLeft=primitiveLiteralValue(a); var literalRight=primitiveLiteralValue(b);
+                if (literalLeft.isPresent() && literalRight.isPresent() && RuntimeChecks.same(literalLeft.get(),literalRight.get())) {
+                    methods.add("EXACT_PRIMITIVE_LITERAL_CAST"); continue;
+                }
+            }
             if (a instanceof FunctionExpr af && b instanceof FunctionExpr bf && af.name().equals(bf.name())
                     && af.arguments().size()==bf.arguments().size() && !JavaExpressions.isLiteral(a)) {
                 boolean congruent=true;
@@ -152,6 +158,16 @@ final class SemanticChecker {
             return JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MOD,
                 JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,args.getFirst(),args.get(1)),args.get(2));
         return new FunctionExpr(((FunctionExpr)expression).name(),args);
+    }
+    /** Closed primitive literal casts have one exact Java value; this evaluates no input or arithmetic. */
+    private Optional<Object> primitiveLiteralValue(Expr expression) {
+        work.charge(1);
+        if (JavaExpressions.isLiteral(expression)) return Optional.of(JavaExpressions.literalValue(expression));
+        if (JavaExpressions.castSourceKind(expression).isEmpty()) return Optional.empty();
+        var value=primitiveLiteralValue(JavaExpressions.operands(expression).getFirst());
+        if (value.isEmpty()) return Optional.empty();
+        var backend=new JavaNumericBackend(request.plan().inputs());
+        return Optional.of(backend.apply(backend.operation(expression),List.of(value.get())));
     }
     private static List<List<Object>> bindings(JointComputationPlan plan) {
         return plan.outputs().stream().map(output -> List.<Object>of(output.name(),output.type())).toList();

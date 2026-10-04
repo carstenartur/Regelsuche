@@ -22,10 +22,13 @@ SDK_MODULES = (
     "regelsuche-validation",
     "regelsuche-discovery",
     "regelsuche-discovery-sdk",
+    "regelsuche-math-algorithms",
+    "regelsuche-optimization-sdk",
     "regelsuche-extension-api",
     "regelsuche-extension-runtime",
 )
 SOURCE_DOC_MODULES = (
+    "regelsuche-optimization-sdk",
     "regelsuche-discovery-sdk",
     "regelsuche-extension-api",
     "regelsuche-extension-runtime",
@@ -360,6 +363,7 @@ def main() -> int:
         ("solver-adapter-java25", ("outcome=CONFIRMED", "outcome=REFUTED", "sdk.provider.artifactSha256")),
         ("number-theory-plan-java25", ("provider=primachsenraum-number-theory-provider", "bases=[2, 3]", "2047", "falsePrimes=0", "falseCompositeDecisions=0")),
         ("extension-runtime-java25", ("extension=hello", "origin=greeting-plugin", "catalog=sha256:")),
+        ("java-optimization-java25", ("optimization=VERIFIED", "checked=ORIGINAL_OVERFLOW_DETECTED")),
     ):
         if name == "number-theory-plan-java25":
             verify_pinned_consumer(root / "examples/external-consumers" / name)

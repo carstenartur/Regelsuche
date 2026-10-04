@@ -33,6 +33,7 @@ class MavenBuildContractTest {
         "regelsuche-search",
         "regelsuche-validation",
         "regelsuche-math-algorithms",
+        "regelsuche-optimization-sdk",
         "regelsuche-math-jas",
         "regelsuche-math-sympy",
         "regelsuche-persistence",
