@@ -7,10 +7,12 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-local-proposals/v1";
+    static final String REVISION = "java-local-proposals/v3";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
+    private boolean skippedConstantFold;
+    boolean skippedConstantFold() { return skippedConstantFold; }
     JavaCandidateGenerator(OptimizationRequest request, VerificationWork work) {
         this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());
     }
@@ -71,10 +73,19 @@ final class JavaCandidateGenerator {
         if (op == NumericOperation.XOR && left.equals(right)) return constant(kind, 0);
         if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
         if (arguments.stream().allMatch(JavaExpressions::isLiteral)) {
+            if (!boundedConstantFold(kind, op, arguments)) { skippedConstantFold = true; return result; }
+            work.charge(Math.max(1, arguments.size()));
             try { return literalValue(kind, backend.apply(backend.operation(result), arguments.stream().map(JavaExpressions::literalValue).toList())); }
             catch (ArithmeticException | IllegalArgumentException unsupported) { return result; }
         }
         return result;
+    }
+    private static boolean boundedConstantFold(NumericKind kind, NumericOperation operation, List<Expr> arguments) {
+        if (kind != NumericKind.BIG_INTEGER) return true;
+        if (EnumSet.of(NumericOperation.POW, NumericOperation.MOD_POW, NumericOperation.MOD_MULTIPLY,
+                NumericOperation.SHIFT_LEFT, NumericOperation.SHIFT_RIGHT).contains(operation)) return false;
+        return arguments.stream().map(JavaExpressions::literalValue)
+            .allMatch(value -> value instanceof BigInteger integer && integer.abs().bitLength() <= 256);
     }
     private static Expr floating(Expr result, NumericOperation op, List<Expr> args) {
         Expr left = args.getFirst();

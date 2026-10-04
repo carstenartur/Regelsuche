@@ -88,6 +88,15 @@ final class RuntimeChecks {
                 case BIG_INTEGER_VALUE_SEMANTICS -> {
                     if(supplied==null || supplied.getClass()!=BigInteger.class) throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_VIOLATED");
                 }
+                case BIG_INTEGER_BIT_LENGTH_BOUND -> {
+                    if (!(supplied instanceof BigInteger value) || value.abs().bitLength() > BigIntegerBounds.parameter(assumption.parameter()))
+                        throw new IllegalArgumentException("BIG_INTEGER_MAGNITUDE_ASSUMPTION_VIOLATED");
+                }
+                case NON_NEGATIVE_UPPER_BOUND -> {
+                    var value=SemanticChecker.integer(supplied);
+                    if(value.signum()<0 || value.compareTo(BigInteger.valueOf(BigIntegerBounds.parameter(assumption.parameter())))>0)
+                        throw new IllegalArgumentException("NUMERIC_UPPER_BOUND_ASSUMPTION_VIOLATED");
+                }
                 case NON_NEGATIVE -> { if(SemanticChecker.integer(supplied).signum()<0) throw new IllegalArgumentException("NONNEGATIVE_ASSUMPTION_VIOLATED"); }
                 case POSITIVE -> { if(SemanticChecker.integer(supplied).signum()<=0) throw new IllegalArgumentException("POSITIVE_ASSUMPTION_VIOLATED"); }
                 case NORMALIZED_MODULAR_INPUT -> {

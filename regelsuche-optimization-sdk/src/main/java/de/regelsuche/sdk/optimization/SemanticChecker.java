@@ -7,12 +7,13 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    static final String REVISION = "java-numeric-independent/v1";
+    static final String REVISION = "java-numeric-independent/v3";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
     SemanticChecker(OptimizationRequest request, VerificationWork work) { this.request = request; this.work = work; }
     void validate() {
+        var bounds = new BigIntegerBounds(request, work);
         work.charge(1);
         if (!ComputationOptimizer.SEMANTICS_REVISION.equals(request.semanticsRevision())) throw new IllegalArgumentException("UNKNOWN_SEMANTICS_REVISION");
         if (!CheckedPolicy.REVISION.equals(request.checkedPolicy().revision())) throw new IllegalArgumentException("UNKNOWN_CHECKED_POLICY_REVISION");
@@ -41,6 +42,7 @@ final class SemanticChecker {
                 new JointComputationPlan.Output("trace", occurrence.evaluatedKind().type(), expression)));
             work.charge(tracePlan.prepare(new JavaNumericBackend(plan.inputs())).cost().inspectionWork());
             requireTotal(expression);
+            bounds.require(expression);
             seen.add(expression);
         }
         for (var node : prepared.nodes()) {
@@ -65,12 +67,24 @@ final class SemanticChecker {
             if (assumption.kind() == SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS &&
                     !NumericKind.BIG_INTEGER.type().equals(plan.inputs().get(assumption.subject())))
                 throw new IllegalArgumentException("ASSUMPTION_NUMERIC_KIND_DIFFERS");
+            if (assumption.kind() == SemanticAssumption.Kind.BIG_INTEGER_BIT_LENGTH_BOUND) {
+                if (!NumericKind.BIG_INTEGER.type().equals(plan.inputs().get(assumption.subject())))
+                    throw new IllegalArgumentException("ASSUMPTION_NUMERIC_KIND_DIFFERS");
+                if (BigIntegerBounds.parameter(assumption.parameter()) > BigIntegerBounds.MAX_BITS)
+                    throw new IllegalArgumentException("BIG_INTEGER_SUPPORTED_RANGE_NOT_PROVED");
+            }
+            if (assumption.kind() == SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND) {
+                if (NumericKind.fromType(plan.inputs().get(assumption.subject())).floatingPoint())
+                    throw new IllegalArgumentException("ASSUMPTION_NUMERIC_KIND_DIFFERS");
+                BigIntegerBounds.parameter(assumption.parameter());
+            }
             if (assumption.kind() == SemanticAssumption.Kind.NORMALIZED_MODULAR_INPUT &&
                     (!plan.inputs().containsKey(assumption.parameter()) || !has(SemanticAssumption.Kind.POSITIVE, assumption.parameter())))
                 throw new IllegalArgumentException("NORMALIZATION_REQUIRES_POSITIVE_MODULUS");
         }
     }
     Proof check(JointComputationPlan source, JointComputationPlan target) {
+        var bounds = new BigIntegerBounds(request, work);
         long initial = work.used(); work.charge(1);
         if (!source.inputs().equals(target.inputs()) || !bindings(source).equals(bindings(target))) return new Proof(false, List.of("BINDINGS_DIFFER"), work.used()-initial);
         var targetPrepared = target.prepare(new JavaNumericBackend(target.inputs()));
@@ -78,6 +92,7 @@ final class SemanticChecker {
         for (var node : targetPrepared.nodes()) if (node.operation()!=null && !JavaExpressions.isLiteral(node.expression())) {
             if (!request.selectedKinds().contains(NumericKind.fromType(node.type()))) throw new IllegalArgumentException("EXCLUDED_NUMERIC_KIND");
             requireTotal(node.expression());
+            bounds.require(node.expression());
         }
         var left = source.outputExpressions(); var right = target.outputExpressions();
         var methods = new LinkedHashSet<String>();
@@ -114,6 +129,11 @@ final class SemanticChecker {
                 }
             } catch (PolynomialProof.OutsideFragment bounded) { /* A larger polynomial is unknown, never proved. */ }
             if (kind==NumericKind.BIG_INTEGER) {
+                // This is an exact typed expansion, not equality modulo an unspecified modulus.
+                // Both traces and every intermediate range have already been checked above.
+                if (expandModularProduct(a).equals(expandModularProduct(b))) {
+                    methods.add("TYPED_MODULAR_PRODUCT_EXPANSION"); continue;
+                }
                 try {
                     var proof = new ModularBridge(request.assumptions()).verify(a,b); work.charge(proof.work());
                     if (proof.accepted()) { methods.add("AFFINE_MODULAR_NORMAL_FORM"); continue; }
@@ -124,10 +144,21 @@ final class SemanticChecker {
         }
         return new Proof(true,List.copyOf(methods),Math.max(1,work.used()-initial));
     }
+    private Expr expandModularProduct(Expr expression) {
+        work.charge(1);
+        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;
+        var args=JavaExpressions.operands(expression).stream().map(this::expandModularProduct).toList();
+        if (JavaExpressions.operationOf(expression).orElse(null)==NumericOperation.MOD_MULTIPLY)
+            return JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MOD,
+                JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,args.getFirst(),args.get(1)),args.get(2));
+        return new FunctionExpr(((FunctionExpr)expression).name(),args);
+    }
     private static List<List<Object>> bindings(JointComputationPlan plan) {
         return plan.outputs().stream().map(output -> List.<Object>of(output.name(),output.type())).toList();
     }
-    private boolean has(SemanticAssumption.Kind kind,String name) { return request.assumptions().stream().anyMatch(a -> a.kind()==kind && a.subject().equals(name)); }
+    private boolean has(SemanticAssumption.Kind kind,String name) { return request.assumptions().stream().anyMatch(a ->
+        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE && a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)
+            && a.subject().equals(name)); }
     private boolean positive(Expr expression) {
         if (expression instanceof VariableExpr v) return has(SemanticAssumption.Kind.POSITIVE,v.name());
         return JavaExpressions.isLiteral(expression) && integer(JavaExpressions.literalValue(expression)).signum()>0;

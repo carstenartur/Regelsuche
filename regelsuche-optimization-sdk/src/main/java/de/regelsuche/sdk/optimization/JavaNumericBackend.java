@@ -43,6 +43,7 @@ final class JavaNumericBackend implements ComputationBackend {
             if (kind.floatingPoint()) throw new IllegalArgumentException("FLOATING_SHIFT_UNSUPPORTED");
             if (function.arguments().size() != 2) throw new IllegalArgumentException("OPERATOR_ARITY");
             var distance = JavaExpressions.kindOf(function.arguments().get(1), inputs);
+            if (kind == NumericKind.BIG_INTEGER && distance != NumericKind.INT) throw new IllegalArgumentException("BIG_INTEGER_SHIFT_REQUIRES_INT");
             if (distance != NumericKind.INT && distance != NumericKind.LONG) throw new IllegalArgumentException("SHIFT_DISTANCE_PROMOTION");
             argumentTypes.set(1, distance.type());
         }

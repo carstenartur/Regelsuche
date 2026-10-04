@@ -17,6 +17,45 @@ class BigIntegerRangeContractTest {
    private final ComputationOptimizer optimizer = new ComputationOptimizer();
    private static final Expr X = new VariableExpr("x");
 
+   @Test
+   void runtimeConsumerHelperEnforcesMagnitudeAndScalarBounds() {
+      var bounded = request(100, SafetyProfile.CHECKED_THROW, OptimizationGoal.READABILITY, true);
+      Assertions.assertThrows(IllegalArgumentException.class,
+         () -> RuntimeChecks.validateAssumptions(bounded, Map.of("x", BigInteger.ONE.shiftLeft(64))));
+      var scalarPlan = new JointComputationPlan(Map.of("x", NumericKind.BIG_INTEGER.type(), "exponent", NumericKind.INT.type()),
+         Map.of(), List.of(new Output("out", NumericKind.BIG_INTEGER.type(), X)));
+      var scalarRequest = new OptimizationRequest(scalarPlan, SourceEvaluationTrace.fromPlan(scalarPlan),
+         Set.of(NumericKind.BIG_INTEGER), ComputationOptimizer.SEMANTICS_REVISION,
+         Set.of(new SemanticAssumption(SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND, "exponent", "100", "test bound")),
+         SafetyProfile.CHECKED_THROW, OptimizationGoal.READABILITY, OptimizationBudget.DEFAULT, CheckedPolicy.EXPLICIT_DEFAULT);
+      Assertions.assertThrows(IllegalArgumentException.class,
+         () -> RuntimeChecks.validateAssumptions(scalarRequest, Map.of("x", BigInteger.ONE, "exponent", 101)));
+      Assertions.assertThrows(IllegalArgumentException.class,
+         () -> RuntimeChecks.validateAssumptions(scalarRequest, Map.of("x", BigInteger.ONE, "exponent", -1)));
+      Assertions.assertDoesNotThrow(
+         () -> RuntimeChecks.validateAssumptions(scalarRequest, Map.of("x", BigInteger.ONE, "exponent", 100)));
+   }
+
+   @Test
+   void bigIntegerShiftRequiresItsJavaIntParameterType() {
+      var expression = JavaExpressions.operation(NumericKind.BIG_INTEGER, NumericOperation.SHIFT_LEFT,
+         X, JavaExpressions.literal(1L));
+      var backend = new JavaNumericBackend(Map.of("x", NumericKind.BIG_INTEGER.type()));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> backend.operation(expression));
+   }
+
+   @Test
+   void costlyOperationsAreNotExecutedForCounterexampleSampling() {
+      var expression = JavaExpressions.operation(NumericKind.BIG_INTEGER, NumericOperation.POW,
+         JavaExpressions.literal(BigInteger.TWO), JavaExpressions.literal(512));
+      var source = new JointComputationPlan(Map.of(), Map.of(), List.of(new Output("out", NumericKind.BIG_INTEGER.type(), expression)));
+      var request = new OptimizationRequest(source, SourceEvaluationTrace.fromPlan(source), Set.of(NumericKind.BIG_INTEGER),
+         ComputationOptimizer.SEMANTICS_REVISION, Set.of(), SafetyProfile.PRESERVE_JAVA,
+         OptimizationGoal.READABILITY, OptimizationBudget.DEFAULT, CheckedPolicy.NONE);
+      Assertions.assertInstanceOf(VerificationResult.Inconclusive.class,
+         optimizer.verify(request, source.withOutputs(List.of(JavaExpressions.literal(BigInteger.ZERO))), CancellationToken.NONE));
+   }
+
    private static OptimizationRequest request(int var0, SafetyProfile var1, OptimizationGoal var2, boolean var3) {
       Expr var4 = JavaExpressions.operation(NumericKind.BIG_INTEGER, NumericOperation.POW, X, JavaExpressions.literal(var0));
       JointComputationPlan var5 = new JointComputationPlan(

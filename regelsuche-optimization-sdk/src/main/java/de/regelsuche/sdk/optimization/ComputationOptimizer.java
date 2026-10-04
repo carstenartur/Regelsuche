@@ -43,8 +43,11 @@ public final class ComputationOptimizer {
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",total);
             var obligations=obligations(request,found.plan());
             var cost=cost(request,found.plan(),obligations);
+            long preparationWork=cost.sourceCost().inspectionWork()+2*cost.candidateCost().inspectionWork();
+            work.charge(preparationWork); total=Math.addExact(total,preparationWork);
+            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             boolean improved=cost.candidateScore()<cost.sourceScore();
-            if(!improved) return new OptimizationResult.NoImprovement("NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
+            if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
             return new OptimizationResult.Candidate(found.plan(),found.prepared(),evidence(request,found.plan(),proof,obligations),obligations,cost,
                 OptimizationResult.SearchCompletion.IMPROVEMENT_FOUND,total);
         } catch(VerificationWork.Stopped stopped) {
@@ -97,7 +100,13 @@ public final class ComputationOptimizer {
         boolean integral=active&&kinds.stream().anyMatch(NumericKind::integral);
         boolean fp=active&&kinds.stream().anyMatch(NumericKind::floatingPoint);
         var replacement=SourceEvaluationTrace.fromPlan(target);
-        long checkWork=active?(request.sourceTrace().occurrences().size()+replacement.occurrences().size())*(fp?3L:2L)+request.plan().inputs().size():0;
+        long checkWork=0;
+        if(active) {
+            var backend=new JavaNumericBackend(request.plan().inputs());
+            for(var occurrence:request.sourceTrace().occurrences()) checkWork+=backend.operation(occurrence.expression()).work();
+            checkWork+=(request.sourceTrace().occurrences().size()+replacement.occurrences().size())*(fp?3L:2L)
+                +request.plan().inputs().size()+2L*request.plan().outputs().size();
+        }
         int fallback=request.safetyProfile()==SafetyProfile.GUARDED_FALLBACK?request.sourceTrace().occurrences().size():0;
         var guard=request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK?RuntimeObligations.GuardKind.NONE:fp?
             RuntimeObligations.GuardKind.FINITE_AND_BITWISE_EQUAL:integral?RuntimeObligations.GuardKind.ORIGINAL_AND_REPLACEMENT_RANGE:RuntimeObligations.GuardKind.NONE;
@@ -130,6 +139,7 @@ public final class ComputationOptimizer {
     }
     private static Map<String,Object> counterexample(OptimizationRequest request,JointComputationPlan candidate,VerificationWork work) {
         if(!request.plan().inputs().equals(candidate.inputs())) return Map.of();
+        if(!safeToSample(request,candidate,work)) return null;
         var source=prepare(request.plan()); var target=prepare(candidate);
         var names=request.plan().inputs().keySet().stream().sorted().toList();
         var baseline=new LinkedHashMap<String,Object>();
@@ -149,6 +159,28 @@ public final class ComputationOptimizer {
             } catch(ArithmeticException existingException) { /* Throwing fragments are validated separately; samples never prove them. */ }
         }
         return null;
+    }
+    /** Diagnostic samples can refute only. Never execute resource-heavy operations to obtain one. */
+    private static boolean safeToSample(OptimizationRequest request,JointComputationPlan candidate,VerificationWork work) {
+        var bounds=new BigIntegerBounds(request,work,4096);
+        var pending=new ArrayDeque<Expr>();
+        pending.addAll(request.plan().outputExpressions()); pending.addAll(candidate.outputExpressions());
+        request.sourceTrace().occurrences().forEach(o -> pending.add(o.expression()));
+        var seen=new HashSet<Expr>();
+        try {
+            while(!pending.isEmpty()) {
+                work.charge(1); var expression=pending.removeFirst();
+                if(!seen.add(expression)) continue;
+                if(JavaExpressions.kindOf(expression,request.plan().inputs())==NumericKind.BIG_INTEGER) {
+                    var operation=JavaExpressions.operationOf(expression).orElse(null);
+                    if(operation!=null && EnumSet.of(NumericOperation.POW,NumericOperation.MOD_POW,NumericOperation.MOD_MULTIPLY,
+                            NumericOperation.SHIFT_LEFT,NumericOperation.SHIFT_RIGHT).contains(operation)) return false;
+                    bounds.require(expression);
+                }
+                if(!JavaExpressions.isLiteral(expression)) pending.addAll(JavaExpressions.operands(expression));
+            }
+            return true;
+        } catch(IllegalArgumentException outsideBound) { return false; }
     }
     private static List<Object> samples(NumericKind kind) {
         return switch(kind) {

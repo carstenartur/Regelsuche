@@ -11,7 +11,7 @@ final class ModularBridge {
         var nonnegative = new HashSet<String>(); var positive = new HashSet<String>();
         var normalized = new HashSet<ModularComputationDomain.NormalizedInput>();
         for (var assumption : assumptions) switch (assumption.kind()) {
-            case NON_NEGATIVE -> nonnegative.add(assumption.subject());
+            case NON_NEGATIVE, NON_NEGATIVE_UPPER_BOUND -> nonnegative.add(assumption.subject());
             case POSITIVE -> positive.add(assumption.subject());
             case NORMALIZED_MODULAR_INPUT -> normalized.add(new ModularComputationDomain.NormalizedInput(assumption.subject(), assumption.parameter()));
             default -> { }
