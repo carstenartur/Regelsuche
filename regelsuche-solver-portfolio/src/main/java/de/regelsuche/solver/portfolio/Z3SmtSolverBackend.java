@@ -147,6 +147,55 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         return SolverExecution.create(obligation, translation, result);
     }
 
+    /** Full raw evidence for one invocation of this existing backend. */
+    public record RetainedAttempt(SolverExecution execution, java.nio.file.Path directory) { }
+
+    public RetainedAttempt executeWithEvidence(Obligation obligation, java.nio.file.Path root)
+            throws IOException {
+        java.nio.file.Files.createDirectories(root);
+        java.nio.file.Path directory = java.nio.file.Files.createTempDirectory(root, "smt-");
+        java.nio.file.Files.writeString(directory.resolve("obligation.json"), obligation.toCanonicalJson());
+        java.nio.file.Files.writeString(directory.resolve("backend.txt"),
+            descriptor.backendId() + "\n" + descriptor.backendVersion() + "\n" + configurationHash + "\n");
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        ProcessRunner recording = (cmd, input, limit) -> {
+            try {
+                java.nio.file.Path invocation = java.nio.file.Files.createDirectory(
+                    directory.resolve("invocation-" + calls.incrementAndGet()));
+                java.nio.file.Files.writeString(invocation.resolve("input.smt2"), input);
+                java.nio.file.Files.writeString(invocation.resolve("command.txt"), cmd.toString());
+                ProcessOutput output = processRunner.run(cmd, input, limit);
+                java.nio.file.Files.writeString(invocation.resolve("stdout.txt"), output.stdout());
+                java.nio.file.Files.writeString(invocation.resolve("stderr.txt"), output.stderr());
+                java.nio.file.Files.writeString(invocation.resolve("status.txt"),
+                    "available=" + output.available() + "\ntimedOut=" + output.timedOut()
+                        + "\nexitCode=" + output.exitCode() + "\n");
+                // Store the exact canonical payload whose hash the native result carries.
+                if (input.contains("(get-proof)"))
+                    java.nio.file.Files.writeString(invocation.resolve("proof.txt"),
+                        payloadAfterStatus(output.stdout(), "unsat"));
+                return output;
+            } catch (IOException failure) {
+                throw new java.io.UncheckedIOException(failure);
+            }
+        };
+        try {
+            SolverExecution result = new Z3SmtSolverBackend(descriptor.backendVersion(),
+                command, Duration.ofMillis(timeoutMillis), recording).execute(obligation);
+            java.nio.file.Files.writeString(directory.resolve("translation.json"), result.translation().toCanonicalJson());
+            java.nio.file.Files.writeString(directory.resolve("result.json"), result.result().toCanonicalJson());
+            java.nio.file.Files.writeString(directory.resolve("execution.json"), result.toCanonicalJson());
+            java.nio.file.Files.writeString(directory.resolve("semantics.txt"),
+                "Conditional on the exact declared premises; consistency is not inferred.\n"
+                + "The solver proof object is retained, not independently kernel-replayed here.\n");
+            return new RetainedAttempt(result, directory);
+        } catch (RuntimeException failure) {
+            try { java.nio.file.Files.writeString(directory.resolve("FAILED.txt"), failure.toString()); }
+            catch (IOException retention) { failure.addSuppressed(retention); }
+            throw failure;
+        }
+    }
+
     private SolverResult proofResult(
         Obligation obligation,
         SmtLibRenderer.Material material
@@ -203,8 +252,8 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         Map<String, String> counterexample,
         String certificateHash
     ) {
-        List<String> capabilities = new ArrayList<>(List.of(
-            "EXTERNAL_Z3", "SMT_LIB_2", "LOSSLESS_STRUCTURED_ASSUMPTIONS"));
+        List<String> capabilities = new ArrayList<>();
+        capabilities.add("SMT_REAL_ARITHMETIC");
         if (status == ResultStatus.CONFIRMED) {
             capabilities.add("SMT_UNSAT_PROOF_OBJECT");
         }
@@ -292,7 +341,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     }
 
     private static String normalize(String value) {
-        return value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        return value == null ? "" : value.trim().replaceAll("\s+", " ");
     }
 
     public record Detection(
