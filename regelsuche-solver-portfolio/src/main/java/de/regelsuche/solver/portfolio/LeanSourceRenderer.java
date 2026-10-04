@@ -52,7 +52,10 @@ public final class LeanSourceRenderer {
         String type = (binders.isEmpty() ? "" : "∀" + binders + ", ") + body;
         String intros = (binders.isEmpty() && obligation.assumptions().isEmpty()) ? "" : "  intros\n";
         return new Material(type, "by\n" + intros + TACTICS,
-            Map.of("goal.closedType", type), issues.stream().distinct().sorted().toList());
+            Map.of("goal.closedType", type,
+                "goal.left", expression(obligation.goal().left(), obligation, issues, 0),
+                "goal.right", expression(obligation.goal().right(), obligation, issues, 0)),
+            issues.stream().distinct().sorted().toList());
     }
 
     private static String relation(Relation relation, Expression left, Expression right,
