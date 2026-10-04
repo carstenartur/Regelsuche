@@ -113,6 +113,26 @@ class SearchExpressionIdentityTest {
         }
     }
 
+    @Test void rollbackAccountingFailureDoesNotReplaceObservationFailureOrSkipOwnershipRestoration() {
+        var store = new SearchExpressionStore(new SearchExpressionStore.Limits(100, 1000, 1000, 1));
+        var first = store.intern(new VariableExpr("a"));
+        store.intern(new VariableExpr("b"));
+        var before = store.statistics();
+        var sink = new IndexSink(store);
+        try (var operation = RetainedOperation.open(sink)) {
+            sink.operation = operation;
+            sink.abortAtLiveNodes = before.liveNodes() + 1;
+            sink.exhaustWorkBeforeAbort = true;
+            var failure = assertThrows(IndexAbort.class, () -> store.intern(new VariableExpr("c")));
+            assertTrue(Arrays.stream(failure.getSuppressed()).anyMatch(ArithmeticException.class::isInstance),
+                "failed rollback accounting is suppressed on the checkpoint failure");
+            assertEquals(before, store.statistics(), "ownership and FIFO statistics are restored despite rollback accounting failure");
+            assertEquals(before.liveNodes(), RetainedGraph.measure(sink).retained().nodes(),
+                "owned nodes are restored after index rollback fails");
+        } finally { sink.operation = null; }
+        assertEquals(new VariableExpr("a"), first.expression);
+    }
+
     @Test void sharedLeftNodeMustStillCheckEachDifferentRightNodeAfterAHashCollision() {
         try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var shared = new VariableExpr("Aa");
@@ -282,6 +302,7 @@ class SearchExpressionIdentityTest {
         RetainedOperation operation;
         RetainedGraph.Usage peak = new RetainedGraph.Usage(0, 0, 0);
         boolean abort, checkpointFailed;
+        boolean exhaustWorkBeforeAbort;
         int checkpoints, abortAtCheckpoint = Integer.MAX_VALUE;
         long firstReferences;
         long abortAtLiveNodes = Long.MAX_VALUE;
@@ -296,6 +317,7 @@ class SearchExpressionIdentityTest {
                 Math.max(peak.characters(), observed.characters()), Math.max(peak.references(), observed.references()));
             if (store.statistics().liveNodes() >= abortAtLiveNodes) {
                 abortAtLiveNodes = Long.MAX_VALUE;
+                if (exhaustWorkBeforeAbort) store.pay(Long.MAX_VALUE - store.work());
                 throw failure;
             }
             if (abort || checkpoints >= abortAtCheckpoint) { checkpointFailed = true; throw failure; }

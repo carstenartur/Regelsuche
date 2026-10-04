@@ -56,7 +56,9 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         var pending = new ArrayDeque<Expr>(); pending.push(expression);pay(1);
         long previousReferences = references, previousCharacters = characters;
         long previousPeakNodes = peakNodes, previousPeakCharacters = peakCharacters, previousPeakReferences = peakReferences;
+        long previousEvictions = evictions;
         SearchExpressionRef committed = null, evicted = null;
+        Throwable primary = null;
         try(var retained=de.regelsuche.retention.RetainedOperation.retain(this,expression,added,addedText,pending)) {
         long addedCharacters = 0, addedReferences = 2; // owned root slot and reference -> expression
         while (!pending.isEmpty()) {
@@ -102,17 +104,37 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         de.regelsuche.retention.RetainedOperation.checkpoint();
         return reference;
         } catch (RuntimeException | Error failure) {
+            primary = failure;
             if (committed != null) {
-                rollbackIndex(committed, evicted);
-                roots.removeLast();
-                for (var node : added.keySet()) nodes.remove(node);
-                for (var text : addedText.keySet()) textValues.remove(text);
+                var rollbackReference = committed;
+                var evictedReference = evicted;
+                attemptCleanup(failure, () -> rollbackIndex(rollbackReference, evictedReference));
+                attemptCleanup(failure, roots::removeLast);
+                for (var node : added.keySet()) attemptCleanup(failure, () -> nodes.remove(node));
+                for (var text : addedText.keySet()) attemptCleanup(failure, () -> textValues.remove(text));
                 references = previousReferences; characters = previousCharacters;
                 peakNodes = previousPeakNodes; peakCharacters = previousPeakCharacters; peakReferences = previousPeakReferences;
-                pay(Math.addExact(Math.addExact(added.size(), addedText.size()), 1));
+                evictions = previousEvictions;
+                attemptCleanup(failure, () -> pay(Math.addExact(Math.addExact(added.size(), addedText.size()), 1)));
             }
             throw failure;
-        } finally {pay(Math.addExact(2L*added.size(),Math.addExact(2L*addedText.size(),pending.size())));added.clear();addedText.clear();pending.clear();}
+        } finally {
+            long cleanupWork = Math.addExact(2L*added.size(),Math.addExact(2L*addedText.size(),pending.size()));
+            if (primary == null) {
+                try { pay(cleanupWork); }
+                catch (RuntimeException | Error failure) {
+                    added.clear(); addedText.clear(); pending.clear();
+                    throw failure;
+                }
+            } else attemptCleanup(primary, () -> pay(cleanupWork));
+            added.clear(); addedText.clear(); pending.clear();
+        }
+    }
+    private static void attemptCleanup(Throwable primary, Runnable cleanup) {
+        try { cleanup.run(); }
+        catch (RuntimeException | Error failure) {
+            if (failure != primary) primary.addSuppressed(failure);
+        }
     }
     private SearchExpressionRef findIndexed(int hash, Expr expression) {
         var bucket = index.get(hash); pay(1);
