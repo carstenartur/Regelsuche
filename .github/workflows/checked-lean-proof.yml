@@ -25,6 +25,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          verify-signature: true
       - name: Run proof-boundary contracts
         run: mvn -B -pl regelsuche-solver-portfolio -am -Dtest=CheckedLeanProofTest -Dsurefire.failIfNoSpecifiedTests=false test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -46,6 +47,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          verify-signature: true
       - name: Install pinned Lean and mathlib reference environment
         run: |
           sudo apt-get update -qq
@@ -66,7 +68,6 @@ jobs:
             app/target/checked-proof/
             app/target/surefire-reports/
             .ci/lean-proof/lake-manifest.json
-
   app-boundary:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -76,8 +77,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          verify-signature: true
       - name: Verify application proof admission
-        run: mvn -B -pl app -am -Dtest=CheckedProofBridgeTest,LeanProofBridgeTest,SmtProofBridgeTest,ProverExecutorAndBridgeTest,ProofBridgeServiceTest,ProofBridgeFormallyProvedTest,ProofWorkerTest,ProofScriptValidatorTest,UnifiedMathDomainWorkbenchTest,WebWorkbenchServerTest,Z3SmtSolverBackendTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -pl app -am -Dtest=ProofCacheAdmissionTest,CheckedProofBridgeTest,LeanProofBridgeTest,SmtProofBridgeTest,ProverExecutorAndBridgeTest,ProofBridgeServiceTest,ProofBridgeFormallyProvedTest,ProofWorkerTest,ProofScriptValidatorTest,UnifiedMathDomainWorkbenchTest,WebWorkbenchServerTest,Z3SmtSolverBackendTest -Dsurefire.failIfNoSpecifiedTests=false test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
