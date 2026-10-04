@@ -97,15 +97,11 @@ final class SemanticChecker {
         var left = source.outputExpressions(); var right = target.outputExpressions();
         var methods = new LinkedHashSet<String>();
         for (int i=0;i<left.size();i++) {
-            work.charge(1); Expr a=left.get(i), b=right.get(i);
+            work.charge(1);
+            Expr a=normalizePrimitiveLiteralCasts(left.get(i)), b=normalizePrimitiveLiteralCasts(right.get(i));
+            if (!a.equals(left.get(i)) || !b.equals(right.get(i))) methods.add("EXACT_PRIMITIVE_LITERAL_CAST");
             var kind=NumericKind.fromType(source.outputs().get(i).type());
             if (a.equals(b)) { methods.add("TYPED_STRUCTURAL_IDENTITY"); continue; }
-            if (kind!=NumericKind.BIG_INTEGER) {
-                var literalLeft=primitiveLiteralValue(a); var literalRight=primitiveLiteralValue(b);
-                if (literalLeft.isPresent() && literalRight.isPresent() && RuntimeChecks.same(literalLeft.get(),literalRight.get())) {
-                    methods.add("EXACT_PRIMITIVE_LITERAL_CAST"); continue;
-                }
-            }
             if (a instanceof FunctionExpr af && b instanceof FunctionExpr bf && af.name().equals(bf.name())
                     && af.arguments().size()==bf.arguments().size() && !JavaExpressions.isLiteral(a)) {
                 boolean congruent=true;
@@ -159,15 +155,27 @@ final class SemanticChecker {
                 JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,args.getFirst(),args.get(1)),args.get(2));
         return new FunctionExpr(((FunctionExpr)expression).name(),args);
     }
-    /** Closed primitive literal casts have one exact Java value; this evaluates no input or arithmetic. */
-    private Optional<Object> primitiveLiteralValue(Expr expression) {
+    /** Closed primitive literal casts have one exact Java value; this evaluates no input or arithmetic.
+     * Only the proof view is normalized. Original and candidate execution traces remain unchanged.
+     */
+    private Expr normalizePrimitiveLiteralCasts(Expr expression) {
         work.charge(1);
-        if (JavaExpressions.isLiteral(expression)) return Optional.of(JavaExpressions.literalValue(expression));
-        if (JavaExpressions.castSourceKind(expression).isEmpty()) return Optional.empty();
-        var value=primitiveLiteralValue(JavaExpressions.operands(expression).getFirst());
-        if (value.isEmpty()) return Optional.empty();
+        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;
+        var args=JavaExpressions.operands(expression).stream().map(this::normalizePrimitiveLiteralCasts).toList();
+        var result=new FunctionExpr(((FunctionExpr)expression).name(),args);
+        if (JavaExpressions.castSourceKind(result).isEmpty() || !JavaExpressions.isLiteral(args.getFirst())) return result;
         var backend=new JavaNumericBackend(request.plan().inputs());
-        return Optional.of(backend.apply(backend.operation(expression),List.of(value.get())));
+        var value=backend.apply(backend.operation(result),List.of(JavaExpressions.literalValue(args.getFirst())));
+        return switch(JavaExpressions.resultKind(result)) {
+            case BYTE -> JavaExpressions.literal((Byte)value);
+            case SHORT -> JavaExpressions.literal((Short)value);
+            case CHAR -> JavaExpressions.literal((Character)value);
+            case INT -> JavaExpressions.literal((Integer)value);
+            case LONG -> JavaExpressions.literal((Long)value);
+            case FLOAT -> JavaExpressions.literal((Float)value);
+            case DOUBLE -> JavaExpressions.literal((Double)value);
+            case BIG_INTEGER -> throw new IllegalArgumentException("NO_IMPLICIT_BIG_INTEGER_CONVERSION");
+        };
     }
     private static List<List<Object>> bindings(JointComputationPlan plan) {
         return plan.outputs().stream().map(output -> List.<Object>of(output.name(),output.type())).toList();

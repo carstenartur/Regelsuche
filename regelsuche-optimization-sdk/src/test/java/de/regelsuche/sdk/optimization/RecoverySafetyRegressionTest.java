@@ -38,6 +38,20 @@ class RecoverySafetyRegressionTest {
     }
 
     @Test
+    void exactLiteralCastsComposeWithIntegralPolynomialIdentities() {
+        var x = new VariableExpr("x");
+        var cast = JavaExpressions.cast(NumericKind.CHAR, NumericKind.INT, JavaExpressions.literal('\uffff'));
+        var source = OptimizationContractTest.plan(NumericKind.INT,
+            JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD,
+                JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD, x, cast), JavaExpressions.literal(0)));
+        var target = source.withOutputs(List.of(JavaExpressions.operation(NumericKind.INT,NumericOperation.ADD,x,JavaExpressions.literal(65535))));
+        var request = OptimizationContractTest.request(source,SafetyProfile.PRESERVE_JAVA);
+        assertInstanceOf(VerificationResult.Verified.class,new ComputationOptimizer().verify(request,target,CancellationToken.NONE));
+        var wrong = source.withOutputs(List.of(JavaExpressions.operation(NumericKind.INT,NumericOperation.ADD,x,JavaExpressions.literal(-1))));
+        assertInstanceOf(VerificationResult.Refuted.class,new ComputationOptimizer().verify(request,wrong,CancellationToken.NONE));
+    }
+
+    @Test
     void candidateDiscardsAHostileBackendEvenWhenItsPreparedStructureIsIdentical() {
         var source = new JointComputationPlan(Map.of("x", NumericKind.INT.type()), Map.of(),
             List.of(new JointComputationPlan.Output("out", NumericKind.INT.type(),

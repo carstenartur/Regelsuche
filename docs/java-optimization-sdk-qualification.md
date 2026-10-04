@@ -17,18 +17,34 @@ erzeugten Distributionsmanifest, nicht in einem erfundenen Release-Verweis.
 
 ## Frisch ausgeführte Prüfungen
 
-* 42 SDK-JUnit-Tests: Java-25-Maven und Gradle erfolgreich. Rot/Grün-Belege
+* 43 SDK-JUnit-Tests: Java-25-Maven und Gradle erfolgreich. Rot/Grün-Belege
   erfassen Prepared-Tamper, BigInteger-Grenzen, Kosten, Fold-/Sampling-Grenzen
   und exakt typisierte BYTE/SHORT/CHAR-Literal-Casts.
 * `verifySdkApiCompatibility`: erfolgreich mit dem originalen Japicmp-Baseline-
   Vergleich sowie vollständiger neuer Optimizer-Typliste und Modulzuordnung.
-* SDK-JaCoCo aus Gradle: 846/991 Zeilen (85,3683 %) und 824/1230 Zweige
-  (66,9919 %). Die neuen Floors 84/64 bleiben unverändert; bestehende
+* SDK-JaCoCo aus Gradle: 849/998 Zeilen (85,0701 %) und 829/1236 Zweige
+  (67,0712 %). Die neuen Floors 84/64 bleiben unverändert; bestehende
   Modul-/Aggregat-Floors wurden nicht abgesenkt. Das ist keine Aussage über
   die noch ausstehende vollständige Aggregatqualifikation.
-* Maven-JUnit-Buildverträge für Packaging, Reactor und Dependency Management
-  erfolgreich. Packaging-Assertions laufen als Java/JUnit; es gibt keine neue
-  parallele Python-Testautorität.
+* 59 fokussierte Maven-JUnit-Tests: 43 SDK, 8 Search-Plan/DAG, 4 Math-Modular-
+  und 4 Experiment-Wiring-Tests, keine Fehler oder ausgelassenen Tests.
+* 111 Maven-JUnit-Buildverträge erfolgreich. Der erste vollständige Lauf
+  scheiterte am fehlenden `mvn` im PATH eines verschachtelten Assembly-Forks;
+  mit dem regulären Maven-Wrapper im PATH besteht derselbe Testvertrag.
+  Packaging-Assertions laufen als Java/JUnit; es gibt keine neue parallele
+  Python-Testautorität. 48 bestehende Orchestrierungsfixtures bestehen mit
+  aktualisierten Eingabelisten für den zusätzlichen Java-Consumer.
+* Gradle-Publikationsclosure und externer Java-25-Consumer erfolgreich. Der
+  Consumer lief in einem neuen `/tmp`-Projekt mit leerem Gradle-Abhängigkeitscache
+  nur gegen das isolierte publizierte Repository. Er prüft die genaue
+  6-Modul-Laufzeitclosure, unabhängige Reverification und den ursprünglichen
+  Checked-Überlauf.
+
+Ein Inkrementallauf verwendete nachweislich alte SDK-Klassendateien; er bleibt
+als fehlgeschlagener Beleg erhalten. Die abschließende SDK-Gradle-Qualifikation
+verwendete `:regelsuche-optimization-sdk:clean --no-build-cache`. Quellhash vor
+und nach dem Lauf ist gleich; der neue Helper wurde zusätzlich in den erzeugten
+Klassen bestätigt. Dieser gezielte Clean entfernt nur die SDK-Buildprodukte.
 
 Die genaue Run-Liste, komprimierte Rohlogs und SHA-256-Liste werden nach den
 verbleibenden Consumer-/Paketprüfungen ergänzt. Volles `ciCheck` ist noch nicht
@@ -76,3 +92,10 @@ Release-/CI-Vertrag bleibt bestehen; ein lokales fokussiertes Ergebnis ersetzt
 keinen noch offenen Gesamtgate. Diese Auslieferungsentscheidung ist die
 begründete lokale Ausnahme für den noch unveröffentlichten Companion-Branch,
 nicht eine Ausnahme von numerischen Beweisen oder Build-/Coverage-Gates.
+
+Für die Clean-Reproduktion wird `project.build.outputTimestamp` auf den
+Unix-Commitzeitpunkt des eingefrorenen Codepins gesetzt. Das ist notwendig,
+weil das Manifest die rohen Eingabe-JAR-Hashes enthält und nicht nur
+normalisierte Klassenbytes. Der genaue Befehl steht in der SDK-README;
+unterschiedliche Maven-Test-/Profil-/Zeitstempeloptionen gelten nicht als
+identischer reproduzierbarer Build.

@@ -68,7 +68,9 @@ closure, licenses, sources, Javadoc, consumer and SHA-256 provenance.
 From a clean committed checkout, build with Java 25:
 
 ```sh
-mvn -B -Psdk-release -pl regelsuche-optimization-sdk -am install
+SDK_SOURCE_EPOCH=$(git show -s --format=%ct HEAD)
+mvn -B -Psdk-release -pl regelsuche-optimization-sdk -am clean install \
+  -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH"
 mvn -B -pl regelsuche-optimization-sdk dependency:copy-dependencies \
   -DincludeScope=runtime -DexcludeGroupIds=de.regelsuche \
   -DoutputDirectory=/absolute/external-runtime
@@ -77,6 +79,9 @@ python3 scripts/package-optimization-sdk.py \
   --output /absolute/distribution --java-home "$JAVA_HOME"
 ```
 
+The commit timestamp fixes Maven input-JAR timestamps as well as the deterministic
+outer archive. Use the same Java/Maven versions and flags for both clean builds;
+the provenance includes raw input-JAR hashes, not only their class entries.
 The packager refuses dirty sources, conflicting class bytes and forbidden
 application dependencies. It merges service entries and keeps dependency
 notices. Repeat the same build and packaging command, then compare every

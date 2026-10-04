@@ -87,6 +87,8 @@ def package(root, repository, version, output):
               'docs/java-sdk-quickstart.md', 'docs/java-sdk-api-policy.md',
               'docs/java-sdk-domain-tutorial.md', 'docs/java-sdk-human-dx.md',
               'docs/generic-extensions.md',
+              'regelsuche-optimization-sdk/README.md',
+              'docs/java-optimization-sdk-qualification.md',
               'docs/superpowers/specs/2026-09-11-generic-extension-program-discovery-design.md']
     for name in inputs:
         data = (root / name).read_bytes()
