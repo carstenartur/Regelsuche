@@ -25,7 +25,7 @@ class CheckedLeanRealTest {
                 CheckedLeanProofTest.obligation("exp(x+y)","exp(x)*exp(y)"),
                 CheckedLeanProofTest.obligation("x^65","x^65"))) {
             var attempt=backend().executeWithEvidence(o);
-            assertEquals(ResultStatus.CONFIRMED,attempt.execution().result().status(),attempt.directory().toString());
+            assertEquals(ResultStatus.CONFIRMED,attempt.execution().result().status(),diagnostics(attempt.directory()));
             for (String name:List.of("proof.lean","proof.olean","audit.json","certificate.txt",
                     "obligation.json","translation.json","result.json","execution.json",
                     "version.stdout","proof.stdout","proof.stderr","lean-toolchain","lake-manifest.json"))
@@ -41,7 +41,7 @@ class CheckedLeanRealTest {
         String type="∀ (rs_x : Real), rs_x = rs_x";
         for (String declarations: List.of(
             "axiom unproved : False\ntheorem regelsuche_lemma : "+type+" := False.elim unproved\n",
-            "axiom hidden : False\ntheorem intermediary : False := hidden\ntheorem regelsuche_lemma : "+type+" := False.elim intermediary\n",
+            "axiom rs_unapproved_hidden : False\ntheorem intermediary : False := rs_unapproved_hidden\ntheorem regelsuche_lemma : "+type+" := False.elim intermediary\n",
             "theorem hiddenHole : False := @sorryAx False true\ntheorem regelsuche_lemma : "+type+" := False.elim hiddenHole\n",
             "theorem regelsuche_lemma : True := by trivial\n",
             "theorem regelsuche_lemma (extra : False) : "+type+" := by intro x; rfl\n")) {
@@ -59,13 +59,26 @@ class CheckedLeanRealTest {
             +new LeanSourceRenderer().audit(type,SolverIr.sha256("audit-fixture"),"3".repeat(32));
         assertEquals(0,compile(text));
     }
+    private static String diagnostics(Path directory) throws Exception {
+        StringBuilder out = new StringBuilder(directory.toString());
+        for (String file : List.of("proof.stdout", "proof.stderr", "FAILED.txt")) {
+            Path path = directory.resolve(file);
+            if (Files.exists(path)) out.append("\n").append(Files.readString(path));
+        }
+        return out.toString();
+    }
     private int compile(String source) throws Exception {
         Files.createDirectories(root());
         Path dir=Files.createTempDirectory(root(),"audit-negative-");
         Path file=dir.resolve("fixture.lean");Files.writeString(file,source);
         Process p=new ProcessBuilder("lake","env","lean",file.toString()).directory(project().toFile())
             .redirectOutput(dir.resolve("stdout.txt").toFile()).redirectError(dir.resolve("stderr.txt").toFile()).start();
-        try { assertTrue(p.waitFor(90,TimeUnit.SECONDS),dir.toString());return p.exitValue(); }
+        try {
+            assertTrue(p.waitFor(90,TimeUnit.SECONDS),dir.toString());
+            System.out.println("Lean fixture at " + dir + "\n" + Files.readString(dir.resolve("stdout.txt"))
+                + "\n" + Files.readString(dir.resolve("stderr.txt")));
+            return p.exitValue();
+        }
         finally { if(p.isAlive())p.destroyForcibly(); }
     }
 }
