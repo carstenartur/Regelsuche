@@ -1,5 +1,7 @@
 package de.regelsuche.example.modular;
 
+import de.regelsuche.math.algorithms.modular.ModularJointPlans;
+
 import static de.regelsuche.ast.BinaryOperator.*;
 import static org.junit.jupiter.api.Assertions.*;
 
