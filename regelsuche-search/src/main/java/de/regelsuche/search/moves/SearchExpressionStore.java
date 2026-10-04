@@ -54,6 +54,9 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         var added = new IdentityHashMap<Expr, Boolean>();
         var addedText=new IdentityHashMap<Object,Boolean>();
         var pending = new ArrayDeque<Expr>(); pending.push(expression);pay(1);
+        long previousReferences = references, previousCharacters = characters;
+        long previousPeakNodes = peakNodes, previousPeakCharacters = peakCharacters, previousPeakReferences = peakReferences;
+        SearchExpressionRef committed = null, evicted = null;
         try(var retained=de.regelsuche.retention.RetainedOperation.retain(this,expression,added,addedText,pending)) {
         long addedCharacters = 0, addedReferences = 2; // owned root slot and reference -> expression
         while (!pending.isEmpty()) {
@@ -83,7 +86,7 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
             de.regelsuche.retention.RetainedOperation.checkpoint();
         }
         addedReferences=Math.addExact(addedReferences,2L*addedText.size());
-        SearchExpressionRef evicted = oldestIndexedRoot();
+        evicted = oldestIndexedRoot();
         long nextReferences = Math.addExact(references, addedReferences);
         long nextCharacters = Math.addExact(characters, addedCharacters);
         long nextNodes = Math.addExact(nodes.size(), added.size());
@@ -93,10 +96,22 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         var reference = new SearchExpressionRef(this, expression, hash);
         pay(Math.addExact(Math.addExact(added.size(),addedText.size()),1));nodes.putAll(added);textValues.putAll(addedText); roots.add(reference); references = nextReferences; characters = nextCharacters;
         index(reference, evicted);
+        committed = reference;
         peakNodes = Math.max(peakNodes, nextNodes); peakCharacters = Math.max(peakCharacters, characters);
         peakReferences = Math.max(peakReferences, withIndex);
         de.regelsuche.retention.RetainedOperation.checkpoint();
         return reference;
+        } catch (RuntimeException | Error failure) {
+            if (committed != null) {
+                rollbackIndex(committed, evicted);
+                roots.removeLast();
+                for (var node : added.keySet()) nodes.remove(node);
+                for (var text : addedText.keySet()) textValues.remove(text);
+                references = previousReferences; characters = previousCharacters;
+                peakNodes = previousPeakNodes; peakCharacters = previousPeakCharacters; peakReferences = previousPeakReferences;
+                pay(Math.addExact(Math.addExact(added.size(), addedText.size()), 1));
+            }
+            throw failure;
         } finally {pay(Math.addExact(2L*added.size(),Math.addExact(2L*addedText.size(),pending.size())));added.clear();addedText.clear();pending.clear();}
     }
     private SearchExpressionRef findIndexed(int hash, Expr expression) {
@@ -133,6 +148,23 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         var bucket = index.get(reference.structuralHash); pay(1);
         if (bucket == null) { bucket = new ArrayList<>(); index.put(reference.structuralHash, bucket); pay(2); }
         bucket.add(reference); indexEntries++; pay(1);
+    }
+    private void rollbackIndex(SearchExpressionRef reference, SearchExpressionRef evicted) {
+        if (limits.indexEntries() == 0) return;
+        var bucket = index.get(reference.structuralHash);
+        bucket.removeLast(); indexEntries--;
+        if (bucket.isEmpty()) index.remove(reference.structuralHash);
+        long rollbackWork = 3;
+        if (evicted != null) {
+            var oldestBucket = index.get(evicted.structuralHash);
+            if (oldestBucket == null) {
+                oldestBucket = new ArrayList<>(); index.put(evicted.structuralHash, oldestBucket);
+                rollbackWork += 2;
+            }
+            rollbackWork = Math.addExact(rollbackWork, oldestBucket.size() + 2L);
+            oldestBucket.addFirst(evicted); indexEntries++; evictions--;
+        }
+        pay(rollbackWork);
     }
     private long text(Object value,IdentityHashMap<Object,Boolean> added) {
         pay(1);if(textValues.containsKey(value))return 0;

@@ -73,6 +73,46 @@ class SearchExpressionIdentityTest {
         }
     }
 
+    @Test void rejectedFinalObservationRestoresOwnershipAndFifoIndex() {
+        for (var names : List.of(List.of("AaAa", "BBBB", "AaBB"), List.of("a", "b", "c"))) {
+            for (int capacity : List.of(0, 1, 2, 3)) {
+                try (var store = new SearchExpressionStore(new SearchExpressionStore.Limits(100, 1000, 1000, capacity))) {
+                    var first = store.intern(new VariableExpr(names.get(0)));
+                    var second = store.intern(new VariableExpr(names.get(1)));
+                    var before = store.statistics();
+                    long workBefore = store.work();
+                    var sink = new IndexSink(store);
+                    try (var operation = RetainedOperation.open(sink)) {
+                        sink.operation = operation;
+                        sink.abortAtLiveNodes = before.liveNodes() + 1;
+                        assertSame(sink.failure, assertThrows(IndexAbort.class,
+                            () -> store.intern(new VariableExpr(names.get(2)))));
+                        assertEquals(before, store.statistics(), "failed observation must restore all statistics");
+                        assertTrue(store.work() > workBefore, "failed work remains paid");
+                        assertEquals(before.liveNodes(), RetainedGraph.measure(sink).retained().nodes(),
+                            "failed ownership and scratch must be released");
+                    } finally { sink.operation = null; }
+                    assertEquals(new VariableExpr(names.get(0)), store.dereference(first));
+                    if (capacity >= 2) assertSame(first, store.intern(new VariableExpr(names.get(0))));
+                    if (capacity >= 1) assertSame(second, store.intern(new VariableExpr(names.get(1))));
+                    var third = store.intern(new VariableExpr(names.get(2)));
+                    assertEquals(before.liveNodes() + 1, store.statistics().liveNodes(),
+                        "retry must acquire the rejected expression's nodes");
+                    assertEquals(before.liveCharacters() + names.get(2).length(), store.statistics().liveCharacters(),
+                        "retry must acquire the rejected expression's text");
+                    assertEquals(before.evictions() + (capacity == 1 || capacity == 2 ? 1 : 0),
+                        store.statistics().evictions());
+                    if (capacity > 0) assertSame(third, store.intern(new VariableExpr(names.get(2))));
+                    if (capacity == 2) {
+                        assertSame(second, store.intern(new VariableExpr(names.get(1))));
+                        assertNotSame(first, store.intern(new VariableExpr(names.get(0))),
+                            "retry must evict the original oldest entry");
+                    }
+                }
+            }
+        }
+    }
+
     @Test void sharedLeftNodeMustStillCheckEachDifferentRightNodeAfterAHashCollision() {
         try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var shared = new VariableExpr("Aa");
@@ -244,6 +284,7 @@ class SearchExpressionIdentityTest {
         boolean abort, checkpointFailed;
         int checkpoints, abortAtCheckpoint = Integer.MAX_VALUE;
         long firstReferences;
+        long abortAtLiveNodes = Long.MAX_VALUE;
         IndexSink(SearchExpressionStore store) { this.store = store; }
         @Override public void retainedReferences(RetainedGraph.Visitor v) { v.reference(store); v.reference(operation); }
         @Override public void executionWork(long units) { if ((abort || checkpoints >= abortAtCheckpoint) && checkpointFailed) throw failure; }
@@ -253,6 +294,10 @@ class SearchExpressionIdentityTest {
             if (++checkpoints == 1) firstReferences = observed.references();
             peak = new RetainedGraph.Usage(Math.max(peak.nodes(), observed.nodes()),
                 Math.max(peak.characters(), observed.characters()), Math.max(peak.references(), observed.references()));
+            if (store.statistics().liveNodes() >= abortAtLiveNodes) {
+                abortAtLiveNodes = Long.MAX_VALUE;
+                throw failure;
+            }
             if (abort || checkpoints >= abortAtCheckpoint) { checkpointFailed = true; throw failure; }
         }
     }
