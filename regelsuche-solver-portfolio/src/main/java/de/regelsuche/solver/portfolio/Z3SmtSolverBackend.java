@@ -252,8 +252,8 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         Map<String, String> counterexample,
         String certificateHash
     ) {
-        List<String> capabilities = new ArrayList<>();
-        capabilities.add("SMT_REAL_ARITHMETIC");
+        List<String> capabilities = new ArrayList<>(List.of(
+            "EXTERNAL_Z3", "SMT_LIB_2", "LOSSLESS_STRUCTURED_ASSUMPTIONS"));
         if (status == ResultStatus.CONFIRMED) {
             capabilities.add("SMT_UNSAT_PROOF_OBJECT");
         }
@@ -341,7 +341,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     }
 
     private static String normalize(String value) {
-        return value == null ? "" : value.trim().replaceAll("\s+", " ");
+        return value == null ? "" : value.trim().replaceAll("\\s+", " ");
     }
 
     public record Detection(
