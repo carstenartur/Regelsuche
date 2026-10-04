@@ -28,7 +28,7 @@ class SmtProofBridgeTest {
     }
 
     @Test
-    void expandsIntegralPowersForSophieGermainIdentity() {
+    void representsIntegralPowersWithTheirSmtArithmeticSemantics() {
         SmtProofBridge bridge = new SmtProofBridge();
 
         ProofBridge.ProofAttempt attempt = bridge.prove(
@@ -41,22 +41,22 @@ class SmtProofBridgeTest {
         String artifact = attempt.artifact();
         assertTrue(artifact.contains("(declare-const a Real)"));
         assertTrue(artifact.contains("(declare-const b Real)"));
-        assertTrue(artifact.contains("(* (* (* a a) a) a)"));
-        assertTrue(artifact.contains("(* b b)"));
+        assertTrue(artifact.contains("(^ a 4)"));
+        assertTrue(artifact.contains("(^ b 2)"));
         assertFalse(artifact.contains("(declare-fun pow"));
         assertFalse(artifact.contains("(pow "));
         assertTrue(artifact.contains("(check-sat)"));
     }
 
     @Test
-    void declaresFallbackPowWithCorrectBinaryArity() {
+    void rejectsSymbolicPowersRatherThanInventingTheirSemantics() {
         SmtProofBridge bridge = new SmtProofBridge();
 
         ProofBridge.ProofAttempt attempt = bridge.prove("a^n", "pow(a,n)", List.of());
 
         String artifact = attempt.artifact();
-        assertTrue(artifact.contains("(declare-fun pow (Real Real) Real)"));
-        assertTrue(artifact.contains("(pow a n)"));
+        assertEquals(CandidateProofStatus.OBSERVED, attempt.status());
+        assertTrue(artifact.contains("Unsupported SMT"));
         assertFalse(artifact.contains("(declare-fun pow (Real) Real)"));
     }
 
@@ -86,6 +86,6 @@ class SmtProofBridgeTest {
             "a / b",
             List.of(Assumption.nonZero("b"))
         );
-        assertTrue(attempt.artifact().contains("(distinct b 0)"));
+        assertTrue(attempt.artifact().contains("(not (= b 0))"));
     }
 }

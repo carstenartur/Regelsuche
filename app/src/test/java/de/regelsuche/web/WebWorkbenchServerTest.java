@@ -217,8 +217,8 @@ class WebWorkbenchServerTest {
         demo.setDoOutput(true);
         String demoBody = new String(demo.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertTrue(demoBody.contains("\"proofOutcome\""), demoBody);
-        assertTrue(demoBody.contains("\"proverStatus\":\"PROVER_CONFIRMED\""), demoBody);
-        assertTrue(demoBody.contains("\"proofStatus\":\"FORMALLY_PROVED\""), demoBody);
+        assertTrue(demoBody.contains("\"proverStatus\":\"PROCESS_SUCCEEDED\""), demoBody);
+        assertTrue(demoBody.contains("\"proofStatus\":\"FORMALLY_PROVABLE\""), demoBody);
 
         HttpURLConnection proof = open("/api/proof-bridge");
         proof.setRequestMethod("POST");
@@ -230,8 +230,8 @@ class WebWorkbenchServerTest {
         }
         assertEquals(200, proof.getResponseCode());
         String proofBody = new String(proof.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        assertTrue(proofBody.contains("\"proverStatus\":\"PROVER_CONFIRMED\""), proofBody);
-        assertTrue(proofBody.contains("\"proofStatus\":\"FORMALLY_PROVED\""), proofBody);
+        assertTrue(proofBody.contains("\"proverStatus\":\"PROCESS_SUCCEEDED\""), proofBody);
+        assertTrue(proofBody.contains("\"proofStatus\":\"FORMALLY_PROVABLE\""), proofBody);
     }
 
     private HttpURLConnection open(String path) throws IOException {

@@ -53,4 +53,37 @@ class CheckedProofBridgeTest {
         assertNotEquals(CandidateProofStatus.FORMALLY_PROVED,
             new ProofBridgeService(forged).attempt(candidate(CandidateProofStatus.OBSERVED), List.of()).proofStatus());
     }
+
+    @Test void otherGoalsAreRejectedBeforeAnyToolInvocation(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) {
+        ProofBridge substitution = (l, r, a) -> new LeanProofBridge().prove("x", "x", List.of());
+        var outcome = new ProofBridgeService(substitution, null, ProverExecutor.lean(root, root.resolve("evidence")))
+            .attemptWithDetails(candidate(CandidateProofStatus.OBSERVED), List.of());
+        assertEquals(ProverExecutionResult.Status.PROVER_FAILED, outcome.execution().status());
+        assertTrue(outcome.execution().stderr().contains("current goal"));
+        assertFalse(java.nio.file.Files.exists(root.resolve("evidence")));
+    }
+    @Test void extraPremisesCannotBeSubstitutedForTheRequestedProof(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) {
+        ProofBridge substitution = (l, r, a) -> new LeanProofBridge().prove(l, r,
+            List.of(Assumption.positive("x")));
+        var outcome = new ProofBridgeService(substitution, null, ProverExecutor.lean(root, root.resolve("evidence")))
+            .attemptWithDetails(candidate(CandidateProofStatus.OBSERVED), List.of());
+        assertEquals(ProverExecutionResult.Status.PROVER_FAILED, outcome.execution().status());
+        assertTrue(outcome.execution().stderr().contains("current goal"));
+    }
+    @Test void generatedArtifactsAreStructurallyValidButEditedOnesAreNot() {
+        var artifact = new LeanProofBridge().prove("x", "x", List.of()).artifact();
+        assertTrue(ProofScriptValidator.validate(artifact, "lean4").isValid());
+        assertFalse(ProofScriptValidator.validate(artifact + "\naxiom untrusted : False\n", "lean4").isValid());
+    }
+    @Test void typedInequalityUsesRealAnalyticSemantics() {
+        var obligation = new de.regelsuche.solver.ir.SolverObligationFactory().relation("positive-exponential",
+            de.regelsuche.solver.ir.SolverIr.Relation.GREATER_THAN, "exp(x)", "0", List.of(),
+            de.regelsuche.solver.ir.SolverIr.RequestedEvidence.FORMAL_PROOF,
+            new de.regelsuche.solver.ir.SolverIr.SourceProvenance("generic-test", "exp-positive",
+                de.regelsuche.solver.ir.SolverIr.sha256("positive-exp-v1")));
+        var lean = new LeanProofBridge().prove(obligation);
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, lean.status());
+        assertTrue(lean.artifact().contains("Real.exp"));
+        assertEquals(CandidateProofStatus.OBSERVED, new SmtProofBridge().prove(obligation).status());
+    }
 }

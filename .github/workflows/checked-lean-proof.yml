@@ -49,13 +49,13 @@ jobs:
       - name: Install pinned Lean and mathlib reference environment
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y elan
+          sudo apt-get install -y elan z3
           cd .ci/lean-proof
           lake update
           lake exe cache get
           lake env lean --version
       - name: Run actual Lean proofs and rejection controls
-        run: mvn -B -pl regelsuche-solver-portfolio -am -Dtest=CheckedLeanProofTest,CheckedLeanRealTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -pl app -am -Dtest=CheckedLeanRealTest,CheckedProofBridgeRealTest -Dsurefire.failIfNoSpecifiedTests=false test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -63,6 +63,8 @@ jobs:
           path: |
             regelsuche-solver-portfolio/target/checked-proof/
             regelsuche-solver-portfolio/target/surefire-reports/
+            app/target/checked-proof/
+            app/target/surefire-reports/
             .ci/lean-proof/lake-manifest.json
 
   app-boundary:
@@ -75,7 +77,7 @@ jobs:
           distribution: temurin
           java-version: '25'
       - name: Verify application proof admission
-        run: mvn -B -pl app -am -Dtest=CheckedProofBridgeTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -pl app -am -Dtest=CheckedProofBridgeTest,LeanProofBridgeTest,SmtProofBridgeTest,ProverExecutorAndBridgeTest,ProofBridgeServiceTest,ProofBridgeFormallyProvedTest,ProofWorkerTest,ProofScriptValidatorTest,UnifiedMathDomainWorkbenchTest,WebWorkbenchServerTest,Z3SmtSolverBackendTest -Dsurefire.failIfNoSpecifiedTests=false test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

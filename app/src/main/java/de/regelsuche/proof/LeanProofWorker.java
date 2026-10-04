@@ -8,26 +8,18 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * {@link ProofWorker} that generates a Lean 4 theorem skeleton and—when a
- * Lean toolchain is present—actually runs it.
- *
- * <p>Constructed without an artifact directory or executor the worker behaves
- * identically to the old skeleton-only {@link LeanProofBridge}: it produces a
- * {@code .lean} file in memory and reports
- * {@link de.regelsuche.validation.CandidateProofStatus#FORMALLY_PROVABLE}.  Pass
- * a real {@link ProverExecutor#lean()} to upgrade to full proof execution.</p>
- */
+/** Uses actual generated Lean tactics and the shared exact-goal/axiom gate.
+ * Without an executor it only generates an unchecked artifact. */
 public final class LeanProofWorker implements ProofWorker {
 
     private final ProofBridgeService service;
 
-    /** Skeleton-only constructor (no artifact written, no executor). */
+    /** Generation-only constructor (no artifact written, no executor). */
     public LeanProofWorker() {
         this(null, null);
     }
 
-    /** Writes artifacts to {@code artifactDirectory}; tries to run {@code lean}. */
+    /** Writes artifacts to {@code artifactDirectory}; uses the configured pinned Lean project. */
     public LeanProofWorker(Path artifactDirectory) {
         this(artifactDirectory, ProverExecutor.lean());
     }
