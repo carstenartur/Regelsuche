@@ -33,6 +33,20 @@ final class JavaNumericBackend implements ComputationBackend {
         var op = NumericOperation.valueOf(action.toUpperCase(Locale.ROOT));
         if (kind == NumericKind.BYTE || kind == NumericKind.SHORT || kind == NumericKind.CHAR)
             throw new IllegalArgumentException("JAVA_ARITHMETIC_REQUIRES_PROMOTION");
+        var argumentTypes = argumentTypes(function, kind, op);
+        if (kind.floatingPoint() && !EnumSet.of(NumericOperation.ADD, NumericOperation.SUBTRACT, NumericOperation.MULTIPLY,
+                NumericOperation.DIVIDE, NumericOperation.REMAINDER, NumericOperation.NEGATE, NumericOperation.ABS).contains(op))
+            throw new IllegalArgumentException("UNSUPPORTED_IEEE_OPERATION");
+        if (kind != NumericKind.BIG_INTEGER && EnumSet.of(NumericOperation.MOD, NumericOperation.MOD_POW,
+                NumericOperation.MOD_MULTIPLY, NumericOperation.POW).contains(op)) throw new IllegalArgumentException("BIG_INTEGER_OPERATION_REQUIRED");
+        if (kind == NumericKind.BIG_INTEGER && (op.name().endsWith("EXACT") || op == NumericOperation.UNSIGNED_SHIFT_RIGHT))
+            throw new IllegalArgumentException("UNSUPPORTED_BIG_INTEGER_OPERATION");
+        long work = op == NumericOperation.MOD_POW ? 1000 : op == NumericOperation.MOD_MULTIPLY ? 10 : kind == NumericKind.BIG_INTEGER ? 4 : 1;
+        if (op == NumericOperation.MOD_POW && function.arguments().size() == 3 && function.arguments().get(1) instanceof NumberExpr n && n.value().signum() >= 0)
+            work = Math.max(1, 2L * n.value().numerator().bitLength());
+        return new Operation(function.name(), argumentTypes, kind.type(), work, kind == NumericKind.BIG_INTEGER ? 2 : 1);
+    }
+    private List<Type> argumentTypes(FunctionExpr function, NumericKind kind, NumericOperation op) {
         int arity = switch (op) {
             case NEGATE, ABS, NOT, NEGATE_EXACT -> 1;
             case MOD_POW, MOD_MULTIPLY -> 3;
@@ -51,17 +65,7 @@ final class JavaNumericBackend implements ComputationBackend {
             if (kind != NumericKind.BIG_INTEGER) throw new IllegalArgumentException("UNSUPPORTED_POWER_OPERATION");
             argumentTypes.set(1, NumericKind.INT.type());
         }
-        if (kind.floatingPoint() && !EnumSet.of(NumericOperation.ADD, NumericOperation.SUBTRACT, NumericOperation.MULTIPLY,
-                NumericOperation.DIVIDE, NumericOperation.REMAINDER, NumericOperation.NEGATE, NumericOperation.ABS).contains(op))
-            throw new IllegalArgumentException("UNSUPPORTED_IEEE_OPERATION");
-        if (kind != NumericKind.BIG_INTEGER && EnumSet.of(NumericOperation.MOD, NumericOperation.MOD_POW,
-                NumericOperation.MOD_MULTIPLY, NumericOperation.POW).contains(op)) throw new IllegalArgumentException("BIG_INTEGER_OPERATION_REQUIRED");
-        if (kind == NumericKind.BIG_INTEGER && (op.name().endsWith("EXACT") || op == NumericOperation.UNSIGNED_SHIFT_RIGHT))
-            throw new IllegalArgumentException("UNSUPPORTED_BIG_INTEGER_OPERATION");
-        long work = op == NumericOperation.MOD_POW ? 1000 : op == NumericOperation.MOD_MULTIPLY ? 10 : kind == NumericKind.BIG_INTEGER ? 4 : 1;
-        if (op == NumericOperation.MOD_POW && function.arguments().size() == 3 && function.arguments().get(1) instanceof NumberExpr n && n.value().signum() >= 0)
-            work = Math.max(1, 2L * n.value().numerator().bitLength());
-        return new Operation(function.name(), argumentTypes, kind.type(), work, kind == NumericKind.BIG_INTEGER ? 2 : 1);
+        return argumentTypes;
     }
     @Override public Object apply(Operation operation, List<Object> arguments) {
         var decoded = JavaExpressions.decode(new FunctionExpr(operation.id(), List.of()));

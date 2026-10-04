@@ -25,6 +25,22 @@ final class SemanticChecker {
             throw new IllegalArgumentException("EXCLUDED_NUMERIC_KIND");
         var prepared = plan.prepare(new JavaNumericBackend(plan.inputs()));
         work.charge(prepared.cost().inspectionWork());
+        validateSourceTrace(plan, prepared, bounds);
+        for (var input : plan.inputs().entrySet()) {
+            var kind = NumericKind.fromType(input.getValue());
+            if (kind == NumericKind.BIG_INTEGER && !has(SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS, input.getKey()))
+                throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_REQUIRED");
+        }
+        boolean fp = prepared.nodes().stream().anyMatch(node -> NumericKind.fromType(node.type()).floatingPoint());
+        if (fp && request.safetyProfile()==SafetyProfile.PRESERVE_JAVA &&
+                request.assumptions().stream().noneMatch(a -> a.kind() == SemanticAssumption.Kind.NO_NAN_PAYLOAD_OBSERVATION))
+            throw new IllegalArgumentException("NAN_PAYLOAD_OBSERVATION_UNSUPPORTED");
+        if (fp && request.safetyProfile() == SafetyProfile.CHECKED_THROW &&
+                (!request.checkedPolicy().requireFinite() || !request.checkedPolicy().compareFloatingPointBits()))
+            throw new IllegalArgumentException("CHECKED_FINITE_AND_BITWISE_COMPARISON_REQUIRED");
+        validateAssumptions(plan);
+    }
+    private void validateSourceTrace(JointComputationPlan plan, PreparedJointComputation prepared, BigIntegerBounds bounds) {
         if (request.sourceTrace().occurrences().size() > JointComputationPlan.MAX_NODES) throw new IllegalArgumentException("TRACE_STRUCTURAL_BOUND");
         var seen = new HashSet<Expr>(); var sourceIds = new HashSet<String>();
         for (var occurrence : request.sourceTrace().occurrences()) {
@@ -49,18 +65,8 @@ final class SemanticChecker {
             if (node.operation() != null && !JavaExpressions.isLiteral(node.expression()) && !seen.contains(node.expression()))
                 throw new IllegalArgumentException("SOURCE_EVALUATION_TRACE_INCOMPLETE");
         }
-        for (var input : plan.inputs().entrySet()) {
-            var kind = NumericKind.fromType(input.getValue());
-            if (kind == NumericKind.BIG_INTEGER && !has(SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS, input.getKey()))
-                throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_REQUIRED");
-        }
-        boolean fp = prepared.nodes().stream().anyMatch(node -> NumericKind.fromType(node.type()).floatingPoint());
-        if (fp && request.safetyProfile()==SafetyProfile.PRESERVE_JAVA &&
-                request.assumptions().stream().noneMatch(a -> a.kind() == SemanticAssumption.Kind.NO_NAN_PAYLOAD_OBSERVATION))
-            throw new IllegalArgumentException("NAN_PAYLOAD_OBSERVATION_UNSUPPORTED");
-        if (fp && request.safetyProfile() == SafetyProfile.CHECKED_THROW &&
-                (!request.checkedPolicy().requireFinite() || !request.checkedPolicy().compareFloatingPointBits()))
-            throw new IllegalArgumentException("CHECKED_FINITE_AND_BITWISE_COMPARISON_REQUIRED");
+    }
+    private void validateAssumptions(JointComputationPlan plan) {
         for (var assumption : request.assumptions()) {
             if (assumption.kind() != SemanticAssumption.Kind.NO_NAN_PAYLOAD_OBSERVATION && !plan.inputs().containsKey(assumption.subject()))
                 throw new IllegalArgumentException("ASSUMPTION_SUBJECT_NOT_INPUT");
@@ -102,20 +108,7 @@ final class SemanticChecker {
             if (!a.equals(left.get(i)) || !b.equals(right.get(i))) methods.add("EXACT_PRIMITIVE_LITERAL_CAST");
             var kind=NumericKind.fromType(source.outputs().get(i).type());
             if (a.equals(b)) { methods.add("TYPED_STRUCTURAL_IDENTITY"); continue; }
-            if (a instanceof FunctionExpr af && b instanceof FunctionExpr bf && af.name().equals(bf.name())
-                    && af.arguments().size()==bf.arguments().size() && !JavaExpressions.isLiteral(a)) {
-                boolean congruent=true;
-                for (int argument=0;argument<af.arguments().size();argument++) {
-                    Expr child=af.arguments().get(argument), replacement=bf.arguments().get(argument);
-                    var childKind=JavaExpressions.kindOf(child,source.inputs());
-                    var childSource=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output("congruence",childKind.type(),child)));
-                    var childTarget=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output("congruence",childKind.type(),replacement)));
-                    var childProof=check(childSource,childTarget);
-                    if(!childProof.accepted()) { congruent=false; break; }
-                    methods.addAll(childProof.methods());
-                }
-                if(congruent) { methods.add("TYPED_OPERATION_CONGRUENCE"); continue; }
-            }
+            if (operationCongruent(a, b, source, methods)) { methods.add("TYPED_OPERATION_CONGRUENCE"); continue; }
             if (kind.floatingPoint()) {
                 if (new StrictFloatingProof(work).equivalent(a,b)) { methods.add("STRICT_IEEE_IDENTITY"); continue; }
                 if (request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA) {
@@ -123,28 +116,49 @@ final class SemanticChecker {
                 }
                 return new Proof(false,List.copyOf(methods),work.used()-initial);
             }
-            boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
-            try {
-                if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {
-                    methods.add(kind==NumericKind.BIG_INTEGER ? "INTEGER_POLYNOMIAL_NORMAL_FORM" : exact ? "INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE" : "BITVECTOR_POLYNOMIAL_MOD_2_"+kind.bits());
-                    continue;
-                }
-            } catch (PolynomialProof.OutsideFragment bounded) { /* A larger polynomial is unknown, never proved. */ }
-            if (kind==NumericKind.BIG_INTEGER) {
-                // This is an exact typed expansion, not equality modulo an unspecified modulus.
-                // Both traces and every intermediate range have already been checked above.
-                if (expandModularProduct(a).equals(expandModularProduct(b))) {
-                    methods.add("TYPED_MODULAR_PRODUCT_EXPANSION"); continue;
-                }
-                try {
-                    var proof = new ModularBridge(request.assumptions()).verify(a,b); work.charge(proof.work());
-                    if (proof.accepted()) { methods.add("AFFINE_MODULAR_NORMAL_FORM"); continue; }
-                } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }
-            }
-            if (kind.integral() && new BitwiseProof(work).equivalent(a,b,kind)) { methods.add("BITVECTOR_TRUTH_TABLE"); continue; }
+            if (integralEquivalent(a, b, kind, methods)) continue;
             return new Proof(false,List.copyOf(methods),work.used()-initial);
         }
         return new Proof(true,List.copyOf(methods),Math.max(1,work.used()-initial));
+    }
+    private boolean operationCongruent(Expr a, Expr b, JointComputationPlan source, Set<String> methods) {
+        if (a instanceof FunctionExpr af && b instanceof FunctionExpr bf && af.name().equals(bf.name())
+                && af.arguments().size()==bf.arguments().size() && !JavaExpressions.isLiteral(a)) {
+            boolean congruent=true;
+            for (int argument=0;argument<af.arguments().size();argument++) {
+                Expr child=af.arguments().get(argument), replacement=bf.arguments().get(argument);
+                var childKind=JavaExpressions.kindOf(child,source.inputs());
+                var childSource=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output("congruence",childKind.type(),child)));
+                var childTarget=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output("congruence",childKind.type(),replacement)));
+                var childProof=check(childSource,childTarget);
+                if(!childProof.accepted()) { congruent=false; break; }
+                methods.addAll(childProof.methods());
+            }
+            return congruent;
+        }
+        return false;
+    }
+    private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set<String> methods) {
+        boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
+        try {
+            if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {
+                methods.add(kind==NumericKind.BIG_INTEGER ? "INTEGER_POLYNOMIAL_NORMAL_FORM" : exact ? "INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE" : "BITVECTOR_POLYNOMIAL_MOD_2_"+kind.bits());
+                return true;
+            }
+        } catch (PolynomialProof.OutsideFragment bounded) { /* A larger polynomial is unknown, never proved. */ }
+        if (kind==NumericKind.BIG_INTEGER) {
+            // This is an exact typed expansion, not equality modulo an unspecified modulus.
+            // Both traces and every intermediate range have already been checked by the caller.
+            if (expandModularProduct(a).equals(expandModularProduct(b))) {
+                methods.add("TYPED_MODULAR_PRODUCT_EXPANSION"); return true;
+            }
+            try {
+                var proof = new ModularBridge(request.assumptions()).verify(a,b); work.charge(proof.work());
+                if (proof.accepted()) { methods.add("AFFINE_MODULAR_NORMAL_FORM"); return true; }
+            } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }
+        }
+        if (kind.integral() && new BitwiseProof(work).equivalent(a,b,kind)) { methods.add("BITVECTOR_TRUTH_TABLE"); return true; }
+        return false;
     }
     private Expr expandModularProduct(Expr expression) {
         work.charge(1);

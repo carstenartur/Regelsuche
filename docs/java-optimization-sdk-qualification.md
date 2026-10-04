@@ -12,8 +12,12 @@ Quellcheckpoints: `ea4dea173ea9198cda1e2f20fa56d05d66523c1d` stellt die API
 wieder her; `4fc49eaf9c4ebd700027c1005dcdb69127d4a316` rekonstruiert die
 unabhängigen numerischen Prüfungen. Der nachfolgende Build-Checkpoint bindet
 zusätzlich exakt ausgewertete primitive Literal-Casts und die reguläre
-Build-/Distributionsintegration. Seine endgültige Artefaktrevision steht im
-erzeugten Distributionsmanifest, nicht in einem erfundenen Release-Verweis.
+Build-/Distributionsintegration. Der Quellbranch ist über
+[PR #1069](https://github.com/carstenartur/Regelsuche/pull/1069) veröffentlicht;
+`0515e8550c456319efed65267096dbf3e64b4390` ist der veröffentlichte Stand vor
+der unten beschriebenen CI-Nachqualifikation. Die endgültige Artefaktrevision
+steht im erzeugten Distributionsmanifest, nicht in einem erfundenen
+Release-Verweis.
 
 ## Frisch ausgeführte Prüfungen
 
@@ -22,9 +26,9 @@ erzeugten Distributionsmanifest, nicht in einem erfundenen Release-Verweis.
   und exakt typisierte BYTE/SHORT/CHAR-Literal-Casts.
 * `verifySdkApiCompatibility`: erfolgreich mit dem originalen Japicmp-Baseline-
   Vergleich sowie vollständiger neuer Optimizer-Typliste und Modulzuordnung.
-* SDK-JaCoCo aus Gradle: 849/998 Zeilen (85,0701 %) und 829/1236 Zweige
-  (67,0712 %). Die neuen Floors 84/64 bleiben unverändert; bestehende
-  Modul-/Aggregat-Floors wurden nicht abgesenkt. Das ist keine Aussage über
+* SDK-JaCoCo aus Gradle: 862/1011 Zeilen (85,2621 %) und 832/1238 Zweige
+  (67,2052 %) nach dem Methodenrefactoring. Die SDK-Floors 84/64 bleiben
+  unverändert; bestehende Modul-/Aggregat-Floors wurden nicht abgesenkt. Das ist keine Aussage über
   die noch ausstehende vollständige Aggregatqualifikation.
 * 59 fokussierte Maven-JUnit-Tests: 43 SDK, 8 Search-Plan/DAG, 4 Math-Modular-
   und 4 Experiment-Wiring-Tests, keine Fehler oder ausgelassenen Tests.
@@ -48,9 +52,47 @@ Klassen bestätigt. Dieser gezielte Clean entfernt nur die SDK-Buildprodukte.
 
 Die genaue Run-Liste, komprimierte Rohlogs und SHA-256-Liste werden nach den
 verbleibenden Consumer-/Paketprüfungen ergänzt. Volles `ciCheck` ist noch nicht
-erneut ausgeführt; hierfür wird ein eigener Speicherslot mit den nativen
+erfolgreich erneut ausgeführt; hierfür wird ein eigener Speicherslot mit den nativen
 Sandbox-Läufen abgestimmt. Frühere Docker-/Browser-Fehler sind historische
 Befunde und kein Nachweis des rekonstruierten aktuellen Laufs.
+
+## Gezielte SDK-CI-Nachqualifikation vom 4. Oktober 2026
+
+Der reale GitHub-Lauf `37230037423`, Job `111517604884`, scheiterte am
+unveränderten AI-Knowledge-Gate: maximale kognitive Methodenkomplexität 70
+bei Limit 65 und maximale zyklomatische Methodenkomplexität 48 bei Limit 35.
+Der erzeugte Methodenreport identifiziert drei betroffene SDK-Methoden:
+
+| Methode | Zyklomatisch vorher → nachher | Kognitiv vorher → nachher |
+| --- | ---: | ---: |
+| `JavaCandidateGenerator.simplify` | 48 → 8 | 70 → 7 |
+| `SemanticChecker.validate` | 44 → 18 | 62 → 18 |
+| `JavaNumericBackend.operation` | 38 → 24 | 43 → 27 |
+
+Die Refactorings extrahieren additive, multiplikative/bitweise und konstante
+Vorschläge, Quelltrace-/Annahmenvalidierung sowie die Bestimmung der
+Argumenttypen. Der anschließende vollständige lokale Gate-Lauf identifizierte
+zusätzlich `SemanticChecker.check` als neuen Hotspot; die vorhandenen
+Kongruenz- und Integralbeweise wurden ebenfalls als private Helfer extrahiert
+(zyklomatisch 31 → 16, kognitiv 63 → 27). Entscheidungs- und Beweisreihenfolge,
+Work-/Cancellation-Aufrufe, Fehlergrenzen und numerische Verträge bleiben
+unverändert. Es gibt keine Unterdrückung, Baselineänderung oder Gateabsenkung.
+
+Der vollständige Root-Task `aiKnowledgeCheck` besteht einschließlich
+Artefaktprüfung, acht Capability-Coverage-Kontrollen und Hotspot-Gate.
+Repository-Maxima: kognitiv 64 und zyklomatisch 33. Der Lauf verwendet die
+unveränderte offizielle Extractor-Quelle des Tags `v0.1.10`, Commit
+`b409bed957c31d63ce7b6ef37205890f0f0ebd9a`, im expliziten lokalen Pluginmodus.
+Ein externes Init-Skript kompiliert sie mit JDK 25 bei unverändertem
+Java-17-Releaseziel; die Umgebung enthält keinen JDK-17-Compiler.
+
+43 SDK-Tests bestehen erneut mit Maven und mit gezieltem Gradle-Clean ohne
+Buildcache. `verifySdkApiCompatibility` besteht frisch gegen die originale
+Japicmp-Baseline. Die oben angegebenen SDK-Coveragewerte stammen aus diesem
+Clean-Lauf und liegen über den unveränderten Floors 84/64. JVMs bleiben
+begrenzt, Gradle verwendet einen Worker. Eine neue vollständige
+Aggregatqualifikation oder Maven-Veröffentlichung wird nicht behauptet;
+der endgültige Distributionspin bleibt der im erzeugten Manifest.
 
 ## Semantik und Adaptergrenzen
 
@@ -86,11 +128,11 @@ Coverage, BOM, API-Gate und normale SDK-Publikationsclosure enthalten das SDK.
 
 Der qualifizierte Distributionsweg ist ein lokal reproduzierbares,
 commit-gepinntes `all`-JAR/ZIP mit vollständiger Closure, Lizenzen, Quellen,
-Javadoc und sauberem Consumer. Es wird keine öffentliche Maven-Verfügbarkeit
-behauptet und nichts remote veröffentlicht. Der vollständige normale
+Javadoc und sauberem Consumer. Der Quellbranch ist über PR #1069 veröffentlicht; es wird keine öffentliche
+Maven-Verfügbarkeit behauptet. Der vollständige normale
 Release-/CI-Vertrag bleibt bestehen; ein lokales fokussiertes Ergebnis ersetzt
 keinen noch offenen Gesamtgate. Diese Auslieferungsentscheidung ist die
-begründete lokale Ausnahme für den noch unveröffentlichten Companion-Branch,
+begründete lokale Distributionsausnahme für den veröffentlichten Quellbranch,
 nicht eine Ausnahme von numerischen Beweisen oder Build-/Coverage-Gates.
 
 Für die Clean-Reproduktion wird `project.build.outputTimestamp` auf den
