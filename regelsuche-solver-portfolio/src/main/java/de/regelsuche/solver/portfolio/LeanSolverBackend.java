@@ -116,7 +116,7 @@ public final class LeanSolverBackend implements SolverBackend {
             String nonce = UUID.randomUUID().toString().replace("-", "");
             String source = renderer.source(obligation, nonce);
             Files.writeString(directory.resolve("proof.lean"), source);
-            ProcessOutput proof = run(List.of("-o", directory.resolve("proof.olean").toString(),
+            ProcessOutput proof = run(List.of("--root=" + directory, "-o", directory.resolve("proof.olean").toString(),
                 directory.resolve("proof.lean").toString()), directory, "proof");
             if (!proof.success()) return finish(obligation, translation,
                 proof.timedOut() ? ResultStatus.TIMEOUT : proof.outputLimit() ? ResultStatus.ERROR : ResultStatus.UNKNOWN,
