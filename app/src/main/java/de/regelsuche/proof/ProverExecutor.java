@@ -80,6 +80,25 @@ public final class ProverExecutor {
     /** Only factory-created, semantically checked backends can grant proof status. */
     boolean checksMathematicalEvidence() { return checkedKind != CheckedKind.NONE; }
 
+    /** Re-evaluated for each queued request; formal proof statuses are never replayed from this key. */
+    public String cacheIdentity() {
+        String configuration;
+        if (checkedKind == CheckedKind.LEAN) {
+            configuration = leanProject == null ? "unconfigured"
+                : new de.regelsuche.solver.portfolio.LeanSolverBackend(leanProject, evidenceRoot).configurationHash();
+        } else if (checkedKind == CheckedKind.Z3) {
+            var detected = de.regelsuche.solver.portfolio.Z3SmtSolverBackend.detectSystemZ3();
+            configuration = detected.availability() + "\n"
+                + detected.backend().descriptor().backendVersion() + "\n"
+                + detected.backend().configurationHash();
+        } else {
+            configuration = command + "\n" + artifactSuffix + "\n" + timeoutMillis
+                + "\n" + successPredicate.getClass().getName();
+        }
+        return "proof-cache/v2/" + toolName + "/"
+            + de.regelsuche.solver.ir.SolverIr.sha256(checkedKind + "\n" + configuration);
+    }
+
     public String toolName() {
         return toolName;
     }

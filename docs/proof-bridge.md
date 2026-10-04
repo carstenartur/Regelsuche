@@ -110,11 +110,25 @@ mvn -B -pl app -am \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-This run also requires Z3 on PATH. The focused workflow installs the actual
-reference tools and retains their evidence. It is distinct from the ordinary
-whole-repository CI and the Docker/browser suites. Compiler warnings, skipped
-real-tool tests in the ordinary lane, and unrelated test failures must not be
-represented as successful complete verification.
+This run also requires Z3 on PATH. The required `checked-proofs` job in the
+existing CI workflow installs the reference tools and retains their evidence.
+It supplements the unchanged complete Gradle, Maven, benchmark and Docker
+authorities rather than replacing them. Compiler warnings, skipped real-tool
+tests outside that job, and unrelated failures are not successful validation.
 
 See [Proof Workbench](proof-workbench.md), [Solver IR](solver-neutral-ir.md) and
 [Solver portfolio](solver-portfolio.md) for the existing orchestration contracts.
+
+## Persistent cache admission
+
+Worker display IDs are not cache scopes. The current `proof-cache/v2` identity
+binds the evidence contract and backend configuration. Lean includes the pinned
+toolchain and manifest; Z3 includes detected version and command configuration.
+Composite workers recompute the scopes of their members. A configuration change
+during an attempt prevents publication of that attempt's status.
+
+The persistent cache currently stores statuses, not independently replayable
+proofs. Therefore `FORMALLY_PROVED` is never admitted from a cache hit, even for
+a current identity. A fresh backend execution is required. Non-proof generation
+results remain reusable in the same scope. Old entries are not deleted or
+silently upgraded; legacy identities cannot authorize the new evidence contract.

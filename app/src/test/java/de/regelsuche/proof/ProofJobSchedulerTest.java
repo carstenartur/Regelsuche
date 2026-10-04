@@ -154,9 +154,9 @@ class ProofJobSchedulerTest {
     }
 
     @Test
-    void cacheHitSkipsWorker() throws InterruptedException {
-        ProofCacheKey key = ProofCacheKey.of("A*1", "A", List.of(), "lean4");
-        cache.put(key, CandidateProofStatus.FORMALLY_PROVED);
+    void generationOnlyCacheHitIsReusableButIsNotAProof() throws InterruptedException {
+        ProofCacheKey key = ProofCacheKey.of("A*1", "A", List.of(), new LeanProofWorker().cacheIdentity());
+        cache.put(key, CandidateProofStatus.FORMALLY_PROVABLE);
 
         String jobId = scheduler.submit(candidate("A*1", "A"), List.of(), 0);
         assertEventually(() -> {
@@ -166,8 +166,8 @@ class ProofJobSchedulerTest {
 
         ProofJob done = scheduler.get(jobId).orElseThrow();
         assertEquals(ProofJobStatus.DONE, done.status());
-        assertEquals(CandidateProofStatus.FORMALLY_PROVED, done.resultStatus(),
-            "cache hit must propagate FORMALLY_PROVED status");
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, done.resultStatus(),
+            "generation-only cache hit must not promote to a formal proof");
     }
 
     @Test

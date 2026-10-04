@@ -16,9 +16,9 @@ import java.util.stream.Collectors;
  * with the highest {@link CandidateProofStatus} ordinal is returned instead.</p>
  *
  * <p>The composite {@link #workerId()} is derived from the member worker ids,
- * e.g. {@code "composite(lean4,smtlib2)"}.  This means the cache key changes
- * whenever the set of members changes, which is the desired behaviour: a cache
- * entry for a different worker composition cannot be reused.</p>
+ * e.g. {@code "composite(lean4,smtlib2)"}. The separate {@link #cacheIdentity()}
+ * binds current member configurations in their execution order, and is
+ * recomputed rather than frozen at construction time.</p>
  */
 public final class CompositeProofWorker implements ProofWorker {
 
@@ -54,6 +54,13 @@ public final class CompositeProofWorker implements ProofWorker {
     @Override
     public String workerId() {
         return workerId;
+    }
+
+    @Override
+    public String cacheIdentity() {
+        // Do not freeze members' mutable toolchain identities at construction.
+        return "proof-cache/v2/composite/" + de.regelsuche.solver.ir.SolverIr.sha256(
+            workers.stream().map(ProofWorker::cacheIdentity).collect(Collectors.joining("\n")));
     }
 
     /** Expose the individual workers for diagnostic purposes. */

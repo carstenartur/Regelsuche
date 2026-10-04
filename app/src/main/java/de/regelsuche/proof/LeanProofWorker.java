@@ -13,6 +13,7 @@ import java.util.Objects;
 public final class LeanProofWorker implements ProofWorker {
 
     private final ProofBridgeService service;
+    private final ProverExecutor executor;
 
     /** Generation-only constructor (no artifact written, no executor). */
     public LeanProofWorker() {
@@ -26,6 +27,7 @@ public final class LeanProofWorker implements ProofWorker {
 
     /** Full constructor. */
     public LeanProofWorker(Path artifactDirectory, ProverExecutor executor) {
+        this.executor = executor;
         this.service = new ProofBridgeService(new LeanProofBridge(), artifactDirectory, executor);
     }
 
@@ -43,6 +45,11 @@ public final class LeanProofWorker implements ProofWorker {
             outcome.attempt().tool(),
             duration
         );
+    }
+
+    @Override
+    public String cacheIdentity() {
+        return executor == null ? "proof-cache/v2/lean4/generation-only" : executor.cacheIdentity();
     }
 
     @Override

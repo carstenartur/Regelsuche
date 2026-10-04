@@ -176,3 +176,13 @@ Funktionsnamen oder stillschweigend weggelassene Voraussetzungen.
 - [Solver-Portfolio](solver-portfolio.md)
 - [Web-Workbench](web-workbench.md)
 - [Testing und Verifikation](testing.md)
+
+### Cache-Migration der Beweisgrenze
+
+Die aktuelle Cache-Kennung bindet den Beweisvertrag und die Werkzeugkonfiguration,
+nicht nur den Anzeigenamen des Workers. Alte Einträge bleiben erhalten, werden
+aber nicht als neue Bestätigung übernommen. Auch unter einer aktuellen Kennung
+ist ein gespeicherter `FORMALLY_PROVED`-Status kein wiederverwendbarer Beweis:
+Dafür ist ein frischer Backendlauf erforderlich. Nichtformale Ergebnisse der
+Skriptgenerierung bleiben innerhalb derselben Konfiguration wiederverwendbar.
+Eine während der Ausführung geänderte Konfiguration verhindert die Freigabe.

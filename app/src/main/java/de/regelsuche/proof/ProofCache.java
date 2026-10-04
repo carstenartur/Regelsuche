@@ -4,15 +4,15 @@ import de.regelsuche.validation.CandidateProofStatus;
 import java.util.Optional;
 
 /**
- * Cache that avoids re-running the same proof obligation.
+ * Status cache for previous attempts. It is not independently replayable proof evidence.
  *
  * <p>The cache operates on {@link ProofCacheKey}s, which embed the prover
- * version; different prover versions produce different keys and never share
- * cached results.</p>
+ * configuration; different configurations do not share cache scope. The scheduler
+ * reuses non-proof results only. Formal confirmations require fresh execution.</p>
  */
 public interface ProofCache {
 
-    /** @return the cached status if a previous proof attempt succeeded. */
+    /** @return the cached status for a previous attempt; not authority to accept a formal proof. */
     Optional<CandidateProofStatus> get(ProofCacheKey key);
 
     /**

@@ -145,7 +145,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(compactConvergence.contains(
         "needs: [gradle-verification, jmh-verification, "
             + "sympy-runtime-verification, maven-product-verification, "
-            + "external-polynomial-comparison, typed-external-polynomial-comparison]"));
+            + "external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs]"));
     assertTrue(compactConvergence.contains(
         "needs.gradle-verification.result != 'success' || "
             + "needs.jmh-verification.result != 'success' || "
@@ -153,7 +153,8 @@ class MavenParallelVerificationWorkflowContractTest {
             + "(github.event_name != 'create' && "
             + "(needs.maven-product-verification.result != 'success' || "
             + "needs.external-polynomial-comparison.result != 'success' || "
-            + "needs.typed-external-polynomial-comparison.result != 'success'))"),
+            + "needs.typed-external-polynomial-comparison.result != 'success' || "
+            + "needs.checked-proofs.result != 'success'))"),
         "the stable required check must reject any incomplete authority");
     assertTrue(convergence.contains("run: exit 1"),
         "an incomplete authority set must fail rather than become skipped-success");

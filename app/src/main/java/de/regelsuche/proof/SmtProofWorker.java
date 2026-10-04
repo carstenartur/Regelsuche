@@ -9,8 +9,9 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * {@link ProofWorker} that emits an SMT-LIB 2 script and—when Z3 or CVC5 is
- * present on the system PATH—executes it to obtain a confirmed proof.
+ * {@link ProofWorker} that emits a typed SMT-LIB 2 artifact and can confirm
+ * its exact obligation through the checked Z3 adapter. Raw transport, including
+ * the current cvc5 executor, cannot authorize a mathematical proof.
  *
  * <p>Without an executor the worker behaves identically to the old
  * {@link SmtProofBridge}: it generates a {@code .smt2} script and reports
@@ -19,8 +20,9 @@ import java.util.Objects;
 public final class SmtProofWorker implements ProofWorker {
 
     private final ProofBridgeService service;
+    private final ProverExecutor executor;
 
-    /** Skeleton-only constructor (no artifact written, no executor). */
+    /** Generation-only constructor (no artifact written, no executor). */
     public SmtProofWorker() {
         this(null, null);
     }
@@ -32,6 +34,7 @@ public final class SmtProofWorker implements ProofWorker {
 
     /** Full constructor — caller chooses the executor (Z3, CVC5, …). */
     public SmtProofWorker(Path artifactDirectory, ProverExecutor executor) {
+        this.executor = executor;
         this.service = new ProofBridgeService(new SmtProofBridge(), artifactDirectory, executor);
     }
 
@@ -49,6 +52,11 @@ public final class SmtProofWorker implements ProofWorker {
             outcome.attempt().tool(),
             duration
         );
+    }
+
+    @Override
+    public String cacheIdentity() {
+        return executor == null ? "proof-cache/v2/smtlib2/generation-only" : executor.cacheIdentity();
     }
 
     @Override
