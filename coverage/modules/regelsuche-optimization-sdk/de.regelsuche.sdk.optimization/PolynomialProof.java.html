@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialProof.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">PolynomialProof.java</span></div><h1>PolynomialProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.*;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Independent bounded ring normal form. Java word arithmetic is reduced modulo 2^width.
+ * Non-polynomial typed subexpressions remain opaque atoms; they are never treated as real numbers.
+ */
+final class PolynomialProof {
+    static final int MAX_TERMS = 256, MAX_DEGREE = 64, MAX_COEFFICIENT_BITS = 4096;
+<span class="nc" id="L12">    static final class OutsideFragment extends RuntimeException {}</span>
+    private record Monomial(Map&lt;Expr, Integer&gt; powers) {
+<span class="fc" id="L14">        Monomial { powers = Map.copyOf(powers); }</span>
+        Monomial times(Monomial other) {
+<span class="fc" id="L16">            var result = new HashMap&lt;&gt;(powers);</span>
+<span class="fc" id="L17">            other.powers.forEach((key, power) -&gt; result.merge(key, power, Integer::sum));</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">            if (result.values().stream().mapToInt(Integer::intValue).sum() &gt; MAX_DEGREE) throw new OutsideFragment();</span>
+<span class="fc" id="L19">            return new Monomial(result);</span>
+        }
+    }
+    private final NumericKind kind;
+    private final BigInteger modulus;
+    private final boolean exactDivision;
+    private final boolean floatingAlgebra;
+    private final VerificationWork work;
+<span class="fc" id="L27">    PolynomialProof(NumericKind kind, boolean exactDivision, boolean floatingAlgebra, VerificationWork work) {</span>
+<span class="fc" id="L28">        this.kind = kind; this.exactDivision = exactDivision; this.floatingAlgebra = floatingAlgebra; this.work = work;</span>
+<span class="fc bfc" id="L29" title="All 4 branches covered.">        modulus = kind.integral() &amp;&amp; !exactDivision ? BigInteger.ONE.shiftLeft(kind.bits()) : null;</span>
+<span class="fc" id="L30">    }</span>
+<span class="fc" id="L31">    boolean equivalent(Expr source, Expr target) { return normalize(source, 0).equals(normalize(target, 0)); }</span>
+    private Map&lt;Monomial, BigInteger&gt; normalize(Expr expression, int depth) {
+<span class="fc" id="L33">        work.charge(1);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new OutsideFragment();</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(expression)) {</span>
+<span class="fc" id="L36">            Object value = JavaExpressions.literalValue(expression);</span>
+            BigInteger number;
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (value instanceof BigInteger b) number = b;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            else if (value instanceof Character c) number = BigInteger.valueOf(c);</span>
+<span class="pc bpc" id="L40" title="2 of 4 branches missed.">            else if (value instanceof Float || value instanceof Double) {</span>
+<span class="nc" id="L41">                double d = ((Number)value).doubleValue();</span>
+<span class="nc bnc" id="L42" title="All 8 branches missed.">                if (!floatingAlgebra || !Double.isFinite(d) || d != Math.rint(d) || Math.abs(d) &gt; 1e15) throw new OutsideFragment();</span>
+<span class="nc" id="L43">                number = BigInteger.valueOf((long)d);</span>
+<span class="pc" id="L44">            } else number = BigInteger.valueOf(((Number)value).longValue());</span>
+<span class="fc" id="L45">            return constant(number);</span>
+        }
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (expression instanceof VariableExpr) return atom(expression);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (JavaExpressions.resultKind(expression) != kind) return atom(expression);</span>
+<span class="fc" id="L49">        var operation = JavaExpressions.operationOf(expression);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (operation.isEmpty()) return atom(expression);</span>
+<span class="fc" id="L51">        var args = JavaExpressions.operands(expression);</span>
+<span class="pc bpc" id="L52" title="1 of 6 branches missed.">        return switch (operation.get()) {</span>
+<span class="fc" id="L53">            case ADD -&gt; add(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1), BigInteger.ONE);</span>
+<span class="fc" id="L54">            case SUBTRACT -&gt; add(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1), BigInteger.ONE.negate());</span>
+<span class="nc" id="L55">            case NEGATE -&gt; multiply(constant(BigInteger.ONE.negate()), normalize(args.getFirst(), depth+1));</span>
+<span class="fc" id="L56">            case MULTIPLY -&gt; multiply(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1));</span>
+            case DIVIDE -&gt; {
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">                if (!exactDivision || !JavaExpressions.isLiteral(args.get(1))) yield atom(expression);</span>
+<span class="fc" id="L59">                Object divisorValue = JavaExpressions.literalValue(args.get(1));</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                BigInteger divisor = divisorValue instanceof BigInteger b ? b : BigInteger.valueOf(((Number)divisorValue).longValue());</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                if (divisor.signum() == 0) throw new OutsideFragment();</span>
+<span class="fc" id="L62">                var numerator = normalize(args.getFirst(), depth+1);</span>
+<span class="fc" id="L63">                var result = new HashMap&lt;Monomial, BigInteger&gt;();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                for (var entry : numerator.entrySet()) {</span>
+<span class="fc" id="L65">                    var qr = entry.getValue().divideAndRemainder(divisor);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                    if (qr[1].signum() != 0) yield atom(expression);</span>
+<span class="fc" id="L67">                    put(result, entry.getKey(), qr[0]);</span>
+<span class="fc" id="L68">                }</span>
+<span class="fc" id="L69">                yield Map.copyOf(result);</span>
+            }
+<span class="fc" id="L71">            default -&gt; atom(expression);</span>
+        };
+    }
+<span class="fc" id="L74">    private Map&lt;Monomial, BigInteger&gt; atom(Expr expression) { return Map.of(new Monomial(Map.of(expression, 1)), BigInteger.ONE); }</span>
+    private Map&lt;Monomial, BigInteger&gt; constant(BigInteger value) {
+<span class="fc" id="L76">        var result = new HashMap&lt;Monomial, BigInteger&gt;(); put(result, new Monomial(Map.of()), value); return Map.copyOf(result);</span>
+    }
+    private Map&lt;Monomial, BigInteger&gt; add(Map&lt;Monomial, BigInteger&gt; left, Map&lt;Monomial, BigInteger&gt; right, BigInteger sign) {
+<span class="fc" id="L79">        var result = new HashMap&lt;&gt;(left);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (var entry : right.entrySet()) { work.charge(1); put(result, entry.getKey(), result.getOrDefault(entry.getKey(), BigInteger.ZERO).add(entry.getValue().multiply(sign))); }</span>
+<span class="fc" id="L81">        return Map.copyOf(result);</span>
+    }
+    private Map&lt;Monomial, BigInteger&gt; multiply(Map&lt;Monomial, BigInteger&gt; left, Map&lt;Monomial, BigInteger&gt; right) {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if ((long)left.size() * right.size() &gt; MAX_TERMS * 4L) throw new OutsideFragment();</span>
+<span class="fc" id="L85">        var result = new HashMap&lt;Monomial, BigInteger&gt;();</span>
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        for (var l : left.entrySet()) for (var r : right.entrySet()) {</span>
+<span class="fc" id="L87">            work.charge(1); var monomial = l.getKey().times(r.getKey());</span>
+<span class="fc" id="L88">            put(result, monomial, result.getOrDefault(monomial, BigInteger.ZERO).add(l.getValue().multiply(r.getValue())));</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">        return Map.copyOf(result);</span>
+    }
+    private void put(Map&lt;Monomial, BigInteger&gt; target, Monomial monomial, BigInteger value) {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (modulus != null) value = value.mod(modulus);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (value.bitLength() &gt; MAX_COEFFICIENT_BITS) throw new OutsideFragment();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (value.signum() == 0) target.remove(monomial); else target.put(monomial, value);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (target.size() &gt; MAX_TERMS) throw new OutsideFragment();</span>
+<span class="fc" id="L97">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

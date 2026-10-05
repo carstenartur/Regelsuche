@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavaNumericBackend.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">JavaNumericBackend.java</span></div><h1>JavaNumericBackend.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.search.program.ComputationBackend;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Java value semantics only; this evaluator never executes consumer source code. */
+final class JavaNumericBackend implements ComputationBackend {
+    private final Map&lt;String, Type&gt; inputs;
+<span class="fc" id="L11">    JavaNumericBackend(Map&lt;String, Type&gt; inputs) { this.inputs = Map.copyOf(inputs); }</span>
+    @Override public Type literalType(NumberExpr literal) {
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        if (!literal.value().isInteger()) throw new IllegalArgumentException(&quot;INTEGER_LITERAL_REQUIRED&quot;);</span>
+<span class="fc" id="L14">        return NumericKind.BIG_INTEGER.type();</span>
+    }
+<span class="fc" id="L16">    @Override public Object literal(NumberExpr literal) { literalType(literal); return literal.value().numerator(); }</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">    @Override public long leafStorage(Type type) { return type.equals(NumericKind.BIG_INTEGER.type()) ? 2 : 1; }</span>
+    @Override public Operation operation(Expr expression) {
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (!(expression instanceof FunctionExpr function)) throw new IllegalArgumentException(&quot;TYPED_JAVA_OPERATION_REQUIRED&quot;);</span>
+<span class="fc" id="L20">        var decoded = JavaExpressions.decode(function);</span>
+<span class="fc" id="L21">        var kind = decoded.kind();</span>
+<span class="fc" id="L22">        String action = decoded.action();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (action.equals(&quot;literal&quot;)) {</span>
+<span class="fc" id="L24">            JavaExpressions.literalValue(expression);</span>
+<span class="fc" id="L25">            return new Operation(function.name(), List.of(NumericKind.BIG_INTEGER.type()), kind.type(), 0, 0);</span>
+        }
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (action.startsWith(&quot;cast_&quot;)) {</span>
+<span class="fc" id="L28">            var from = JavaExpressions.castSourceKind(expression).orElseThrow();</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">            if (from == NumericKind.BIG_INTEGER || kind == NumericKind.BIG_INTEGER)</span>
+<span class="nc" id="L30">                throw new IllegalArgumentException(&quot;UNSUPPORTED_BIG_INTEGER_CAST&quot;);</span>
+<span class="fc" id="L31">            return new Operation(function.name(), List.of(from.type()), kind.type(), 1, 1);</span>
+        }
+<span class="fc" id="L33">        var op = NumericOperation.valueOf(action.toUpperCase(Locale.ROOT));</span>
+<span class="pc bpc" id="L34" title="3 of 6 branches missed.">        if (kind == NumericKind.BYTE || kind == NumericKind.SHORT || kind == NumericKind.CHAR)</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(&quot;JAVA_ARITHMETIC_REQUIRES_PROMOTION&quot;);</span>
+<span class="fc" id="L36">        var argumentTypes = argumentTypes(function, kind, op);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (kind.floatingPoint() &amp;&amp; !EnumSet.of(NumericOperation.ADD, NumericOperation.SUBTRACT, NumericOperation.MULTIPLY,</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                NumericOperation.DIVIDE, NumericOperation.REMAINDER, NumericOperation.NEGATE, NumericOperation.ABS).contains(op))</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(&quot;UNSUPPORTED_IEEE_OPERATION&quot;);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (kind != NumericKind.BIG_INTEGER &amp;&amp; EnumSet.of(NumericOperation.MOD, NumericOperation.MOD_POW,</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                NumericOperation.MOD_MULTIPLY, NumericOperation.POW).contains(op)) throw new IllegalArgumentException(&quot;BIG_INTEGER_OPERATION_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L42" title="2 of 6 branches missed.">        if (kind == NumericKind.BIG_INTEGER &amp;&amp; (op.name().endsWith(&quot;EXACT&quot;) || op == NumericOperation.UNSIGNED_SHIFT_RIGHT))</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;UNSUPPORTED_BIG_INTEGER_OPERATION&quot;);</span>
+<span class="fc bfc" id="L44" title="All 6 branches covered.">        long work = op == NumericOperation.MOD_POW ? 1000 : op == NumericOperation.MOD_MULTIPLY ? 10 : kind == NumericKind.BIG_INTEGER ? 4 : 1;</span>
+<span class="pc bpc" id="L45" title="1 of 8 branches missed.">        if (op == NumericOperation.MOD_POW &amp;&amp; function.arguments().size() == 3 &amp;&amp; function.arguments().get(1) instanceof NumberExpr n &amp;&amp; n.value().signum() &gt;= 0)</span>
+<span class="fc" id="L46">            work = Math.max(1, 2L * n.value().numerator().bitLength());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        return new Operation(function.name(), argumentTypes, kind.type(), work, kind == NumericKind.BIG_INTEGER ? 2 : 1);</span>
+    }
+    private List&lt;Type&gt; argumentTypes(FunctionExpr function, NumericKind kind, NumericOperation op) {
+<span class="fc bfc" id="L50" title="All 3 branches covered.">        int arity = switch (op) {</span>
+<span class="fc" id="L51">            case NEGATE, ABS, NOT, NEGATE_EXACT -&gt; 1;</span>
+<span class="fc" id="L52">            case MOD_POW, MOD_MULTIPLY -&gt; 3;</span>
+<span class="fc" id="L53">            default -&gt; 2;</span>
+        };
+<span class="fc" id="L55">        var argumentTypes = new ArrayList&lt;Type&gt;(Collections.nCopies(arity, kind.type()));</span>
+<span class="fc bfc" id="L56" title="All 6 branches covered.">        if (op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if (kind.floatingPoint()) throw new IllegalArgumentException(&quot;FLOATING_SHIFT_UNSUPPORTED&quot;);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (function.arguments().size() != 2) throw new IllegalArgumentException(&quot;OPERATOR_ARITY&quot;);</span>
+<span class="fc" id="L59">            var distance = JavaExpressions.kindOf(function.arguments().get(1), inputs);</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">            if (kind == NumericKind.BIG_INTEGER &amp;&amp; distance != NumericKind.INT) throw new IllegalArgumentException(&quot;BIG_INTEGER_SHIFT_REQUIRES_INT&quot;);</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">            if (distance != NumericKind.INT &amp;&amp; distance != NumericKind.LONG) throw new IllegalArgumentException(&quot;SHIFT_DISTANCE_PROMOTION&quot;);</span>
+<span class="fc" id="L62">            argumentTypes.set(1, distance.type());</span>
+        }
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (op == NumericOperation.POW) {</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (kind != NumericKind.BIG_INTEGER) throw new IllegalArgumentException(&quot;UNSUPPORTED_POWER_OPERATION&quot;);</span>
+<span class="fc" id="L66">            argumentTypes.set(1, NumericKind.INT.type());</span>
+        }
+<span class="fc" id="L68">        return argumentTypes;</span>
+    }
+    @Override public Object apply(Operation operation, List&lt;Object&gt; arguments) {
+<span class="fc" id="L71">        var decoded = JavaExpressions.decode(new FunctionExpr(operation.id(), List.of()));</span>
+<span class="fc" id="L72">        var kind = decoded.kind(); String action = decoded.action();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (action.equals(&quot;literal&quot;)) {</span>
+<span class="fc" id="L74">            var literal = new FunctionExpr(operation.id(), List.of(JavaExpressions.literal((BigInteger)arguments.getFirst())));</span>
+<span class="fc" id="L75">            return JavaExpressions.literalValue(literal);</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (action.startsWith(&quot;cast_&quot;)) return cast(arguments.getFirst(), kind);</span>
+<span class="fc" id="L78">        var op = NumericOperation.valueOf(action.toUpperCase(Locale.ROOT));</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        Object x = arguments.getFirst(); Object y = arguments.size() &gt; 1 ? arguments.get(1) : null;</span>
+<span class="fc bfc" id="L80" title="All 4 branches covered.">        if (kind == NumericKind.BIG_INTEGER) return big(op, (BigInteger)x, y, arguments.size() &gt; 2 ? (BigInteger) arguments.get(2) : null);</span>
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (kind == NumericKind.FLOAT) return floating32(op, (Float)x, y == null ? 0 : (Float)y);</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        if (kind == NumericKind.DOUBLE) return floating64(op, (Double)x, y == null ? 0 : (Double)y);</span>
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">        if (kind == NumericKind.INT) return integral32(op, ((Number)x).intValue(), y == null ? 0 : ((Number)y).intValue());</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        return integral64(op, ((Number)x).longValue(), y == null ? 0 : ((Number)y).longValue());</span>
+    }
+    private static Object big(NumericOperation op, BigInteger x, Object other, BigInteger modulus) {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        BigInteger y = other instanceof BigInteger value ? value : null;</span>
+<span class="pc bpc" id="L88" title="12 of 18 branches missed.">        return switch (op) {</span>
+<span class="pc" id="L89">            case ADD -&gt; x.add(y); case SUBTRACT -&gt; x.subtract(y); case MULTIPLY -&gt; x.multiply(y);</span>
+<span class="pc" id="L90">            case DIVIDE -&gt; x.divide(y); case REMAINDER -&gt; x.remainder(y); case MOD -&gt; x.mod(y);</span>
+<span class="nc" id="L91">            case NEGATE -&gt; x.negate(); case ABS -&gt; x.abs(); case AND -&gt; x.and(y); case OR -&gt; x.or(y);</span>
+<span class="nc" id="L92">            case XOR -&gt; x.xor(y); case NOT -&gt; x.not(); case SHIFT_LEFT -&gt; x.shiftLeft(((Number)other).intValue());</span>
+<span class="nc" id="L93">            case SHIFT_RIGHT -&gt; x.shiftRight(((Number)other).intValue()); case POW -&gt; x.pow((Integer)other);</span>
+<span class="fc" id="L94">            case MOD_POW -&gt; x.modPow(y, modulus); case MOD_MULTIPLY -&gt; x.multiply(y).mod(modulus);</span>
+<span class="nc" id="L95">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_BIG_INTEGER_OPERATION&quot;);</span>
+        };
+    }
+    private static int integral32(NumericOperation op, int x, int y) {
+<span class="pc bpc" id="L99" title="11 of 19 branches missed.">        return switch (op) {</span>
+<span class="fc" id="L100">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
+<span class="nc" id="L101">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
+<span class="pc" id="L102">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
+<span class="nc" id="L103">            case ADD_EXACT -&gt; Math.addExact(x, y); case SUBTRACT_EXACT -&gt; Math.subtractExact(x, y);</span>
+<span class="nc" id="L104">            case MULTIPLY_EXACT -&gt; Math.multiplyExact(x, y); case NEGATE_EXACT -&gt; Math.negateExact(x);</span>
+<span class="nc" id="L105">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_INTEGRAL_OPERATION&quot;);</span>
+        };
+    }
+    private static long integral64(NumericOperation op, long x, long y) {
+<span class="pc bpc" id="L109" title="17 of 19 branches missed.">        return switch (op) {</span>
+<span class="pc" id="L110">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
+<span class="nc" id="L111">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
+<span class="pc" id="L112">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
+<span class="nc" id="L113">            case ADD_EXACT -&gt; Math.addExact(x, y); case SUBTRACT_EXACT -&gt; Math.subtractExact(x, y);</span>
+<span class="nc" id="L114">            case MULTIPLY_EXACT -&gt; Math.multiplyExact(x, y); case NEGATE_EXACT -&gt; Math.negateExact(x);</span>
+<span class="nc" id="L115">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_INTEGRAL_OPERATION&quot;);</span>
+        };
+    }
+    private static float floating32(NumericOperation op, float x, float y) {
+<span class="pc bpc" id="L119" title="6 of 8 branches missed.">        return switch (op) { case ADD -&gt; x+y; case SUBTRACT -&gt; x-y; case MULTIPLY -&gt; x*y; case DIVIDE -&gt; x/y;</span>
+<span class="nc" id="L120">            case REMAINDER -&gt; x%y; case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_IEEE_OPERATION&quot;); };</span>
+    }
+    private static double floating64(NumericOperation op, double x, double y) {
+<span class="pc bpc" id="L123" title="6 of 8 branches missed.">        return switch (op) { case ADD -&gt; x+y; case SUBTRACT -&gt; x-y; case MULTIPLY -&gt; x*y; case DIVIDE -&gt; x/y;</span>
+<span class="nc" id="L124">            case REMAINDER -&gt; x%y; case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_IEEE_OPERATION&quot;); };</span>
+    }
+    static Object cast(Object value, NumericKind to) {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        Number n = value instanceof Character c ? Integer.valueOf(c) : (Number)value;</span>
+        // Float/Double.intValue and longValue implement Java saturation/truncation; narrowing then wraps.
+<span class="pc bpc" id="L129" title="3 of 8 branches missed.">        return switch (to) {</span>
+<span class="fc" id="L130">            case BYTE -&gt; (byte)n.intValue(); case SHORT -&gt; (short)n.intValue(); case CHAR -&gt; (char)n.intValue();</span>
+<span class="pc" id="L131">            case INT -&gt; n.intValue(); case LONG -&gt; n.longValue(); case FLOAT -&gt; n.floatValue(); case DOUBLE -&gt; n.doubleValue();</span>
+<span class="nc" id="L132">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_CAST&quot;);</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

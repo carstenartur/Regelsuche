@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StrictFloatingProof.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">StrictFloatingProof.java</span></div><h1>StrictFloatingProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.*;
+import java.util.*;
+
+/** A small IEEE checker independent of candidate-generation rules. No reassociation or real algebra. */
+final class StrictFloatingProof {
+    private final VerificationWork work;
+<span class="fc" id="L9">    StrictFloatingProof(VerificationWork work) { this.work = work; }</span>
+<span class="fc" id="L10">    boolean equivalent(Expr left, Expr right) { return canonical(left, 0).equals(canonical(right, 0)); }</span>
+    private Expr canonical(Expr expression, int depth) {
+<span class="fc" id="L12">        work.charge(1);</span>
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;FP_STRUCTURAL_BOUND&quot;);</span>
+<span class="fc bfc" id="L14" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
+<span class="fc" id="L15">        var args = JavaExpressions.operands(expression).stream().map(child -&gt; canonical(child, depth+1)).toList();</span>
+<span class="fc" id="L16">        Expr result = new FunctionExpr(((FunctionExpr)expression).name(), args);</span>
+<span class="fc" id="L17">        var op = JavaExpressions.operationOf(result);</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (op.isEmpty()) return result;</span>
+<span class="fc bfc" id="L19" title="All 4 branches covered.">        if (op.get() == NumericOperation.NEGATE &amp;&amp; JavaExpressions.operationOf(args.getFirst()).orElse(null) == NumericOperation.NEGATE)</span>
+<span class="fc" id="L20">            return JavaExpressions.operands(args.getFirst()).getFirst();</span>
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (op.get() == NumericOperation.MULTIPLY || op.get() == NumericOperation.DIVIDE) {</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">            if (isNumber(args.get(1), 1.0, false)) return args.getFirst();</span>
+<span class="nc bnc" id="L23" title="All 4 branches missed.">            if (op.get() == NumericOperation.MULTIPLY &amp;&amp; isNumber(args.getFirst(), 1.0, false)) return args.get(1);</span>
+        }
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">        if (op.get() == NumericOperation.SUBTRACT &amp;&amp; isNumber(args.get(1), 0.0, false)) return args.getFirst();</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (op.get() == NumericOperation.ADD) {</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            if (isNumber(args.get(1), 0.0, true)) return args.getFirst();</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">            if (isNumber(args.getFirst(), 0.0, true)) return args.get(1);</span>
+        }
+<span class="fc" id="L30">        return result;</span>
+    }
+    static boolean isNumber(Expr expression, double value, boolean negativeZero) {
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (!JavaExpressions.isLiteral(expression)) return false;</span>
+<span class="fc" id="L34">        Object literal = JavaExpressions.literalValue(expression);</span>
+<span class="pc bpc" id="L35" title="1 of 4 branches missed.">        if (!(literal instanceof Float || literal instanceof Double)) return false;</span>
+<span class="fc" id="L36">        double d = ((Number)literal).doubleValue();</span>
+<span class="pc bpc" id="L37" title="2 of 8 branches missed.">        return d == value &amp;&amp; (value != 0 || (Double.doubleToRawLongBits(d) &lt; 0) == negativeZero);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

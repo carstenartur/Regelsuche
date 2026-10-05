@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavaExpressions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">JavaExpressions.java</span></div><h1>JavaExpressions.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Typed constructors over the existing Expr IR. Floating literals store their exact raw bits. */
+public final class JavaExpressions {
+    private JavaExpressions() {}
+<span class="fc" id="L11">    public static Expr literal(BigInteger value) { return new NumberExpr(ExactRational.integer(value)); }</span>
+<span class="fc" id="L12">    public static Expr literal(int value) { return encodedLiteral(NumericKind.INT, BigInteger.valueOf(value)); }</span>
+<span class="fc" id="L13">    public static Expr literal(long value) { return encodedLiteral(NumericKind.LONG, BigInteger.valueOf(value)); }</span>
+<span class="fc" id="L14">    public static Expr literal(float value) { return encodedLiteral(NumericKind.FLOAT, BigInteger.valueOf(Float.floatToRawIntBits(value))); }</span>
+<span class="fc" id="L15">    public static Expr literal(double value) { return encodedLiteral(NumericKind.DOUBLE, BigInteger.valueOf(Double.doubleToRawLongBits(value))); }</span>
+<span class="fc" id="L16">    public static Expr literal(byte value) { return encodedLiteral(NumericKind.BYTE, BigInteger.valueOf(value)); }</span>
+<span class="fc" id="L17">    public static Expr literal(short value) { return encodedLiteral(NumericKind.SHORT, BigInteger.valueOf(value)); }</span>
+<span class="fc" id="L18">    public static Expr literal(char value) { return encodedLiteral(NumericKind.CHAR, BigInteger.valueOf(value)); }</span>
+    private static Expr encodedLiteral(NumericKind kind, BigInteger value) {
+<span class="fc" id="L20">        return new FunctionExpr(prefix(kind) + &quot;literal&quot;, List.of(literal(value)));</span>
+    }
+    public static Expr operation(NumericKind kind, NumericOperation operation, Expr... arguments) {
+<span class="fc" id="L23">        return new FunctionExpr(prefix(kind) + operation.name().toLowerCase(Locale.ROOT), List.of(arguments));</span>
+    }
+    public static Expr cast(NumericKind from, NumericKind to, Expr expression) {
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">        if (from == NumericKind.BIG_INTEGER || to == NumericKind.BIG_INTEGER) throw new IllegalArgumentException(&quot;NO_IMPLICIT_BIG_INTEGER_CONVERSION&quot;);</span>
+<span class="fc" id="L27">        return new FunctionExpr(prefix(to) + &quot;cast_&quot; + from.name().toLowerCase(Locale.ROOT), List.of(expression));</span>
+    }
+<span class="fc bfc" id="L29" title="All 6 branches covered.">    public static boolean isLiteral(Expr expression) { return expression instanceof NumberExpr || expression instanceof FunctionExpr f &amp;&amp; f.name().endsWith(&quot;_literal&quot;); }</span>
+    public static Optional&lt;NumericOperation&gt; operationOf(Expr expression) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (!(expression instanceof FunctionExpr function)) return Optional.empty();</span>
+<span class="fc" id="L32">        var decoded = decode(function);</span>
+<span class="fc bfc" id="L33" title="All 4 branches covered.">        if (decoded.action().equals(&quot;literal&quot;) || decoded.action().startsWith(&quot;cast_&quot;)) return Optional.empty();</span>
+<span class="fc" id="L34">        return Optional.of(NumericOperation.valueOf(decoded.action().toUpperCase(Locale.ROOT)));</span>
+    }
+    public static NumericKind resultKind(Expr expression) {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (expression instanceof NumberExpr) return NumericKind.BIG_INTEGER;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) return decode(function).kind();</span>
+<span class="nc" id="L39">        throw new IllegalArgumentException(&quot;VARIABLE_KIND_REQUIRES_PLAN&quot;);</span>
+    }
+    public static NumericKind kindOf(Expr expression, Map&lt;String, de.regelsuche.search.program.ComputationBackend.Type&gt; inputs) {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L43">            var type = inputs.get(variable.name());</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (type == null) throw new IllegalArgumentException(&quot;UNBOUND_NUMERIC_INPUT&quot;);</span>
+<span class="fc" id="L45">            return NumericKind.fromType(type);</span>
+        }
+<span class="fc" id="L47">        return resultKind(expression);</span>
+    }
+    public static Object literalValue(Expr expression) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (!number.value().isInteger()) throw new IllegalArgumentException(&quot;INTEGER_LITERAL_REQUIRED&quot;);</span>
+<span class="fc" id="L52">            return number.value().numerator();</span>
+        }
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (!(expression instanceof FunctionExpr f) || !decode(f).action().equals(&quot;literal&quot;)</span>
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">                || f.arguments().size() != 1 || !(f.arguments().getFirst() instanceof NumberExpr number)</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                || !number.value().isInteger()) throw new IllegalArgumentException(&quot;TYPED_LITERAL_REQUIRED&quot;);</span>
+<span class="fc" id="L57">        BigInteger value = number.value().numerator();</span>
+<span class="pc bpc" id="L58" title="1 of 8 branches missed.">        return switch (decode(f).kind()) {</span>
+<span class="nc" id="L59">            case BIG_INTEGER -&gt; value;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            case BYTE -&gt; { if (value.bitLength() &gt; 7) throw new IllegalArgumentException(&quot;BYTE_LITERAL_RANGE&quot;); yield value.byteValue(); }</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            case SHORT -&gt; { if (value.bitLength() &gt; 15) throw new IllegalArgumentException(&quot;SHORT_LITERAL_RANGE&quot;); yield value.shortValue(); }</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">            case CHAR -&gt; { if (value.signum() &lt; 0 || value.bitLength() &gt; 16) throw new IllegalArgumentException(&quot;CHAR_LITERAL_RANGE&quot;); yield (char)value.intValue(); }</span>
+<span class="fc" id="L63">            case INT -&gt; value.intValueExact();</span>
+<span class="fc" id="L64">            case LONG -&gt; value.longValueExact();</span>
+<span class="fc" id="L65">            case FLOAT -&gt; Float.intBitsToFloat(value.intValueExact());</span>
+<span class="fc" id="L66">            case DOUBLE -&gt; Double.longBitsToDouble(value.longValueExact());</span>
+        };
+    }
+    public static Optional&lt;NumericKind&gt; castSourceKind(Expr expression) {
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (!(expression instanceof FunctionExpr function)) return Optional.empty();</span>
+<span class="fc" id="L71">        String action = decode(function).action();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        return action.startsWith(&quot;cast_&quot;) ? Optional.of(NumericKind.valueOf(action.substring(5).toUpperCase(Locale.ROOT))) : Optional.empty();</span>
+    }
+    public static List&lt;Expr&gt; operands(Expr expression) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        return expression instanceof FunctionExpr function ? function.arguments() : List.of();</span>
+    }
+<span class="fc" id="L77">    static String prefix(NumericKind kind) { return &quot;j_&quot; + kind.name().toLowerCase(Locale.ROOT) + &quot;_&quot;; }</span>
+<span class="fc" id="L78">    record Decoded(NumericKind kind, String action) {}</span>
+    static Decoded decode(FunctionExpr function) {
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        for (var kind : NumericKind.values()) if (function.name().startsWith(prefix(kind)))</span>
+<span class="fc" id="L81">            return new Decoded(kind, function.name().substring(prefix(kind).length()));</span>
+<span class="nc" id="L82">        throw new IllegalArgumentException(&quot;UNKNOWN_JAVA_OPERATION&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

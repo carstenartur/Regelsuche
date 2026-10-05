@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BigIntegerBounds.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">BigIntegerBounds.java</span></div><h1>BigIntegerBounds.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
+import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.Map;
+
+/** Conservative magnitude proof, independent of algebraic equivalence and candidate execution.
+ * The supported fragment stays well below BigInteger's implementation range. Resource exhaustion
+ * is outside the value contract, but its supported-range ArithmeticException is not.
+ */
+final class BigIntegerBounds {
+    static final long MAX_BITS = 1_000_000;
+    private final OptimizationRequest request;
+    private final VerificationWork work;
+    private final long maximum;
+<span class="fc" id="L18">    private final Map&lt;Expr, Long&gt; cache = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L20">    BigIntegerBounds(OptimizationRequest request, VerificationWork work) { this(request, work, MAX_BITS); }</span>
+<span class="fc" id="L21">    BigIntegerBounds(OptimizationRequest request, VerificationWork work, long maximum) {</span>
+<span class="fc" id="L22">        this.request = request; this.work = work; this.maximum = maximum;</span>
+<span class="fc" id="L23">    }</span>
+    void require(Expr expression) {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (JavaExpressions.kindOf(expression, request.plan().inputs()) == NumericKind.BIG_INTEGER) bits(expression);</span>
+<span class="fc" id="L26">    }</span>
+    private long bits(Expr expression) {
+<span class="fc" id="L28">        work.charge(1);</span>
+<span class="fc" id="L29">        var known = cache.get(expression);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (known != null) return known;</span>
+        long bound;
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(expression)) {</span>
+<span class="fc" id="L33">            bound = SemanticChecker.integer(JavaExpressions.literalValue(expression)).abs().bitLength();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L35">            bound = assumption(SemanticAssumption.Kind.BIG_INTEGER_BIT_LENGTH_BOUND, variable.name());</span>
+        } else {
+<span class="fc" id="L37">            var args = JavaExpressions.operands(expression);</span>
+<span class="fc" id="L38">            var operation = JavaExpressions.operationOf(expression).orElseThrow();</span>
+<span class="fc" id="L39">            long left = bits(args.getFirst());</span>
+<span class="pc bpc" id="L40" title="5 of 12 branches missed.">            bound = switch (operation) {</span>
+<span class="nc" id="L41">                case NEGATE, ABS -&gt; left;</span>
+<span class="nc" id="L42">                case NOT -&gt; left + 1;</span>
+<span class="fc" id="L43">                case ADD, SUBTRACT, AND, OR, XOR -&gt; Math.max(left, bits(args.get(1))) + 1;</span>
+<span class="fc" id="L44">                case MULTIPLY -&gt; left + bits(args.get(1));</span>
+<span class="fc" id="L45">                case DIVIDE -&gt; { bits(args.get(1)); yield left; }</span>
+<span class="nc" id="L46">                case REMAINDER -&gt; Math.min(left, bits(args.get(1)));</span>
+<span class="fc" id="L47">                case MOD -&gt; bits(args.get(1));</span>
+<span class="fc" id="L48">                case MOD_MULTIPLY -&gt; { bounded(left + bits(args.get(1))); yield bits(args.get(2)); }</span>
+<span class="fc" id="L49">                case MOD_POW -&gt; { bits(args.get(1)); yield bits(args.get(2)); }</span>
+                case POW -&gt; {
+<span class="fc" id="L51">                    long exponent = nonnegativeScalar(args.get(1));</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                    yield exponent == 0 ? 1 : Math.multiplyExact(left, exponent);</span>
+                }
+                case SHIFT_LEFT, SHIFT_RIGHT -&gt; {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                    long distance = JavaExpressions.isLiteral(args.get(1))</span>
+<span class="nc" id="L56">                        ? SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).longValueExact()</span>
+<span class="nc" id="L57">                        : nonnegativeScalar(args.get(1));</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">                    yield left + (operation == NumericOperation.SHIFT_LEFT ? Math.max(0, distance) : Math.max(0, -distance));</span>
+                }
+<span class="nc" id="L60">                default -&gt; throw new IllegalArgumentException(&quot;BIG_INTEGER_MAGNITUDE_OPERATION_UNSUPPORTED&quot;);</span>
+            };
+        }
+<span class="fc" id="L63">        bounded(bound);</span>
+<span class="fc" id="L64">        cache.put(expression, bound);</span>
+<span class="fc" id="L65">        return bound;</span>
+    }
+    private long nonnegativeScalar(Expr expression) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(expression)) {</span>
+<span class="fc" id="L69">            var value = SemanticChecker.integer(JavaExpressions.literalValue(expression));</span>
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">            if (value.signum() &gt;= 0 &amp;&amp; value.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) &lt;= 0) return value.longValue();</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(&quot;NONNEGATIVE_INT_SCALAR_REQUIRED&quot;);</span>
+        }
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (expression instanceof VariableExpr variable) return assumption(SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND, variable.name());</span>
+<span class="nc" id="L74">        throw new IllegalArgumentException(&quot;BOUNDED_SCALAR_VALUE_REQUIRED&quot;);</span>
+    }
+    private long assumption(SemanticAssumption.Kind kind, String subject) {
+<span class="fc bfc" id="L77" title="All 4 branches covered.">        return request.assumptions().stream().filter(a -&gt; a.kind() == kind &amp;&amp; a.subject().equals(subject))</span>
+<span class="fc" id="L78">            .mapToLong(a -&gt; parameter(a.parameter())).min().orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                kind == SemanticAssumption.Kind.BIG_INTEGER_BIT_LENGTH_BOUND ? &quot;BIG_INTEGER_MAGNITUDE_BOUND_REQUIRED&quot; : &quot;BOUNDED_SCALAR_VALUE_REQUIRED&quot;));</span>
+    }
+    static long parameter(String parameter) {
+        try {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (!parameter.matches(&quot;0|[1-9][0-9]{0,9}&quot;)) throw new NumberFormatException();</span>
+<span class="fc" id="L84">            long value = Long.parseLong(parameter);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (value &gt; Integer.MAX_VALUE) throw new NumberFormatException();</span>
+<span class="fc" id="L86">            return value;</span>
+<span class="nc" id="L87">        } catch (NumberFormatException invalid) { throw new IllegalArgumentException(&quot;INVALID_NUMERIC_BOUND_ASSUMPTION&quot;); }</span>
+    }
+    private void bounded(long bound) {
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        if (bound &lt; 0 || bound &gt; maximum) throw new IllegalArgumentException(&quot;BIG_INTEGER_SUPPORTED_RANGE_NOT_PROVED&quot;);</span>
+<span class="fc" id="L91">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitwiseProof.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">BitwiseProof.java</span></div><h1>BitwiseProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Exhaustive truth tables over up to eight opaque word inputs, for every bit position.
+ * This is a universal bitvector proof (not numeric input sampling).
+ */
+final class BitwiseProof {
+    private final VerificationWork work;
+<span class="fc" id="L12">    private final Map&lt;Expr,Expr&gt; representatives=new HashMap&lt;&gt;();</span>
+<span class="fc" id="L13">    private final Set&lt;Expr&gt; constants=new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L14">    BitwiseProof(VerificationWork work) { this.work=work; }</span>
+    boolean equivalent(Expr left,Expr right,NumericKind kind) {
+<span class="fc" id="L16">        var atoms=new LinkedHashSet&lt;Expr&gt;(); collect(left,atoms); collect(right,atoms);</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if (atoms.size()&gt;8) return false;</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        constants.add(kind==NumericKind.LONG?JavaExpressions.literal(0L):JavaExpressions.literal(0));</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        constants.add(kind==NumericKind.LONG?JavaExpressions.literal(-1L):JavaExpressions.literal(-1));</span>
+<span class="fc" id="L20">        var distinct=new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        for(var atom:atoms) {</span>
+<span class="fc" id="L22">            Expr representative=atom;</span>
+<span class="fc" id="L23">            var options=new ArrayList&lt;&gt;(constants); options.addAll(distinct);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            for(var option:options) {</span>
+                try {
+<span class="fc bfc" id="L26" title="All 2 branches covered.">                    if(new PolynomialProof(kind,false,false,work).equivalent(atom,option)) { representative=option; break; }</span>
+<span class="pc" id="L27">                } catch(PolynomialProof.OutsideFragment unknown) { /* Unproved atoms remain independent. */ }</span>
+<span class="fc" id="L28">            }</span>
+<span class="fc" id="L29">            representatives.put(atom,representative);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            if(representative.equals(atom)) distinct.add(atom);</span>
+<span class="fc" id="L31">        }</span>
+<span class="fc" id="L32">        var list=List.copyOf(distinct);</span>
+<span class="fc bfc" id="L33" title="All 4 branches covered.">        for(int bit=0;bit&lt;kind.bits();bit++) for(int assignment=0;assignment&lt;(1&lt;&lt;list.size());assignment++) {</span>
+<span class="fc" id="L34">            work.charge(1);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if(value(left,bit,assignment,list)!=value(right,bit,assignment,list)) return false;</span>
+        }
+<span class="fc" id="L37">        return true;</span>
+    }
+    private void collect(Expr e,Set&lt;Expr&gt; atoms) {
+<span class="fc" id="L40">        work.charge(1);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) { constants.add(e); return; }</span>
+<span class="fc" id="L42">        var op=JavaExpressions.operationOf(e).orElse(null);</span>
+<span class="pc bpc" id="L43" title="3 of 8 branches missed.">        if(op==NumericOperation.AND || op==NumericOperation.OR || op==NumericOperation.XOR || op==NumericOperation.NOT)</span>
+<span class="fc" id="L44">            JavaExpressions.operands(e).forEach(child -&gt; collect(child,atoms));</span>
+<span class="fc" id="L45">        else atoms.add(e);</span>
+<span class="fc" id="L46">    }</span>
+    private boolean value(Expr e,int bit,int assignment,List&lt;Expr&gt; atoms) {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) return SemanticChecker.integer(JavaExpressions.literalValue(e)).testBit(bit);</span>
+<span class="fc" id="L49">        var op=JavaExpressions.operationOf(e).orElse(null); var args=JavaExpressions.operands(e);</span>
+<span class="pc bpc" id="L50" title="3 of 4 branches missed.">        if(op==NumericOperation.NOT) return !value(args.getFirst(),bit,assignment,atoms);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if(op==NumericOperation.AND) return value(args.getFirst(),bit,assignment,atoms)&amp;value(args.get(1),bit,assignment,atoms);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if(op==NumericOperation.OR) return value(args.getFirst(),bit,assignment,atoms)|value(args.get(1),bit,assignment,atoms);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if(op==NumericOperation.XOR) return value(args.getFirst(),bit,assignment,atoms)^value(args.get(1),bit,assignment,atoms);</span>
+<span class="fc" id="L54">        var representative=representatives.getOrDefault(e,e);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if(JavaExpressions.isLiteral(representative)) return SemanticChecker.integer(JavaExpressions.literalValue(representative)).testBit(bit);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return (assignment&amp;(1&lt;&lt;atoms.indexOf(representative)))!=0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

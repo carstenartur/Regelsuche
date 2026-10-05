@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SemanticChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">SemanticChecker.java</span></div><h1>SemanticChecker.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.search.program.*;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
+final class SemanticChecker {
+    static final String REVISION = &quot;java-numeric-independent/v4&quot;;
+<span class="fc" id="L11">    record Proof(boolean accepted, List&lt;String&gt; methods, long work) { Proof { methods = List.copyOf(methods); } }</span>
+    private final OptimizationRequest request;
+    private final VerificationWork work;
+<span class="fc" id="L14">    SemanticChecker(OptimizationRequest request, VerificationWork work) { this.request = request; this.work = work; }</span>
+    void validate() {
+<span class="fc" id="L16">        var bounds = new BigIntegerBounds(request, work);</span>
+<span class="fc" id="L17">        work.charge(1);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (!ComputationOptimizer.SEMANTICS_REVISION.equals(request.semanticsRevision())) throw new IllegalArgumentException(&quot;UNKNOWN_SEMANTICS_REVISION&quot;);</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (!CheckedPolicy.REVISION.equals(request.checkedPolicy().revision())) throw new IllegalArgumentException(&quot;UNKNOWN_CHECKED_POLICY_REVISION&quot;);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (request.checkedPolicy().checkTinyInexactUnderflow()) throw new IllegalArgumentException(&quot;TINY_INEXACT_UNDERFLOW_UNSUPPORTED&quot;);</span>
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (request.safetyProfile() == SafetyProfile.CHECKED_THROW &amp;&amp; !request.checkedPolicy().checkIntegralRange()</span>
+<span class="nc bnc" id="L22" title="All 2 branches missed.">                &amp;&amp; request.selectedKinds().stream().anyMatch(NumericKind::integral)) throw new IllegalArgumentException(&quot;CHECKED_INTEGRAL_RANGE_POLICY_REQUIRED&quot;);</span>
+<span class="fc" id="L23">        var plan = request.plan();</span>
+<span class="fc bfc" id="L24" title="All 4 branches covered.">        if (plan.outputs().stream().anyMatch(output -&gt; !request.selectedKinds().contains(NumericKind.fromType(output.type()))))</span>
+<span class="fc" id="L25">            throw new IllegalArgumentException(&quot;EXCLUDED_NUMERIC_KIND&quot;);</span>
+<span class="fc" id="L26">        var prepared = plan.prepare(new JavaNumericBackend(plan.inputs()));</span>
+<span class="fc" id="L27">        work.charge(prepared.cost().inspectionWork());</span>
+<span class="fc" id="L28">        validateSourceTrace(plan, prepared, bounds);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (var input : plan.inputs().entrySet()) {</span>
+<span class="fc" id="L30">            var kind = NumericKind.fromType(input.getValue());</span>
+<span class="fc bfc" id="L31" title="All 4 branches covered.">            if (kind == NumericKind.BIG_INTEGER &amp;&amp; !has(SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS, input.getKey()))</span>
+<span class="fc" id="L32">                throw new IllegalArgumentException(&quot;BIG_INTEGER_VALUE_CONTRACT_REQUIRED&quot;);</span>
+<span class="fc" id="L33">        }</span>
+<span class="fc" id="L34">        boolean fp = prepared.nodes().stream().anyMatch(node -&gt; NumericKind.fromType(node.type()).floatingPoint());</span>
+<span class="fc bfc" id="L35" title="All 4 branches covered.">        if (fp &amp;&amp; request.safetyProfile()==SafetyProfile.PRESERVE_JAVA &amp;&amp;</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">                request.assumptions().stream().noneMatch(a -&gt; a.kind() == SemanticAssumption.Kind.NO_NAN_PAYLOAD_OBSERVATION))</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;NAN_PAYLOAD_OBSERVATION_UNSUPPORTED&quot;);</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">        if (fp &amp;&amp; request.safetyProfile() == SafetyProfile.CHECKED_THROW &amp;&amp;</span>
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">                (!request.checkedPolicy().requireFinite() || !request.checkedPolicy().compareFloatingPointBits()))</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;CHECKED_FINITE_AND_BITWISE_COMPARISON_REQUIRED&quot;);</span>
+<span class="fc" id="L41">        validateAssumptions(plan);</span>
+<span class="fc" id="L42">    }</span>
+    private void validateSourceTrace(JointComputationPlan plan, PreparedJointComputation prepared, BigIntegerBounds bounds) {
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (request.sourceTrace().occurrences().size() &gt; JointComputationPlan.MAX_NODES) throw new IllegalArgumentException(&quot;TRACE_STRUCTURAL_BOUND&quot;);</span>
+<span class="fc" id="L45">        var seen = new HashSet&lt;Expr&gt;(); var sourceIds = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (var occurrence : request.sourceTrace().occurrences()) {</span>
+<span class="fc" id="L47">            work.charge(1);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (!sourceIds.add(occurrence.sourceId())) throw new IllegalArgumentException(&quot;DUPLICATE_SOURCE_OCCURRENCE_ID&quot;);</span>
+<span class="fc" id="L49">            Expr expression = occurrence.expression();</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (JavaExpressions.resultKind(expression) != occurrence.evaluatedKind()) throw new IllegalArgumentException(&quot;TRACE_OPERATION_TYPE_DIFFERS&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">            if (!request.selectedKinds().contains(occurrence.evaluatedKind()) || !request.selectedKinds().contains(occurrence.declaredKind()))</span>
+<span class="fc" id="L52">                throw new IllegalArgumentException(&quot;EXCLUDED_NUMERIC_KIND&quot;);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (Expr operand : JavaExpressions.operands(expression))</span>
+<span class="fc bfc" id="L54" title="All 6 branches covered.">                if (!JavaExpressions.isLiteral(operand) &amp;&amp; !(operand instanceof VariableExpr) &amp;&amp; !seen.contains(operand))</span>
+<span class="fc" id="L55">                    throw new IllegalArgumentException(&quot;TRACE_EVALUATION_ORDER_OR_OPERATION_MISSING&quot;);</span>
+            // A trace entry need not have an output's type (e.g. an int exponent in BigInteger.pow).
+<span class="fc" id="L57">            var tracePlan = new JointComputationPlan(plan.inputs(), Map.of(), List.of(</span>
+<span class="fc" id="L58">                new JointComputationPlan.Output(&quot;trace&quot;, occurrence.evaluatedKind().type(), expression)));</span>
+<span class="fc" id="L59">            work.charge(tracePlan.prepare(new JavaNumericBackend(plan.inputs())).cost().inspectionWork());</span>
+<span class="fc" id="L60">            requireTotal(expression);</span>
+<span class="fc" id="L61">            bounds.require(expression);</span>
+<span class="fc" id="L62">            seen.add(expression);</span>
+<span class="fc" id="L63">        }</span>
+        // Outputs describe values, not the number of source evaluations. For example,
+        // sum=x+1; result=sum+sum has two evaluations, but three expanded operations.
+        // The adapter's ordered trace owns multiplicity (including dead operations).
+        // Every occurrence above is checked; obligations, costs and hashes retain it.
+        // Reverification against that original request rejects a shortened trace.
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (var node : prepared.nodes()) {</span>
+<span class="fc" id="L70">            work.charge(1);</span>
+<span class="fc bfc" id="L71" title="All 6 branches covered.">            if (node.operation() != null &amp;&amp; !JavaExpressions.isLiteral(node.expression()) &amp;&amp; !seen.contains(node.expression()))</span>
+<span class="fc" id="L72">                throw new IllegalArgumentException(&quot;SOURCE_EVALUATION_TRACE_INCOMPLETE&quot;);</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">    }</span>
+    private void validateAssumptions(JointComputationPlan plan) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (var assumption : request.assumptions()) {</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">            if (assumption.kind() != SemanticAssumption.Kind.NO_NAN_PAYLOAD_OBSERVATION &amp;&amp; !plan.inputs().containsKey(assumption.subject()))</span>
+<span class="nc" id="L78">                throw new IllegalArgumentException(&quot;ASSUMPTION_SUBJECT_NOT_INPUT&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (assumption.kind() == SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS &amp;&amp;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                    !NumericKind.BIG_INTEGER.type().equals(plan.inputs().get(assumption.subject())))</span>
+<span class="fc" id="L81">                throw new IllegalArgumentException(&quot;ASSUMPTION_NUMERIC_KIND_DIFFERS&quot;);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (assumption.kind() == SemanticAssumption.Kind.BIG_INTEGER_BIT_LENGTH_BOUND) {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                if (!NumericKind.BIG_INTEGER.type().equals(plan.inputs().get(assumption.subject())))</span>
+<span class="nc" id="L84">                    throw new IllegalArgumentException(&quot;ASSUMPTION_NUMERIC_KIND_DIFFERS&quot;);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                if (BigIntegerBounds.parameter(assumption.parameter()) &gt; BigIntegerBounds.MAX_BITS)</span>
+<span class="nc" id="L86">                    throw new IllegalArgumentException(&quot;BIG_INTEGER_SUPPORTED_RANGE_NOT_PROVED&quot;);</span>
+            }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (assumption.kind() == SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND) {</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                if (NumericKind.fromType(plan.inputs().get(assumption.subject())).floatingPoint())</span>
+<span class="nc" id="L90">                    throw new IllegalArgumentException(&quot;ASSUMPTION_NUMERIC_KIND_DIFFERS&quot;);</span>
+<span class="fc" id="L91">                BigIntegerBounds.parameter(assumption.parameter());</span>
+            }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (assumption.kind() == SemanticAssumption.Kind.NORMALIZED_MODULAR_INPUT &amp;&amp;</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">                    (!plan.inputs().containsKey(assumption.parameter()) || !has(SemanticAssumption.Kind.POSITIVE, assumption.parameter())))</span>
+<span class="nc" id="L95">                throw new IllegalArgumentException(&quot;NORMALIZATION_REQUIRES_POSITIVE_MODULUS&quot;);</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">    }</span>
+    Proof check(JointComputationPlan source, JointComputationPlan target) {
+<span class="fc" id="L99">        var bounds = new BigIntegerBounds(request, work);</span>
+<span class="fc" id="L100">        long initial = work.used(); work.charge(1);</span>
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        if (!source.inputs().equals(target.inputs()) || !bindings(source).equals(bindings(target))) return new Proof(false, List.of(&quot;BINDINGS_DIFFER&quot;), work.used()-initial);</span>
+<span class="fc" id="L102">        var targetPrepared = target.prepare(new JavaNumericBackend(target.inputs()));</span>
+<span class="fc" id="L103">        work.charge(targetPrepared.cost().inspectionWork());</span>
+<span class="fc bfc" id="L104" title="All 6 branches covered.">        for (var node : targetPrepared.nodes()) if (node.operation()!=null &amp;&amp; !JavaExpressions.isLiteral(node.expression())) {</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (!request.selectedKinds().contains(NumericKind.fromType(node.type()))) throw new IllegalArgumentException(&quot;EXCLUDED_NUMERIC_KIND&quot;);</span>
+<span class="fc" id="L106">            requireTotal(node.expression());</span>
+<span class="fc" id="L107">            bounds.require(node.expression());</span>
+        }
+<span class="fc" id="L109">        var left = source.outputExpressions(); var right = target.outputExpressions();</span>
+<span class="fc" id="L110">        var methods = new LinkedHashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i=0;i&lt;left.size();i++) {</span>
+<span class="fc" id="L112">            work.charge(1);</span>
+<span class="fc" id="L113">            Expr a=normalizePrimitiveLiteralCasts(left.get(i)), b=normalizePrimitiveLiteralCasts(right.get(i));</span>
+<span class="fc bfc" id="L114" title="All 4 branches covered.">            if (!a.equals(left.get(i)) || !b.equals(right.get(i))) methods.add(&quot;EXACT_PRIMITIVE_LITERAL_CAST&quot;);</span>
+<span class="fc" id="L115">            var kind=NumericKind.fromType(source.outputs().get(i).type());</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (a.equals(b)) { methods.add(&quot;TYPED_STRUCTURAL_IDENTITY&quot;); continue; }</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (operationCongruent(a, b, source, methods)) { methods.add(&quot;TYPED_OPERATION_CONGRUENCE&quot;); continue; }</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (kind.floatingPoint()) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (new StrictFloatingProof(work).equivalent(a,b)) { methods.add(&quot;STRICT_IEEE_IDENTITY&quot;); continue; }</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                if (request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA) {</span>
+<span class="fc" id="L121">                    methods.add(&quot;RUNTIME_FINITE_AND_RAW_BITS_GATE&quot;); continue;</span>
+                }
+<span class="fc" id="L123">                return new Proof(false,List.copyOf(methods),work.used()-initial);</span>
+            }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (integralEquivalent(a, b, kind, methods)) continue;</span>
+<span class="fc" id="L126">            return new Proof(false,List.copyOf(methods),work.used()-initial);</span>
+        }
+<span class="fc" id="L128">        return new Proof(true,List.copyOf(methods),Math.max(1,work.used()-initial));</span>
+    }
+    private boolean operationCongruent(Expr a, Expr b, JointComputationPlan source, Set&lt;String&gt; methods) {
+<span class="fc bfc" id="L131" title="All 6 branches covered.">        if (a instanceof FunctionExpr af &amp;&amp; b instanceof FunctionExpr bf &amp;&amp; af.name().equals(bf.name())</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">                &amp;&amp; af.arguments().size()==bf.arguments().size() &amp;&amp; !JavaExpressions.isLiteral(a)) {</span>
+<span class="fc" id="L133">            boolean congruent=true;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (int argument=0;argument&lt;af.arguments().size();argument++) {</span>
+<span class="fc" id="L135">                Expr child=af.arguments().get(argument), replacement=bf.arguments().get(argument);</span>
+<span class="fc" id="L136">                var childKind=JavaExpressions.kindOf(child,source.inputs());</span>
+<span class="fc" id="L137">                var childSource=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output(&quot;congruence&quot;,childKind.type(),child)));</span>
+<span class="fc" id="L138">                var childTarget=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output(&quot;congruence&quot;,childKind.type(),replacement)));</span>
+<span class="fc" id="L139">                var childProof=check(childSource,childTarget);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                if(!childProof.accepted()) { congruent=false; break; }</span>
+<span class="fc" id="L141">                methods.addAll(childProof.methods());</span>
+            }
+<span class="fc" id="L143">            return congruent;</span>
+        }
+<span class="fc" id="L145">        return false;</span>
+    }
+    private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set&lt;String&gt; methods) {
+<span class="fc bfc" id="L148" title="All 4 branches covered.">        boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;</span>
+        try {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {</span>
+<span class="fc bfc" id="L151" title="All 4 branches covered.">                methods.add(kind==NumericKind.BIG_INTEGER ? &quot;INTEGER_POLYNOMIAL_NORMAL_FORM&quot; : exact ? &quot;INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE&quot; : &quot;BITVECTOR_POLYNOMIAL_MOD_2_&quot;+kind.bits());</span>
+<span class="fc" id="L152">                return true;</span>
+            }
+<span class="pc" id="L154">        } catch (PolynomialProof.OutsideFragment bounded) { /* A larger polynomial is unknown, never proved. */ }</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (kind==NumericKind.BIG_INTEGER) {</span>
+            // This is an exact typed expansion, not equality modulo an unspecified modulus.
+            // Both traces and every intermediate range have already been checked by the caller.
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (expandModularProduct(a).equals(expandModularProduct(b))) {</span>
+<span class="fc" id="L159">                methods.add(&quot;TYPED_MODULAR_PRODUCT_EXPANSION&quot;); return true;</span>
+            }
+            try {
+<span class="fc" id="L162">                var proof = new ModularBridge(request.assumptions()).verify(a,b); work.charge(proof.work());</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (proof.accepted()) { methods.add(&quot;AFFINE_MODULAR_NORMAL_FORM&quot;); return true; }</span>
+<span class="fc" id="L164">            } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }</span>
+        }
+<span class="fc bfc" id="L166" title="All 4 branches covered.">        if (kind.integral() &amp;&amp; new BitwiseProof(work).equivalent(a,b,kind)) { methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;); return true; }</span>
+<span class="fc" id="L167">        return false;</span>
+    }
+    private Expr expandModularProduct(Expr expression) {
+<span class="fc" id="L170">        work.charge(1);</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
+<span class="fc" id="L172">        var args=JavaExpressions.operands(expression).stream().map(this::expandModularProduct).toList();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (JavaExpressions.operationOf(expression).orElse(null)==NumericOperation.MOD_MULTIPLY)</span>
+<span class="fc" id="L174">            return JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MOD,</span>
+<span class="fc" id="L175">                JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,args.getFirst(),args.get(1)),args.get(2));</span>
+<span class="fc" id="L176">        return new FunctionExpr(((FunctionExpr)expression).name(),args);</span>
+    }
+    /** Closed primitive literal casts have one exact Java value; this evaluates no input or arithmetic.
+     * Only the proof view is normalized. Original and candidate execution traces remain unchanged.
+     */
+    private Expr normalizePrimitiveLiteralCasts(Expr expression) {
+<span class="fc" id="L182">        work.charge(1);</span>
+<span class="fc bfc" id="L183" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
+<span class="fc" id="L184">        var args=JavaExpressions.operands(expression).stream().map(this::normalizePrimitiveLiteralCasts).toList();</span>
+<span class="fc" id="L185">        var result=new FunctionExpr(((FunctionExpr)expression).name(),args);</span>
+<span class="fc bfc" id="L186" title="All 4 branches covered.">        if (JavaExpressions.castSourceKind(result).isEmpty() || !JavaExpressions.isLiteral(args.getFirst())) return result;</span>
+<span class="fc" id="L187">        var backend=new JavaNumericBackend(request.plan().inputs());</span>
+<span class="fc" id="L188">        var value=backend.apply(backend.operation(result),List.of(JavaExpressions.literalValue(args.getFirst())));</span>
+<span class="pc bpc" id="L189" title="4 of 8 branches missed.">        return switch(JavaExpressions.resultKind(result)) {</span>
+<span class="fc" id="L190">            case BYTE -&gt; JavaExpressions.literal((Byte)value);</span>
+<span class="fc" id="L191">            case SHORT -&gt; JavaExpressions.literal((Short)value);</span>
+<span class="fc" id="L192">            case CHAR -&gt; JavaExpressions.literal((Character)value);</span>
+<span class="fc" id="L193">            case INT -&gt; JavaExpressions.literal((Integer)value);</span>
+<span class="nc" id="L194">            case LONG -&gt; JavaExpressions.literal((Long)value);</span>
+<span class="nc" id="L195">            case FLOAT -&gt; JavaExpressions.literal((Float)value);</span>
+<span class="nc" id="L196">            case DOUBLE -&gt; JavaExpressions.literal((Double)value);</span>
+<span class="nc" id="L197">            case BIG_INTEGER -&gt; throw new IllegalArgumentException(&quot;NO_IMPLICIT_BIG_INTEGER_CONVERSION&quot;);</span>
+        };
+    }
+    private static List&lt;List&lt;Object&gt;&gt; bindings(JointComputationPlan plan) {
+<span class="fc" id="L201">        return plan.outputs().stream().map(output -&gt; List.&lt;Object&gt;of(output.name(),output.type())).toList();</span>
+    }
+<span class="fc" id="L203">    private boolean has(SemanticAssumption.Kind kind,String name) { return request.assumptions().stream().anyMatch(a -&gt;</span>
+<span class="pc bpc" id="L204" title="1 of 6 branches missed.">        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE &amp;&amp; a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            &amp;&amp; a.subject().equals(name)); }</span>
+    private boolean positive(Expr expression) {
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) return has(SemanticAssumption.Kind.POSITIVE,v.name());</span>
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">        return JavaExpressions.isLiteral(expression) &amp;&amp; integer(JavaExpressions.literalValue(expression)).signum()&gt;0;</span>
+    }
+    private void requireTotal(Expr expression) {
+<span class="fc" id="L211">        var op=JavaExpressions.operationOf(expression);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (op.isEmpty()) return;</span>
+<span class="fc" id="L213">        var kind=JavaExpressions.resultKind(expression); var args=JavaExpressions.operands(expression);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (op.get().name().endsWith(&quot;EXACT&quot;)) throw new IllegalArgumentException(&quot;EXISTING_EXACT_CHECK_MUST_REMAIN&quot;);</span>
+<span class="pc bpc" id="L215" title="2 of 6 branches missed.">        if ((op.get()==NumericOperation.DIVIDE || op.get()==NumericOperation.REMAINDER) &amp;&amp; !kind.floatingPoint()) {</span>
+<span class="pc bpc" id="L216" title="2 of 4 branches missed.">            if (!JavaExpressions.isLiteral(args.get(1)) || integer(JavaExpressions.literalValue(args.get(1))).signum()==0)</span>
+<span class="nc" id="L217">                throw new IllegalArgumentException(&quot;POSSIBLE_DIVISION_EXCEPTION&quot;);</span>
+        }
+<span class="fc bfc" id="L219" title="All 7 branches covered.">        if (kind==NumericKind.BIG_INTEGER) switch(op.get()) {</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">            case MOD -&gt; { if (!positive(args.get(1))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
+            case MOD_POW -&gt; {
+                try {
+<span class="fc" id="L223">                    var proof = new ModularBridge(request.assumptions()).verify(expression,expression); work.charge(proof.work());</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                    if (!proof.accepted()) throw new IllegalArgumentException(&quot;NONNEGATIVE_AFFINE_EXPONENT_AND_POSITIVE_MODULUS_REQUIRED&quot;);</span>
+<span class="pc" id="L225">                } catch (NoSuchElementException malformed) { throw new IllegalArgumentException(&quot;MODULAR_FRAGMENT_REQUIRED&quot;,malformed); }</span>
+            }
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            case MOD_MULTIPLY -&gt; { if (!positive(args.get(2))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
+            case POW -&gt; {
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">                if (!(JavaExpressions.isLiteral(args.get(1)) &amp;&amp; integer(JavaExpressions.literalValue(args.get(1))).signum()&gt;=0)</span>
+<span class="pc bpc" id="L230" title="4 of 6 branches missed.">                        &amp;&amp; !(args.get(1) instanceof VariableExpr v &amp;&amp; (has(SemanticAssumption.Kind.NON_NEGATIVE,v.name()) || has(SemanticAssumption.Kind.POSITIVE,v.name()))))</span>
+<span class="nc" id="L231">                    throw new IllegalArgumentException(&quot;NONNEGATIVE_EXPONENT_REQUIRED&quot;);</span>
+            }
+            default -&gt; { }
+        }
+<span class="fc" id="L235">    }</span>
+    static BigInteger integer(Object value) {
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (value instanceof BigInteger b) return b;</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (value instanceof Character c) return BigInteger.valueOf(c);</span>
+<span class="pc bpc" id="L239" title="3 of 8 branches missed.">        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long)</span>
+<span class="fc" id="L240">            return BigInteger.valueOf(((Number)value).longValue());</span>
+<span class="nc" id="L241">        throw new IllegalArgumentException(&quot;INTEGRAL_VALUE_REQUIRED&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

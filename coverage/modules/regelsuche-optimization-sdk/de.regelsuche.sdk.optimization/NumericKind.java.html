@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NumericKind.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">NumericKind.java</span></div><h1>NumericKind.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.search.program.ComputationBackend;
+import java.math.BigInteger;
+
+/** Declared and executed Java numeric kinds are represented separately in the source trace. */
+<span class="fc" id="L7">public enum NumericKind {</span>
+<span class="fc" id="L8">    BIG_INTEGER(0, true, BigInteger.class), BYTE(8, true, Byte.class), SHORT(16, true, Short.class),</span>
+<span class="fc" id="L9">    CHAR(16, false, Character.class), INT(32, true, Integer.class), LONG(64, true, Long.class),</span>
+<span class="fc" id="L10">    FLOAT(32, true, Float.class), DOUBLE(64, true, Double.class);</span>
+    private final int bits;
+    private final boolean signed;
+    private final ComputationBackend.Type type;
+<span class="fc" id="L14">    NumericKind(int bits, boolean signed, Class&lt;?&gt; runtimeClass) {</span>
+<span class="fc" id="L15">        this.bits = bits; this.signed = signed;</span>
+<span class="fc" id="L16">        type = new ComputationBackend.Type(&quot;java.&quot; + name().toLowerCase(java.util.Locale.ROOT), runtimeClass);</span>
+<span class="fc" id="L17">    }</span>
+<span class="fc" id="L18">    public int bits() { return bits; }</span>
+<span class="fc" id="L19">    public boolean signed() { return signed; }</span>
+<span class="fc bfc" id="L20" title="All 4 branches covered.">    public boolean floatingPoint() { return this == FLOAT || this == DOUBLE; }</span>
+<span class="fc bfc" id="L21" title="All 4 branches covered.">    public boolean integral() { return this != BIG_INTEGER &amp;&amp; !floatingPoint(); }</span>
+<span class="fc" id="L22">    public ComputationBackend.Type type() { return type; }</span>
+    public static NumericKind fromType(ComputationBackend.Type type) {
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        for (var kind : values()) if (kind.type.equals(type)) return kind;</span>
+<span class="nc" id="L25">        throw new IllegalArgumentException(&quot;UNKNOWN_NUMERIC_TYPE&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

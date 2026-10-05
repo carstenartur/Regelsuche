@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuntimeChecks.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">RuntimeChecks.java</span></div><h1>RuntimeChecks.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.search.program.*;
+import java.math.*;
+import java.util.*;
+
+/** Reference execution for testing/integration of the emitted policy. Never invoked by optimization. */
+final class RuntimeChecks {
+    static final class AssumptionGuardFailure extends IllegalArgumentException {
+<span class="fc" id="L11">        AssumptionGuardFailure(String message) { super(message); }</span>
+    }
+
+    private RuntimeChecks() {}
+    static Map&lt;String,Object&gt; checked(OptimizationRequest request, JointComputationPlan target, RuntimeObligations obligations, Map&lt;String,?&gt; inputs) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        for(var input:request.plan().inputs().entrySet()) input.getValue().requireValue(inputs.get(input.getKey()));</span>
+<span class="fc" id="L17">        validateAssumptions(request,inputs);</span>
+<span class="fc bfc" id="L18" title="All 4 branches covered.">        if(obligations.requireFinite()) for(var value:inputs.values()) finite(value);</span>
+<span class="fc" id="L19">        var original=trace(request.plan(),obligations.originalTrace(),inputs,obligations);</span>
+<span class="fc" id="L20">        var replacement=trace(target,obligations.replacementTrace(),inputs,obligations);</span>
+<span class="fc bfc" id="L21" title="All 4 branches covered.">        if(obligations.compareFloatingPointBits()) for(var name:original.keySet())</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            if(!same(original.get(name),replacement.get(name))) throw new ArithmeticException(&quot;MATH_NUMERIC_DEVIATION&quot;);</span>
+<span class="fc" id="L23">        return replacement;</span>
+    }
+    static Map&lt;String,Object&gt; trace(JointComputationPlan plan,SourceEvaluationTrace trace,Map&lt;String,?&gt; inputs,RuntimeObligations obligations) {
+<span class="fc" id="L26">        var backend=new JavaNumericBackend(plan.inputs());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for(var entry:plan.inputs().entrySet()) entry.getValue().requireValue(inputs.get(entry.getKey()));</span>
+<span class="fc" id="L28">        var values=new HashMap&lt;Expr,Object&gt;();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for(var occurrence:trace.occurrences()) {</span>
+<span class="fc" id="L30">            Expr expression=occurrence.expression();</span>
+<span class="fc" id="L31">            var args=JavaExpressions.operands(expression).stream().map(e -&gt; value(e,values,inputs)).toList();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            if(obligations.checkIntegralRange()) range(expression,args);</span>
+<span class="fc" id="L33">            Object value=backend.apply(backend.operation(expression),args);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if(obligations.requireFinite()) finite(value);</span>
+<span class="fc" id="L35">            values.put(expression,value);</span>
+<span class="fc" id="L36">        }</span>
+<span class="fc" id="L37">        var outputs=new LinkedHashMap&lt;String,Object&gt;(); var expressions=plan.outputExpressions();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for(int i=0;i&lt;expressions.size();i++) {</span>
+<span class="fc" id="L39">            Object value=value(expressions.get(i),values,inputs);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if(obligations.requireFinite()) finite(value);</span>
+<span class="fc" id="L41">            outputs.put(plan.outputs().get(i).name(),value);</span>
+        }
+<span class="fc" id="L43">        return Collections.unmodifiableMap(outputs);</span>
+    }
+    private static Object value(Expr expression,Map&lt;Expr,Object&gt; values,Map&lt;String,?&gt; inputs) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if(expression instanceof VariableExpr variable) return inputs.get(variable.name());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(expression)) return JavaExpressions.literalValue(expression);</span>
+<span class="fc" id="L48">        Object result=values.get(expression);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if(result==null) throw new IllegalArgumentException(&quot;TRACE_DEPENDENCY_MISSING&quot;);</span>
+<span class="fc" id="L50">        return result;</span>
+    }
+    static void finite(Object value) {
+<span class="pc bpc" id="L53" title="4 of 8 branches missed.">        if(value instanceof Float f &amp;&amp; !Float.isFinite(f) || value instanceof Double d &amp;&amp; !Double.isFinite(d))</span>
+<span class="fc" id="L54">            throw new ArithmeticException(&quot;MATH_NON_FINITE&quot;);</span>
+<span class="fc" id="L55">    }</span>
+    private static void range(Expr expression,List&lt;Object&gt; args) {
+<span class="fc" id="L57">        NumericKind kind=JavaExpressions.resultKind(expression);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if(!kind.integral()) return;</span>
+<span class="fc" id="L59">        var cast=JavaExpressions.castSourceKind(expression);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if(cast.isPresent()) {</span>
+<span class="nc" id="L61">            Object value=args.getFirst(); BigInteger integer;</span>
+<span class="nc bnc" id="L62" title="All 4 branches missed.">            if(value instanceof Float || value instanceof Double) {</span>
+<span class="nc" id="L63">                finite(value); integer=new BigDecimal(((Number)value).doubleValue()).toBigInteger();</span>
+<span class="nc" id="L64">            } else integer=SemanticChecker.integer(value);</span>
+<span class="nc" id="L65">            inRange(integer,kind); return;</span>
+        }
+<span class="fc" id="L67">        var op=JavaExpressions.operationOf(expression).orElseThrow();</span>
+<span class="fc" id="L68">        BigInteger left=SemanticChecker.integer(args.getFirst());</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        BigInteger right=args.size()&gt;1?SemanticChecker.integer(args.get(1)):BigInteger.ZERO;</span>
+<span class="pc bpc" id="L70" title="4 of 8 branches missed.">        BigInteger result=switch(op) {</span>
+<span class="fc" id="L71">            case ADD,ADD_EXACT -&gt; left.add(right); case SUBTRACT,SUBTRACT_EXACT -&gt; left.subtract(right);</span>
+<span class="pc" id="L72">            case MULTIPLY,MULTIPLY_EXACT -&gt; left.multiply(right); case NEGATE,NEGATE_EXACT -&gt; left.negate();</span>
+<span class="pc" id="L73">            case ABS -&gt; left.abs(); case DIVIDE -&gt; left.divide(right);</span>
+<span class="nc" id="L74">            case SHIFT_LEFT -&gt; left.shiftLeft(right.intValue() &amp; (kind.bits()-1));</span>
+<span class="nc" id="L75">            default -&gt; null; // Remainder, bitwise and right shifts cannot overflow their executed width.</span>
+        };
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if(result!=null) inRange(result,kind);</span>
+<span class="fc" id="L78">    }</span>
+    private static void inRange(BigInteger value,NumericKind kind) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        BigInteger minimum=kind.signed()?BigInteger.ONE.shiftLeft(kind.bits()-1).negate():BigInteger.ZERO;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        BigInteger maximum=BigInteger.ONE.shiftLeft(kind.signed()?kind.bits()-1:kind.bits()).subtract(BigInteger.ONE);</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        if(value.compareTo(minimum)&lt;0 || value.compareTo(maximum)&gt;0) throw new ArithmeticException(&quot;MATH_INTEGRAL_RANGE&quot;);</span>
+<span class="fc" id="L83">    }</span>
+    static boolean same(Object left,Object right) {
+<span class="pc bpc" id="L85" title="5 of 6 branches missed.">        if(left instanceof Float a &amp;&amp; right instanceof Float b) return Float.floatToIntBits(a)==Float.floatToIntBits(b);</span>
+<span class="pc bpc" id="L86" title="1 of 6 branches missed.">        if(left instanceof Double a &amp;&amp; right instanceof Double b) return Double.doubleToLongBits(a)==Double.doubleToLongBits(b);</span>
+<span class="fc" id="L87">        return Objects.equals(left,right);</span>
+    }
+    static void validateAssumptions(OptimizationRequest request,Map&lt;String,?&gt; inputs) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for(var assumption:request.assumptions()) {</span>
+<span class="fc" id="L91">            Object supplied=inputs.get(assumption.subject());</span>
+<span class="pc bpc" id="L92" title="1 of 7 branches missed.">            switch(assumption.kind()) {</span>
+                case BIG_INTEGER_VALUE_SEMANTICS -&gt; {
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">                    if(supplied==null || supplied.getClass()!=BigInteger.class) throw new IllegalArgumentException(&quot;BIG_INTEGER_VALUE_CONTRACT_VIOLATED&quot;);</span>
+                }
+                case BIG_INTEGER_BIT_LENGTH_BOUND -&gt; {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                    if (!(supplied instanceof BigInteger value)) throw new IllegalArgumentException(&quot;BIG_INTEGER_VALUE_REQUIRED&quot;);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                    if (value.abs().bitLength() &gt; BigIntegerBounds.parameter(assumption.parameter()))</span>
+<span class="fc" id="L99">                        throw new AssumptionGuardFailure(&quot;BIG_INTEGER_MAGNITUDE_ASSUMPTION_VIOLATED&quot;);</span>
+<span class="fc" id="L100">                }</span>
+                case NON_NEGATIVE_UPPER_BOUND -&gt; {
+<span class="fc" id="L102">                    var value=SemanticChecker.integer(supplied);</span>
+<span class="fc bfc" id="L103" title="All 4 branches covered.">                    if(value.signum()&lt;0 || value.compareTo(BigInteger.valueOf(BigIntegerBounds.parameter(assumption.parameter())))&gt;0)</span>
+<span class="fc" id="L104">                        throw new AssumptionGuardFailure(&quot;NUMERIC_UPPER_BOUND_ASSUMPTION_VIOLATED&quot;);</span>
+<span class="fc" id="L105">                }</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                case NON_NEGATIVE -&gt; { if(SemanticChecker.integer(supplied).signum()&lt;0) throw new AssumptionGuardFailure(&quot;NONNEGATIVE_ASSUMPTION_VIOLATED&quot;); }</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                case POSITIVE -&gt; { if(SemanticChecker.integer(supplied).signum()&lt;=0) throw new AssumptionGuardFailure(&quot;POSITIVE_ASSUMPTION_VIOLATED&quot;); }</span>
+                case NORMALIZED_MODULAR_INPUT -&gt; {
+<span class="nc" id="L109">                    var value=SemanticChecker.integer(supplied); var modulus=SemanticChecker.integer(inputs.get(assumption.parameter()));</span>
+<span class="nc bnc" id="L110" title="All 6 branches missed.">                    if(modulus.signum()&lt;=0 || value.signum()&lt;0 || value.compareTo(modulus)&gt;=0) throw new AssumptionGuardFailure(&quot;NORMALIZATION_ASSUMPTION_VIOLATED&quot;);</span>
+<span class="nc" id="L111">                }</span>
+                default -&gt; { }
+            }
+<span class="fc" id="L114">        }</span>
+<span class="fc" id="L115">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

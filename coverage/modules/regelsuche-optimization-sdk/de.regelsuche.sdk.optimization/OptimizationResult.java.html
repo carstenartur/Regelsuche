@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OptimizationResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">OptimizationResult.java</span></div><h1>OptimizationResult.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.search.program.*;
+import java.util.Map;
+import java.util.Objects;
+
+public sealed interface OptimizationResult {
+<span class="fc" id="L8">    enum SearchCompletion { EXHAUSTED_BOUNDED_SPACE, IMPROVEMENT_FOUND }</span>
+<span class="fc" id="L9">    record CostAssessment(long sourceScore, long candidateScore, long checkWork, int fallbackOperations,</span>
+            PreparedJointComputation.Cost sourceCost, PreparedJointComputation.Cost candidateCost,
+            boolean estimatedRuntimeImprovement) {}
+    record Candidate(JointComputationPlan plan, PreparedJointComputation prepared, VerificationEvidence evidence,
+            RuntimeObligations obligations, CostAssessment cost, SearchCompletion searchCompletion, long work) implements OptimizationResult {
+<span class="fc" id="L14">        public Candidate {</span>
+<span class="fc" id="L15">            var trusted = ComputationOptimizer.prepare(Objects.requireNonNull(plan));</span>
+<span class="pc bpc" id="L16" title="1 of 4 branches missed.">            if (prepared == null || !trusted.nodes().equals(prepared.nodes())</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">                    || !trusted.outputBindings().equals(prepared.outputBindings())</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">                    || !trusted.cost().equals(prepared.cost()))</span>
+<span class="fc" id="L19">                throw new IllegalArgumentException(&quot;PREPARED_PLAN_BINDING_DIFFERS&quot;);</span>
+<span class="fc" id="L20">            prepared = trusted;</span>
+<span class="fc" id="L21">            Objects.requireNonNull(evidence); Objects.requireNonNull(obligations);</span>
+<span class="fc" id="L22">            Objects.requireNonNull(cost); Objects.requireNonNull(searchCompletion);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (work &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_OPTIMIZATION_WORK&quot;);</span>
+<span class="fc" id="L24">        }</span>
+    }
+<span class="fc" id="L26">    record NoImprovement(String diagnostic, SearchCompletion searchCompletion, long work) implements OptimizationResult {}</span>
+<span class="fc" id="L27">    record Unsupported(String diagnostic) implements OptimizationResult {}</span>
+<span class="fc" id="L28">    record BudgetExceeded(String diagnostic, long work) implements OptimizationResult {}</span>
+<span class="fc" id="L29">    record Cancelled(String diagnostic) implements OptimizationResult {}</span>
+    record Refuted(String diagnostic, Map&lt;String, Object&gt; counterexample) implements OptimizationResult {
+<span class="nc" id="L31">        public Refuted { counterexample = Map.copyOf(counterexample); }</span>
+    }
+<span class="nc" id="L33">    record Inconclusive(String diagnostic) implements OptimizationResult {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
