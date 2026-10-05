@@ -53,7 +53,7 @@ class SourceTraceSharingTest {
     }
 
     @Test
-    void_aRequiredOperationCannotDisappearFromTheSourceTrace() {
+    void aRequiredOperationCannotDisappearFromTheSourceTrace() {
         Expr result = JavaExpressions.operation(NumericKind.INT,
             NumericOperation.ADD, sum, JavaExpressions.literal(0));
         var plan = plan(List.of(new Output("result", NumericKind.INT.type(), result)));
