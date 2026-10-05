@@ -11,7 +11,7 @@ from student_sdk_source import verify_pinned_consumer
 
 EXAMPLES = ('hello-rule-java25', 'geometric-sequence-domain-java25',
             'finite-difference-domain-java25', 'solver-adapter-java25', 'number-theory-plan-java25',
-            'extension-runtime-java25')
+            'extension-runtime-java25', 'java-optimization-java25')
 
 
 def single(directory, pattern):
@@ -87,6 +87,8 @@ def package(root, repository, version, output):
               'docs/java-sdk-quickstart.md', 'docs/java-sdk-api-policy.md',
               'docs/java-sdk-domain-tutorial.md', 'docs/java-sdk-human-dx.md',
               'docs/generic-extensions.md',
+              'regelsuche-optimization-sdk/README.md',
+              'docs/java-optimization-sdk-qualification.md',
               'docs/superpowers/specs/2026-09-11-generic-extension-program-discovery-design.md']
     for name in inputs:
         data = (root / name).read_bytes()

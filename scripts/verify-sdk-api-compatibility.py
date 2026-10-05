@@ -41,6 +41,45 @@ REQUIRED_EXTENSION_PACKAGES = {
     'de.regelsuche.extension',
     'de.regelsuche.extension.runtime',
 }
+REQUIRED_OPTIMIZATION_CLASSES = {'de/regelsuche/sdk/optimization/' + name + '.class' for name in (
+    'CancellationToken', 'CheckedPolicy', 'ComputationOptimizer', 'JavaExpressions', 'NumericKind',
+    'NumericOperation', 'OptimizationBudget', 'OptimizationGoal', 'OptimizationRequest', 'OptimizationResult',
+    'OptimizationResult$Candidate', 'OptimizationResult$CostAssessment', 'OptimizationResult$SearchCompletion',
+    'OptimizationResult$NoImprovement', 'OptimizationResult$Unsupported', 'OptimizationResult$BudgetExceeded',
+    'OptimizationResult$Cancelled', 'OptimizationResult$Refuted', 'OptimizationResult$Inconclusive',
+    'RuntimeObligations', 'RuntimeObligations$GuardKind', 'SafetyProfile', 'SemanticAssumption',
+    'SemanticAssumption$Kind', 'SourceEvaluationTrace', 'SourceEvaluationTrace$Occurrence',
+    'VerificationEvidence', 'VerificationResult', 'VerificationResult$Verified', 'VerificationResult$Refuted',
+    'VerificationResult$Inconclusive', 'VerificationResult$Unsupported', 'VerificationResult$Cancelled',
+    'VerificationResult$BudgetExceeded',
+)}
+
+
+def validate_optimization_revision(policy, jars):
+    if policy.get('optimizationApiVersion') != '1' or policy.get('optimizationSemanticsRevision') != 'java25-numeric/v1':
+        raise RuntimeError('optimizer API/semantics revision missing or unsupported')
+    package = 'de.regelsuche.sdk.optimization'
+    if package not in policy.get('stablePackages', ()) or package in policy.get('baselineCompatibilityPackages', ()):
+        raise RuntimeError('optimizer package must be stable and outside the pre-optimizer baseline')
+    owned = [Path(jar) for jar in jars if re.fullmatch(r'regelsuche-optimization-sdk-[0-9][A-Za-z0-9.+_-]*\.jar', Path(jar).name)
+             and not Path(jar).name.endswith(('-sources.jar', '-javadoc.jar', '-all.jar'))]
+    if len(owned) != 1:
+        raise RuntimeError('exactly one optimizer binary API artifact is required')
+    for jar in jars:
+        with zipfile.ZipFile(jar) as archive:
+            names = archive.namelist()
+            if len(names) != len(set(names)):
+                raise RuntimeError(f'duplicate ZIP entries in API artifact {jar}')
+            entries = set(names)
+            if Path(jar) == owned[0]:
+                missing = REQUIRED_OPTIMIZATION_CLASSES - entries
+                if missing:
+                    raise RuntimeError(f'optimizer public API types missing: {sorted(missing)}')
+                forbidden = [name for name in entries if name.startswith(('org/eclipse/', 'de/regelsuche/example/'))]
+                if forbidden:
+                    raise RuntimeError(f'optimizer artifact contains application classes: {forbidden}')
+            elif REQUIRED_OPTIMIZATION_CLASSES & entries:
+                raise RuntimeError(f'optimizer API classes owned by the wrong artifact: {jar}')
 
 
 def run(command, cwd):
@@ -99,6 +138,7 @@ def main():
     policy = json.loads((root / 'config/sdk/public-api.json').read_text())
     new_jars = [jar.resolve() for jar in args.new_jars]
     validate_extension_revision(policy, new_jars)
+    validate_optimization_revision(policy, new_jars)
 
     # The argument is computed from Gradle's external ModuleComponentIdentifiers.
     if any('regelsuche' in Path(part).name.lower()
@@ -194,6 +234,8 @@ def main():
             'baselineCompatibilityPackages': baseline_packages,
             'extensionApiVersion': policy['extensionApiVersion'],
             'newExtensionPackages': sorted(REQUIRED_EXTENSION_PACKAGES),
+            'optimizationApiVersion': policy['optimizationApiVersion'],
+            'optimizationSemanticsRevision': policy['optimizationSemanticsRevision'],
         }, indent=2) + '\n')
 
 

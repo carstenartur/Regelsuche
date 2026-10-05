@@ -15,13 +15,16 @@
     "regelsuche-discovery-sdk",
     "regelsuche-plugin-api",
     "regelsuche-extension-api",
-    "regelsuche-extension-runtime"
+    "regelsuche-extension-runtime",
+    "regelsuche-math-algorithms",
+    "regelsuche-optimization-sdk"
   ],
   "stablePackages": [
     "de.regelsuche.api",
     "de.regelsuche.sdk.discovery",
     "de.regelsuche.extension",
-    "de.regelsuche.extension.runtime"
+    "de.regelsuche.extension.runtime",
+    "de.regelsuche.sdk.optimization"
   ],
   "baselineCompatibilityPackages": [
     "de.regelsuche.api",
@@ -64,5 +67,7 @@
     "de.regelsuche.sdk.discovery.python",
     "de.regelsuche.sdk.discovery.cli"
   ],
-  "deprecationPolicy": "No binary or source incompatible changes in a supported API revision. Deprecate for one full product minor release before removal in a new API revision."
+  "deprecationPolicy": "No binary or source incompatible changes in a supported API revision. Deprecate for one full product minor release before removal in a new API revision.",
+  "optimizationApiVersion": "1",
+  "optimizationSemanticsRevision": "java25-numeric/v1"
 }

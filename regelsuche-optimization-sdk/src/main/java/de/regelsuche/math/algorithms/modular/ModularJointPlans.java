@@ -1,7 +1,6 @@
-package de.regelsuche.example.modular;
+package de.regelsuche.math.algorithms.modular;
 
 import de.regelsuche.ast.*;
-import de.regelsuche.math.algorithms.modular.ModularComputationDomain;
 import de.regelsuche.search.program.*;
 import java.math.BigInteger;
 import java.util.*;
