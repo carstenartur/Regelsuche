@@ -52,14 +52,38 @@ positive cases failed; the missing-operation negative passed. The SDK suite
 contained 50 tests, two failures and no errors or skips. That is pre-fix evidence,
 not a claim of current success.
 
-The `Regelsuche SDK consumer bundle` workflow executes the documented Maven
-reactor and existing production packager twice from the exact PR source commit.
-It retains the source/tree identities, Maven/JDK versions, complete Maven logs,
-SDK test reports and compact source-bound distributions. Both builds must pass;
-both fresh external consumers must pass; every distribution file must be
-byte-identical. Failed builds may retain diagnostics but cannot create the
-reproducibility success receipt. This gate does not replace the full existing
-Regelsuche CI or the Sandbox installed-product and numerical-corpus gates.
+`MavenOptimizationSdkDistributionTest` now owns the two real builds, fresh
+standalone consumers, source/provenance checks and byte comparisons. It is enabled
+by the existing `sdk-release` profile. The existing CI command already invokes
+`mvn -Pfull,sdk-release verify`; no additional workflow or relaxed policy is needed.
+For a focused qualification, run from a clean committed checkout with Java 25:
+
+```sh
+mvn --batch-mode --no-transfer-progress -Psdk-release -pl maven-build-contract \
+  -Dtest=MavenOptimizationSdkDistributionTest test
+```
+
+The test calls the normal SDK Maven reactor and the existing production packager,
+not a replacement build or numerical test framework. That nested reactor excludes
+the build-contract module, so it cannot recursively call this test. Every original
+SDK test must run without failures, errors or skips in each clean build. Each
+packager invocation compiles and runs the real standalone consumer in a fresh
+directory. Output hashes, source identity, manifest and complete distribution
+bytes are checked by JUnit. Only after all checks pass is a success receipt written.
+
+Evidence is retained beneath
+`maven-build-contract/target/surefire-reports/sdk-distribution-*/` and is included
+in the existing Maven artifact upload. Each run creates a fresh evidence directory;
+old receipts cannot qualify a partial or failed execution. A profile-disabled
+invocation does not count as distribution acceptance. The exact checked-out commit
+is recorded, including a CI merge commit when that is the checkout being tested.
+
+The first successful source-bound builds on `a2c069f298e2` executed 51 SDK tests
+per build and produced identical complete distributions. However, introducing a
+third workflow violated the repository's two-workflow governance test. That
+workflow is removed rather than changing the policy; its successful SDK tests
+remain historical evidence, not a pass of the complete repository contract.
+Fresh execution through Maven/JUnit must qualify the current source.
 
 Sandbox must consume the resulting actual JAR bytes and matching provenance,
 not just edit a revision string alongside an older binary. The existing embedded
