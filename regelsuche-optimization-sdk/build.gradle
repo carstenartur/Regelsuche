@@ -3,7 +3,7 @@ repositories { mavenCentral() }
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 dependencies {
     api project(':regelsuche-search')
-    implementation project(':regelsuche-math-algorithms')
+    api project(':regelsuche-math-algorithms')
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

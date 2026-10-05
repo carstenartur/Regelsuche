@@ -23,7 +23,19 @@ final class EvidenceHashes {
     static String assumptions(Set<SemanticAssumption> assumptions) {
         return hash(assumptions.stream().map(a -> field(a.kind().name())+field(a.subject())+field(a.parameter())+field(a.provenance())).sorted().reduce("",String::concat));
     }
-    private static String field(String value) { return value.length()+":"+value; }
+    private static String field(String value) {
+        Objects.requireNonNull(value, "canonical field");
+        for(int i=0;i<value.length();i++) {
+            char c=value.charAt(i);
+            if(Character.isHighSurrogate(c)) {
+                if(++i>=value.length() || !Character.isLowSurrogate(value.charAt(i)))
+                    throw new IllegalArgumentException("malformed Unicode in canonical field");
+            } else if(Character.isLowSurrogate(c)) {
+                throw new IllegalArgumentException("malformed Unicode in canonical field");
+            }
+        }
+        return value.getBytes(StandardCharsets.UTF_8).length+":"+value;
+    }
     static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch(NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }

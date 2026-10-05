@@ -7,8 +7,13 @@ import java.util.*;
 
 /** Reference execution for testing/integration of the emitted policy. Never invoked by optimization. */
 final class RuntimeChecks {
+    static final class AssumptionGuardFailure extends IllegalArgumentException {
+        AssumptionGuardFailure(String message) { super(message); }
+    }
+
     private RuntimeChecks() {}
     static Map<String,Object> checked(OptimizationRequest request, JointComputationPlan target, RuntimeObligations obligations, Map<String,?> inputs) {
+        for(var input:request.plan().inputs().entrySet()) input.getValue().requireValue(inputs.get(input.getKey()));
         validateAssumptions(request,inputs);
         if(obligations.requireFinite()) for(var value:inputs.values()) finite(value);
         var original=trace(request.plan(),obligations.originalTrace(),inputs,obligations);
@@ -89,19 +94,20 @@ final class RuntimeChecks {
                     if(supplied==null || supplied.getClass()!=BigInteger.class) throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_VIOLATED");
                 }
                 case BIG_INTEGER_BIT_LENGTH_BOUND -> {
-                    if (!(supplied instanceof BigInteger value) || value.abs().bitLength() > BigIntegerBounds.parameter(assumption.parameter()))
-                        throw new IllegalArgumentException("BIG_INTEGER_MAGNITUDE_ASSUMPTION_VIOLATED");
+                    if (!(supplied instanceof BigInteger value)) throw new IllegalArgumentException("BIG_INTEGER_VALUE_REQUIRED");
+                    if (value.abs().bitLength() > BigIntegerBounds.parameter(assumption.parameter()))
+                        throw new AssumptionGuardFailure("BIG_INTEGER_MAGNITUDE_ASSUMPTION_VIOLATED");
                 }
                 case NON_NEGATIVE_UPPER_BOUND -> {
                     var value=SemanticChecker.integer(supplied);
                     if(value.signum()<0 || value.compareTo(BigInteger.valueOf(BigIntegerBounds.parameter(assumption.parameter())))>0)
-                        throw new IllegalArgumentException("NUMERIC_UPPER_BOUND_ASSUMPTION_VIOLATED");
+                        throw new AssumptionGuardFailure("NUMERIC_UPPER_BOUND_ASSUMPTION_VIOLATED");
                 }
-                case NON_NEGATIVE -> { if(SemanticChecker.integer(supplied).signum()<0) throw new IllegalArgumentException("NONNEGATIVE_ASSUMPTION_VIOLATED"); }
-                case POSITIVE -> { if(SemanticChecker.integer(supplied).signum()<=0) throw new IllegalArgumentException("POSITIVE_ASSUMPTION_VIOLATED"); }
+                case NON_NEGATIVE -> { if(SemanticChecker.integer(supplied).signum()<0) throw new AssumptionGuardFailure("NONNEGATIVE_ASSUMPTION_VIOLATED"); }
+                case POSITIVE -> { if(SemanticChecker.integer(supplied).signum()<=0) throw new AssumptionGuardFailure("POSITIVE_ASSUMPTION_VIOLATED"); }
                 case NORMALIZED_MODULAR_INPUT -> {
                     var value=SemanticChecker.integer(supplied); var modulus=SemanticChecker.integer(inputs.get(assumption.parameter()));
-                    if(modulus.signum()<=0 || value.signum()<0 || value.compareTo(modulus)>=0) throw new IllegalArgumentException("NORMALIZATION_ASSUMPTION_VIOLATED");
+                    if(modulus.signum()<=0 || value.signum()<0 || value.compareTo(modulus)>=0) throw new AssumptionGuardFailure("NORMALIZATION_ASSUMPTION_VIOLATED");
                 }
                 default -> { }
             }

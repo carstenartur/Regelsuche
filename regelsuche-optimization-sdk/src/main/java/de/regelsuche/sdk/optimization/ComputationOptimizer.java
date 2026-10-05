@@ -89,7 +89,7 @@ public final class ComputationOptimizer {
         if(request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK) throw new IllegalArgumentException("GUARDED_PROFILE_REQUIRED");
         if(!(reverify(request,candidate,CancellationToken.NONE) instanceof VerificationResult.Verified)) throw new IllegalArgumentException("CANDIDATE_NOT_REVERIFIED");
         try { return RuntimeChecks.checked(request,candidate.plan(),candidate.obligations(),inputs); }
-        catch(ArithmeticException numericalGate) { return prepare(request.plan()).execute(inputs); }
+        catch(RuntimeChecks.AssumptionGuardFailure | ArithmeticException numericalGate) { return prepare(request.plan()).execute(inputs); }
     }
     private static RuntimeObligations obligations(OptimizationRequest request,JointComputationPlan target) {
         var kinds=EnumSet.noneOf(NumericKind.class);

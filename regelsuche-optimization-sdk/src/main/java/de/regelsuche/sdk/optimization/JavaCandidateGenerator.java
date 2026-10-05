@@ -29,7 +29,7 @@ final class JavaCandidateGenerator {
                 work.charge(modular.work()); complete = modular.complete();
                 for (var rewrite : modular.rewrites()) proposals.add(new JointPlanSearch.Proposal(rewrite.rule(), source.withOutputs(rewrite.outputs()).expression()));
             } catch (IllegalArgumentException outsideModularFragment) { /* Java arithmetic proposals remain available. */ }
-        }
+        } else complete = false;
         return new JointPlanSearch.Generation(proposals, Math.max(1, work.used() - start), complete);
     }
     private Expr simplify(Expr expression, int depth) {
