@@ -23,10 +23,49 @@ class ReviewFeedbackRegressionTest {
         var completeTrace = SourceEvaluationTrace.fromPlan(plan);
         var tamperedTrace = new SourceEvaluationTrace(List.of(
             completeTrace.occurrences().getFirst(), completeTrace.occurrences().getLast()));
-        var request = request(plan, tamperedTrace, Set.of(), SafetyProfile.PRESERVE_JAVA, Set.of(NumericKind.INT));
+        var originalRequest = request(plan, completeTrace, Set.of(), SafetyProfile.PRESERVE_JAVA, Set.of(NumericKind.INT));
+        var changedRequest = request(plan, tamperedTrace, Set.of(), SafetyProfile.PRESERVE_JAVA, Set.of(NumericKind.INT));
+        var proof = assertInstanceOf(VerificationResult.Verified.class,
+            optimizer.verify(originalRequest, plan, CancellationToken.NONE));
+        assertEquals(3, proof.obligations().originalTrace().occurrences().size());
+        assertEquals(completeTrace, proof.obligations().originalTrace());
+        var prepared = ComputationOptimizer.prepare(plan);
+        var candidate = new OptimizationResult.Candidate(plan, prepared, proof.evidence(), proof.obligations(),
+            new OptimizationResult.CostAssessment(1, 1, 0, 0, prepared.cost(), prepared.cost(), false),
+            OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE, 1);
+        assertInstanceOf(VerificationResult.Verified.class,
+            optimizer.reverify(originalRequest, candidate, CancellationToken.NONE));
 
+        // The shorter trace could describe sum=x+1; result=sum+sum. The value DAG
+        // alone cannot distinguish that program from (x+1)+(x+1). Only evidence
+        // bound to the actual original trace can authorize reuse of a candidate.
+        assertInstanceOf(VerificationResult.Verified.class,
+            optimizer.verify(changedRequest, plan, CancellationToken.NONE));
+        assertNotEquals(EvidenceHashes.trace(completeTrace), EvidenceHashes.trace(tamperedTrace));
         assertInstanceOf(VerificationResult.Unsupported.class,
-            optimizer.verify(request, plan, CancellationToken.NONE));
+            optimizer.reverify(changedRequest, candidate, CancellationToken.NONE));
+    }
+
+    @Test
+    void duplicateEvaluationsRemainInEstimatedSourceCosts() {
+        Expr plusZero = JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD, X, JavaExpressions.literal(0));
+        Expr output = JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD, plusZero, plusZero);
+        var plan = plan(NumericKind.INT, output);
+        var duplicateTrace = SourceEvaluationTrace.fromPlan(plan);
+        var sharedTrace = new SourceEvaluationTrace(List.of(
+            duplicateTrace.occurrences().getFirst(), duplicateTrace.occurrences().getLast()));
+        var duplicateRequest = request(plan, duplicateTrace, Set.of(), SafetyProfile.PRESERVE_JAVA, Set.of(NumericKind.INT));
+        var sharedRequest = request(plan, sharedTrace, Set.of(), SafetyProfile.PRESERVE_JAVA, Set.of(NumericKind.INT));
+        var duplicate = assertInstanceOf(OptimizationResult.Candidate.class,
+            optimizer.optimize(duplicateRequest, CancellationToken.NONE));
+        var shared = assertInstanceOf(OptimizationResult.Candidate.class,
+            optimizer.optimize(sharedRequest, CancellationToken.NONE));
+        assertEquals(duplicateTrace, duplicate.obligations().originalTrace());
+        assertEquals(sharedTrace, shared.obligations().originalTrace());
+        assertTrue(duplicate.cost().sourceScore() > shared.cost().sourceScore());
+        assertEquals(duplicate.cost().candidateScore(), shared.cost().candidateScore());
+        assertEquals(ComputationOptimizer.prepare(plan).execute(Map.of("x", Integer.MAX_VALUE)),
+            duplicate.prepared().execute(Map.of("x", Integer.MAX_VALUE)));
     }
 
     @Test

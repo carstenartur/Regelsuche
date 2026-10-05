@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    static final String REVISION = "java-numeric-independent/v3";
+    static final String REVISION = "java-numeric-independent/v4";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -25,7 +25,7 @@ final class SemanticChecker {
             throw new IllegalArgumentException("EXCLUDED_NUMERIC_KIND");
         var prepared = plan.prepare(new JavaNumericBackend(plan.inputs()));
         work.charge(prepared.cost().inspectionWork());
-        validateSourceTrace(plan, bounds);
+        validateSourceTrace(plan, prepared, bounds);
         for (var input : plan.inputs().entrySet()) {
             var kind = NumericKind.fromType(input.getValue());
             if (kind == NumericKind.BIG_INTEGER && !has(SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS, input.getKey()))
@@ -40,10 +40,9 @@ final class SemanticChecker {
             throw new IllegalArgumentException("CHECKED_FINITE_AND_BITWISE_COMPARISON_REQUIRED");
         validateAssumptions(plan);
     }
-    private void validateSourceTrace(JointComputationPlan plan, BigIntegerBounds bounds) {
+    private void validateSourceTrace(JointComputationPlan plan, PreparedJointComputation prepared, BigIntegerBounds bounds) {
         if (request.sourceTrace().occurrences().size() > JointComputationPlan.MAX_NODES) throw new IllegalArgumentException("TRACE_STRUCTURAL_BOUND");
         var seen = new HashSet<Expr>(); var sourceIds = new HashSet<String>();
-        var tracedOccurrences = new HashMap<Expr,Integer>();
         for (var occurrence : request.sourceTrace().occurrences()) {
             work.charge(1);
             if (!sourceIds.add(occurrence.sourceId())) throw new IllegalArgumentException("DUPLICATE_SOURCE_OCCURRENCE_ID");
@@ -61,20 +60,17 @@ final class SemanticChecker {
             requireTotal(expression);
             bounds.require(expression);
             seen.add(expression);
-            tracedOccurrences.merge(expression, 1, Math::addExact);
         }
-        var requiredOccurrences = new HashMap<Expr,Integer>();
-        for (var output : plan.outputExpressions()) countOutputOccurrences(output, requiredOccurrences);
-        for (var occurrence : requiredOccurrences.entrySet()) {
-            if (tracedOccurrences.getOrDefault(occurrence.getKey(), 0) < occurrence.getValue())
+        // Outputs describe values, not the number of source evaluations. For example,
+        // sum=x+1; result=sum+sum has two evaluations, but three expanded operations.
+        // The adapter's ordered trace owns multiplicity (including dead operations).
+        // Every occurrence above is checked; obligations, costs and hashes retain it.
+        // Reverification against that original request rejects a shortened trace.
+        for (var node : prepared.nodes()) {
+            work.charge(1);
+            if (node.operation() != null && !JavaExpressions.isLiteral(node.expression()) && !seen.contains(node.expression()))
                 throw new IllegalArgumentException("SOURCE_EVALUATION_TRACE_INCOMPLETE");
         }
-    }
-    private void countOutputOccurrences(Expr expression, Map<Expr,Integer> occurrences) {
-        work.charge(1);
-        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return;
-        occurrences.merge(expression, 1, Math::addExact);
-        for (Expr operand : JavaExpressions.operands(expression)) countOutputOccurrences(operand, occurrences);
     }
     private void validateAssumptions(JointComputationPlan plan) {
         for (var assumption : request.assumptions()) {
