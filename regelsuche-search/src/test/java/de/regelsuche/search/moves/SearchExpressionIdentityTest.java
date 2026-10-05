@@ -113,6 +113,47 @@ class SearchExpressionIdentityTest {
         }
     }
 
+    @Test void commitWorkOverflowRestoresOwnershipAndFifoIndexAtEveryDebit() {
+        for (var names : List.of(List.of("AaAa", "BBBB", "AaBB"), List.of("a", "b", "c"))) {
+            for (int capacity : List.of(0, 1, 2, 3)) {
+                var limits = new SearchExpressionStore.Limits(100, 1000, 1000, capacity);
+                long acquisitionWork;
+                try (var probe = new SearchExpressionStore(limits)) {
+                    probe.intern(new VariableExpr(names.get(0)));
+                    probe.intern(new VariableExpr(names.get(1)));
+                    long before = probe.work();
+                    probe.intern(new VariableExpr(names.get(2)));
+                    acquisitionWork = probe.work() - before - 4; // final scratch cleanup is outside acquisition
+                }
+                for (long allowance = 0; allowance < acquisitionWork; allowance++) {
+                    try (var store = new SearchExpressionStore(limits)) {
+                        var first = store.intern(new VariableExpr(names.get(0)));
+                        var second = store.intern(new VariableExpr(names.get(1)));
+                        var before = store.statistics();
+                        var retainedBefore = RetainedGraph.measure(store).retained();
+                        store.pay(Long.MAX_VALUE - store.work() - allowance);
+                        try {
+                            assertThrows(ArithmeticException.class, () -> store.intern(new VariableExpr(names.get(2))));
+                            assertEquals(before, store.statistics(), "failed debit with allowance " + allowance);
+                            assertEquals(retainedBefore, RetainedGraph.measure(store).retained(),
+                                "failed acquisition must release root, node, text and index ownership");
+                        } finally { store.pay(-store.work()); }
+                        assertEquals(new VariableExpr(names.get(0)), store.dereference(first));
+                        if (capacity >= 2) assertSame(first, store.intern(new VariableExpr(names.get(0))));
+                        if (capacity >= 1) assertSame(second, store.intern(new VariableExpr(names.get(1))));
+                        store.intern(new VariableExpr(names.get(2)));
+                        assertEquals(before.liveNodes() + 1, store.statistics().liveNodes());
+                        assertEquals(before.liveCharacters() + names.get(2).length(), store.statistics().liveCharacters());
+                        if (capacity == 2) {
+                            assertSame(second, store.intern(new VariableExpr(names.get(1))));
+                            assertNotSame(first, store.intern(new VariableExpr(names.get(0))));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Test void rollbackAccountingFailureDoesNotReplaceObservationFailureOrSkipOwnershipRestoration() {
         var store = new SearchExpressionStore(new SearchExpressionStore.Limits(100, 1000, 1000, 1));
         var first = store.intern(new VariableExpr("a"));

@@ -57,6 +57,8 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         long previousReferences = references, previousCharacters = characters;
         long previousPeakNodes = peakNodes, previousPeakCharacters = peakCharacters, previousPeakReferences = peakReferences;
         long previousEvictions = evictions;
+        int previousIndexEntries = indexEntries;
+        var indexMutation = new IndexMutation();
         SearchExpressionRef committed = null, evicted = null;
         Throwable primary = null;
         try(var retained=de.regelsuche.retention.RetainedOperation.retain(this,expression,added,addedText,pending)) {
@@ -96,9 +98,10 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         if (nextNodes > limits.nodes() || nextCharacters > limits.characters() || withIndex > limits.references()) throw new LimitExceeded();
         // Validation/arithmetic precedes mutation, including rejection under total live retention pressure.
         var reference = new SearchExpressionRef(this, expression, hash);
-        pay(Math.addExact(Math.addExact(added.size(),addedText.size()),1));nodes.putAll(added);textValues.putAll(addedText); roots.add(reference); references = nextReferences; characters = nextCharacters;
-        index(reference, evicted);
+        pay(Math.addExact(Math.addExact(added.size(),addedText.size()),1));
         committed = reference;
+        nodes.putAll(added);textValues.putAll(addedText); roots.add(reference); references = nextReferences; characters = nextCharacters;
+        index(reference, evicted, indexMutation);
         peakNodes = Math.max(peakNodes, nextNodes); peakCharacters = Math.max(peakCharacters, characters);
         peakReferences = Math.max(peakReferences, withIndex);
         de.regelsuche.retention.RetainedOperation.checkpoint();
@@ -108,13 +111,16 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
             if (committed != null) {
                 var rollbackReference = committed;
                 var evictedReference = evicted;
-                attemptCleanup(failure, () -> rollbackIndex(rollbackReference, evictedReference));
-                attemptCleanup(failure, roots::removeLast);
+                attemptCleanup(failure, () -> rollbackIndex(rollbackReference, evictedReference, indexMutation));
+                attemptCleanup(failure, () -> {
+                    if (!roots.isEmpty() && roots.getLast() == rollbackReference) roots.removeLast();
+                });
                 for (var node : added.keySet()) attemptCleanup(failure, () -> nodes.remove(node));
                 for (var text : addedText.keySet()) attemptCleanup(failure, () -> textValues.remove(text));
                 references = previousReferences; characters = previousCharacters;
                 peakNodes = previousPeakNodes; peakCharacters = previousPeakCharacters; peakReferences = previousPeakReferences;
                 evictions = previousEvictions;
+                indexEntries = previousIndexEntries;
                 attemptCleanup(failure, () -> pay(Math.addExact(Math.addExact(added.size(), addedText.size()), 1)));
             }
             throw failure;
@@ -159,32 +165,39 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         }
         return indexReferences(nextIndexSize, nextBuckets);
     }
-    private void index(SearchExpressionRef reference, SearchExpressionRef evicted) {
+    private static final class IndexMutation {
+        boolean evictedRemoved, bucketCreated, inserted;
+    }
+    private void index(SearchExpressionRef reference, SearchExpressionRef evicted, IndexMutation mutation) {
         if (limits.indexEntries() == 0) return;
         if (evicted != null) {
             var bucket = index.get(evicted.structuralHash); pay(1);
             pay(bucket.size()); bucket.remove(0); // FIFO within a collision bucket, including shifted slots
+            mutation.evictedRemoved = true;
             if (bucket.isEmpty()) { index.remove(evicted.structuralHash); pay(1); }
             indexEntries--; evictions = Math.addExact(evictions, 1);
         }
         var bucket = index.get(reference.structuralHash); pay(1);
-        if (bucket == null) { bucket = new ArrayList<>(); index.put(reference.structuralHash, bucket); pay(2); }
-        bucket.add(reference); indexEntries++; pay(1);
+        if (bucket == null) {
+            bucket = new ArrayList<>(); index.put(reference.structuralHash, bucket);
+            mutation.bucketCreated = true; pay(2);
+        }
+        bucket.add(reference); mutation.inserted = true; indexEntries++; pay(1);
     }
-    private void rollbackIndex(SearchExpressionRef reference, SearchExpressionRef evicted) {
+    private void rollbackIndex(SearchExpressionRef reference, SearchExpressionRef evicted, IndexMutation mutation) {
         if (limits.indexEntries() == 0) return;
         var bucket = index.get(reference.structuralHash);
-        bucket.removeLast(); indexEntries--;
-        if (bucket.isEmpty()) index.remove(reference.structuralHash);
+        if (mutation.inserted) bucket.removeLast();
+        if (mutation.bucketCreated && bucket.isEmpty()) index.remove(reference.structuralHash);
         long rollbackWork = 3;
-        if (evicted != null) {
+        if (mutation.evictedRemoved) {
             var oldestBucket = index.get(evicted.structuralHash);
             if (oldestBucket == null) {
                 oldestBucket = new ArrayList<>(); index.put(evicted.structuralHash, oldestBucket);
                 rollbackWork += 2;
             }
             rollbackWork = Math.addExact(rollbackWork, oldestBucket.size() + 2L);
-            oldestBucket.addFirst(evicted); indexEntries++; evictions--;
+            oldestBucket.addFirst(evicted);
         }
         pay(rollbackWork);
     }

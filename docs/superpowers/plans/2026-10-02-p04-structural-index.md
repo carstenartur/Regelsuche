@@ -46,6 +46,6 @@
 - [x] Run `:regelsuche-search:test --tests '*SearchExpressionIdentityTest'`; observe failures in the unchanged implementation.
 - [x] Implement iterative hashing/comparison with actual work, memo and scratch ownership; hash only when indexing is enabled. Use integer buckets so collection operations never call recursive `Expr.hashCode/equals`.
 - [x] Update native revision and qualification documentation without promoting coverage.
-- [ ] Run focused identity/native tests, then `:regelsuche-core:test :regelsuche-search:test :regelsuche-learning:test`; expect all green. Re-run the unchanged public P03 compatibility probe if accessible.
-- [ ] Commit, obtain one independent whole-branch review, and address substantive findings RED→GREEN.
+- [x] Run focused identity/native tests, then `:regelsuche-core:test :regelsuche-search:test :regelsuche-learning:test`; expect all green. Re-run the unchanged public P03 compatibility probe if accessible.
+- [x] Commit, obtain one independent whole-branch review, and address substantive findings RED→GREEN.
 - [ ] Publish the bounded follow-up PR; integrate only after exact-head required CI and review qualification.
