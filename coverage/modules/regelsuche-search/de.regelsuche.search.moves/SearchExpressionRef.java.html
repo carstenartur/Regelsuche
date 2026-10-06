@@ -7,6 +7,9 @@ public final class SearchExpressionRef implements de.regelsuche.retention.Retain
 <span class="fc" id="L7">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(owner);v.reference(expression);}</span>
     final SearchExpressionStore owner;
     final Expr expression;
-<span class="fc" id="L10">    SearchExpressionRef(SearchExpressionStore owner, Expr expression) { this.owner = owner; this.expression = expression; }</span>
+    final int structuralHash;
+<span class="fc" id="L11">    SearchExpressionRef(SearchExpressionStore owner, Expr expression, int structuralHash) {</span>
+<span class="fc" id="L12">        this.owner = owner; this.expression = expression; this.structuralHash = structuralHash;</span>
+<span class="fc" id="L13">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
