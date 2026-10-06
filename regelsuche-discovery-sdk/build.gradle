@@ -47,13 +47,3 @@ tasks.named('jacocoTestReport') {
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
 }
-
-tasks.register('periodicSignalExample', JavaExec) {
-    group = 'application'
-    description = 'Runs exact periodic-signal plan selection with independent holdout checks and fixed baselines.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'de.regelsuche.sdk.discovery.signal.PeriodicSignalExample'
-    javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
