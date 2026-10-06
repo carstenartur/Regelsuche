@@ -8,12 +8,13 @@ BOM `de.regelsuche:regelsuche-bom` richtet sie aus.
 | Achse | Aktueller Vertrag |
 |---|---|
 | Java | 25 |
+| Java-Optimierungsfassade | `ComputationOptimizer.API_REVISION = 1`, `java25-numeric/v1` |
 | Discovery-SPI | `DiscoveryApi.VERSION = 1` |
 | Bisherige Plugin-SPI | `apiVersion() = 1` (noch nicht migrierter Anwendungspfad) |
 | Generische Extension-/Plugin-SPI | `ExtensionApi.VERSION = 2` |
 | Core-Kompatibilität für Plugins | `1.0.0` |
 | Produktversion | `release.properties`, im Release konkret im Manifest |
-| Stabile SDK-Pakete | `de.regelsuche.api`, exakt `de.regelsuche.sdk.discovery`, `de.regelsuche.extension`, `de.regelsuche.extension.runtime` |
+| Stabile SDK-Pakete | `de.regelsuche.api`, exakt `de.regelsuche.sdk.discovery`, `de.regelsuche.sdk.optimization`, `de.regelsuche.extension`, `de.regelsuche.extension.runtime` |
 | Stabile Plugin-Klassen | die explizite Klassenliste in `public-api.json`, ausschließlich aus `regelsuche-plugin-api` |
 | Experimentell | `de.regelsuche.sdk.discovery.python`, `de.regelsuche.sdk.discovery.cli` |
 
@@ -22,6 +23,16 @@ Die nach innen gerichteten Module `core`, `egraph`, `search`, `validation` und
 Implementierung ist damit nicht automatisch als stabile SDK-API freigegeben.
 Typen in öffentlichen SDK-Signaturen werden beim API-Diff mit aufgelöst; die
 externen Consumer prüfen die konkret benutzten unteren Verträge.
+
+Die neue Optimierungsfassade gehört zu `regelsuche-optimization-sdk`; ihre
+Search-/Math-Abhängigkeiten sind in BOM und Distributionsclosure enthalten.
+Die eigenständige Consumer-Qualifikation verwendet Java 25 ohne Eclipse oder
+Experiments. Das Paket existierte in 0.4.0 nicht: Der API-Gate prüft stattdessen
+Revision, vollständige öffentliche Typen einschließlich Ergebnisvarianten und
+eindeutige JAR-Zuordnung. Die bestehenden 0.4.0-Kompatibilitätsprüfungen bleiben
+unverändert. Vertrag und Grenzen stehen in der
+[SDK-Dokumentation](../regelsuche-optimization-sdk/README.md), neue Belege in der
+[Qualifikation](java-optimization-sdk-qualification.md).
 
 `@StableApi` und `@IncubatingApi` sind im Bytecode dokumentierte
 Lebenszykluskennzeichnungen. In einer unterstützten API-Revision sind binär

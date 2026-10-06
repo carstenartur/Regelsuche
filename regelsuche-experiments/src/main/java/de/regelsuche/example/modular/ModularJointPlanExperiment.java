@@ -1,5 +1,7 @@
 package de.regelsuche.example.modular;
 
+import de.regelsuche.math.algorithms.modular.ModularJointPlans;
+
 import de.regelsuche.ast.*;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.math.algorithms.modular.ModularComputationDomain;

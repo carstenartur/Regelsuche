@@ -44,7 +44,7 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.write(self.repository / "keep.txt", "published artifacts")
         self.write(self.source / "keep.txt", "maintained consumer")
         for name in ("hello-rule-java25", "finite-difference-domain-java25", "solver-adapter-java25", "number-theory-plan-java25",
-                     "extension-runtime-java25"):
+                     "java-optimization-java25", "extension-runtime-java25"):
             self.write(self.root / "examples/external-consumers" / name / "keep.txt", "maintained consumer")
         self.write(self.root / verifier.GENERATOR_RELATIVE, "# fixture generator\n")
         self.write(self.root / "release.properties", "version=0.4.0-SNAPSHOT\n")
@@ -149,10 +149,10 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.assertEqual([sys.executable, str(self.root / verifier.GENERATOR_RELATIVE)], command[:2])
         self.assertEqual(str(self.output / "generated-starter"), command[command.index("--output") + 1])
         self.assertEqual(self.root, commands.call_args_list[0].args[1])
-        self.assertEqual(7, consumers.call_count)
+        self.assertEqual(8, consumers.call_count)
         first_call, second_call = [call.args for call in consumers.call_args_list[:2]]
         caches = [call.args[4] for call in consumers.call_args_list]
-        self.assertEqual(7, len(set(caches)))
+        self.assertEqual(8, len(set(caches)))
         self.assertEqual(self.output / "isolated-gradle-user-home", first_call[4])
         self.assertEqual(self.output / "generated-gradle-user-home", second_call[4])
         wrapper = "gradlew.bat" if os.name == "nt" else "gradlew"
@@ -165,6 +165,7 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
             "solver-adapter-java25": "success",
             "number-theory-plan-java25": "success",
             "extension-runtime-java25": "success",
+            "java-optimization-java25": "success",
         }, report["progressiveConsumers"])
         extension_call = consumers.call_args_list[-1].args
         self.assertEqual(self.output / "extension-runtime-java25", extension_call[1])
@@ -177,7 +178,7 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
 
     @staticmethod
     def consumer_results():
-        # Independent expected outputs of all seven consumers; no Java work is simulated
+        # Independent expected outputs of all eight consumers; no Java work is simulated
         # as evidence. This list only lets the real orchestration code reach each check.
         return [
             ("provider=example-geometric-sequence-provider outcome=CONFIRMED multiplier=2",
@@ -189,6 +190,7 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
             ("outcome=CONFIRMED outcome=REFUTED sdk.provider.artifactSha256", "solver dependencies", []),
             ("provider=primachsenraum-number-theory-provider bases=[2, 3] 2047 falsePrimes=0 falseCompositeDecisions=0",
              "number theory dependencies", []),
+            ("optimization=VERIFIED checked=ORIGINAL_OVERFLOW_DETECTED", "optimizer dependencies", []),
             ("extension=hello origin=greeting-plugin catalog=sha256:" + "a" * 64,
              "extension dependencies", []),
         ]
@@ -207,7 +209,7 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
                 redirect_stdout(io.StringIO()), \
                 self.assertRaisesRegex(RuntimeError, message):
             verifier.main()
-        self.assertEqual(7, consumers.call_count)
+        self.assertEqual(8, consumers.call_count)
         self.assertFalse((self.output / "consumer-report.json").exists())
         self.assertFalse((self.output / "consumer-report.md").exists())
         self.assert_inputs_survive()
