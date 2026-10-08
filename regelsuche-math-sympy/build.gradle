@@ -31,7 +31,7 @@ graalPy {
 dependencies {
     api project(':regelsuche-core')
 
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
 
     // The production SymPy adapter remains independent of the native engine.
     // Only the capability-matched JMH source set sees the native implementation.
