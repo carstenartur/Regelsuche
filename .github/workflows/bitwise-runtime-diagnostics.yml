@@ -6,31 +6,62 @@ permissions:
   contents: read
 jobs:
   regressions:
+    permissions:
+      contents: write
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: control
+          persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: b483191d5ef20490195a6f7254c04da37f0adecc
           path: verified-source
-          persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: '25'
           verify-signature: true
-      - name: Verify exact checkout and execute all SDK and dependency tests
-        working-directory: verified-source
-        shell: bash
+      - name: Apply the bounded source edit to the isolated checkout
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = b483191d5ef20490195a6f7254c04da37f0adecc
-          test -z "$(git status --porcelain)"
+          test "$(git -C verified-source rev-parse HEAD)" = b483191d5ef20490195a6f7254c04da37f0adecc
+          test -z "$(git -C verified-source status --porcelain)"
+          python3 control/.github/runtime-only-correction.py verified-source
+          git -C verified-source diff --check
+          git -C verified-source diff --stat
+      - name: Execute the entire SDK and dependency reactor
+        working-directory: verified-source
+        run: |
+          set -euo pipefail
           if ! mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-regressions.log" 2>&1; then
-            tail -140 "$RUNNER_TEMP/sdk-regressions.log"
+            tail -160 "$RUNNER_TEMP/sdk-regressions.log"
             exit 1
           fi
-          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-regressions.log" | tail -35
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-regressions.log" | tail -25
+      - name: Commit only the tested production changes on the isolated feature branch
+        working-directory: verified-source
+        run: |
+          set -euo pipefail
+          branch=fix/general-java-algebra-search-20261009
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = b483191d5ef20490195a6f7254c04da37f0adecc
+          git add regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/{ComputationOptimizer,JavaCandidateGenerator,CoreAlgebraCandidates,RuntimeInputScope}.java
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: keep closed mathematics out of runtime-only Java optimization'
+          git push origin "HEAD:$branch"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/source-revision.txt"
+          test -z "$(git status --porcelain)"
+      - name: Qualify two clean SDK builds and fresh consumers with the unchanged workflow contract
+        working-directory: verified-source
+        run: |
+          set -euo pipefail
+          if ! mvn --batch-mode --no-transfer-progress -Psdk-release -pl maven-build-contract -Dtest=MavenOptimizationSdkDistributionTest,MavenWorkflowSemanticsContractTest test > "$RUNNER_TEMP/distribution.log" 2>&1; then
+            tail -160 "$RUNNER_TEMP/distribution.log"
+            exit 1
+          fi
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/distribution.log"
+          find maven-build-contract/target/surefire-reports -name reproducibility.json -exec cat {} \;
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -38,4 +69,7 @@ jobs:
           retention-days: 7
           path: |
             ${{ runner.temp }}/sdk-regressions.log
+            ${{ runner.temp }}/source-revision.txt
+            ${{ runner.temp }}/distribution.log
             verified-source/regelsuche-optimization-sdk/target/surefire-reports/**
+            verified-source/maven-build-contract/target/surefire-reports/**
