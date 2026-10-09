@@ -9,7 +9,7 @@ supplied trusted verifier has the same responsibility as the old verifier hook.
 Exact schema capabilities remain private and bind the checked model/application.
 
 The current search revision is
-`regelsuche.native-expr-move-search/v5-partial-structural-index`; output uses
+`regelsuche.native-expr-move-search/v6-partial-validation-retention`; output uses
 `regelsuche.native-legacy-export/v2-partial-atomic-inventory`. Both have the fixed
 coverage `PARTIAL_ATOMIC_INVENTORY`. There is no option or test switch that promotes
 them to complete accounting.
@@ -47,8 +47,8 @@ Default retention limits remain 1,000,000 unique AST nodes, 16,777,216 scalar/te
 characters and 2,000,000 references/collection entries. A reported observed peak
 below these limits cannot certify the missing atomic graph regions.
 
-The follow-up P04 completion must cover recursive rewrite rebuilds and validation
-queues; canonicalization/normalization maps and intermediate expressions;
+The follow-up P04 completion must cover recursive rewrite rebuilds and remaining
+validation internals; canonicalization/normalization maps and intermediate expressions;
 matcher/backtracking and schema-domain/instantiation temporaries; formatter and
 feature buffer capacity/growth; application-side export helpers; and remaining
 result/receipt assembly overlaps. It must then pass the complete native public
@@ -95,3 +95,30 @@ Frontier/goal/replay equality outside this store and the other atomic regions
 listed above remain outside this slice. The public completion flags remain
 false. Deep-store tests are not a claim that every downstream AST consumer is
 stack-safe.
+
+## V6: retained direct AST validation
+
+Direct expression/history validation keeps its existing occurrence, depth, text,
+Unicode and canonical-byte limits without serializing AST JSON. Iterative preorder
+visits replace the recursive counter. The inspection owns its input, current visit,
+append-only visit arena and current completed numeric/symbol rendering through the
+existing retention scope. Arena insertion, removal/lookup, bounds and release are
+paid execution work; completed rendering characters are charged separately from
+the subsequent text scan. Node/text validation units retain their previous definition.
+
+Each state's arena contribution is limited to 10,000 visits, including queued
+occurrences. This prevents nested wide functions from multiplying the queue before
+the traversal reaches its node limit. Histories still contain at most nine states.
+Arena growth is observed within 256 insertions and before cleanup; completed scalar
+renderings are observed before replacement, including after a failed validation
+debit, then released before visiting another node. An already observed terminal
+graph with no subsequent ownership growth is not scanned twice. Cleanup
+releases scratch, remains paid even after failed scope acquisition and preserves the original throwable
+when the observer repeats it. Input observation failures enter the existing kernel's
+resource-result path so no paid attempt is lost before frontier initialization.
+
+This is additional diagnostic accounting, not a speedup claim. Keeping visits to
+the end of an inspection has a measured logical retention cost. Internal temporary
+allocations inside JDK scalar formatting, other validators and the atomic regions
+above still prevent total qualification. All public completion flags remain false;
+V6 cannot reinterpret V5 or establish a learning/economic advantage.

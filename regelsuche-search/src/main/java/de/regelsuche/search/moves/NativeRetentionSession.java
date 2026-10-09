@@ -42,6 +42,17 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     @Override public void executionWork(long units){if(units<0)throw new IllegalArgumentException("negative native work");executionWork=Math.addExact(executionWork,units);}
     @Override public void validationWork(long units){if(units<0)throw new IllegalArgumentException("negative validation work");validationWork=Math.addExact(validationWork,units);}
     void validate(Expr expression){AstExpressionValidation.inspect(expression);}
+    /** Input observation can fail before the frontier owns the session. Its first checkpoint
+     * transports the recorded failure through the existing result/receipt path. */
+    void validateInputs() {
+        try {
+            validate(problem.source());
+            if (problem.context().goal() != null) validate(problem.context().goal());
+        } catch (SearchExecution.ResourceLimit exhausted) {
+            executionWork(exhausted.takeWork().total());
+            incomplete("NATIVE_RESOURCE_LIMIT");
+        }
+    }
     long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}
     @Override public long observedWork(){return work();}
     boolean complete(){return complete;}
