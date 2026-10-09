@@ -220,7 +220,7 @@ final class SearchExpressionIdentity implements RetainedGraph.View {
 <span class="fc" id="L220">        try { release(); }</span>
 <span class="fc" id="L221">        catch (RuntimeException | Error cleanup) {</span>
 <span class="fc bfc" id="L222" title="All 2 branches covered.">            if (failure == null) { failure = cleanup; throw cleanup; }</span>
-<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (cleanup != failure) failure.addSuppressed(cleanup);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (cleanup != failure) failure.addSuppressed(cleanup);</span>
 <span class="fc" id="L224">        } finally { close(retained, failure); }</span>
 <span class="fc" id="L225">    }</span>
     private static void close(RetainedOperation.Frame retained, Throwable failure) {

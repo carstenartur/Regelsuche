@@ -96,9 +96,9 @@ final class JavaNumericBackend implements ComputationBackend {
         };
     }
     private static int integral32(NumericOperation op, int x, int y) {
-<span class="pc bpc" id="L99" title="11 of 19 branches missed.">        return switch (op) {</span>
+<span class="pc bpc" id="L99" title="10 of 19 branches missed.">        return switch (op) {</span>
 <span class="fc" id="L100">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
-<span class="nc" id="L101">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
+<span class="pc" id="L101">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
 <span class="pc" id="L102">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
 <span class="nc" id="L103">            case ADD_EXACT -&gt; Math.addExact(x, y); case SUBTRACT_EXACT -&gt; Math.subtractExact(x, y);</span>
 <span class="nc" id="L104">            case MULTIPLY_EXACT -&gt; Math.multiplyExact(x, y); case NEGATE_EXACT -&gt; Math.negateExact(x);</span>

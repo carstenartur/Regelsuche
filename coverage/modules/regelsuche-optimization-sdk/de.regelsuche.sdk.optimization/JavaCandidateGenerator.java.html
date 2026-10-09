@@ -98,8 +98,8 @@ final class JavaCandidateGenerator {
 <span class="pc bpc" id="L98" title="1 of 2 branches missed.">        Expr left = arguments.getFirst(); Expr right = arguments.size() &gt; 1 ? arguments.get(1) : null;</span>
 <span class="pc bpc" id="L99" title="3 of 4 branches missed.">        if (op == NumericOperation.NEGATE &amp;&amp; operation(left) == NumericOperation.NEGATE) return children(left).getFirst();</span>
 <span class="fc bfc" id="L100" title="All 2 branches covered.">        if (op == NumericOperation.ADD) {</span>
-<span class="pc bpc" id="L101" title="1 of 4 branches missed.">            if (number(right, 0)) return left; if (number(left, 0)) return right;</span>
-<span class="pc bpc" id="L102" title="1 of 4 branches missed.">            if (operation(left) == NumericOperation.SUBTRACT &amp;&amp; children(left).get(1).equals(right)) return children(left).getFirst();</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">            if (number(right, 0)) return left; if (number(left, 0)) return right;</span>
+<span class="fc bfc" id="L102" title="All 4 branches covered.">            if (operation(left) == NumericOperation.SUBTRACT &amp;&amp; children(left).get(1).equals(right)) return children(left).getFirst();</span>
 <span class="pc bpc" id="L103" title="3 of 4 branches missed.">            if (operation(right) == NumericOperation.SUBTRACT &amp;&amp; children(right).get(1).equals(left)) return children(right).getFirst();</span>
 <span class="pc bpc" id="L104" title="1 of 2 branches missed.">            Expr factored = factor(kind, left, right); if (factored != null) return factored;</span>
         }
@@ -126,7 +126,7 @@ final class JavaCandidateGenerator {
             }
         }
 <span class="pc bpc" id="L128" title="1 of 6 branches missed.">        if ((op == NumericOperation.XOR || op == NumericOperation.OR) &amp;&amp; number(right, 0)) return left;</span>
-<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        if (op == NumericOperation.XOR &amp;&amp; left.equals(right)) return constant(kind, 0);</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">        if (op == NumericOperation.XOR &amp;&amp; left.equals(right)) return constant(kind, 0);</span>
 <span class="pc bpc" id="L130" title="4 of 6 branches missed.">        if ((op == NumericOperation.OR || op == NumericOperation.AND) &amp;&amp; left.equals(right)) return left;</span>
 <span class="fc" id="L131">        return foldConstant(result, op, kind, arguments);</span>
     }
@@ -176,13 +176,13 @@ final class JavaCandidateGenerator {
 <span class="fc bfc" id="L176" title="All 2 branches covered.">        if (literal instanceof BigInteger b) return b.equals(BigInteger.valueOf(value));</span>
 <span class="pc bpc" id="L177" title="1 of 4 branches missed.">        return literal instanceof Number n &amp;&amp; n.doubleValue() == value;</span>
     }
-<span class="pc bpc" id="L179" title="2 of 5 branches missed.">    private static Expr constant(NumericKind kind, long value) { return literalValue(kind, switch(kind) {</span>
+<span class="pc bpc" id="L179" title="1 of 5 branches missed.">    private static Expr constant(NumericKind kind, long value) { return literalValue(kind, switch(kind) {</span>
 <span class="pc" id="L180">        case BIG_INTEGER -&gt; BigInteger.valueOf(value); case FLOAT -&gt; (float)value; case DOUBLE -&gt; (double)value;</span>
-<span class="pc" id="L181">        case LONG -&gt; value; default -&gt; (int)value;</span>
+<span class="fc" id="L181">        case LONG -&gt; value; default -&gt; (int)value;</span>
     }); }
     private static Expr literalValue(NumericKind kind, Object value) {
-<span class="pc bpc" id="L184" title="3 of 6 branches missed.">        return switch(kind) {</span>
-<span class="pc" id="L185">            case BIG_INTEGER -&gt; JavaExpressions.literal((BigInteger)value); case INT -&gt; JavaExpressions.literal(((Number)value).intValue());</span>
+<span class="pc bpc" id="L184" title="2 of 6 branches missed.">        return switch(kind) {</span>
+<span class="fc" id="L185">            case BIG_INTEGER -&gt; JavaExpressions.literal((BigInteger)value); case INT -&gt; JavaExpressions.literal(((Number)value).intValue());</span>
 <span class="pc" id="L186">            case LONG -&gt; JavaExpressions.literal(((Number)value).longValue()); case FLOAT -&gt; JavaExpressions.literal(((Number)value).floatValue());</span>
 <span class="fc" id="L187">            case DOUBLE -&gt; JavaExpressions.literal(((Number)value).doubleValue());</span>
 <span class="nc" id="L188">            default -&gt; throw new IllegalArgumentException(&quot;PROMOTED_LITERAL_REQUIRED&quot;);</span>
