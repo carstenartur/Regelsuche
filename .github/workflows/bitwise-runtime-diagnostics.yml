@@ -1,4 +1,4 @@
-name: Runtime bitwise exact-source qualification
+name: General Java algebra exact-source qualification
 on:
   push:
     branches: [diagnostic/bitwise-runtime-20261009]
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 015a28cf9c4755bf3b8bd14c88c4bde2f44f4ede
+          ref: 465ca3fcfe701a52abd3286eb65fd8587151b845
           path: verified-source
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
@@ -19,28 +19,28 @@ jobs:
           distribution: temurin
           java-version: '25'
           verify-signature: true
-      - name: Verify exact checkout and run the complete optimization SDK reactor
+      - name: Verify exact checkout and execute all SDK and dependency tests
         working-directory: verified-source
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 015a28cf9c4755bf3b8bd14c88c4bde2f44f4ede
+          test "$(git rev-parse HEAD)" = 465ca3fcfe701a52abd3286eb65fd8587151b845
           test -z "$(git status --porcelain)"
           if ! mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-regressions.log" 2>&1; then
-            tail -170 "$RUNNER_TEMP/sdk-regressions.log"
+            tail -130 "$RUNNER_TEMP/sdk-regressions.log"
             exit 1
           fi
-          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-regressions.log" | tail -45
-      - name: Print new regression evidence even when red
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-regressions.log" | tail -35
+      - name: Retain the new test results
         if: always()
         working-directory: verified-source
         shell: bash
         run: |
-          find regelsuche-optimization-sdk/target/surefire-reports -maxdepth 1 -name '*BitwiseRuntimeOptimizationTest.txt' -type f -print -exec cat {} \;
+          find regelsuche-optimization-sdk/target/surefire-reports -maxdepth 1 -name '*GeneralAlgebraIntegrationTest.txt' -type f -print -exec cat {} \;
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: runtime-bitwise-regressions-${{ github.run_id }}
+          name: general-algebra-regressions-${{ github.run_id }}
           retention-days: 7
           path: |
             ${{ runner.temp }}/sdk-regressions.log
