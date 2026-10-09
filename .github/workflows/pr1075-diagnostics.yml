@@ -1,38 +1,67 @@
-name: PR 1075 existing failure diagnostics
+name: PR 1075 exact-head regression verification
 on:
   push:
     branches: [diagnostic/pr1075-before-rebase-20261009]
 permissions:
-  actions: read
   contents: read
 jobs:
-  failure-summary:
+  regressions:
     runs-on: ubuntu-22.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
-      - name: Read existing failed logs and emit bounded error context
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 89fae2d204388ba82333e8e890338a281081219a
+          path: verified-source
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - name: Verify source identity and unchanged workflow policy
+        working-directory: verified-source
         shell: bash
         run: |
           set -euo pipefail
-          for job in 113812065433 113812065186; do
-            gh api --allow-escape-sequences "repos/$REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/$job.log"
-          done
+          test "$(git rev-parse HEAD)" = 89fae2d204388ba82333e8e890338a281081219a
+          test -z "$(git status --porcelain)"
+          git ls-files '.github/workflows/*'
+          if ! mvn --batch-mode --no-transfer-progress -pl maven-build-contract \
+            -Dtest=MavenWorkflowSemanticsContractTest test > "$RUNNER_TEMP/workflow-contract.log" 2>&1; then
+            tail -100 "$RUNNER_TEMP/workflow-contract.log"
+            exit 1
+          fi
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/workflow-contract.log"
+      - name: Run all SDK and dependency-reactor tests without exclusions
+        working-directory: verified-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am \
+            test > "$RUNNER_TEMP/sdk-regressions.log" 2>&1; then
+            tail -130 "$RUNNER_TEMP/sdk-regressions.log"
+            exit 1
+          fi
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-regressions.log" | tail -35
           python3 - <<'PY'
-          import os, pathlib, re
-          for job in ('113812065433', '113812065186'):
-              text = (pathlib.Path(os.environ['RUNNER_TEMP']) / (job + '.log')).read_text(errors='replace')
-              text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
-              lines = text.splitlines()
-              print('\n=== EXISTING FAILED JOB ' + job + ' ===')
-              primary = [i for i,s in enumerate(lines) if re.search(r'<<< FAILURE|<<< ERROR|> Task .* FAILED|>.*FAILED|What went wrong:|Execution failed for task|FAILURE: Build failed|BUILD FAILURE|Caused by:|\[ERROR\].*(?:Failed to execute|Failures:|Errors:|Test.*:|[A-Za-z]+Test\.)', s)]
-              selected = set()
-              for i in primary:
-                  selected.update(range(max(0,i-2),min(len(lines),i+10)))
-              for i in sorted(selected)[-240:]:
-                  print('LOG: ' + lines[i][:1600])
-              if not primary:
-                  print('\n'.join('LOG: ' + s[:1600] for s in lines[-80:]))
+          import pathlib, xml.etree.ElementTree as E
+          paths = sorted(pathlib.Path('regelsuche-optimization-sdk/target/surefire-reports').glob('TEST-*.xml'))
+          assert paths, 'SDK test reports must exist'
+          totals = dict.fromkeys(('tests','failures','errors','skipped'),0)
+          for p in paths:
+              root=E.parse(p).getroot()
+              for key in totals: totals[key]+=int(root.get(key,'0'))
+          assert totals['tests'] > 0 and all(totals[k]==0 for k in ('failures','errors','skipped')), totals
+          print('EXACT_HEAD=89fae2d204388ba82333e8e890338a281081219a SDK_TOTALS=' + str(totals))
           PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: pr1075-exact-head-regressions-${{ github.run_id }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/workflow-contract.log
+            ${{ runner.temp }}/sdk-regressions.log
+            verified-source/maven-build-contract/target/surefire-reports/**
+            verified-source/regelsuche-optimization-sdk/target/surefire-reports/**
