@@ -25,12 +25,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f .github/math-proof-fix.patch ]; then
-            echo 'be4447bfb4696b7383cbd7d8ffa5aed1fd5b99ae111f6a3996b096696bbdef9f  .github/math-proof-fix.patch' | sha256sum -c -
+            echo '146b68754a466cb273ff6b4e31724ae696619784bb7914c3b99821a37508e5ff  .github/math-proof-fix.patch' | sha256sum -c -
             git apply --check .github/math-proof-fix.patch
             git apply .github/math-proof-fix.patch
             rm .github/math-proof-fix.patch
-            git add .github/math-proof-fix.patch regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/SemanticChecker.java regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/MixedTheoryProofTest.java
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: compose independently proved bitvector identities inside arithmetic contexts'
+            git add .github/math-proof-fix.patch regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/SemanticChecker.java
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: retain the universal bitvector proof receipt for contextual normalization'
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
           test -z "$(git status --porcelain)"

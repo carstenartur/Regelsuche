@@ -63,7 +63,7 @@ class IndependentCandidateTest {
         var plan = new JointComputationPlan(
                 Map.of("a", NumericKind.BIG_INTEGER.type(), "e", NumericKind.BIG_INTEGER.type(), "x", NumericKind.INT.type()),
                 Map.of(), List.of(new Output("first", NumericKind.BIG_INTEGER.type(), first),
-                        new Output("second", NumericKind.BIG_INTEGER.type(), second), output("unchanged", X)));
+                        new Output("second", NumericKind.BIG_INTEGER.type(), second), output("unchanged", add(X, 7))));
         var assumptions = Set.of(
                 new SemanticAssumption(SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS, "a", "", "test contract"),
                 new SemanticAssumption(SemanticAssumption.Kind.BIG_INTEGER_VALUE_SEMANTICS, "e", "", "test contract"),
@@ -73,7 +73,7 @@ class IndependentCandidateTest {
         var request = request(plan, assumptions);
         var result = optimizer.optimize(request, CancellationToken.NONE);
         var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result::toString);
-        assertEquals(X, candidate.plan().outputExpressions().get(2));
+        assertEquals(add(X, 7), candidate.plan().outputExpressions().get(2));
         assertTrue(candidate.cost().estimatedRuntimeImprovement());
         assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request, candidate, CancellationToken.NONE));
         for (int exponent : new int[] {0, 1, 7, 31}) {
