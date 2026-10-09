@@ -105,13 +105,16 @@ public final class ComputationOptimizer {
         boolean fp=active&&kinds.stream().anyMatch(NumericKind::floatingPoint);
         var replacement=SourceEvaluationTrace.fromPlan(target);
         long checkWork=0;
-        if(active) {
+        // A BigInteger-only fallback has no primitive numerical gate. Receiver
+        // guards belong to the source adapter; it must account for their real cost.
+        boolean evaluateOriginal = active && (request.safetyProfile()==SafetyProfile.CHECKED_THROW || integral || fp);
+        if(evaluateOriginal) {
             var backend=new JavaNumericBackend(request.plan().inputs());
             for(var occurrence:request.sourceTrace().occurrences()) checkWork+=backend.operation(occurrence.expression()).work();
             checkWork+=(request.sourceTrace().occurrences().size()+replacement.occurrences().size())*(fp?3L:2L)
                 +request.plan().inputs().size()+2L*request.plan().outputs().size();
         }
-        int fallback=request.safetyProfile()==SafetyProfile.GUARDED_FALLBACK?request.sourceTrace().occurrences().size():0;
+        int fallback=request.safetyProfile()==SafetyProfile.GUARDED_FALLBACK && (integral || fp)?request.sourceTrace().occurrences().size():0;
         var guard=request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK?RuntimeObligations.GuardKind.NONE:fp?
             RuntimeObligations.GuardKind.FINITE_AND_BITWISE_EQUAL:integral?RuntimeObligations.GuardKind.ORIGINAL_AND_REPLACEMENT_RANGE:RuntimeObligations.GuardKind.NONE;
         return new RuntimeObligations(guard,request.sourceTrace(),replacement,integral,fp,fp,checkWork,fallback);
