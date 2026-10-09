@@ -1,0 +1,445 @@
+{
+  "activeExceptions": [],
+  "allowedCognitiveIncrease": 2,
+  "allowedCyclomaticIncrease": 1,
+  "changes": [
+    {
+      "baseline": {
+        "cognitiveComplexity": 42,
+        "cyclomaticComplexity": 21,
+        "maxNestingDepth": 4,
+        "signature": "public List<SearchGraphClusterDto> cluster(List<DiscoveredTransformation> transformations)",
+        "sourceFile": "app/src/main/java/de/regelsuche/api/searchgraph/MacroSequenceClusterer.java",
+        "type": "de.regelsuche.api.searchgraph.MacroSequenceClusterer"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 42,
+        "cyclomaticComplexity": 21,
+        "maxNestingDepth": 4,
+        "signature": "public List<SearchGraphClusterDto> cluster(List<DiscoveredTransformation> transformations)",
+        "sourceFile": "app/src/main/java/de/regelsuche/api/searchgraph/MacroSequenceClusterer.java",
+        "type": "de.regelsuche.api.searchgraph.MacroSequenceClusterer"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/api/searchgraph/MacroSequenceClusterer.java|public List<SearchGraphClusterDto> cluster(List<DiscoveredTransformation> transformations)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 56,
+        "cyclomaticComplexity": 27,
+        "maxNestingDepth": 4,
+        "signature": "private MainPathProjection buildMainPathProjection(DiscoveredTransformation mainPath, Map<String,String> rawExpressionToClusterId, Map<String,CanonicalExpressionCluster> clustersByHash, boolean showLowSignal, SemanticMacroStepDisplay showMacroSteps)",
+        "sourceFile": "app/src/main/java/de/regelsuche/api/searchgraph/semantic/SemanticSearchGraphAssembler.java",
+        "type": "de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphAssembler"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 56,
+        "cyclomaticComplexity": 27,
+        "maxNestingDepth": 4,
+        "signature": "private MainPathProjection buildMainPathProjection(DiscoveredTransformation mainPath, Map<String,String> rawExpressionToClusterId, Map<String,CanonicalExpressionCluster> clustersByHash, boolean showLowSignal, SemanticMacroStepDisplay showMacroSteps)",
+        "sourceFile": "app/src/main/java/de/regelsuche/api/searchgraph/semantic/SemanticSearchGraphAssembler.java",
+        "type": "de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphAssembler"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/api/searchgraph/semantic/SemanticSearchGraphAssembler.java|private MainPathProjection buildMainPathProjection(DiscoveredTransformation mainPath, Map<String,String> rawExpressionToClusterId, Map<String,CanonicalExpressionCluster> clustersByHash, boolean showLowSignal, SemanticMacroStepDisplay showMacroSteps)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 60,
+        "cyclomaticComplexity": 33,
+        "maxNestingDepth": 3,
+        "signature": "private List<String> validate(JsonNode root, Path evidenceDirectory)",
+        "sourceFile": "app/src/main/java/de/regelsuche/docs/DiscoveryEvidenceSchemaV1.java",
+        "type": "de.regelsuche.docs.DiscoveryEvidenceSchemaV1"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 60,
+        "cyclomaticComplexity": 33,
+        "maxNestingDepth": 3,
+        "signature": "private List<String> validate(JsonNode root, Path evidenceDirectory)",
+        "sourceFile": "app/src/main/java/de/regelsuche/docs/DiscoveryEvidenceSchemaV1.java",
+        "type": "de.regelsuche.docs.DiscoveryEvidenceSchemaV1"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/docs/DiscoveryEvidenceSchemaV1.java|private List<String> validate(JsonNode root, Path evidenceDirectory)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 57,
+        "cyclomaticComplexity": 29,
+        "maxNestingDepth": 5,
+        "signature": "public String write(DiscoveryBenchmarkEvidence evidence, String evidenceFileName)",
+        "sourceFile": "app/src/main/java/de/regelsuche/docs/SearchSpaceGallerySvgWriter.java",
+        "type": "de.regelsuche.docs.SearchSpaceGallerySvgWriter"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 57,
+        "cyclomaticComplexity": 29,
+        "maxNestingDepth": 5,
+        "signature": "public String write(DiscoveryBenchmarkEvidence evidence, String evidenceFileName)",
+        "sourceFile": "app/src/main/java/de/regelsuche/docs/SearchSpaceGallerySvgWriter.java",
+        "type": "de.regelsuche.docs.SearchSpaceGallerySvgWriter"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/docs/SearchSpaceGallerySvgWriter.java|public String write(DiscoveryBenchmarkEvidence evidence, String evidenceFileName)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 26,
+        "cyclomaticComplexity": 26,
+        "maxNestingDepth": 2,
+        "signature": "private String renderStatusOverview(ReferenceCampaignRunner.CampaignReport report)",
+        "sourceFile": "app/src/main/java/de/regelsuche/docs/StaticReferencePageGenerator.java",
+        "type": "de.regelsuche.docs.StaticReferencePageGenerator"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 26,
+        "cyclomaticComplexity": 26,
+        "maxNestingDepth": 2,
+        "signature": "private String renderStatusOverview(ReferenceCampaignRunner.CampaignReport report)",
+        "sourceFile": "app/src/main/java/de/regelsuche/docs/StaticReferencePageGenerator.java",
+        "type": "de.regelsuche.docs.StaticReferencePageGenerator"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/docs/StaticReferencePageGenerator.java|private String renderStatusOverview(ReferenceCampaignRunner.CampaignReport report)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 11,
+        "cyclomaticComplexity": 29,
+        "maxNestingDepth": 3,
+        "signature": "public static String ariaLabel(String expression, Locale locale)",
+        "sourceFile": "app/src/main/java/de/regelsuche/export/layout/AstAriaRenderer.java",
+        "type": "de.regelsuche.export.layout.AstAriaRenderer"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 11,
+        "cyclomaticComplexity": 29,
+        "maxNestingDepth": 3,
+        "signature": "public static String ariaLabel(String expression, Locale locale)",
+        "sourceFile": "app/src/main/java/de/regelsuche/export/layout/AstAriaRenderer.java",
+        "type": "de.regelsuche.export.layout.AstAriaRenderer"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/export/layout/AstAriaRenderer.java|public static String ariaLabel(String expression, Locale locale)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 47,
+        "cyclomaticComplexity": 21,
+        "maxNestingDepth": 5,
+        "signature": "public SearchResult search(SearchRequest requested)",
+        "sourceFile": "app/src/main/java/de/regelsuche/radar/RuleRadarSearchService.java",
+        "type": "de.regelsuche.radar.RuleRadarSearchService"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 47,
+        "cyclomaticComplexity": 21,
+        "maxNestingDepth": 5,
+        "signature": "public SearchResult search(SearchRequest requested)",
+        "sourceFile": "app/src/main/java/de/regelsuche/radar/RuleRadarSearchService.java",
+        "type": "de.regelsuche.radar.RuleRadarSearchService"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/radar/RuleRadarSearchService.java|public SearchResult search(SearchRequest requested)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 22,
+        "cyclomaticComplexity": 33,
+        "maxNestingDepth": 2,
+        "signature": "private void handleExports(HttpExchange exchange)",
+        "sourceFile": "app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java",
+        "type": "de.regelsuche.web.WebWorkbenchServer"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 22,
+        "cyclomaticComplexity": 33,
+        "maxNestingDepth": 2,
+        "signature": "private void handleExports(HttpExchange exchange)",
+        "sourceFile": "app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java",
+        "type": "de.regelsuche.web.WebWorkbenchServer"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java|private void handleExports(HttpExchange exchange)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 25,
+        "cyclomaticComplexity": 26,
+        "maxNestingDepth": 1,
+        "signature": "private static void validateSuccessfulLifecycle(EvaluationReport evaluation, NoveltyReport novelty, ProofReport proof, HypothesisCandidate lifecycleCandidate, LifecycleDecision lifecycleDecision)",
+        "sourceFile": "regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionLifecycleRunner.java",
+        "type": "de.regelsuche.experiments.autopilot.AutonomousProductionLifecycleRunner"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 25,
+        "cyclomaticComplexity": 26,
+        "maxNestingDepth": 1,
+        "signature": "private static void validateSuccessfulLifecycle(EvaluationReport evaluation, NoveltyReport novelty, ProofReport proof, HypothesisCandidate lifecycleCandidate, LifecycleDecision lifecycleDecision)",
+        "sourceFile": "regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionLifecycleRunner.java",
+        "type": "de.regelsuche.experiments.autopilot.AutonomousProductionLifecycleRunner"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionLifecycleRunner.java|private static void validateSuccessfulLifecycle(EvaluationReport evaluation, NoveltyReport novelty, ProofReport proof, HypothesisCandidate lifecycleCandidate, LifecycleDecision lifecycleDecision)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 34,
+        "cyclomaticComplexity": 18,
+        "maxNestingDepth": 4,
+        "signature": "private static PartialState structuralCompare(PatternExpr pattern, Expr expression, int limit)",
+        "sourceFile": "regelsuche-core/src/main/java/de/regelsuche/transform/PatternMatchAnalyzer.java",
+        "type": "de.regelsuche.transform.PatternMatchAnalyzer"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 34,
+        "cyclomaticComplexity": 18,
+        "maxNestingDepth": 4,
+        "signature": "private static PartialState structuralCompare(PatternExpr pattern, Expr expression, int limit)",
+        "sourceFile": "regelsuche-core/src/main/java/de/regelsuche/transform/PatternMatchAnalyzer.java",
+        "type": "de.regelsuche.transform.PatternMatchAnalyzer"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-core/src/main/java/de/regelsuche/transform/PatternMatchAnalyzer.java|private static PartialState structuralCompare(PatternExpr pattern, Expr expression, int limit)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 64,
+        "cyclomaticComplexity": 25,
+        "maxNestingDepth": 5,
+        "signature": "private static List<SeedExpression> parseYaml(String content)",
+        "sourceFile": "regelsuche-experiments/src/main/java/de/regelsuche/example/ScientificSeedCorpora.java",
+        "type": "de.regelsuche.example.ScientificSeedCorpora"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 64,
+        "cyclomaticComplexity": 25,
+        "maxNestingDepth": 5,
+        "signature": "private static List<SeedExpression> parseYaml(String content)",
+        "sourceFile": "regelsuche-experiments/src/main/java/de/regelsuche/example/ScientificSeedCorpora.java",
+        "type": "de.regelsuche.example.ScientificSeedCorpora"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-experiments/src/main/java/de/regelsuche/example/ScientificSeedCorpora.java|private static List<SeedExpression> parseYaml(String content)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 26,
+        "cyclomaticComplexity": 27,
+        "maxNestingDepth": 1,
+        "signature": "private static void validate(int minimumImprovedFinalTestCases, int minimumDistinctImprovedFamilies, int minimumNewlyReachedCases, boolean allowMaterialWorkReductionRoute, int minimumMechanicalWorkReductionPermille, int minimumRetainedProgramPrimitiveSteps, boolean requireCompositionTopology, boolean requireDecisionTopology, int maximumCorrectnessRegressions, int maximumHiddenAssumptionRegressions, int maximumUnexpectedUnsupportedCases, int maximumTechnicalFailures, int maximumProgramNodes, int maximumGenomeRules, int requiredCleanReproductions, boolean requirePinnedContainerReproduction, SuccessRoute successRoute, NullResultPolicy nullResultPolicy)",
+        "sourceFile": "regelsuche-learning/src/main/java/de/regelsuche/evolution/EvolutionRewriteProgramAcceptanceThresholds.java",
+        "type": "de.regelsuche.evolution.EvolutionRewriteProgramAcceptanceThresholds"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 26,
+        "cyclomaticComplexity": 27,
+        "maxNestingDepth": 1,
+        "signature": "private static void validate(int minimumImprovedFinalTestCases, int minimumDistinctImprovedFamilies, int minimumNewlyReachedCases, boolean allowMaterialWorkReductionRoute, int minimumMechanicalWorkReductionPermille, int minimumRetainedProgramPrimitiveSteps, boolean requireCompositionTopology, boolean requireDecisionTopology, int maximumCorrectnessRegressions, int maximumHiddenAssumptionRegressions, int maximumUnexpectedUnsupportedCases, int maximumTechnicalFailures, int maximumProgramNodes, int maximumGenomeRules, int requiredCleanReproductions, boolean requirePinnedContainerReproduction, SuccessRoute successRoute, NullResultPolicy nullResultPolicy)",
+        "sourceFile": "regelsuche-learning/src/main/java/de/regelsuche/evolution/EvolutionRewriteProgramAcceptanceThresholds.java",
+        "type": "de.regelsuche.evolution.EvolutionRewriteProgramAcceptanceThresholds"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-learning/src/main/java/de/regelsuche/evolution/EvolutionRewriteProgramAcceptanceThresholds.java|private static void validate(int minimumImprovedFinalTestCases, int minimumDistinctImprovedFamilies, int minimumNewlyReachedCases, boolean allowMaterialWorkReductionRoute, int minimumMechanicalWorkReductionPermille, int minimumRetainedProgramPrimitiveSteps, boolean requireCompositionTopology, boolean requireDecisionTopology, int maximumCorrectnessRegressions, int maximumHiddenAssumptionRegressions, int maximumUnexpectedUnsupportedCases, int maximumTechnicalFailures, int maximumProgramNodes, int maximumGenomeRules, int requiredCleanReproductions, boolean requirePinnedContainerReproduction, SuccessRoute successRoute, NullResultPolicy nullResultPolicy)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 25,
+        "cyclomaticComplexity": 26,
+        "maxNestingDepth": 1,
+        "signature": "private static void validate(OpenTargetConjecture conjecture, EvaluationReport evaluation, Instant createdAt)",
+        "sourceFile": "regelsuche-learning/src/main/java/de/regelsuche/mining/OpenTargetHypothesisCandidateAdapter.java",
+        "type": "de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 25,
+        "cyclomaticComplexity": 26,
+        "maxNestingDepth": 1,
+        "signature": "private static void validate(OpenTargetConjecture conjecture, EvaluationReport evaluation, Instant createdAt)",
+        "sourceFile": "regelsuche-learning/src/main/java/de/regelsuche/mining/OpenTargetHypothesisCandidateAdapter.java",
+        "type": "de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-learning/src/main/java/de/regelsuche/mining/OpenTargetHypothesisCandidateAdapter.java|private static void validate(OpenTargetConjecture conjecture, EvaluationReport evaluation, Instant createdAt)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 57,
+        "cyclomaticComplexity": 22,
+        "maxNestingDepth": 5,
+        "signature": "RulePackage parse(Path path, List<String> lines)",
+        "sourceFile": "regelsuche-plugin-api/src/main/java/de/regelsuche/plugin/RuleFileParser.java",
+        "type": "de.regelsuche.plugin.RuleFileParser"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 57,
+        "cyclomaticComplexity": 22,
+        "maxNestingDepth": 5,
+        "signature": "RulePackage parse(Path path, List<String> lines)",
+        "sourceFile": "regelsuche-plugin-api/src/main/java/de/regelsuche/plugin/RuleFileParser.java",
+        "type": "de.regelsuche.plugin.RuleFileParser"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-plugin-api/src/main/java/de/regelsuche/plugin/RuleFileParser.java|RulePackage parse(Path path, List<String> lines)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 44,
+        "cyclomaticComplexity": 16,
+        "maxNestingDepth": 4,
+        "signature": "public List<SearchState> search(SearchProblem problem)",
+        "sourceFile": "regelsuche-search/src/main/java/de/regelsuche/search/strategy/BeamSearchStrategy.java",
+        "type": "de.regelsuche.search.strategy.BeamSearchStrategy"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 44,
+        "cyclomaticComplexity": 16,
+        "maxNestingDepth": 4,
+        "signature": "public List<SearchState> search(SearchProblem problem)",
+        "sourceFile": "regelsuche-search/src/main/java/de/regelsuche/search/strategy/BeamSearchStrategy.java",
+        "type": "de.regelsuche.search.strategy.BeamSearchStrategy"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-search/src/main/java/de/regelsuche/search/strategy/BeamSearchStrategy.java|public List<SearchState> search(SearchProblem problem)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 38,
+        "cyclomaticComplexity": 23,
+        "maxNestingDepth": 3,
+        "signature": "public PortfolioRun execute(PortfolioRequest request, CancellationToken cancellationToken)",
+        "sourceFile": "regelsuche-solver-portfolio/src/main/java/de/regelsuche/solver/portfolio/SolverPortfolioExecutor.java",
+        "type": "de.regelsuche.solver.portfolio.SolverPortfolioExecutor"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 38,
+        "cyclomaticComplexity": 23,
+        "maxNestingDepth": 3,
+        "signature": "public PortfolioRun execute(PortfolioRequest request, CancellationToken cancellationToken)",
+        "sourceFile": "regelsuche-solver-portfolio/src/main/java/de/regelsuche/solver/portfolio/SolverPortfolioExecutor.java",
+        "type": "de.regelsuche.solver.portfolio.SolverPortfolioExecutor"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-solver-portfolio/src/main/java/de/regelsuche/solver/portfolio/SolverPortfolioExecutor.java|public PortfolioRun execute(PortfolioRequest request, CancellationToken cancellationToken)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    },
+    {
+      "baseline": {
+        "cognitiveComplexity": 21,
+        "cyclomaticComplexity": 31,
+        "maxNestingDepth": 2,
+        "signature": "private Evaluation evaluate(Expr expression, Map<String,RuntimeValue> variables)",
+        "sourceFile": "regelsuche-validation/src/main/java/de/regelsuche/validation/DeterministicCounterexampleSearchService.java",
+        "type": "de.regelsuche.validation.DeterministicCounterexampleSearchService"
+      },
+      "blocked": false,
+      "cognitiveIncrease": 0,
+      "current": {
+        "cognitiveComplexity": 21,
+        "cyclomaticComplexity": 31,
+        "maxNestingDepth": 2,
+        "signature": "private Evaluation evaluate(Expr expression, Map<String,RuntimeValue> variables)",
+        "sourceFile": "regelsuche-validation/src/main/java/de/regelsuche/validation/DeterministicCounterexampleSearchService.java",
+        "type": "de.regelsuche.validation.DeterministicCounterexampleSearchService"
+      },
+      "cyclomaticIncrease": 0,
+      "exceptionId": null,
+      "identity": "regelsuche-validation/src/main/java/de/regelsuche/validation/DeterministicCounterexampleSearchService.java|private Evaluation evaluate(Expr expression, Map<String,RuntimeValue> variables)",
+      "status": "UNCHANGED_OR_IMPROVED"
+    }
+  ],
+  "currentHotspotCount": 17,
+  "retiredOrNoLongerTopHotspots": [
+    {
+      "cognitiveComplexity": 33,
+      "cyclomaticComplexity": 26,
+      "maxNestingDepth": 2,
+      "signature": "private static Expr foldBinary(Expr left, BinaryOperator op, Expr right)",
+      "sourceFile": "regelsuche-core/src/main/java/de/regelsuche/calculus/Differentiator.java",
+      "type": "de.regelsuche.calculus.Differentiator"
+    },
+    {
+      "cognitiveComplexity": 36,
+      "cyclomaticComplexity": 28,
+      "maxNestingDepth": 3,
+      "signature": "private static boolean matchInternal(PatternExpr pattern, Expr expression, Map<String,Expr> bindings, RecognitionProfile profile, MatchBudget budget)",
+      "sourceFile": "regelsuche-core/src/main/java/de/regelsuche/transform/EquivalenceAwarePatternMatcher.java",
+      "type": "de.regelsuche.transform.EquivalenceAwarePatternMatcher"
+    },
+    {
+      "cognitiveComplexity": 38,
+      "cyclomaticComplexity": 13,
+      "maxNestingDepth": 4,
+      "signature": "private int applyAllRules(EGraph eGraph, EGraphPatternMatcher matcher, EGraphPatternApplier applier, ToIntFunction<ENode> costOfNode, Map<String,Integer> appliedRules, Collection<EClassId> classSnapshot)",
+      "sourceFile": "regelsuche-egraph/src/main/java/de/regelsuche/egraph/EqualitySaturation.java",
+      "type": "de.regelsuche.egraph.EqualitySaturation"
+    }
+  ],
+  "schema": "regelsuche.quality.complexity-hotspot-report/v1",
+  "status": "PASSED",
+  "violations": []
+}

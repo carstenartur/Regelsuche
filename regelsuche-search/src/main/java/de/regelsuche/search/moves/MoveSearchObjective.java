@@ -38,7 +38,8 @@ final class MoveSearchObjective<S,M,V> implements de.regelsuche.retention.Retain
     boolean satisfied() { return stopAtQuality && incumbent != null && outputScore <= maximumOutputScore; }
     long finish() {
         witness = path.steps();
-        return witness.size() + 1L;
+        // The observed producer pays its own materialization; only legacy calls delegate it.
+        return de.regelsuche.retention.RetainedOperation.isObserved() ? 0 : witness.size() + 1L;
     }
     S incumbent() { return incumbent; }
     long inputScore() { return inputScore; }

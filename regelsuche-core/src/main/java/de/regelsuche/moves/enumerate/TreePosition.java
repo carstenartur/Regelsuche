@@ -3,6 +3,8 @@ package de.regelsuche.moves.enumerate;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -48,7 +50,12 @@ import java.util.stream.Collectors;
  * only the selected ancestor chain and preserves every untouched sibling by
  * object identity.</p>
  */
-public record TreePosition(List<Integer> path, String text) implements Comparable<TreePosition> {
+public record TreePosition(List<Integer> path, String text) implements Comparable<TreePosition>, RetainedGraph.View {
+
+    @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+        visitor.reference(path);
+        visitor.reference(text);
+    }
 
     /**
      * Numeric path order (root/empty first, then element-wise), then by subtree text,
@@ -90,10 +97,22 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
      * @return a typed success or failure result; invalid and absent paths remain distinct
      */
     public SelectionResult selectAt(Expr root) {
-        Navigation navigation = navigate(root);
-        return navigation.status() == Status.SELECTED
-                ? SelectionResult.selected(path, navigation.selected())
-                : SelectionResult.failure(navigation.status(), path);
+        Object[] pending = new Object[2];
+        var retained = RetainedOperation.retainCompleted(1, this, root, pending);
+        Throwable primary = null;
+        try {
+            Navigation navigation = navigate(root);
+            pending[0] = navigation;
+            pending[1] = navigation.status() == Status.SELECTED
+                    ? SelectionResult.selected(path, navigation.selected())
+                    : SelectionResult.failure(navigation.status(), path);
+            completed(navigation.status() == Status.SELECTED ? 2 : 1);
+            return (SelectionResult) pending[1];
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            observeFailure(failure);
+            throw failure;
+        } finally { close(retained, primary); }
     }
 
     /**
@@ -114,22 +133,33 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
      */
     public ReplacementResult replaceAt(Expr root, Expr replacement) {
         Objects.requireNonNull(replacement, "replacement");
-        Navigation navigation = navigate(root);
-        if (navigation.status() != Status.SELECTED) {
-            return ReplacementResult.failure(navigation.status(), path);
-        }
+        Object[] pending = new Object[3];
+        var retained = RetainedOperation.retainCompleted(1, this, root, replacement, pending);
+        Throwable primary = null;
+        try {
+            Navigation navigation = navigate(root);
+            pending[0] = navigation;
+            if (navigation.status() != Status.SELECTED) {
+                pending[2] = ReplacementResult.failure(navigation.status(), path);
+                completed(1);
+                return (ReplacementResult) pending[2];
+            }
 
-        Expr rewritten = replacement;
-        List<ParentFrame> parents = navigation.parents();
-        for (int index = parents.size() - 1; index >= 0; index--) {
-            ParentFrame frame = parents.get(index);
-            rewritten = rebuildParent(frame.parent(), frame.childIndex(), rewritten);
-        }
-        return ReplacementResult.replaced(
-                path,
-                navigation.selected(),
-                rewritten,
-                parents.size());
+            pending[1] = replacement;
+            List<ParentFrame> parents = navigation.parents();
+            for (int index = parents.size() - 1; index >= 0; index--) {
+                ParentFrame frame = parents.get(index);
+                pending[1] = rebuildParent(frame.parent(), frame.childIndex(), (Expr) pending[1]);
+            }
+            pending[2] = ReplacementResult.replaced(
+                    path, navigation.selected(), (Expr) pending[1], parents.size());
+            completed(3); // result and its two present Optional owners
+            return (ReplacementResult) pending[2];
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            observeFailure(failure);
+            throw failure;
+        } finally { close(retained, primary); }
     }
 
     @Override
@@ -138,57 +168,109 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
     }
 
     private Navigation navigate(Expr root) {
-        if (root == null) {
-            return Navigation.failure(Status.INVALID_PATH, path);
-        }
-
-        Expr current = root;
         List<ParentFrame> parents = new ArrayList<>(path.size());
-        for (int childIndex : path) {
-            if (childIndex < 0) {
-                return Navigation.failure(Status.INVALID_PATH, path);
-            }
-
-            Expr child;
-            if (current instanceof BinaryExpr binary) {
-                child = switch (childIndex) {
-                    case 0 -> binary.left();
-                    case 1 -> binary.right();
-                    default -> null;
-                };
-                if (child == null) {
-                    return Navigation.failure(Status.INVALID_PATH, path);
+        Object[] pending = new Object[1];
+        var retained = RetainedOperation.retainCompleted(2, this, root, parents, pending);
+        Throwable primary = null;
+        try {
+            Expr current = root;
+            Status status = root == null ? Status.INVALID_PATH : Status.SELECTED;
+            for (int childIndex : path) {
+                if (status != Status.SELECTED) break;
+                RetainedOperation.work(1);
+                if (childIndex < 0) {
+                    status = Status.INVALID_PATH;
+                    break;
                 }
-            } else if (current instanceof FunctionExpr function) {
-                if (childIndex >= function.arguments().size()) {
-                    return Navigation.failure(Status.INVALID_PATH, path);
-                }
-                child = function.arguments().get(childIndex);
-            } else {
-                return Navigation.failure(Status.POSITION_NOT_PRESENT, path);
-            }
 
-            parents.add(new ParentFrame(current, childIndex));
-            current = child;
-        }
-        return Navigation.selected(path, current, parents);
+                Expr child;
+                if (current instanceof BinaryExpr binary) {
+                    child = switch (childIndex) {
+                        case 0 -> binary.left();
+                        case 1 -> binary.right();
+                        default -> null;
+                    };
+                    if (child == null) {
+                        status = Status.INVALID_PATH;
+                        break;
+                    }
+                } else if (current instanceof FunctionExpr function) {
+                    if (childIndex >= function.arguments().size()) {
+                        status = Status.INVALID_PATH;
+                        break;
+                    }
+                    child = function.arguments().get(childIndex);
+                } else {
+                    status = Status.POSITION_NOT_PRESENT;
+                    break;
+                }
+
+                parents.add(new ParentFrame(current, childIndex));
+                current = child;
+                completed(2); // parent frame and insertion into the actual navigation buffer
+            }
+            pending[0] = status == Status.SELECTED
+                    ? Navigation.selected(path, current, parents)
+                    : Navigation.failure(status, path);
+            completed(status == Status.SELECTED ? parents.size() + 1L : 1);
+            return (Navigation) pending[0];
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            observeFailure(failure);
+            throw failure;
+        } finally { close(retained, primary); }
     }
 
     private static Expr rebuildParent(Expr parent, int childIndex, Expr rewrittenChild) {
-        if (parent instanceof BinaryExpr binary) {
-            return switch (childIndex) {
-                case 0 -> new BinaryExpr(rewrittenChild, binary.operator(), binary.right());
-                case 1 -> new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);
-                default -> throw new IllegalStateException(
-                        "validated binary path became invalid");
-            };
+        Object[] pending = new Object[2];
+        var retained = RetainedOperation.retainCompleted(1, parent, rewrittenChild, pending);
+        Throwable primary = null;
+        try {
+            if (parent instanceof BinaryExpr binary) {
+                pending[0] = switch (childIndex) {
+                    case 0 -> new BinaryExpr(rewrittenChild, binary.operator(), binary.right());
+                    case 1 -> new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);
+                    default -> throw new IllegalStateException("validated binary path became invalid");
+                };
+                completed(1);
+            } else if (parent instanceof FunctionExpr function) {
+                List<Expr> arguments = new ArrayList<>(function.arguments());
+                pending[1] = arguments;
+                completed(arguments.size() + 1L);
+                arguments.set(childIndex, rewrittenChild);
+                RetainedOperation.work(1);
+                pending[0] = new FunctionExpr(function.name(), arguments);
+                completed(arguments.size() + 1L);
+            } else {
+                throw new IllegalStateException("validated path parent is not traversable");
+            }
+            return (Expr) pending[0];
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            observeFailure(failure);
+            throw failure;
+        } finally { close(retained, primary); }
+    }
+
+    /** Logical execution units only; callers retain the single mathematical application charge. */
+    private static void completed(long units) {
+        RetainedOperation.work(units);
+        RetainedOperation.checkpoint();
+    }
+
+    private static void observeFailure(Throwable primary) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != primary) primary.addSuppressed(observation);
         }
-        if (parent instanceof FunctionExpr function) {
-            List<Expr> arguments = new ArrayList<>(function.arguments());
-            arguments.set(childIndex, rewrittenChild);
-            return new FunctionExpr(function.name(), arguments);
+    }
+
+    private static void close(RetainedOperation.Frame frame, Throwable primary) {
+        try { if (frame != null) frame.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (primary == null) throw cleanup;
+            if (cleanup != primary) primary.addSuppressed(cleanup);
         }
-        throw new IllegalStateException("validated path parent is not traversable");
     }
 
     private static int comparePaths(List<Integer> a, List<Integer> b) {
@@ -203,18 +285,25 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
     }
 
     /** Outcome categories shared by iterative selection and replacement. */
-    public enum Status {
+    public enum Status implements RetainedGraph.View {
         SELECTED,
         REPLACED,
         INVALID_PATH,
-        POSITION_NOT_PRESENT
+        POSITION_NOT_PRESENT;
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {}
     }
 
     /** Typed selection outcome. A successful result exposes the selected subtree. */
     public record SelectionResult(
             Status status,
             List<Integer> path,
-            Optional<Expr> selectedSubtree) {
+            Optional<Expr> selectedSubtree) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(status);
+            visitor.reference(path);
+            visitor.reference(selectedSubtree);
+        }
         public SelectionResult {
             status = Objects.requireNonNull(status, "status");
             path = List.copyOf(path);
@@ -254,7 +343,13 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
             List<Integer> path,
             Optional<Expr> selectedSubtree,
             Optional<Expr> rewrittenRoot,
-            int copiedAncestors) {
+            int copiedAncestors) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(status);
+            visitor.reference(path);
+            visitor.reference(selectedSubtree);
+            visitor.reference(rewrittenRoot);
+        }
         public ReplacementResult {
             status = Objects.requireNonNull(status, "status");
             path = List.copyOf(path);
@@ -302,7 +397,8 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
         }
     }
 
-    private record ParentFrame(Expr parent, int childIndex) {
+    private record ParentFrame(Expr parent, int childIndex) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(parent); }
         private ParentFrame {
             Objects.requireNonNull(parent, "parent");
             if (childIndex < 0) {
@@ -315,7 +411,13 @@ public record TreePosition(List<Integer> path, String text) implements Comparabl
             Status status,
             List<Integer> path,
             Expr selected,
-            List<ParentFrame> parents) {
+            List<ParentFrame> parents) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(status);
+            visitor.reference(path);
+            visitor.reference(selected);
+            visitor.reference(parents);
+        }
         private Navigation {
             status = Objects.requireNonNull(status, "status");
             path = List.copyOf(path);

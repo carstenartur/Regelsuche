@@ -29,7 +29,7 @@ class NativePullBudgetTest {
         }
         @Override public boolean carries(){return true;}
         @Override public ObjectSource<NativeMoveProof> open(Meter meter){this.meter=meter;opens++;RetainedOperation.work(7);return this;}
-        @Override public void requireSource(NativeMoveProof candidate){assertEquals(proof.source(),candidate.source());}
+        @Override public void requireSource(NativeMoveProof candidate){assertSame(proof.source(),candidate.source());}
         @Override public ExecutionWork work(NativeMoveProof candidate){return candidate.work();}
         @Override public Optional<NativeMoveProof> next(long allowance){received=allowance;pulls++;meter.charge(Operation.MATCH,1);meter.charge(proof.work());return Optional.of(proof);}
         @Override public Status status(){return pulls==0?Status.READY:Status.EXHAUSTED;}

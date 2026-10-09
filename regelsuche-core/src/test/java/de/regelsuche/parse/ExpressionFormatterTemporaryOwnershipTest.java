@@ -14,7 +14,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
     private static final class CleanupFailure extends RuntimeException { }
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;
-        Expr input;
+        Object input, callback;
         long work, previousWork, growthWork, peakCharacters, abortCharactersAt = Long.MAX_VALUE;
         int queuedActions, buffers, checkpoints;
         boolean inputMissing, growth, abortGrowth, unwrittenReplacement;
@@ -23,21 +23,30 @@ class ExpressionFormatterTemporaryOwnershipTest {
         String expectedOutput;
         boolean actualResultCopyOwned;
         boolean throwCleanupAfterCallback, callbackStateObserved;
+        boolean callbackOwned, pendingQueueOwned, chargeFailed, failFrameCleanup;
         boolean abortAtDecimalOperands;
         int decimalObjects;
         final Set<String> decimalValues = new HashSet<>();
         final Set<String> observedText = new HashSet<>();
-        long failConversionCharge = -1;
-        final ArithmeticException conversionFailure = new ArithmeticException("conversion charge failure");
+        long failCharge = -1, armFailureAfterCharge = -1;
+        final ArithmeticException chargeFailure = new ArithmeticException("formatter charge failure");
         @Override public void executionWork(long units) {
             if (throwCleanupAfterCallback && callbackStateObserved && units == 1) {
                 throwCleanupAfterCallback = false;
                 throw new CleanupFailure();
             }
             work = Math.addExact(work, units);
-            if (units == failConversionCharge) {
-                failConversionCharge = -1;
-                throw conversionFailure;
+            if (failFrameCleanup && chargeFailed && units == 4) {
+                failFrameCleanup = false;
+                throw new CleanupFailure();
+            }
+            if (units == armFailureAfterCharge) {
+                armFailureAfterCharge = -1;
+                failCharge = 1;
+            } else if (units == failCharge) {
+                failCharge = -1;
+                chargeFailed = true;
+                throw chargeFailure;
             }
         }
         @Override public void validationWork(long units) { executionWork(units); }
@@ -75,6 +84,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> collection) {
+                    if (value instanceof ArrayDeque<?>) pendingQueueOwned = true;
                     if (value instanceof ArrayDeque<?> && collection.stream().anyMatch(item ->
                             item.getClass().getEnclosingClass() == ExpressionFormatter.class))
                         queuedActions = Math.max(queuedActions, collection.size());
@@ -83,6 +93,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
                     visitor.reference(binary.left()); visitor.reference(binary.right());
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
+            callbackOwned |= callback != null && seen.contains(callback);
             buffers = Math.max(buffers, currentBuffers);
             decimalObjects = Math.max(decimalObjects, currentDecimals);
             if (abortAtDecimalOperands && currentDecimals >= 2) throw new GrowthLimit();
@@ -143,11 +154,11 @@ class ExpressionFormatterTemporaryOwnershipTest {
         String expected = "12345678901234567";
         var input = NumberExpr.exact(expected);
         var observation = new Observation(); observation.input = input;
-        observation.failConversionCharge = expected.length() + 1L;
+        observation.failCharge = expected.length() + 1L;
         var emitted = new Emission();
         try (var scope = RetainedOperation.open(observation)) {
             observation.scope = scope;
-            assertSame(observation.conversionFailure,
+            assertSame(observation.chargeFailure,
                 assertThrows(ArithmeticException.class, () -> ExpressionFormatter.formatMeasured(input, emitted)));
             assertTrue(observation.observedText.contains(expected),
                 "the already produced integer String must be observed before error cleanup");
@@ -285,6 +296,105 @@ class ExpressionFormatterTemporaryOwnershipTest {
             assertFalse(observation.inputMissing);
             observation.abortGrowth = false;
             assertEquals(input.name() + "()", ExpressionFormatter.format(input));
+        }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+    }
+
+    @Test void failedInitialBufferDebitStillObservesTheInputWorkspaceAndCallback() {
+        var input = new FunctionExpr("f", List.of());
+        var observation = new Observation(); observation.input = input;
+        var emitted = new Emission(); observation.callback = emitted;
+        observation.failCharge = 19;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertSame(observation.chargeFailure,
+                assertThrows(ArithmeticException.class, () -> ExpressionFormatter.formatMeasured(input, emitted)));
+            assertEquals(1, observation.buffers, "the already allocated initial char array remains observable");
+            assertTrue(observation.pendingQueueOwned, "the actual pending queue shares the failed workspace owner");
+            assertTrue(observation.callbackOwned);
+            assertFalse(observation.inputMissing);
+            assertEquals(0, emitted.count, "workspace failure precedes any emission");
+            assertEquals(0, RetainedGraph.measure(scope).retained().characters());
+            assertEquals("f()", ExpressionFormatter.format(input), "failed acquisition restores the enclosing scope");
+        }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+    }
+
+    @Test void failedEquationBufferDebitStillObservesItsInputAndWorkspace() {
+        var input = new Equation(new VariableExpr("x"), new VariableExpr("y"));
+        var observation = new Observation(); observation.input = input; observation.failCharge = 19;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertSame(observation.chargeFailure,
+                assertThrows(ArithmeticException.class, () -> ExpressionFormatter.format(input)));
+            assertEquals(1, observation.buffers);
+            assertTrue(observation.pendingQueueOwned);
+            assertTrue(observation.peakCharacters >= 18, "both input names and the initial buffer overlap");
+            assertFalse(observation.inputMissing);
+            assertEquals(0, RetainedGraph.measure(scope).retained().characters());
+            assertEquals("x = y", ExpressionFormatter.format(input));
+        }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+    }
+
+    @Test void failedGrowthDebitStillObservesTheUnwrittenReplacementAndOldBuffer() {
+        var input = new FunctionExpr("a".repeat(80), List.of());
+        var observation = new Observation(); observation.input = input; observation.failCharge = 80;
+        var emitted = new Emission();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertSame(observation.chargeFailure,
+                assertThrows(ArithmeticException.class, () -> ExpressionFormatter.formatMeasured(input, emitted)));
+            assertTrue(observation.growth, "failed allocation debit must observe both actual arrays");
+            assertTrue(observation.unwrittenReplacement, "the failed debit precedes copying and append");
+            assertEquals(80, emitted.count, "the attempted fragment emission remains delegated exactly once");
+            assertTrue(observation.peakCharacters >= 176);
+            assertFalse(observation.inputMissing);
+            assertEquals(0, RetainedGraph.measure(scope).retained().characters());
+            assertEquals(input.name() + "()", ExpressionFormatter.format(input));
+        }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+    }
+
+    @Test void allocationDebitRemainsPrimaryWhenObservationAndFrameCleanupAlsoFail() {
+        for (long failedCharge : new long[] {19, 80}) {
+            var input = new FunctionExpr("a".repeat(80), List.of());
+            var observation = new Observation(); observation.input = input;
+            observation.failCharge = failedCharge; observation.failFrameCleanup = true;
+            observation.abortCharactersAt = failedCharge == 19 ? 1 : Long.MAX_VALUE;
+            observation.abortGrowth = failedCharge == 80;
+            var emitted = new Emission();
+            try (var scope = RetainedOperation.open(observation)) {
+                observation.scope = scope;
+                var failure = assertThrows(ArithmeticException.class,
+                    () -> ExpressionFormatter.formatMeasured(input, emitted));
+                assertSame(observation.chargeFailure, failure);
+                assertEquals(2, failure.getSuppressed().length);
+                assertInstanceOf(GrowthLimit.class, failure.getSuppressed()[0]);
+                assertInstanceOf(CleanupFailure.class, failure.getSuppressed()[1]);
+                assertEquals(0, RetainedGraph.measure(scope).retained().characters());
+                observation.abortCharactersAt = Long.MAX_VALUE; observation.abortGrowth = false;
+                assertEquals(input.name() + "()", ExpressionFormatter.format(input));
+            }
+            assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+        }
+    }
+
+    @Test void failedStringHandoffDebitStillObservesTheActualResultAndPopulatedBuffer() {
+        var input = new FunctionExpr("empty", List.of());
+        var observation = new Observation(); observation.input = input; observation.expectedOutput = "empty()";
+        // After paying the final String copy, the next unit is its completed-value handoff.
+        observation.armFailureAfterCharge = observation.expectedOutput.length();
+        var emitted = new Emission();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertSame(observation.chargeFailure,
+                assertThrows(ArithmeticException.class, () -> ExpressionFormatter.formatMeasured(input, emitted)));
+            assertTrue(observation.actualResultCopyOwned, "the allocated result String overlaps its populated source buffer");
+            assertEquals(observation.expectedOutput.length(), emitted.count);
+            assertFalse(observation.inputMissing);
+            assertEquals(0, RetainedGraph.measure(scope).retained().characters());
+            assertEquals(observation.expectedOutput, ExpressionFormatter.format(input));
         }
         assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
     }

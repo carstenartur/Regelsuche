@@ -207,19 +207,21 @@ class SearchExpressionIdentityTest {
     @Test void cancelledIndexWorkIsObservedPaidAndDoesNotMutateOwnership() {
         try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var expected = store.intern(chain(20));
+            var lookup = chain(20);
+            var retry = chain(20);
             var before = store.statistics();
             long workBefore = store.work();
             var sink = new IndexSink(store);
             try (var operation = RetainedOperation.open(sink)) {
                 sink.operation = operation;
                 sink.abort = true;
-                var failure = assertThrows(IndexAbort.class, () -> store.intern(chain(20)));
+                var failure = assertThrows(IndexAbort.class, () -> store.intern(lookup));
                 assertSame(sink.failure, failure, "cleanup must not replace the original failure by self-suppression");
                 sink.abort = false;
                 assertTrue(sink.peak.nodes() > before.liveNodes(), "scratch owns the independent lookup tree");
                 assertTrue(store.work() > workBefore, "failed lookup work remains paid");
                 assertEquals(before, store.statistics(), "no ownership mutation before lookup succeeds");
-                assertSame(expected, store.intern(chain(20)), "the session remains usable after cancellation");
+                assertSame(expected, store.intern(retry), "the session remains usable after cancellation");
             } finally { sink.operation = null; }
         }
     }
@@ -276,6 +278,9 @@ class SearchExpressionIdentityTest {
     private static void assertPopulatedCancellation(boolean comparison) {
         try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var expected = store.intern(chain(20));
+            var lookup = chain(20);
+            var other = chain(20);
+            var retry = chain(20);
             var before = store.statistics();
             long workBefore = store.work();
             var sink = new IndexSink(store);
@@ -283,8 +288,8 @@ class SearchExpressionIdentityTest {
                 sink.operation = operation;
                 sink.abortAtCheckpoint = 2;
                 var failure = assertThrows(IndexAbort.class, () -> {
-                    if (comparison) SearchExpressionIdentity.same(store, chain(20), chain(20));
-                    else store.intern(chain(20));
+                    if (comparison) SearchExpressionIdentity.same(store, lookup, other);
+                    else store.intern(lookup);
                 });
                 assertSame(sink.failure, failure);
                 assertTrue(sink.peak.references() > sink.firstReferences + 100, "cancellation observes populated scratch");
@@ -292,7 +297,7 @@ class SearchExpressionIdentityTest {
                 assertEquals(before, store.statistics());
                 assertEquals(before.liveNodes(), RetainedGraph.measure(sink).retained().nodes(), "temporary trees are released");
                 sink.abortAtCheckpoint = Integer.MAX_VALUE;
-                assertSame(expected, store.intern(chain(20)));
+                assertSame(expected, store.intern(retry));
             } finally { sink.operation = null; }
         }
     }

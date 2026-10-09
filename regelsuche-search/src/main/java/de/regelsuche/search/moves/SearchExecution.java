@@ -1,6 +1,7 @@
 package de.regelsuche.search.moves;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.List;
@@ -75,12 +76,29 @@ public final class SearchExecution {
         default void checkpoint() {}
         default long additionalWork(){return 0;}
         default boolean ownershipComplete(){return true;}
-
+        /** Finite result metadata only: no search, provider generation or proof application. */
+        default void beginResultAssembly() {}
+        default void endResultAssembly() {}
     }
     public record Expansion<S>(S source,boolean closed,List<StagedIncrementalMoveExecution.Lane> lanes) implements RetainedGraph.View {
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(lanes);}
 
-        public Expansion { lanes=List.copyOf(lanes); }
+        public Expansion(S source,boolean closed,List<StagedIncrementalMoveExecution.Lane> lanes) {
+            Object[] pending = new Object[2];
+            var retained = RetainedOperation.retainCompleted(1, source, lanes, pending);
+            Throwable primary = null;
+            try {
+                this.source = source;
+                this.closed = closed;
+                this.lanes = copied(pending, 0, List.copyOf(lanes), lanes, lanes.size());
+                pending[1] = this;
+                completed(1);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                observeFailure(failure);
+                throw failure;
+            } finally { close(retained, primary); }
+        }
     }
     public record Step<S,M,V>(S source,S target,M move,V verification) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(verification);}
@@ -93,10 +111,58 @@ public final class SearchExecution {
             Map<S,A> stateAssessments,List<Object> pickerReceipts,List<IncrementalProviderContract.Snapshot> batchCursorReceipts,
             List<S> assessmentOrder,List<S> reachedOrder) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);v.reference(batchCursorReceipts);v.reference(assessmentOrder);v.reference(reachedOrder);}
-        Result {
-            witness=List.copyOf(witness);events=List.copyOf(events);reachedStates=Set.copyOf(reachedStates);
-            deadEndStates=List.copyOf(deadEndStates);stateAssessments=Map.copyOf(stateAssessments);pickerReceipts=List.copyOf(pickerReceipts);batchCursorReceipts=List.copyOf(batchCursorReceipts);
-            assessmentOrder=List.copyOf(assessmentOrder);reachedOrder=List.copyOf(reachedOrder);
+        Result(MoveSearch.Outcome outcome,List<Step<S,M,V>> witness,List<Event<S,M,V>> events,
+                Set<S> reachedStates,List<S> deadEndStates,MoveSearch.Metrics metrics,boolean completeBoundedRelation,
+                Map<S,A> stateAssessments,List<Object> pickerReceipts,List<IncrementalProviderContract.Snapshot> batchCursorReceipts,
+                List<S> assessmentOrder,List<S> reachedOrder) {
+            Object[] completed = new Object[10];
+            var retained = RetainedOperation.retainCompleted(1, outcome, witness, events, reachedStates,
+                deadEndStates, metrics, stateAssessments, pickerReceipts, batchCursorReceipts, assessmentOrder, reachedOrder, completed);
+            Throwable primary = null;
+            try {
+                this.outcome = outcome;
+                this.metrics = metrics;
+                this.completeBoundedRelation = completeBoundedRelation;
+                this.witness = copied(completed, 0, List.copyOf(witness), witness, witness.size());
+                this.events = copied(completed, 1, List.copyOf(events), events, events.size());
+                this.reachedStates = copied(completed, 2, Set.copyOf(reachedStates), reachedStates, reachedStates.size());
+                this.deadEndStates = copied(completed, 3, List.copyOf(deadEndStates), deadEndStates, deadEndStates.size());
+                this.stateAssessments = copied(completed, 4, Map.copyOf(stateAssessments), stateAssessments, stateAssessments.size());
+                this.pickerReceipts = copied(completed, 5, List.copyOf(pickerReceipts), pickerReceipts, pickerReceipts.size());
+                this.batchCursorReceipts = copied(completed, 6, List.copyOf(batchCursorReceipts), batchCursorReceipts, batchCursorReceipts.size());
+                this.assessmentOrder = copied(completed, 7, List.copyOf(assessmentOrder), assessmentOrder, assessmentOrder.size());
+                this.reachedOrder = copied(completed, 8, List.copyOf(reachedOrder), reachedOrder, reachedOrder.size());
+                completed[9] = this;
+                completed(1);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                observeFailure(failure);
+                throw failure;
+            } finally { close(retained, primary); }
+        }
+    }
+
+    /** Observe a completed copy before its debit; immutable collection reuse allocates no new copy. */
+    static <T> T copied(Object[] owner,int slot,T value,Object original,int size) {
+        owner[slot] = value;
+        completed(value == original ? 0 : size + 1L);
+        return value;
+    }
+    static void completed(long units) {
+        RetainedOperation.work(units);
+        RetainedOperation.checkpoint();
+    }
+    static void observeFailure(Throwable failure) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+    static void close(RetainedOperation.Frame retained,Throwable primary) {
+        try { if (retained != null) retained.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (primary == null) throw cleanup;
+            if (cleanup != primary) primary.addSuppressed(cleanup);
         }
     }
 }
