@@ -1,0 +1,75 @@
+name: Mathematics variable repair (scoped)
+
+on:
+  push:
+    branches: [fix/math-variable-candidates-20261009]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: math-variable-repair-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  numeric-regressions:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: regelsuche
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - name: Execute the real Maven/JUnit regression tests
+        id: tests
+        continue-on-error: true
+        working-directory: regelsuche
+        run: |
+          set -o pipefail
+          java -version
+          mvn --version
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-optimization-sdk -am \
+            -Dtest=IndependentCandidateTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee sdk-tests.log
+      - name: Prepare offline dependencies without pretending tests passed
+        if: github.event.before == '9890b4e4264c8a07ec2778e4bb73c5bd22350d9f'
+        working-directory: regelsuche
+        run: |
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-optimization-sdk -am \
+            -DskipTests install dependency:go-offline
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: github.event.before == '9890b4e4264c8a07ec2778e4bb73c5bd22350d9f'
+        with:
+          repository: carstenartur/sandbox
+          ref: ea0b7526d46e83af2f64b5ac5d5e245102b3289d
+          path: sandbox
+      - name: Retain exact sources and portable tools for the isolated repair
+        if: github.event.before == '9890b4e4264c8a07ec2778e4bb73c5bd22350d9f'
+        run: |
+          set -euo pipefail
+          mkdir -p offline
+          git -C regelsuche archive --format=tar.gz HEAD > offline/regelsuche-source.tar.gz
+          git -C sandbox archive --format=tar.gz HEAD > offline/sandbox-source.tar.gz
+          git -C regelsuche rev-parse HEAD > offline/regelsuche-commit.txt
+          git -C sandbox rev-parse HEAD > offline/sandbox-commit.txt
+          tar -czf offline/jdk25.tar.gz -C "$JAVA_HOME" .
+          maven_home="$(dirname "$(dirname "$(readlink -f "$(command -v mvn)")")")"
+          tar -czf offline/maven.tar.gz -C "$maven_home" .
+          tar -czf offline/maven-repository.tar.gz -C "$HOME/.m2" repository
+          sha256sum offline/*.tar.gz > offline/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: math-variable-repair-${{ github.sha }}
+          retention-days: 7
+          compression-level: 0
+          path: |
+            regelsuche/sdk-tests.log
+            regelsuche/**/target/surefire-reports/**
+            offline/**
+      - name: Preserve the real test outcome
+        if: always() && steps.tests.outcome != 'success'
+        run: exit 1
