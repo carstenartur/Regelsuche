@@ -2,6 +2,7 @@ package de.regelsuche.sdk.optimization;
 
 import de.regelsuche.ast.*;
 import de.regelsuche.math.algorithms.modular.ModularComputationDomain;
+import de.regelsuche.search.program.JointComputationPlan;
 import java.util.*;
 
 /** Type-preserving bridge to the existing affine modular generator and independent checker. */
@@ -19,9 +20,46 @@ final class ModularBridge {
         domain = new ModularComputationDomain(nonnegative, positive, normalized);
     }
     ModularComputationDomain.Generation generate(List<Expr> expressions, int maximum) {
-        var generated = domain.generate(expressions.stream().map(ModularBridge::toModular).toList(), maximum);
-        return new ModularComputationDomain.Generation(generated.rewrites().stream().map(rewrite ->
-            new ModularComputationDomain.Rewrite(rewrite.rule(), rewrite.outputs().stream().map(ModularBridge::fromModular).toList())).toList(), generated.work(), generated.complete());
+        // An unrelated numeric output must not disable modular optimization.
+        // Project convertible outputs, then restore their original positions.
+        var indices = new ArrayList<Integer>();
+        var modular = new ArrayList<Expr>();
+        long inspections = 1;
+        for (int index = 0; index < expressions.size(); index++) {
+            inspections += inspectionSize(expressions.get(index));
+            try {
+                modular.add(toModular(expressions.get(index)));
+                indices.add(index);
+            } catch (IllegalArgumentException unsupportedOutput) {
+                // Preserve this output verbatim; the whole plan is still verified.
+            }
+        }
+        if (modular.isEmpty()) return new ModularComputationDomain.Generation(List.of(), inspections, true);
+        var generated = domain.generate(modular, maximum);
+        var rewrites = new ArrayList<ModularComputationDomain.Rewrite>();
+        for (var rewrite : generated.rewrites()) {
+            var restored = new ArrayList<>(expressions);
+            for (int index = 0; index < indices.size(); index++) {
+                Expr replacement = fromModular(rewrite.outputs().get(index));
+                inspections += inspectionSize(replacement);
+                restored.set(indices.get(index), replacement);
+            }
+            rewrites.add(new ModularComputationDomain.Rewrite(rewrite.rule(), restored));
+        }
+        return new ModularComputationDomain.Generation(rewrites, inspections + generated.work(), generated.complete());
+    }
+    private static long inspectionSize(Expr expression) {
+        var pending = new ArrayDeque<Expr>();
+        pending.add(expression);
+        long count = 0;
+        while (!pending.isEmpty()) {
+            Expr current = pending.removeLast();
+            if (++count > JointComputationPlan.MAX_NODES)
+                throw new IllegalArgumentException("MODULAR_TRANSPORT_STRUCTURAL_BOUND");
+            if (current instanceof FunctionExpr function) pending.addAll(function.arguments());
+            else if (current instanceof BinaryExpr binary) { pending.add(binary.left()); pending.add(binary.right()); }
+        }
+        return count;
     }
     ModularComputationDomain.Verification verify(Expr source, Expr target) {
         return domain.verifyEquivalent(List.of(toModular(source)), List.of(toModular(target)));
