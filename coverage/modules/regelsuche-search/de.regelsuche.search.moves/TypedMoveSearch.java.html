@@ -140,7 +140,7 @@ import java.util.function.ToDoubleFunction;
         /** Root including the assessed capabilities, even when its work exhausts the budget. */
         public State initialState() {
 <span class="fc" id="L142">            return encodedResult.stateAssessments().keySet().stream()</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">                .filter(state -&gt; state.searchDepth() == 0).map(State::decode).findFirst().orElseThrow();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                .filter(state -&gt; state.searchDepth() == 0).map(State::decode).findFirst().orElseThrow();</span>
         }
 
         /** Includes rejected proposals; absence of verification means it was not performed. */
