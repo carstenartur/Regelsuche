@@ -7,11 +7,11 @@ permissions:
 jobs:
   regressions:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 58346ed56625e008e841b36022631b5c8830e377
+          ref: 0ebe94c6b82499cad322e3f0be07ee991dbb028c
           path: verified-source
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
@@ -24,19 +24,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 58346ed56625e008e841b36022631b5c8830e377
+          test "$(git rev-parse HEAD)" = 0ebe94c6b82499cad322e3f0be07ee991dbb028c
           test -z "$(git status --porcelain)"
           if ! mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-regressions.log" 2>&1; then
             tail -130 "$RUNNER_TEMP/sdk-regressions.log"
             exit 1
           fi
           grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-regressions.log" | tail -35
-      - name: Retain the new test results
+      - name: Qualify two clean distributions and fresh consumers with the unchanged workflow contract
+        working-directory: verified-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! mvn --batch-mode --no-transfer-progress -Psdk-release -pl maven-build-contract \
+            -Dtest=MavenOptimizationSdkDistributionTest,MavenWorkflowSemanticsContractTest test > "$RUNNER_TEMP/distribution.log" 2>&1; then
+            tail -160 "$RUNNER_TEMP/distribution.log"
+            exit 1
+          fi
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/distribution.log"
+      - name: Retain new regression results
         if: always()
         working-directory: verified-source
         shell: bash
         run: |
-          find regelsuche-optimization-sdk/target/surefire-reports -maxdepth 1 -name '*GeneralAlgebraIntegrationTest.txt' -type f -print -exec cat {} \;
+          find regelsuche-optimization-sdk/target/surefire-reports -maxdepth 1 -name '*Algebra*Test.txt' -type f -print -exec cat {} \;
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -44,4 +55,6 @@ jobs:
           retention-days: 7
           path: |
             ${{ runner.temp }}/sdk-regressions.log
+            ${{ runner.temp }}/distribution.log
             verified-source/regelsuche-optimization-sdk/target/surefire-reports/**
+            verified-source/maven-build-contract/target/surefire-reports/**
