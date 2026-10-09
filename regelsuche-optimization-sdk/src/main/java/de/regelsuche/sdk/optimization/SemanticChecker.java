@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    static final String REVISION = "java-numeric-independent/v4";
+    static final String REVISION = "java-numeric-independent/v5";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -146,6 +146,13 @@ final class SemanticChecker {
     }
     private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set<String> methods) {
         boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
+        if (kind == NumericKind.INT || kind == NumericKind.LONG) {
+            Expr normalizedA = normalizeBitwiseContexts(a, new IdentityHashMap<>());
+            Expr normalizedB = normalizeBitwiseContexts(b, new IdentityHashMap<>());
+            if (!normalizedA.equals(a) || !normalizedB.equals(b)) methods.add("BITVECTOR_CONTEXT_CONGRUENCE");
+            a = normalizedA;
+            b = normalizedB;
+        }
         try {
             if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {
                 methods.add(kind==NumericKind.BIG_INTEGER ? "INTEGER_POLYNOMIAL_NORMAL_FORM" : exact ? "INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE" : "BITVECTOR_POLYNOMIAL_MOD_2_"+kind.bits());
@@ -165,6 +172,38 @@ final class SemanticChecker {
         }
         if (kind.integral() && new BitwiseProof(work).equivalent(a,b,kind)) { methods.add("BITVECTOR_TRUTH_TABLE"); return true; }
         return false;
+    }
+    /** Independent proof-view normalization, never a generator call. Universal word
+     * proofs can replace a subterm inside an arithmetic context by congruence.
+     * Original/candidate traces and their range/exception obligations are untouched.
+     */
+    private Expr normalizeBitwiseContexts(Expr expression, Map<Expr, Expr> memo) {
+        work.charge(1);
+        Expr cached = memo.get(expression);
+        if (cached != null) return cached;
+        if (expression instanceof VariableExpr || JavaExpressions.isLiteral(expression)) return expression;
+        var arguments = JavaExpressions.operands(expression).stream()
+            .map(child -> normalizeBitwiseContexts(child, memo)).toList();
+        Expr result = new FunctionExpr(((FunctionExpr) expression).name(), arguments);
+        var kind = JavaExpressions.resultKind(result);
+        var operation = JavaExpressions.operationOf(result).orElse(null);
+        if ((kind == NumericKind.INT || kind == NumericKind.LONG)
+                && (operation == NumericOperation.XOR || operation == NumericOperation.AND
+                    || operation == NumericOperation.OR || operation == NumericOperation.NOT)) {
+            var representatives = new ArrayList<Expr>();
+            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(0L) : JavaExpressions.literal(0));
+            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(-1L) : JavaExpressions.literal(-1));
+            representatives.addAll(arguments);
+            for (Expr representative : representatives) {
+                if (JavaExpressions.kindOf(representative, request.plan().inputs()) == kind
+                        && new BitwiseProof(work).equivalent(result, representative, kind)) {
+                    result = representative;
+                    break;
+                }
+            }
+        }
+        memo.put(expression, result);
+        return result;
     }
     private Expr expandModularProduct(Expr expression) {
         work.charge(1);
