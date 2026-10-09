@@ -20,9 +20,11 @@ class MixedTheoryProofTest {
             var request = request(kind, source);
             var optimizer = new ComputationOptimizer();
             var verified = optimizer.verify(request, plan(kind,number(kind,7)), CancellationToken.NONE);
-            assertInstanceOf(VerificationResult.Verified.class, verified, verified.toString());
+            var proof = assertInstanceOf(VerificationResult.Verified.class, verified, verified.toString());
+            assertTrue(proof.evidence().proofMethods().contains("BITVECTOR_TRUTH_TABLE"));
             var result = optimizer.optimize(request, CancellationToken.NONE);
             var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result.toString());
+            assertTrue(candidate.evidence().proofMethods().contains("BITVECTOR_TRUTH_TABLE"));
             assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request,candidate,CancellationToken.NONE));
             assertEquals(List.of(number(kind,7)),candidate.plan().outputExpressions());
         }

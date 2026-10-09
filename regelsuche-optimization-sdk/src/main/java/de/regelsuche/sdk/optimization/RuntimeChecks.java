@@ -16,6 +16,11 @@ final class RuntimeChecks {
         for(var input:request.plan().inputs().entrySet()) input.getValue().requireValue(inputs.get(input.getKey()));
         validateAssumptions(request,inputs);
         if(obligations.requireFinite()) for(var value:inputs.values()) finite(value);
+        boolean evaluateOriginal=request.safetyProfile()==SafetyProfile.CHECKED_THROW
+            || obligations.checkIntegralRange() || obligations.requireFinite() || obligations.compareFloatingPointBits();
+        // The prepared DAG is also the source of candidate operation costs. A
+        // trace expands shared outputs and would execute that arithmetic again.
+        if(!evaluateOriginal) return ComputationOptimizer.prepare(target).execute(inputs);
         var original=trace(request.plan(),obligations.originalTrace(),inputs,obligations);
         var replacement=trace(target,obligations.replacementTrace(),inputs,obligations);
         if(obligations.compareFloatingPointBits()) for(var name:original.keySet())
