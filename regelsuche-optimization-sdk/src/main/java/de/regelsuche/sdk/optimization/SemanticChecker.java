@@ -149,7 +149,7 @@ final class SemanticChecker {
         if (kind == NumericKind.INT || kind == NumericKind.LONG) {
             Expr normalizedA = normalizeBitwiseContexts(a, new IdentityHashMap<>());
             Expr normalizedB = normalizeBitwiseContexts(b, new IdentityHashMap<>());
-            if (!normalizedA.equals(a) || !normalizedB.equals(b)) methods.add("BITVECTOR_CONTEXT_CONGRUENCE");
+            if (!normalizedA.equals(a) || !normalizedB.equals(b)) methods.add("BITVECTOR_TRUTH_TABLE");
             a = normalizedA;
             b = normalizedB;
         }
