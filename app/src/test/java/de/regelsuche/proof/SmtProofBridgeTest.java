@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
+import de.regelsuche.solver.ir.CoreExpressionIrAdapter;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.portfolio.SmtProofArtifacts;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -43,6 +46,16 @@ class SmtProofBridgeTest {
         assertTrue(artifact.contains("(declare-const b Real)"));
         assertTrue(artifact.contains("(^ a 4)"));
         assertTrue(artifact.contains("(^ b 2)"));
+        var obligation = SmtProofArtifacts.readArtifact(artifact);
+        var expressions = new CoreExpressionIrAdapter();
+        assertEquals(SolverIr.Relation.EQUALS, obligation.goal().relation());
+        assertEquals(expressions.parse("a^4 + 4*b^4"), obligation.goal().left());
+        assertEquals(expressions.parse(
+            "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)"),
+            obligation.goal().right());
+        assertTrue(obligation.assumptions().isEmpty());
+        assertEquals(SolverIr.RequestedEvidence.FORMAL_PROOF,
+            obligation.requestedEvidence());
         assertFalse(artifact.contains("(declare-fun pow"));
         assertFalse(artifact.contains("(pow "));
         assertTrue(artifact.contains("(check-sat)"));

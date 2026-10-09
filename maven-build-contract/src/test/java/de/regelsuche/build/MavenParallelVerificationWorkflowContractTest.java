@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 class MavenParallelVerificationWorkflowContractTest {
   private static final ObjectMapper YAML = new ObjectMapper(YAMLFactory.builder()
       .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build());
-  private static final String PLAYWRIGHT_VERSION = "1.60.0";
+  private static final String PLAYWRIGHT_VERSION = "1.63.0";
   private static final String FULL_MAVEN_COMMAND =
       "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify";
 
