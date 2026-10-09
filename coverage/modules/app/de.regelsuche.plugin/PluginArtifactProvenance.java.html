@@ -92,8 +92,8 @@ public record PluginArtifactProvenance(
 <span class="fc bfc" id="L92" title="All 2 branches covered.">            if (!verifier.verify(Base64.getDecoder().decode(signatureBase64))) {</span>
 <span class="fc" id="L93">                throw new SecurityException(&quot;invalid provenance signature&quot;);</span>
             }
-<span class="fc" id="L95">        } catch (GeneralSecurityException failure) {</span>
-<span class="fc" id="L96">            throw new SecurityException(&quot;unable to verify provenance&quot;, failure);</span>
+<span class="nc" id="L95">        } catch (GeneralSecurityException failure) {</span>
+<span class="nc" id="L96">            throw new SecurityException(&quot;unable to verify provenance&quot;, failure);</span>
 <span class="fc" id="L97">        }</span>
 <span class="fc" id="L98">    }</span>
 
