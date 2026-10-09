@@ -1,0 +1,37 @@
+name: PR 1075 existing failure diagnostics
+on:
+  push:
+    branches: [diagnostic/pr1075-before-rebase-20261009]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  failure-summary:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Read existing failed logs and emit bounded error context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for job in 113812065433 113812065186; do
+            gh api "repos/$REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/$job.log"
+          done
+          python3 - <<'PY'
+          import os, pathlib, re
+          for job in ('113812065433', '113812065186'):
+              lines = (pathlib.Path(os.environ['RUNNER_TEMP']) / (job + '.log')).read_text(errors='replace').splitlines()
+              print('\n=== EXISTING FAILED JOB ' + job + ' ===')
+              primary = [i for i,s in enumerate(lines) if re.search(r'<<< FAILURE|<<< ERROR|> Task .* FAILED|>.*FAILED|What went wrong:|Execution failed for task|FAILURE: Build failed|BUILD FAILURE|Caused by:|\[ERROR\].*(?:Failed to execute|Failures:|Errors:|Test.*:|[A-Za-z]+Test\.)', s)]
+              selected = set()
+              for i in primary:
+                  selected.update(range(max(0,i-2),min(len(lines),i+10)))
+              ordered = sorted(selected)
+              for i in ordered[-240:]:
+                  print(lines[i][:1800])
+              if not primary:
+                  print('\n'.join(lines[-80:]))
+          PY
