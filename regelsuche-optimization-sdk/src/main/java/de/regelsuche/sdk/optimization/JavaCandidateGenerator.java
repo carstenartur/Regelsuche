@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-local-proposals/v4";
+    static final String REVISION = "java-local-proposals/v5";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -128,6 +128,11 @@ final class JavaCandidateGenerator {
         if ((op == NumericOperation.XOR || op == NumericOperation.OR) && number(right, 0)) return left;
         if (op == NumericOperation.XOR && left.equals(right)) return constant(kind, 0);
         if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
+        if (op == NumericOperation.OR || op == NumericOperation.XOR) {
+            work.charge(8);
+            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments);
+            if (!bitwise.equals(result)) return bitwise;
+        }
         return foldConstant(result, op, kind, arguments);
     }
     private Expr foldConstant(Expr result, NumericOperation op, NumericKind kind, List<Expr> arguments) {
