@@ -48,4 +48,4 @@
 - [x] Update native revision and qualification documentation without promoting coverage.
 - [x] Run focused identity/native tests, then `:regelsuche-core:test :regelsuche-search:test :regelsuche-learning:test`; expect all green. Re-run the unchanged public P03 compatibility probe if accessible.
 - [x] Commit, obtain one independent whole-branch review, and address substantive findings RED→GREEN.
-- [ ] Publish the bounded follow-up PR; integrate only after exact-head required CI and review qualification.
+- [x] Publish the bounded follow-up PR; integrate only after exact-head required CI and review qualification. PR #1065 merged on 2026-10-06 at `51d699d092c8a6dae139c2c3b539d774d96955e3`; exact final head `014343918090e2ab6cebc21d8b80f0579af384df` passed CI `37443413603`, including all six authorities and `ciCheck`. All three review threads are resolved. P04 as a whole remains incomplete.
