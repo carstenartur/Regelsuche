@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 465ca3fcfe701a52abd3286eb65fd8587151b845
+          ref: 58346ed56625e008e841b36022631b5c8830e377
           path: verified-source
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 465ca3fcfe701a52abd3286eb65fd8587151b845
+          test "$(git rev-parse HEAD)" = 58346ed56625e008e841b36022631b5c8830e377
           test -z "$(git status --porcelain)"
           if ! mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-regressions.log" 2>&1; then
             tail -130 "$RUNNER_TEMP/sdk-regressions.log"
