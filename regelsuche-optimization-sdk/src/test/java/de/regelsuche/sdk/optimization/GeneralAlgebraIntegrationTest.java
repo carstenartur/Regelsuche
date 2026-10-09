@@ -16,6 +16,7 @@ class GeneralAlgebraIntegrationTest {
     private static Expr sub(NumericKind k, Expr a, Expr b) { return JavaExpressions.operation(k, NumericOperation.SUBTRACT,a,b); }
     private static Expr mul(NumericKind k, Expr a, Expr b) { return JavaExpressions.operation(k, NumericOperation.MULTIPLY,a,b); }
     private static Expr v(String name) { return new VariableExpr(name); }
+    private static Expr zero(NumericKind kind) { return kind==NumericKind.INT?JavaExpressions.literal(0):JavaExpressions.literal(0L); }
 
     @Test void sharedCoreRulesAreUsedWithoutAJavaSpecificFormulaImplementation() {
         var k=NumericKind.INT;
@@ -54,7 +55,8 @@ class GeneralAlgebraIntegrationTest {
             var result=new ComputationOptimizer().optimize(request,CancellationToken.NONE);
             var candidate=assertInstanceOf(OptimizationResult.Candidate.class,result,result.toString());
             assertInstanceOf(VerificationResult.Verified.class,new ComputationOptimizer().reverify(request,candidate,CancellationToken.NONE));
-            assertEquals(0,candidate.prepared().cost().operationCount(),candidate.plan().toString());
+            // A literal is one prepared instruction, but performs no arithmetic.
+            assertEquals(List.of(zero(kind)),candidate.plan().outputExpressions());
         }
     }
 
@@ -86,7 +88,7 @@ class GeneralAlgebraIntegrationTest {
         var result=optimizer.optimize(request,CancellationToken.NONE);
         var candidate=assertInstanceOf(OptimizationResult.Candidate.class,result,result.toString());
         assertInstanceOf(VerificationResult.Verified.class,optimizer.reverify(request,candidate,CancellationToken.NONE));
-        assertEquals(0,candidate.prepared().cost().operationCount(),candidate.plan().toString());
+        assertEquals(List.of(zero(kind)),candidate.plan().outputExpressions());
         long[] values={0,1,-1,Integer.MIN_VALUE,Integer.MAX_VALUE,Long.MIN_VALUE,Long.MAX_VALUE};
         var before=ComputationOptimizer.prepare(request.plan());
         for(long a:values)for(long b:values)for(long c:values) {

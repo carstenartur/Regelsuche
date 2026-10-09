@@ -27,7 +27,11 @@ class IndependentCandidateTest {
         var result = optimizer.optimize(request, CancellationToken.NONE);
         var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result::toString);
         assertEquals(X, candidate.plan().outputExpressions().getFirst());
-        assertEquals(unsafe, candidate.plan().outputExpressions().get(1));
+        assertEquals(NumericOperation.DIVIDE,JavaExpressions.operationOf(candidate.plan().outputExpressions().get(1)).orElseThrow());
+        // A general catalog may commute y*2 to 2*y. Prove the required value,
+        // rather than pinning spelling; the unsafe cancellation to y must fail.
+        assertEquivalent(integers(List.of(output("safe",X),output("keep",unsafe))),candidate.plan());
+        assertNotEquals(Y,candidate.plan().outputExpressions().get(1));
         assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request, candidate, CancellationToken.NONE));
         for (int x : new int[] {0, 1, -1, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
             var inputs = Map.<String, Object>of("x", x, "y", Integer.MAX_VALUE);
@@ -44,10 +48,15 @@ class IndependentCandidateTest {
         var request = request(plan, Set.of());
         var result = optimizer.optimize(request, CancellationToken.NONE);
         var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result::toString);
-        assertEquals(operation(NumericOperation.ADD, X, unsafe), candidate.plan().outputExpressions().getFirst());
+        assertEquivalent(integers(List.of(output("result",operation(NumericOperation.ADD,X,unsafe)))),candidate.plan());
+        assertTrue(candidate.cost().candidateCost().operationWork()<candidate.cost().sourceCost().operationWork());
         assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request, candidate, CancellationToken.NONE));
         var inputs = Map.<String, Object>of("x", Integer.MAX_VALUE, "y", Integer.MIN_VALUE);
         assertEquals(ComputationOptimizer.prepare(plan).execute(inputs), candidate.prepared().execute(inputs));
+    }
+
+    private void assertEquivalent(JointComputationPlan expected,JointComputationPlan actual) {
+        assertInstanceOf(VerificationResult.Verified.class,optimizer.verify(request(expected,Set.of()),actual,CancellationToken.NONE));
     }
 
     @Test
