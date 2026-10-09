@@ -12,7 +12,7 @@ import java.util.*;
  * Proofs use the existing exact Polynomial representation, on the integer affine fragment.
  */
 public final class ModularComputationDomain {
-    public static final String REVISION = "regelsuche.modular-affine-domain/v1";
+    public static final String REVISION = "regelsuche.modular-affine-domain/v2";
     private static final int MAX_NODES = 2_048;
     private static final int MAX_DEPTH = 96;
     public record NormalizedInput(String value, String modulus) {
@@ -78,8 +78,27 @@ public final class ModularComputationDomain {
         if (maximumCandidates < 1) throw new IllegalArgumentException("positive candidate cap required");
         var work = new Work();
         var powers = new LinkedHashSet<FunctionExpr>();
-        for (Expr output : outputs) collect(output, powers, work, 0);
+        var products = new LinkedHashSet<FunctionExpr>();
+        for (Expr output : outputs) collect(output, powers, products, work, 0);
         var result = new LinkedHashMap<List<Expr>, Rewrite>();
+        // A unit power can be replaced by its unreduced base only at a matching
+        // modular-product use. Never replace a shared unit-power output globally.
+        for (var product : products) {
+            if (product.arguments().size() != 3) continue;
+            Expr modulus = product.arguments().get(2);
+            for (int index = 0; index < 2; index++) {
+                if (!(product.arguments().get(index) instanceof FunctionExpr factor)) continue;
+                Power unit;
+                try { unit = power(factor, work); } catch (IllegalArgumentException invalid) { continue; }
+                if (!unit.modulus().equals(modulus)
+                        || !unit.exponent().equals(Polynomial.constant(Rational.ONE))) continue;
+                var arguments = new ArrayList<>(product.arguments());
+                arguments.set(index, unit.base());
+                var changed = replace(outputs, product, new FunctionExpr("modmul", arguments), work);
+                result.putIfAbsent(changed, new Rewrite("modmul-unit-power-residue", changed));
+                if (result.size() >= maximumCandidates) return new Generation(List.copyOf(result.values()), work.units, false);
+            }
+        }
         for (var current : powers) {
             Power e;
             try { e = power(current, work); } catch (IllegalArgumentException invalid) { continue; }
@@ -113,8 +132,8 @@ public final class ModularComputationDomain {
         try {
             if (source.size() != target.size() || source.isEmpty()) return new Verification(false, 1);
             for (int i = 0; i < source.size(); i++) {
-                Power left = normalForm(source.get(i), null, work, 0);
-                Power right = normalForm(target.get(i), left.modulus(), work, 0);
+                Power left = normalForm(source.get(i), null, work, 0, false);
+                Power right = normalForm(target.get(i), left.modulus(), work, 0, false);
                 work.units++;
                 if (!left.equals(right)) return new Verification(false, work.units);
             }
@@ -124,7 +143,7 @@ public final class ModularComputationDomain {
         }
     }
 
-    private Power normalForm(Expr expression, Expr expectedModulus, Work work, int depth) {
+    private Power normalForm(Expr expression, Expr expectedModulus, Work work, int depth, boolean reducedByParent) {
         work.visit(depth);
         if (expression instanceof FunctionExpr function && function.name().equals("modpow")) {
             Power result = power(function, work);
@@ -135,11 +154,18 @@ public final class ModularComputationDomain {
             Expr modulus = function.arguments().get(2);
             requirePositive(modulus);
             if (expectedModulus != null && !expectedModulus.equals(modulus)) throw new IllegalArgumentException("modulus differs");
-            Power left = normalForm(function.arguments().getFirst(), modulus, work, depth + 1);
-            Power right = normalForm(function.arguments().get(1), modulus, work, depth + 1);
+            Power left = normalForm(function.arguments().getFirst(), modulus, work, depth + 1, true);
+            Power right = normalForm(function.arguments().get(1), modulus, work, depth + 1, true);
             if (!left.base().equals(right.base())) throw new IllegalArgumentException("product bases differ");
             work.units += left.exponent().termCount() + right.exponent().termCount();
             return new Power(left.base(), left.exponent().add(right.exponent()), modulus);
+        }
+        // Congruent factors need not already be normalized: the parent modmul
+        // reduces their product. This permission must never reach a bare output.
+        if (reducedByParent && expectedModulus != null
+                && (expression instanceof VariableExpr || expression instanceof NumberExpr n && n.value().isInteger())) {
+            requirePositive(expectedModulus);
+            return new Power(expression, Polynomial.constant(Rational.ONE), expectedModulus);
         }
         if (expression instanceof VariableExpr variable) {
             var matches = normalized.stream().filter(p -> p.value().equals(variable.name())
@@ -216,13 +242,14 @@ public final class ModularComputationDomain {
         }
         return result == null ? new NumberExpr(0) : result;
     }
-    private static void collect(Expr expression, Set<FunctionExpr> powers, Work work, int depth) {
+    private static void collect(Expr expression, Set<FunctionExpr> powers, Set<FunctionExpr> products, Work work, int depth) {
         work.visit(depth);
         if (expression instanceof FunctionExpr f) {
-            for (var argument : f.arguments()) collect(argument, powers, work, depth + 1);
+            for (var argument : f.arguments()) collect(argument, powers, products, work, depth + 1);
             if (f.name().equals("modpow")) powers.add(f);
+            if (f.name().equals("modmul")) products.add(f);
         } else if (expression instanceof BinaryExpr b) {
-            collect(b.left(), powers, work, depth + 1); collect(b.right(), powers, work, depth + 1);
+            collect(b.left(), powers, products, work, depth + 1); collect(b.right(), powers, products, work, depth + 1);
         }
     }
     private static List<Expr> replace(List<Expr> outputs, Expr source, Expr target, Work work) {
