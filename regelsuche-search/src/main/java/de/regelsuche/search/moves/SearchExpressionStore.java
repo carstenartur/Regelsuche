@@ -25,25 +25,42 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         public LimitExceeded() { super("NATIVE_RETENTION_EXHAUSTED"); }
     }
     private final Limits limits;
-    private final LinkedHashMap<Expr, SearchExpressionRef> index = new LinkedHashMap<>();
+    // Integer keys keep recursive Expr.hashCode/equals outside collection internals.
+    private final LinkedHashMap<Integer, ArrayList<SearchExpressionRef>> index = new LinkedHashMap<>();
     private final ArrayList<SearchExpressionRef> roots = new ArrayList<>();
     private final IdentityHashMap<Expr, Boolean> nodes = new IdentityHashMap<>();
     private final IdentityHashMap<Object,Boolean> textValues=new IdentityHashMap<>();
     private long characters, references, peakNodes, peakCharacters, peakReferences, evictions;
     private boolean closed;
     private long work;
+    private int indexEntries;
     public long work(){return work;}
-    private void pay(long units){work=Math.addExact(work,units);}
+    void pay(long units){work=Math.addExact(work,units);}
+    void checkIndexScratch(long references, long characters) {
+        pay(1);
+        if (references > limits.references() || characters > limits.characters()) throw new LimitExceeded();
+    }
 
     public SearchExpressionStore(Limits limits) { this.limits = Objects.requireNonNull(limits); }
 
     public SearchExpressionRef intern(Expr expression) {
         requireOpen(); Objects.requireNonNull(expression);pay(1);
-        var existing = index.get(expression); // HashMap confirms full immutable Expr equality after hashing.
-        if (existing != null) return existing;
+        int hash = 0;
+        if (limits.indexEntries() > 0) {
+            hash = SearchExpressionIdentity.hash(this, expression);
+            var existing = findIndexed(hash, expression);
+            if (existing != null) return existing;
+        }
         var added = new IdentityHashMap<Expr, Boolean>();
         var addedText=new IdentityHashMap<Object,Boolean>();
         var pending = new ArrayDeque<Expr>(); pending.push(expression);pay(1);
+        long previousReferences = references, previousCharacters = characters;
+        long previousPeakNodes = peakNodes, previousPeakCharacters = peakCharacters, previousPeakReferences = peakReferences;
+        long previousEvictions = evictions;
+        int previousIndexEntries = indexEntries;
+        var indexMutation = new IndexMutation();
+        SearchExpressionRef committed = null, evicted = null;
+        Throwable primary = null;
         try(var retained=de.regelsuche.retention.RetainedOperation.retain(this,expression,added,addedText,pending)) {
         long addedCharacters = 0, addedReferences = 2; // owned root slot and reference -> expression
         while (!pending.isEmpty()) {
@@ -73,26 +90,116 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
             de.regelsuche.retention.RetainedOperation.checkpoint();
         }
         addedReferences=Math.addExact(addedReferences,2L*addedText.size());
-        int nextIndexSize = Math.min(limits.indexEntries(), index.size() + 1);
+        evicted = oldestIndexedRoot();
         long nextReferences = Math.addExact(references, addedReferences);
         long nextCharacters = Math.addExact(characters, addedCharacters);
         long nextNodes = Math.addExact(nodes.size(), added.size());
-        long withIndex = Math.addExact(nextReferences, 2L * nextIndexSize);
+        long withIndex = Math.addExact(nextReferences, indexReferencesAfterInsertion(hash, evicted));
         if (nextNodes > limits.nodes() || nextCharacters > limits.characters() || withIndex > limits.references()) throw new LimitExceeded();
         // Validation/arithmetic precedes mutation, including rejection under total live retention pressure.
-        var reference = new SearchExpressionRef(this, expression);
-        pay(Math.addExact(Math.addExact(added.size(),addedText.size()),1));nodes.putAll(added);textValues.putAll(addedText); roots.add(reference); references = nextReferences; characters = nextCharacters;
-        if (limits.indexEntries() > 0) {
-            if (index.size() == limits.indexEntries()) {
-                pay(1);index.remove(index.keySet().iterator().next()); evictions = Math.addExact(evictions, 1);
-            }
-            pay(1);index.put(expression, reference);
-        }
+        var reference = new SearchExpressionRef(this, expression, hash);
+        pay(Math.addExact(Math.addExact(added.size(),addedText.size()),1));
+        committed = reference;
+        nodes.putAll(added);textValues.putAll(addedText); roots.add(reference); references = nextReferences; characters = nextCharacters;
+        index(reference, evicted, indexMutation);
         peakNodes = Math.max(peakNodes, nextNodes); peakCharacters = Math.max(peakCharacters, characters);
         peakReferences = Math.max(peakReferences, withIndex);
         de.regelsuche.retention.RetainedOperation.checkpoint();
         return reference;
-        } finally {pay(Math.addExact(2L*added.size(),Math.addExact(2L*addedText.size(),pending.size())));added.clear();addedText.clear();pending.clear();}
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            if (committed != null) {
+                var rollbackReference = committed;
+                var evictedReference = evicted;
+                attemptCleanup(failure, () -> rollbackIndex(rollbackReference, evictedReference, indexMutation));
+                attemptCleanup(failure, () -> {
+                    if (!roots.isEmpty() && roots.getLast() == rollbackReference) roots.removeLast();
+                });
+                for (var node : added.keySet()) attemptCleanup(failure, () -> nodes.remove(node));
+                for (var text : addedText.keySet()) attemptCleanup(failure, () -> textValues.remove(text));
+                references = previousReferences; characters = previousCharacters;
+                peakNodes = previousPeakNodes; peakCharacters = previousPeakCharacters; peakReferences = previousPeakReferences;
+                evictions = previousEvictions;
+                indexEntries = previousIndexEntries;
+                attemptCleanup(failure, () -> pay(Math.addExact(Math.addExact(added.size(), addedText.size()), 1)));
+            }
+            throw failure;
+        } finally {
+            long cleanupWork = Math.addExact(2L*added.size(),Math.addExact(2L*addedText.size(),pending.size()));
+            if (primary == null) {
+                try { pay(cleanupWork); }
+                catch (RuntimeException | Error failure) {
+                    added.clear(); addedText.clear(); pending.clear();
+                    throw failure;
+                }
+            } else attemptCleanup(primary, () -> pay(cleanupWork));
+            added.clear(); addedText.clear(); pending.clear();
+        }
+    }
+    private static void attemptCleanup(Throwable primary, Runnable cleanup) {
+        try { cleanup.run(); }
+        catch (RuntimeException | Error failure) {
+            if (failure != primary) primary.addSuppressed(failure);
+        }
+    }
+    private SearchExpressionRef findIndexed(int hash, Expr expression) {
+        var bucket = index.get(hash); pay(1);
+        if (bucket == null) return null;
+        for (int i = 0; i < bucket.size(); i++) {
+            var existing = bucket.get(i); pay(1);
+            if (SearchExpressionIdentity.same(this, expression, existing.expression)) return existing;
+        }
+        return null;
+    }
+    private SearchExpressionRef oldestIndexedRoot() {
+        return indexEntries > 0 && indexEntries == limits.indexEntries()
+            ? roots.get(roots.size() - indexEntries) : null;
+    }
+    private long indexReferencesAfterInsertion(int hash, SearchExpressionRef evicted) {
+        if (limits.indexEntries() == 0) return 0;
+        int nextIndexSize = Math.min(limits.indexEntries(), indexEntries + 1);
+        int nextBuckets = index.size();
+        pay(1); if (!index.containsKey(hash)) nextBuckets++;
+        if (evicted != null && evicted.structuralHash != hash) {
+            pay(1); if (index.get(evicted.structuralHash).size() == 1) nextBuckets--;
+        }
+        return indexReferences(nextIndexSize, nextBuckets);
+    }
+    private static final class IndexMutation {
+        boolean evictedRemoved, bucketCreated, inserted;
+    }
+    private void index(SearchExpressionRef reference, SearchExpressionRef evicted, IndexMutation mutation) {
+        if (limits.indexEntries() == 0) return;
+        if (evicted != null) {
+            var bucket = index.get(evicted.structuralHash); pay(1);
+            pay(bucket.size()); bucket.remove(0); // FIFO within a collision bucket, including shifted slots
+            mutation.evictedRemoved = true;
+            if (bucket.isEmpty()) { index.remove(evicted.structuralHash); pay(1); }
+            indexEntries--; evictions = Math.addExact(evictions, 1);
+        }
+        var bucket = index.get(reference.structuralHash); pay(1);
+        if (bucket == null) {
+            bucket = new ArrayList<>(); index.put(reference.structuralHash, bucket);
+            mutation.bucketCreated = true; pay(2);
+        }
+        bucket.add(reference); mutation.inserted = true; indexEntries++; pay(1);
+    }
+    private void rollbackIndex(SearchExpressionRef reference, SearchExpressionRef evicted, IndexMutation mutation) {
+        if (limits.indexEntries() == 0) return;
+        var bucket = index.get(reference.structuralHash);
+        if (mutation.inserted) bucket.removeLast();
+        if (mutation.bucketCreated && bucket.isEmpty()) index.remove(reference.structuralHash);
+        long rollbackWork = 3;
+        if (mutation.evictedRemoved) {
+            var oldestBucket = index.get(evicted.structuralHash);
+            if (oldestBucket == null) {
+                oldestBucket = new ArrayList<>(); index.put(evicted.structuralHash, oldestBucket);
+                rollbackWork += 2;
+            }
+            rollbackWork = Math.addExact(rollbackWork, oldestBucket.size() + 2L);
+            oldestBucket.addFirst(evicted);
+        }
+        pay(rollbackWork);
     }
     private long text(Object value,IdentityHashMap<Object,Boolean> added) {
         pay(1);if(textValues.containsKey(value))return 0;
@@ -109,9 +216,10 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
         return reference.expression;
     }
     public Statistics statistics() {
-        return new Statistics(nodes.size(), characters, Math.addExact(references, 2L * index.size()),
-            peakNodes, peakCharacters, peakReferences, index.size(), evictions);
+        return new Statistics(nodes.size(), characters, Math.addExact(references, indexReferences(indexEntries, index.size())),
+            peakNodes, peakCharacters, peakReferences, indexEntries, evictions);
     }
+    private static long indexReferences(int entries, int buckets) { return Math.addExact(entries, 3L * buckets); } // key/value, bucket backing slot, members
     private void requireOpen() { if (closed) throw new IllegalStateException("expression session is closed"); }
-    @Override public void close() { if(closed)return;pay(Math.addExact(roots.size(),Math.addExact(2L*index.size(),Math.addExact(2L*nodes.size(),2L*textValues.size()))));closed = true; index.clear(); roots.clear(); nodes.clear();textValues.clear(); characters = 0; references = 0; }
+    @Override public void close() { if(closed)return;pay(Math.addExact(roots.size(),Math.addExact(indexReferences(indexEntries,index.size()),Math.addExact(2L*nodes.size(),2L*textValues.size()))));closed = true; index.clear(); indexEntries=0; roots.clear(); nodes.clear();textValues.clear(); characters = 0; references = 0; }
 }

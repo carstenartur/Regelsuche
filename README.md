@@ -17,6 +17,7 @@ können als neue Strategien wiederverwendet werden.
 [Workbench](docs/web-workbench.md) ·
 [Discovery Gallery](docs/demo-gallery.md) ·
 [Java Discovery SDK](docs/java-discovery-sdk.md) ·
+[Primachsenraum-Signalplugin](docs/periodic-signal-discovery.md) ·
 [Python-Client](docs/python-client.md) ·
 [Darstellungen und Transferdemo](docs/representation-transfer-demo.md) ·
 [Strategien lernen und vergleichen](docs/trace-strategy-transfer.md) ·
