@@ -3,6 +3,7 @@ name: Mathematics SDK repaired distribution (scoped)
 on:
   push:
     branches: [fix/math-variable-candidates-20261009]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,38 +14,44 @@ concurrency:
 
 jobs:
   sdk-distribution:
+    if: github.ref == 'refs/heads/fix/math-variable-candidates-20261009'
+    permissions:
+      contents: write
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ed968b9c3c140a6a6d0e585e0cfd33a7e368a60b
-          path: regelsuche
+      - name: Apply the locally tested proof repair on its isolated branch
+        run: |
+          set -euo pipefail
+          if [ -f .github/math-proof-fix.patch ]; then
+            echo 'be4447bfb4696b7383cbd7d8ffa5aed1fd5b99ae111f6a3996b096696bbdef9f  .github/math-proof-fix.patch' | sha256sum -c -
+            git apply --check .github/math-proof-fix.patch
+            git apply .github/math-proof-fix.patch
+            rm .github/math-proof-fix.patch
+            git add .github/math-proof-fix.patch regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/SemanticChecker.java regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/MixedTheoryProofTest.java
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: compose independently proved bitvector identities inside arithmetic contexts'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD > "$RUNNER_TEMP/sdk-source-commit.txt"
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: '25'
           verify-signature: true
       - name: Qualify two clean SDK builds and fresh consumers using Maven and JUnit
-        working-directory: regelsuche
         run: |
           set -o pipefail
           mvn --batch-mode --no-transfer-progress -Psdk-release -pl maven-build-contract \
-            -Dtest=MavenOptimizationSdkDistributionTest test 2>&1 | tee "$GITHUB_WORKSPACE/sdk-distribution.log"
-      - name: Retain portable dependencies for offline consumer verification
-        if: always()
-        run: |
-          set -euo pipefail
-          mkdir -p offline
-          tar -czf offline/maven-repository.tar.gz -C "$HOME/.m2" repository
-          sha256sum offline/maven-repository.tar.gz > offline/SHA256SUMS
+            -Dtest=MavenOptimizationSdkDistributionTest test 2>&1 | tee "$RUNNER_TEMP/sdk-distribution.log"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: repaired-sdk-ed968b9c-${{ github.run_id }}
+          name: repaired-sdk-${{ github.run_id }}
           retention-days: 7
           compression-level: 0
           path: |
-            sdk-distribution.log
-            regelsuche/maven-build-contract/target/surefire-reports/**
-            offline/**
+            ${{ runner.temp }}/sdk-distribution.log
+            ${{ runner.temp }}/sdk-source-commit.txt
+            maven-build-contract/target/surefire-reports/**

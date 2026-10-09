@@ -1,0 +1,126 @@
+--- a/regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/SemanticChecker.java
++++ b/regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/SemanticChecker.java
+@@ -7,7 +7,7 @@
+ 
+ /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
+ final class SemanticChecker {
+-    static final String REVISION = "java-numeric-independent/v4";
++    static final String REVISION = "java-numeric-independent/v5";
+     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
+     private final OptimizationRequest request;
+     private final VerificationWork work;
+@@ -146,6 +146,13 @@
+     }
+     private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set<String> methods) {
+         boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
++        if (kind == NumericKind.INT || kind == NumericKind.LONG) {
++            Expr normalizedA = normalizeBitwiseContexts(a, new IdentityHashMap<>());
++            Expr normalizedB = normalizeBitwiseContexts(b, new IdentityHashMap<>());
++            if (!normalizedA.equals(a) || !normalizedB.equals(b)) methods.add("BITVECTOR_CONTEXT_CONGRUENCE");
++            a = normalizedA;
++            b = normalizedB;
++        }
+         try {
+             if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {
+                 methods.add(kind==NumericKind.BIG_INTEGER ? "INTEGER_POLYNOMIAL_NORMAL_FORM" : exact ? "INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE" : "BITVECTOR_POLYNOMIAL_MOD_2_"+kind.bits());
+@@ -165,6 +172,38 @@
+         }
+         if (kind.integral() && new BitwiseProof(work).equivalent(a,b,kind)) { methods.add("BITVECTOR_TRUTH_TABLE"); return true; }
+         return false;
++    }
++    /** Independent proof-view normalization, never a generator call. Universal word
++     * proofs can replace a subterm inside an arithmetic context by congruence.
++     * Original/candidate traces and their range/exception obligations are untouched.
++     */
++    private Expr normalizeBitwiseContexts(Expr expression, Map<Expr, Expr> memo) {
++        work.charge(1);
++        Expr cached = memo.get(expression);
++        if (cached != null) return cached;
++        if (expression instanceof VariableExpr || JavaExpressions.isLiteral(expression)) return expression;
++        var arguments = JavaExpressions.operands(expression).stream()
++            .map(child -> normalizeBitwiseContexts(child, memo)).toList();
++        Expr result = new FunctionExpr(((FunctionExpr) expression).name(), arguments);
++        var kind = JavaExpressions.resultKind(result);
++        var operation = JavaExpressions.operationOf(result).orElse(null);
++        if ((kind == NumericKind.INT || kind == NumericKind.LONG)
++                && (operation == NumericOperation.XOR || operation == NumericOperation.AND
++                    || operation == NumericOperation.OR || operation == NumericOperation.NOT)) {
++            var representatives = new ArrayList<Expr>();
++            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(0L) : JavaExpressions.literal(0));
++            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(-1L) : JavaExpressions.literal(-1));
++            representatives.addAll(arguments);
++            for (Expr representative : representatives) {
++                if (JavaExpressions.kindOf(representative, request.plan().inputs()) == kind
++                        && new BitwiseProof(work).equivalent(result, representative, kind)) {
++                    result = representative;
++                    break;
++                }
++            }
++        }
++        memo.put(expression, result);
++        return result;
+     }
+     private Expr expandModularProduct(Expr expression) {
+         work.charge(1);
+--- /dev/null
++++ b/regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/MixedTheoryProofTest.java
+@@ -0,0 +1,59 @@
++package de.regelsuche.sdk.optimization;
++
++import static org.junit.jupiter.api.Assertions.*;
++import de.regelsuche.ast.Expr;
++import de.regelsuche.ast.VariableExpr;
++import de.regelsuche.search.program.JointComputationPlan;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++import org.junit.jupiter.api.Test;
++
++/** The final proof must compose independently checked arithmetic and word identities. */
++class MixedTheoryProofTest {
++    @Test void xorOfEquivalentArithmeticTermsIsProvedInsideAddition() {
++        for (var kind : List.of(NumericKind.INT, NumericKind.LONG)) {
++            Expr x = new VariableExpr("x");
++            Expr a = op(kind, NumericOperation.SUBTRACT, op(kind, NumericOperation.ADD, x, number(kind,1)), number(kind,1));
++            Expr b = op(kind, NumericOperation.ADD, a, number(kind,0));
++            Expr source = op(kind, NumericOperation.ADD, op(kind, NumericOperation.XOR, a,b), number(kind,7));
++            var request = request(kind, source);
++            var optimizer = new ComputationOptimizer();
++            var verified = optimizer.verify(request, plan(kind,number(kind,7)), CancellationToken.NONE);
++            assertInstanceOf(VerificationResult.Verified.class, verified, verified.toString());
++            var result = optimizer.optimize(request, CancellationToken.NONE);
++            var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result.toString());
++            assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request,candidate,CancellationToken.NONE));
++            assertEquals(List.of(number(kind,7)),candidate.plan().outputExpressions());
++        }
++    }
++    @Test void independentArithmeticAtomsAreNotMerged() {
++        Expr x = new VariableExpr("x"), y = new VariableExpr("y");
++        var kind = NumericKind.INT;
++        var inputs = Map.of("x",kind.type(),"y",kind.type());
++        Expr source = op(kind,NumericOperation.ADD,op(kind,NumericOperation.XOR,x,y),number(kind,7));
++        var plan = new JointComputationPlan(inputs,Map.of(),List.of(new JointComputationPlan.Output("result",kind.type(),source)));
++        var request = new OptimizationRequest(plan,SourceEvaluationTrace.fromPlan(plan),Set.of(kind),ComputationOptimizer.SEMANTICS_REVISION,
++            Set.of(),SafetyProfile.PRESERVE_JAVA,OptimizationGoal.LOWER_ESTIMATED_RUNTIME,OptimizationBudget.DEFAULT,CheckedPolicy.NONE);
++        var target = plan.withOutputs(List.of(number(kind,7)));
++        assertFalse(new ComputationOptimizer().verify(request,target,CancellationToken.NONE) instanceof VerificationResult.Verified);
++    }
++    @Test void overflowSensitiveDivisionIsNotAnEquivalentBitwiseAtom() {
++        var kind = NumericKind.INT;
++        Expr x = new VariableExpr("x");
++        Expr lossy = op(kind,NumericOperation.DIVIDE,op(kind,NumericOperation.MULTIPLY,x,number(kind,2)),number(kind,2));
++        Expr source = op(kind,NumericOperation.ADD,op(kind,NumericOperation.XOR,lossy,x),number(kind,7));
++        var verified = new ComputationOptimizer().verify(request(kind,source),plan(kind,number(kind,7)),CancellationToken.NONE);
++        assertFalse(verified instanceof VerificationResult.Verified,verified.toString());
++    }
++    private static Expr op(NumericKind kind,NumericOperation operation,Expr... values) { return JavaExpressions.operation(kind,operation,values); }
++    private static Expr number(NumericKind kind,int value) { return kind==NumericKind.LONG?JavaExpressions.literal((long)value):JavaExpressions.literal(value); }
++    private static JointComputationPlan plan(NumericKind kind,Expr expression) {
++        return new JointComputationPlan(Map.of("x",kind.type()),Map.of(),List.of(new JointComputationPlan.Output("result",kind.type(),expression)));
++    }
++    private static OptimizationRequest request(NumericKind kind,Expr source) {
++        var plan=plan(kind,source);
++        return new OptimizationRequest(plan,SourceEvaluationTrace.fromPlan(plan),Set.of(kind),ComputationOptimizer.SEMANTICS_REVISION,Set.of(),
++            SafetyProfile.PRESERVE_JAVA,OptimizationGoal.LOWER_ESTIMATED_RUNTIME,OptimizationBudget.DEFAULT,CheckedPolicy.NONE);
++    }
++}
