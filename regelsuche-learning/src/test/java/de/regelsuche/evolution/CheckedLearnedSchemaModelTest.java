@@ -513,10 +513,11 @@ class CheckedLearnedSchemaModelTest {
             meter.closeFailure=new IllegalStateException("additional imported frame close failure");
             meter.jsonFailure=new IllegalStateException("additional JSON release failure");
         }
+        var received=state(source);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
         try(var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),binding,
-                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)));
+            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(received,binding,context));
             assertSame(meter.failure,thrown,"later close attempts must preserve the original technical error");
             assertNotNull(meter.work);assertEquals(meter.work.units,meter.afterFailure.getLast());
             assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count());
@@ -556,23 +557,28 @@ class CheckedLearnedSchemaModelTest {
         var meter=new ImportMeter(ImportMeter.Abort.NONE);meter.duplicateValue=parse("991");
         observeRejectedBuild(model,source,withEvidence(binding,data.toString()),meter);
         assertEquals(1,meter.duplicateInsertions,"the replacing map insertion remains paid despite duplicate rejection");
+        assertEquals(meter.duplicateValue,meter.insertedDuplicateValue,"the observed replacing value remains the exact imported literal");
     }
 
     private static void observeRejectedBuild(CheckedLearnedSchemaModel model,Expr source,ExactTheoryEvidence.Binding binding,ImportMeter meter) {
+        var received=state(source);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        NativeVerification rejected;
         try (var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            assertRejectedImport(model.replayApplication(state(source),binding,
-                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)),"partial import build");
+            rejected=model.replayApplication(received,binding,context);
         }
+        assertRejectedImport(rejected,"partial import build");
     }
 
     @Test void successfulImportDelegatesItsReceiptWithoutAlsoSettlingItLocally() {
         var model=CheckedLearnedSchemaModel.learn(formation);Expr source=parse("(x+y)*(x-y)+y*y");
         var binding=applicationBinding(model,source);var meter=new ImportMeter(ImportMeter.Abort.NONE);
+        var received=state(source);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
         try (var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            var result=model.replayApplication(state(source),binding,
-                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+            var result=model.replayApplication(received,binding,context);
             assertTrue(result.accepted());assertTrue(meter.sawResult);assertTrue(meter.sawBindings);
             assertTrue(meter.sawBindingsWithOutcome,"the returned match outcome remains owned throughout binding decoding");
             assertEquals(result.work(),meter.work.units);
@@ -588,10 +594,11 @@ class CheckedLearnedSchemaModelTest {
         boolean rejected=kind==ImportMeter.Abort.REJECT_OBSERVATION || kind==ImportMeter.Abort.REJECT_CLOSE;
         Expr receivedSource=rejected?parse("991"):source;
         meter.rejectedSource=rejected?CODEC.encodeExpression(receivedSource):null;
+        var received=state(receivedSource);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
         try (var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(receivedSource),binding,
-                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION)));
+            var thrown=assertThrows(IllegalArgumentException.class,()->model.replayApplication(received,binding,context));
             assertSame(meter.failure,thrown);
             assertTrue(meter.work.units>1,"domain and concrete replay work was already accumulated");
             assertEquals(meter.work.units,meter.afterFailure.getLast());
@@ -607,7 +614,7 @@ class CheckedLearnedSchemaModelTest {
         enum Abort { NONE, BINDINGS, RESULT, CLOSE, REJECT_OBSERVATION, REJECT_CLOSE, JSON_OWNER_ACQUIRE }
         final Abort abort;RetainedOperation scope;CheckedSchemaSupport.Work work;IllegalArgumentException failure;
         boolean repeatClose,jsonFailureThrown;RuntimeException closeFailure,jsonFailure;
-        int pathAllocations,pathInsertions,duplicateInsertions;Expr duplicateValue;long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection,sawBindingsWithOutcome;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
+        int pathAllocations,pathInsertions,duplicateInsertions;Expr duplicateValue,insertedDuplicateValue;long failedDebit,directWork,retentionWork;boolean sawBindings,sawResult,sawRejection,sawBindingsWithOutcome;String rejectedSource;final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
         ImportMeter(Abort abort){this.abort=abort;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);}
         @Override public void validationWork(long amount){executionWork(amount);}
@@ -629,7 +636,13 @@ class CheckedLearnedSchemaModelTest {
                     if (amount==1 && path.equals(List.of(0))) pathInsertions++;
                 }
                 if (amount==2 && duplicateValue!=null && value instanceof java.util.TreeMap<?,?> map
-                        && map.containsValue(duplicateValue) && !owners.contains("CHECKED_SCHEMA_DUPLICATE_BINDING")) duplicateInsertions++;
+                        && !owners.contains("CHECKED_SCHEMA_DUPLICATE_BINDING")) {
+                    // The fixture's ordinary bindings are variables. Observe the imported numeric
+                    // replacement by type; assert its exact value outside this paid callback.
+                    for (Object replacement:map.values()) if (replacement instanceof NumberExpr number) {
+                        insertedDuplicateValue=number;duplicateInsertions++;break;
+                    }
+                }
             }
             if (sawResult) afterResult.add(amount);
             boolean result=owners.stream().anyMatch(value->value instanceof NativeVerification);
@@ -708,9 +721,10 @@ class CheckedLearnedSchemaModelTest {
         Expr received=rejected?parse("x/0"):source;
         var meter=new VerifierMeter(abort,received,proposal);meter.repeatClose=repeatClose;
         if(distinctClose)meter.closeFailure=new IllegalStateException("separate native verifier close failure");
+        var receivedState=state(received);
         try(var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            var thrown=assertThrows(Throwable.class,()->verifier.verify(state(received),proposal,context));
+            var thrown=assertThrows(Throwable.class,()->verifier.verify(receivedState,proposal,context));
             assertSame(meter.failure,thrown,"a technical failure is neither a rejection receipt nor a new self-suppression error");
             assertNotNull(meter.work);assertTrue(meter.work.units>1);
             assertEquals(meter.work.units,meter.afterFailure.getLast(),"unreturned root Work is settled after all frames close");
@@ -732,8 +746,9 @@ class CheckedLearnedSchemaModelTest {
         var proposal=providers.getFirst().candidates(state(source),context).moves().getFirst();
         for(Expr received:List.of(source,parse("x/0"))) {
             var meter=new VerifierMeter(VerifierMeter.Abort.NONE,received,proposal);
+            var receivedState=state(received);
             try(var scope=RetainedOperation.open(meter)) {
-                meter.scope=scope;var receipt=verifier.verify(state(received),proposal,context);
+                meter.scope=scope;var receipt=verifier.verify(receivedState,proposal,context);
                 assertEquals(received==source,receipt.accepted());assertTrue(meter.sawRoot);assertTrue(meter.sawResult);
                 assertEquals(receipt.work(),meter.work.units);
                 assertEquals(List.of(4L),meter.afterResult,"normal close only; delegated Work is not also locally settled");
@@ -760,9 +775,10 @@ class CheckedLearnedSchemaModelTest {
         var semantic=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),invalid,context));
         assertEquals("checked scalar division needs nonzero literal denominator",semantic.getMessage());
         var meter=new VerifierMeter(abort,source,null);
+        var received=state(source);
         try(var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            var thrown=assertThrows(Throwable.class,()->model.replayApplication(state(source),invalid,context));
+            var thrown=assertThrows(Throwable.class,()->model.replayApplication(received,invalid,context));
             assertSame(meter.failure,thrown);assertTrue(meter.sawRejectedDomain);assertTrue(meter.sawOutcome);
             assertEquals(meter.work.units,meter.afterFailure.getLast());
             assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count());
@@ -785,22 +801,25 @@ class CheckedLearnedSchemaModelTest {
         var semantic=assertThrows(IllegalArgumentException.class,()->model.replayApplication(state(source),invalid,context));
         assertEquals("checked scalar polynomial structure limit",semantic.getMessage(),"source has 511 nodes; only the 513-node generated target is out of domain");
         var meter=new VerifierMeter(VerifierMeter.Abort.TARGET_REJECT_CLOSE,source,null);
+        var received=state(source);
         try(var scope=RetainedOperation.open(meter)) {
             meter.scope=scope;
-            var thrown=assertThrows(Throwable.class,()->model.replayApplication(state(source),invalid,context));
+            var thrown=assertThrows(Throwable.class,()->model.replayApplication(received,invalid,context));
             assertSame(meter.failure,thrown);assertTrue(meter.sawTargetDomain);assertTrue(meter.sawOutcome);
             assertEquals(meter.work.units,meter.afterFailure.getLast());
             assertEquals(1,meter.afterFailure.stream().filter(units->units==meter.work.units).count());
         }
         assertFalse(de.regelsuche.retention.RetainedJson.active());
         assertEquals(0,RetainedGraph.measure(meter.scope).retained().characters());
+        assertEquals(new BinaryExpr(source,ADD,new NumberExpr(0)),meter.generatedTarget,
+            "the observed target-domain owner contains the actual exact expansion");
     }
 
     /** Observes actual frame values; a nested application ledger cannot stand in for the verifier ledger. */
     private static final class VerifierMeter implements RetainedOperation.Sink {
         enum Abort { NONE,SOURCE_RUNTIME,SOURCE_ARGUMENT,SOURCE_ERROR,RESULT,CLOSE,REJECT_OBSERVATION,REJECT_CLOSE,SUBSTITUTION,OCCURRENCE_REJECT_CLOSE,TARGET_REJECT_CLOSE,BINDING_REJECT_CLOSE }
         final Abort abort;final Expr received;final NativeSearchMove proposal;final Throwable failure;
-        RetainedOperation scope;CheckedSchemaSupport.Work work;RuntimeException closeFailure;
+        RetainedOperation scope;CheckedSchemaSupport.Work work;RuntimeException closeFailure;Expr generatedTarget;
         boolean tripped,repeatClose,sawRoot,sawResult,resultCheckpoint,sawRejectedDomain,sawTargetDomain,sawOutcome;
         final List<Long> afterFailure=new ArrayList<>(),afterResult=new ArrayList<>();
         VerifierMeter(Abort abort,Expr received,NativeSearchMove proposal) {
@@ -861,6 +880,18 @@ class CheckedLearnedSchemaModelTest {
             boolean outcome=seen.stream().anyMatch(value->value instanceof de.regelsuche.transform.ExprMatcher.MatchOutcome);
             boolean receipt=seen.stream().anyMatch(value->value instanceof NativeVerification);
             sawResult|=receipt;sawOutcome|=outcome;
+            // Observe the application's actual target object. Expr.equals would itself debit
+            // this observer and recursively enter snapshot; mathematical comparison is outside.
+            for(Object value:seen)if(value instanceof CheckedSchemaMatcherPlan.ApplicationSteps application
+                    && application.phase()==IncrementalProviderContract.ApplicationPhase.TARGET_DOMAIN
+                    && value instanceof RetainedGraph.View view) {
+                view.retainedReferences(new RetainedGraph.Visitor() {
+                    @Override public void reference(Object ref) {
+                        if(ref instanceof Expr expression && expression!=received)generatedTarget=expression;
+                    }
+                    @Override public void requireExact(Object ref,Class<?> type){assertEquals(type,ref.getClass());}
+                });
+            }
             for(Object owner:seen)if(owner instanceof RetainedOperation.Frame frame) {
                 var direct=new ArrayList<Object>();
                 frame.retainedReferences(new RetainedGraph.Visitor() {
@@ -873,8 +904,7 @@ class CheckedLearnedSchemaModelTest {
                         if(value instanceof CheckedSchemaSupport.Work candidate)ledger=candidate;
                         boundary|=proposal==null?value instanceof ExactTheoryEvidence.Binding:value==proposal;
                         source|=value==received;
-                        target|=value instanceof BinaryExpr binary && binary.operator()==ADD
-                            && binary.left().equals(received) && binary.right().equals(new NumberExpr(0));
+                        target|=generatedTarget!=null && value==generatedTarget;
                         if(value instanceof ArrayDeque<?> deque)waiting=deque.size();
                         if(value instanceof Object[] slot && slot.length==1 && slot[0] instanceof RetainedGraph.View node
                                 && slot[0].getClass().getEnclosingClass()==CheckedSchemaSupport.class
@@ -894,7 +924,7 @@ class CheckedLearnedSchemaModelTest {
                     substitution|=!source && current!=null && outcome;
                     sawTargetDomain|=target && current!=null && waiting>=0;
                     sawRejectedDomain|=current instanceof BinaryExpr binary && binary.operator()==DIV
-                        && binary.right().equals(new NumberExpr(0));
+                        && binary.right() instanceof NumberExpr number && number.value().isZero();
                 }
             }
             return new Snapshot(sourceGrowth,substitution,receipt,outcome,seen.stream().anyMatch(value->value.getClass().getSimpleName().equals("BindingReplay")));
@@ -943,6 +973,35 @@ class CheckedLearnedSchemaModelTest {
             model = CheckedLearnedSchemaModel.load(learned.toCanonicalJson(), learned.inventoryHash());
             selected = model.nativeProviders().getFirst().candidates(state(parse(SINGLE)), CONTEXT).moves().stream()
                 .filter(move -> move.targetExpression().equals(parse("x^2"))).findFirst().orElseThrow().exportLegacy().transformation().rule();
+        }
+
+        @Test void checkedApplicationPublishesAncestorRebuildWithoutChargingMathematicsTwice() {
+            var source = state(parse(MULTIPLE));
+            var provider = model.nativeProviders(1, Map.of(), Set.of(selected)).getFirst();
+            var expected = provider.candidates(source, CONTEXT);
+            var observed = Collections.newSetFromMap(new IdentityHashMap<de.regelsuche.moves.enumerate.TreePosition.ReplacementResult, Boolean>());
+            var active = new RetainedOperation[1];
+            var sink = new RetainedOperation.Sink() {
+                @Override public void executionWork(long units) {}
+                @Override public void validationWork(long units) {}
+                @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(active[0]); }
+                @Override public void checkpoint() {
+                    RetainedGraph.measure(active[0]);
+                    for (var value : graph(active[0]))
+                        if (value instanceof de.regelsuche.moves.enumerate.TreePosition.ReplacementResult result) observed.add(result);
+                }
+            };
+            NativeMoveProvider.Batch actual;
+            try (var scope = RetainedOperation.open(sink)) {
+                active[0] = scope;
+                actual = provider.candidates(source, CONTEXT);
+            }
+            assertEquals(expected.work(), actual.work(), "ownership work must not duplicate the existing mathematical receipt");
+            assertFalse(observed.isEmpty(), "CheckedApplication.advance must expose its actual TreePosition reconstruction");
+            assertTrue(observed.stream().anyMatch(result -> result.copiedAncestors() > 0));
+            assertEquals(expected.moves().stream().map(NativeSearchMove::exportLegacy).toList(),
+                actual.moves().stream().map(NativeSearchMove::exportLegacy).toList());
+            assertEquals(0, RetainedGraph.measure(active[0]).retained().nodes());
         }
     
         @Test void normalReceiptsAndDeclaredOrderPreserveTheHistoricalProviderContract() throws Exception {
@@ -1173,11 +1232,11 @@ class CheckedLearnedSchemaModelTest {
                         boolean current=items.stream().anyMatch(item->item instanceof Object[] slot && slot.length==1 && slot[0]!=null
                             && slot[0].getClass().getEnclosingClass()==CheckedSchemaSupport.class && slot[0].getClass().getSimpleName().equals("Node"));
                         if(current) {
-                            if(items.contains(source)) {
+                            if(items.stream().anyMatch(item->item==source)) {
                                 sourceVisited=true;domainWork=items.stream().filter(CheckedSchemaSupport.Work.class::isInstance)
                                     .map(CheckedSchemaSupport.Work.class::cast).findFirst().orElseThrow();
                             }
-                            domainVisited|=items.contains(applicationWork);
+                            domainVisited|=items.stream().anyMatch(item->item==applicationWork);
                         }
                     }
                 failedDebit=units;
@@ -1277,9 +1336,10 @@ class CheckedLearnedSchemaModelTest {
         @Test void normalReturnedBatchDelegatesWithoutAlsoSettlingItsReceiptLocally() {
             for (String text : List.of(MULTIPLE, "x+17", "x/0")) {
                 var received = state(parse(text)); var meter = new ProviderMeter(Abort.NONE, received);
+                var provider = model.nativeProviders(1, Map.of(), Set.of(selected)).getFirst();
                 try (var scope = de.regelsuche.retention.RetainedOperation.open(meter)) {
                     meter.scope = scope;
-                    var batch = model.nativeProviders(1, Map.of(), Set.of(selected)).getFirst().candidates(received, CONTEXT);
+                    var batch = provider.candidates(received, CONTEXT);
                     assertSame(batch, meter.finished); assertEquals(batch.work().totalWorkUnitsV2(), meter.rootWork.units);
                     assertEquals(List.of(4L), meter.afterBatch, "only the final owner close follows receipt observation");
                 }
@@ -1342,12 +1402,12 @@ class CheckedLearnedSchemaModelTest {
                     for (Object ref : refs(frame)) if (ref instanceof Object[] values) {
                         var items = java.util.Arrays.asList(values);
                         var ledger = items.stream().filter(CheckedSchemaSupport.Work.class::isInstance).map(CheckedSchemaSupport.Work.class::cast).findFirst().orElse(null);
-                        if (items.contains(received)) { rootWork = ledger; rootSeen = true; }
+                        if (items.stream().anyMatch(item->item==received)) { rootWork = ledger; rootSeen = true; }
                         for(Object value:values) if(value instanceof Object[] slot && slot.length==3
                                 && slot[0] instanceof CheckedSchemaMatcherPlan.ApplicationSteps && slot[2] instanceof String)
                             rejectedApplyOwner=frame;
                         boolean domain = items.stream().anyMatch(java.util.ArrayDeque.class::isInstance);
-                        if (domain && items.contains(received.expression())) {
+                        if (domain && items.stream().anyMatch(item->item==received.expression())) {
                             if (rootWork == null) rootWork = ledger; // Observe the unfixed source ledger for RED.
                             sourceGrowth |= items.stream().anyMatch(item -> item instanceof java.util.ArrayDeque<?> queue && !queue.isEmpty())
                                 && items.stream().anyMatch(this::currentAtSource);

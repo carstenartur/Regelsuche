@@ -1,5 +1,6 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,8 +20,21 @@ final class MoveWitnessPath<S,M,V> implements de.regelsuche.retention.RetainedGr
     }
     List<SearchExecution.Step<S,M,V>> steps() {
         var steps = new ArrayList<SearchExecution.Step<S,M,V>>();
-        for (var cursor = this; cursor.step != null; cursor = cursor.parent) steps.add(cursor.step);
-        Collections.reverse(steps);
-        return List.copyOf(steps);
+        Object[] pending = new Object[1];
+        var retained = RetainedOperation.retainCompleted(2, this, steps, pending);
+        Throwable primary = null;
+        try {
+            for (var cursor = this; cursor.step != null; cursor = cursor.parent) {
+                steps.add(cursor.step);
+                SearchExecution.completed(1);
+            }
+            Collections.reverse(steps);
+            SearchExecution.completed(steps.size() / 2L);
+            return SearchExecution.copied(pending, 0, List.copyOf(steps), steps, steps.size());
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            SearchExecution.observeFailure(failure);
+            throw failure;
+        } finally { SearchExecution.close(retained, primary); }
     }
 }

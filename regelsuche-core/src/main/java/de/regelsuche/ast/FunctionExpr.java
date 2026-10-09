@@ -44,4 +44,14 @@ public record FunctionExpr(String name, List<Expr> arguments) implements Expr {
     public Expr argument() {
         return arguments.get(0);
     }
+    @Override public boolean equals(Object other) {
+        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.same(this, other);
+        return this == other || other instanceof FunctionExpr function
+            && name.equals(function.name) && arguments.equals(function.arguments);
+    }
+    @Override public int hashCode() {
+        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.valueHash(this);
+        return 31 * name.hashCode() + arguments.hashCode();
+    }
+
 }

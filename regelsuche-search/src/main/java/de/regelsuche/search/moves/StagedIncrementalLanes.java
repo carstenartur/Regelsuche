@@ -1,6 +1,7 @@
 package de.regelsuche.search.moves;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import static de.regelsuche.search.moves.IncrementalProviderContract.*;
 
@@ -135,8 +136,27 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
     public boolean complete() { return lanes.stream().allMatch(lane -> lane.finished && lane.cursor.snapshot().complete()); }
     public boolean workExhausted() { return workExhausted; }
     SearchExecution.Expansion<S> receipt() {
-        return new SearchExecution.Expansion<>(state, closed, lanes.stream().map(lane ->
-            new StagedIncrementalMoveExecution.Lane(lane.index, lane.stage, lane.cursor == null ? null : lane.cursor.snapshot())).toList());
+        var receipts = new ArrayList<StagedIncrementalMoveExecution.Lane>();
+        Object[] pending = new Object[2];
+        var retained = RetainedOperation.retainCompleted(2, this, receipts, pending);
+        Throwable primary = null;
+        try {
+            for (var lane : lanes) {
+                var snapshot = lane.cursor == null ? null : lane.cursor.snapshot();
+                pending[0] = snapshot;
+                SearchExecution.completed(snapshot == null ? 0 : 1);
+                receipts.add(new StagedIncrementalMoveExecution.Lane(lane.index, lane.stage, snapshot));
+                SearchExecution.completed(2);
+            }
+            var result = new SearchExecution.Expansion<>(state, closed, receipts);
+            pending[1] = result;
+            SearchExecution.completed(0);
+            return result;
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            SearchExecution.observeFailure(failure);
+            throw failure;
+        } finally { SearchExecution.close(retained, primary); }
     }
     public void close() {
         if (closed) return;

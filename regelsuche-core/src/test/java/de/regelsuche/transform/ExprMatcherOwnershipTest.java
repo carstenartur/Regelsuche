@@ -105,14 +105,17 @@ class ExprMatcherOwnershipTest {
                     if (values instanceof List<?>) for (Object item : values) {
                         if (item instanceof String text && dynamicTrace(text)) currentTraceEntries.add(text);
                     }
-                    hasZeroPath |= values.equals(List.of(0));
+                    hasZeroPath |= values instanceof List<?> path && path.size() == 1
+                        && path.getFirst() instanceof Integer index && index == 0;
                     if (values instanceof LinkedHashSet<?>) {
                         hasLimitDiagnostic |= values.stream().anyMatch(item -> item instanceof ExprMatcher.MatchDiagnostic d
                             && d.code().equals("MATCH_RESULT_LIMIT"));
                         hasEmptyDiagnostic |= values.stream().anyMatch(item -> item instanceof ExprMatcher.MatchDiagnostic d
                             && d.code().equals("REPRESENTATIVE_PROVIDER_EMPTY"));
                     }
-                    if (values.equals(List.of(1,0))) {
+                    if (values instanceof List<?> path && path.size() == 2
+                            && path.get(0) instanceof Integer first && first == 1
+                            && path.get(1) instanceof Integer second && second == 0) {
                         hasMutablePath |= values instanceof ArrayList<?>;
                         hasFrozenPath |= !(values instanceof ArrayList<?>);
                     }

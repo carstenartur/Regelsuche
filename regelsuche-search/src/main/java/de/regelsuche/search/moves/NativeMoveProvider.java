@@ -17,7 +17,23 @@ public interface NativeMoveProvider {
         public Batch { moves=List.copyOf(moves);cursorReceipts=List.copyOf(cursorReceipts); }
     }
     static boolean carries(List<String> required,TypedMoveSearch.State source,TypedMoveSearch.Context context) {
-        var available=new java.util.HashSet<>(context.initialAssumptions());available.addAll(source.assumptions());return available.containsAll(required);
+        var available = new java.util.HashSet<>(context.initialAssumptions());
+        var retained = de.regelsuche.retention.RetainedOperation.retainCompleted(
+            context.initialAssumptions().size() + 2L, required, source, context, available);
+        Throwable primary = null;
+        try {
+            available.addAll(source.assumptions());
+            SearchExecution.completed(source.assumptions().size() + 1L);
+            for (var assumption : required) {
+                de.regelsuche.retention.RetainedOperation.work(1);
+                if (!available.contains(assumption)) return false;
+            }
+            return true;
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            SearchExecution.observeFailure(failure);
+            throw failure;
+        } finally { SearchExecution.close(retained, primary); }
     }
     static Batch rejectedAssumptions(){return new Batch(List.of(),new TransformationWorkMetrics(0,0,0,0,0,1,1,0,0,0,0,0,0,0),true);}
     default Batch candidates(TypedMoveSearch.State source,TypedMoveSearch.Context context) {

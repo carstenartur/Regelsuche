@@ -97,8 +97,10 @@ public final class EquivalenceAwarePatternMatcher {
         long setupWork = 7L + bindings.size() + (original == bindings ? 0 : bindings.size())
             + (profile.inferAlgebraicBindings() ? 1 : 0);
         boolean branchesSettled = false;
-        try (var owned = RetainedOperation.retainCompleted(setupWork,
-                pattern,expression,bindings,profile,original,working,budget,result,search)) {
+        try {
+            var owned = RetainedOperation.retainCompleted(setupWork,
+                pattern,expression,bindings,profile,original,working,budget,result,search);
+            Throwable ownedFailure = null;
             try {
                 AttemptStatus status;
                 String detail = "";
@@ -130,8 +132,11 @@ public final class EquivalenceAwarePatternMatcher {
                 RetainedOperation.checkpoint();
                 return outcome;
             } catch (RuntimeException | Error failure) {
+                ownedFailure = failure;
                 observeFailure(failure);
                 throw failure;
+            } finally {
+                closeFrame(owned, ownedFailure);
             }
         } catch (RuntimeException | Error failure) {
             // A returned outcome delegates these branches to its caller. This
@@ -141,6 +146,16 @@ public final class EquivalenceAwarePatternMatcher {
                 if (accounting != failure) failure.addSuppressed(accounting);
             }
             throw failure;
+        }
+    }
+
+    /** A sink may repeat its primary error while settling a frame's already completed release. */
+    private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
+        if (frame == null) return;
+        try { frame.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (primary == null) throw cleanup;
+            if (cleanup != primary) primary.addSuppressed(cleanup);
         }
     }
 
@@ -306,11 +321,19 @@ public final class EquivalenceAwarePatternMatcher {
         }
 
         private boolean matchNumber(PatternExpr.LiteralNumber number, Expr candidate) {
-            return candidate instanceof NumberExpr literal
-                ? literal.value().equals(number.value())
-                : profile.inferAlgebraicBindings()
-                    && BoundedExactMonomial.from(candidate, budget.algebraic)
-                        .map(monomial -> monomial.isConstant(number.value())).orElse(false);
+            if (candidate instanceof NumberExpr literal) return literal.value().equals(number.value());
+            if (!profile.inferAlgebraicBindings()) return false;
+            var monomial = BoundedExactMonomial.from(candidate, budget.algebraic);
+            var value = RetainedOperation.retain(monomial);
+            Throwable valueFailure = null;
+            try {
+                return monomial.isPresent() && monomial.get().isConstant(number.value());
+            } catch (RuntimeException | Error failure) {
+                valueFailure = failure;
+                throw failure;
+            } finally {
+                closeFrame(value, valueFailure);
+            }
         }
 
         private boolean matchFunction(PatternExpr.Function function, Expr candidate) {
@@ -420,20 +443,38 @@ public final class EquivalenceAwarePatternMatcher {
             );
         }
         var monomial = BoundedExactMonomial.from(expression, budget.algebraic);
-        if (monomial.isEmpty()) {
-            return false;
+        var value = RetainedOperation.retain(monomial);
+        Throwable valueFailure = null;
+        try {
+            if (monomial.isEmpty()) {
+                return false;
+            }
+            var root = monomial.get().exactRoot(exponent, budget.algebraic);
+            var rooted = RetainedOperation.retain(root);
+            Throwable rootedFailure = null;
+            try {
+                if (root.isEmpty()) {
+                    return false;
+                }
+                bindings.put(placeholder.name(), root.get().toExpr());
+                return equivalent(
+                    operation.instantiate(bindings),
+                    expression,
+                    profile,
+                    budget
+                );
+            } catch (RuntimeException | Error failure) {
+                rootedFailure = failure;
+                throw failure;
+            } finally {
+                closeFrame(rooted, rootedFailure);
+            }
+        } catch (RuntimeException | Error failure) {
+            valueFailure = failure;
+            throw failure;
+        } finally {
+            closeFrame(value, valueFailure);
         }
-        var root = monomial.get().exactRoot(exponent, budget.algebraic);
-        if (root.isEmpty()) {
-            return false;
-        }
-        bindings.put(placeholder.name(), root.get().toExpr());
-        return equivalent(
-            operation.instantiate(bindings),
-            expression,
-            profile,
-            budget
-        );
     }
 
     private static int bindingPriority(PatternExpr pattern) {
@@ -484,11 +525,38 @@ public final class EquivalenceAwarePatternMatcher {
         if (!profile.inferAlgebraicBindings()) {
             return false;
         }
-        var leftMonomial = BoundedExactMonomial.from(left, budget.algebraic);
-        var rightMonomial = BoundedExactMonomial.from(right, budget.algebraic);
-        return leftMonomial.isPresent()
-            && rightMonomial.isPresent()
-            && leftMonomial.get().equivalentTo(rightMonomial.get());
+        var inputs = RetainedOperation.retain(left, right);
+        Throwable inputsFailure = null;
+        try {
+            var leftMonomial = BoundedExactMonomial.from(left, budget.algebraic);
+            var leftOwned = RetainedOperation.retain(leftMonomial);
+            Throwable leftOwnedFailure = null;
+            try {
+                var rightMonomial = BoundedExactMonomial.from(right, budget.algebraic);
+                var rightOwned = RetainedOperation.retain(rightMonomial);
+                Throwable rightOwnedFailure = null;
+                try {
+                    return leftMonomial.isPresent()
+                        && rightMonomial.isPresent()
+                        && leftMonomial.get().equivalentTo(rightMonomial.get());
+                } catch (RuntimeException | Error failure) {
+                    rightOwnedFailure = failure;
+                    throw failure;
+                } finally {
+                    closeFrame(rightOwned, rightOwnedFailure);
+                }
+            } catch (RuntimeException | Error failure) {
+                leftOwnedFailure = failure;
+                throw failure;
+            } finally {
+                closeFrame(leftOwned, leftOwnedFailure);
+            }
+        } catch (RuntimeException | Error failure) {
+            inputsFailure = failure;
+            throw failure;
+        } finally {
+            closeFrame(inputs, inputsFailure);
+        }
     }
 
     private static boolean couldStructurallyMatch(

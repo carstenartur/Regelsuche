@@ -46,18 +46,29 @@ public record StructuralMoveContext(String rootOperator, int degree, int variabl
     public String key() {
         var writer=new JsonWriter();
         try(var retained=RetainedOperation.retain(this,writer)) {
-        String result=writer.beginObject().property("root", rootOperator).property("degree", degree).property("variables", variables)
-            .property("products", products).property("powers", powers).property("repeated", repeatedSubtrees)
-            .stringArray("assumptions", assumptions).stringArray("capabilities", capabilities).endObject().toString();
-        RetainedOperation.work(result.length());return RetainedOperation.produced(result);
+            try {
+                return writer.beginObject().property("root", rootOperator).property("degree", degree).property("variables", variables)
+                    .property("products", products).property("powers", powers).property("repeated", repeatedSubtrees)
+                    .stringArray("assumptions", assumptions).stringArray("capabilities", capabilities).endObject().toString();
+            } catch(RuntimeException | Error failure) {
+                closeAfterFailure(retained,failure);throw failure;
+            }
         }
     }
     /** Prevents typed observations from silently changing frozen historical feature tables. */
     public String typedKey() {
         String key=key();try(var retained=RetainedOperation.retain(key)){
-            String result="regelsuche.typed-structural-context/v1:"+key;
-            RetainedOperation.work(result.length());return RetainedOperation.produced(result);
+            try {
+                String result="regelsuche.typed-structural-context/v1:"+key;
+                try(var output=RetainedOperation.retainCompleted(result.length()+1L,result)) {return result;}
+            } catch(RuntimeException | Error failure) {
+                closeAfterFailure(retained,failure);throw failure;
+            }
         }
+    }
+    private static void closeAfterFailure(RetainedOperation.Frame frame,Throwable failure) {
+        if(frame==null)return;
+        try{frame.close();}catch(RuntimeException | Error cleanup){if(cleanup!=failure)failure.addSuppressed(cleanup);}
     }
     private static void collect(Expr expr, HashMap<Expr, Integer> seen, HashSet<String> variables, int[] counts) {
         RetainedOperation.work(3);

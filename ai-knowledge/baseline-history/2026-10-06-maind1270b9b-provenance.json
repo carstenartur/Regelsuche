@@ -1,0 +1,36 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "sourceCommit": "d1270b9b8c652340ed3abb895c1a24bb68cb5899",
+  "sourceTree": "dbfdb5919db388d876779259e4571307ba86a58a",
+  "measurement": "hosted",
+  "workflowRun": "https://github.com/carstenartur/Regelsuche/actions/runs/37475603053",
+  "measuringJob": "https://github.com/carstenartur/Regelsuche/actions/runs/37475603053/job/112310618344",
+  "artifact": {
+    "name": "repository-verification",
+    "id": 11420348932,
+    "sha256": "f1732d072ede593957966dbeef76cb3042d245b66c4d06857f35ac18f246f3c0",
+    "digestVerification": "Archive downloaded; local SHA256 equals the API-reported digest."
+  },
+  "extractorVersion": "0.1.10",
+  "sourceBaselineSha256": "ffe19a30017b1ce269f95bf42aad0e98994506a045df8530b008020c37b06399",
+  "policySha256": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+  "command": "env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true ciCheck --parallel --console=plain --stacktrace (AI_KNOWLEDGE_EXTRACTOR_ENABLED=true)",
+  "exitCode": 0,
+  "qualification": "Accepted main passed the complete unchanged old-baseline aiKnowledgeCheck in its hosted ciCheck: 682415 estimated tokens, +13550 against 668865, below the unchanged 15000 allowance. Eight coverage controls and all 17 hotspot checks passed; all mandatory CI jobs succeeded. Policy, extractor version, selectors and thresholds are byte-identical between the source commit and the promoting change. Failing PR values are retained but supply no baseline values.",
+  "artifacts": {
+    "2026-10-06-maind1270b9b-check.json": "b4ef20c53832da0192c59d39f72ac4bcaf06d98f320134cafdb5a70542007263",
+    "2026-10-06-maind1270b9b-previous-baseline.json": "ffe19a30017b1ce269f95bf42aad0e98994506a045df8530b008020c37b06399",
+    "2026-10-06-maind1270b9b-metrics-snapshot.json": "126eb4e0724f076ae699a880a0080052845d16f793e72c06d7da6160d207d769",
+    "2026-10-06-maind1270b9b-aiKnowledgeCheck.log": "715a4aa4412b5f4a75f2e1ccc636da4e702dcb32b5a1723320f927d42438af9c",
+    "2026-10-06-maind1270b9b-trend.json": "e5b6a3416155eab7854a85e07949ea1769869b814e961ae096bec99d48c64dd5",
+    "2026-10-06-maind1270b9b-ci.json": "ddf41b81424ac554763773f895d69d2c4d1083a17eb450f1a34264c7e677da75"
+  },
+  "rejectedCandidate": {
+    "file": "2026-10-06-pr-2910951144-rejected-trend.json",
+    "sha256": "e610bdadd2d7596a91b553f6a41a72aa7896f553927332e81a93fd6eccc794c8",
+    "job": "https://github.com/carstenartur/Regelsuche/actions/runs/37534987773/job/112513532904",
+    "estimatedContextTokens": 684225.0,
+    "increaseAgainstPreviousBaseline": 15360.0,
+    "increaseAgainstPromotedBaseline": 1810.0
+  }
+}

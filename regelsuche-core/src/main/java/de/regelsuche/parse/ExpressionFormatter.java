@@ -41,7 +41,7 @@ public final class ExpressionFormatter {
             }
         }
         Output builder = new Output(expr, emittedCodeUnits);
-        try (var output = RetainedOperation.retain(builder)) {
+        try (var output = RetainedOperation.retainCompleted(19, builder)) {
             append(builder);
             return builder.value();
         }
@@ -50,13 +50,14 @@ public final class ExpressionFormatter {
     public static String format(Equation equation) {
         Objects.requireNonNull(equation, "equation");
         Output builder = new Output(equation, NativeEmission.INSTANCE);
-        try (var output = RetainedOperation.retain(builder)) {
+        try (var output = RetainedOperation.retainCompleted(19, builder)) {
             append(builder);
             return builder.value();
         }
     }
 
     private static void append(Output builder) {
+        builder.initialize();
         while (!builder.pending.isEmpty()) {
             Action action = builder.pending.pop();
             builder.current = action;
@@ -303,7 +304,10 @@ public final class ExpressionFormatter {
         private Output(Object input, java.util.function.LongConsumer emittedCodeUnits) {
             this.input = input;
             this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
-            RetainedOperation.work(19);
+        }
+
+        /** The workspace is already retained before initialization can debit or fail. */
+        private void initialize() {
             if (input instanceof Expr expression) {
                 push(pending, new FormatExpression(expression, 0));
             } else {
@@ -374,8 +378,7 @@ public final class ExpressionFormatter {
             if (needed <= text.length) return;
             var old = text;
             var replacement = new char[Math.max(needed, Math.addExact(Math.multiplyExact(old.length, 2), 2))];
-            RetainedOperation.work(replacement.length);
-            try (var growth = RetainedOperation.retain(old, replacement)) {
+            try (var growth = RetainedOperation.retainCompleted(replacement.length, old, replacement)) {
                 System.arraycopy(old, 0, replacement, 0, size);
                 text = replacement;
                 RetainedOperation.work(size + 1L);

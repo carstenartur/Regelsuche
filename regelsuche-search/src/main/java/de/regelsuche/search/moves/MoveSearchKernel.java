@@ -1,6 +1,7 @@
 package de.regelsuche.search.moves;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -229,38 +230,105 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         }
 
         private SearchExecution.Result<S,M,V,A> finish() {
-            var objective = ledger.objective;
-            if (objective != null) {
-                ledger.search = Math.addExact(ledger.search, objective.finish());
-                if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();
+            problem.beginResultAssembly();
+            try {
+                finishObjective();
+                assembleResult();
+            } finally { problem.endResultAssembly(); }
+            // One bounded correction, after copy, observation and frame-close costs.
+            // Neither this correction nor the assembly phase may resume the search.
+            if (rejectFinalLimits()) {
+                problem.beginResultAssembly();
+                try { replaceResult(); }
+                finally { problem.endResultAssembly(); }
             }
-            if (cleanupOverrun(problem, ledger) || ((objective != null || problem.additionalWork()>0) && ledger.total() > budget.totalWork())) {
-                stop(Outcome.WORK_EXHAUSTED);
-                witness = List.of();
-                hit = -1;
-                primitiveHit = -1;
-            }
-            if(!problem.ownershipComplete()) { stop(Outcome.INCONCLUSIVE);witness=List.of();hit=-1;primitiveHit=-1; }
-            var receipts = opened.stream().map(node -> node.picker.executionReceipt()).toList();
-            boolean accountingComplete = problem.ownershipComplete() && opened.stream().allMatch(node -> node.picker.accountingComplete())
-                && ledger.batchReceipts.stream().allMatch(receipt->receipt.accountingComplete() && receipt.status()!=IncrementalProviderContract.Status.FAILED);
-            if (!accountingComplete && outcome != Outcome.WORK_EXHAUSTED) {
-                stop(Outcome.INCONCLUSIVE); witness = List.of(); hit = -1; primitiveHit = -1;
-            }
-            if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
-            // Capture chronology before Map.copyOf/Set.copyOf discard iteration order.
-            // These fields also own the immutable copies throughout final replay/handoff.
-            assessmentOrder=List.copyOf(assessments.keySet());
-            de.regelsuche.retention.RetainedOperation.work(assessmentOrder.size()+1L);
-            reachedOrder=List.copyOf(reached);
-            de.regelsuche.retention.RetainedOperation.work(reachedOrder.size()+1L);
-            result = new SearchExecution.Result<>(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
-                ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
-                ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments,
-                receipts,ledger.batchReceipts,assessmentOrder,reachedOrder);
-            de.regelsuche.retention.RetainedOperation.work(3);
             return result;
         }
+
+        private void finishObjective() {
+            var objective = ledger.objective;
+            if (objective != null) {
+                ledger.search = Math.addExact(ledger.search, objective.finish(problem.accountsWitnessMaterialization()));
+                if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();
+            }
+            if (finalWorkOverrun())
+                rejectResult(Outcome.WORK_EXHAUSTED);
+            if (!problem.ownershipComplete()) rejectResult(Outcome.INCONCLUSIVE);
+        }
+
+        private void assembleResult() {
+            var receipts = new ArrayList<Object>();
+            Object[] pending = new Object[1];
+            var retained = RetainedOperation.retainCompleted(2, this, receipts, pending);
+            Throwable primary = null;
+            try {
+                for (var node : opened) {
+                    receipts.add(node.picker.executionReceipt());
+                    SearchExecution.completed(1);
+                }
+                boolean accountingComplete = problem.ownershipComplete() && opened.stream().allMatch(node -> node.picker.accountingComplete())
+                    && ledger.batchReceipts.stream().allMatch(receipt->receipt.accountingComplete() && receipt.status()!=IncrementalProviderContract.Status.FAILED);
+                if (!accountingComplete && outcome != Outcome.WORK_EXHAUSTED) rejectResult(Outcome.INCONCLUSIVE);
+                if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
+                // Capture chronology before Map.copyOf/Set.copyOf discard iteration order.
+                assessmentOrder = List.copyOf(assessments.keySet());
+                SearchExecution.completed(assessmentOrder.size() + 1L);
+                reachedOrder = List.copyOf(reached);
+                SearchExecution.completed(reachedOrder.size() + 1L);
+                var metrics = metrics();
+                pending[0] = metrics;
+                SearchExecution.completed(ledger.matches.size() + 2L);
+                result = new SearchExecution.Result<>(outcome, witness, events, reached, deadEnds, metrics, complete, assessments,
+                    receipts, ledger.batchReceipts, assessmentOrder, reachedOrder);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                SearchExecution.observeFailure(failure);
+                throw failure;
+            } finally { SearchExecution.close(retained, primary); }
+        }
+
+        private Metrics metrics() {
+            return new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
+                ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
+                ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches);
+        }
+
+        private void rejectResult(Outcome failure) {
+            stop(failure);
+            witness = List.of();
+            hit = -1;
+            primitiveHit = -1;
+        }
+
+        private boolean finalWorkOverrun() {
+            return cleanupOverrun(problem, ledger)
+                || ((ledger.objective != null || problem.additionalWork() > 0) && ledger.total() > budget.totalWork());
+        }
+
+        private boolean rejectFinalLimits() {
+            if (!problem.ownershipComplete()) rejectResult(Outcome.INCONCLUSIVE);
+            else if (finalWorkOverrun()) rejectResult(Outcome.WORK_EXHAUSTED);
+            return result.outcome() != outcome || result.completeBoundedRelation() != complete
+                || result.metrics().firstHitDepth() != hit || result.metrics().firstHitPrimitiveDepth() != primitiveHit
+                || result.witness().size() != witness.size();
+        }
+
+        private void replaceResult() {
+            var metrics = metrics();
+            var retained = RetainedOperation.retainCompleted(ledger.matches.size() + 2L, this, metrics);
+            Throwable primary = null;
+            try {
+                // The attempted result stays owned by this field until the replacement is complete.
+                result = new SearchExecution.Result<>(outcome, witness, result.events(), result.reachedStates(), result.deadEndStates(),
+                    metrics, complete, result.stateAssessments(), result.pickerReceipts(), result.batchCursorReceipts(),
+                    result.assessmentOrder(), result.reachedOrder());
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                SearchExecution.observeFailure(failure);
+                throw failure;
+            } finally { SearchExecution.close(retained, primary); }
+        }
+
     }
 
     private SearchExecution.Picker<M> picker(SearchExecution.Environment<E,S,M,A,V> problem,S state) { return problem.picker(state); }
@@ -285,16 +353,40 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         if (next.isEmpty()) return Expansion.EXHAUSTED;
         var move = next.orElseThrow(); ledger.consumed++; ledger.search++;
         var admission = admit(problem, node, move, visited, ledger);
+        Object[] pending = new Object[4];
+        var retained = RetainedOperation.retainCompleted(1, node, move, admission, pending);
+        Throwable primary = null;
+        try {
+            return expandAdmission(problem, node, move, admission, pending, ledger, events, visited, frontier, serial, assessments);
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            SearchExecution.observeFailure(failure);
+            throw failure;
+        } finally { SearchExecution.close(retained, primary); }
+    }
+
+    private Expansion expandAdmission(SearchExecution.Environment<E,S,M,A,V> problem, Node node, M move, Admission admission,
+            Object[] pending, Ledger ledger, List<SearchExecution.Event<S,M,V>> events, MoveSearchVisits<S> visited,
+            PriorityQueue<Ticket> frontier, long[] serial, Map<S,A> assessments) {
         var decision = admission.decision();
         var verification = admission.verification();
         var child = admission.child();
-        var delta = new HashSet<>(child.capabilities()); delta.removeAll(node.state.capabilities());
+        var delta = new HashSet<>(child.capabilities());
+        pending[0] = delta;
+        SearchExecution.completed(child.capabilities().size() + 1L);
+        delta.removeAll(node.state.capabilities());
+        SearchExecution.completed(node.state.capabilities().size());
         move = move.withCapabilityDelta(delta);
+        pending[1] = move;
+        SearchExecution.completed(1);
         boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;
         if (decision == Decision.ENQUEUED) {
             visited.add(child, admission.theoryWork()); node.enqueued++; recordAssessment(assessments,child,admission.value());
             var path = node.path.append(new SearchExecution.Step<>(node.state, child, move, verification));
-            frontier.add(new Ticket(new Node(child, admission.theoryWork(), path, admission.value()),
+            pending[2] = path;
+            var successor = new Node(child, admission.theoryWork(), path, admission.value());
+            pending[3] = successor;
+            frontier.add(new Ticket(successor,
                 child.expression().equals(problem.goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial[0]++));
             ledger.observe(child, path);
         }
@@ -309,40 +401,71 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         frontier.add(new Ticket(node, continuation, serial[0]++)); ledger.search++;
         return proofRejected ? Expansion.REJECTED_PROOF : Expansion.MORE;
     }
+
     private void recordAssessment(Map<S,A> assessments,S state,A value){
         boolean firstAdmission=assessments.put(state,value)==null;
         de.regelsuche.retention.RetainedOperation.work(firstAdmission?3:1);
     }
-    private final class Admission {
+    private final class Admission implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v) {
+            v.reference(MoveSearchKernel.this);v.reference(child);v.reference(decision);v.reference(verification);v.reference(value);
+        }
         private final S child; private final long theoryWork; private final Decision decision; private final V verification; private final A value;
         Admission(S child,long theoryWork,Decision decision,V verification,A value){this.child=child;this.theoryWork=theoryWork;this.decision=decision;this.verification=verification;this.value=value;}
         S child(){return child;} long theoryWork(){return theoryWork;} Decision decision(){return decision;} V verification(){return verification;} A value(){return value;}
     }
     private Admission admit(SearchExecution.Environment<E,S,M,A,V> problem, Node node, M move, MoveSearchVisits<S> visited, Ledger ledger) {
+        Object[] pending = new Object[5];
+        var retained = RetainedOperation.retainCompleted(1, problem, node, move, pending);
+        Throwable primary = null;
+        try { return evaluateAdmission(problem, node, move, visited, ledger, pending); }
+        catch (RuntimeException | Error failure) {
+            primary = failure;
+            SearchExecution.observeFailure(failure);
+            throw failure;
+        } finally { SearchExecution.close(retained, primary); }
+    }
+
+    private Admission admission(Object[] pending,S child,long theory,Decision decision,V verification,A value) {
+        var result = new Admission(child, theory, decision, verification, value);
+        pending[4] = result;
+        SearchExecution.completed(1);
+        return result;
+    }
+
+    private Admission evaluateAdmission(SearchExecution.Environment<E,S,M,A,V> problem, Node node, M move,
+            MoveSearchVisits<S> visited, Ledger ledger, Object[] pending) {
         var step = move;
         long depth = (long) node.state.primitiveDepth() + step.primitiveStepCount();
         long theory = Math.addExact(node.theoryWork, step.executionWork().exactTheoryWorkUnits());
         var child = problem.state(step.targetExpression(), node.state.searchDepth() + 1,
             (int) Math.min(Integer.MAX_VALUE, depth), move.ruleId(), node.state.assumptions(), Set.of(), 0);
+        pending[0] = child;
+        SearchExecution.completed(1);
         var value = inspect(problem, child, ledger);
+        pending[1] = value;
         long debt = Math.max(0L, (long) node.state.complexityDebt() + value.complexity() - node.value.complexity());
         child = problem.state(child.expression(), child.searchDepth(), child.primitiveDepth(), child.previousRule(), child.assumptions(),
             value.capabilities().keySet(), (int) Math.min(Integer.MAX_VALUE, debt));
+        pending[2] = child;
+        SearchExecution.completed(1);
         Decision decision = rejectBounds(problem, node, move, depth, theory, debt, ledger);
-        if (decision != null) return new Admission(child, theory, decision, null, value);
+        if (decision != null) return admission(pending, child, theory, decision, null, value);
 
         decision = visited.rejection(child, theory);
         if (decision == Decision.DUPLICATE) ledger.duplicates++;
         if (ledger.total() > problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
-        if (decision != null) return new Admission(child, theory, decision, null, value);
+        if (decision != null) return admission(pending, child, theory, decision, null, value);
         if (ledger.total() >= problem.budget().totalWork()) {
-            return new Admission(child, theory, Decision.WORK_LIMIT, null, value);
+            return admission(pending, child, theory, Decision.WORK_LIMIT, null, value);
         }
         var verification = problem.verify(node.state, move);
         ledger.verification = Math.addExact(ledger.verification, verification.work());
+        pending[3] = verification;
+        SearchExecution.completed(1);
         decision = ledger.total() > problem.budget().totalWork() ? Decision.WORK_LIMIT
             : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;
-        return new Admission(child, theory, decision, verification, value);
+        return admission(pending, child, theory, decision, verification, value);
     }
 
     /** A rejected bound must not trigger a paid visited lookup or a proof attempt. */
@@ -356,13 +479,26 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
     }
 
     private A inspect(SearchExecution.Environment<E,S,M,A,V> problem, S state, Ledger ledger) {
-        var value = problem.inspect(state);
-        if (value.capabilities().values().stream().anyMatch(capability -> !capability.sourceExpression().equals(state.expression())))
-            throw new IllegalArgumentException("capability evidence differs from source state");
-        ledger.search = Math.addExact(ledger.search, value.searchWork());
-        ledger.primitive = Math.addExact(ledger.primitive, value.primitiveWork());
-        return value;
+        Object[] pending = new Object[1];
+        var retained = RetainedOperation.retainCompleted(1, problem, state, pending);
+        Throwable primary = null;
+        try {
+            var value = problem.inspect(state);
+            pending[0] = value;
+            // Completed callback work is settled exactly once, even if source validation aborts.
+            ledger.search = Math.addExact(ledger.search, value.searchWork());
+            ledger.primitive = Math.addExact(ledger.primitive, value.primitiveWork());
+            SearchExecution.completed(1);
+            if (value.capabilities().values().stream().anyMatch(capability -> !capability.sourceExpression().equals(state.expression())))
+                throw new IllegalArgumentException("capability evidence differs from source state");
+            return value;
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            SearchExecution.observeFailure(failure);
+            throw failure;
+        } finally { SearchExecution.close(retained, primary); }
     }
+
     private double priority(SearchExecution.Environment<E,S,M,A,V> problem, S state, A value) {
         double score = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? state.searchDepth() : problem.score(state) - value.value();
         if (!Double.isFinite(score)) throw new IllegalArgumentException("nonfinite state priority");

@@ -2,13 +2,14 @@ package de.regelsuche.search.moves;
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import de.regelsuche.transform.*;
 import java.util.*;
 
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
-    public static final String REVISION = "regelsuche.native-expr-move-search/v6-partial-validation-retention";
+    public static final String REVISION = "regelsuche.native-expr-move-search/v7-partial-atomic-ownership";
     /** Fixed release coverage, independent of mathematical proof validity or observed resource limits. */
     public enum Coverage { PARTIAL_ATOMIC_INVENTORY }
     public static Coverage coverage(){return Coverage.PARTIAL_ATOMIC_INVENTORY;}
@@ -138,9 +139,31 @@ public final class NativeMoveSearch {
             this(problem,result,0);
         }
         private Result(Problem problem,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result,long replayWork){
-            this.source=problem.source();this.result=result;this.replayWork=replayWork;this.workBudget=problem.budget().totalWork();
-            incrementalProviders=problem.scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL?problem.providers().stream()
-                .map(p->new StagedIncrementalMoveExecution.Provider(p.descriptor(),NativeIncrementalSources.definition(p))).toList():null;
+            var providers = new ArrayList<StagedIncrementalMoveExecution.Provider>();
+            Object[] pending = new Object[4];
+            var retained = RetainedOperation.retainCompleted(2, problem, result, providers, pending);
+            Throwable primary = null;
+            try {
+                this.source=problem.source();this.result=result;this.replayWork=replayWork;this.workBudget=problem.budget().totalWork();
+                if (problem.scheduling() == MoveSearch.Scheduling.STAGED_INCREMENTAL) {
+                    for (var provider : problem.providers()) {
+                        var descriptor = provider.descriptor();
+                        pending[0] = descriptor;
+                        var definition = NativeIncrementalSources.definition(provider);
+                        pending[1] = definition;
+                        SearchExecution.completed(provider instanceof ExprIncrementalProvider ? 0 : 1);
+                        providers.add(new StagedIncrementalMoveExecution.Provider(descriptor, definition));
+                        SearchExecution.completed(2);
+                    }
+                    incrementalProviders = SearchExecution.copied(pending, 2, List.copyOf(providers), providers, providers.size());
+                } else incrementalProviders = null;
+                pending[3] = this;
+                SearchExecution.completed(1);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                SearchExecution.observeFailure(failure);
+                throw failure;
+            } finally { SearchExecution.close(retained, primary); }
         }
         @SuppressWarnings("unchecked")
         public List<SearchExecution.Expansion<TypedMoveSearch.State>> cursorReceipts(){
@@ -171,7 +194,7 @@ public final class NativeMoveSearch {
         /** Independent finite output-phase budget; add its observed work once to totalWork; coverage remains incomplete. */
         public ExportResult exportLegacy(long workBudget,SearchExpressionStore.Limits limits){return NativeExportSession.run(this,workBudget,limits);}
         public static final long DEFAULT_EXPORT_WORK=10_000_000;
-        public static final String EXPORT_REVISION="regelsuche.native-legacy-export/v2-partial-atomic-inventory";
+        public static final String EXPORT_REVISION="regelsuche.native-legacy-export/v3-partial-atomic-ownership";
         /** Requires fully qualified output accounting; partial coverage throws with its paid diagnostic artefact. */
         public MoveSearch.Result exportLegacy(){
             var exported=exportLegacy(DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);
@@ -182,26 +205,95 @@ public final class NativeMoveSearch {
             var witness=new ArrayList<MoveSearch.WitnessStep>();var events=new ArrayList<MoveSearch.Event>();
             var reached=new HashSet<MoveState>();var dead=new ArrayList<MoveState>();
             var expansions=new ArrayList<StagedIncrementalMoveExecution.Expansion>();
-            try(var retained=de.regelsuche.retention.RetainedOperation.retain(assessments,witness,events,reached,dead,expansions)) {
+            // Returned components remain owned while the next export or constructor can fail.
+            // A producer's temporary produced(...) frame alone cannot provide this handoff.
+            var completed=new Object[5];
+            var retained=de.regelsuche.retention.RetainedOperation.retainCompleted(7,
+                assessments,witness,events,reached,dead,expansions,completed,this);
+            Throwable primary=null;
+            try {
                 for(var state:result.assessmentOrder()){
                     var assessment=result.stateAssessments().get(state);
                     de.regelsuche.retention.RetainedOperation.work(1);
-                    assessments.put(export(state),export(assessment));de.regelsuche.retention.RetainedOperation.checkpoint();
+                    export(state,completed,0);export(assessment,completed,1);
+                    assessments.put((MoveState)completed[0],(StateValue.Assessment)completed[1]);
+                    SearchExecution.completed(1);
                 }
-                for(var step:result.witness()){witness.add(new MoveSearch.WitnessStep(export(step.source()),export(step.target()),step.move().exportLegacy(),step.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}
-                for(var event:result.events()){events.add(new MoveSearch.Event(export(event.source()),export(event.target()),event.move().exportLegacy(),event.decision(),event.verification()==null?null:event.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}
-                for(var state:result.reachedOrder()){reached.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
-                for(var state:result.deadEndStates()){dead.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
-                if(incrementalProviders!=null)for(var receipt:cursorReceipts()){expansions.add(new StagedIncrementalMoveExecution.Expansion(export(receipt.source()),receipt.closed(),receipt.lanes()));de.regelsuche.retention.RetainedOperation.checkpoint();}
-                de.regelsuche.retention.RetainedOperation.work(assessments.size()+witness.size()+events.size()+reached.size()+dead.size()+expansions.size()+7L);
-                return de.regelsuche.retention.RetainedOperation.produced(new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),false,assessments,null,
-                    incrementalProviders==null?null:new StagedIncrementalMoveExecution(REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,expansions)));
-            }
+                for(var step:result.witness()){
+                    export(step.source(),completed,0);export(step.target(),completed,1);
+                    completed[2]=step.move().exportLegacy();completed[3]=step.verification().exportLegacy();
+                    completed[4]=new MoveSearch.WitnessStep((MoveState)completed[0],(MoveState)completed[1],
+                        (SearchMove)completed[2],(MoveVerifier.Verification)completed[3]);
+                    SearchExecution.completed(1);
+                    witness.add((MoveSearch.WitnessStep)completed[4]);SearchExecution.completed(1);
+                }
+                for(var event:result.events()){
+                    export(event.source(),completed,0);export(event.target(),completed,1);
+                    completed[2]=event.move().exportLegacy();
+                    completed[3]=event.verification()==null?null:event.verification().exportLegacy();
+                    completed[4]=new MoveSearch.Event((MoveState)completed[0],(MoveState)completed[1],
+                        (SearchMove)completed[2],event.decision(),(MoveVerifier.Verification)completed[3]);
+                    SearchExecution.completed(1);
+                    events.add((MoveSearch.Event)completed[4]);SearchExecution.completed(1);
+                }
+                for(var state:result.reachedOrder()){
+                    export(state,completed,0);reached.add((MoveState)completed[0]);SearchExecution.completed(1);
+                }
+                for(var state:result.deadEndStates()){
+                    export(state,completed,0);dead.add((MoveState)completed[0]);SearchExecution.completed(1);
+                }
+                if(incrementalProviders!=null){
+                    var receipts=cursorReceipts();completed[3]=receipts;SearchExecution.completed(receipts.size()+1L);
+                    for(var receipt:receipts){
+                        export(receipt.source(),completed,0);
+                        completed[1]=new StagedIncrementalMoveExecution.Expansion((MoveState)completed[0],receipt.closed(),receipt.lanes());
+                        var expansion=(StagedIncrementalMoveExecution.Expansion)completed[1];
+                        SearchExecution.completed(1L+(expansion.lanes()==receipt.lanes()?0:receipt.lanes().size()+1L));
+                        expansions.add((StagedIncrementalMoveExecution.Expansion)completed[1]);SearchExecution.completed(1);
+                    }
+                }
+                completed[0]=incrementalProviders==null?null:new StagedIncrementalMoveExecution(
+                    REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,expansions);
+                if(completed[0]!=null){
+                    var staged=(StagedIncrementalMoveExecution)completed[0];
+                    SearchExecution.completed(1L+(staged.providers()==incrementalProviders?0:incrementalProviders.size()+1L)
+                        +(staged.expansions()==expansions?0:expansions.size()+1L));
+                }
+                completed[1]=new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),false,assessments,null,
+                    (StagedIncrementalMoveExecution)completed[0]);
+                var projection=(MoveSearch.Result)completed[1];
+                // All constructor copies already exist. Settle the entire owned block
+                // before its first fallible debit/checkpoint; historical constructors stay unmetered.
+                SearchExecution.completed(1L+(projection.witness()==witness?0:witness.size()+1L)
+                    +(projection.events()==events?0:events.size()+1L)
+                    +(projection.reachedStates()==reached?0:reached.size()+1L)
+                    +(projection.deadEndStates()==dead?0:dead.size()+1L)
+                    +(projection.stateAssessments()==assessments?0:assessments.size()+1L));
+                return projection;
+            } catch(RuntimeException | Error failure){
+                primary=failure;SearchExecution.observeFailure(failure);throw failure;
+            } finally {SearchExecution.close(retained,primary);}
         }
     }
     public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
             List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness,long replayWork,long workBudget) implements RetainedGraph.View {
-        public QualityResult { witness=List.copyOf(witness); }
+        public QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
+                List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness,long replayWork,long workBudget) {
+            Object[] pending = new Object[2];
+            var retained = RetainedOperation.retainCompleted(1, search, incumbent, witness, pending);
+            Throwable primary = null;
+            try {
+                this.search=search;this.incumbent=incumbent;this.inputScore=inputScore;this.outputScore=outputScore;
+                this.replayWork=replayWork;this.workBudget=workBudget;
+                this.witness=SearchExecution.copied(pending, 0, List.copyOf(witness), witness, witness.size());
+                pending[1] = this;
+                SearchExecution.completed(1);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                SearchExecution.observeFailure(failure);
+                throw failure;
+            } finally { SearchExecution.close(retained, primary); }
+        }
         /** Observed work only; see the native search coverage and accounting receipt. */
         public long totalWork(){return search.totalWork();}
         public boolean hasIncumbent(){return incumbent!=null;}
@@ -255,9 +347,13 @@ public final class NativeMoveSearch {
                 accounting.completed(searched,selection,execution);
                 var replay=selection.incumbent()==null?new Replay(0,null):
                     replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
-                var result=new Result(problem,searched,replay.work());
-                var quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
-                accounting.finish(result,quality);
+                QualityResult quality;
+                accounting.beginResultAssembly();
+                try {
+                    var result=new Result(problem,searched,replay.work());
+                    quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
+                } finally { accounting.endResultAssembly(); }
+                accounting.finish(quality.search(),quality);
                 if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());
                 return quality;
             }
@@ -276,7 +372,11 @@ public final class NativeMoveSearch {
             accounting.completed(searched,null,execution);
             var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
                 ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
-            var result=new Result(problem,searched,replay.work());accounting.finish(result);
+            Result result;
+            accounting.beginResultAssembly();
+            try { result=new Result(problem,searched,replay.work()); }
+            finally { accounting.endResultAssembly(); }
+            accounting.finish(result);
             if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());
             return result;
             }
@@ -298,25 +398,40 @@ public final class NativeMoveSearch {
     private static Replay replay(Execution execution,Expr source,Expr target,
             List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness){
         long work=0;
-        TypedMoveSearch.State cursor=witness.isEmpty()?null:witness.getFirst().source();
-        if(cursor!=null && (!cursor.expression().equals(source) || cursor.searchDepth()!=0))
-            throw new IllegalStateException("native replay root differs");
-        for(var step:witness) {
-            if(!cursor.equals(step.source()))throw new IllegalStateException("broken native witness lineage");
-            NativeVerification checked;
-            try {checked=execution.verify(cursor,step.move());}
-            catch(SearchExecution.ResourceLimit exhausted) {
-                if(execution.accounting==null)throw exhausted;
-                execution.accounting.incomplete("NATIVE_RESOURCE_LIMIT");
-                return new Replay(Math.addExact(work,exhausted.takeWork().total()),null);
-            }
-            work=Math.addExact(work,checked.work());
-            if(!checked.accepted() || !checked.equals(step.verification()))return new Replay(work,checked);
-            cursor=step.target();
+        Object[] current = new Object[1];
+        try {
+            var retained = RetainedOperation.retainCompleted(1, execution, source, target, witness, current);
+            Throwable primary = null;
+            try {
+                TypedMoveSearch.State cursor=witness.isEmpty()?null:witness.getFirst().source();
+                if(cursor!=null && (!cursor.expression().equals(source) || cursor.searchDepth()!=0))
+                    throw new IllegalStateException("native replay root differs");
+                for(var step:witness) {
+                    if(!cursor.equals(step.source()))throw new IllegalStateException("broken native witness lineage");
+                    var checked=execution.verify(cursor,step.move());
+                    // A returned checker receipt is already paid, even if owning or comparing it aborts.
+                    current[0]=checked;
+                    work=Math.addExact(work,checked.work());
+                    SearchExecution.completed(1);
+                    if(!checked.accepted() || !checked.equals(step.verification()))return new Replay(work,checked);
+                    cursor=step.target();
+                    current[0]=null;
+                    RetainedOperation.work(1);
+                }
+                if(!(cursor==null?source:cursor.expression()).equals(target))throw new IllegalStateException("native replay endpoint differs");
+                return new Replay(work,null);
+            } catch(RuntimeException | Error failure) {
+                primary=failure;
+                SearchExecution.observeFailure(failure);
+                throw failure;
+            } finally { SearchExecution.close(retained,primary); }
+        } catch(SearchExecution.ResourceLimit exhausted) {
+            if(execution.accounting==null)throw exhausted;
+            execution.accounting.incomplete("NATIVE_RESOURCE_LIMIT");
+            return new Replay(Math.addExact(work,exhausted.takeWork().total()),null);
         }
-        if(!(cursor==null?source:cursor.expression()).equals(target))throw new IllegalStateException("native replay endpoint differs");
-        return new Replay(work,null);
     }
+
     private static final class Execution implements SearchExecution.Environment<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>,RetainedGraph.View {
         private final Problem problem;private final SearchExpressionStore store;
         private final NativeRetentionSession accounting;
@@ -325,7 +440,10 @@ public final class NativeMoveSearch {
         @Override public void ownership(RetainedGraph.View root){if(accounting!=null)accounting.ownership(root);}
         @Override public void checkpoint(){if(accounting!=null)accounting.checkpoint();}
         @Override public long additionalWork(){return accounting==null?0:accounting.work();}
+        @Override public boolean accountsWitnessMaterialization(){return accounting!=null;}
         @Override public boolean ownershipComplete(){return accounting==null || accounting.complete();}
+        @Override public void beginResultAssembly(){if(accounting!=null)accounting.beginResultAssembly();}
+        @Override public void endResultAssembly(){if(accounting!=null)accounting.endResultAssembly();}
         @Override public Expr source(){return problem.source();}
         @Override public Expr goal(){return problem.context().goal();}
         @Override public List<String> initialAssumptions(){return problem.context().initialAssumptions();}
@@ -340,7 +458,7 @@ public final class NativeMoveSearch {
         @Override public NativeStateValue.Assessment inspect(TypedMoveSearch.State state){return problem.stateValue().evaluate(state,problem.context());}
         @Override public double score(TypedMoveSearch.State state){return problem.stateScore().applyAsDouble(state);}
         @Override public boolean carries(List<String> assumptions,TypedMoveSearch.State state){
-            var available=new HashSet<>(initialAssumptions());available.addAll(state.assumptions());return available.containsAll(assumptions);
+            return NativeMoveProvider.carries(assumptions,state,problem.context());
         }
         @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move){
             de.regelsuche.retention.RetainedOperation.work(1);
@@ -368,17 +486,43 @@ public final class NativeMoveSearch {
             return scheduling()==MoveSearch.Scheduling.STAGED?new StagedBatchPicker<>(providers,ranking):new EagerBatchPicker<>(providers,ranking,false);
         }
     }
-    private static StateValue.Assessment export(NativeStateValue.Assessment value){
+    private static StateValue.Assessment export(NativeStateValue.Assessment value,Object[] owner,int slot){
         var capabilities=new TreeMap<String,StateValue.Capability>();var codec=new CompiledAstReplayCodec();
-        var text=new String[3];
-        try(var retained=de.regelsuche.retention.RetainedOperation.retain(capabilities,text)) {
+        var completed=new Object[4];
+        var retained=de.regelsuche.retention.RetainedOperation.retainCompleted(2,value,capabilities,completed);
+        Throwable primary=null;
+        try {
             for(var entry:value.capabilities().entrySet()) {
-                var c=entry.getValue();text[0]=codec.encodeExpression(c.sourceExpression());text[1]=codec.encodeExpression(c.matchedExpression());text[2]=codec.encodeExpression(c.rewrittenExpression());
-                capabilities.put(entry.getKey(),new StateValue.Capability(c.providerId(),text[0],c.subtreePath(),text[1],text[2]));
-                de.regelsuche.retention.RetainedOperation.work(4);de.regelsuche.retention.RetainedOperation.checkpoint();
+                var c=entry.getValue();completed[0]=codec.encodeExpression(c.sourceExpression());
+                completed[1]=codec.encodeExpression(c.matchedExpression());completed[2]=codec.encodeExpression(c.rewrittenExpression());
+                completed[3]=new StateValue.Capability(c.providerId(),(String)completed[0],c.subtreePath(),(String)completed[1],(String)completed[2]);
+                capabilities.put(entry.getKey(),(StateValue.Capability)completed[3]);SearchExecution.completed(4);
             }
-            return de.regelsuche.retention.RetainedOperation.produced(new StateValue.Assessment(value.complexity(),value.value(),value.searchWork(),value.primitiveWork(),capabilities));
-        }
+            completed[3]=new StateValue.Assessment(value.complexity(),value.value(),value.searchWork(),value.primitiveWork(),capabilities);
+            owner[slot]=completed[3];
+            var assessment=(StateValue.Assessment)completed[3];
+            // Include the completed RetainedSortedMap wrapper, TreeMap and entries in the first debit.
+            SearchExecution.completed(1L+(assessment.capabilities()==capabilities?0:capabilities.size()+2L));
+            return assessment;
+        } catch(RuntimeException | Error failure){
+            primary=failure;SearchExecution.observeFailure(failure);throw failure;
+        } finally {SearchExecution.close(retained,primary);}
     }
-    static MoveState export(TypedMoveSearch.State state){return new MoveState(new CompiledAstReplayCodec().encodeExpression(state.expression()),state.searchDepth(),state.primitiveDepth(),state.previousRule(),state.assumptions(),state.capabilities(),state.complexityDebt());}
+    static MoveState export(TypedMoveSearch.State state){return export(state,null,0);}
+    private static MoveState export(TypedMoveSearch.State state,Object[] owner,int slot){
+        var completed=new Object[2];
+        var retained=de.regelsuche.retention.RetainedOperation.retainCompleted(1,state,completed);
+        Throwable primary=null;
+        try {
+            completed[0]=new CompiledAstReplayCodec().encodeExpression(state.expression());
+            completed[1]=new MoveState((String)completed[0],state.searchDepth(),state.primitiveDepth(),state.previousRule(),
+                state.assumptions(),state.capabilities(),state.complexityDebt());
+            if(owner!=null)owner[slot]=completed[1];
+            var projected=(MoveState)completed[1];
+            SearchExecution.completed(1L+(projected.capabilities()==state.capabilities()?0:state.capabilities().size()+1L));
+            return projected;
+        } catch(RuntimeException | Error failure){
+            primary=failure;SearchExecution.observeFailure(failure);throw failure;
+        } finally {SearchExecution.close(retained,primary);}
+    }
 }

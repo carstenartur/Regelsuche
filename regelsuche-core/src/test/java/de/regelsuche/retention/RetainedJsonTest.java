@@ -9,6 +9,74 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RetainedJsonTest {
+    private static final class NodeAllocationMeter implements RetainedOperation.Sink {
+        RetainedOperation operation;
+        boolean armed, objectAndMap, arrayAndList;
+        final IllegalStateException failure = new IllegalStateException("completed JSON node debit");
+        @Override public void executionWork(long units) {
+            if (armed && units == 2) { armed = false; throw failure; }
+        }
+        @Override public void validationWork(long units) { executionWork(units); }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+        @Override public void checkpoint() {
+            RetainedGraph.measure(operation);
+            var pending = new java.util.ArrayDeque<Object>();
+            var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Object, Boolean>());
+            pending.add(operation);
+            while (!pending.isEmpty()) {
+                Object current = pending.removeFirst();
+                if (!seen.add(current)) continue;
+                if (current instanceof RetainedGraph.View view) {
+                    var owned = references(view);
+                    if (current instanceof com.fasterxml.jackson.databind.node.ObjectNode)
+                        objectAndMap |= owned.stream().anyMatch(value -> value instanceof java.util.Map<?, ?>);
+                    if (current instanceof com.fasterxml.jackson.databind.node.ArrayNode)
+                        arrayAndList |= owned.stream().anyMatch(value -> value instanceof List<?>);
+                    owned.stream().filter(java.util.Objects::nonNull).forEach(pending::add);
+                } else if (current instanceof Object[] values) {
+                    for (Object value : values) if (value != null) pending.add(value);
+                }
+            }
+        }
+    }
+
+    @Test void failedObjectAllocationDebitStillObservesItsActualChildMap() {
+        var mapper = new ObjectMapper();
+        var meter = new NodeAllocationMeter();
+        try (var operation = RetainedOperation.open(meter)) {
+            meter.operation = operation;
+            try (var json = RetainedJson.open()) {
+                meter.armed = true;
+                assertSame(meter.failure, assertThrows(IllegalStateException.class, () -> RetainedJson.object(mapper)));
+                assertTrue(meter.objectAndMap, "the completed ObjectNode and child map are published before their debit");
+                assertNull(references(operation).get(2), "failed construction restores the enclosing frame");
+                assertEquals("{\"retry\":true}", RetainedJson.object(mapper).put("retry", true).toString());
+            }
+        }
+        assertFalse(RetainedJson.active());
+    }
+
+    @Test void failedArrayAllocationDebitStillObservesItsUnpublishedChildList() {
+        var mapper = new ObjectMapper();
+        var meter = new NodeAllocationMeter();
+        try (var operation = RetainedOperation.open(meter)) {
+            meter.operation = operation;
+            try (var json = RetainedJson.open()) {
+                var parent = RetainedJson.object(mapper);
+                try (var owner = RetainedOperation.retain(parent)) {
+                    meter.armed = true;
+                    assertSame(meter.failure, assertThrows(IllegalStateException.class, () -> parent.putArray("items")));
+                    assertTrue(meter.arrayAndList, "the completed ArrayNode and child list are visible before insertion in the parent");
+                    assertFalse(parent.has("items"));
+                    assertSame(owner, references(operation).get(2));
+                    parent.putArray("items").add("retry");
+                    assertEquals("{\"items\":[\"retry\"]}", parent.toString());
+                }
+            }
+        }
+        assertFalse(RetainedJson.active());
+    }
+
     @Test void importReaderKeepsStrictConfigurationAndExposesActualDecodedContainers()throws Exception{
         var mapper=new ObjectMapper(com.fasterxml.jackson.core.JsonFactory.builder()
             .enable(com.fasterxml.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())

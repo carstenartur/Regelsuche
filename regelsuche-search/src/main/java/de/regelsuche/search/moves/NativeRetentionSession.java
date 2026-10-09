@@ -20,6 +20,7 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private long executionWork;
     private long validationWork,retentionWork,peakNodes,peakCharacters,peakReferences;
     private boolean complete=true;
+    private boolean resultAssembly;
     private String detail="";
     NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){
         this(problem,store,limits,false);
@@ -56,7 +57,17 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}
     @Override public long observedWork(){return work();}
     boolean complete(){return complete;}
-    @Override public void checkpoint(){observe(this,true);}
+    @Override public void checkpoint(){observe(this,!resultAssembly);}
+    /** Only the already finite metadata graph may finish after a recorded limit.
+     * Observations, failed peaks and work remain paid; no successful flag is restored. */
+    void beginResultAssembly() {
+        if(resultAssembly)throw new IllegalStateException("nested native result assembly");
+        resultAssembly=true;executionWork(1);
+    }
+    void endResultAssembly() {
+        if(!resultAssembly)throw new IllegalStateException("native result assembly not active");
+        resultAssembly=false;executionWork(1);
+    }
     void incomplete(String reason){complete=false;if(detail.isEmpty())detail=reason;}
     void fail(String reason){incomplete(reason);throw new SearchExecution.ResourceLimit();}
     private RetainedGraph.Observation observe(Object root,boolean enforce){
