@@ -18,20 +18,21 @@ jobs:
         run: |
           set -euo pipefail
           for job in 113812065433 113812065186; do
-            gh api "repos/$REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/$job.log"
+            gh api --allow-escape-sequences "repos/$REPOSITORY/actions/jobs/$job/logs" > "$RUNNER_TEMP/$job.log"
           done
           python3 - <<'PY'
           import os, pathlib, re
           for job in ('113812065433', '113812065186'):
-              lines = (pathlib.Path(os.environ['RUNNER_TEMP']) / (job + '.log')).read_text(errors='replace').splitlines()
+              text = (pathlib.Path(os.environ['RUNNER_TEMP']) / (job + '.log')).read_text(errors='replace')
+              text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
+              lines = text.splitlines()
               print('\n=== EXISTING FAILED JOB ' + job + ' ===')
               primary = [i for i,s in enumerate(lines) if re.search(r'<<< FAILURE|<<< ERROR|> Task .* FAILED|>.*FAILED|What went wrong:|Execution failed for task|FAILURE: Build failed|BUILD FAILURE|Caused by:|\[ERROR\].*(?:Failed to execute|Failures:|Errors:|Test.*:|[A-Za-z]+Test\.)', s)]
               selected = set()
               for i in primary:
                   selected.update(range(max(0,i-2),min(len(lines),i+10)))
-              ordered = sorted(selected)
-              for i in ordered[-240:]:
-                  print(lines[i][:1800])
+              for i in sorted(selected)[-240:]:
+                  print('LOG: ' + lines[i][:1600])
               if not primary:
-                  print('\n'.join(lines[-80:]))
+                  print('\n'.join('LOG: ' + s[:1600] for s in lines[-80:]))
           PY
