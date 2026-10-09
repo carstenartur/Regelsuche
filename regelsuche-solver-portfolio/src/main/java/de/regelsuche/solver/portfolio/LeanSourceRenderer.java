@@ -80,34 +80,41 @@ public final class LeanSourceRenderer {
     private static String expression(Expression expression, Obligation obligation,
                                      List<String> issues, int depth) {
         if (depth > 128) { issues.add("EXPRESSION_DEPTH_LIMIT"); return "0"; }
-        if (expression instanceof Literal literal) {
-            if (literal.value().length() > 4096) { issues.add("LITERAL_SIZE_LIMIT"); return "0"; }
-            BigDecimal d = new BigDecimal(literal.value());
-            if (d.scale() <= 0) return "(" + d.toBigIntegerExact() + " : Real)";
-            return "((" + d.unscaledValue() + " : Real) / " + java.math.BigInteger.TEN.pow(d.scale()) + ")";
-        }
+        if (expression instanceof Literal literal) return literal(literal, issues);
         if (expression instanceof Symbol symbol) return "rs_" + symbol.name();
-        if (expression instanceof Binary b) {
-            String left = expression(b.left(), obligation, issues, depth + 1);
-            String right = expression(b.right(), obligation, issues, depth + 1);
-            if (b.operator() == BinaryOperator.DIVIDE && !nonzero(b.right(), obligation))
-                issues.add("DIVISION_DOMAIN_NOT_ENCODED:" + b.right().canonicalMaterial());
-            if (b.operator() == BinaryOperator.POWER) {
-                if (b.right() instanceof Literal l) {
-                    BigDecimal d = new BigDecimal(l.value());
-                    if (d.signum() >= 0 && d.stripTrailingZeros().scale() <= 0)
-                        return "(" + left + " ^ (" + d.toBigIntegerExact() + " : Nat))";
-                }
-                if (!positive(b.left(), obligation)) issues.add("REAL_POWER_POSITIVE_BASE_REQUIRED");
-                return "(Real.rpow " + left + " " + right + ")";
+        if (expression instanceof Binary binary) return binary(binary, obligation, issues, depth);
+        return call((Call) expression, obligation, issues, depth);
+    }
+
+    private static String literal(Literal literal, List<String> issues) {
+        if (literal.value().length() > 4096) { issues.add("LITERAL_SIZE_LIMIT"); return "0"; }
+        BigDecimal d = new BigDecimal(literal.value());
+        if (d.scale() <= 0) return "(" + d.toBigIntegerExact() + " : Real)";
+        return "((" + d.unscaledValue() + " : Real) / " + java.math.BigInteger.TEN.pow(d.scale()) + ")";
+    }
+
+    private static String binary(Binary b, Obligation obligation, List<String> issues, int depth) {
+        String left = expression(b.left(), obligation, issues, depth + 1);
+        String right = expression(b.right(), obligation, issues, depth + 1);
+        if (b.operator() == BinaryOperator.DIVIDE && !nonzero(b.right(), obligation))
+            issues.add("DIVISION_DOMAIN_NOT_ENCODED:" + b.right().canonicalMaterial());
+        if (b.operator() == BinaryOperator.POWER) {
+            if (b.right() instanceof Literal l) {
+                BigDecimal d = new BigDecimal(l.value());
+                if (d.signum() >= 0 && d.stripTrailingZeros().scale() <= 0)
+                    return "(" + left + " ^ (" + d.toBigIntegerExact() + " : Nat))";
             }
-            String operator = switch (b.operator()) {
-                case ADD -> "+"; case SUBTRACT -> "-"; case MULTIPLY -> "*"; case DIVIDE -> "/";
-                case POWER -> throw new IllegalStateException();
-            };
-            return "(" + left + " " + operator + " " + right + ")";
+            if (!positive(b.left(), obligation)) issues.add("REAL_POWER_POSITIVE_BASE_REQUIRED");
+            return "(Real.rpow " + left + " " + right + ")";
         }
-        Call call = (Call) expression;
+        String operator = switch (b.operator()) {
+            case ADD -> "+"; case SUBTRACT -> "-"; case MULTIPLY -> "*"; case DIVIDE -> "/";
+            case POWER -> throw new IllegalStateException();
+        };
+        return "(" + left + " " + operator + " " + right + ")";
+    }
+
+    private static String call(Call call, Obligation obligation, List<String> issues, int depth) {
         int arity = call.function().equals("pow") ? 2 : 1;
         if (call.arguments().size() != arity) { issues.add("UNSUPPORTED_ARITY:" + call.function()); return "0"; }
         Expression argument = call.arguments().get(0);

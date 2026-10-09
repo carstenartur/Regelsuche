@@ -35,7 +35,9 @@ public final class ComputationOptimizer {
             if(!found.withinBudget() || !found.search().withinBudget() || searchWork>budget.maximumWork()
                     || outcome==MoveSearch.Outcome.WORK_EXHAUSTED || outcome==MoveSearch.Outcome.STATE_LIMIT)
                 return new OptimizationResult.BudgetExceeded("SEARCH_BUDGET_EXCEEDED",Math.max(searchWork,work.used()));
-            if(outcome==MoveSearch.Outcome.INCONCLUSIVE) return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
+            // A rejected alternative makes the explored relation incomplete; it
+            // does not invalidate an independently verified incumbent. Preserve
+            // the incomplete status when no improvement was actually proved.
             long beforeFinal=work.used();
             var proof=checker.check(request.plan(),found.plan());
             if(!proof.accepted()) return new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED");
@@ -47,6 +49,8 @@ public final class ComputationOptimizer {
             work.charge(preparationWork); total=Math.addExact(total,preparationWork);
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             boolean improved=cost.candidateScore()<cost.sourceScore();
+            if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
+                return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
             return new OptimizationResult.Candidate(found.plan(),found.prepared(),evidence(request,found.plan(),proof,obligations),obligations,cost,
                 OptimizationResult.SearchCompletion.IMPROVEMENT_FOUND,total);
@@ -96,18 +100,22 @@ public final class ComputationOptimizer {
         request.plan().inputs().values().forEach(type -> kinds.add(NumericKind.fromType(type)));
         request.sourceTrace().occurrences().forEach(o -> kinds.add(o.evaluatedKind()));
         target.outputs().forEach(o -> kinds.add(NumericKind.fromType(o.type())));
-        boolean active=request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
-        boolean integral=active&&kinds.stream().anyMatch(NumericKind::integral);
-        boolean fp=active&&kinds.stream().anyMatch(NumericKind::floatingPoint);
         var replacement=SourceEvaluationTrace.fromPlan(target);
+        boolean active=request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
+        boolean integral=active&&(request.sourceTrace().occurrences().stream().anyMatch(o -> o.evaluatedKind().integral())
+            || replacement.occurrences().stream().anyMatch(o -> o.evaluatedKind().integral()));
+        boolean fp=active&&kinds.stream().anyMatch(NumericKind::floatingPoint);
         long checkWork=0;
-        if(active) {
+        // A BigInteger-only fallback has no primitive numerical gate. Receiver
+        // guards belong to the source adapter; it must account for their real cost.
+        boolean evaluateOriginal = active && (request.safetyProfile()==SafetyProfile.CHECKED_THROW || integral || fp);
+        if(evaluateOriginal) {
             var backend=new JavaNumericBackend(request.plan().inputs());
             for(var occurrence:request.sourceTrace().occurrences()) checkWork+=backend.operation(occurrence.expression()).work();
             checkWork+=(request.sourceTrace().occurrences().size()+replacement.occurrences().size())*(fp?3L:2L)
                 +request.plan().inputs().size()+2L*request.plan().outputs().size();
         }
-        int fallback=request.safetyProfile()==SafetyProfile.GUARDED_FALLBACK?request.sourceTrace().occurrences().size():0;
+        int fallback=request.safetyProfile()==SafetyProfile.GUARDED_FALLBACK && (integral || fp)?request.sourceTrace().occurrences().size():0;
         var guard=request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK?RuntimeObligations.GuardKind.NONE:fp?
             RuntimeObligations.GuardKind.FINITE_AND_BITWISE_EQUAL:integral?RuntimeObligations.GuardKind.ORIGINAL_AND_REPLACEMENT_RANGE:RuntimeObligations.GuardKind.NONE;
         return new RuntimeObligations(guard,request.sourceTrace(),replacement,integral,fp,fp,checkWork,fallback);

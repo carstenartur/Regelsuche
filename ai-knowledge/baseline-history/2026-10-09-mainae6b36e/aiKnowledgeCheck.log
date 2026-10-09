@@ -1,0 +1,34 @@
+Picked up JAVA_TOOL_OPTIONS:  -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=42501 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=42501
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :ai-knowledge-extractor:core:compileJava UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:compileJava UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:pluginDescriptors UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:processResources UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:classes UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:jar UP-TO-DATE
+> Task :ai-knowledge-extractor:core:processResources UP-TO-DATE
+> Task :ai-knowledge-extractor:core:classes UP-TO-DATE
+> Task :ai-knowledge-extractor:core:jar UP-TO-DATE
+> Task :ai-knowledge-verification:aiKnowledgeCheck
+> Task :ai-knowledge-verification:verifyAiKnowledgeArtifacts
+
+> Task :ai-knowledge-verification:verifyAiKnowledgeCoverageControls
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.022s
+
+OK
+
+> Task :ai-knowledge-verification:verifyRegelsucheAiKnowledgeArtifacts
+AI knowledge artifacts passed required-file, evidence and schema-v3 and semantic capability-coverage checks.
+
+> Task :ai-knowledge-verification:verifyComplexityHotspots
+complexityHotspotStatus=PASSED
+complexityHotspotCount=17
+
+> Task :ai-knowledge-verification:verifyRegelsucheAiKnowledgeLifecycle
+> Task :aiKnowledgeCheck
+
+BUILD SUCCESSFUL in 14s
+12 actionable tasks: 5 executed, 7 up-to-date
