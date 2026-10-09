@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Real Lean execution for generated typed requests. The configured toolchain is trusted code. */
 public final class LeanSolverBackend implements SolverBackend {
@@ -190,9 +191,10 @@ public final class LeanSolverBackend implements SolverBackend {
         Process process = new ProcessBuilder(actual).directory(project.toFile()).start();
         process.getOutputStream().close();
         var pool = Executors.newFixedThreadPool(2);
+        var terminatedForOutputLimit = new AtomicBoolean();
         try {
-            Future<Capture> out = pool.submit(() -> drain(process.getInputStream(), process));
-            Future<Capture> err = pool.submit(() -> drain(process.getErrorStream(), process));
+            Future<Capture> out = pool.submit(() -> drain(process.getInputStream(), process, terminatedForOutputLimit));
+            Future<Capture> err = pool.submit(() -> drain(process.getErrorStream(), process, terminatedForOutputLimit));
             boolean done = process.waitFor(timeout.toMillis(),TimeUnit.MILLISECONDS);
             if (!done) {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);
@@ -209,13 +211,24 @@ public final class LeanSolverBackend implements SolverBackend {
         }
     }
     private record Capture(String text, boolean limit) { }
-    private static Capture drain(InputStream stream, Process process) throws IOException {
+    private static Capture drain(InputStream stream, Process process, AtomicBoolean terminatedForOutputLimit) throws IOException {
         try (stream; var output = new java.io.ByteArrayOutputStream()) {
-            byte[] buffer = new byte[8192]; int n; boolean over = false;
-            while ((n=stream.read(buffer)) != -1) {
+            byte[] buffer = new byte[8192]; boolean over = false;
+            while (true) {
+                int n;
+                try { n = stream.read(buffer); }
+                catch (IOException closed) {
+                    // Our output-limit termination can close either process pipe. Retain
+                    // both bounded captures; unrelated transport failures still propagate.
+                    if (!terminatedForOutputLimit.get()) throw closed;
+                    break;
+                }
+                if (n == -1) break;
                 int remaining = 4_000_000-output.size();
                 if (remaining > 0) output.write(buffer,0,Math.min(remaining,n));
-                if (n > remaining) { over=true; process.destroyForcibly(); }
+                if (n > remaining) {
+                    over=true; terminatedForOutputLimit.set(true); process.destroyForcibly();
+                }
             }
             return new Capture(output.toString(StandardCharsets.UTF_8),over);
         }
