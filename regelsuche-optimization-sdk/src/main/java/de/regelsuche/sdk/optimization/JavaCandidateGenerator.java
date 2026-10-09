@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-local-proposals/v3";
+    static final String REVISION = "java-local-proposals/v4";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -17,27 +17,76 @@ final class JavaCandidateGenerator {
         this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());
     }
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
+        if (maximum < 1) throw new IllegalArgumentException("POSITIVE_CANDIDATE_LIMIT_REQUIRED");
         long start = work.used(); work.charge(1);
         var outputs = source.outputExpressions();
         var proposals = new ArrayList<JointPlanSearch.Proposal>();
+        var seen = new HashSet<List<Expr>>();
         var simplified = outputs.stream().map(expression -> simplify(expression, 0)).toList();
-        if (!simplified.equals(outputs)) proposals.add(new JointPlanSearch.Proposal("typed-local-algebra", source.withOutputs(simplified).expression()));
+        addProposal(source, outputs, simplified, "typed-local-algebra", proposals, seen);
+
+        // Keep the fast combined candidate, but never make its admissibility a
+        // prerequisite for independent changes. Only the checker admits a move.
+        var nodes = new ArrayList<Expr>();
+        Set<Expr> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Expr output : outputs) collect(output, nodes, visited, 0);
         boolean complete = true;
+        for (Expr node : nodes) {
+            Expr local = simplifyHere(node);
+            if (node.equals(local)) continue;
+            var memo = new IdentityHashMap<Expr, Expr>();
+            var changed = outputs.stream().map(output -> replace(output, node, local, memo, 0)).toList();
+            if (seen.contains(changed)) continue;
+            if (proposals.size() == maximum) { complete = false; break; }
+            addProposal(source, outputs, changed, "typed-local-algebra-at-subexpression", proposals, seen);
+        }
         if (proposals.size() < maximum) {
             try {
                 var modular = new ModularBridge(request.assumptions()).generate(outputs, maximum - proposals.size());
-                work.charge(modular.work()); complete = modular.complete();
-                for (var rewrite : modular.rewrites()) proposals.add(new JointPlanSearch.Proposal(rewrite.rule(), source.withOutputs(rewrite.outputs()).expression()));
+                work.charge(modular.work()); complete &= modular.complete();
+                for (var rewrite : modular.rewrites())
+                    addProposal(source, outputs, rewrite.outputs(), rewrite.rule(), proposals, seen);
             } catch (IllegalArgumentException outsideModularFragment) { /* Java arithmetic proposals remain available. */ }
         } else complete = false;
         return new JointPlanSearch.Generation(proposals, Math.max(1, work.used() - start), complete);
+    }
+    private void addProposal(JointComputationPlan source, List<Expr> original, List<Expr> changed, String rule,
+                             List<JointPlanSearch.Proposal> proposals, Set<List<Expr>> seen) {
+        work.charge(1);
+        if (!changed.equals(original) && seen.add(changed))
+            proposals.add(new JointPlanSearch.Proposal(rule, source.withOutputs(changed).expression()));
+    }
+    private void collect(Expr expression, List<Expr> nodes, Set<Expr> visited, int depth) {
+        work.charge(1);
+        if (depth > 128) throw new IllegalArgumentException("GENERATION_STRUCTURAL_BOUND");
+        if (!visited.add(expression) || JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return;
+        for (Expr child : JavaExpressions.operands(expression)) collect(child, nodes, visited, depth + 1);
+        nodes.add(expression);
+    }
+    private Expr replace(Expr expression, Expr original, Expr replacement, Map<Expr, Expr> memo, int depth) {
+        work.charge(1);
+        if (depth > 128) throw new IllegalArgumentException("GENERATION_STRUCTURAL_BOUND");
+        Expr cached = memo.get(expression);
+        if (cached != null) return cached;
+        Expr result;
+        if (expression.equals(original)) result = replacement;
+        else if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) result = expression;
+        else result = new FunctionExpr(((FunctionExpr) expression).name(), JavaExpressions.operands(expression).stream()
+                .map(child -> replace(child, original, replacement, memo, depth + 1)).toList());
+        memo.put(expression, result);
+        return result;
     }
     private Expr simplify(Expr expression, int depth) {
         work.charge(1);
         if (depth > 128) throw new IllegalArgumentException("GENERATION_STRUCTURAL_BOUND");
         if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;
-        var arguments = JavaExpressions.operands(expression).stream().map(child -> simplify(child, depth+1)).toList();
-        Expr result = new FunctionExpr(((FunctionExpr)expression).name(), arguments);
+        var arguments = JavaExpressions.operands(expression).stream().map(child -> simplify(child, depth + 1)).toList();
+        return simplifyHere(new FunctionExpr(((FunctionExpr) expression).name(), arguments));
+    }
+    private Expr simplifyHere(Expr result) {
+        work.charge(1);
+        if (JavaExpressions.isLiteral(result) || result instanceof VariableExpr) return result;
+        var arguments = JavaExpressions.operands(result);
         var optional = JavaExpressions.operationOf(result);
         if (optional.isEmpty()) return result;
         NumericOperation op = optional.get(); NumericKind kind = JavaExpressions.resultKind(result);

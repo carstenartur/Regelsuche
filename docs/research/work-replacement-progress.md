@@ -130,9 +130,29 @@ the affected Java 25 suites pass 1,058 core, 577 search and 1,058 learning tests
 with no failures, errors or skipped tests. This is local verification, not a
 replacement for the final hosted checks or a completed P04 acceptance.
 
-Before this continuation can merge, its exact final head must pass the full affected
-module suites, unchanged public P03 legacy corpus comparison, independent review
-and all hosted authorities. Earlier green slice CI is intermediate evidence only.
+PR #1055 was integrated at `c9709bf4ec421ed42bee4bf157f841a3c6b33096`.
+Its source-bound public P03 compatibility evidence is retained on
+[`codex/pr1055-integration-evidence-20260929`](https://github.com/carstenartur/Regelsuche/tree/ba34bfe1e1ee561dd4cfcef9ab32da07682a7c04/docs/research/evidence/work-replacement/pr1055-p03-compatibility).
+
+[PR #1065](https://github.com/carstenartur/Regelsuche/pull/1065) adds the paid
+structural store index and was integrated at
+`51d699d092c8a6dae139c2c3b539d774d96955e3` on 2026-10-06. Its actual final head
+`014343918090e2ab6cebc21d8b80f0579af384df` passed all six authorities and
+`Checkout-local ciCheck` in [CI 37443413603](https://github.com/carstenartur/Regelsuche/actions/runs/37443413603).
+All three regular review threads are resolved, including failure-atomic ownership,
+preservation of the primary rollback failure and partial index-commit phases.
+The earlier [structural-index evidence](https://github.com/carstenartur/Regelsuche/tree/c8f0223b0dde93fe4ff4b53fd18522f5e413acd7/docs/research/evidence/work-replacement/pr1065-p04-structural-index)
+is bound to `596afa3`, not falsely relabeled as the later final head.
+
+The next bounded slice starts at `8a98a14e6713225801832918befd7c12d5cb74ba`:
+direct AST/history validation owns and pays its visit arena and completed scalar
+renderings, including failed debits and cleanup. Input observation failures retain
+their normal resource result. This is native revision V6, still partial; its
+new review/CI qualification is separate from #1065's completed integration.
+
+Every continuation's exact final head must pass the full affected module suites,
+unchanged public P03 legacy corpus comparison, independent review and all hosted
+authorities. Earlier green slice CI is intermediate evidence only.
 Remaining P04 work is a follow-up: complete the atomic ownership/work inventory
 (canonicalizer, normalization, matching/backtracking, domain/instantiation,
 formatting and application-side export helpers), qualify the full native public
