@@ -11,7 +11,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class MavenPlaywrightBootstrapContractTest {
-  private static final String PLAYWRIGHT_VERSION = "1.60.0";
+  private static final String PLAYWRIGHT_VERSION = "1.63.0";
   private static final String PLAYWRIGHT_COORDINATE =
       "com.microsoft.playwright:playwright:" + PLAYWRIGHT_VERSION;
 
