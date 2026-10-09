@@ -7,14 +7,16 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-local-proposals/v6";
+    static final String REVISION = "java-core-algebra-proposals/v1";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
+    private final JavaAlgebraCandidates algebra;
     private boolean skippedConstantFold;
     boolean skippedConstantFold() { return skippedConstantFold; }
     JavaCandidateGenerator(OptimizationRequest request, VerificationWork work) {
         this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());
+        algebra = new JavaAlgebraCandidates(work, request.budget().maximumWork());
     }
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
         if (maximum < 1) throw new IllegalArgumentException("POSITIVE_CANDIDATE_LIMIT_REQUIRED");
@@ -48,6 +50,17 @@ final class JavaCandidateGenerator {
                     addProposal(source, outputs, rewrite.outputs(), rewrite.rule(), proposals, seen);
             } catch (IllegalArgumentException outsideModularFragment) { /* Java arithmetic proposals remain available. */ }
         } else complete = false;
+        // Broad algebra can expose many cost-neutral intermediate forms. Give
+        // it a bounded share after the existing domain proposals, rather than
+        // letting its permutations crowd out those independently checked moves.
+        if (proposals.size() < maximum) {
+            var general = algebra.generate(source, Math.min(8, maximum - proposals.size()));
+            complete &= general.complete();
+            for (var proposal : general.proposals()) {
+                var changed = source.withExpression(proposal.expression()).outputExpressions();
+                addProposal(source, outputs, changed, proposal.rule(), proposals, seen);
+            }
+        }
         return new JointPlanSearch.Generation(proposals, Math.max(1, work.used() - start), complete);
     }
     private void addProposal(JointComputationPlan source, List<Expr> original, List<Expr> changed, String rule,
