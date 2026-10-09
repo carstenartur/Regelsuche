@@ -30,7 +30,7 @@ jobs:
         run: |
           set -o pipefail
           mvn --batch-mode --no-transfer-progress -Psdk-release -pl maven-build-contract \
-            -Dtest=MavenOptimizationSdkDistributionTest test 2>&1 | tee sdk-distribution.log
+            -Dtest=MavenOptimizationSdkDistributionTest test 2>&1 | tee "$GITHUB_WORKSPACE/sdk-distribution.log"
       - name: Retain portable dependencies for offline consumer verification
         if: always()
         run: |
@@ -45,6 +45,6 @@ jobs:
           retention-days: 7
           compression-level: 0
           path: |
-            regelsuche/sdk-distribution.log
+            sdk-distribution.log
             regelsuche/maven-build-contract/target/surefire-reports/**
             offline/**
