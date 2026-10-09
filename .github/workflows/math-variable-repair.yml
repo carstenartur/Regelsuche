@@ -21,16 +21,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Apply the locally tested proof repair on its isolated branch
+      - name: Apply the locally tested cost regression repair
         run: |
           set -euo pipefail
-          if [ -f .github/math-proof-fix.patch ]; then
-            echo '146b68754a466cb273ff6b4e31724ae696619784bb7914c3b99821a37508e5ff  .github/math-proof-fix.patch' | sha256sum -c -
-            git apply --check .github/math-proof-fix.patch
-            git apply .github/math-proof-fix.patch
-            rm .github/math-proof-fix.patch
-            git add .github/math-proof-fix.patch regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/SemanticChecker.java
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: retain the universal bitvector proof receipt for contextual normalization'
+          if [ -f .github/math-guard-cost.patch ]; then
+            echo '0636a31d774b321f1d467d9e4da00cec2a9177060da05a9436d118a5f5d1a839  .github/math-guard-cost.patch' | sha256sum -c -
+            git apply --check .github/math-guard-cost.patch
+            git apply .github/math-guard-cost.patch
+            rm .github/math-guard-cost.patch
+            git add .github/math-guard-cost.patch regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/ComputationOptimizer.java regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/GuardedBigIntegerCostTest.java
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: charge only emitted primitive numerical fallback obligations'
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
           test -z "$(git status --porcelain)"
