@@ -1,0 +1,71 @@
+name: Explained modular powers qualification
+on:
+  push:
+    branches: [diagnostic/explained-modular-powers-20261009]
+permissions:
+  contents: read
+jobs:
+  verify-source:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 015a28cf9c4755bf3b8bd14c88c4bde2f44f4ede
+          path: verified-source
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - name: Prepare immutable source candidate without adding control files
+        working-directory: verified-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 015a28cf9c4755bf3b8bd14c88c4bde2f44f4ede
+          test -z "$(git status --porcelain)"
+          gzip -dc ../control/qualification.patch.gz > "$RUNNER_TEMP/qualification.patch"
+          echo '9e549587cb8f41243bce6cc11e70d0567301cf20dce011154902649050e2c59a  '"$RUNNER_TEMP/qualification.patch" | sha256sum -c -
+          git apply --check "$RUNNER_TEMP/qualification.patch"
+          git apply "$RUNNER_TEMP/qualification.patch"
+          git add docs/superpowers regelsuche-math-algorithms regelsuche-optimization-sdk
+          git diff --cached --check
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat: explain verified shared modular powers and eliminate unit powers at reducing uses'
+          git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/source-tree.txt"
+      - name: Run complete SDK dependency reactor and unchanged workflow contract
+        working-directory: verified-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-tests.log" 2>&1 || { tail -150 "$RUNNER_TEMP/sdk-tests.log"; exit 1; }
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-tests.log" | tail -35
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -Dtest=MavenWorkflowSemanticsContractTest test > "$RUNNER_TEMP/workflow-contract.log" 2>&1 || { tail -100 "$RUNNER_TEMP/workflow-contract.log"; exit 1; }
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/workflow-contract.log"
+      - name: Publish only tested ordinary source files to the isolated feature branch
+        working-directory: verified-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          git push origin HEAD:refs/heads/feat/explained-modular-powers-20261009
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: explained-modular-powers-${{ github.run_id }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/source-commit.txt
+            ${{ runner.temp }}/source-tree.txt
+            ${{ runner.temp }}/sdk-tests.log
+            ${{ runner.temp }}/workflow-contract.log
+            verified-source/regelsuche-optimization-sdk/target/surefire-reports/**
+            verified-source/regelsuche-math-algorithms/target/surefire-reports/**
+            verified-source/maven-build-contract/target/surefire-reports/**
