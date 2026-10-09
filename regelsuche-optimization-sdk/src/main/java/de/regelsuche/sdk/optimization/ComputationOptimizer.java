@@ -13,11 +13,18 @@ public final class ComputationOptimizer {
     public static final String SEMANTICS_REVISION = "java25-numeric/v1";
     public static PreparedJointComputation prepare(JointComputationPlan plan) { return plan.prepare(new JavaNumericBackend(plan.inputs())); }
     public OptimizationResult optimize(OptimizationRequest request, CancellationToken token) {
+        return optimize(request,token,false);
+    }
+    /** Same general search and proof boundary, excluding edits justified only by static evaluation. */
+    public OptimizationResult optimizeRuntime(OptimizationRequest request, CancellationToken token) {
+        return optimize(request,token,true);
+    }
+    private OptimizationResult optimize(OptimizationRequest request, CancellationToken token, boolean runtimeOnly) {
         Objects.requireNonNull(request); var work=new VerificationWork(request,token);
         try {
             var checker=new SemanticChecker(request,work); checker.validate();
             long setup=work.used();
-            var generator=new JavaCandidateGenerator(request,work);
+            var generator=new JavaCandidateGenerator(request,work,runtimeOnly);
             var domain=new JointPlanSearch.Domain() {
                 @Override public String revision() { return SEMANTICS_REVISION; }
                 @Override public JointPlanSearch.Generation generate(JointComputationPlan source,int maximum) { return generator.generate(source,maximum); }
@@ -45,6 +52,14 @@ public final class ComputationOptimizer {
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",total);
             var obligations=obligations(request,found.plan());
             var cost=cost(request,found.plan(),obligations);
+            if(runtimeOnly) {
+                long beforePolicy=work.used();
+                boolean useful=new RuntimeInputScope(work).improves(request,found.prepared());
+                total=Math.max(work.used(),Math.addExact(total,work.used()-beforePolicy));
+                if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("RUNTIME_POLICY_BUDGET_EXCEEDED",total);
+                if(!useful) return new OptimizationResult.NoImprovement("NO_RUNTIME_DEPENDENT_IMPROVEMENT",
+                        OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
+            }
             long preparationWork=cost.sourceCost().inspectionWork()+2*cost.candidateCost().inspectionWork();
             work.charge(preparationWork); total=Math.addExact(total,preparationWork);
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);

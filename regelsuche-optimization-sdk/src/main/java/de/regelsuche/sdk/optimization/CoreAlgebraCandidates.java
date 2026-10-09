@@ -34,15 +34,23 @@ final class CoreAlgebraCandidates {
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final List<RewriteRule> rules;
+    private final RuntimeInputScope runtime;
 
     CoreAlgebraCandidates(OptimizationRequest request, VerificationWork work) {
         this(request, work, AstRewriteTransformationEngine.defaultRules());
     }
 
     CoreAlgebraCandidates(OptimizationRequest request, VerificationWork work, List<RewriteRule> rules) {
+        this(request,work,rules,false);
+    }
+    CoreAlgebraCandidates(OptimizationRequest request, VerificationWork work, boolean runtimeOnly) {
+        this(request,work,AstRewriteTransformationEngine.defaultRules(),runtimeOnly);
+    }
+    private CoreAlgebraCandidates(OptimizationRequest request, VerificationWork work, List<RewriteRule> rules, boolean runtimeOnly) {
         this.request = request;
         this.work = work;
         this.rules = List.copyOf(rules);
+        this.runtime = runtimeOnly ? new RuntimeInputScope(work) : null;
     }
 
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
@@ -55,6 +63,7 @@ final class CoreAlgebraCandidates {
         var proposals = new ArrayList<JointPlanSearch.Proposal>();
         var seen = new HashSet<List<Expr>>();
         for (Expr site : sites) {
+            if (runtime != null && !runtime.depends(site)) continue;
             NumericKind kind = JavaExpressions.kindOf(site, source.inputs());
             if (kind != NumericKind.INT && kind != NumericKind.LONG && kind != NumericKind.BIG_INTEGER) continue;
             var bridge = new Bridge(kind);
@@ -129,6 +138,8 @@ final class CoreAlgebraCandidates {
         Expr lift(Expr expression, int depth) {
             work.charge(1);
             if (++nodes > MAX_ISLAND_NODES || depth > 64) throw new OutsideBridge();
+            // Preserve authored closed subgraphs while still using literal identities.
+            if (runtime != null && !JavaExpressions.isLiteral(expression) && !runtime.depends(expression)) return atom(expression);
             if (JavaExpressions.kindOf(expression, request.plan().inputs()) != kind) return atom(expression);
             if (JavaExpressions.isLiteral(expression)) {
                 Object value = JavaExpressions.literalValue(expression);

@@ -7,16 +7,21 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-general-algebra-proposals/v7";
+    static final String REVISION = "java-general-algebra-proposals/v8";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
     private final CoreAlgebraCandidates algebra;
+    private final RuntimeInputScope runtime;
     private boolean skippedConstantFold;
     boolean skippedConstantFold() { return skippedConstantFold; }
     JavaCandidateGenerator(OptimizationRequest request, VerificationWork work) {
+        this(request,work,false);
+    }
+    JavaCandidateGenerator(OptimizationRequest request, VerificationWork work, boolean runtimeOnly) {
         this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());
-        algebra = new CoreAlgebraCandidates(request, work);
+        runtime = runtimeOnly ? new RuntimeInputScope(work) : null;
+        algebra = new CoreAlgebraCandidates(request, work, runtimeOnly);
     }
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
         if (maximum < 1) throw new IllegalArgumentException("POSITIVE_CANDIDATE_LIMIT_REQUIRED");
@@ -63,6 +68,12 @@ final class JavaCandidateGenerator {
     private void addProposal(JointComputationPlan source, List<Expr> original, List<Expr> changed, String rule,
                              List<JointPlanSearch.Proposal> proposals, Set<List<Expr>> seen) {
         work.charge(1);
+        if (runtime != null) {
+            var retained = new ArrayList<>(changed);
+            for (int i=0;i<original.size();i++)
+                if (!runtime.depends(original.get(i))) retained.set(i,original.get(i));
+            changed = retained;
+        }
         if (!changed.equals(original) && seen.add(changed))
             proposals.add(new JointPlanSearch.Proposal(rule, source.withOutputs(changed).expression()));
     }
@@ -88,6 +99,7 @@ final class JavaCandidateGenerator {
     }
     private Expr simplify(Expr expression, int depth) {
         work.charge(1);
+        if (runtime != null && !runtime.depends(expression)) return expression;
         if (depth > 128) throw new IllegalArgumentException("GENERATION_STRUCTURAL_BOUND");
         if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;
         var arguments = JavaExpressions.operands(expression).stream().map(child -> simplify(child, depth + 1)).toList();
@@ -95,6 +107,7 @@ final class JavaCandidateGenerator {
     }
     private Expr simplifyHere(Expr result) {
         work.charge(1);
+        if (runtime != null && !runtime.depends(result)) return result;
         if (JavaExpressions.isLiteral(result) || result instanceof VariableExpr) return result;
         var arguments = JavaExpressions.operands(result);
         var optional = JavaExpressions.operationOf(result);
