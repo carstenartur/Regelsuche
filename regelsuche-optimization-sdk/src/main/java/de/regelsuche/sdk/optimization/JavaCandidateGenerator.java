@@ -7,14 +7,16 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-local-proposals/v6";
+    static final String REVISION = "java-general-algebra-proposals/v7";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
+    private final CoreAlgebraCandidates algebra;
     private boolean skippedConstantFold;
     boolean skippedConstantFold() { return skippedConstantFold; }
     JavaCandidateGenerator(OptimizationRequest request, VerificationWork work) {
         this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());
+        algebra = new CoreAlgebraCandidates(request, work);
     }
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
         if (maximum < 1) throw new IllegalArgumentException("POSITIVE_CANDIDATE_LIMIT_REQUIRED");
@@ -25,28 +27,36 @@ final class JavaCandidateGenerator {
         var simplified = outputs.stream().map(expression -> simplify(expression, 0)).toList();
         addProposal(source, outputs, simplified, "typed-local-algebra", proposals, seen);
 
-        // Keep the fast combined candidate, but never make its admissibility a
-        // prerequisite for independent changes. Only the checker admits a move.
+        // Local numeric rules are additional proposals, not the complete math engine.
         var nodes = new ArrayList<Expr>();
         Set<Expr> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Expr output : outputs) collect(output, nodes, visited, 0);
         boolean complete = true;
+        int localLimit = Math.max(1, maximum / 2);
         for (Expr node : nodes) {
             Expr local = simplifyHere(node);
             if (node.equals(local)) continue;
             var memo = new IdentityHashMap<Expr, Expr>();
             var changed = outputs.stream().map(output -> replace(output, node, local, memo, 0)).toList();
             if (seen.contains(changed)) continue;
-            if (proposals.size() == maximum) { complete = false; break; }
+            if (proposals.size() >= localLimit) { complete = false; break; }
             addProposal(source, outputs, changed, "typed-local-algebra-at-subexpression", proposals, seen);
         }
+        if (proposals.size() < maximum) {
+            var generated = algebra.generate(source, maximum - proposals.size());
+            complete &= generated.complete();
+            for (var proposal : generated.proposals()) {
+                var candidate = source.withExpression(proposal.expression());
+                addProposal(source, outputs, candidate.outputExpressions(), proposal.rule(), proposals, seen);
+            }
+        } else complete = false;
         if (proposals.size() < maximum) {
             try {
                 var modular = new ModularBridge(request.assumptions()).generate(outputs, maximum - proposals.size());
                 work.charge(modular.work()); complete &= modular.complete();
                 for (var rewrite : modular.rewrites())
                     addProposal(source, outputs, rewrite.outputs(), rewrite.rule(), proposals, seen);
-            } catch (IllegalArgumentException outsideModularFragment) { /* Java arithmetic proposals remain available. */ }
+            } catch (IllegalArgumentException outsideModularFragment) { /* Other mathematical proposals remain available. */ }
         } else complete = false;
         return new JointPlanSearch.Generation(proposals, Math.max(1, work.used() - start), complete);
     }
