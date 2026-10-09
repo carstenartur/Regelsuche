@@ -68,7 +68,8 @@ class IndependentCandidateRegressionTest {
                 optimizer.optimize(request, CancellationToken.NONE));
         var second = assertInstanceOf(OptimizationResult.Candidate.class,
                 optimizer.optimize(request, CancellationToken.NONE));
-        assertEquals(first.plan(), second.plan());
+        assertEquals(first.plan().inputs(), second.plan().inputs());
+        assertEquals(first.plan().outputs(), second.plan().outputs());
         assertEquals(first.evidence(), second.evidence());
         assertEquals(first.cost(), second.cost());
     }

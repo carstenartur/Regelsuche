@@ -35,7 +35,9 @@ public final class ComputationOptimizer {
             if(!found.withinBudget() || !found.search().withinBudget() || searchWork>budget.maximumWork()
                     || outcome==MoveSearch.Outcome.WORK_EXHAUSTED || outcome==MoveSearch.Outcome.STATE_LIMIT)
                 return new OptimizationResult.BudgetExceeded("SEARCH_BUDGET_EXCEEDED",Math.max(searchWork,work.used()));
-            if(outcome==MoveSearch.Outcome.INCONCLUSIVE) return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
+            // A rejected alternative makes the explored relation incomplete; it
+            // does not invalidate an independently verified incumbent. Preserve
+            // the incomplete status when no improvement was actually proved.
             long beforeFinal=work.used();
             var proof=checker.check(request.plan(),found.plan());
             if(!proof.accepted()) return new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED");
@@ -47,6 +49,8 @@ public final class ComputationOptimizer {
             work.charge(preparationWork); total=Math.addExact(total,preparationWork);
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             boolean improved=cost.candidateScore()<cost.sourceScore();
+            if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
+                return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
             return new OptimizationResult.Candidate(found.plan(),found.prepared(),evidence(request,found.plan(),proof,obligations),obligations,cost,
                 OptimizationResult.SearchCompletion.IMPROVEMENT_FOUND,total);
