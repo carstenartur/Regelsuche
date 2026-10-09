@@ -36,10 +36,10 @@ final class MoveSearchObjective<S,M,V> implements de.regelsuche.retention.Retain
         return assessment.work();
     }
     boolean satisfied() { return stopAtQuality && incumbent != null && outputScore <= maximumOutputScore; }
-    long finish() {
+    long finish(boolean materializationPaidByEnvironment) {
         witness = path.steps();
-        // The observed producer pays its own materialization; only legacy calls delegate it.
-        return de.regelsuche.retention.RetainedOperation.isObserved() ? 0 : witness.size() + 1L;
+        // An unrelated outer observer cannot pay the historical search's own ledger.
+        return materializationPaidByEnvironment ? 0 : witness.size() + 1L;
     }
     S incumbent() { return incumbent; }
     long inputScore() { return inputScore; }

@@ -440,6 +440,7 @@ public final class NativeMoveSearch {
         @Override public void ownership(RetainedGraph.View root){if(accounting!=null)accounting.ownership(root);}
         @Override public void checkpoint(){if(accounting!=null)accounting.checkpoint();}
         @Override public long additionalWork(){return accounting==null?0:accounting.work();}
+        @Override public boolean accountsWitnessMaterialization(){return accounting!=null;}
         @Override public boolean ownershipComplete(){return accounting==null || accounting.complete();}
         @Override public void beginResultAssembly(){if(accounting!=null)accounting.beginResultAssembly();}
         @Override public void endResultAssembly(){if(accounting!=null)accounting.endResultAssembly();}

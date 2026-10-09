@@ -35,7 +35,7 @@ class MoveSearchObjectiveWorkTest {
             long ledger = objective.observe("selected", path);
             var observed = new Work();
             long delegated;
-            try (var scope = RetainedOperation.open(observed)) { observed.scope = scope; delegated = objective.finish(); }
+            try (var scope = RetainedOperation.open(observed)) { observed.scope = scope; delegated = objective.finish(true); }
             assertEquals(expected, objective.witness());
             assertTrue(direct.units >= length + 1L, "the existing native producer has paid its immutable copy");
             assertEquals(direct.units, observed.units, "objective and direct path invoke the same observed producer");
@@ -48,7 +48,7 @@ class MoveSearchObjectiveWorkTest {
             var path = path(length);
             var objective = new MoveSearchObjective<String,String,String>(Score.INSTANCE, 0);
             long ledger = objective.observe("selected", path);
-            assertEquals(length + 1L, objective.finish());
+            assertEquals(length + 1L, objective.finish(false));
             assertEquals(17, ledger);
             assertEquals(path.steps(), objective.witness());
             assertEquals("s0", objective.witness().getFirst().source());

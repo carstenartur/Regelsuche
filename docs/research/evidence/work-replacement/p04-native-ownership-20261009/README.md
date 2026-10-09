@@ -6,6 +6,10 @@ The reviewed local head is `2efdd698393f47045cf62a670955b2fd80579eca`.
 Its production Java is unchanged from the full-suite/corpus source
 `1a09fdb3dd2940973c85d0f10c21e2fa2324afee`.
 
+Subsequent GitHub review found a legacy/ambient-observer delegation defect.
+[Its reproduced correction and fresh 2,909-test qualification](../pr1081-ambient-ledger-fix/README.md)
+are retained separately; the earlier source bindings and review are unchanged.
+
 The shared frontier now observes the supported expression comparisons, local
 rewrite ancestors, scalar and monomial intermediates, assumption metadata,
 formatting/JSON buffers, proof wrappers and result/export copies. Completed

@@ -248,7 +248,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         private void finishObjective() {
             var objective = ledger.objective;
             if (objective != null) {
-                ledger.search = Math.addExact(ledger.search, objective.finish());
+                ledger.search = Math.addExact(ledger.search, objective.finish(problem.accountsWitnessMaterialization()));
                 if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();
             }
             if (finalWorkOverrun())

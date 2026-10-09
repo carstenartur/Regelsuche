@@ -10,6 +10,7 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +52,47 @@ class TypedSourceOnlyBudgetBoundaryTest {
             assertEquals(ample.witness(), tight.witness());
             assertEquals(ample.search().metrics(), tight.search().metrics());
             assertVerifiedLineage(tight);
+        }
+    }
+
+    private static final class AmbientWork implements RetainedOperation.Sink {
+        private long units;
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) { }
+        @Override public void executionWork(long work) { units = Math.addExact(units, work); }
+        @Override public void validationWork(long work) { units = Math.addExact(units, work); }
+        @Override public void checkpoint() { }
+    }
+
+    @Test void anOuterObserverCannotRemoveWorkFromTheLegacySearchLedger() {
+        for (var contract : SearchContinuationContract.values()) {
+            var solver = new TypedSourceOnlySearch();
+            var input = problem(10000);
+            var expected = solver.searchUntil(input, OBJECTIVE, 1, contract);
+            var observed = new AmbientWork();
+            TypedSourceOnlySearch.Result actual;
+            try (var scope = RetainedOperation.open(observed)) {
+                actual = solver.searchUntil(input, OBJECTIVE, 1, contract);
+            }
+            assertTrue(observed.units > 0, "the outer diagnostic sink really observed work");
+            assertEquals(expected, actual, "legacy receipts do not delegate their own costs to an unrelated sink");
+        }
+    }
+
+    @Test void anOuterObserverCannotTurnWitnessMaterializationOverrunIntoSuccess() {
+        for (var contract : SearchContinuationContract.values()) {
+            var solver = new TypedSourceOnlySearch();
+            var ample = solver.searchUntil(problem(10000), OBJECTIVE, 1, contract);
+            var input = problem(ample.search().metrics().totalWork() - 1);
+            var expected = solver.searchUntil(input, OBJECTIVE, 1, contract);
+            var observed = new AmbientWork();
+            TypedSourceOnlySearch.Result actual;
+            try (var scope = RetainedOperation.open(observed)) {
+                actual = solver.searchUntil(input, OBJECTIVE, 1, contract);
+            }
+            assertTrue(observed.units > 0);
+            assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED, actual.search().outcome());
+            assertEquals(expected, actual);
+            assertEquals(ample.witness(), actual.witness(), "the paid failed attempt retains its incumbent proof");
         }
     }
 

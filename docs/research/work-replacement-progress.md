@@ -176,3 +176,10 @@ retains source history, raw failures/successes and independent review. P04 is
 still incomplete: complete cost coverage requires an explicit bounded contract
 for every admitted callback and delegated execution path, followed by exact-head
 CI and integration. V7/V3 remain PARTIAL; P05–P12 remain subsequent work.
+
+PR #1081 review additionally reproduced a legacy witness-copy charge lost under
+an unrelated enclosing observer. The explicit environment contract in
+`d372e99b3dae354b73d5f7a23baa2f833d2ad732` fixes both false budget success and the
+missing work; 2,909 fresh module tests pass. Two new corpus JVMs reproduce all 13
+earlier result files byte-for-byte. The [separate correction evidence](evidence/work-replacement/pr1081-ambient-ledger-fix/README.md)
+preserves the earlier failed attempts and does not promote native coverage.

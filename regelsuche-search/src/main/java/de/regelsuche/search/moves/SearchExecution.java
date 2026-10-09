@@ -75,6 +75,8 @@ public final class SearchExecution {
         default void ownership(RetainedGraph.View root) {}
         default void checkpoint() {}
         default long additionalWork(){return 0;}
+        /** True only when this environment adds the observed witness producer work to its ledger. */
+        default boolean accountsWitnessMaterialization(){return false;}
         default boolean ownershipComplete(){return true;}
         /** Finite result metadata only: no search, provider generation or proof application. */
         default void beginResultAssembly() {}
