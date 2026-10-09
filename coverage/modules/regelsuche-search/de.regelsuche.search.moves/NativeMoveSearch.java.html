@@ -8,7 +8,7 @@ import java.util.*;
 
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 <span class="fc" id="L10">public final class NativeMoveSearch {</span>
-    public static final String REVISION = &quot;regelsuche.native-expr-move-search/v5-partial-structural-index&quot;;
+    public static final String REVISION = &quot;regelsuche.native-expr-move-search/v6-partial-validation-retention&quot;;
     /** Fixed release coverage, independent of mathematical proof validity or observed resource limits. */
 <span class="fc" id="L13">    public enum Coverage { PARTIAL_ATOMIC_INVENTORY }</span>
 <span class="fc" id="L14">    public static Coverage coverage(){return Coverage.PARTIAL_ATOMIC_INVENTORY;}</span>
@@ -248,7 +248,7 @@ import java.util.*;
 <span class="fc" id="L248">        try(var store=new SearchExpressionStore(limits)) {</span>
 <span class="fc" id="L249">            var accounting=new NativeRetentionSession(problem,store,limits);</span>
 <span class="fc" id="L250">            try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {</span>
-<span class="fc" id="L251">                accounting.operation(operation);accounting.externalObjective(objective);accounting.validate(problem.source());</span>
+<span class="fc" id="L251">                accounting.operation(operation);accounting.externalObjective(objective);accounting.validateInputs();</span>
 <span class="fc" id="L252">                var execution=new Execution(problem,store,accounting);</span>
 <span class="fc" id="L253">                var searched=new MoveSearchKernel&lt;Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification&gt;()</span>
 <span class="fc" id="L254">                    .search(execution,continuation,selection);</span>
@@ -269,7 +269,7 @@ import java.util.*;
 <span class="fc" id="L269">            var accounting=new NativeRetentionSession(problem,store,limits);</span>
 <span class="fc" id="L270">            try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {</span>
 <span class="fc" id="L271">            accounting.operation(operation);</span>
-<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            accounting.validate(problem.source());if(problem.context().goal()!=null)accounting.validate(problem.context().goal());</span>
+<span class="fc" id="L272">            accounting.validateInputs();</span>
 <span class="fc" id="L273">            var execution=new Execution(problem,store,accounting);</span>
 <span class="fc" id="L274">            var searched=new MoveSearchKernel&lt;Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification&gt;()</span>
 <span class="fc" id="L275">                .search(execution,continuation,null);</span>

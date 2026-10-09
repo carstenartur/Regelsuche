@@ -63,7 +63,7 @@
 </td>
 <td>
 <div class="infoBox duration">
-<div class="counter">3m59.81s</div>
+<div class="counter">3m31.74s</div>
 <p>duration</p>
 </div>
 </td>
@@ -90,16 +90,16 @@ Daemon will be stopped at the end of the build
 Calculating task graph as no cached configuration is available for tasks: :regelsuche-release:runAutonomousDiscoveryWalkthrough
 &gt; Task :regelsuche-autopilot:processResources NO-SOURCE
 &gt; Task :regelsuche-egraph:processResources NO-SOURCE
-&gt; Task :regelsuche-core:processResources
 &gt; Task :regelsuche-discovery:processResources
-&gt; Task :regelsuche-experiments:processResources
-&gt; Task :regelsuche-optimization-sdk:processResources NO-SOURCE
+&gt; Task :regelsuche-core:processResources
 &gt; Task :regelsuche-math-algorithms:processResources NO-SOURCE
-&gt; Task :regelsuche-release:processResources NO-SOURCE
 &gt; Task :regelsuche-learning:processResources
-&gt; Task :regelsuche-validation:processResources NO-SOURCE
+&gt; Task :regelsuche-release:processResources NO-SOURCE
 &gt; Task :regelsuche-search:processResources
 &gt; Task :regelsuche-solver-ir:processResources NO-SOURCE
+&gt; Task :regelsuche-validation:processResources NO-SOURCE
+&gt; Task :regelsuche-optimization-sdk:processResources NO-SOURCE
+&gt; Task :regelsuche-experiments:processResources
 
 &gt; Task :regelsuche-core:compileJava
 Note: /workspace/regelsuche-core/src/main/java/de/regelsuche/retention/RetainedJson.java uses or overrides a deprecated API.
@@ -108,33 +108,35 @@ Note: /workspace/regelsuche-core/src/main/java/de/regelsuche/retention/RetainedJ
 Note: Recompile with -Xlint:unchecked for details.
 
 &gt; Task :regelsuche-core:classes
+
+&gt; Task :regelsuche-egraph:compileJava
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
 2 warnings
 
-&gt; Task :regelsuche-egraph:compileJava
-
 &gt; Task :regelsuche-egraph:classes
 &gt; Task :regelsuche-core:jar
+&gt; Task :regelsuche-egraph:jar
 
 &gt; Task :regelsuche-validation:compileJava
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
+2 warnings
 
 &gt; Task :regelsuche-validation:classes
-2 warnings
-&gt; Task :regelsuche-egraph:jar
 &gt; Task :regelsuche-validation:jar
 
-&gt; Task :regelsuche-math-algorithms:compileJava
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
+&gt; Task :regelsuche-math-algorithms:compileJava
 Note: /workspace/regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/completion/KnuthBendixCompletionService.java uses or overrides a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 2 warnings
+
+&gt; Task :regelsuche-math-algorithms:classes
 
 &gt; Task :regelsuche-search:compileJava
 /workspace/regelsuche-search/src/main/java/de/regelsuche/search/moves/NativeMoveProof.java:25: warning: non-varargs call of varargs method with inexact argument type for last parameter;
@@ -148,38 +150,37 @@ Note: Recompile with -Xlint:deprecation for details.
   cast to Object for a varargs call
   cast to Object[] for a non-varargs call and to suppress this warning
 
-&gt; Task :regelsuche-math-algorithms:classes
 &gt; Task :regelsuche-math-algorithms:jar
 
-2 warnings
 &gt; Task :regelsuche-search:compileJava
 
 &gt; Task :regelsuche-search:classes
+2 warnings
 &gt; Task :regelsuche-search:jar
+Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
 
 &gt; Task :regelsuche-solver-ir:compileJava
 
 &gt; Task :regelsuche-solver-ir:classes
-Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 &gt; Task :regelsuche-solver-ir:jar
-
-&gt; Task :regelsuche-optimization-sdk:compileJava
-
-&gt; Task :regelsuche-optimization-sdk:classes
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
 2 warnings
+
+&gt; Task :regelsuche-optimization-sdk:compileJava
+
+&gt; Task :regelsuche-optimization-sdk:classes
 &gt; Task :regelsuche-optimization-sdk:jar
 &gt; Task :regelsuche-discovery:compileJava
 &gt; Task :regelsuche-discovery:classes
 &gt; Task :regelsuche-discovery:jar
-
 warning: unknown enum constant Mode.PROPERTIES
-&gt; Task :regelsuche-experiments:compileJava
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
+
+&gt; Task :regelsuche-experiments:compileJava
 2 warnings
 
 &gt; Task :regelsuche-experiments:classes
@@ -196,17 +197,17 @@ Note: Recompile with -Xlint:deprecation for details.
 &gt; Task :regelsuche-autopilot:jar
 
 &gt; Task :regelsuche-release:compileJava
+
+&gt; Task :regelsuche-release:classes
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 
-&gt; Task :regelsuche-release:classes
-
 &gt; Task :regelsuche-release:runAutonomousDiscoveryWalkthrough
-sha256:a6a58f711f5f760d6172cb968956bc4fb1f95aa02e30700e57283e78e753c135
+sha256:5f7a20e57cddc8b2ef4d289ea7cd015f231c8d366f159198cc3b14fe13349605
 
 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 1m 6s
+BUILD SUCCESSFUL in 50s
 29 actionable tasks: 29 executed
 Configuration cache entry stored.
 </pre>
@@ -223,7 +224,7 @@ Configuration cache entry stored.
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 9.7.1</a> at Oct 9, 2026, 12:35:02 PM</p>
+<a href="https://www.gradle.org">Gradle 9.7.1</a> at Oct 9, 2026, 2:37:33 PM</p>
 </div>
 </div>
 </body>

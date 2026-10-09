@@ -139,7 +139,7 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
     private static void attemptCleanup(Throwable primary, Runnable cleanup) {
 <span class="fc" id="L140">        try { cleanup.run(); }</span>
 <span class="fc" id="L141">        catch (RuntimeException | Error failure) {</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (failure != primary) primary.addSuppressed(failure);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (failure != primary) primary.addSuppressed(failure);</span>
 <span class="fc" id="L143">        }</span>
 <span class="fc" id="L144">    }</span>
     private SearchExpressionRef findIndexed(int hash, Expr expression) {
