@@ -181,9 +181,10 @@ class FinalProducerOwnershipTest {
     }
     private static NativeMoveSearch.Result nativeResult(NativeMoveSearch.Problem problem,SearchExecution.Result<?,?,?,?> result) {
         try {
-            var constructor = NativeMoveSearch.Result.class.getDeclaredConstructor(NativeMoveSearch.Problem.class, SearchExecution.Result.class, long.class);
+            var constructor = NativeMoveSearch.Result.class.getDeclaredConstructor(NativeMoveSearch.Problem.class, SearchExecution.Result.class,
+                long.class, boolean.class, boolean.class);
             constructor.setAccessible(true);
-            return constructor.newInstance(problem, result, 0);
+            return constructor.newInstance(problem, result, 0, false, false);
         } catch (InvocationTargetException failure) {
             if (failure.getCause() instanceof RuntimeException cause) throw cause;
             if (failure.getCause() instanceof Error cause) throw cause;

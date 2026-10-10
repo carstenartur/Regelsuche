@@ -9,9 +9,15 @@ import java.util.*;
 
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
+    private final boolean qualifyExecution;
+    public NativeMoveSearch(){this(false);}
+    private NativeMoveSearch(boolean qualifyExecution){this.qualifyExecution=qualifyExecution;}
+    /** Opt-in declared logical accounting. Unknown execution paths retain partial coverage. */
+    public static NativeMoveSearch boundedAccounting(){return new NativeMoveSearch(true);}
     public static final String REVISION = "regelsuche.native-expr-move-search/v7-partial-atomic-ownership";
-    /** Fixed release coverage, independent of mathematical proof validity or observed resource limits. */
-    public enum Coverage { PARTIAL_ATOMIC_INVENTORY }
+    public static final String QUALIFIED_REVISION = "regelsuche.native-expr-move-search/v8-declared-execution";
+    /** Execution coverage is independent of mathematical validity and budget success. */
+    public enum Coverage { PARTIAL_ATOMIC_INVENTORY, COMPLETE_DECLARED_EXECUTION }
     public static Coverage coverage(){return Coverage.PARTIAL_ATOMIC_INVENTORY;}
     public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider,RetainedGraph.View {
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(descriptor);v.reference(transport);}
@@ -30,11 +36,17 @@ public final class NativeMoveSearch {
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
             if(!NativeMoveProvider.carries(move.assumptions(),source,context) || !NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return new NativeVerification(false,1,null,null,"TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
             var generated=transport.generate(source.expression());
-            boolean accepted=descriptor.equals(move.descriptor()) && source.expression().equals(move.sourceExpression())
-                && move.proof() instanceof NativeMoveProof.Primitive proof && generated.contains(proof.step());
-            return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(generated.size())
-                    .withCandidateWork(new ExecutionWork(generated.size(),0,0)).totalWorkUnitsV2(),
-                accepted?move.proof():null,accepted?move.ruleId():null,accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
+            long work=TransformationWorkMetrics.flatEngine(generated.size())
+                .withCandidateWork(new ExecutionWork(generated.size(),0,0)).totalWorkUnitsV2();
+            try {
+                boolean accepted=descriptor.equals(move.descriptor()) && source.expression().equals(move.sourceExpression())
+                    && move.proof() instanceof NativeMoveProof.Primitive proof && generated.contains(proof.step());
+                return new NativeVerification(accepted,work,accepted?move.proof():null,accepted?move.ruleId():null,
+                    accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
+            } catch(SearchExecution.ResourceLimit exhausted) {
+                // Regeneration completed before comparison; its unreturned receipt stays paid.
+                throw exhausted.paidVerification(work);
+            }
         }
     }
     public enum ZeroScore implements java.util.function.ToDoubleFunction<TypedMoveSearch.State> { INSTANCE;
@@ -63,7 +75,8 @@ public final class NativeMoveSearch {
     /** Populated privately before result publication; accessors expose only immutable scalar observations. */
     public static final class Accounting implements RetainedGraph.View {
         private long validationWork,executionWork,storageWork,retentionWork,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
-        private boolean complete,externalKnown;private long externalNodes,externalCharacters,externalReferences;private String detail="";
+        private boolean complete,externalKnown,executionQualified,cursorsComplete;private long externalNodes,externalCharacters,externalReferences;private String detail="";
+        void qualify(boolean execution,boolean cursors){executionQualified=execution;cursorsComplete=cursors;}
         void update(long validation,long execution,long storage,long retention,long pn,long pc,long pr,long rn,long rc,long rr,boolean complete,String detail){
             validationWork=validation;executionWork=execution;storageWork=storage;retentionWork=retention;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
             resultNodes=rn;resultCharacters=rc;resultReferences=rr;this.complete=complete;this.detail=detail;
@@ -80,9 +93,9 @@ public final class NativeMoveSearch {
         /** Peak of observed graphs only; uninstrumented atomic temporaries make total coverage incomplete. */
         public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
         public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
-        /** No total work/retention qualification is available while the atomic inventory remains partial. */
-        public boolean complete(){return false;}
-        public Coverage coverage(){return NativeMoveSearch.coverage();}
+        /** All declared execution paths, cursor receipts and observations must be covered. */
+        public boolean complete(){return executionQualified && cursorsComplete && complete;}
+        public Coverage coverage(){return executionQualified?Coverage.COMPLETE_DECLARED_EXECUTION:NativeMoveSearch.coverage();}
         /** Diagnostic completion of installed observations, never evidence of complete accounting. */
         public boolean observationsComplete(){return complete;}
         public String detail(){return detail;}
@@ -92,9 +105,12 @@ public final class NativeMoveSearch {
     /** Separate output-phase receipt; never changes the already published search charge. */
     public static final class ExportAccounting implements RetainedGraph.View {
         private final long budget;
+        private final boolean qualificationRequested,executionQualified;
         private long work,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
         private boolean complete;private String detail="";
-        ExportAccounting(long budget){this.budget=budget;}
+        ExportAccounting(long budget,boolean qualificationRequested,boolean executionQualified){
+            this.budget=budget;this.qualificationRequested=qualificationRequested;this.executionQualified=executionQualified;
+        }
         void update(long work,long pn,long pc,long pr,RetainedGraph.Usage retained,boolean complete,String detail){
             this.work=work;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
             resultNodes=retained.nodes();resultCharacters=retained.characters();resultReferences=retained.references();this.complete=complete;this.detail=detail;
@@ -104,12 +120,12 @@ public final class NativeMoveSearch {
         /** Peak of observed graphs only; uninstrumented atomic temporaries make total coverage incomplete. */
         public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
         public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
-        /** No total work/retention qualification is available while the atomic inventory remains partial. */
-        public boolean complete(){return false;}
-        public Coverage coverage(){return NativeMoveSearch.coverage();}
+        /** Output cannot retroactively qualify a partially accounted originating search. */
+        public boolean complete(){return executionQualified && complete;}
+        public Coverage coverage(){return executionQualified?Coverage.COMPLETE_DECLARED_EXECUTION:NativeMoveSearch.coverage();}
         /** Diagnostic completion of installed observations, never evidence of complete accounting. */
         public boolean observationsComplete(){return complete;}public String detail(){return detail;}
-        public String workRevision(){return Result.EXPORT_REVISION;}
+        public String workRevision(){return qualificationRequested?Result.QUALIFIED_EXPORT_REVISION:Result.EXPORT_REVISION;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
     }
     public static final class ExportFailure extends IllegalStateException {
@@ -134,17 +150,18 @@ public final class NativeMoveSearch {
         private final SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result;
         private final Expr source;
         private final long replayWork,workBudget;
+        private final boolean qualificationRequested,replayAccepted,cursorsComplete;
         private final List<StagedIncrementalMoveExecution.Provider> incrementalProviders;
-        private Result(Problem problem,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result){
-            this(problem,result,0);
-        }
-        private Result(Problem problem,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result,long replayWork){
+        private Result(Problem problem,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result,
+                long replayWork,boolean replayAccepted,boolean qualificationRequested){
             var providers = new ArrayList<StagedIncrementalMoveExecution.Provider>();
             Object[] pending = new Object[4];
             var retained = RetainedOperation.retainCompleted(2, problem, result, providers, pending);
             Throwable primary = null;
             try {
                 this.source=problem.source();this.result=result;this.replayWork=replayWork;this.workBudget=problem.budget().totalWork();
+                this.replayAccepted=replayAccepted;this.qualificationRequested=qualificationRequested;
+                cursorsComplete=qualificationRequested && inspectCursorReceipts(result);
                 if (problem.scheduling() == MoveSearch.Scheduling.STAGED_INCREMENTAL) {
                     for (var provider : problem.providers()) {
                         var descriptor = provider.descriptor();
@@ -165,25 +182,47 @@ public final class NativeMoveSearch {
                 throw failure;
             } finally { SearchExecution.close(retained, primary); }
         }
+        private static boolean inspectCursorReceipts(SearchExecution.Result<?,?,?,?> result) {
+            boolean complete=true;
+            SearchExecution.completed(1);
+            for(var receipt:result.batchCursorReceipts()) {
+                SearchExecution.completed(1);
+                complete &= receipt.accountingComplete() && receipt.status()!=IncrementalProviderContract.Status.FAILED;
+            }
+            for(var receipt:result.pickerReceipts()) {
+                SearchExecution.completed(1);
+                if(!(receipt instanceof SearchExecution.Expansion<?> expansion)){complete=false;continue;}
+                for(var lane:expansion.lanes()) {
+                    SearchExecution.completed(1);
+                    if(lane.cursor()!=null)complete &= lane.cursor().accountingComplete()
+                        && lane.cursor().status()!=IncrementalProviderContract.Status.FAILED;
+                }
+            }
+            return complete;
+        }
+        boolean cursorsComplete(){return cursorsComplete;}
+        boolean qualificationRequested(){return qualificationRequested;}
         @SuppressWarnings("unchecked")
         public List<SearchExecution.Expansion<TypedMoveSearch.State>> cursorReceipts(){
             return result.pickerReceipts().stream().map(r->(SearchExecution.Expansion<TypedMoveSearch.State>)r).toList();
         }
         /** Managed cursor receipts from eager/staged batch draining; separate from lane scheduling receipts. */
         public List<IncrementalProviderContract.Snapshot> batchCursorReceipts(){return result.batchCursorReceipts();}
-        public Coverage coverage(){return NativeMoveSearch.coverage();}
-        public boolean accountingComplete(){return false;}
+        public Coverage coverage(){return accounting==null?NativeMoveSearch.coverage():accounting.coverage();}
+        public boolean accountingComplete(){return accounting!=null && accounting.complete();}
         /** Installed observations completed; partial coverage still precludes total qualification. */
-        public boolean observationsComplete(){return (accounting==null || accounting.observationsComplete())
+        public boolean observationsComplete(){
+            if(qualificationRequested)return accounting!=null && accounting.observationsComplete() && cursorsComplete;
+            return (accounting==null || accounting.observationsComplete())
             && batchCursorReceipts().stream().allMatch(receipt->receipt.accountingComplete() && receipt.status()!=IncrementalProviderContract.Status.FAILED)
             && cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
         public Accounting accounting(){if(accounting==null)throw new IllegalStateException("ownership accounting unavailable for this revision");return accounting;}
-        public String workRevision(){return REVISION;}
+        public String workRevision(){return qualificationRequested?QUALIFIED_REVISION:REVISION;}
         public long replayWork(){return replayWork;}
         /** Sum of observed search/replay/accounting work, not a complete execution-cost upper bound. */
         public long totalWork(){return Math.addExact(Math.addExact(metrics().totalWork(),replayWork),accounting==null?0:accounting.work());}
         public boolean withinBudget(){return accountingComplete() && totalWork()<=workBudget;}
-        public MoveSearch.Outcome outcome(){return MoveSearch.Outcome.INCONCLUSIVE;}
+        public MoveSearch.Outcome outcome(){return accountingComplete() && replayAccepted?observedOutcome():MoveSearch.Outcome.INCONCLUSIVE;}
         /** Diagnostic execution outcome including observed failures; never a total-budget qualification. */
         public MoveSearch.Outcome observedOutcome(){if(accounting!=null && !accounting.observationsComplete())return MoveSearch.Outcome.INCONCLUSIVE;return totalWork()>workBudget?MoveSearch.Outcome.WORK_EXHAUSTED:result.outcome();}
         public long workBudget(){return workBudget;}
@@ -195,6 +234,7 @@ public final class NativeMoveSearch {
         public ExportResult exportLegacy(long workBudget,SearchExpressionStore.Limits limits){return NativeExportSession.run(this,workBudget,limits);}
         public static final long DEFAULT_EXPORT_WORK=10_000_000;
         public static final String EXPORT_REVISION="regelsuche.native-legacy-export/v3-partial-atomic-ownership";
+        public static final String QUALIFIED_EXPORT_REVISION="regelsuche.native-legacy-export/v4-declared-execution";
         /** Requires fully qualified output accounting; partial coverage throws with its paid diagnostic artefact. */
         public MoveSearch.Result exportLegacy(){
             var exported=exportLegacy(DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);
@@ -253,13 +293,14 @@ public final class NativeMoveSearch {
                     }
                 }
                 completed[0]=incrementalProviders==null?null:new StagedIncrementalMoveExecution(
-                    REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,expansions);
+                    workRevision(),StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,expansions);
                 if(completed[0]!=null){
                     var staged=(StagedIncrementalMoveExecution)completed[0];
                     SearchExecution.completed(1L+(staged.providers()==incrementalProviders?0:incrementalProviders.size()+1L)
                         +(staged.expansions()==expansions?0:expansions.size()+1L));
                 }
-                completed[1]=new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),false,assessments,null,
+                boolean completeRelation=result.completeBoundedRelation() && replayAccepted && withinBudget();
+                completed[1]=new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),completeRelation,assessments,null,
                     (StagedIncrementalMoveExecution)completed[0]);
                 var projection=(MoveSearch.Result)completed[1];
                 // All constructor copies already exist. Settle the entire owned block
@@ -338,7 +379,7 @@ public final class NativeMoveSearch {
         var selection=new MoveSearchObjective<TypedMoveSearch.State,NativeSearchMove,NativeVerification>(
             new ObjectiveAdapter(objective),maximumOutputScore,stopAtQuality);
         try(var store=new SearchExpressionStore(limits)) {
-            var accounting=new NativeRetentionSession(problem,store,limits);
+            var accounting=new NativeRetentionSession(problem,store,limits,false,qualifyExecution);
             try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {
                 accounting.operation(operation);accounting.externalObjective(objective);accounting.validateInputs();
                 var execution=new Execution(problem,store,accounting);
@@ -350,7 +391,7 @@ public final class NativeMoveSearch {
                 QualityResult quality;
                 accounting.beginResultAssembly();
                 try {
-                    var result=new Result(problem,searched,replay.work());
+                    var result=new Result(problem,searched,replay.work(),replay.rejected()==null,qualifyExecution);
                     quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
                 } finally { accounting.endResultAssembly(); }
                 accounting.finish(quality.search(),quality);
@@ -362,7 +403,7 @@ public final class NativeMoveSearch {
     public Result search(Problem problem,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
         Objects.requireNonNull(limits);
         try(var store=new SearchExpressionStore(limits)) {
-            var accounting=new NativeRetentionSession(problem,store,limits);
+            var accounting=new NativeRetentionSession(problem,store,limits,false,qualifyExecution);
             try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {
             accounting.operation(operation);
             accounting.validateInputs();
@@ -374,7 +415,7 @@ public final class NativeMoveSearch {
                 ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
             Result result;
             accounting.beginResultAssembly();
-            try { result=new Result(problem,searched,replay.work()); }
+            try { result=new Result(problem,searched,replay.work(),replay.rejected()==null,qualifyExecution); }
             finally { accounting.endResultAssembly(); }
             accounting.finish(result);
             if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());

@@ -13,7 +13,8 @@ import java.util.Set;
  * The caller supplies the measured objective; these logical units do not represent total CPU.
  */
 public final class TypedSourceOnlySearch {
-    public record Score(long value, long work) {
+    public record Score(long value, long work) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) {}
         public Score {
             if (work < 1) throw new IllegalArgumentException("objective inspection must report positive work");
         }
