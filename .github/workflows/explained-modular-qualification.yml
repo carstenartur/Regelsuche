@@ -10,13 +10,13 @@ concurrency:
 jobs:
   verify-source:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 6bd7564c9e81a46ccaeb5045de7b295491bda56b
+          ref: 79251dc53d30c31d5607fe8ab0c0c42fb256b01e
           fetch-depth: 100
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
@@ -24,109 +24,94 @@ jobs:
           java-version: '25'
           verify-signature: true
           cache: maven
-      - name: Apply the accounting repair without changing mathematical rules or tests
+      - name: Resolve only the three reviewed conflicts with the exact current main
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 6bd7564c9e81a46ccaeb5045de7b295491bda56b
+          test "$(git rev-parse HEAD)" = 79251dc53d30c31d5607fe8ab0c0c42fb256b01e
           test -z "$(git status --porcelain)"
+          git fetch --no-tags --depth=100 origin c1815c00813659de26fddfe0dbfc1cd212421d29
+          test "$(git merge-base HEAD FETCH_HEAD)" = 8a98a14e6713225801832918befd7c12d5cb74ba
+          set +e
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' merge --no-commit --no-ff c1815c00813659de26fddfe0dbfc1cd212421d29 > "$RUNNER_TEMP/merge-audit.txt" 2>&1
+          result=$?
+          set -e
+          test "$result" = 1
           python3 - <<'PY'
           from pathlib import Path
-          root = Path('regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization')
-          path = root / 'ComputationOptimizer.java'
+          import subprocess
+          root = 'regelsuche-optimization-sdk/src/'
+          checker = root + 'main/java/de/regelsuche/sdk/optimization/SemanticChecker.java'
+          tests = [root + 'test/java/de/regelsuche/sdk/optimization/' + name for name in ('GuardedBigIntegerCostTest.java','MixedTheoryProofTest.java')]
+          actual = subprocess.check_output(['git','diff','--name-only','--diff-filter=U'], text=True).splitlines()
+          assert set(actual) == {checker, *tests}, actual
+          path = Path(checker)
           text = path.read_text()
-          before = '''    public VerificationResult verify(OptimizationRequest request, JointComputationPlan candidate, CancellationToken token) {
-                  Objects.requireNonNull(request); Objects.requireNonNull(candidate); var work=new VerificationWork(request,token);
-                  try {'''
-          after = '''    public VerificationResult verify(OptimizationRequest request, JointComputationPlan candidate, CancellationToken token) {
-                  Objects.requireNonNull(request); Objects.requireNonNull(candidate);
-                  return verifyWithin(request, candidate, new VerificationWork(request, token));
-              }
-              private VerificationResult verifyWithin(OptimizationRequest request, JointComputationPlan candidate, VerificationWork work) {
-                  try {'''
-          assert text.count(before) == 1
-          text = text.replace(before, after)
-          before = '''    public VerificationResult reverify(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
-                  Objects.requireNonNull(candidate);
-                  var verified=verify(request,candidate.plan(),token);'''
-          after = '''    public VerificationResult reverify(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
-                  Objects.requireNonNull(request); Objects.requireNonNull(candidate);
-                  return reverifyWithin(request, candidate, new VerificationWork(request, token));
-              }
-              /** Continue the same caller budget and deadline through proof and presentation. */
-              VerificationResult reverifyWithin(OptimizationRequest request, OptimizationResult.Candidate candidate, VerificationWork work) {
-                  Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(work);
-                  var verified=verifyWithin(request,candidate.plan(),work);'''
-          assert text.count(before) == 1
-          path.write_text(text.replace(before, after))
-          path = root / 'ComputationExplanations.java'
-          text = path.read_text()
-          before = '''        var verified = new ComputationOptimizer().reverify(request, candidate, token);
-                  if (!(verified instanceof VerificationResult.Verified proof)) return new Result(verified, Optional.empty());
-                  var work = new VerificationWork(request, token);'''
-          after = '''        var work = new VerificationWork(request, token);
-                  var verified = new ComputationOptimizer().reverifyWithin(request, candidate, work);
-                  if (!(verified instanceof VerificationResult.Verified proof)) return new Result(verified, Optional.empty());
-                  long verificationWork = work.used();'''
-          assert text.count(before) == 1
-          text = text.replace(before, after)
-          before = 'proof.obligations(), before, after, originalPowers, replacementPowers, work.used())))'
-          after = 'proof.obligations(), before, after, originalPowers, replacementPowers, work.used() - verificationWork)))'
-          assert text.count(before) == 1
-          path.write_text(text.replace(before, after))
+          conflict = '''<<<<<<< HEAD
+              static final String REVISION = "java-numeric-independent/v6";
+          =======
+              static final String REVISION = "java-numeric-independent/v5";
+          >>>>>>> c1815c00813659de26fddfe0dbfc1cd212421d29'''
+          assert text.count(conflict) == 1
+          text = text.replace(conflict, '    static final String REVISION = "java-numeric-independent/v6";')
+          assert '<<<<<<<' not in text and '>>>>>>>' not in text
+          path.write_text(text)
+          # Main's versions contain every earlier test plus the later cost and
+          # proof-receipt regressions. Preserve their bytes without weakening them.
+          for test in tests:
+              Path(test).write_bytes(subprocess.check_output(['git','show','c1815c00813659de26fddfe0dbfc1cd212421d29:'+test]))
+          subprocess.run(['git','add',checker,*tests],check=True)
+          assert not subprocess.check_output(['git','diff','--name-only','--diff-filter=U']).strip()
           PY
-          git add regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/ComputationOptimizer.java regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/ComputationExplanations.java
           git diff --cached --check
-          git diff --cached > "$RUNNER_TEMP/accounting-repair.patch"
           git write-tree > "$RUNNER_TEMP/source-tree.txt"
-      - name: Run the complete SDK reactor and unchanged workflow contract
+          git diff --cached c1815c00813659de26fddfe0dbfc1cd212421d29 --stat >> "$RUNNER_TEMP/merge-audit.txt"
+          cat "$RUNNER_TEMP/merge-audit.txt"
+      - name: Qualify the reconciled SDK reactor and unchanged workflow contract
         shell: bash
         run: |
           set -euo pipefail
-          mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-tests.log" 2>&1 || { tail -130 "$RUNNER_TEMP/sdk-tests.log"; exit 1; }
-          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-tests.log" | tail -35
+          mvn --batch-mode --no-transfer-progress -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-tests.log" 2>&1 || { tail -150 "$RUNNER_TEMP/sdk-tests.log"; exit 1; }
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-tests.log" | tail -25
           mvn --batch-mode --no-transfer-progress -pl maven-build-contract -Dtest=MavenWorkflowSemanticsContractTest test > "$RUNNER_TEMP/workflow-contract.log" 2>&1 || { tail -90 "$RUNNER_TEMP/workflow-contract.log"; exit 1; }
           grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/workflow-contract.log"
-      - name: Publish only the tested repair to its isolated branch
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as E
+          modules = ['regelsuche-core','regelsuche-egraph','regelsuche-search','regelsuche-validation','regelsuche-math-algorithms','regelsuche-optimization-sdk','maven-build-contract']
+          for module in modules:
+              files = list(Path(module+'/target/surefire-reports').glob('TEST-*.xml'))
+              assert files, module
+              total = dict.fromkeys(('tests','failures','errors','skipped'),0)
+              for file in files:
+                  suite = E.parse(file).getroot()
+                  for key in total: total[key] += int(suite.get(key,'0'))
+              assert total['tests'] > 0 and not any(total[k] for k in ('failures','errors','skipped')), (module,total)
+              print(module,total)
+          PY
+      - name: Publish the tested integration on the existing PR only
         shell: bash
         run: |
           set -euo pipefail
           git diff --exit-code
           test "$(git write-tree)" = "$(cat "$RUNNER_TEMP/source-tree.txt")"
-          git fetch --no-tags origin refs/heads/fix/explanation-request-budget-20261010
-          test "$(git rev-parse FETCH_HEAD)" = 6bd7564c9e81a46ccaeb5045de7b295491bda56b
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: share work allowance and deadline between verification and explanation'
-          git push origin HEAD:refs/heads/fix/explanation-request-budget-20261010
+          git fetch --no-tags origin refs/heads/feat/explained-modular-powers-20261009
+          test "$(git rev-parse FETCH_HEAD)" = 79251dc53d30c31d5607fe8ab0c0c42fb256b01e
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = c1815c00813659de26fddfe0dbfc1cd212421d29
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'merge: retain current main fixes in the general mathematics SDK integration'
+          test -z "$(git status --porcelain)"
+          git push origin HEAD:refs/heads/feat/explained-modular-powers-20261009
           git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
-      - name: Inspect main integration in a disposable worktree without publishing it
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --depth=100 origin c1815c00813659de26fddfe0dbfc1cd212421d29
-          git worktree add --detach "$RUNNER_TEMP/main-audit" HEAD
-          cd "$RUNNER_TEMP/main-audit"
-          git merge-base HEAD c1815c00813659de26fddfe0dbfc1cd212421d29 > "$RUNNER_TEMP/merge-base.txt"
-          set +e
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' merge --no-commit --no-ff c1815c00813659de26fddfe0dbfc1cd212421d29 > "$RUNNER_TEMP/merge-audit.txt" 2>&1
-          result=$?
-          set -e
-          echo "MERGE_AUDIT_EXIT=$result"
-          git diff --name-only --diff-filter=U >> "$RUNNER_TEMP/merge-audit.txt"
-          git diff --cc >> "$RUNNER_TEMP/merge-audit.txt"
-          cat "$RUNNER_TEMP/merge-audit.txt"
-          echo "$result" > "$RUNNER_TEMP/merge-audit-exit.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: explanation-budget-${{ github.run_id }}
+          name: explanation-main-integration-${{ github.run_id }}
           retention-days: 7
           path: |
             ${{ runner.temp }}/source-commit.txt
             ${{ runner.temp }}/source-tree.txt
-            ${{ runner.temp }}/accounting-repair.patch
+            ${{ runner.temp }}/merge-audit.txt
             ${{ runner.temp }}/sdk-tests.log
             ${{ runner.temp }}/workflow-contract.log
-            ${{ runner.temp }}/merge-audit*
-            ${{ runner.temp }}/merge-base.txt
             regelsuche-optimization-sdk/target/surefire-reports/**
             maven-build-contract/target/surefire-reports/**
