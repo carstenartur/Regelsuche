@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchDerivations.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">SearchDerivations.java</span></div><h1>SearchDerivations.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.program.JointComputationPlan;
+import de.regelsuche.search.program.JointPlanSearch;
+import java.util.ArrayList;
+
+/** Retains the existing frontier's witness and replays it; never searches for a new explanation. */
+final class SearchDerivations {
+    private SearchDerivations() {}
+
+    static SearchDerivation capture(OptimizationRequest request, VerificationEvidence evidence,
+            JointPlanSearch.Result found, VerificationWork work) {
+<span class="fc" id="L14">        var witness = found.search().witness();</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (witness.size() &gt; SearchDerivation.MAX_STEPS)</span>
+<span class="nc" id="L16">            throw new IllegalArgumentException(&quot;DERIVATION_STRUCTURAL_BOUND&quot;);</span>
+<span class="fc" id="L17">        var steps = new ArrayList&lt;SearchDerivation.Step&gt;();</span>
+<span class="fc" id="L18">        Expr cursor = envelope(request.plan(), work);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (var edge : witness) {</span>
+<span class="fc" id="L20">            work.charge(1);</span>
+<span class="fc" id="L21">            Expr before = envelope(request.plan().withExpression(edge.source().expression()), work);</span>
+<span class="fc" id="L22">            Expr after = envelope(request.plan().withExpression(edge.target().expression()), work);</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">            if (!edge.verification().accepted() || !cursor.equals(before))</span>
+<span class="nc" id="L24">                throw new IllegalArgumentException(&quot;SELECTED_DERIVATION_DISCONTINUOUS&quot;);</span>
+<span class="fc" id="L25">            steps.add(new SearchDerivation.Step(edge.move().ruleId(), before, after));</span>
+<span class="fc" id="L26">            cursor = after;</span>
+<span class="fc" id="L27">        }</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (!cursor.equals(envelope(found.plan(), work)))</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;SELECTED_DERIVATION_ENDPOINT_DIFFERS&quot;);</span>
+<span class="fc" id="L30">        return new SearchDerivation(evidence, request.budget().maximumCandidates(), request.budget().maximumWork(), steps);</span>
+    }
+
+    static void replay(OptimizationRequest request, OptimizationResult.Candidate candidate,
+            SearchDerivation derivation, VerificationWork work) {
+<span class="fc" id="L35">        work.charge(1);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!derivation.evidence().equals(candidate.evidence()))</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;DERIVATION_EVIDENCE_BINDING_DIFFERS&quot;);</span>
+<span class="fc" id="L38">        var checker = new SemanticChecker(request, work);</span>
+<span class="fc" id="L39">        var generator = new JavaCandidateGenerator(request, work, derivation.generationBudget());</span>
+<span class="fc" id="L40">        var current = request.plan();</span>
+<span class="fc" id="L41">        Expr cursor = envelope(current, work);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (var step : derivation.steps()) {</span>
+<span class="fc" id="L43">            work.charge(1);</span>
+            // Rebuild and bound the envelope before inspecting untrusted equality or rule claims.
+<span class="fc" id="L45">            Expr before = envelope(request.plan().withExpression(step.before()), work);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (!cursor.equals(before)) throw new IllegalArgumentException(&quot;DERIVATION_DISCONTINUOUS&quot;);</span>
+<span class="fc" id="L47">            var next = request.plan().withExpression(step.after());</span>
+<span class="fc" id="L48">            Expr after = envelope(next, work);</span>
+<span class="fc" id="L49">            requireGeneratedEdge(generator, current, next, step.rule(), after, derivation.candidateLimit(), work);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (!checker.check(current, next).accepted())</span>
+<span class="nc" id="L51">                throw new IllegalArgumentException(&quot;DERIVATION_STEP_NOT_PROVED&quot;);</span>
+<span class="fc" id="L52">            current = next;</span>
+<span class="fc" id="L53">            cursor = after;</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (!cursor.equals(envelope(candidate.plan(), work)))</span>
+<span class="fc" id="L56">            throw new IllegalArgumentException(&quot;DERIVATION_ENDPOINT_DIFFERS&quot;);</span>
+<span class="fc" id="L57">    }</span>
+
+    private static void requireGeneratedEdge(JavaCandidateGenerator generator, JointComputationPlan current,
+            JointComputationPlan next, String rule, Expr after, int candidateLimit, VerificationWork work) {
+        // Uses the original bounded candidate cap, not the caller's potentially different search settings.
+        // Generation already charges this same work object. There is no new frontier or deadline.
+<span class="fc" id="L63">        var generated = generator.generate(current, candidateLimit);</span>
+<span class="fc" id="L64">        var resolution = next.resolveOutputs();</span>
+<span class="fc" id="L65">        work.charge(resolution.work());</span>
+<span class="fc" id="L66">        long comparisonWork = Math.max(1, resolution.expandedNodes());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (var proposal : generated.proposals()) {</span>
+<span class="fc" id="L68">            work.charge(1);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (proposal.rule().equals(rule)) {</span>
+<span class="fc" id="L70">                work.charge(comparisonWork);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                if (proposal.expression().equals(after)) return;</span>
+            }
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">        throw new IllegalArgumentException(&quot;DERIVATION_RULE_OR_TARGET_NOT_GENERATED&quot;);</span>
+    }
+
+    private static Expr envelope(JointComputationPlan plan, VerificationWork work) {
+<span class="fc" id="L78">        work.charge(1);</span>
+<span class="fc" id="L79">        var expression = plan.searchExpression();</span>
+<span class="fc" id="L80">        work.charge(expression.work());</span>
+<span class="fc" id="L81">        return expression.expression();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

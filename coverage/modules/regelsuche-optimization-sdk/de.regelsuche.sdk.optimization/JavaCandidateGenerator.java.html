@@ -14,196 +14,201 @@ final class JavaCandidateGenerator {
     private final JavaAlgebraCandidates algebra;
     private boolean skippedConstantFold;
 <span class="fc" id="L16">    boolean skippedConstantFold() { return skippedConstantFold; }</span>
-<span class="fc" id="L17">    JavaCandidateGenerator(OptimizationRequest request, VerificationWork work) {</span>
-<span class="fc" id="L18">        this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());</span>
-<span class="fc" id="L19">        algebra = new JavaAlgebraCandidates(work, request.budget().maximumWork());</span>
-<span class="fc" id="L20">    }</span>
+    JavaCandidateGenerator(OptimizationRequest request, VerificationWork work) {
+<span class="fc" id="L18">        this(request, work, request.budget().maximumWork());</span>
+<span class="fc" id="L19">    }</span>
+    /** Replay keeps the recorded generation configuration, not a fresh work allowance. */
+<span class="fc" id="L21">    JavaCandidateGenerator(OptimizationRequest request, VerificationWork work, long generationBudget) {</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (generationBudget &lt; 1) throw new IllegalArgumentException(&quot;POSITIVE_GENERATION_BUDGET_REQUIRED&quot;);</span>
+<span class="fc" id="L23">        this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());</span>
+<span class="fc" id="L24">        algebra = new JavaAlgebraCandidates(work, generationBudget);</span>
+<span class="fc" id="L25">    }</span>
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
-<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (maximum &lt; 1) throw new IllegalArgumentException(&quot;POSITIVE_CANDIDATE_LIMIT_REQUIRED&quot;);</span>
-<span class="fc" id="L23">        long start = work.used(); work.charge(1);</span>
-<span class="fc" id="L24">        var outputs = source.outputExpressions();</span>
-<span class="fc" id="L25">        var proposals = new ArrayList&lt;JointPlanSearch.Proposal&gt;();</span>
-<span class="fc" id="L26">        var seen = new HashSet&lt;List&lt;Expr&gt;&gt;();</span>
-<span class="fc" id="L27">        var simplified = outputs.stream().map(expression -&gt; simplify(expression, 0)).toList();</span>
-<span class="fc" id="L28">        addProposal(source, outputs, simplified, &quot;typed-local-algebra&quot;, proposals, seen);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (maximum &lt; 1) throw new IllegalArgumentException(&quot;POSITIVE_CANDIDATE_LIMIT_REQUIRED&quot;);</span>
+<span class="fc" id="L28">        long start = work.used(); work.charge(1);</span>
+<span class="fc" id="L29">        var outputs = source.outputExpressions();</span>
+<span class="fc" id="L30">        var proposals = new ArrayList&lt;JointPlanSearch.Proposal&gt;();</span>
+<span class="fc" id="L31">        var seen = new HashSet&lt;List&lt;Expr&gt;&gt;();</span>
+<span class="fc" id="L32">        var simplified = outputs.stream().map(expression -&gt; simplify(expression, 0)).toList();</span>
+<span class="fc" id="L33">        addProposal(source, outputs, simplified, &quot;typed-local-algebra&quot;, proposals, seen);</span>
 
         // Keep the fast combined candidate, but never make its admissibility a
         // prerequisite for independent changes. Only the checker admits a move.
-<span class="fc" id="L32">        var nodes = new ArrayList&lt;Expr&gt;();</span>
-<span class="fc" id="L33">        Set&lt;Expr&gt; visited = Collections.newSetFromMap(new IdentityHashMap&lt;&gt;());</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (Expr output : outputs) collect(output, nodes, visited, 0);</span>
-<span class="fc" id="L35">        boolean complete = true;</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (Expr node : nodes) {</span>
-<span class="fc" id="L37">            Expr local = simplifyHere(node);</span>
-<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (node.equals(local)) continue;</span>
-<span class="fc" id="L39">            var memo = new IdentityHashMap&lt;Expr, Expr&gt;();</span>
-<span class="fc" id="L40">            var changed = outputs.stream().map(output -&gt; replace(output, node, local, memo, 0)).toList();</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (seen.contains(changed)) continue;</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (proposals.size() == maximum) { complete = false; break; }</span>
-<span class="fc" id="L43">            addProposal(source, outputs, changed, &quot;typed-local-algebra-at-subexpression&quot;, proposals, seen);</span>
-<span class="fc" id="L44">        }</span>
-<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (proposals.size() &lt; maximum) {</span>
+<span class="fc" id="L37">        var nodes = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L38">        Set&lt;Expr&gt; visited = Collections.newSetFromMap(new IdentityHashMap&lt;&gt;());</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (Expr output : outputs) collect(output, nodes, visited, 0);</span>
+<span class="fc" id="L40">        boolean complete = true;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (Expr node : nodes) {</span>
+<span class="fc" id="L42">            Expr local = simplifyHere(node);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (node.equals(local)) continue;</span>
+<span class="fc" id="L44">            var memo = new IdentityHashMap&lt;Expr, Expr&gt;();</span>
+<span class="fc" id="L45">            var changed = outputs.stream().map(output -&gt; replace(output, node, local, memo, 0)).toList();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (seen.contains(changed)) continue;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (proposals.size() == maximum) { complete = false; break; }</span>
+<span class="fc" id="L48">            addProposal(source, outputs, changed, &quot;typed-local-algebra-at-subexpression&quot;, proposals, seen);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (proposals.size() &lt; maximum) {</span>
             try {
-<span class="fc" id="L47">                var modular = new ModularBridge(request.assumptions()).generate(outputs, maximum - proposals.size());</span>
-<span class="fc" id="L48">                work.charge(modular.work()); complete &amp;= modular.complete();</span>
-<span class="fc bfc" id="L49" title="All 2 branches covered.">                for (var rewrite : modular.rewrites())</span>
-<span class="fc" id="L50">                    addProposal(source, outputs, rewrite.outputs(), rewrite.rule(), proposals, seen);</span>
-<span class="pc" id="L51">            } catch (IllegalArgumentException outsideModularFragment) { /* Java arithmetic proposals remain available. */ }</span>
-<span class="fc" id="L52">        } else complete = false;</span>
+<span class="fc" id="L52">                var modular = new ModularBridge(request.assumptions()).generate(outputs, maximum - proposals.size());</span>
+<span class="fc" id="L53">                work.charge(modular.work()); complete &amp;= modular.complete();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                for (var rewrite : modular.rewrites())</span>
+<span class="fc" id="L55">                    addProposal(source, outputs, rewrite.outputs(), rewrite.rule(), proposals, seen);</span>
+<span class="pc" id="L56">            } catch (IllegalArgumentException outsideModularFragment) { /* Java arithmetic proposals remain available. */ }</span>
+<span class="fc" id="L57">        } else complete = false;</span>
         // Broad algebra can expose many cost-neutral intermediate forms. Give
         // it a bounded share after the existing domain proposals, rather than
         // letting its permutations crowd out those independently checked moves.
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (proposals.size() &lt; maximum) {</span>
-<span class="fc" id="L57">            var general = algebra.generate(source, Math.min(8, maximum - proposals.size()));</span>
-<span class="fc" id="L58">            complete &amp;= general.complete();</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (var proposal : general.proposals()) {</span>
-<span class="fc" id="L60">                var changed = source.withExpression(proposal.expression()).outputExpressions();</span>
-<span class="fc" id="L61">                addProposal(source, outputs, changed, proposal.rule(), proposals, seen);</span>
-<span class="fc" id="L62">            }</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (proposals.size() &lt; maximum) {</span>
+<span class="fc" id="L62">            var general = algebra.generate(source, Math.min(8, maximum - proposals.size()));</span>
+<span class="fc" id="L63">            complete &amp;= general.complete();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (var proposal : general.proposals()) {</span>
+<span class="fc" id="L65">                var changed = source.withExpression(proposal.expression()).outputExpressions();</span>
+<span class="fc" id="L66">                addProposal(source, outputs, changed, proposal.rule(), proposals, seen);</span>
+<span class="fc" id="L67">            }</span>
         }
-<span class="fc" id="L64">        return new JointPlanSearch.Generation(proposals, Math.max(1, work.used() - start), complete);</span>
+<span class="fc" id="L69">        return new JointPlanSearch.Generation(proposals, Math.max(1, work.used() - start), complete);</span>
     }
     private void addProposal(JointComputationPlan source, List&lt;Expr&gt; original, List&lt;Expr&gt; changed, String rule,
                              List&lt;JointPlanSearch.Proposal&gt; proposals, Set&lt;List&lt;Expr&gt;&gt; seen) {
-<span class="fc" id="L68">        work.charge(1);</span>
-<span class="fc bfc" id="L69" title="All 4 branches covered.">        if (!changed.equals(original) &amp;&amp; seen.add(changed))</span>
-<span class="fc" id="L70">            proposals.add(new JointPlanSearch.Proposal(rule, source.withOutputs(changed).expression()));</span>
-<span class="fc" id="L71">    }</span>
-    private void collect(Expr expression, List&lt;Expr&gt; nodes, Set&lt;Expr&gt; visited, int depth) {
 <span class="fc" id="L73">        work.charge(1);</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;GENERATION_STRUCTURAL_BOUND&quot;);</span>
-<span class="pc bpc" id="L75" title="1 of 6 branches missed.">        if (!visited.add(expression) || JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return;</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (Expr child : JavaExpressions.operands(expression)) collect(child, nodes, visited, depth + 1);</span>
-<span class="fc" id="L77">        nodes.add(expression);</span>
-<span class="fc" id="L78">    }</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">        if (!changed.equals(original) &amp;&amp; seen.add(changed))</span>
+<span class="fc" id="L75">            proposals.add(new JointPlanSearch.Proposal(rule, source.withOutputs(changed).expression()));</span>
+<span class="fc" id="L76">    }</span>
+    private void collect(Expr expression, List&lt;Expr&gt; nodes, Set&lt;Expr&gt; visited, int depth) {
+<span class="fc" id="L78">        work.charge(1);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;GENERATION_STRUCTURAL_BOUND&quot;);</span>
+<span class="fc bfc" id="L80" title="All 6 branches covered.">        if (!visited.add(expression) || JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (Expr child : JavaExpressions.operands(expression)) collect(child, nodes, visited, depth + 1);</span>
+<span class="fc" id="L82">        nodes.add(expression);</span>
+<span class="fc" id="L83">    }</span>
     private Expr replace(Expr expression, Expr original, Expr replacement, Map&lt;Expr, Expr&gt; memo, int depth) {
-<span class="fc" id="L80">        work.charge(1);</span>
-<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;GENERATION_STRUCTURAL_BOUND&quot;);</span>
-<span class="fc" id="L82">        Expr cached = memo.get(expression);</span>
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (cached != null) return cached;</span>
+<span class="fc" id="L85">        work.charge(1);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;GENERATION_STRUCTURAL_BOUND&quot;);</span>
+<span class="fc" id="L87">        Expr cached = memo.get(expression);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (cached != null) return cached;</span>
         Expr result;
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (expression.equals(original)) result = replacement;</span>
-<span class="fc bfc" id="L86" title="All 4 branches covered.">        else if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) result = expression;</span>
-<span class="fc" id="L87">        else result = new FunctionExpr(((FunctionExpr) expression).name(), JavaExpressions.operands(expression).stream()</span>
-<span class="fc" id="L88">                .map(child -&gt; replace(child, original, replacement, memo, depth + 1)).toList());</span>
-<span class="fc" id="L89">        memo.put(expression, result);</span>
-<span class="fc" id="L90">        return result;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (expression.equals(original)) result = replacement;</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">        else if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) result = expression;</span>
+<span class="fc" id="L92">        else result = new FunctionExpr(((FunctionExpr) expression).name(), JavaExpressions.operands(expression).stream()</span>
+<span class="fc" id="L93">                .map(child -&gt; replace(child, original, replacement, memo, depth + 1)).toList());</span>
+<span class="fc" id="L94">        memo.put(expression, result);</span>
+<span class="fc" id="L95">        return result;</span>
     }
     private Expr simplify(Expr expression, int depth) {
-<span class="fc" id="L93">        work.charge(1);</span>
-<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;GENERATION_STRUCTURAL_BOUND&quot;);</span>
-<span class="fc bfc" id="L95" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
-<span class="fc" id="L96">        var arguments = JavaExpressions.operands(expression).stream().map(child -&gt; simplify(child, depth + 1)).toList();</span>
-<span class="fc" id="L97">        return simplifyHere(new FunctionExpr(((FunctionExpr) expression).name(), arguments));</span>
+<span class="fc" id="L98">        work.charge(1);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;GENERATION_STRUCTURAL_BOUND&quot;);</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
+<span class="fc" id="L101">        var arguments = JavaExpressions.operands(expression).stream().map(child -&gt; simplify(child, depth + 1)).toList();</span>
+<span class="fc" id="L102">        return simplifyHere(new FunctionExpr(((FunctionExpr) expression).name(), arguments));</span>
     }
     private Expr simplifyHere(Expr result) {
-<span class="fc" id="L100">        work.charge(1);</span>
-<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        if (JavaExpressions.isLiteral(result) || result instanceof VariableExpr) return result;</span>
-<span class="fc" id="L102">        var arguments = JavaExpressions.operands(result);</span>
-<span class="fc" id="L103">        var optional = JavaExpressions.operationOf(result);</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (optional.isEmpty()) return result;</span>
-<span class="fc" id="L105">        NumericOperation op = optional.get(); NumericKind kind = JavaExpressions.resultKind(result);</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (op.name().endsWith(&quot;EXACT&quot;)) return result;</span>
-<span class="fc bfc" id="L107" title="All 4 branches covered.">        if (kind.floatingPoint() &amp;&amp; request.safetyProfile() == SafetyProfile.PRESERVE_JAVA) return floating(result, op, arguments);</span>
-<span class="fc" id="L108">        return simplifyAdditive(result, op, kind, arguments);</span>
+<span class="fc" id="L105">        work.charge(1);</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        if (JavaExpressions.isLiteral(result) || result instanceof VariableExpr) return result;</span>
+<span class="fc" id="L107">        var arguments = JavaExpressions.operands(result);</span>
+<span class="fc" id="L108">        var optional = JavaExpressions.operationOf(result);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (optional.isEmpty()) return result;</span>
+<span class="fc" id="L110">        NumericOperation op = optional.get(); NumericKind kind = JavaExpressions.resultKind(result);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (op.name().endsWith(&quot;EXACT&quot;)) return result;</span>
+<span class="fc bfc" id="L112" title="All 4 branches covered.">        if (kind.floatingPoint() &amp;&amp; request.safetyProfile() == SafetyProfile.PRESERVE_JAVA) return floating(result, op, arguments);</span>
+<span class="fc" id="L113">        return simplifyAdditive(result, op, kind, arguments);</span>
     }
     private Expr simplifyAdditive(Expr result, NumericOperation op, NumericKind kind, List&lt;Expr&gt; arguments) {
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        Expr left = arguments.getFirst(); Expr right = arguments.size() &gt; 1 ? arguments.get(1) : null;</span>
-<span class="pc bpc" id="L112" title="3 of 4 branches missed.">        if (op == NumericOperation.NEGATE &amp;&amp; operation(left) == NumericOperation.NEGATE) return children(left).getFirst();</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (op == NumericOperation.ADD) {</span>
-<span class="fc bfc" id="L114" title="All 4 branches covered.">            if (number(right, 0)) return left; if (number(left, 0)) return right;</span>
-<span class="fc bfc" id="L115" title="All 4 branches covered.">            if (operation(left) == NumericOperation.SUBTRACT &amp;&amp; children(left).get(1).equals(right)) return children(left).getFirst();</span>
-<span class="pc bpc" id="L116" title="1 of 4 branches missed.">            if (operation(right) == NumericOperation.SUBTRACT &amp;&amp; children(right).get(1).equals(left)) return children(right).getFirst();</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">            Expr factored = factor(kind, left, right); if (factored != null) return factored;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        Expr left = arguments.getFirst(); Expr right = arguments.size() &gt; 1 ? arguments.get(1) : null;</span>
+<span class="pc bpc" id="L117" title="3 of 4 branches missed.">        if (op == NumericOperation.NEGATE &amp;&amp; operation(left) == NumericOperation.NEGATE) return children(left).getFirst();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (op == NumericOperation.ADD) {</span>
+<span class="fc bfc" id="L119" title="All 4 branches covered.">            if (number(right, 0)) return left; if (number(left, 0)) return right;</span>
+<span class="fc bfc" id="L120" title="All 4 branches covered.">            if (operation(left) == NumericOperation.SUBTRACT &amp;&amp; children(left).get(1).equals(right)) return children(left).getFirst();</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">            if (operation(right) == NumericOperation.SUBTRACT &amp;&amp; children(right).get(1).equals(left)) return children(right).getFirst();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            Expr factored = factor(kind, left, right); if (factored != null) return factored;</span>
         }
-<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (op == NumericOperation.SUBTRACT) {</span>
-<span class="fc bfc" id="L120" title="All 4 branches covered.">            if (number(right, 0)) return left; if (left.equals(right)) return constant(kind, 0);</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (operation(left) == NumericOperation.ADD) {</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">                if (children(left).get(1).equals(right)) return children(left).getFirst();</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">                if (children(left).getFirst().equals(right)) return children(left).get(1);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (op == NumericOperation.SUBTRACT) {</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">            if (number(right, 0)) return left; if (left.equals(right)) return constant(kind, 0);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (operation(left) == NumericOperation.ADD) {</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                if (children(left).get(1).equals(right)) return children(left).getFirst();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                if (children(left).getFirst().equals(right)) return children(left).get(1);</span>
             }
         }
-<span class="fc" id="L126">        return simplifyProductsAndBitwise(result, op, kind, arguments, left, right);</span>
+<span class="fc" id="L131">        return simplifyProductsAndBitwise(result, op, kind, arguments, left, right);</span>
     }
     private Expr simplifyProductsAndBitwise(Expr result, NumericOperation op, NumericKind kind,
                                            List&lt;Expr&gt; arguments, Expr left, Expr right) {
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (op == NumericOperation.MULTIPLY) {</span>
-<span class="pc bpc" id="L131" title="2 of 4 branches missed.">            if (number(right, 1)) return left; if (number(left, 1)) return right;</span>
-<span class="fc bfc" id="L132" title="All 4 branches covered.">            if (number(right, 0) || number(left, 0)) return constant(kind, 0);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (op == NumericOperation.MULTIPLY) {</span>
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">            if (number(right, 1)) return left; if (number(left, 1)) return right;</span>
+<span class="fc bfc" id="L137" title="All 4 branches covered.">            if (number(right, 0) || number(left, 0)) return constant(kind, 0);</span>
         }
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (op == NumericOperation.DIVIDE) {</span>
-<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (number(right, 1)) return left;</span>
-<span class="pc bpc" id="L136" title="3 of 6 branches missed.">            if (operation(left) == NumericOperation.MULTIPLY &amp;&amp; JavaExpressions.isLiteral(right) &amp;&amp; !number(right, 0)) {</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">                if (children(left).get(1).equals(right)) return children(left).getFirst();</span>
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                if (children(left).getFirst().equals(right)) return children(left).get(1);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (op == NumericOperation.DIVIDE) {</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (number(right, 1)) return left;</span>
+<span class="pc bpc" id="L141" title="3 of 6 branches missed.">            if (operation(left) == NumericOperation.MULTIPLY &amp;&amp; JavaExpressions.isLiteral(right) &amp;&amp; !number(right, 0)) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                if (children(left).get(1).equals(right)) return children(left).getFirst();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                if (children(left).getFirst().equals(right)) return children(left).get(1);</span>
             }
         }
-<span class="fc bfc" id="L141" title="All 6 branches covered.">        if ((op == NumericOperation.XOR || op == NumericOperation.OR) &amp;&amp; number(right, 0)) return left;</span>
-<span class="fc bfc" id="L142" title="All 4 branches covered.">        if (op == NumericOperation.XOR &amp;&amp; left.equals(right)) return constant(kind, 0);</span>
-<span class="pc bpc" id="L143" title="1 of 6 branches missed.">        if ((op == NumericOperation.OR || op == NumericOperation.AND) &amp;&amp; left.equals(right)) return left;</span>
-<span class="fc bfc" id="L144" title="All 4 branches covered.">        if (op == NumericOperation.OR || op == NumericOperation.XOR) {</span>
-<span class="fc" id="L145">            work.charge(8);</span>
-<span class="fc" id="L146">            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments);</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (!bitwise.equals(result)) return bitwise;</span>
+<span class="fc bfc" id="L146" title="All 6 branches covered.">        if ((op == NumericOperation.XOR || op == NumericOperation.OR) &amp;&amp; number(right, 0)) return left;</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (op == NumericOperation.XOR &amp;&amp; left.equals(right)) return constant(kind, 0);</span>
+<span class="pc bpc" id="L148" title="1 of 6 branches missed.">        if ((op == NumericOperation.OR || op == NumericOperation.AND) &amp;&amp; left.equals(right)) return left;</span>
+<span class="fc bfc" id="L149" title="All 4 branches covered.">        if (op == NumericOperation.OR || op == NumericOperation.XOR) {</span>
+<span class="fc" id="L150">            work.charge(8);</span>
+<span class="fc" id="L151">            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (!bitwise.equals(result)) return bitwise;</span>
         }
-<span class="fc" id="L149">        return foldConstant(result, op, kind, arguments);</span>
+<span class="fc" id="L154">        return foldConstant(result, op, kind, arguments);</span>
     }
     private Expr foldConstant(Expr result, NumericOperation op, NumericKind kind, List&lt;Expr&gt; arguments) {
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (arguments.stream().allMatch(JavaExpressions::isLiteral)) {</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (!boundedConstantFold(kind, op, arguments)) { skippedConstantFold = true; return result; }</span>
-<span class="nc" id="L154">            work.charge(Math.max(1, arguments.size()));</span>
-<span class="nc" id="L155">            try { return literalValue(kind, backend.apply(backend.operation(result), arguments.stream().map(JavaExpressions::literalValue).toList())); }</span>
-<span class="nc" id="L156">            catch (ArithmeticException | IllegalArgumentException unsupported) { return result; }</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (arguments.stream().allMatch(JavaExpressions::isLiteral)) {</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (!boundedConstantFold(kind, op, arguments)) { skippedConstantFold = true; return result; }</span>
+<span class="nc" id="L159">            work.charge(Math.max(1, arguments.size()));</span>
+<span class="nc" id="L160">            try { return literalValue(kind, backend.apply(backend.operation(result), arguments.stream().map(JavaExpressions::literalValue).toList())); }</span>
+<span class="nc" id="L161">            catch (ArithmeticException | IllegalArgumentException unsupported) { return result; }</span>
         }
-<span class="fc" id="L158">        return result;</span>
+<span class="fc" id="L163">        return result;</span>
     }
     private static boolean boundedConstantFold(NumericKind kind, NumericOperation operation, List&lt;Expr&gt; arguments) {
-<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (kind != NumericKind.BIG_INTEGER) return true;</span>
-<span class="fc" id="L162">        if (EnumSet.of(NumericOperation.POW, NumericOperation.MOD_POW, NumericOperation.MOD_MULTIPLY,</span>
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                NumericOperation.SHIFT_LEFT, NumericOperation.SHIFT_RIGHT).contains(operation)) return false;</span>
-<span class="nc" id="L164">        return arguments.stream().map(JavaExpressions::literalValue)</span>
-<span class="nc bnc" id="L165" title="All 4 branches missed.">            .allMatch(value -&gt; value instanceof BigInteger integer &amp;&amp; integer.abs().bitLength() &lt;= 256);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (kind != NumericKind.BIG_INTEGER) return true;</span>
+<span class="fc" id="L167">        if (EnumSet.of(NumericOperation.POW, NumericOperation.MOD_POW, NumericOperation.MOD_MULTIPLY,</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                NumericOperation.SHIFT_LEFT, NumericOperation.SHIFT_RIGHT).contains(operation)) return false;</span>
+<span class="nc" id="L169">        return arguments.stream().map(JavaExpressions::literalValue)</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">            .allMatch(value -&gt; value instanceof BigInteger integer &amp;&amp; integer.abs().bitLength() &lt;= 256);</span>
     }
     private static Expr floating(Expr result, NumericOperation op, List&lt;Expr&gt; args) {
-<span class="fc" id="L168">        Expr left = args.getFirst();</span>
-<span class="fc bfc" id="L169" title="All 4 branches covered.">        if (op == NumericOperation.NEGATE &amp;&amp; operation(left) == NumericOperation.NEGATE) return children(left).getFirst();</span>
-<span class="pc bpc" id="L170" title="1 of 4 branches missed.">        if (op == NumericOperation.MULTIPLY || op == NumericOperation.DIVIDE) {</span>
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (StrictFloatingProof.isNumber(args.get(1), 1.0, false)) return left;</span>
-<span class="nc bnc" id="L172" title="All 4 branches missed.">            if (op == NumericOperation.MULTIPLY &amp;&amp; StrictFloatingProof.isNumber(left, 1.0, false)) return args.get(1);</span>
+<span class="fc" id="L173">        Expr left = args.getFirst();</span>
+<span class="fc bfc" id="L174" title="All 4 branches covered.">        if (op == NumericOperation.NEGATE &amp;&amp; operation(left) == NumericOperation.NEGATE) return children(left).getFirst();</span>
+<span class="pc bpc" id="L175" title="1 of 4 branches missed.">        if (op == NumericOperation.MULTIPLY || op == NumericOperation.DIVIDE) {</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (StrictFloatingProof.isNumber(args.get(1), 1.0, false)) return left;</span>
+<span class="nc bnc" id="L177" title="All 4 branches missed.">            if (op == NumericOperation.MULTIPLY &amp;&amp; StrictFloatingProof.isNumber(left, 1.0, false)) return args.get(1);</span>
         }
-<span class="pc bpc" id="L174" title="3 of 4 branches missed.">        if (op == NumericOperation.SUBTRACT &amp;&amp; StrictFloatingProof.isNumber(args.get(1), 0.0, false)) return left;</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (op == NumericOperation.ADD) {</span>
-<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (StrictFloatingProof.isNumber(args.get(1), 0.0, true)) return left;</span>
-<span class="nc bnc" id="L177" title="All 2 branches missed.">            if (StrictFloatingProof.isNumber(left, 0.0, true)) return args.get(1);</span>
+<span class="pc bpc" id="L179" title="3 of 4 branches missed.">        if (op == NumericOperation.SUBTRACT &amp;&amp; StrictFloatingProof.isNumber(args.get(1), 0.0, false)) return left;</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (op == NumericOperation.ADD) {</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if (StrictFloatingProof.isNumber(args.get(1), 0.0, true)) return left;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (StrictFloatingProof.isNumber(left, 0.0, true)) return args.get(1);</span>
         }
-<span class="fc" id="L179">        return result;</span>
+<span class="fc" id="L184">        return result;</span>
     }
     private static Expr factor(NumericKind kind, Expr left, Expr right) {
-<span class="fc bfc" id="L182" title="All 4 branches covered.">        if (operation(left) != NumericOperation.MULTIPLY || operation(right) != NumericOperation.MULTIPLY) return null;</span>
-<span class="fc" id="L183">        var a = children(left); var b = children(right);</span>
-<span class="fc bfc" id="L184" title="All 6 branches covered.">        for (int i=0;i&lt;2;i++) for (int j=0;j&lt;2;j++) if (a.get(i).equals(b.get(j)))</span>
-<span class="fc" id="L185">            return JavaExpressions.operation(kind, NumericOperation.MULTIPLY, a.get(i),</span>
-<span class="fc" id="L186">                JavaExpressions.operation(kind, NumericOperation.ADD, a.get(1-i), b.get(1-j)));</span>
-<span class="fc" id="L187">        return null;</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">        if (operation(left) != NumericOperation.MULTIPLY || operation(right) != NumericOperation.MULTIPLY) return null;</span>
+<span class="fc" id="L188">        var a = children(left); var b = children(right);</span>
+<span class="fc bfc" id="L189" title="All 6 branches covered.">        for (int i=0;i&lt;2;i++) for (int j=0;j&lt;2;j++) if (a.get(i).equals(b.get(j)))</span>
+<span class="fc" id="L190">            return JavaExpressions.operation(kind, NumericOperation.MULTIPLY, a.get(i),</span>
+<span class="fc" id="L191">                JavaExpressions.operation(kind, NumericOperation.ADD, a.get(1-i), b.get(1-j)));</span>
+<span class="fc" id="L192">        return null;</span>
     }
-<span class="fc" id="L189">    private static List&lt;Expr&gt; children(Expr expression) { return JavaExpressions.operands(expression); }</span>
-<span class="fc" id="L190">    private static NumericOperation operation(Expr expression) { return JavaExpressions.operationOf(expression).orElse(null); }</span>
+<span class="fc" id="L194">    private static List&lt;Expr&gt; children(Expr expression) { return JavaExpressions.operands(expression); }</span>
+<span class="fc" id="L195">    private static NumericOperation operation(Expr expression) { return JavaExpressions.operationOf(expression).orElse(null); }</span>
     private static boolean number(Expr expression, long value) {
-<span class="pc bpc" id="L192" title="1 of 4 branches missed.">        if (expression == null || !JavaExpressions.isLiteral(expression)) return false;</span>
-<span class="fc" id="L193">        Object literal = JavaExpressions.literalValue(expression);</span>
-<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (literal instanceof BigInteger b) return b.equals(BigInteger.valueOf(value));</span>
-<span class="pc bpc" id="L195" title="1 of 4 branches missed.">        return literal instanceof Number n &amp;&amp; n.doubleValue() == value;</span>
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">        if (expression == null || !JavaExpressions.isLiteral(expression)) return false;</span>
+<span class="fc" id="L198">        Object literal = JavaExpressions.literalValue(expression);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (literal instanceof BigInteger b) return b.equals(BigInteger.valueOf(value));</span>
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">        return literal instanceof Number n &amp;&amp; n.doubleValue() == value;</span>
     }
-<span class="pc bpc" id="L197" title="1 of 5 branches missed.">    private static Expr constant(NumericKind kind, long value) { return literalValue(kind, switch(kind) {</span>
-<span class="pc" id="L198">        case BIG_INTEGER -&gt; BigInteger.valueOf(value); case FLOAT -&gt; (float)value; case DOUBLE -&gt; (double)value;</span>
-<span class="fc" id="L199">        case LONG -&gt; value; default -&gt; (int)value;</span>
+<span class="pc bpc" id="L202" title="1 of 5 branches missed.">    private static Expr constant(NumericKind kind, long value) { return literalValue(kind, switch(kind) {</span>
+<span class="pc" id="L203">        case BIG_INTEGER -&gt; BigInteger.valueOf(value); case FLOAT -&gt; (float)value; case DOUBLE -&gt; (double)value;</span>
+<span class="fc" id="L204">        case LONG -&gt; value; default -&gt; (int)value;</span>
     }); }
     private static Expr literalValue(NumericKind kind, Object value) {
-<span class="pc bpc" id="L202" title="2 of 6 branches missed.">        return switch(kind) {</span>
-<span class="fc" id="L203">            case BIG_INTEGER -&gt; JavaExpressions.literal((BigInteger)value); case INT -&gt; JavaExpressions.literal(((Number)value).intValue());</span>
-<span class="pc" id="L204">            case LONG -&gt; JavaExpressions.literal(((Number)value).longValue()); case FLOAT -&gt; JavaExpressions.literal(((Number)value).floatValue());</span>
-<span class="fc" id="L205">            case DOUBLE -&gt; JavaExpressions.literal(((Number)value).doubleValue());</span>
-<span class="nc" id="L206">            default -&gt; throw new IllegalArgumentException(&quot;PROMOTED_LITERAL_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L207" title="2 of 6 branches missed.">        return switch(kind) {</span>
+<span class="fc" id="L208">            case BIG_INTEGER -&gt; JavaExpressions.literal((BigInteger)value); case INT -&gt; JavaExpressions.literal(((Number)value).intValue());</span>
+<span class="pc" id="L209">            case LONG -&gt; JavaExpressions.literal(((Number)value).longValue()); case FLOAT -&gt; JavaExpressions.literal(((Number)value).floatValue());</span>
+<span class="fc" id="L210">            case DOUBLE -&gt; JavaExpressions.literal(((Number)value).doubleValue());</span>
+<span class="nc" id="L211">            default -&gt; throw new IllegalArgumentException(&quot;PROMOTED_LITERAL_REQUIRED&quot;);</span>
         };
     }
 }

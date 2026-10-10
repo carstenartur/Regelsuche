@@ -3,33 +3,40 @@
 import de.regelsuche.search.program.*;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 public sealed interface OptimizationResult {
-<span class="fc" id="L8">    enum SearchCompletion { EXHAUSTED_BOUNDED_SPACE, IMPROVEMENT_FOUND }</span>
-<span class="fc" id="L9">    record CostAssessment(long sourceScore, long candidateScore, long checkWork, int fallbackOperations,</span>
+<span class="fc" id="L9">    enum SearchCompletion { EXHAUSTED_BOUNDED_SPACE, IMPROVEMENT_FOUND }</span>
+<span class="fc" id="L10">    record CostAssessment(long sourceScore, long candidateScore, long checkWork, int fallbackOperations,</span>
             PreparedJointComputation.Cost sourceCost, PreparedJointComputation.Cost candidateCost,
             boolean estimatedRuntimeImprovement) {}
     record Candidate(JointComputationPlan plan, PreparedJointComputation prepared, VerificationEvidence evidence,
-            RuntimeObligations obligations, CostAssessment cost, SearchCompletion searchCompletion, long work) implements OptimizationResult {
-<span class="fc" id="L14">        public Candidate {</span>
-<span class="fc" id="L15">            var trusted = ComputationOptimizer.prepare(Objects.requireNonNull(plan));</span>
-<span class="pc bpc" id="L16" title="1 of 4 branches missed.">            if (prepared == null || !trusted.nodes().equals(prepared.nodes())</span>
-<span class="pc bpc" id="L17" title="1 of 2 branches missed.">                    || !trusted.outputBindings().equals(prepared.outputBindings())</span>
-<span class="pc bpc" id="L18" title="1 of 2 branches missed.">                    || !trusted.cost().equals(prepared.cost()))</span>
-<span class="fc" id="L19">                throw new IllegalArgumentException(&quot;PREPARED_PLAN_BINDING_DIFFERS&quot;);</span>
-<span class="fc" id="L20">            prepared = trusted;</span>
-<span class="fc" id="L21">            Objects.requireNonNull(evidence); Objects.requireNonNull(obligations);</span>
-<span class="fc" id="L22">            Objects.requireNonNull(cost); Objects.requireNonNull(searchCompletion);</span>
-<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (work &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_OPTIMIZATION_WORK&quot;);</span>
-<span class="fc" id="L24">        }</span>
+            RuntimeObligations obligations, CostAssessment cost, SearchCompletion searchCompletion, long work,
+            Optional&lt;SearchDerivation&gt; derivation) implements OptimizationResult {
+        /** Older/manual candidates remain usable, but no search history is invented for them. */
+        public Candidate(JointComputationPlan plan, PreparedJointComputation prepared, VerificationEvidence evidence,
+                RuntimeObligations obligations, CostAssessment cost, SearchCompletion searchCompletion, long work) {
+<span class="fc" id="L19">            this(plan, prepared, evidence, obligations, cost, searchCompletion, work, Optional.empty());</span>
+<span class="fc" id="L20">        }</span>
+<span class="fc" id="L21">        public Candidate {</span>
+<span class="fc" id="L22">            var trusted = ComputationOptimizer.prepare(Objects.requireNonNull(plan));</span>
+<span class="pc bpc" id="L23" title="1 of 4 branches missed.">            if (prepared == null || !trusted.nodes().equals(prepared.nodes())</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">                    || !trusted.outputBindings().equals(prepared.outputBindings())</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">                    || !trusted.cost().equals(prepared.cost()))</span>
+<span class="fc" id="L26">                throw new IllegalArgumentException(&quot;PREPARED_PLAN_BINDING_DIFFERS&quot;);</span>
+<span class="fc" id="L27">            prepared = trusted;</span>
+<span class="fc" id="L28">            Objects.requireNonNull(evidence); Objects.requireNonNull(obligations);</span>
+<span class="fc" id="L29">            Objects.requireNonNull(cost); Objects.requireNonNull(searchCompletion); Objects.requireNonNull(derivation);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            if (work &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_OPTIMIZATION_WORK&quot;);</span>
+<span class="fc" id="L31">        }</span>
     }
-<span class="fc" id="L26">    record NoImprovement(String diagnostic, SearchCompletion searchCompletion, long work) implements OptimizationResult {}</span>
-<span class="fc" id="L27">    record Unsupported(String diagnostic) implements OptimizationResult {}</span>
-<span class="fc" id="L28">    record BudgetExceeded(String diagnostic, long work) implements OptimizationResult {}</span>
-<span class="fc" id="L29">    record Cancelled(String diagnostic) implements OptimizationResult {}</span>
+<span class="fc" id="L33">    record NoImprovement(String diagnostic, SearchCompletion searchCompletion, long work) implements OptimizationResult {}</span>
+<span class="fc" id="L34">    record Unsupported(String diagnostic) implements OptimizationResult {}</span>
+<span class="fc" id="L35">    record BudgetExceeded(String diagnostic, long work) implements OptimizationResult {}</span>
+<span class="fc" id="L36">    record Cancelled(String diagnostic) implements OptimizationResult {}</span>
     record Refuted(String diagnostic, Map&lt;String, Object&gt; counterexample) implements OptimizationResult {
-<span class="nc" id="L31">        public Refuted { counterexample = Map.copyOf(counterexample); }</span>
+<span class="nc" id="L38">        public Refuted { counterexample = Map.copyOf(counterexample); }</span>
     }
-<span class="fc" id="L33">    record Inconclusive(String diagnostic) implements OptimizationResult {}</span>
+<span class="fc" id="L40">    record Inconclusive(String diagnostic) implements OptimizationResult {}</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
