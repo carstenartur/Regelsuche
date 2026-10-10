@@ -16,8 +16,16 @@ public final class ComputationExplanations {
     }
     public record Explanation(VerificationEvidence proof, Set<SemanticAssumption> assumptions,
             RuntimeObligations obligations, PlanView original, PlanView replacement,
-            long originalModularPowers, long replacementModularPowers, long presentationWork) {
-        public Explanation { assumptions = Set.copyOf(assumptions); }
+            long originalModularPowers, long replacementModularPowers, long presentationWork,
+            Optional<SearchDerivation> derivation) {
+        /** Compatibility: manually assembled value views do not imply a recorded search. */
+        public Explanation(VerificationEvidence proof, Set<SemanticAssumption> assumptions,
+                RuntimeObligations obligations, PlanView original, PlanView replacement,
+                long originalModularPowers, long replacementModularPowers, long presentationWork) {
+            this(proof, assumptions, obligations, original, replacement, originalModularPowers,
+                    replacementModularPowers, presentationWork, Optional.empty());
+        }
+        public Explanation { assumptions = Set.copyOf(assumptions); Objects.requireNonNull(derivation); }
     }
     public record Result(VerificationResult verification, Optional<Explanation> explanation) {
         public Result {
@@ -34,8 +42,7 @@ public final class ComputationExplanations {
         long verificationWork = work.used();
         try {
             work.charge(1);
-            // Always reconstruct presentation from the verified plan, not a rule
-            // label or a caller-supplied schedule/cost estimate.
+            // Value views are reconstructed; the selected search path is retained and independently replayed.
             var original = ComputationOptimizer.prepare(request.plan());
             var replacement = ComputationOptimizer.prepare(candidate.plan());
             work.charge(original.cost().inspectionWork() + replacement.cost().inspectionWork());
@@ -50,7 +57,8 @@ public final class ComputationExplanations {
                 JavaExpressions.operationOf(s.expression()).orElse(null) == NumericOperation.MOD_POW).count();
             work.charge(after.steps().size());
             return new Result(verified, Optional.of(new Explanation(proof.evidence(), request.assumptions(),
-                proof.obligations(), before, after, originalPowers, replacementPowers, work.used() - verificationWork)));
+                proof.obligations(), before, after, originalPowers, replacementPowers, work.used() - verificationWork,
+                candidate.derivation())));
         } catch (VerificationWork.Stopped stopped) {
             return new Result(stopped.cancelled ? new VerificationResult.Cancelled("CANCELLED")
                 : new VerificationResult.BudgetExceeded("EXPLANATION_BUDGET_EXCEEDED", work.used()), Optional.empty());

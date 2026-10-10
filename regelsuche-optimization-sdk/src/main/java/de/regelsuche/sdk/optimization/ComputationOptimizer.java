@@ -62,8 +62,13 @@ public final class ComputationOptimizer {
             if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
                 return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
-            return new OptimizationResult.Candidate(found.plan(),found.prepared(),evidence(request,found.plan(),proof,obligations),obligations,cost,
-                OptimizationResult.SearchCompletion.IMPROVEMENT_FOUND,total);
+            var receipt = evidence(request,found.plan(),proof,obligations);
+            long beforeDerivation = work.used();
+            var derivation = SearchDerivations.capture(request, receipt, found, work);
+            total = Math.addExact(total, work.used() - beforeDerivation);
+            if (total > budget.maximumWork()) return new OptimizationResult.BudgetExceeded("DERIVATION_CAPTURE_BUDGET_EXCEEDED", total);
+            return new OptimizationResult.Candidate(found.plan(),found.prepared(),receipt,obligations,cost,
+                OptimizationResult.SearchCompletion.IMPROVEMENT_FOUND,total,Optional.of(derivation));
         } catch(VerificationWork.Stopped stopped) {
             return stopped.cancelled ? new OptimizationResult.Cancelled("CANCELLED") : new OptimizationResult.BudgetExceeded("OPTIMIZATION_BUDGET_EXCEEDED",work.used());
         } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }
@@ -98,6 +103,15 @@ public final class ComputationOptimizer {
         if(!(verified instanceof VerificationResult.Verified proof)) return verified;
         if(!proof.evidence().equals(candidate.evidence()) || !proof.obligations().equals(candidate.obligations()))
             return new VerificationResult.Unsupported("EVIDENCE_BINDING_OR_REVISION_DIFFERS");
+        try {
+            if (candidate.derivation().isPresent())
+                SearchDerivations.replay(request, candidate, candidate.derivation().orElseThrow(), work);
+        } catch (VerificationWork.Stopped stopped) {
+            return stopped.cancelled ? new VerificationResult.Cancelled("CANCELLED")
+                : new VerificationResult.BudgetExceeded("DERIVATION_REPLAY_BUDGET_EXCEEDED", work.used());
+        } catch (IllegalArgumentException invalid) {
+            return new VerificationResult.Unsupported(diagnostic(invalid));
+        }
         return proof;
     }
     /** Reference policy evaluator for consumer qualification. Generated Java needs no SDK runtime. */

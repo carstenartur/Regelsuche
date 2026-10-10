@@ -15,8 +15,13 @@ final class JavaCandidateGenerator {
     private boolean skippedConstantFold;
     boolean skippedConstantFold() { return skippedConstantFold; }
     JavaCandidateGenerator(OptimizationRequest request, VerificationWork work) {
+        this(request, work, request.budget().maximumWork());
+    }
+    /** Replay keeps the recorded generation configuration, not a fresh work allowance. */
+    JavaCandidateGenerator(OptimizationRequest request, VerificationWork work, long generationBudget) {
+        if (generationBudget < 1) throw new IllegalArgumentException("POSITIVE_GENERATION_BUDGET_REQUIRED");
         this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());
-        algebra = new JavaAlgebraCandidates(work, request.budget().maximumWork());
+        algebra = new JavaAlgebraCandidates(work, generationBudget);
     }
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
         if (maximum < 1) throw new IllegalArgumentException("POSITIVE_CANDIDATE_LIMIT_REQUIRED");
