@@ -102,6 +102,28 @@ the unchanged-source rerun completed. P03 is the accepted predecessor for P04.
 
 ## P04 — additive foundation, total qualification incomplete
 
+### 2026-10-10 recovery and declared-inventory follow-up
+
+#1081 was integrated at `c1815c00813659de26fddfe0dbfc1cd212421d29` after full
+required head CI37987198320, including aggregate ciCheck114021652224 with passed
+coverage. The current reconstruction starts from main
+`fba017704a95f58cb99d1f66cdeece013cdb901e`, preserving the intervening SDK changes.
+Automatic workspace maintenance removed the unpublished follow-up and local
+evidence, so it is reconstructed under new source identities, not passed off as
+byte-identical recovery. The published predecessor evidence remains unchanged.
+
+Fresh unchanged-base verification: Core1147, Search673 and Learning1089 tests,
+zero failures/errors/skips. The opt-in V8/V4 reconstruction has 28 passing focused
+tests (Core4/Search20/Learning4), including actual learning/load, one lazy selected
+application and a fresh JVM with positive load/compile/query/export charges.
+The initial reconstruction RED is an absent-API compilation failure, not a
+claimed behavioral RED. Full module, frozen public differential, independent
+review, AI quality and hosted head-CI gates remain pending. P04 is not complete;
+no P05–P12 or economic learning-success claim follows from this checkpoint.
+See [the recovery plan](../superpowers/plans/2026-10-10-native-execution-recovery.md).
+
+### Integrated foundation history
+
 [PR #1054](https://github.com/carstenartur/Regelsuche/pull/1054) prepares native
 immutable Expr execution through the existing shared frontier, pickers and
 managed cursor lifecycle. Primitive rules, the existing compiled-program

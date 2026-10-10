@@ -322,7 +322,13 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             new ApplicationFactory());
     }
 
+    boolean ownsApplication(CheckedSchemaMatcherPlan.Application candidate) {
+        RetainedOperation.work(1);
+        return candidate instanceof ApplicationFactory factory && factory.owner()==this;
+    }
+
     private final class ApplicationFactory implements CheckedSchemaMatcherPlan.Application,RetainedGraph.View {
+        private CheckedLearnedSchemaModel owner(){return CheckedLearnedSchemaModel.this;}
         @Override public CheckedSchemaMatcherPlan.ApplicationSteps start(Schema schema,Expr source,String encoded,List<Integer> path,Map<String,Expr> bindings,Work work){
             return new CheckedApplication(schema,source,encoded,path,bindings,work);
         }
@@ -456,6 +462,9 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     }
     /** Only this final model-owned provider is recognized by the installed native checker. */
     final class NativeProvider implements NativeMoveProvider,RetainedGraph.View {
+        boolean ownedBy(CheckedLearnedSchemaModel expected){
+            RetainedOperation.work(1);return CheckedLearnedSchemaModel.this==expected;
+        }
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(index);}
         private final IndexedProvider index;
         private NativeProvider(IndexedProvider index){this.index=index;}
@@ -953,7 +962,13 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         return (VerifiedApplication) pending[2];
     }
     public NativeVerifier nativeVerifier() {return new IndependentNativeVerifier();}
-    private final class IndependentNativeVerifier implements NativeVerifier,RetainedGraph.View {
+    private final class IndependentNativeVerifier implements NativeVerifier,NativeVerifierProvider.ExecutionInventory,RetainedGraph.View {
+        @Override public String executionRevision(NativeMoveProvider candidate) {
+            RetainedOperation.work(1);
+            boolean covered=candidate instanceof NativeProvider eager && eager.ownedBy(CheckedLearnedSchemaModel.this)
+                || candidate instanceof CheckedSchemaMatcherPlan.NativeProvider lazy && lazy.ownedBy(CheckedLearnedSchemaModel.this);
+            return covered?CheckedSchemaNativeVerifierProvider.EXECUTION_REVISION:null;
+        }
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
             var work=new Work();work.add(1);

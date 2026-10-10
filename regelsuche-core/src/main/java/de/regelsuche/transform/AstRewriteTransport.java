@@ -55,6 +55,25 @@ public final class AstRewriteTransport implements RetainedGraph.View {
     }
 
     /**
+     * Declared logical execution inventory, independent of mathematical authorization.
+     * Subclasses may introduce arbitrary guards: never call them during admission.
+     */
+    public boolean hasBoundedExecutionInventory() {
+        RetainedOperation.work(1);
+        for (var rule : engine.rules()) {
+            RetainedOperation.work(1);
+            if (rule.getClass() != PatternRewriteRule.class) return false;
+            var profile = ((PatternRewriteRule) rule).recognitionProfile();
+            boolean exact = profile.associativeOperators().isEmpty()
+                & profile.commutativeOperators().isEmpty() & profile.recognitionRuleIds().isEmpty()
+                & !profile.inferAlgebraicBindings() & profile.maxEquivalenceDepth() == 0;
+            RetainedOperation.work(5);
+            if (!exact) return false;
+        }
+        return true;
+    }
+
+    /**
      * Regenerate each primitive under this engine's rules and bounds, checking all retained metadata.
      * This proves replay relative to those rules, not the validity of arbitrary user-supplied rules
      * or the truth of their retained side conditions.

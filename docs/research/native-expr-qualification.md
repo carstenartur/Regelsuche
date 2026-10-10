@@ -8,11 +8,50 @@ verification uses supported registered verifiers and fresh checking; an explicit
 supplied trusted verifier has the same responsibility as the old verifier hook.
 Exact schema capabilities remain private and bind the checked model/application.
 
-The current search revision is
+The default search revision is
 `regelsuche.native-expr-move-search/v7-partial-atomic-ownership`; output uses
 `regelsuche.native-legacy-export/v3-partial-atomic-ownership`. Both have the fixed
-coverage `PARTIAL_ATOMIC_INVENTORY`. There is no option or test switch that promotes
-them to complete accounting.
+coverage `PARTIAL_ATOMIC_INVENTORY`. No option reinterprets these historical
+revisions as complete accounting. The separate opt-in V8/V4 contract below has
+its own paid admission and measurement identities.
+
+## Opt-in declared execution inventory (release qualification pending)
+
+`NativeMoveSearch.boundedAccounting()` uses the same frontier and providers with
+revision `regelsuche.native-expr-move-search/v8-declared-execution`. It can publish
+`COMPLETE_DECLARED_EXECUTION` only after paid recognition of the actual execution
+path: inventory-order ranking, the built-in zero score and empty state value,
+an installed registered checker, and owned supported providers. Exact pattern
+transports inspect every nested rule and recognition profile; compiled programs
+inspect their actual stages. Pattern subclasses and equivalence matching remain
+outside this initial inventory. Merely implementing a retained-graph view, using
+an enum, sharing a descriptor/hash, or supplying an apparent cost-capability
+interface does not grant qualification.
+
+Installed checked-schema verifiers additionally bind the model object and the
+private application factory of lazy plans. This keeps the search module free of
+a dependency on the learner. It is a trusted installed-code contract, not a
+mathematical proof or a claim accepted from an untrusted candidate.
+
+The native node-count objective counts occurrences, including shared subtrees,
+without AST-JSON transport. The objective's visited work is delegated exactly
+once, including an aborted paid prefix; scratch ownership is charged separately.
+Both adequate-quality and best-under-budget requests use the existing kernel.
+
+Accounting completion requires complete observations and cursor receipts. A
+completed account may still exceed its total budget, including final replay,
+result construction and cleanup. Such a result is WORK_EXHAUSTED, not a success;
+retention failure or an undeclared callback remains INCONCLUSIVE. Mathematical
+checking still independently authorizes every selected witness.
+
+Output has its own budget and revision
+`regelsuche.native-legacy-export/v4-declared-execution`. It cannot qualify an
+unqualified originating search, refund search work, or manufacture a complete
+bounded relation that the kernel did not establish. Default V7/V3 charges and
+projection semantics are preserved. These revisions specify logical work and
+retained graph units, not physical JVM bytes, elapsed time, economic benefit or
+production readiness. Full suite, corpus, review and exact-head CI remain release
+gates; focused tests alone do not complete P04.
 
 | Observation | Public contract |
 | --- | --- |

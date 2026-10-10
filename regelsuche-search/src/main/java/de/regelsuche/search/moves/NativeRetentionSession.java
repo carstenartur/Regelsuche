@@ -20,6 +20,8 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private long executionWork;
     private long validationWork,retentionWork,peakNodes,peakCharacters,peakReferences;
     private boolean complete=true;
+    private final boolean qualificationRequested;
+    private boolean executionQualified;
     private boolean resultAssembly;
     private String detail="";
     NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){
@@ -27,7 +29,12 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     }
     /** Package-local prototype control; ordinary native searches use the paid fresh scanner. */
     NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits,boolean useInventory){
+        this(problem,store,limits,useInventory,false);
+    }
+    NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits,
+            boolean useInventory,boolean qualificationRequested){
         this.problem=problem;this.store=store;this.limits=limits;
+        this.qualificationRequested=qualificationRequested;
         inventory=useInventory?new RetainedGraph.Inventory():null;
         inventoryLimits=useInventory?new RetainedGraph.Usage(limits.nodes(),limits.characters(),limits.references()):null;
         retentionWork=useInventory?6:0; // actual inventory/backend/containers and limit value only
@@ -49,6 +56,7 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
         try {
             validate(problem.source());
             if (problem.context().goal() != null) validate(problem.context().goal());
+            if (qualificationRequested) executionQualified=NativeExecutionInventory.eligible(problem,externalObjective);
         } catch (SearchExecution.ResourceLimit exhausted) {
             executionWork(exhausted.takeWork().total());
             incomplete("NATIVE_RESOURCE_LIMIT");
@@ -99,6 +107,7 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     void finish(NativeMoveSearch.Result result,RetainedGraph.View output){
         executionWork(5);
         var receipt=new NativeMoveSearch.Accounting();result.accounting=receipt;
+        if(qualificationRequested){executionWork(2);receipt.qualify(executionQualified,result.cursorsComplete());}
         update(receipt,0,0,0);
         observe(new Handoff(this,output),false);
         if(inventory!=null){
