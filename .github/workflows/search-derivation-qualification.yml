@@ -10,79 +10,53 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          path: control
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ac8ab6df53115edd17d0a3e40e7bafda17a54ec6
-          path: source
+          ref: dcbd12bad508f6a824630dbf4502808f0bdf95c8
+          fetch-depth: 2
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Stage source changes in an isolated committed checkout
-        working-directory: source
+      - name: Verify the unchanged production source and complete SDK suite
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = ac8ab6df53115edd17d0a3e40e7bafda17a54ec6
+          test "$(git rev-parse HEAD)" = dcbd12bad508f6a824630dbf4502808f0bdf95c8
           test -z "$(git status --porcelain)"
-          python3 ../control/qualification/integrate-derivation.py .
-          git add regelsuche-optimization-sdk examples/external-consumers/java-optimization-java25
-          git diff --cached --check
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat: retain and independently replay selected mathematical search paths'
+          test "$(git diff --name-only HEAD^ HEAD)" = regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/EmptySearchDerivationTest.java
           git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
-          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/source-tree.txt"
-      - name: Verify the complete SDK dependency reactor
-        working-directory: source
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk.log" 2>&1 || { tail -110 "$RUNNER_TEMP/sdk.log"; exit 1; }
-          grep -E 'Tests run:|BUILD SUCCESS|ACTUAL_.*SEARCH' "$RUNNER_TEMP/sdk.log" | tail -45
-          cp -a regelsuche-optimization-sdk/target/surefire-reports "$RUNNER_TEMP/sdk-reports"
-      - name: Execute repository-owned reproducible SDK distribution and workflow contracts
-        working-directory: source
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp -Psdk-release -pl maven-build-contract -Dtest=MavenOptimizationSdkDistributionTest,MavenWorkflowSemanticsContractTest test > "$RUNNER_TEMP/distribution.log" 2>&1 || { tail -150 "$RUNNER_TEMP/distribution.log"; exit 1; }
-          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/distribution.log" | tail -12
+          mvn -B -ntp -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk-review.log" 2>&1 || { tail -110 "$RUNNER_TEMP/sdk-review.log"; exit 1; }
+          grep -E 'Tests run:|BUILD SUCCESS' "$RUNNER_TEMP/sdk-review.log" | tail -30
           python3 - <<'PY'
-          import json
           from pathlib import Path
-          receipts=list(Path('maven-build-contract/target/surefire-reports').glob('sdk-distribution-*/reproducibility.json'))
-          assert len(receipts)==1, receipts
-          receipt=json.loads(receipts[0].read_text())
-          assert receipt['status']=='PASS' and receipt['cleanBuilds']==2
-          print('REPRODUCIBLE_SDK', json.dumps(receipt))
+          import xml.etree.ElementTree as E
+          totals=dict.fromkeys(('tests','failures','errors','skipped'),0)
+          for p in Path('regelsuche-optimization-sdk/target/surefire-reports').glob('TEST-*.xml'):
+              root=E.parse(p).getroot()
+              for k in totals: totals[k]+=int(root.get(k,'0'))
+          assert totals==dict(tests=106,failures=0,errors=0,skipped=0),totals
+          print('SDK_REVIEW_TOTALS',totals)
           PY
-      - name: Publish tested source only to the existing main-based feature branch
-        working-directory: source
+      - name: Publish only the tested review regression
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/source-commit.txt")"
           test -z "$(git status --porcelain)"
           git fetch --no-tags origin refs/heads/feat/selected-search-derivation-20261010
-          test "$(git rev-parse FETCH_HEAD)" = ac8ab6df53115edd17d0a3e40e7bafda17a54ec6
+          test "$(git rev-parse FETCH_HEAD)" = c48d160800a5d1ab82a7adbb0804be768256e94b
           git push origin HEAD:refs/heads/feat/selected-search-derivation-20261010
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: selected-search-derivation-${{ github.run_id }}
+          name: selected-search-review-${{ github.run_id }}
           retention-days: 7
           path: |
-            ${{ runner.temp }}/source-*.txt
-            ${{ runner.temp }}/sdk.log
-            ${{ runner.temp }}/sdk-reports/**
-            ${{ runner.temp }}/distribution.log
-            source/regelsuche-optimization-sdk/target/surefire-reports/**
-            source/maven-build-contract/target/surefire-reports/**
+            ${{ runner.temp }}/source-commit.txt
+            ${{ runner.temp }}/sdk-review.log
+            regelsuche-optimization-sdk/target/surefire-reports/**
