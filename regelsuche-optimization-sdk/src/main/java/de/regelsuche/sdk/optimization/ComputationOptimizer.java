@@ -69,7 +69,10 @@ public final class ComputationOptimizer {
         } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }
     }
     public VerificationResult verify(OptimizationRequest request, JointComputationPlan candidate, CancellationToken token) {
-        Objects.requireNonNull(request); Objects.requireNonNull(candidate); var work=new VerificationWork(request,token);
+        Objects.requireNonNull(request); Objects.requireNonNull(candidate);
+        return verifyWithin(request, candidate, new VerificationWork(request, token));
+    }
+    private VerificationResult verifyWithin(OptimizationRequest request, JointComputationPlan candidate, VerificationWork work) {
         try {
             var checker=new SemanticChecker(request,work); checker.validate();
             var proof=checker.check(request.plan(),candidate);
@@ -85,8 +88,13 @@ public final class ComputationOptimizer {
         } catch(IllegalArgumentException invalid) { return new VerificationResult.Unsupported(diagnostic(invalid)); }
     }
     public VerificationResult reverify(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
-        Objects.requireNonNull(candidate);
-        var verified=verify(request,candidate.plan(),token);
+        Objects.requireNonNull(request); Objects.requireNonNull(candidate);
+        return reverifyWithin(request, candidate, new VerificationWork(request, token));
+    }
+    /** Continue the same caller budget and deadline through proof and presentation. */
+    VerificationResult reverifyWithin(OptimizationRequest request, OptimizationResult.Candidate candidate, VerificationWork work) {
+        Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(work);
+        var verified=verifyWithin(request,candidate.plan(),work);
         if(!(verified instanceof VerificationResult.Verified proof)) return verified;
         if(!proof.evidence().equals(candidate.evidence()) || !proof.obligations().equals(candidate.obligations()))
             return new VerificationResult.Unsupported("EVIDENCE_BINDING_OR_REVISION_DIFFERS");

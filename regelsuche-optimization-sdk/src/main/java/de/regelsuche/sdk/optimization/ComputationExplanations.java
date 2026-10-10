@@ -28,9 +28,10 @@ public final class ComputationExplanations {
     }
     public static Result describe(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
         Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(token);
-        var verified = new ComputationOptimizer().reverify(request, candidate, token);
-        if (!(verified instanceof VerificationResult.Verified proof)) return new Result(verified, Optional.empty());
         var work = new VerificationWork(request, token);
+        var verified = new ComputationOptimizer().reverifyWithin(request, candidate, work);
+        if (!(verified instanceof VerificationResult.Verified proof)) return new Result(verified, Optional.empty());
+        long verificationWork = work.used();
         try {
             work.charge(1);
             // Always reconstruct presentation from the verified plan, not a rule
@@ -49,7 +50,7 @@ public final class ComputationExplanations {
                 JavaExpressions.operationOf(s.expression()).orElse(null) == NumericOperation.MOD_POW).count();
             work.charge(after.steps().size());
             return new Result(verified, Optional.of(new Explanation(proof.evidence(), request.assumptions(),
-                proof.obligations(), before, after, originalPowers, replacementPowers, work.used())));
+                proof.obligations(), before, after, originalPowers, replacementPowers, work.used() - verificationWork)));
         } catch (VerificationWork.Stopped stopped) {
             return new Result(stopped.cancelled ? new VerificationResult.Cancelled("CANCELLED")
                 : new VerificationResult.BudgetExceeded("EXPLANATION_BUDGET_EXCEEDED", work.used()), Optional.empty());
