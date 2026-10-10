@@ -112,69 +112,79 @@ public final class CompiledAstRewriteProgram implements RetainedGraph.View {
 <span class="fc" id="L112">            ((PreparedAstRewriteTransformationEngine) source.engine()).astTransport())).toList();</span>
 <span class="fc" id="L113">    }</span>
 
+    /** Inspect every actual owned stage; a final program wrapper alone is not cost authority. */
+    public boolean hasBoundedExecutionInventory() {
+<span class="fc" id="L117">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (var stage : stages) {</span>
+<span class="fc" id="L119">            RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (!stage.transport().hasBoundedExecutionInventory()) return false;</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return true;</span>
+    }
+
     /** Complete paths only. Exceeding a candidate/structural limit throws, never silently truncates. */
     public Batch transformMeasured(Expr expression) {
-<span class="fc" id="L117">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L118">        List&lt;Candidate&gt; current = List.of();</span>
-<span class="fc" id="L119">        var retainedCurrent=new Object[]{current};</span>
-<span class="fc" id="L120">        long calls = 0, emitted = 0, composed = 0, duplicates = 0;</span>
-<span class="fc" id="L121">        try(var operation=RetainedOperation.retain(this,expression,retainedCurrent)) {</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (int index = 0; index &lt; stages.size(); index++) {</span>
-<span class="fc" id="L123">            var stage = stages.get(index);</span>
-<span class="fc" id="L124">            var next = new ArrayList&lt;Candidate&gt;();</span>
-<span class="fc" id="L125">            try(var stageFrame=RetainedOperation.retain(current,next)) {</span>
-<span class="fc bfc" id="L126" title="All 2 branches covered.">            int prefixes = index == 0 ? 1 : current.size();</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (int p = 0; p &lt; prefixes; p++) {</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                Expr input = index == 0 ? expression : current.get(p).target();</span>
-<span class="fc" id="L129">                var generated = stage.transport().generate(input);</span>
-<span class="fc" id="L130">                calls++;</span>
-<span class="fc" id="L131">                emitted = Math.addExact(emitted, generated.size());</span>
-<span class="fc" id="L132">                try(var generatedFrame=RetainedOperation.retain(generated)) {</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">                for (var step : generated) {</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">                    if (next.size() &gt;= maximumCandidates) {</span>
-<span class="fc" id="L135">                        throw new CandidateLimitExceeded(metrics(calls, emitted, composed, duplicates));</span>
+<span class="fc" id="L127">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L128">        List&lt;Candidate&gt; current = List.of();</span>
+<span class="fc" id="L129">        var retainedCurrent=new Object[]{current};</span>
+<span class="fc" id="L130">        long calls = 0, emitted = 0, composed = 0, duplicates = 0;</span>
+<span class="fc" id="L131">        try(var operation=RetainedOperation.retain(this,expression,retainedCurrent)) {</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int index = 0; index &lt; stages.size(); index++) {</span>
+<span class="fc" id="L133">            var stage = stages.get(index);</span>
+<span class="fc" id="L134">            var next = new ArrayList&lt;Candidate&gt;();</span>
+<span class="fc" id="L135">            try(var stageFrame=RetainedOperation.retain(current,next)) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            int prefixes = index == 0 ? 1 : current.size();</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (int p = 0; p &lt; prefixes; p++) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                Expr input = index == 0 ? expression : current.get(p).target();</span>
+<span class="fc" id="L139">                var generated = stage.transport().generate(input);</span>
+<span class="fc" id="L140">                calls++;</span>
+<span class="fc" id="L141">                emitted = Math.addExact(emitted, generated.size());</span>
+<span class="fc" id="L142">                try(var generatedFrame=RetainedOperation.retain(generated)) {</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                for (var step : generated) {</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                    if (next.size() &gt;= maximumCandidates) {</span>
+<span class="fc" id="L145">                        throw new CandidateLimitExceeded(metrics(calls, emitted, composed, duplicates));</span>
                     }
-<span class="fc" id="L137">                    var steps = new ArrayList&lt;AstRewriteTransport.Step&gt;();</span>
-<span class="fc" id="L138">                    var ids = new ArrayList&lt;String&gt;();</span>
-<span class="fc" id="L139">                    try(var historyFrame=RetainedOperation.retain(steps,ids)) {</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">                    if (index != 0) {</span>
-<span class="fc" id="L141">                        steps.addAll(current.get(p).steps());</span>
-<span class="fc" id="L142">                        ids.addAll(current.get(p).sourceIds());</span>
-<span class="fc" id="L143">                        RetainedOperation.work(Math.addExact(steps.size(),ids.size()));</span>
-<span class="fc" id="L144">                        composed++;</span>
+<span class="fc" id="L147">                    var steps = new ArrayList&lt;AstRewriteTransport.Step&gt;();</span>
+<span class="fc" id="L148">                    var ids = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L149">                    try(var historyFrame=RetainedOperation.retain(steps,ids)) {</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                    if (index != 0) {</span>
+<span class="fc" id="L151">                        steps.addAll(current.get(p).steps());</span>
+<span class="fc" id="L152">                        ids.addAll(current.get(p).sourceIds());</span>
+<span class="fc" id="L153">                        RetainedOperation.work(Math.addExact(steps.size(),ids.size()));</span>
+<span class="fc" id="L154">                        composed++;</span>
                     }
-<span class="fc" id="L146">                    steps.add(step);</span>
-<span class="fc" id="L147">                    ids.add(stage.sourceId());</span>
-<span class="fc" id="L148">                    RetainedOperation.work(2);</span>
-<span class="fc" id="L149">                    next.add(RetainedOperation.produced(new Candidate(programId, ids, steps)));</span>
-<span class="fc" id="L150">                    RetainedOperation.work(Math.addExact(1,Math.addExact(steps.size(),ids.size())));</span>
-<span class="fc" id="L151">                    RetainedOperation.checkpoint();</span>
+<span class="fc" id="L156">                    steps.add(step);</span>
+<span class="fc" id="L157">                    ids.add(stage.sourceId());</span>
+<span class="fc" id="L158">                    RetainedOperation.work(2);</span>
+<span class="fc" id="L159">                    next.add(RetainedOperation.produced(new Candidate(programId, ids, steps)));</span>
+<span class="fc" id="L160">                    RetainedOperation.work(Math.addExact(1,Math.addExact(steps.size(),ids.size())));</span>
+<span class="fc" id="L161">                    RetainedOperation.checkpoint();</span>
                     }
-<span class="fc" id="L153">                }</span>
+<span class="fc" id="L163">                }</span>
                 }
             }
             // Equal endpoints alone cannot collapse histories with different intermediate states,
             // rule metadata or side conditions. First structural history wins deterministically.
-<span class="fc" id="L158">            var unique=new LinkedHashSet&lt;&gt;(next);</span>
-<span class="fc" id="L159">            try(var dedupFrame=RetainedOperation.retain(unique)) {</span>
-<span class="fc" id="L160">                RetainedOperation.work(next.size());</span>
-<span class="fc" id="L161">                current=RetainedOperation.produced(List.copyOf(unique));</span>
-<span class="fc" id="L162">                retainedCurrent[0]=current;</span>
-<span class="fc" id="L163">                RetainedOperation.work(Math.addExact(1,current.size()));</span>
+<span class="fc" id="L168">            var unique=new LinkedHashSet&lt;&gt;(next);</span>
+<span class="fc" id="L169">            try(var dedupFrame=RetainedOperation.retain(unique)) {</span>
+<span class="fc" id="L170">                RetainedOperation.work(next.size());</span>
+<span class="fc" id="L171">                current=RetainedOperation.produced(List.copyOf(unique));</span>
+<span class="fc" id="L172">                retainedCurrent[0]=current;</span>
+<span class="fc" id="L173">                RetainedOperation.work(Math.addExact(1,current.size()));</span>
             }
-<span class="fc" id="L165">            duplicates = Math.addExact(duplicates, next.size() - current.size());</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (current.isEmpty()) break;</span>
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            }</span>
+<span class="fc" id="L175">            duplicates = Math.addExact(duplicates, next.size() - current.size());</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (current.isEmpty()) break;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            }</span>
         }
-<span class="fc" id="L169">        return RetainedOperation.produced(new Batch(current, metrics(calls, emitted, composed, duplicates)));</span>
-<span class="nc" id="L170">        } catch(de.regelsuche.search.moves.SearchExecution.ResourceLimit exhausted) {</span>
-<span class="nc" id="L171">            throw exhausted.paidGeneration(metrics(calls,emitted,composed,duplicates));</span>
+<span class="fc" id="L179">        return RetainedOperation.produced(new Batch(current, metrics(calls, emitted, composed, duplicates)));</span>
+<span class="nc" id="L180">        } catch(de.regelsuche.search.moves.SearchExecution.ResourceLimit exhausted) {</span>
+<span class="nc" id="L181">            throw exhausted.paidGeneration(metrics(calls,emitted,composed,duplicates));</span>
         }
     }
 
     private static TransformationWorkMetrics metrics(long calls, long emitted, long composed, long duplicates) {
-<span class="fc" id="L176">        return new TransformationWorkMetrics(1, 0, calls, emitted, composed, 0, 0, 0, 0, 0, 0, 0, 0, duplicates)</span>
-<span class="fc" id="L177">            .withCandidateWork(new ExecutionWork(emitted, 0, 0));</span>
+<span class="fc" id="L186">        return new TransformationWorkMetrics(1, 0, calls, emitted, composed, 0, 0, 0, 0, 0, 0, 0, 0, duplicates)</span>
+<span class="fc" id="L187">            .withCandidateWork(new ExecutionWork(emitted, 0, 0));</span>
     }
 
     /**
@@ -183,26 +193,26 @@ public final class CompiledAstRewriteProgram implements RetainedGraph.View {
      * authorize a candidate; side conditions remain obligations, not discharged facts.
      */
     public Replay replay(Expr source, Candidate candidate) {
-<span class="fc" id="L186">        Objects.requireNonNull(source, &quot;source&quot;);</span>
-<span class="fc" id="L187">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc bfc" id="L188" title="All 4 branches covered.">        if (!programId.equals(candidate.programId()) || !source.equals(candidate.source())</span>
-<span class="fc bfc" id="L189" title="All 2 branches covered.">                || !stages.stream().map(Stage::sourceId).toList().equals(candidate.sourceIds())) {</span>
-<span class="fc" id="L190">            throw new IllegalArgumentException(&quot;candidate is not bound to this program and source&quot;);</span>
+<span class="fc" id="L196">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L197">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc bfc" id="L198" title="All 4 branches covered.">        if (!programId.equals(candidate.programId()) || !source.equals(candidate.source())</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                || !stages.stream().map(Stage::sourceId).toList().equals(candidate.sourceIds())) {</span>
+<span class="fc" id="L200">            throw new IllegalArgumentException(&quot;candidate is not bound to this program and source&quot;);</span>
         }
-<span class="fc" id="L192">        var regenerated = transformMeasured(source);</span>
-<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (!regenerated.candidates().contains(candidate)) {</span>
-<span class="fc" id="L194">            throw new IllegalArgumentException(&quot;candidate differs from complete typed program regeneration&quot;);</span>
+<span class="fc" id="L202">        var regenerated = transformMeasured(source);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (!regenerated.candidates().contains(candidate)) {</span>
+<span class="fc" id="L204">            throw new IllegalArgumentException(&quot;candidate differs from complete typed program regeneration&quot;);</span>
         }
-<span class="fc" id="L196">        return new Replay(candidate.target(), regenerated.workMetrics());</span>
+<span class="fc" id="L206">        return new Replay(candidate.target(), regenerated.workMetrics());</span>
     }
 
     /** Decode untrusted persisted data, then regenerate the full program under the supplied source. */
     public Replay replayEncoded(Expr source, byte[] document) {
-<span class="fc" id="L201">        return replay(source, new CompiledAstReplayCodec().decode(document));</span>
+<span class="fc" id="L211">        return replay(source, new CompiledAstReplayCodec().decode(document));</span>
     }
 
     private static void requireId(String id) {
-<span class="pc bpc" id="L205" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;program/source ID must be present&quot;);</span>
-<span class="fc" id="L206">    }</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;program/source ID must be present&quot;);</span>
+<span class="fc" id="L216">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -110,86 +110,90 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
 <span class="fc" id="L110">        return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));</span>
     }
     final class NativeProvider implements ExprIncrementalProvider,RetainedGraph.View {
-<span class="fc" id="L113">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}</span>
-<span class="fc" id="L114">        private NativeProvider() {}</span>
-<span class="fc" id="L115">        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}</span>
+        boolean ownedBy(CheckedLearnedSchemaModel expected){
+<span class="fc" id="L114">            de.regelsuche.retention.RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">            return model==expected &amp;&amp; expected.ownsApplication(application);</span>
+        }
+<span class="fc" id="L117">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}</span>
+<span class="fc" id="L118">        private NativeProvider() {}</span>
+<span class="fc" id="L119">        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}</span>
         @Override public Definition contractDefinition(){
-<span class="fc" id="L117">            return new Definition(IncrementalProviderContract.NATIVE_PREPAID_REVISION,definition.providerId(),definition.kind(),definition.modelRevision(),</span>
-<span class="fc" id="L118">                definition.semanticsRevision()+&quot;;&quot;+NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,definition.mathematics(),null);</span>
+<span class="fc" id="L121">            return new Definition(IncrementalProviderContract.NATIVE_PREPAID_REVISION,definition.providerId(),definition.kind(),definition.modelRevision(),</span>
+<span class="fc" id="L122">                definition.semanticsRevision()+&quot;;&quot;+NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,definition.mathematics(),null);</span>
         }
         @Override public IncrementalProviderContract.ObjectSource&lt;NativeMoveProof&gt; openSource(TypedMoveSearch.State state,
                 TypedMoveSearch.Context context,IncrementalProviderContract.Meter meter){
-<span class="fc" id="L122">            return CheckedSchemaCursor.nativeSource(CheckedSchemaMatcherPlan.this,state.expression(),meter);</span>
+<span class="fc" id="L126">            return CheckedSchemaCursor.nativeSource(CheckedSchemaMatcherPlan.this,state.expression(),meter);</span>
         }
-<span class="fc" id="L124">        NativeVerifier independentVerifier(){return model.nativeVerifier();}</span>
+<span class="fc" id="L128">        NativeVerifier independentVerifier(){return model.nativeVerifier();}</span>
     }
-<span class="fc" id="L126">    CheckedLearnedSchemaModel.Bounds bounds() { return bounds; }</span>
-<span class="fc" id="L127">    int maximumSchemasPerOccurrence() { return maximumSchemasPerOccurrence; }</span>
-<span class="fc" id="L128">    boolean allSchemasIncluded() { return allSchemasIncluded; }</span>
+<span class="fc" id="L130">    CheckedLearnedSchemaModel.Bounds bounds() { return bounds; }</span>
+<span class="fc" id="L131">    int maximumSchemasPerOccurrence() { return maximumSchemasPerOccurrence; }</span>
+<span class="fc" id="L132">    boolean allSchemasIncluded() { return allSchemasIncluded; }</span>
     Range relevant(Expr expression) {
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        String shape = expression instanceof BinaryExpr binary ? binary.operator().name() : &quot;LEAF&quot;;</span>
-<span class="fc" id="L131">        return new Range(index.getOrDefault(shape, List.of()), index.getOrDefault(&quot;P&quot;, List.of()));</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        String shape = expression instanceof BinaryExpr binary ? binary.operator().name() : &quot;LEAF&quot;;</span>
+<span class="fc" id="L135">        return new Range(index.getOrDefault(shape, List.of()), index.getOrDefault(&quot;P&quot;, List.of()));</span>
     }
     ApplicationSteps startApplication(Entry entry, Expr source, String encoded, List&lt;Integer&gt; path,
             Map&lt;String, Expr&gt; bindings, Work work) {
-<span class="fc" id="L135">        return application.start(entry.schema(), source, encoded, path, bindings, work);</span>
+<span class="fc" id="L139">        return application.start(entry.schema(), source, encoded, path, bindings, work);</span>
     }
 
     private static void validate(CheckedLearnedSchemaModel model, int maximum, Map&lt;String, Double&gt; utility,
             Set&lt;String&gt; included, Work work) {
-<span class="pc bpc" id="L140" title="2 of 4 branches missed.">        if (maximum &lt; 1 || maximum &gt; model.bounds().maximumSchemas())</span>
-<span class="nc" id="L141">            throw new IllegalArgumentException(&quot;schema selection bound outside model limits&quot;);</span>
-<span class="fc" id="L142">        var known = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (var schema : model.schemas()) { work.add(1); known.add(schema.id()); }</span>
-<span class="fc" id="L144">        work.add(included.size() + utility.size() + 1L);</span>
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (!known.containsAll(included)) throw new IllegalArgumentException(&quot;unregistered included schema&quot;);</span>
-<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (var entry : utility.entrySet()) {</span>
-<span class="pc bpc" id="L147" title="2 of 4 branches missed.">            if (!known.contains(entry.getKey()) || !Double.isFinite(entry.getValue()))</span>
-<span class="nc" id="L148">                throw new IllegalArgumentException(&quot;unknown schema or nonfinite selection utility&quot;);</span>
-<span class="fc" id="L149">        }</span>
-<span class="fc" id="L150">    }</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if (maximum &lt; 1 || maximum &gt; model.bounds().maximumSchemas())</span>
+<span class="nc" id="L145">            throw new IllegalArgumentException(&quot;schema selection bound outside model limits&quot;);</span>
+<span class="fc" id="L146">        var known = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (var schema : model.schemas()) { work.add(1); known.add(schema.id()); }</span>
+<span class="fc" id="L148">        work.add(included.size() + utility.size() + 1L);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!known.containsAll(included)) throw new IllegalArgumentException(&quot;unregistered included schema&quot;);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (var entry : utility.entrySet()) {</span>
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">            if (!known.contains(entry.getKey()) || !Double.isFinite(entry.getValue()))</span>
+<span class="nc" id="L152">                throw new IllegalArgumentException(&quot;unknown schema or nonfinite selection utility&quot;);</span>
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">    }</span>
     private static long prepareEntries(CheckedLearnedSchemaModel model, Set&lt;String&gt; selected,
             List&lt;Entry&gt; entries, Work work) {
-<span class="fc" id="L153">        long visits = 0;</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (var schema : model.schemas()) {</span>
-<span class="fc" id="L155">            work.add(1);</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (!selected.contains(schema.id())) continue;</span>
-<span class="fc" id="L157">            int sourceNodes = nodes(schema.source()), targetNodes = nodes(schema.target());</span>
-<span class="fc" id="L158">            visits = Math.addExact(visits, sourceNodes + targetNodes);</span>
-<span class="fc" id="L159">            work.add(sourceNodes + targetNodes + 1L);</span>
-<span class="fc" id="L160">            entries.add(new Entry(schema, ExprMatcher.pattern(schema.source()), sourceNodes - targetNodes));</span>
-<span class="fc" id="L161">        }</span>
-<span class="fc" id="L162">        return visits;</span>
+<span class="fc" id="L157">        long visits = 0;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (var schema : model.schemas()) {</span>
+<span class="fc" id="L159">            work.add(1);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (!selected.contains(schema.id())) continue;</span>
+<span class="fc" id="L161">            int sourceNodes = nodes(schema.source()), targetNodes = nodes(schema.target());</span>
+<span class="fc" id="L162">            visits = Math.addExact(visits, sourceNodes + targetNodes);</span>
+<span class="fc" id="L163">            work.add(sourceNodes + targetNodes + 1L);</span>
+<span class="fc" id="L164">            entries.add(new Entry(schema, ExprMatcher.pattern(schema.source()), sourceNodes - targetNodes));</span>
+<span class="fc" id="L165">        }</span>
+<span class="fc" id="L166">        return visits;</span>
     }
     private static Map&lt;String, List&lt;Entry&gt;&gt; orderedIndex(List&lt;Entry&gt; entries, Map&lt;String, Double&gt; utility, Work comparisons) {
-<span class="fc" id="L165">        var comparator = Comparator.&lt;Entry&gt;comparingDouble(entry -&gt; utility.getOrDefault(entry.schema().id(), 0.0))</span>
-<span class="fc" id="L166">            .reversed().thenComparing(Comparator.comparingInt(Entry::reduction).reversed())</span>
-<span class="pc" id="L167">            .thenComparing(entry -&gt; entry.schema().id());</span>
-<span class="fc" id="L168">        entries.sort((left, right) -&gt; { comparisons.add(1); return comparator.compare(left, right); });</span>
-<span class="fc" id="L169">        var grouped = new TreeMap&lt;String, List&lt;Entry&gt;&gt;();</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (var entry : entries) {</span>
-<span class="fc" id="L171">            PatternExpr pattern = entry.schema().source();</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">            String shape = pattern instanceof PatternExpr.Operation operation ? operation.operator().name()</span>
-<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                : pattern instanceof PatternExpr.Placeholder ? &quot;P&quot; : &quot;LEAF&quot;;</span>
-<span class="fc" id="L174">            grouped.computeIfAbsent(shape, ignored -&gt; new ArrayList&lt;&gt;()).add(entry);</span>
-<span class="fc" id="L175">        }</span>
-<span class="fc" id="L176">        grouped.replaceAll((key, value) -&gt; List.copyOf(value));</span>
-<span class="fc" id="L177">        return Map.copyOf(grouped);</span>
+<span class="fc" id="L169">        var comparator = Comparator.&lt;Entry&gt;comparingDouble(entry -&gt; utility.getOrDefault(entry.schema().id(), 0.0))</span>
+<span class="fc" id="L170">            .reversed().thenComparing(Comparator.comparingInt(Entry::reduction).reversed())</span>
+<span class="pc" id="L171">            .thenComparing(entry -&gt; entry.schema().id());</span>
+<span class="fc" id="L172">        entries.sort((left, right) -&gt; { comparisons.add(1); return comparator.compare(left, right); });</span>
+<span class="fc" id="L173">        var grouped = new TreeMap&lt;String, List&lt;Entry&gt;&gt;();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (var entry : entries) {</span>
+<span class="fc" id="L175">            PatternExpr pattern = entry.schema().source();</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            String shape = pattern instanceof PatternExpr.Operation operation ? operation.operator().name()</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                : pattern instanceof PatternExpr.Placeholder ? &quot;P&quot; : &quot;LEAF&quot;;</span>
+<span class="fc" id="L178">            grouped.computeIfAbsent(shape, ignored -&gt; new ArrayList&lt;&gt;()).add(entry);</span>
+<span class="fc" id="L179">        }</span>
+<span class="fc" id="L180">        grouped.replaceAll((key, value) -&gt; List.copyOf(value));</span>
+<span class="fc" id="L181">        return Map.copyOf(grouped);</span>
     }
     private static String configuration(String modelId, int maximum,
             Map&lt;String, Double&gt; utility, Set&lt;String&gt; selected) {
-<span class="fc" id="L181">        var root = JSON.createObjectNode().put(&quot;revision&quot;, REVISION).put(&quot;workRevision&quot;, WORK_REVISION)</span>
-<span class="fc" id="L182">            .put(&quot;modelId&quot;, modelId)</span>
-<span class="fc" id="L183">            .put(&quot;maximumSchemasPerOccurrence&quot;, maximum).put(&quot;order&quot;, &quot;preorder;shaped-before-wildcard;utility-reduction-id&quot;);</span>
-<span class="fc" id="L184">        var ids = root.putArray(&quot;included&quot;);</span>
-<span class="fc" id="L185">        selected.stream().sorted().forEach(ids::add);</span>
-<span class="fc" id="L186">        var values = root.putObject(&quot;utilities&quot;);</span>
-<span class="fc" id="L187">        new TreeMap&lt;&gt;(utility).forEach((id, value) -&gt; values.put(id, Double.toHexString(value)));</span>
-<span class="fc" id="L188">        return write(root);</span>
+<span class="fc" id="L185">        var root = JSON.createObjectNode().put(&quot;revision&quot;, REVISION).put(&quot;workRevision&quot;, WORK_REVISION)</span>
+<span class="fc" id="L186">            .put(&quot;modelId&quot;, modelId)</span>
+<span class="fc" id="L187">            .put(&quot;maximumSchemasPerOccurrence&quot;, maximum).put(&quot;order&quot;, &quot;preorder;shaped-before-wildcard;utility-reduction-id&quot;);</span>
+<span class="fc" id="L188">        var ids = root.putArray(&quot;included&quot;);</span>
+<span class="fc" id="L189">        selected.stream().sorted().forEach(ids::add);</span>
+<span class="fc" id="L190">        var values = root.putObject(&quot;utilities&quot;);</span>
+<span class="fc" id="L191">        new TreeMap&lt;&gt;(utility).forEach((id, value) -&gt; values.put(id, Double.toHexString(value)));</span>
+<span class="fc" id="L192">        return write(root);</span>
     }
     private static int nodes(PatternExpr expression) {
-<span class="fc bfc" id="L191" title="All 2 branches covered.">        return expression instanceof PatternExpr.Operation operation</span>
-<span class="fc" id="L192">            ? 1 + nodes(operation.left()) + nodes(operation.right()) : 1;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        return expression instanceof PatternExpr.Operation operation</span>
+<span class="fc" id="L196">            ? 1 + nodes(operation.left()) + nodes(operation.right()) : 1;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeNodeCountObjective.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeNodeCountObjective.java</span></div><h1>NativeNodeCountObjective.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.retention.*;
+import de.regelsuche.search.program.AstExpressionValidation;
+import de.regelsuche.transform.AstRewriteTransport;
+import java.util.ArrayList;
+import java.util.Objects;
+
+/** Occurrence count: visits are delegated once; native scratch ownership is charged separately. */
+<span class="fc" id="L11">public enum NativeNodeCountObjective implements TypedSourceOnlySearch.Objective, RetainedGraph.View {</span>
+<span class="fc" id="L12">    INSTANCE;</span>
+<span class="fc" id="L13">    @Override public void retainedReferences(RetainedGraph.Visitor visitor) {}</span>
+
+    @Override public TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state) {
+<span class="fc" id="L16">        var counter = new Counter(Objects.requireNonNull(state));</span>
+        try {
+<span class="fc" id="L18">            var frame = RetainedOperation.retainCompleted(2, counter);</span>
+<span class="fc" id="L19">            Throwable primary = null;</span>
+<span class="fc" id="L20">            try { return counter.evaluate(); }</span>
+<span class="fc" id="L21">            catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L22">                primary = failure;</span>
+<span class="fc" id="L23">                SearchExecution.observeFailure(failure);</span>
+<span class="fc" id="L24">                throw failure;</span>
+            } finally {
+<span class="fc" id="L26">                try { counter.release(); }</span>
+<span class="nc" id="L27">                catch (RuntimeException | Error cleanup) {</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">                    if (primary == null) { primary = cleanup; throw cleanup; }</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">                    if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L30">                } finally { SearchExecution.close(frame, primary); }</span>
+            }
+<span class="fc" id="L32">        } catch (SearchExecution.ResourceLimit exhausted) {</span>
+<span class="fc" id="L33">            throw exhausted.paidSearch(counter.visited);</span>
+        }
+    }
+
+    private static final class Counter implements RetainedGraph.View {
+        private final TypedMoveSearch.State state;
+<span class="fc" id="L39">        private final ArrayList&lt;Expr&gt; arena = new ArrayList&lt;&gt;();</span>
+        private TypedSourceOnlySearch.Score score;
+        private int visited;
+<span class="fc" id="L42">        Counter(TypedMoveSearch.State state) { this.state = state; }</span>
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L44">            visitor.reference(state); visitor.reference(arena); visitor.reference(score);</span>
+<span class="fc" id="L45">        }</span>
+        TypedSourceOnlySearch.Score evaluate() {
+<span class="fc" id="L47">            push(state.expression());</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            while (visited &lt; arena.size()) {</span>
+<span class="fc" id="L49">                var expression = arena.get(visited++);</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">                switch (expression) {</span>
+<span class="fc" id="L51">                    case BinaryExpr binary -&gt; { push(binary.left()); push(binary.right()); }</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                    case FunctionExpr function -&gt; { for (var arg : function.arguments()) push(arg); }</span>
+<span class="fc" id="L53">                    case VariableExpr ignored -&gt; {}</span>
+<span class="fc" id="L54">                    case NumberExpr ignored -&gt; {}</span>
+                }
+<span class="fc" id="L56">            }</span>
+<span class="fc" id="L57">            score = new TypedSourceOnlySearch.Score(visited, visited);</span>
+<span class="fc" id="L58">            SearchExecution.completed(1);</span>
+<span class="fc" id="L59">            return score;</span>
+        }
+        private void push(Expr expression) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (arena.size() == AstRewriteTransport.MAXIMUM_NODES)</span>
+<span class="nc" id="L63">                throw new AstExpressionValidation.InvalidExpression(&quot;objective occurrence limit exceeded&quot;);</span>
+<span class="fc" id="L64">            arena.add(expression);</span>
+<span class="fc" id="L65">            RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (arena.size() % 256 == 0) RetainedOperation.checkpoint();</span>
+<span class="fc" id="L67">        }</span>
+        void release() {
+<span class="fc" id="L69">            long work = arena.size() + 1L;</span>
+<span class="fc" id="L70">            arena.clear();</span>
+<span class="fc" id="L71">            RetainedOperation.work(work);</span>
+<span class="fc" id="L72">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

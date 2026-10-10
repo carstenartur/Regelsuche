@@ -22,7 +22,7 @@ final class MoveSearchVisits&lt;S extends SearchExecution.Position&lt;?&gt;&gt; 
         }
     }
 <span class="fc" id="L24">    private record Position(Object expression, List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities) implements de.regelsuche.retention.RetainedGraph.View {</span>
-<span class="nc" id="L25">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(expression);v.reference(assumptions);v.reference(capabilities);}</span>
+<span class="fc" id="L25">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(expression);v.reference(assumptions);v.reference(capabilities);}</span>
         static Position of(SearchExecution.Position&lt;?&gt; state) {
 <span class="fc" id="L27">            return new Position(state.expression(), state.assumptions(), state.capabilities());</span>
         }

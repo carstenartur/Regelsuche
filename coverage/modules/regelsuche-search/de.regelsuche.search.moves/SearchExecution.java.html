@@ -17,26 +17,31 @@ public final class SearchExecution {
         private long mechanical,verification;
 <span class="fc" id="L18">        private ExecutionWork mathematics=ExecutionWork.ZERO;</span>
 <span class="fc" id="L19">        ResourceLimit() {}</span>
+        ResourceLimit paidSearch(long units) {
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative aborted search work&quot;);</span>
+<span class="fc" id="L22">            mechanical = Math.addExact(mechanical, units);</span>
+<span class="fc" id="L23">            return this;</span>
+        }
         public ResourceLimit paidGeneration(TransformationWorkMetrics work) {
-<span class="fc" id="L21">            long updated=Math.addExact(mechanical,work.totalWorkUnits());</span>
-<span class="fc" id="L22">            var updatedMath=mathematics.plus(work.candidateWork());</span>
-<span class="fc" id="L23">            mechanical=updated;mathematics=updatedMath;return this;</span>
+<span class="fc" id="L26">            long updated=Math.addExact(mechanical,work.totalWorkUnits());</span>
+<span class="fc" id="L27">            var updatedMath=mathematics.plus(work.candidateWork());</span>
+<span class="fc" id="L28">            mechanical=updated;mathematics=updatedMath;return this;</span>
         }
         ResourceLimit paidVerification(long units) {
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if(units&lt;0)throw new IllegalArgumentException(&quot;negative aborted verification work&quot;);</span>
-<span class="fc" id="L27">            verification=Math.addExact(verification,units);return this;</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if(units&lt;0)throw new IllegalArgumentException(&quot;negative aborted verification work&quot;);</span>
+<span class="fc" id="L32">            verification=Math.addExact(verification,units);return this;</span>
         }
         ResourceLimit verificationPhase() {
-<span class="nc" id="L30">            long updated=Math.addExact(verification,Math.addExact(mechanical,mathematics.canonicalWorkUnits()));</span>
-<span class="nc" id="L31">            verification=updated;mechanical=0;mathematics=ExecutionWork.ZERO;return this;</span>
+<span class="nc" id="L35">            long updated=Math.addExact(verification,Math.addExact(mechanical,mathematics.canonicalWorkUnits()));</span>
+<span class="nc" id="L36">            verification=updated;mechanical=0;mathematics=ExecutionWork.ZERO;return this;</span>
         }
         AbortedWork takeWork() {
-<span class="fc" id="L34">            var result=new AbortedWork(mechanical,mathematics,verification);</span>
-<span class="fc" id="L35">            mechanical=0;mathematics=ExecutionWork.ZERO;verification=0;return result;</span>
+<span class="fc" id="L39">            var result=new AbortedWork(mechanical,mathematics,verification);</span>
+<span class="fc" id="L40">            mechanical=0;mathematics=ExecutionWork.ZERO;verification=0;return result;</span>
         }
     }
-<span class="fc" id="L38">    record AbortedWork(long mechanical,ExecutionWork mathematics,long verification) {</span>
-<span class="fc" id="L39">        long total(){return Math.addExact(Math.addExact(mechanical,mathematics.canonicalWorkUnits()),verification);}</span>
+<span class="fc" id="L43">    record AbortedWork(long mechanical,ExecutionWork mathematics,long verification) {</span>
+<span class="fc" id="L44">        long total(){return Math.addExact(Math.addExact(mechanical,mathematics.canonicalWorkUnits()),verification);}</span>
     }
     public interface Position&lt;E&gt; {
         E expression(); int searchDepth(); int primitiveDepth(); String previousRule();
@@ -55,16 +60,16 @@ public final class SearchExecution {
         Map&lt;String, ? extends Capability&lt;E&gt;&gt; capabilities();
     }
     public interface Picker&lt;M&gt; extends AutoCloseable {
-<span class="fc" id="L58">        default void initialize() {}</span>
-<span class="fc" id="L59">        default List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts(){return List.of();}</span>
+<span class="fc" id="L63">        default void initialize() {}</span>
+<span class="fc" id="L64">        default List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts(){return List.of();}</span>
         Optional&lt;M&gt; next(); TransformationWorkMetrics workMetrics(); List&lt;M&gt; generatedMoves(); boolean complete();
-<span class="fc" id="L61">        default Optional&lt;M&gt; next(long allowance) { return next(); }</span>
-<span class="fc" id="L62">        default boolean accountingComplete() { return true; }</span>
-<span class="fc" id="L63">        default boolean incremental() { return false; }</span>
-<span class="fc" id="L64">        default boolean workExhausted() { return false; }</span>
-<span class="fc" id="L65">        default int nextStage() { return 0; }</span>
-<span class="nc" id="L66">        default Object executionReceipt() { return null; }</span>
-<span class="nc" id="L67">        @Override default void close() {}</span>
+<span class="fc" id="L66">        default Optional&lt;M&gt; next(long allowance) { return next(); }</span>
+<span class="fc" id="L67">        default boolean accountingComplete() { return true; }</span>
+<span class="fc" id="L68">        default boolean incremental() { return false; }</span>
+<span class="fc" id="L69">        default boolean workExhausted() { return false; }</span>
+<span class="fc" id="L70">        default int nextStage() { return 0; }</span>
+<span class="nc" id="L71">        default Object executionReceipt() { return null; }</span>
+<span class="nc" id="L72">        @Override default void close() {}</span>
     }
     interface Environment&lt;E,S extends Position&lt;E&gt;,M extends Edge&lt;E,M&gt;,A extends Assessment&lt;E&gt;,V extends Verification&gt; {
         E source(); E goal(); List&lt;String&gt; initialAssumptions(); MoveSearch.Budget budget();
@@ -72,100 +77,100 @@ public final class SearchExecution {
         S state(E expression,int depth,int primitive,String previous,List&lt;String&gt; assumptions,Set&lt;String&gt; capabilities,int debt);
         A inspect(S state); double score(S state); V verify(S state,M move); boolean carries(List&lt;String&gt; assumptions,S state);
         Picker&lt;M&gt; picker(S state);
-<span class="fc" id="L75">        default void ownership(RetainedGraph.View root) {}</span>
-<span class="fc" id="L76">        default void checkpoint() {}</span>
-<span class="fc" id="L77">        default long additionalWork(){return 0;}</span>
+<span class="fc" id="L80">        default void ownership(RetainedGraph.View root) {}</span>
+<span class="fc" id="L81">        default void checkpoint() {}</span>
+<span class="fc" id="L82">        default long additionalWork(){return 0;}</span>
         /** True only when this environment adds the observed witness producer work to its ledger. */
-<span class="fc" id="L79">        default boolean accountsWitnessMaterialization(){return false;}</span>
-<span class="fc" id="L80">        default boolean ownershipComplete(){return true;}</span>
+<span class="fc" id="L84">        default boolean accountsWitnessMaterialization(){return false;}</span>
+<span class="fc" id="L85">        default boolean ownershipComplete(){return true;}</span>
         /** Finite result metadata only: no search, provider generation or proof application. */
-<span class="fc" id="L82">        default void beginResultAssembly() {}</span>
-<span class="fc" id="L83">        default void endResultAssembly() {}</span>
+<span class="fc" id="L87">        default void beginResultAssembly() {}</span>
+<span class="fc" id="L88">        default void endResultAssembly() {}</span>
     }
     public record Expansion&lt;S&gt;(S source,boolean closed,List&lt;StagedIncrementalMoveExecution.Lane&gt; lanes) implements RetainedGraph.View {
-<span class="fc" id="L86">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(lanes);}</span>
+<span class="fc" id="L91">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(lanes);}</span>
 
-<span class="fc" id="L88">        public Expansion(S source,boolean closed,List&lt;StagedIncrementalMoveExecution.Lane&gt; lanes) {</span>
-<span class="fc" id="L89">            Object[] pending = new Object[2];</span>
-<span class="fc" id="L90">            var retained = RetainedOperation.retainCompleted(1, source, lanes, pending);</span>
-<span class="fc" id="L91">            Throwable primary = null;</span>
+<span class="fc" id="L93">        public Expansion(S source,boolean closed,List&lt;StagedIncrementalMoveExecution.Lane&gt; lanes) {</span>
+<span class="fc" id="L94">            Object[] pending = new Object[2];</span>
+<span class="fc" id="L95">            var retained = RetainedOperation.retainCompleted(1, source, lanes, pending);</span>
+<span class="fc" id="L96">            Throwable primary = null;</span>
             try {
-<span class="fc" id="L93">                this.source = source;</span>
-<span class="fc" id="L94">                this.closed = closed;</span>
-<span class="fc" id="L95">                this.lanes = copied(pending, 0, List.copyOf(lanes), lanes, lanes.size());</span>
-<span class="fc" id="L96">                pending[1] = this;</span>
-<span class="fc" id="L97">                completed(1);</span>
-<span class="fc" id="L98">            } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L99">                primary = failure;</span>
-<span class="fc" id="L100">                observeFailure(failure);</span>
-<span class="fc" id="L101">                throw failure;</span>
-<span class="fc" id="L102">            } finally { close(retained, primary); }</span>
-<span class="fc" id="L103">        }</span>
+<span class="fc" id="L98">                this.source = source;</span>
+<span class="fc" id="L99">                this.closed = closed;</span>
+<span class="fc" id="L100">                this.lanes = copied(pending, 0, List.copyOf(lanes), lanes, lanes.size());</span>
+<span class="fc" id="L101">                pending[1] = this;</span>
+<span class="fc" id="L102">                completed(1);</span>
+<span class="fc" id="L103">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L104">                primary = failure;</span>
+<span class="fc" id="L105">                observeFailure(failure);</span>
+<span class="fc" id="L106">                throw failure;</span>
+<span class="fc" id="L107">            } finally { close(retained, primary); }</span>
+<span class="fc" id="L108">        }</span>
     }
-<span class="fc" id="L105">    public record Step&lt;S,M,V&gt;(S source,S target,M move,V verification) implements RetainedGraph.View {</span>
-<span class="fc" id="L106">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(verification);}</span>
+<span class="fc" id="L110">    public record Step&lt;S,M,V&gt;(S source,S target,M move,V verification) implements RetainedGraph.View {</span>
+<span class="fc" id="L111">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(verification);}</span>
     }
-<span class="fc" id="L108">    public record Event&lt;S,M,V&gt;(S source,S target,M move,MoveSearch.Decision decision,V verification) implements RetainedGraph.View {</span>
-<span class="fc" id="L109">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(decision);v.reference(verification);}</span>
+<span class="fc" id="L113">    public record Event&lt;S,M,V&gt;(S source,S target,M move,MoveSearch.Decision decision,V verification) implements RetainedGraph.View {</span>
+<span class="fc" id="L114">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(decision);v.reference(verification);}</span>
     }
     record Result&lt;S,M,V,A&gt;(MoveSearch.Outcome outcome,List&lt;Step&lt;S,M,V&gt;&gt; witness,List&lt;Event&lt;S,M,V&gt;&gt; events,
             Set&lt;S&gt; reachedStates,List&lt;S&gt; deadEndStates,MoveSearch.Metrics metrics,boolean completeBoundedRelation,
             Map&lt;S,A&gt; stateAssessments,List&lt;Object&gt; pickerReceipts,List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts,
             List&lt;S&gt; assessmentOrder,List&lt;S&gt; reachedOrder) implements RetainedGraph.View {
-<span class="fc" id="L115">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);v.reference(batchCursorReceipts);v.reference(assessmentOrder);v.reference(reachedOrder);}</span>
+<span class="fc" id="L120">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);v.reference(batchCursorReceipts);v.reference(assessmentOrder);v.reference(reachedOrder);}</span>
         Result(MoveSearch.Outcome outcome,List&lt;Step&lt;S,M,V&gt;&gt; witness,List&lt;Event&lt;S,M,V&gt;&gt; events,
                 Set&lt;S&gt; reachedStates,List&lt;S&gt; deadEndStates,MoveSearch.Metrics metrics,boolean completeBoundedRelation,
                 Map&lt;S,A&gt; stateAssessments,List&lt;Object&gt; pickerReceipts,List&lt;IncrementalProviderContract.Snapshot&gt; batchCursorReceipts,
-<span class="fc" id="L119">                List&lt;S&gt; assessmentOrder,List&lt;S&gt; reachedOrder) {</span>
-<span class="fc" id="L120">            Object[] completed = new Object[10];</span>
-<span class="fc" id="L121">            var retained = RetainedOperation.retainCompleted(1, outcome, witness, events, reachedStates,</span>
+<span class="fc" id="L124">                List&lt;S&gt; assessmentOrder,List&lt;S&gt; reachedOrder) {</span>
+<span class="fc" id="L125">            Object[] completed = new Object[10];</span>
+<span class="fc" id="L126">            var retained = RetainedOperation.retainCompleted(1, outcome, witness, events, reachedStates,</span>
                 deadEndStates, metrics, stateAssessments, pickerReceipts, batchCursorReceipts, assessmentOrder, reachedOrder, completed);
-<span class="fc" id="L123">            Throwable primary = null;</span>
+<span class="fc" id="L128">            Throwable primary = null;</span>
             try {
-<span class="fc" id="L125">                this.outcome = outcome;</span>
-<span class="fc" id="L126">                this.metrics = metrics;</span>
-<span class="fc" id="L127">                this.completeBoundedRelation = completeBoundedRelation;</span>
-<span class="fc" id="L128">                this.witness = copied(completed, 0, List.copyOf(witness), witness, witness.size());</span>
-<span class="fc" id="L129">                this.events = copied(completed, 1, List.copyOf(events), events, events.size());</span>
-<span class="fc" id="L130">                this.reachedStates = copied(completed, 2, Set.copyOf(reachedStates), reachedStates, reachedStates.size());</span>
-<span class="fc" id="L131">                this.deadEndStates = copied(completed, 3, List.copyOf(deadEndStates), deadEndStates, deadEndStates.size());</span>
-<span class="fc" id="L132">                this.stateAssessments = copied(completed, 4, Map.copyOf(stateAssessments), stateAssessments, stateAssessments.size());</span>
-<span class="fc" id="L133">                this.pickerReceipts = copied(completed, 5, List.copyOf(pickerReceipts), pickerReceipts, pickerReceipts.size());</span>
-<span class="fc" id="L134">                this.batchCursorReceipts = copied(completed, 6, List.copyOf(batchCursorReceipts), batchCursorReceipts, batchCursorReceipts.size());</span>
-<span class="fc" id="L135">                this.assessmentOrder = copied(completed, 7, List.copyOf(assessmentOrder), assessmentOrder, assessmentOrder.size());</span>
-<span class="fc" id="L136">                this.reachedOrder = copied(completed, 8, List.copyOf(reachedOrder), reachedOrder, reachedOrder.size());</span>
-<span class="fc" id="L137">                completed[9] = this;</span>
-<span class="fc" id="L138">                completed(1);</span>
-<span class="fc" id="L139">            } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L140">                primary = failure;</span>
-<span class="fc" id="L141">                observeFailure(failure);</span>
-<span class="fc" id="L142">                throw failure;</span>
-<span class="fc" id="L143">            } finally { close(retained, primary); }</span>
-<span class="fc" id="L144">        }</span>
+<span class="fc" id="L130">                this.outcome = outcome;</span>
+<span class="fc" id="L131">                this.metrics = metrics;</span>
+<span class="fc" id="L132">                this.completeBoundedRelation = completeBoundedRelation;</span>
+<span class="fc" id="L133">                this.witness = copied(completed, 0, List.copyOf(witness), witness, witness.size());</span>
+<span class="fc" id="L134">                this.events = copied(completed, 1, List.copyOf(events), events, events.size());</span>
+<span class="fc" id="L135">                this.reachedStates = copied(completed, 2, Set.copyOf(reachedStates), reachedStates, reachedStates.size());</span>
+<span class="fc" id="L136">                this.deadEndStates = copied(completed, 3, List.copyOf(deadEndStates), deadEndStates, deadEndStates.size());</span>
+<span class="fc" id="L137">                this.stateAssessments = copied(completed, 4, Map.copyOf(stateAssessments), stateAssessments, stateAssessments.size());</span>
+<span class="fc" id="L138">                this.pickerReceipts = copied(completed, 5, List.copyOf(pickerReceipts), pickerReceipts, pickerReceipts.size());</span>
+<span class="fc" id="L139">                this.batchCursorReceipts = copied(completed, 6, List.copyOf(batchCursorReceipts), batchCursorReceipts, batchCursorReceipts.size());</span>
+<span class="fc" id="L140">                this.assessmentOrder = copied(completed, 7, List.copyOf(assessmentOrder), assessmentOrder, assessmentOrder.size());</span>
+<span class="fc" id="L141">                this.reachedOrder = copied(completed, 8, List.copyOf(reachedOrder), reachedOrder, reachedOrder.size());</span>
+<span class="fc" id="L142">                completed[9] = this;</span>
+<span class="fc" id="L143">                completed(1);</span>
+<span class="fc" id="L144">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L145">                primary = failure;</span>
+<span class="fc" id="L146">                observeFailure(failure);</span>
+<span class="fc" id="L147">                throw failure;</span>
+<span class="fc" id="L148">            } finally { close(retained, primary); }</span>
+<span class="fc" id="L149">        }</span>
     }
 
     /** Observe a completed copy before its debit; immutable collection reuse allocates no new copy. */
     static &lt;T&gt; T copied(Object[] owner,int slot,T value,Object original,int size) {
-<span class="fc" id="L149">        owner[slot] = value;</span>
-<span class="fc bfc" id="L150" title="All 2 branches covered.">        completed(value == original ? 0 : size + 1L);</span>
-<span class="fc" id="L151">        return value;</span>
+<span class="fc" id="L154">        owner[slot] = value;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        completed(value == original ? 0 : size + 1L);</span>
+<span class="fc" id="L156">        return value;</span>
     }
     static void completed(long units) {
-<span class="fc" id="L154">        RetainedOperation.work(units);</span>
-<span class="fc" id="L155">        RetainedOperation.checkpoint();</span>
-<span class="fc" id="L156">    }</span>
+<span class="fc" id="L159">        RetainedOperation.work(units);</span>
+<span class="fc" id="L160">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L161">    }</span>
     static void observeFailure(Throwable failure) {
-<span class="fc" id="L158">        try { RetainedOperation.checkpoint(); }</span>
-<span class="fc" id="L159">        catch (RuntimeException | Error observation) {</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (observation != failure) failure.addSuppressed(observation);</span>
-<span class="fc" id="L161">        }</span>
-<span class="fc" id="L162">    }</span>
+<span class="fc" id="L163">        try { RetainedOperation.checkpoint(); }</span>
+<span class="fc" id="L164">        catch (RuntimeException | Error observation) {</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">    }</span>
     static void close(RetainedOperation.Frame retained,Throwable primary) {
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        try { if (retained != null) retained.close(); }</span>
-<span class="fc" id="L165">        catch (RuntimeException | Error cleanup) {</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L168">        }</span>
-<span class="fc" id="L169">    }</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        try { if (retained != null) retained.close(); }</span>
+<span class="fc" id="L170">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
