@@ -140,3 +140,16 @@ a fixed setup allowance (32 work units plus twice the exponent bit length), so
 a modular square can compete with `modPow`. This is a search-ranking heuristic,
 not a measured latency or a constant-time guarantee; consumers must account for
 their own receiver guards and fallback costs.
+
+
+Plain `BigInteger.mod` now participates in the modular search bridge. A bounded,
+independent multiplicative residue normal form verifies nested reductions,
+computed bases and products with several bases. A reduction can disappear only
+when the result is already normalized for the same positive modulus; a bare
+unreduced product remains inadmissible. Additive subexpressions are treated as
+exact atoms, and nested exponents retain the affine and structural proof bounds.
+
+This allows the small-power candidate to be found inside a larger expression
+such as `x.modPow(TWO, m).add(x).mod(m)`. The adapter must still establish receiver
+and range contracts and account for the cost of any generated guards. In
+particular, removing one `mod` does not necessarily pay for new receiver checks.
