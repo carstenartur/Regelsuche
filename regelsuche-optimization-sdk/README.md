@@ -89,3 +89,25 @@ artifact hash. JUnit owns packaging regressions; Python is only the production
 build adapter. The normal API, publication, coverage and `ciCheck` authorities
 include this module. See `docs/java-optimization-sdk-qualification.md` for the
 fresh reconstruction evidence and any unresolved environment gates.
+
+
+## Proof-bound explanations and contextual residues
+
+`ComputationExplanations.describe(request, candidate, cancellation)` independently
+reverifies a candidate and exposes immutable, typed original/replacement DAGs,
+exact assumptions and runtime obligations, and original/candidate `modPow`
+counts. No explanation is returned for an unverified candidate, a stale receipt,
+a canceled request, or an exhausted explanation budget. The presentation is not
+itself a proof. Consumers should render actual local names, retain necessary
+runtime guards, and keep operation-count claims separate from measurements.
+
+The modular domain can eliminate `modPow(a, 1, m)` at a use inside a matching
+reducing modular product, even when `a` is negative or unreduced. This is not a
+license to replace a standalone normalized result by its raw base, or to use a
+different modulus. Both original and proposed traces retain Java numeric checks.
+In particular, related powers `a^(2e+1)` and `a^(e+1)` can share one `a^e` and two
+modular products without introducing a second exponentiation of exponent one.
+
+This SDK change does not derive constructor-field, loop, or helper-method
+contracts from arbitrary Java code. The complete historic Bouncy Castle #2455
+constructor remains a source-adapter milestone, not a claimed acceptance result.

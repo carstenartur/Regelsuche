@@ -28,12 +28,17 @@ public final class ComputationOptimizer {
             };
             var budget=request.budget();
             var search=new JointPlanSearch(new JavaNumericBackend(request.plan().inputs()),domain,weights(request.goal()),budget.maximumCandidates());
-            var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,budget.maximumWork(),budget.maximumStates(),Math.max(1,budget.maximumWork()-setup),64));
+            // Search is an anytime producer, not the final proof. Reserve half
+            // the remaining request allowance for independently checking and
+            // preparing the incumbent after bounded exploration stops.
+            long explorationAllowance=Math.max(1,(budget.maximumWork()-setup)/2);
+            var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,explorationAllowance,budget.maximumStates(),explorationAllowance,64));
             work.charge(1);
             long searchWork=Math.addExact(setup,found.totalWork());
             var outcome=found.search().search().outcome();
-            if(!found.withinBudget() || !found.search().withinBudget() || searchWork>budget.maximumWork()
-                    || outcome==MoveSearch.Outcome.WORK_EXHAUSTED || outcome==MoveSearch.Outcome.STATE_LIMIT)
+            boolean explorationLimited=!found.withinBudget() || !found.search().withinBudget()
+                    || outcome==MoveSearch.Outcome.WORK_EXHAUSTED || outcome==MoveSearch.Outcome.STATE_LIMIT;
+            if(searchWork>budget.maximumWork())
                 return new OptimizationResult.BudgetExceeded("SEARCH_BUDGET_EXCEEDED",Math.max(searchWork,work.used()));
             // A rejected alternative makes the explored relation incomplete; it
             // does not invalidate an independently verified incumbent. Preserve
@@ -49,6 +54,11 @@ public final class ComputationOptimizer {
             work.charge(preparationWork); total=Math.addExact(total,preparationWork);
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             boolean improved=cost.candidateScore()<cost.sourceScore();
+            // Reaching the exploration limit says nothing about the validity of
+            // an incumbent that has now passed the full original-source proof.
+            // Without an improvement, do not misreport an exhausted search space.
+            if(!improved && explorationLimited)
+                return new OptimizationResult.BudgetExceeded("SEARCH_BUDGET_EXCEEDED",total);
             if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
                 return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
@@ -59,7 +69,10 @@ public final class ComputationOptimizer {
         } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }
     }
     public VerificationResult verify(OptimizationRequest request, JointComputationPlan candidate, CancellationToken token) {
-        Objects.requireNonNull(request); Objects.requireNonNull(candidate); var work=new VerificationWork(request,token);
+        Objects.requireNonNull(request); Objects.requireNonNull(candidate);
+        return verifyWithin(request, candidate, new VerificationWork(request, token));
+    }
+    private VerificationResult verifyWithin(OptimizationRequest request, JointComputationPlan candidate, VerificationWork work) {
         try {
             var checker=new SemanticChecker(request,work); checker.validate();
             var proof=checker.check(request.plan(),candidate);
@@ -75,8 +88,13 @@ public final class ComputationOptimizer {
         } catch(IllegalArgumentException invalid) { return new VerificationResult.Unsupported(diagnostic(invalid)); }
     }
     public VerificationResult reverify(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
-        Objects.requireNonNull(candidate);
-        var verified=verify(request,candidate.plan(),token);
+        Objects.requireNonNull(request); Objects.requireNonNull(candidate);
+        return reverifyWithin(request, candidate, new VerificationWork(request, token));
+    }
+    /** Continue the same caller budget and deadline through proof and presentation. */
+    VerificationResult reverifyWithin(OptimizationRequest request, OptimizationResult.Candidate candidate, VerificationWork work) {
+        Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(work);
+        var verified=verifyWithin(request,candidate.plan(),work);
         if(!(verified instanceof VerificationResult.Verified proof)) return verified;
         if(!proof.evidence().equals(candidate.evidence()) || !proof.obligations().equals(candidate.obligations()))
             return new VerificationResult.Unsupported("EVIDENCE_BINDING_OR_REVISION_DIFFERS");
