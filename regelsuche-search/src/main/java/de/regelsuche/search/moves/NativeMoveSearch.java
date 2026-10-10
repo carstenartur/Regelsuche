@@ -36,11 +36,17 @@ public final class NativeMoveSearch {
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
             if(!NativeMoveProvider.carries(move.assumptions(),source,context) || !NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return new NativeVerification(false,1,null,null,"TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
             var generated=transport.generate(source.expression());
-            boolean accepted=descriptor.equals(move.descriptor()) && source.expression().equals(move.sourceExpression())
-                && move.proof() instanceof NativeMoveProof.Primitive proof && generated.contains(proof.step());
-            return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(generated.size())
-                    .withCandidateWork(new ExecutionWork(generated.size(),0,0)).totalWorkUnitsV2(),
-                accepted?move.proof():null,accepted?move.ruleId():null,accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
+            long work=TransformationWorkMetrics.flatEngine(generated.size())
+                .withCandidateWork(new ExecutionWork(generated.size(),0,0)).totalWorkUnitsV2();
+            try {
+                boolean accepted=descriptor.equals(move.descriptor()) && source.expression().equals(move.sourceExpression())
+                    && move.proof() instanceof NativeMoveProof.Primitive proof && generated.contains(proof.step());
+                return new NativeVerification(accepted,work,accepted?move.proof():null,accepted?move.ruleId():null,
+                    accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
+            } catch(SearchExecution.ResourceLimit exhausted) {
+                // Regeneration completed before comparison; its unreturned receipt stays paid.
+                throw exhausted.paidVerification(work);
+            }
         }
     }
     public enum ZeroScore implements java.util.function.ToDoubleFunction<TypedMoveSearch.State> { INSTANCE;

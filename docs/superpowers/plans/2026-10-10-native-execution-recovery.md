@@ -77,3 +77,21 @@ search completeness cannot manufacture the kernel's bounded relation.
   compile465, query1053893, export5729172 work units and one selected exact learned
   witness. This is an application-accounting test, not a lifecycle speedup claim.
 - Steps1–3 implementation/test scopes complete; step4 release gates still open.
+- First full reconstruction run: Core1151/Learning1093 pass; Search693 has three
+  failures in `FinalProducerOwnershipTest`. Its reflection helper still requested
+  the previous private Result constructor. The helper now explicitly selects the
+  unqualified metadata path; all nine original ownership assertions pass in the
+  focused follow-up. No production-only compatibility shim was added.
+- Independent whole-branch review of 03dcb57ee6e995274836472c0a3a69549f1dc4a9:
+  one Important/P2 finding: primitive verification loses completed regeneration
+  work if subsequent structural comparison aborts. Three real behavioral RED
+  regressions reproduce expected4 versus actual0, directly and through admission
+  and final replay. The correction transfers the unreturned work once through
+  the existing ResourceLimit ledger. Successful/default charges stay unchanged;
+  the previously undercounted failure prefix is deliberately corrected.
+- Review minor: explicitly labelled the legacy V7/V3 partial-contract table so
+  its always-false completion wording cannot be mistaken for qualified V8/V4.
+  No deferred review item. Correction GREEN: all16 focused tests pass. Fresh full
+  Core1151/Search696/Learning1093 (2940 total) pass with zero failures/errors/skips
+  and unchanged source hashes. Four public-corpus protocol tests also pass.
+  Frozen public differential, AI quality and required hosted head CI remain open.

@@ -53,6 +53,11 @@ retained graph units, not physical JVM bytes, elapsed time, economic benefit or
 production readiness. Full suite, corpus, review and exact-head CI remain release
 gates; focused tests alone do not complete P04.
 
+## Default V7/V3 partial-accounting contract
+
+The following table and export limitations describe the default partial path,
+not a successfully qualified opt-in V8/V4 execution.
+
 | Observation | Public contract |
 | --- | --- |
 | Search `outcome()` | Always `INCONCLUSIVE` while coverage is partial |

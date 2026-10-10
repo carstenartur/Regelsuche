@@ -117,8 +117,14 @@ zero failures/errors/skips. The opt-in V8/V4 reconstruction has 28 passing focus
 tests (Core4/Search20/Learning4), including actual learning/load, one lazy selected
 application and a fresh JVM with positive load/compile/query/export charges.
 The initial reconstruction RED is an absent-API compilation failure, not a
-claimed behavioral RED. Full module, frozen public differential, independent
-review, AI quality and hosted head-CI gates remain pending. P04 is not complete;
+claimed behavioral RED. The independent review found a lost paid failure prefix
+in primitive verification. Three behavioral RED tests reproduce expected4 versus
+actual0; the correction transfers the completed regeneration receipt once.
+All16 correction/ownership tests pass, and a fresh full run passes Core1151,
+Search696 and Learning1093 (2940 total, zero failures/errors/skips). The first
+full run's three reflection-fixture failures and the review RED remain retained.
+Frozen public differential, AI quality and hosted head-CI gates remain pending.
+P04 is not complete;
 no P05–P12 or economic learning-success claim follows from this checkpoint.
 See [the recovery plan](../superpowers/plans/2026-10-10-native-execution-recovery.md).
 
