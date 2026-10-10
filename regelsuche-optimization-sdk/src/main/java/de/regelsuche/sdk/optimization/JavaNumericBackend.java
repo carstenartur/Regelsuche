@@ -1,6 +1,7 @@
 package de.regelsuche.sdk.optimization;
 
 import de.regelsuche.ast.*;
+import de.regelsuche.math.algorithms.modular.ModularOperationCosts;
 import de.regelsuche.search.program.ComputationBackend;
 import java.math.BigInteger;
 import java.util.*;
@@ -41,9 +42,10 @@ final class JavaNumericBackend implements ComputationBackend {
                 NumericOperation.MOD_MULTIPLY, NumericOperation.POW).contains(op)) throw new IllegalArgumentException("BIG_INTEGER_OPERATION_REQUIRED");
         if (kind == NumericKind.BIG_INTEGER && (op.name().endsWith("EXACT") || op == NumericOperation.UNSIGNED_SHIFT_RIGHT))
             throw new IllegalArgumentException("UNSUPPORTED_BIG_INTEGER_OPERATION");
-        long work = op == NumericOperation.MOD_POW ? 1000 : op == NumericOperation.MOD_MULTIPLY ? 10 : kind == NumericKind.BIG_INTEGER ? 4 : 1;
-        if (op == NumericOperation.MOD_POW && function.arguments().size() == 3 && function.arguments().get(1) instanceof NumberExpr n && n.value().signum() >= 0)
-            work = Math.max(1, 2L * n.value().numerator().bitLength());
+        long work = op == NumericOperation.MOD_POW ? ModularOperationCosts.POWER_FALLBACK_WORK
+                : op == NumericOperation.MOD_MULTIPLY ? ModularOperationCosts.MULTIPLY_WORK : kind == NumericKind.BIG_INTEGER ? 4 : 1;
+        if (op == NumericOperation.MOD_POW && function.arguments().size() == 3)
+            work = ModularOperationCosts.powerWork(function.arguments().get(1));
         return new Operation(function.name(), argumentTypes, kind.type(), work, kind == NumericKind.BIG_INTEGER ? 2 : 1);
     }
     private List<Type> argumentTypes(FunctionExpr function, NumericKind kind, NumericOperation op) {
