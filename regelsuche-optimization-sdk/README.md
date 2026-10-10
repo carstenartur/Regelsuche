@@ -153,3 +153,8 @@ This allows the small-power candidate to be found inside a larger expression
 such as `x.modPow(TWO, m).add(x).mod(m)`. The adapter must still establish receiver
 and range contracts and account for the cost of any generated guards. In
 particular, removing one `mod` does not necessarily pay for new receiver checks.
+
+An optimizer-produced `Inconclusive` result reports consumed work so adapters can
+charge bounded retries without discarding the entire unused allocation. The old
+single-argument constructor remains available and marks work as unknown (`-1`);
+consumers must conservatively reserve the full allocation for that legacy case.

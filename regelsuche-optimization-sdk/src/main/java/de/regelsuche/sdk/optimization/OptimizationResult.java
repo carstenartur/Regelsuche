@@ -37,5 +37,9 @@ public sealed interface OptimizationResult {
     record Refuted(String diagnostic, Map<String, Object> counterexample) implements OptimizationResult {
         public Refuted { counterexample = Map.copyOf(counterexample); }
     }
-    record Inconclusive(String diagnostic) implements OptimizationResult {}
+    record Inconclusive(String diagnostic, long work) implements OptimizationResult {
+        /** Legacy/manual outcomes have unknown work; adapters must reserve their allocation. */
+        public Inconclusive(String diagnostic) { this(diagnostic, -1); }
+        public Inconclusive { if (work < -1) throw new IllegalArgumentException("NEGATIVE_OPTIMIZATION_WORK"); }
+    }
 }
