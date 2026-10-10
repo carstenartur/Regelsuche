@@ -111,3 +111,23 @@ modular products without introducing a second exponentiation of exponent one.
 This SDK change does not derive constructor-field, loop, or helper-method
 contracts from arbitrary Java code. The complete historic Bouncy Castle #2455
 constructor remains a source-adapter milestone, not a claimed acceptance result.
+
+## Recorded selected search paths
+
+Optimizer-produced candidates expose `derivation()`. It contains the exact retained
+`JointPlanSearch` witness, with rule identifiers and typed before/after output envelopes.
+There is no second search and no source-name-specific explanation. A compound proposal
+is one recorded edge; it is not expanded into invented primitive identities.
+
+`reverify` and `ComputationExplanations.describe` replay a present derivation: evidence
+binding, contiguous endpoints, regeneration of each claimed rule/target from the recorded
+generation configuration, and independent numeric checking of every edge are required.
+The generation configuration is not a work grant: every replay operation consumes the
+one caller allowance and original deadline shared with final proof and presentation.
+Cancellation, exhaustion or invalid history produces no partial successful explanation.
+The original source trace and numerical policy remain authoritative for Java behavior.
+
+The previous Candidate constructor remains available and explicitly means unrecorded
+history. An absent history differs from a recorded zero-edge path (an unchanged value
+graph with a different prepared schedule). Neither is padded with a fabricated rewrite.
+These immutable records are replayable data, not a signed audit log or a timing result.
