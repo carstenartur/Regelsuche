@@ -16,17 +16,8 @@ import java.util.Objects;
  * via {@link ProverExecutor}, and returns the resulting candidate with the
  * lifted {@link CandidateProofStatus}.
  *
- * <p>The service refuses to <em>lower</em> a candidate's status — if a
- * candidate is already {@link CandidateProofStatus#FORMALLY_PROVED}, calling
- * the bridge does not regress it back to {@code FORMALLY_PROVABLE}.</p>
- *
- * <p>A candidate is only lifted to {@link CandidateProofStatus#FORMALLY_PROVED}
- * when a configured {@link ProverExecutor} actually returned
- * {@link ProverExecutionResult.Status#PROVER_CONFIRMED}. Without an executor
- * (or with a {@code SCRIPT_GENERATED} / {@code PROVER_NOT_AVAILABLE} /
- * {@code PROVER_TIMEOUT} / {@code PROVER_FAILED} outcome) the candidate
- * stays at the {@link CandidateProofStatus#FORMALLY_PROVABLE} ceiling the
- * bridge itself returned.</p>
+ * <p>Every proof confirmation is fresh and bound to the current goal and assumptions.
+ * Incoming candidate flags and custom process success cannot authorize FORMALLY_PROVED.
  */
 public class ProofBridgeService {
     private final ProofBridge bridge;
@@ -59,23 +50,28 @@ public class ProofBridgeService {
         }
 
         ProverExecutionResult execution = null;
-        CandidateProofStatus next = attempt.status();
+        CandidateProofStatus next = cap(attempt.status());
         if (executor != null) {
-            execution = executor.execute(attempt.artifact());
-            if (execution.status() == ProverExecutionResult.Status.PROVER_CONFIRMED) {
-                next = CandidateProofStatus.FORMALLY_PROVED;
-            } else {
-                // Cap at FORMALLY_PROVABLE — script generated but not confirmed.
-                if (next.ordinal() > CandidateProofStatus.FORMALLY_PROVABLE.ordinal()) {
-                    next = CandidateProofStatus.FORMALLY_PROVABLE;
+            if (executor.checksMathematicalEvidence()) {
+                try {
+                    var expected = ProofObligationAdapter.equality(candidate.leftPattern(), candidate.rightPattern(), assumptions);
+                    execution = executor.executeBound(attempt.artifact(), expected);
+                } catch (IllegalArgumentException unsupported) {
+                    execution = new ProverExecutionResult(ProverExecutionResult.Status.PROVER_FAILED,
+                        -1, "", unsupported.getMessage(), 0, attempt.tool());
                 }
+            } else {
+                execution = executor.execute(attempt.artifact());
             }
+            if (executor.checksMathematicalEvidence()
+                    && execution.status() == ProverExecutionResult.Status.PROVER_CONFIRMED)
+                next = CandidateProofStatus.FORMALLY_PROVED;
         }
-
-        if (candidate.proofStatus() != null
-            && candidate.proofStatus().ordinal() > next.ordinal()) {
-            next = candidate.proofStatus();
-        }
+        // A prior higher numeric status carries no goal/premise-bound evidence.
+        // Preserve lesser discovery information, never an unbound formal confirmation.
+        CandidateProofStatus previous = candidate.proofStatus();
+        if (previous != null && previous.ordinal() <= CandidateProofStatus.SYMBOLICALLY_VERIFIED.ordinal()
+                && previous.ordinal() > next.ordinal()) next = previous;
 
         RuleCandidate updated = new RuleCandidate(
             candidate.leftPattern(),
@@ -99,6 +95,10 @@ public class ProofBridgeService {
         return attemptWithDetails(candidate, assumptions).candidate();
     }
 
+    private static CandidateProofStatus cap(CandidateProofStatus status) {
+        return status == CandidateProofStatus.FORMALLY_PROVED ? CandidateProofStatus.FORMALLY_PROVABLE : status;
+    }
+
     private Path writeArtifact(RuleCandidate candidate, ProofBridge.ProofAttempt attempt) {
         try {
             Files.createDirectories(artifactDirectory);
@@ -107,7 +107,8 @@ public class ProofBridgeService {
                 case "smtlib2" -> ".smt2";
                 default -> ".txt";
             };
-            Path target = artifactDirectory.resolve(safeFileName(candidate) + suffix);
+            Path run = Files.createTempDirectory(artifactDirectory, "attempt-");
+            Path target = run.resolve("proof" + suffix);
             Files.writeString(target, attempt.artifact(), StandardCharsets.UTF_8);
             return target;
         } catch (IOException ex) {

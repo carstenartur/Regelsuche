@@ -7,20 +7,22 @@ technischer Jobstatus bleiben getrennt.
 
 ![Proof-Job-Panel mit Eingabefeldern, Jobliste, Status und Artefakt-Aktion](assets/screenshots/proof-job-panel.png)
 
-*Der Screenshot wird aus dem Browser-E2E-Flow erzeugt und zeigt den Weg vom
-Auftrag bis zum geöffneten Artefakt-Bundle.*
+*Der Screenshot dokumentiert den Browserflow, nicht die Bestätigung eines neuen
+Lean-Beweises. Reale Werkzeugprüfung und UI-Aufnahme sind getrennte Abnahmen.*
 
 ## Voraussetzungen
 
-- Die Workbench wurde lokal gestartet.
-- Die Proof-Funktion ist in der Serverkonfiguration aktiviert.
-- Für reale formale Ergebnisse steht ein passender Solver beziehungsweise
-  Prover zur Verfügung.
+Die Workbench muss laufen und die Proof-Funktion in der Serverkonfiguration
+aktiviert sein. Ein deterministischer Testworker kann UI, Queue und Artefakte
+prüfen, liefert aber keinen realen mathematischen Nachweis.
 
-Die Standarddemo kann den Produktfluss mit einem deterministischen Testworker
-zeigen. Dieser Flow belegt UI, Queue, Scheduler und Artefakte, aber keinen realen
-mathematischen Proof. Reale Z3-/cvc5-Ausführung wird separat mit dem Proof-Image
-geprüft.
+Für reale Bestätigung verwendet die Anwendung die
+[geprüften Proof Bridges](proof-bridge.md). Lean benötigt ein vorbereitetes,
+festgelegtes Lean/mathlib-Projekt einschließlich `lean-toolchain` und
+`lake-manifest.json`, nicht lediglich ein installiertes Programm. Z3 muss
+verfügbar sein und ein vollständiges Beweisobjekt liefern. Ein erfolgreicher
+beliebiger Prozess ist nur `PROCESS_SUCCEEDED` und autorisiert kein
+`FORMALLY_PROVED`.
 
 ## Bedienung
 
@@ -35,36 +37,26 @@ geprüft.
 7. Öffne bei einem terminalen Job **Artefakte** und prüfe Skript,
    Standardausgabe, Fehlerausgabe und Metadaten getrennt.
 
-Die Oberfläche unterscheidet mindestens:
-
-- wartend;
-- laufend;
-- bestätigt;
-- fachlich nicht bestätigt oder widerlegt;
-- technisch fehlgeschlagen;
-- abgebrochen;
-- Proof-Funktion nicht verfügbar.
-
 Eine deaktivierte Funktion erscheint als nicht verfügbar und nicht als rohe
-Serverfehlermeldung.
-
-Der vollständige HTTP-Vertrag steht in der lokalen Swagger UI unter dem Bereich
-**Proof Jobs**. Markdown dupliziert Methoden, Pfade, Payloads und Statuscodes
-nicht.
+Serverfehlermeldung. Der vollständige HTTP-Vertrag steht in der lokalen Swagger
+UI unter **Proof Jobs**. Die typisierten Java-Bridges akzeptieren auch native
+Ungleichheitsziele; das erweitert nicht automatisch jedes Browser-Eingabeformular.
 
 ## Dokumentierter Browserflow
 
-Der sichtbare End-to-End-Flow verwendet die Sophie-Germain-Identität:
+Der vorhandene End-to-End-Flow verwendet die Sophie-Germain-Identität:
 
 ```text
 a^4 + 4*b^4
 → (a^2 - 2*a*b + 2*b^2) * (a^2 + 2*a*b + 2*b^2)
 ```
 
-Die SMT-Bridge expandiert begrenzte nichtnegative ganzzahlige Exponenten in
-gewöhnliche nichtlineare reelle Arithmetik. Andere Exponenten verwenden einen
-explizit deklarierten `pow`-Fallback. Dadurch ist die sichtbare `a^4`-Notation
-Teil einer strukturierten Obligation und nicht nur Darstellung.
+Die SMT-Bridge nutzt jetzt denselben verlustfreien Renderer wie das
+Solver-Portfolio. Unterstützte feste natürliche Potenzen behalten ihre
+arithmetische Bedeutung. Nicht unterstützte Potenzen oder analytische Funktionen
+werden abgelehnt; der frühere uninterpretiert deklarierte `pow`-Fallback ist
+entfernt. Für unterstützte reelle Funktionsbeweise erzeugt die Lean-Bridge
+wirkliche Taktiken mit `Real.exp`, `Real.log` und `Real.rpow`.
 
 Der Browser-Test reicht den Auftrag ein, wartet auf die Jobliste, öffnet das
 Bundle und erzeugt den Screenshot. Aktualisierung:
@@ -73,8 +65,8 @@ Bundle und erzeugt den Screenshot. Aktualisierung:
 ./gradlew :app:e2eTest -Pregelsuche.recordDocs=true
 ```
 
-Dokumentationsaufnahme und mathematische Solverbestätigung sind getrennte
-Verträge.
+Eine solche Aufnahme ersetzt weder einen Solverlauf noch die Prüfung der
+exakten Zielaussage und Annahmen.
 
 ## Ausführungsarchitektur
 
@@ -83,16 +75,17 @@ flowchart TD
     request[Proof Job] --> queue[Persistente Job Queue]
     queue --> scheduler[Proof Job Scheduler]
     scheduler --> workers[Konfigurierte Worker-Komposition]
-    workers --> lean[Lean Worker]
-    workers --> smt[SMT Worker: Z3 / cvc5]
+    workers --> lean[Lean: exakter Typ und Axiomabschluss]
+    workers --> smt[Z3: verlustfreie Obligation und Beweisobjekt]
     workers --> cache[Ergebniscache]
     workers --> artifacts[Artefakt-Repository]
 ```
 
-Queue, Cache und Artefakte verwenden atomare Dateischreibvorgänge. Der aktive
-Worker wird von der Anwendung konfiguriert und nicht durch frei wählbare
-Auftragsdaten ersetzt. Ein Aufrufer kann die Proof-Grenze deshalb nicht
-unbemerkt auf ein permissiveres Backend umschalten.
+Der aktive Worker ist vertrauenswürdige Anwendungskonfiguration, keine frei
+wählbare Befehlszeile aus einem Auftrag. Die Standard-Bridges prüfen den
+aktuellen Auftrag; ein älterer ungebundener Kandidatenstatus wird nicht als
+neuer Beweis übernommen. Fremde Worker-Implementierungen sind weiterhin Teil
+der vertrauenswürdigen Konfiguration.
 
 ## Konfiguration
 
@@ -102,33 +95,35 @@ unbemerkt auf ein permissiveres Backend umschalten.
 | `REGELSUCHE_PROOF_ARTIFACT_PATH` | `<persistencePath>/proofs` | Wurzel der auftragsspezifischen Bundles |
 | `REGELSUCHE_PROOF_JOB_STORE` | `<persistencePath>/proof-jobs.json` | persistente Queue |
 | `REGELSUCHE_PROOF_CACHE` | `<persistencePath>/proof-cache.json` | Cache für wiederholte Obligationen |
+| `REGELSUCHE_LEAN_PROJECT` | nicht gesetzt | vorbereitetes, festgelegtes Lean/mathlib-Projekt |
 
-Explizite JVM-Properties können in Tests und kontrollierten Starts Vorrang vor
-Umgebungsvariablen besitzen. Die genaue REST-Konfiguration ist in OpenAPI
-dokumentiert.
+`regelsuche.lean.project` kann das Lean-Projekt explizit festlegen.
+`regelsuche.proof.evidence` beziehungsweise die typisierten Executor-Factories
+legen den Ablageort der vollständigen Backend-Nachweise fest. Die genaue
+REST-Konfiguration bleibt in OpenAPI dokumentiert.
 
-## Artefakt-Bundle
+## Artefakte und Vertrauensgrenze
 
-Jeder terminale Übergang schreibt ein einheitliches Bundle, auch bei Fehlern:
+Das Job-Bundle enthält Skript, stdout/stderr und Job-Metadaten. Der geprüfte
+Backendlauf bewahrt zusätzlich die native Obligation, Übersetzung, Ergebnis und
+Ausführung auf. Lean speichert `.lean`, `.olean`, Axiom-Audit, Werkzeugversion,
+Konfiguration und ein hashgebundenes Zertifikat. Z3 speichert jeden vollständigen
+SMT-Eingabetext, die tatsächlichen Ausgaben und das zugehörige Beweisobjekt.
+Jeder neue Lauf erhält ein eigenes Verzeichnis.
 
-```text
-proofs/
-└── <jobId>/
-    ├── proof.lean      # alternativ proof.smt2 oder proof.txt
-    ├── stdout.txt
-    ├── stderr.txt
-    └── metadata.json
-```
+Die Lean-Prüfung bindet einen geschlossenen Satz an genau die verlangte Aussage
+und kontrolliert transitive Abhängigkeiten. Nur `propext`, `Classical.choice`
+und `Quot.sound` sind in dieser Richtlinie zugelassen. Zusätzliche Axiome,
+verstecktes `sorryAx`, geänderte Ziele oder zusätzliche Voraussetzungen werden
+nicht akzeptiert. Das konfigurierte Lean/mathlib-System bleibt vertrauenswürdig
+vorausgesetzt; beliebiger fremder Lean-Code ist kein zulässiger Auftrag.
 
-`metadata.json` bindet Auftrag, Worker, Tool, Status und diagnostische
-Ausführungsdaten. Pfad-Traversal und unzulässiger Dateizugriff werden durch
-Repositorytests blockiert.
+Ein Beweis unter Annahmen beweist nicht deren gemeinsame Erfüllbarkeit. Die
+SMT-Beweisobjekte werden gespeichert, aber hier nicht unabhängig im Lean-Kern
+nachgeprüft. Der rohe cvc5-Executor ist nur Transport und kann ohne zusätzlichen
+geprüften Adapter keinen formalen Status autorisieren.
 
-Eine vorhandene Proof-Datei autorisiert noch keinen formalen Status. Erst das
-strukturierte, tatsächlich ausgeführte Backend-Ergebnis darf einen
-entsprechenden Claim tragen.
-
-## Proof-Image mit realen Solvern
+## Proof-Image und tatsächliche Tests
 
 `Dockerfile.proof` enthält Z3 und cvc5:
 
@@ -137,67 +132,42 @@ docker build -f Dockerfile.proof -t regelsuche-proof .
 docker run --rm -p 127.0.0.1:8080:8080 regelsuche-proof
 ```
 
-Lean 4 kann optional ergänzt werden:
+Die optionale Lean-Installation des Images allein ersetzt noch nicht das
+benötigte vorbereitete mathlib-Projekt. Für dessen reproduzierbare Referenz
+siehe `.ci/lean-proof` und [Proof Bridge](proof-bridge.md).
 
-```bash
-docker build \
-  -f Dockerfile.proof \
-  --build-arg INSTALL_LEAN=true \
-  -t regelsuche-proof-lean .
-```
-
-Das Proof-Image ist eine lokale Referenzumgebung. Eine öffentliche
-Bereitstellung benötigt dieselben Authentifizierungs-, TLS- und
-Ressourcengrenzen wie die normale Workbench.
-
-## Verifikation
-
-Realer Image- und Solververtrag:
+Der bestehende Testcontainers-Vertrag prüft die Image-Installation und den
+Anwendungsflow:
 
 ```bash
 ./gradlew :app:dockerE2eTest \
   --tests de.regelsuche.dockere2e.ProofDockerImageIntegrationTest
 ```
 
-Der Test baut das reale Image über Testcontainers, prüft die installierten
-Solver, reicht die Sophie-Germain-Obligation über die Anwendung ein, wartet auf
-den terminalen Status und verifiziert das vollständige Bundle.
-
-Repositoryweiter autoritativer Vertrag:
+Die neuen echten Backend- und App-Beweisläufe sind separat ausführbar:
 
 ```bash
-./gradlew --no-configuration-cache ciCheck
+export REGELSUCHE_REAL_LEAN=true
+export REGELSUCHE_LEAN_PROJECT="$PWD/.ci/lean-proof"
+(cd .ci/lean-proof && lake update && lake exe cache get)
+mvn -B -pl app -am \
+  -Dtest=CheckedLeanRealTest,CheckedProofBridgeRealTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-Die Verifikationssemantik liegt in Gradle, JUnit und den Checkout-Skripten, nicht
-in einem GitHub-spezifischen Proof-Workflow.
-
-## Wichtige Testbereiche
-
-- technischer Job-Lebenszyklus und Fehlerstatus;
-- persistente Queue und Neustartverhalten;
-- Bundle-Layout und Traversal-Schutz;
-- Konfigurationspriorität;
-- SMT-Translation, Potenzexpansion und Fallback;
-- Browserflow mit Jobliste und Artefaktansicht;
-- reale Z3-/cvc5-Ausführung im Proof-Image.
+Diese Tests benötigen Lean/mathlib und Z3. Ohne die ausdrückliche Umgebung sind
+sie übersprungen, nicht bestanden. Ihre fokussierte Ausführung ersetzt nicht
+die reguläre Gesamtsuite, Browser- oder Docker-Tests.
 
 ## Aussagegrenzen
 
-Die Proof Workbench belegt je nach ausgeführtem Vertrag:
-
-- reproduzierbare Bildung einer Obligation;
-- technische Ausführung eines Backends;
-- retained Solver-Ausgabe und Artefakte;
-- gegebenenfalls einen bestätigten formalen Status.
-
-Sie belegt nicht automatisch:
-
-- externe mathematische Neuheit;
-- Interessantheit;
-- Vollständigkeit des gewählten Formalisierungsfragments;
-- Fehlerfreiheit des Provers;
-- allgemeine Beweisbarkeit außerhalb der konkreten Obligation.
+Die Workbench organisiert reproduzierbare Beweisaufgaben, keine automatische
+Begutachtung mathematischer Neuheit. Ein Skript ist noch kein Beweis, ein
+Prozess-Erfolg noch keine mathematische Bestätigung. Die unterstützte
+Repräsentation und der tatsächliche Backendlauf bestimmen die Aussagekraft.
+Allgemeine Quantoren über Mengen, unendliche Summen und Grenzübergänge erfordern
+weitere versionierte IR- und Beweisunterstützung, nicht undurchsichtige
+Funktionsnamen oder stillschweigend weggelassene Voraussetzungen.
 
 ## Siehe auch
 
@@ -206,3 +176,13 @@ Sie belegt nicht automatisch:
 - [Solver-Portfolio](solver-portfolio.md)
 - [Web-Workbench](web-workbench.md)
 - [Testing und Verifikation](testing.md)
+
+### Cache-Migration der Beweisgrenze
+
+Die aktuelle Cache-Kennung bindet den Beweisvertrag und die Werkzeugkonfiguration,
+nicht nur den Anzeigenamen des Workers. Alte Einträge bleiben erhalten, werden
+aber nicht als neue Bestätigung übernommen. Auch unter einer aktuellen Kennung
+ist ein gespeicherter `FORMALLY_PROVED`-Status kein wiederverwendbarer Beweis:
+Dafür ist ein frischer Backendlauf erforderlich. Nichtformale Ergebnisse der
+Skriptgenerierung bleiben innerhalb derselben Konfiguration wiederverwendbar.
+Eine während der Ausführung geänderte Konfiguration verhindert die Freigabe.

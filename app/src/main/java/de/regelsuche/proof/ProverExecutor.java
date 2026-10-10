@@ -10,8 +10,8 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Executes a generated prover artifact against a real external tool such as
- * {@code lean} or {@code z3}.
+ * Separates raw process execution from checked mathematical evidence for
+ * Lean and Z3. Custom constructors are transport-only, even with a success predicate.
  *
  * <p>The executor writes the script to a temporary file, invokes the tool
  * with a hard timeout, captures {@code stdout}/{@code stderr} and reports
@@ -31,6 +31,11 @@ public final class ProverExecutor {
     private final String artifactSuffix;
     private final long timeoutMillis;
     private final SuccessPredicate successPredicate;
+    private final CheckedKind checkedKind;
+    private final Path leanProject;
+    private final Path evidenceRoot;
+    private enum CheckedKind { NONE, LEAN, Z3 }
+
 
     public ProverExecutor(List<String> command, String toolName, String artifactSuffix) {
         this(command, toolName, artifactSuffix, Duration.ofMillis(DEFAULT_TIMEOUT_MILLIS), defaultSuccess());
@@ -51,6 +56,9 @@ public final class ProverExecutor {
         Objects.requireNonNull(artifactSuffix, "artifactSuffix");
         Objects.requireNonNull(timeout, "timeout");
         Objects.requireNonNull(successPredicate, "successPredicate");
+        this.checkedKind = CheckedKind.NONE;
+        this.leanProject = null;
+        this.evidenceRoot = null;
         this.command = List.copyOf(command);
         this.toolName = toolName;
         this.artifactSuffix = artifactSuffix;
@@ -58,11 +66,45 @@ public final class ProverExecutor {
         this.successPredicate = successPredicate;
     }
 
+    private ProverExecutor(CheckedKind kind, Path project, Path evidence) {
+        this.checkedKind = kind;
+        this.leanProject = project;
+        this.evidenceRoot = Objects.requireNonNull(evidence).toAbsolutePath().normalize();
+        this.toolName = kind == CheckedKind.LEAN ? "lean4" : "smtlib2";
+        this.command = List.of();
+        this.artifactSuffix = "";
+        this.timeoutMillis = 20_000L;
+        this.successPredicate = defaultSuccess();
+    }
+
+    /** Only factory-created, semantically checked backends can grant proof status. */
+    boolean checksMathematicalEvidence() { return checkedKind != CheckedKind.NONE; }
+
+    /** Re-evaluated for each queued request; formal proof statuses are never replayed from this key. */
+    public String cacheIdentity() {
+        String configuration;
+        if (checkedKind == CheckedKind.LEAN) {
+            configuration = leanProject == null ? "unconfigured"
+                : new de.regelsuche.solver.portfolio.LeanSolverBackend(leanProject, evidenceRoot).configurationHash();
+        } else if (checkedKind == CheckedKind.Z3) {
+            var detected = de.regelsuche.solver.portfolio.Z3SmtSolverBackend.detectSystemZ3();
+            configuration = detected.availability() + "\n"
+                + detected.backend().descriptor().backendVersion() + "\n"
+                + detected.backend().configurationHash();
+        } else {
+            configuration = command + "\n" + artifactSuffix + "\n" + timeoutMillis
+                + "\n" + successPredicate.getClass().getName();
+        }
+        return "proof-cache/v2/" + toolName + "/"
+            + de.regelsuche.solver.ir.SolverIr.sha256(checkedKind + "\n" + configuration);
+    }
+
     public String toolName() {
         return toolName;
     }
 
     public ProverExecutionResult execute(String artifact) {
+        if (checksMathematicalEvidence()) return checkedExecute(artifact, null);
         Path scriptFile;
         try {
             scriptFile = Files.createTempFile("regelsuche_prover_", artifactSuffix);
@@ -154,7 +196,7 @@ public final class ProverExecutor {
         long duration = System.currentTimeMillis() - start;
         boolean ok = successPredicate.isSuccess(exitCode, stdout, stderr);
         return new ProverExecutionResult(
-            ok ? ProverExecutionResult.Status.PROVER_CONFIRMED : ProverExecutionResult.Status.PROVER_FAILED,
+            ok ? ProverExecutionResult.Status.PROCESS_SUCCEEDED : ProverExecutionResult.Status.PROVER_FAILED,
             exitCode,
             stdout,
             stderr,
@@ -171,42 +213,82 @@ public final class ProverExecutor {
         }
     }
 
-    /**
-     * @return a {@link ProverExecutor} for the Lean 4 elaborator
-     *         ({@code lean}). Success is exit code 0 with no error/warning
-     *         containing {@code "sorry"} (so a {@code sorry}-only skeleton is
-     *         not counted as proved).
-     */
+    /** Uses a configured, pinned Lean/mathlib project; never falls back to a raw exit check. */
     public static ProverExecutor lean() {
-        return new ProverExecutor(
-            List.of("lean"),
-            "lean4",
-            ".lean",
-            Duration.ofSeconds(20),
-            (exit, out, err) -> exit == 0 && !(out + err).toLowerCase().contains("sorry")
-        );
+        String project = System.getProperty("regelsuche.lean.project", System.getenv("REGELSUCHE_LEAN_PROJECT"));
+        return new ProverExecutor(CheckedKind.LEAN,
+            project == null || project.isBlank() ? null : Path.of(project), defaultEvidence());
     }
 
-    /** @return a {@link ProverExecutor} for {@code z3 -smt2 <file>}. */
-    public static ProverExecutor z3() {
-        return new ProverExecutor(
-            List.of("z3", "-smt2"),
-            "smtlib2",
-            ".smt2",
-            Duration.ofSeconds(20),
-            (exit, out, err) -> exit == 0 && out.toLowerCase().contains("unsat")
-        );
+    public static ProverExecutor lean(Path project, Path evidenceRoot) {
+        return new ProverExecutor(CheckedKind.LEAN, Objects.requireNonNull(project), evidenceRoot);
     }
 
-    /** @return a {@link ProverExecutor} for {@code cvc5 --lang=smt2 <file>}. */
+    public static ProverExecutor z3() { return z3(defaultEvidence()); }
+    public static ProverExecutor z3(Path evidenceRoot) {
+        return new ProverExecutor(CheckedKind.Z3, null, evidenceRoot);
+    }
+
+    /** Raw cvc5 transport. It does not grant proof status without a checked artifact adapter. */
     public static ProverExecutor cvc5() {
-        return new ProverExecutor(
-            List.of("cvc5", "--lang=smt2"),
-            "smtlib2",
-            ".smt2",
-            Duration.ofSeconds(20),
-            (exit, out, err) -> exit == 0 && out.toLowerCase().contains("unsat")
-        );
+        return new ProverExecutor(List.of("cvc5", "--lang=smt2"), "smtlib2", ".smt2",
+            Duration.ofSeconds(20), (exit, out, err) -> exit == 0);
+    }
+
+    private static Path defaultEvidence() {
+        return Path.of(System.getProperty("regelsuche.proof.evidence", "proof-evidence"));
+    }
+
+    ProverExecutionResult executeBound(String artifact, de.regelsuche.solver.ir.SolverIr.Obligation expected) {
+        return checksMathematicalEvidence() ? checkedExecute(artifact, Objects.requireNonNull(expected)) : execute(artifact);
+    }
+
+    private ProverExecutionResult checkedExecute(String artifact,
+            de.regelsuche.solver.ir.SolverIr.Obligation expected) {
+        long start = System.currentTimeMillis();
+        try {
+            var request = checkedKind == CheckedKind.LEAN
+                ? de.regelsuche.solver.portfolio.LeanSolverBackend.readArtifact(artifact)
+                : de.regelsuche.solver.portfolio.SmtProofArtifacts.readArtifact(artifact);
+            if (expected != null && !request.contentHash().equals(expected.contentHash()))
+                throw new IllegalArgumentException("artifact does not match the current goal and premises");
+            de.regelsuche.solver.ir.SolverExecution execution;
+            Path directory;
+            if (checkedKind == CheckedKind.LEAN) {
+                if (leanProject == null) return result(ProverExecutionResult.Status.PROVER_NOT_AVAILABLE,
+                    -1, "", "Configure a pinned Lean/mathlib project", start);
+                var attempt = new de.regelsuche.solver.portfolio.LeanSolverBackend(leanProject, evidenceRoot)
+                    .executeWithEvidence(request);
+                execution = attempt.execution(); directory = attempt.directory();
+            } else {
+                var detection = de.regelsuche.solver.portfolio.Z3SmtSolverBackend.detectSystemZ3();
+                if (detection.availability() != de.regelsuche.solver.portfolio.BackendAvailability.AVAILABLE)
+                    return result(ProverExecutionResult.Status.PROVER_NOT_AVAILABLE, -1, "", detection.detail(), start);
+                var attempt = detection.backend().executeWithEvidence(request, evidenceRoot);
+                execution = attempt.execution(); directory = attempt.directory();
+            }
+            var answer = execution.result();
+            boolean bound = execution.obligationHash().equals(request.contentHash())
+                && answer.goalHash().equals(request.goalHash())
+                && answer.assumptionsHash().equals(request.assumptionsHash());
+            boolean proved = bound && answer.status() == de.regelsuche.solver.ir.SolverIr.ResultStatus.CONFIRMED
+                && answer.translationStatus() == de.regelsuche.solver.ir.SolverIr.TranslationStatus.LOSSLESS
+                && answer.translationIssues().isEmpty() && !answer.certificateHash().isEmpty();
+            ProverExecutionResult.Status status = proved ? ProverExecutionResult.Status.PROVER_CONFIRMED
+                : answer.status() == de.regelsuche.solver.ir.SolverIr.ResultStatus.TIMEOUT
+                    ? ProverExecutionResult.Status.PROVER_TIMEOUT : ProverExecutionResult.Status.PROVER_FAILED;
+            return result(status, proved ? 0 : -1,
+                answer.toCanonicalJson() + "\nEvidence: " + directory,
+                proved ? "" : answer.message(), start);
+        } catch (Exception failure) {
+            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+            return result(ProverExecutionResult.Status.PROVER_FAILED, -1, "", failure.toString(), start);
+        }
+    }
+
+    private ProverExecutionResult result(ProverExecutionResult.Status status, int exit,
+                                         String out, String err, long start) {
+        return new ProverExecutionResult(status, exit, out, err, System.currentTimeMillis() - start, toolName);
     }
 
     private static SuccessPredicate defaultSuccess() {

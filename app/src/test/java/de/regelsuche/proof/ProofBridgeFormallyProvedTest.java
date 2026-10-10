@@ -52,7 +52,7 @@ class ProofBridgeFormallyProvedTest {
     }
 
     @Test
-    void proofBridgeOnlyMarksProvedAfterSuccessfulExecution(@TempDir Path tempDir) throws IOException {
+    void rawSuccessfulExecutionStillDoesNotEstablishAProof(@TempDir Path tempDir) throws IOException {
         // 1. Without executor: bridge generates the script and exports the
         //    artifact, but does NOT mark the candidate as formally proved.
         ProofBridgeService noExecutor = new ProofBridgeService(stubBridge(), tempDir);
@@ -86,7 +86,7 @@ class ProofBridgeFormallyProvedTest {
             < CandidateProofStatus.FORMALLY_PROVED.ordinal(),
             "failed proofs must not promote to FORMALLY_PROVED");
 
-        // 3. With a successful executor: candidate is finally lifted.
+        // 3. Even successful transport does not provide checked proof evidence.
         ProverExecutor success = new ProverExecutor(
             List.of("true"),
             "lean4",
@@ -97,8 +97,8 @@ class ProofBridgeFormallyProvedTest {
         ProofBridgeService confirmingService = new ProofBridgeService(stubBridge(), null, success);
         ProofBridgeService.ProofAttemptOutcome confirmed = confirmingService.attemptWithDetails(
             baseline(), List.of());
-        assertEquals(ProverExecutionResult.Status.PROVER_CONFIRMED, confirmed.execution().status());
-        assertEquals(CandidateProofStatus.FORMALLY_PROVED, confirmed.candidate().proofStatus(),
-            "successful execution must lift candidate to FORMALLY_PROVED");
+        assertEquals(ProverExecutionResult.Status.PROCESS_SUCCEEDED, confirmed.execution().status());
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, confirmed.candidate().proofStatus(),
+            "successful raw execution must not lift a candidate to FORMALLY_PROVED");
     }
 }

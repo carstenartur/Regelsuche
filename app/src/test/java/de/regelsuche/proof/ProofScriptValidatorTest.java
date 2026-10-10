@@ -83,15 +83,15 @@ class ProofScriptValidatorTest {
     }
 
     @Test
-    void scriptGeneratedByLeanBridgeContainsSorry() {
+    void generatedTypedLeanArtifactIsStructurallyCompleteButNotYetExecuted() {
         LeanProofBridge bridge = new LeanProofBridge();
         ProofBridge.ProofAttempt attempt = bridge.prove("a + b", "b + a",
             java.util.List.of());
         ProofScriptValidator.ValidationResult result =
             ProofScriptValidator.validate(attempt.artifact(), attempt.tool());
-        // The skeleton generator always emits sorry — this is expected and
-        // confirms that SCRIPT_GENERATED never satisfies a proof policy.
-        assertTrue(result.hasAdmittedStatement(),
-            "LeanProofBridge skeleton should contain sorry (admitted statement)");
+        // Structural validity alone still does not authorize FORMALLY_PROVED.
+        assertTrue(result.isValid());
+        assertFalse(result.hasAdmittedStatement());
+        assertFalse(attempt.artifact().contains("sorry"));
     }
 }

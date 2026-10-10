@@ -263,9 +263,51 @@ jobs:
             regelsuche-learning/build/test-results/**
           if-no-files-found: error
 
+  checked-proofs:
+    name: Checked Lean and SMT proof authority
+    if: github.event_name != 'create'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      REGELSUCHE_REAL_LEAN: 'true'
+      REGELSUCHE_LEAN_PROJECT: ${{ github.workspace }}/.ci/lean-proof
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with: { distribution: temurin, java-version: '25', verify-signature: true }
+      - name: Retain the exact proof-authority source
+        run: git archive --format=zip --output=/tmp/checked-proof-source.zip HEAD
+      - name: Install the pinned Lean and mathlib reference environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends elan z3
+          cd .ci/lean-proof
+          lake update
+          lake exe cache get
+          lake env lean --version
+      - name: Check native contracts and actual application proof admission
+        run: >-
+          mvn -B -pl app -am
+          -Dtest=CheckedLeanProofTest,CheckedLeanRealTest,CheckedProofBridgeTest,CheckedProofBridgeRealTest,ProofCacheAdmissionTest,ProofJobSchedulerTest,LeanProofBridgeTest,SmtProofBridgeTest,ProverExecutorAndBridgeTest,ProofBridgeServiceTest,ProofBridgeFormallyProvedTest,ProofWorkerTest,ProofScriptValidatorTest,UnifiedMathDomainWorkbenchTest,WebWorkbenchServerTest,Z3SmtSolverBackendTest
+          -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Retain all proof inputs, outputs and failed-attempt evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: checked-proof-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            /tmp/checked-proof-source.zip
+            regelsuche-solver-portfolio/target/checked-proof/
+            regelsuche-solver-portfolio/target/surefire-reports/
+            app/target/checked-proof/
+            app/target/surefire-reports/
+            .ci/lean-proof/lake-manifest.json
+          if-no-files-found: error
+
   verification:
     name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
-    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison, typed-external-polynomial-comparison]
+    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs]
     if: >-
       ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
     runs-on: ubuntu-22.04
@@ -273,7 +315,7 @@ jobs:
     steps:
       - name: Reject incomplete verification authority
         if: >-
-          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success')) }}
+          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success')) }}
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Download project-parallel Gradle coverage evidence

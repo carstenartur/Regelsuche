@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.solver.ir.CoreExpressionIrAdapter;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.portfolio.SmtProofArtifacts;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -107,10 +110,23 @@ class ProofDockerImageIntegrationTest {
             .GET()
             .build());
         assertEquals(200, proof.statusCode(), proof::body);
-        assertTrue(proof.body().contains("; left  : a^4 + 4*b^4"), proof::body);
-        assertTrue(proof.body().contains("(* (* (* a a) a) a)"), proof::body);
+        // Decode and re-render the returned artifact: comments or a matching
+        // status cannot stand in for the exact submitted goal and premises.
+        var obligation = SmtProofArtifacts.readArtifact(proof.body());
+        var expressions = new CoreExpressionIrAdapter();
+        assertEquals(SolverIr.Relation.EQUALS, obligation.goal().relation());
+        assertEquals(expressions.parse("a^4 + 4*b^4"), obligation.goal().left());
+        assertEquals(expressions.parse(
+            "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)"),
+            obligation.goal().right());
+        assertTrue(obligation.assumptions().isEmpty());
+        assertEquals(SolverIr.RequestedEvidence.FORMAL_PROOF,
+            obligation.requestedEvidence());
+        assertTrue(proof.body().contains("(^ a 4)"), proof::body);
+        assertTrue(proof.body().contains("(^ b 4)"), proof::body);
         assertFalse(proof.body().contains("(pow "), proof::body);
         assertTrue(proof.body().contains("(check-sat)"), proof::body);
+        assertTrue(proof.body().contains("(get-proof)"), proof::body);
 
         JsonNode metadata = JSON.readTree(readArtifact(jobId, "metadata.json"));
         assertEquals("FORMALLY_PROVED", metadata.path("status").asText(),

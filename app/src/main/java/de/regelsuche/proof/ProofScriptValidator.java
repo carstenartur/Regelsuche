@@ -39,6 +39,18 @@ public final class ProofScriptValidator {
             violations.add("empty-script");
             return new ValidationResult(violations);
         }
+        try {
+            if (script.startsWith(de.regelsuche.solver.portfolio.LeanSolverBackend.ENVELOPE)) {
+                de.regelsuche.solver.portfolio.LeanSolverBackend.readArtifact(script);
+                return new ValidationResult(List.of()); // structural check, not execution
+            }
+            if (script.startsWith(de.regelsuche.solver.portfolio.SmtProofArtifacts.ENVELOPE)) {
+                de.regelsuche.solver.portfolio.SmtProofArtifacts.readArtifact(script);
+                return new ValidationResult(List.of());
+            }
+        } catch (IllegalArgumentException invalid) {
+            return new ValidationResult(List.of("edited-typed-proof-artifact"));
+        }
         String effectiveTool = tool == null ? "" : tool;
         boolean foundAdmitted = false;
         boolean foundPlaceholder = false;

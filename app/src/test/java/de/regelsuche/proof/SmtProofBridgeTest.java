@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
+import de.regelsuche.solver.ir.CoreExpressionIrAdapter;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.portfolio.SmtProofArtifacts;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -28,7 +31,7 @@ class SmtProofBridgeTest {
     }
 
     @Test
-    void expandsIntegralPowersForSophieGermainIdentity() {
+    void representsIntegralPowersWithTheirSmtArithmeticSemantics() {
         SmtProofBridge bridge = new SmtProofBridge();
 
         ProofBridge.ProofAttempt attempt = bridge.prove(
@@ -41,22 +44,32 @@ class SmtProofBridgeTest {
         String artifact = attempt.artifact();
         assertTrue(artifact.contains("(declare-const a Real)"));
         assertTrue(artifact.contains("(declare-const b Real)"));
-        assertTrue(artifact.contains("(* (* (* a a) a) a)"));
-        assertTrue(artifact.contains("(* b b)"));
+        assertTrue(artifact.contains("(^ a 4)"));
+        assertTrue(artifact.contains("(^ b 2)"));
+        var obligation = SmtProofArtifacts.readArtifact(artifact);
+        var expressions = new CoreExpressionIrAdapter();
+        assertEquals(SolverIr.Relation.EQUALS, obligation.goal().relation());
+        assertEquals(expressions.parse("a^4 + 4*b^4"), obligation.goal().left());
+        assertEquals(expressions.parse(
+            "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)"),
+            obligation.goal().right());
+        assertTrue(obligation.assumptions().isEmpty());
+        assertEquals(SolverIr.RequestedEvidence.FORMAL_PROOF,
+            obligation.requestedEvidence());
         assertFalse(artifact.contains("(declare-fun pow"));
         assertFalse(artifact.contains("(pow "));
         assertTrue(artifact.contains("(check-sat)"));
     }
 
     @Test
-    void declaresFallbackPowWithCorrectBinaryArity() {
+    void rejectsSymbolicPowersRatherThanInventingTheirSemantics() {
         SmtProofBridge bridge = new SmtProofBridge();
 
         ProofBridge.ProofAttempt attempt = bridge.prove("a^n", "pow(a,n)", List.of());
 
         String artifact = attempt.artifact();
-        assertTrue(artifact.contains("(declare-fun pow (Real Real) Real)"));
-        assertTrue(artifact.contains("(pow a n)"));
+        assertEquals(CandidateProofStatus.OBSERVED, attempt.status());
+        assertTrue(artifact.contains("Unsupported SMT"));
         assertFalse(artifact.contains("(declare-fun pow (Real) Real)"));
     }
 
@@ -86,6 +99,6 @@ class SmtProofBridgeTest {
             "a / b",
             List.of(Assumption.nonZero("b"))
         );
-        assertTrue(attempt.artifact().contains("(distinct b 0)"));
+        assertTrue(attempt.artifact().contains("(not (= b 0))"));
     }
 }

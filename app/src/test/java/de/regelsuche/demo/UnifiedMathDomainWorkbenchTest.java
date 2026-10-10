@@ -184,10 +184,10 @@ class UnifiedMathDomainWorkbenchTest {
         // generated as a script) so the UI can render it.
         assertNotNull(execution.proofOutcome(),
             "proof bridge must be invoked when a service is configured");
-        assertEquals(CandidateProofStatus.FORMALLY_PROVED, execution.proofStatus(),
-            "successful executor must lift the candidate to FORMALLY_PROVED");
-        assertTrue(execution.formallyProved(),
-            "DemoExecution.formallyProved() must return true after PROVER_CONFIRMED");
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, execution.proofStatus(),
+            "transport-only execution does not establish a proof");
+        org.junit.jupiter.api.Assertions.assertFalse(execution.formallyProved(),
+            "the UI must not display transport success as a mathematical proof");
         assertTrue(execution.proofArtifact().isPresent(),
             "the generated proof script must be exposed for the UI");
     }
