@@ -1,0 +1,56 @@
+name: Qualify selected search derivations
+on:
+  push:
+    branches: [diagnostic/search-derivation-20261010]
+permissions:
+  contents: read
+concurrency:
+  group: selected-search-derivation-qualification
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ac8ab6df53115edd17d0a3e40e7bafda17a54ec6
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Test exact source with the ordinary SDK reactor
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = ac8ab6df53115edd17d0a3e40e7bafda17a54ec6
+          test -z "$(git status --porcelain)"
+          mvn -B -ntp -Psdk-release -pl regelsuche-optimization-sdk -am test > "$RUNNER_TEMP/sdk.log" 2>&1 || { tail -100 "$RUNNER_TEMP/sdk.log"; exit 1; }
+          grep -E 'Tests run:|BUILD SUCCESS|ACTUAL_SEARCH_DERIVATION' "$RUNNER_TEMP/sdk.log" | tail -45
+      - name: Summarize actual JUnit reports
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as E
+          totals = dict.fromkeys(('tests','failures','errors','skipped'), 0)
+          for path in sorted(Path('regelsuche-optimization-sdk/target/surefire-reports').glob('TEST-*.xml')):
+              root=E.parse(path).getroot()
+              for key in totals: totals[key] += int(root.get(key,'0'))
+              for case in root.findall('testcase'):
+                  for tag in ('failure','error'):
+                      failure=case.find(tag)
+                      if failure is not None: print(path.name, case.get('name'), failure.get('message'))
+          print('SDK_JUNIT_TOTALS', totals)
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: selected-search-derivation-${{ github.run_id }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/sdk.log
+            regelsuche-optimization-sdk/target/surefire-reports/**
