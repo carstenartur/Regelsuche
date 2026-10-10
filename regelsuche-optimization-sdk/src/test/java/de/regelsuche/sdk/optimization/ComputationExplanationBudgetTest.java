@@ -71,7 +71,7 @@ class ComputationExplanationBudgetTest {
 
     private static OptimizationRequest withWork(OptimizationRequest original, long maximum) {
         var budget = original.budget();
-        return new OptimizationRequest(original.plan(), original.sourceTrace(), original.enabledKinds(),
+        return new OptimizationRequest(original.plan(), original.sourceTrace(), original.selectedKinds(),
                 original.semanticsRevision(), original.assumptions(), original.safetyProfile(), original.goal(),
                 new OptimizationBudget(maximum, budget.maximumStates(), budget.maximumCandidates(), budget.timeoutMillis()),
                 original.checkedPolicy());
