@@ -17,6 +17,9 @@ import org.junit.jupiter.api.Test;
 class CheckedSchemaCursorTest {
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private static final String PAIR = "((a+b)*(a-b)+b*b)+((c+d)*(c-d)+d*d)";
+    // Separate the retained historical numeric failure from semantic diagnostics.
+    // This is the public corpus's predeclared ample ceiling, not an economic comparison.
+    private static final long DIAGNOSTIC_WORK = 1_000_000_000;
     private static CheckedLearnedSchemaModel model;
     private static String schemaId;
 
@@ -138,7 +141,16 @@ class CheckedSchemaCursorTest {
     @Test void nativeStagedFrontierUsesTheSameCursorOrderingAndClosesItsReceipts() {
         var selected=plan(model);Expr source=parse(PAIR);
         Expr goal=CODEC.decodeExpression(eager(PAIR).moves().getFirst().transformation().transformedExpression());
-        var context=TypedMoveSearch.Context.frozen(goal);var budget=new MoveSearch.Budget(0,1,100000,10,1000000);
+        var context=TypedMoveSearch.Context.frozen(goal);
+        var historical=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(selected.nativeProvider()),
+            MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,new MoveSearch.Budget(0,1,100000,10,1000000)),
+            SearchContinuationContract.PATH_SENSITIVE);
+        assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,historical.observedOutcome());
+        assertTrue(historical.totalWork()>historical.workBudget());
+        assertFalse(historical.withinBudget());assertFalse(historical.accountingComplete());
+        assertTrue(historical.cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+        System.out.println("P04_SCHEMA_HISTORICAL_FRONTIER total="+historical.totalWork()+" budget="+historical.workBudget());
+        var budget=new MoveSearch.Budget(0,1,100000,10,DIAGNOSTIC_WORK);
         var legacy=new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,context,List.of(selected.provider()),
             MovePriorityPolicy.INVENTORY_ORDER,model.verifier(),s->0,MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget));
         var result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(selected.nativeProvider()),
@@ -161,14 +173,23 @@ class CheckedSchemaCursorTest {
     @Test void nativeStagedSourceOnlyFinalReplayAndPartialBudgetRetainPrepaidWork() {
         var provider=plan(model).nativeProvider();Expr source=parse(PAIR);
         var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
-        var verifier=NativeVerifier.registered(List.of(provider));var checks=new NativeTestObservation.Checks(verifier);
-        var problem=new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,
-            new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,checks);
-        try(var transport=AstTransportObservation.open()) {
-        var quality=new NativeMoveSearch().searchUntil(problem,NativeTestObservation.Objective.DEPTH,0,SearchContinuationContract.PATH_SENSITIVE);
-        assertFalse(quality.withinBudget());assertTrue(quality.totalWork()<=quality.workBudget());assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);
-        assertTrue(quality.search().cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
-        assertEquals(0,transport.total(),"checked schema generation, selection, admission and final replay must stay native");
+        for(long workBudget:List.of(1_000_000L,DIAGNOSTIC_WORK)) {
+            var verifier=NativeVerifier.registered(List.of(provider));var checks=new NativeTestObservation.Checks(verifier);
+            var problem=new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,
+                new MoveSearch.Budget(0,1,100000,10,workBudget),NativeMovePriorityPolicy.INVENTORY_ORDER,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,checks);
+            try(var transport=AstTransportObservation.open()) {
+                var quality=new NativeMoveSearch().searchUntil(problem,NativeTestObservation.Objective.DEPTH,0,SearchContinuationContract.PATH_SENSITIVE);
+                assertFalse(quality.withinBudget());
+                if(workBudget==1_000_000L) {
+                    assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,quality.search().observedOutcome());
+                    assertTrue(quality.totalWork()>quality.workBudget());
+                    System.out.println("P04_SCHEMA_HISTORICAL_QUALITY total="+quality.totalWork()+" budget="+quality.workBudget());
+                } else {
+                    assertTrue(quality.totalWork()<=quality.workBudget());assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);
+                }
+                assertTrue(quality.search().cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+                assertEquals(0,transport.total(),"checked schema generation, selection, admission and final replay must stay native");
+            }
         }
         boolean abandoned=false;var observedBudgets=new ArrayList<String>();
         long previousBudget=0, unpaidBudget=0, paidBudget=-1;

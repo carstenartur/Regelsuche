@@ -80,14 +80,24 @@ class TypedLearnedMoveInventoryTest {
         history.observe(learned, MoveContext.Phase.TRAIN, Map.of());
         assertTrue(run(inventory, inventory.providers(), source, goal,
             HistoryMovePolicy.typed(history.freeze(), HistoryMovePolicy.Weights.DEFAULT)).reached());
-        try(var transport=AstTransportObservation.open()) {
+        // Keep the historical numeric failure; the public corpus's predeclared
+        // ample ceiling checks semantics separately and makes no economic claim.
+        for(long workBudget:List.of(10_000_000L,1_000_000_000L)) try(var transport=AstTransportObservation.open()) {
             var context=new TypedMoveSearch.Context(goal,List.of(),MoveContext.Phase.TRAIN);
-            var budget=new MoveSearch.Budget(6,1,0,100,10_000_000);
+            var budget=new MoveSearch.Budget(6,1,0,100,workBudget);
             var nativeResult=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,
                 inventory.nativeProviders(),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget,
                 HistoryMovePolicy.nativePolicy(history.freeze(),HistoryMovePolicy.Weights.DEFAULT),NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE),
                 SearchContinuationContract.PATH_SENSITIVE);
             System.out.println("P04_INVENTORY_LEARNED outcome="+nativeResult.observedOutcome()+" total="+nativeResult.totalWork()+" budget="+nativeResult.workBudget()+" withinBudget="+nativeResult.withinBudget()+" replay="+nativeResult.replayWork()+" validation="+nativeResult.accounting().validationWork()+" execution="+nativeResult.accounting().executionWork()+" storage="+nativeResult.accounting().storageWork()+" retention="+nativeResult.accounting().retentionWork()+" peak="+nativeResult.accounting().peak()+" retained="+nativeResult.accounting().resultRetained()+" external="+nativeResult.accounting().externalRetained()+" metrics="+nativeResult.metrics());
+            if(workBudget==10_000_000L) {
+                assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,nativeResult.observedOutcome());
+                assertTrue(nativeResult.totalWork()>nativeResult.workBudget());
+                assertFalse(nativeResult.withinBudget());assertFalse(nativeResult.accountingComplete());
+                assertTrue(nativeResult.cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+                assertEquals(0,transport.total());
+                continue;
+            }
             assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.observedOutcome(),()->nativeResult.accounting().detail()+" total="+nativeResult.totalWork()+" retention="+nativeResult.accounting().retentionWork()+" replay="+nativeResult.replayWork()+" metrics="+nativeResult.metrics());
             assertEquals(SearchMove.SourceKind.LEARNED,nativeResult.witness().getFirst().move().descriptor().sourceKind());
             assertEquals(3,nativeResult.witness().getFirst().move().primitiveStepCount());

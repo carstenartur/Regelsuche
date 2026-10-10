@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.regelsuche.ast.*;
+import de.regelsuche.retention.RetainedJson;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.symbol.SymbolId;
 import de.regelsuche.transform.AstRewriteTransport;
@@ -24,8 +26,10 @@ final class AstReplayJson {
     private ObjectNode write(Expr expression, int depth, int[] nodes) {
         visit(depth, nodes);
         Objects.requireNonNull(expression, "expression");
-        var node = de.regelsuche.retention.RetainedJson.object(mapper);
-        try(var retained=de.regelsuche.retention.RetainedJson.active()?de.regelsuche.retention.RetainedOperation.retain(node):null) {
+        var node = RetainedJson.object(mapper);
+        var retained = RetainedJson.active() ? RetainedOperation.retain(node) : null;
+        Throwable primary = null;
+        try {
         switch (expression) {
             case NumberExpr number -> {
                 // Bound conversion of arbitrarily large in-memory values before decimal rendering.
@@ -33,11 +37,13 @@ final class AstReplayJson {
                         || number.value().denominator().bitLength() > 4 * CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS) {
                     throw new IllegalArgumentException("AST replay numeric literal is too large");
                 }
-                node.put("type", "number").put("value", text(number.value().canonicalText()));
+                node.put("type", "number");
+                putRenderedText(node, "value", number.value().canonicalText());
             }
             case VariableExpr variable -> {
                 if (variable.symbol().isPresent()) {
-                    node.put("type", "symbol").put("id", text(variable.symbol().orElseThrow().canonicalText()));
+                    node.put("type", "symbol");
+                    putRenderedText(node, "id", variable.symbol().orElseThrow().canonicalText());
                 } else node.put("type", "variable").put("name", text(variable.name()));
             }
             case BinaryExpr binary -> {
@@ -54,7 +60,44 @@ final class AstReplayJson {
                 function.arguments().forEach(argument -> arguments.add(write(argument, depth + 1, nodes)));
             }
         }
-        return de.regelsuche.retention.RetainedOperation.produced(node);
+        return RetainedOperation.produced(node);
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            throw failure;
+        } finally {
+            close(retained, primary);
+        }
+    }
+
+    /** A fresh rendering belongs to the exporter before validation can debit or reject it. */
+    private void putRenderedText(ObjectNode node, String field, String value) {
+        if (!RetainedJson.active()) {
+            node.put(field, text(value));
+            return;
+        }
+        var retained = RetainedOperation.retainCompleted(1L + value.length(), value);
+        Throwable primary = null;
+        try {
+            node.put(field, text(value));
+            RetainedOperation.work(1); // completed handoff to the already retained JSON node
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            try { RetainedOperation.checkpoint(); }
+            catch (RuntimeException | Error observation) {
+                if (observation != failure) failure.addSuppressed(observation);
+            }
+            throw failure;
+        } finally {
+            close(retained, primary);
+        }
+    }
+
+    private static void close(RetainedOperation.Frame retained, Throwable primary) {
+        if (retained == null) return;
+        try { retained.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (primary == null) throw cleanup;
+            if (cleanup != primary) primary.addSuppressed(cleanup);
         }
     }
 

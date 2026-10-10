@@ -146,13 +146,13 @@ public final class RetainedJson {
     }
     private static final NodeFactory NODES=new NodeFactory();
     private static final class ObjectValue extends ObjectNode implements RetainedGraph.View {
-        ObjectValue(){super(NODES,new LinkedHashMap<>());RetainedOperation.work(2);}
+        ObjectValue(){super(NODES,new LinkedHashMap<>());try(var allocated=RetainedOperation.retainCompleted(2,this)) {}}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(_children);}
     }
     private static final class ArrayValue extends ArrayNode implements RetainedGraph.View {
         private final ArrayList<JsonNode> owned;
         ArrayValue(){this(new ArrayList<>());}
-        private ArrayValue(ArrayList<JsonNode> values){super(NODES,values);owned=values;RetainedOperation.work(2);}
+        private ArrayValue(ArrayList<JsonNode> values){super(NODES,values);owned=values;try(var allocated=RetainedOperation.retainCompleted(2,this)) {}}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(owned);v.reference(owned);}
     }
     private static final class TextOutput extends Writer implements RetainedGraph.View {

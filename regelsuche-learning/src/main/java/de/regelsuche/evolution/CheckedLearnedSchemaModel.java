@@ -542,7 +542,21 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             String schemaId,String proofHash,String domain,Expr source,Expr target,List<Integer> path,Map<String,Expr> substitutions,
             long applicationWork,String modelHash) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(checkerRevision);v.reference(inventorySemanticsHash);v.reference(modelId);v.reference(schemaId);v.reference(proofHash);v.reference(domain);v.reference(source);v.reference(target);v.reference(path);v.reference(substitutions);v.reference(modelHash);}
-        public ApplicationData { path=List.copyOf(path);substitutions=de.regelsuche.retention.RetainedSortedMap.copyOf(substitutions); }
+        public ApplicationData {
+            Object[] copies=new Object[2];
+            var retained=RetainedOperation.retainCompleted(1,revision,checkerRevision,inventorySemanticsHash,modelId,
+                schemaId,proofHash,domain,source,target,path,substitutions,modelHash,copies);
+            Throwable primary=null;
+            try {
+                var originalPath=path;
+                path=List.copyOf(path);copies[0]=path;
+                completedEvidenceWork(path==originalPath?1:path.size()+1L);
+                substitutions=de.regelsuche.retention.RetainedSortedMap.copyOf(substitutions);copies[1]=substitutions;
+                completedEvidenceWork(substitutions.size()+2L);
+            } catch(RuntimeException | Error failure) {
+                primary=failure;observeImportFailure(failure);throw failure;
+            } finally {closeReplayFrame(retained,primary);}
+        }
     }
     static final class VerifiedApplication implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(data);v.reference(binding);}
@@ -550,7 +564,10 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         private final ExactTheoryEvidence.Binding binding;
         private VerifiedApplication(ApplicationData data,String encodedSource){this.data=data;binding=encodedSource==null?null:renderEvidence(data,encodedSource);}
         ExactTheoryEvidence.Binding binding(){return binding==null?renderEvidence(data,CODEC.encodeExpression(data.source())):binding;}
-        NativeExactTheoryEvidence.Binding nativeBinding(){return new NativeExactTheoryEvidence.Binding(data.source(),data.target(),data.schemaId(),data.applicationWork(),data);}
+        NativeExactTheoryEvidence.Binding nativeBinding(){
+            var result=new NativeExactTheoryEvidence.Binding(data.source(),data.target(),data.schemaId(),data.applicationWork(),data);
+            try(var retained=RetainedOperation.retainCompleted(1,this,result)){return result;}
+        }
     }
     private VerifiedApplication apply(Schema schema, Expr source, String encodedSource,
             List<Integer> path, Map<String, Expr> substitutions, Work work) {
@@ -643,24 +660,53 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
 
     private VerifiedApplication evidence(Schema schema,Expr source,String encodedSource,Expr target,
             List<Integer> path,Map<String,Expr> substitutions,Work work) {
-        return new VerifiedApplication(new ApplicationData(APPLICATION_REVISION,CHECKER_REVISION,inventorySemanticsHash,descriptor.id(),
-            schema.id(),schema.proofHash(),DOMAIN,source,target,path,substitutions,work.units,modelHash),encodedSource);
+        Object[] products=new Object[2];
+        var retained=RetainedOperation.retainCompleted(1,this,schema,source,encodedSource,target,path,substitutions,work,products);
+        Throwable primary=null;
+        try {
+            var data=new ApplicationData(APPLICATION_REVISION,CHECKER_REVISION,inventorySemanticsHash,descriptor.id(),
+                schema.id(),schema.proofHash(),DOMAIN,source,target,path,substitutions,work.units,modelHash);
+            products[0]=data;completedEvidenceWork(1);
+            var verified=new VerifiedApplication(data,encodedSource);
+            products[1]=verified;completedEvidenceWork(1);
+            return verified;
+        } catch(RuntimeException | Error failure) {
+            primary=failure;observeImportFailure(failure);throw failure;
+        } finally {closeReplayFrame(retained,primary);}
     }
     private static ExactTheoryEvidence.Binding renderEvidence(ApplicationData data,String encodedSource) {
         de.regelsuche.search.program.AstTransportObservation.record(de.regelsuche.search.program.AstTransportObservation.Operation.EVIDENCE_JSON_WRITE);
-        String encodedTarget=CODEC.encodeExpression(data.target());
-        var evidence=de.regelsuche.retention.RetainedJson.object(JSON).put("schema",data.revision()).put("checkerRevision",data.checkerRevision())
-            .put("inventorySemanticsHash",data.inventorySemanticsHash()).put("modelId",data.modelId())
-            .put("schemaId",data.schemaId()).put("proofHash",data.proofHash()).put("domain",data.domain())
-            .put("source",encodedSource).put("target",encodedTarget);
-        try(var retained=de.regelsuche.retention.RetainedOperation.retain(data,encodedSource,encodedTarget,evidence)) {
-        var positions=evidence.putArray("path");data.path().forEach(positions::add);
-        var bindings=evidence.putArray("bindings");data.substitutions().forEach((name,value)->bindings.addObject()
-            .put("name",name).put("expression",CODEC.encodeExpression(value)));
-        evidence.put("applicationWork",data.applicationWork());String canonical=write(evidence);
-        return new ExactTheoryEvidence.Binding(encodedSource,encodedTarget,data.schemaId(),SchematicProofPlan.hash(canonical),
-            data.proofHash(),data.modelHash(),data.applicationWork(),canonical);
-        }
+        Object[] products=new Object[5];
+        var retained=RetainedOperation.retainCompleted(1,data,encodedSource,products);
+        Throwable primary=null;
+        try {
+            String encodedTarget=CODEC.encodeExpression(data.target());
+            products[0]=encodedTarget;completedEvidenceWork(1);
+            var evidence=de.regelsuche.retention.RetainedJson.object(JSON).put("schema",data.revision()).put("checkerRevision",data.checkerRevision())
+                .put("inventorySemanticsHash",data.inventorySemanticsHash()).put("modelId",data.modelId())
+                .put("schemaId",data.schemaId()).put("proofHash",data.proofHash()).put("domain",data.domain())
+                .put("source",encodedSource).put("target",encodedTarget);
+            products[1]=evidence;completedEvidenceWork(1);
+            var positions=evidence.putArray("path");data.path().forEach(positions::add);
+            var bindings=evidence.putArray("bindings");data.substitutions().forEach((name,value)->bindings.addObject()
+                .put("name",name).put("expression",CODEC.encodeExpression(value)));
+            evidence.put("applicationWork",data.applicationWork());String canonical=write(evidence);
+            products[2]=canonical;completedEvidenceWork(1);
+            String hash=SchematicProofPlan.hash(canonical);
+            products[3]=hash;completedEvidenceWork(1);
+            var binding=new ExactTheoryEvidence.Binding(encodedSource,encodedTarget,data.schemaId(),hash,
+                data.proofHash(),data.modelHash(),data.applicationWork(),canonical);
+            products[4]=binding;completedEvidenceWork(1);
+            return binding;
+        } catch(RuntimeException | Error failure) {
+            primary=failure;observeImportFailure(failure);throw failure;
+        } finally {closeReplayFrame(retained,primary);}
+    }
+
+    /** Added mechanical ownership work; the recorded mathematical application work is unchanged. */
+    private static void completedEvidenceWork(long units) {
+        RetainedOperation.work(units);
+        RetainedOperation.checkpoint();
     }
 
     /** Checks one supplied occurrence and substitution; never enumerates primitive paths or other sites. */

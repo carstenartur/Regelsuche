@@ -31,7 +31,7 @@ class NativeTargetFreeWorkspaceBrowserTest {
             try (var browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true))) {
                 System.out.println("nativeWorkspaceBrowserVersion=" + browser.version());
                 System.out.println("nativeWorkspacePlaywrightJar=" + Playwright.class.getProtectionDomain().getCodeSource().getLocation());
-                assertTrue(browser.version().startsWith("148."), "requires the pinned Chromium 148 browser");
+                assertTrue(browser.version().startsWith("153."), "requires the pinned Chromium 153 browser");
                 var page = browser.newPage(new Browser.NewPageOptions().setViewportSize(1360, 1000));
                 page.onPageError(errors::add);
                 page.navigate("http://127.0.0.1:" + server.boundPort() + "/#run=" + result.workspace().runId().substring(7));

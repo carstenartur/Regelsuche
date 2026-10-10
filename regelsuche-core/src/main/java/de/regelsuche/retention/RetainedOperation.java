@@ -19,6 +19,8 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
     private boolean closed;
     private RetainedOperation(Sink sink){this.sink=Objects.requireNonNull(sink);previous=CURRENT.get();sink.executionWork(1);CURRENT.set(this);}
     public static RetainedOperation open(Sink sink){return new RetainedOperation(sink);}
+    /** Representation helpers preserve their historical unobserved execution path. */
+    public static boolean isObserved(){return CURRENT.get()!=null;}
     public static long observedWork(){var scope=CURRENT.get();return scope==null?0:scope.sink.observedWork();}
     public static void work(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.executionWork(units);}
     public static void validation(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.validationWork(units);}

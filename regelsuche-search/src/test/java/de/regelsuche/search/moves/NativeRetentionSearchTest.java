@@ -39,7 +39,7 @@ class NativeRetentionSearchTest {
         var target=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),MoveSearch.Mode.FAST,
             MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000));
         var engine=new NativeMoveSearch();var result=engine.search(target,SearchContinuationContract.PATH_SENSITIVE);
-        assertTrue(assertDoesNotThrow(result::accounting).observationsComplete());assertFalse(result.accounting().complete());assertEquals("regelsuche.native-expr-move-search/v5-partial-structural-index",result.workRevision());
+        assertTrue(assertDoesNotThrow(result::accounting).observationsComplete());assertFalse(result.accounting().complete());assertEquals("regelsuche.native-expr-move-search/v7-partial-atomic-ownership",result.workRevision());
         var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION),List.of(),
             target.mode(),target.scheduling(),target.budget());
         for(var quality:List.of(engine.searchUntil(problem,DepthObjective.INSTANCE,1,SearchContinuationContract.PATH_SENSITIVE),

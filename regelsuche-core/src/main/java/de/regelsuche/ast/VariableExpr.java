@@ -42,16 +42,20 @@ public final class VariableExpr implements Expr {
         return Optional.ofNullable(symbol);
     }
 
+    // Core identity avoids allocating an Optional while inspecting a value label.
+    SymbolId identitySymbol() { return symbol; }
+
     @Override
     public boolean equals(Object other) {
+        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.same(this, other);
         if (this == other) return true;
         if (!(other instanceof VariableExpr variable)) return false;
-        return symbol == null ? variable.symbol == null && name.equals(variable.name)
-            : symbol.equals(variable.symbol);
+        return symbol == null ? variable.symbol == null && name.equals(variable.name) : symbol.equals(variable.symbol);
     }
 
     @Override
     public int hashCode() {
+        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.valueHash(this);
         return symbol == null ? name.hashCode() : symbol.hashCode();
     }
 

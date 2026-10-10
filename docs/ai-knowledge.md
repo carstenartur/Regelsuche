@@ -157,6 +157,49 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted predecessor for checked solver integration (2026-10-09)
+
+The baseline is the exact generated snapshot of accepted main
+`ae6b36eae23ed96aed2f0815442ab67634f87065`, tree
+`eb052f81047973154d99105273de5851b0c9b9a3`, integrated by PR #1076.
+Its byte-identical source PR passed all six authorities and `ciCheck` in
+[run 37938454239](https://github.com/carstenartur/Regelsuche/actions/runs/37938454239).
+The fresh complete unchanged old-baseline gate measured 682835 tokens, +13970
+against 668865, below the unchanged 15000 allowance. Eight coverage controls
+and seventeen hotspot checks passed with the pinned v0.1.10 extractor.
+
+[Provenance](../ai-knowledge/baseline-history/2026-10-09-mainae6b36e/provenance.json)
+and the [independent review](../ai-knowledge/baseline-history/2026-10-09-mainae6b36e/independent-review.md)
+bind the actual plugin policy, selectors, source inventories and raw reports.
+The active baseline is byte-identical to the
+[accepted snapshot](../ai-knowledge/baseline-history/2026-10-09-mainae6b36e/metrics-snapshot.json),
+SHA256 `47ca2375967a95763395ad65bad1bff60a0f8e82ed9246684b0ea8dfea2f28ef`.
+The first local run included two ignored working notes and was rejected; its
+683195-token output and the failed PR #1068 trend remain in the raw-report
+archive. Neither supplied baseline values. No threshold, selector, exception
+or mathematical proof rule changed. The subsequent
+[main CI](https://github.com/carstenartur/Regelsuche/actions/runs/37943010886)
+also passed all six authorities and `ciCheck`. Final-head PR CI remains a
+separate integration gate; this promotion does not complete P04.
+
+### Accepted predecessor for the checked-proof bridge (2026-10-06)
+
+The earlier proposal in PR #1078 used accepted main `d1270b9b8c652340ed3abb895c1a24bb68cb5899`,
+tree `dbfdb5919db388d876779259e4571307ba86a58a`. Its
+[main CI](https://github.com/carstenartur/Regelsuche/actions/runs/37475603053)
+passed all mandatory authorities and `Checkout-local ciCheck`; the hosted
+`ciCheck` ran the complete unchanged old-baseline `aiKnowledgeCheck` with the
+pinned v0.1.10 extractor: 682415 estimated tokens, +13550 against 668865, below
+the unchanged 15000 allowance; all eight coverage controls and seventeen hotspot
+checks passed. The `repository-verification` archive was downloaded and its
+SHA256 matched the API-reported digest. The [provenance](../ai-knowledge/baseline-history/2026-10-06-maind1270b9b-provenance.json)
+binds source, policy, artifact and copied-report hashes. That proposal is byte-identical
+to the [accepted snapshot](../ai-knowledge/baseline-history/2026-10-06-maind1270b9b-metrics-snapshot.json).
+The [failed PR trend](../ai-knowledge/baseline-history/2026-10-06-pr-2910951144-rejected-trend.json)
+(684225 tokens, +15360 against the former baseline, +1810 against the accepted
+predecessor) remains retained and supplies no baseline values. Thresholds,
+selectors and exceptions are unchanged.
+
 ### Accepted predecessor for the P04 continuation (2026-09-29)
 
 The baseline advances to accepted main `ab48fb0a47eec12cb63c30de253de50d2a72db1c`,

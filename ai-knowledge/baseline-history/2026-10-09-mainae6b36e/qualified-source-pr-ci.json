@@ -1,0 +1,834 @@
+{
+  "qualifiedHead": "151826e648da62784574573b0980da42d3b68beb",
+  "qualifiedTree": "eb052f81047973154d99105273de5851b0c9b9a3",
+  "mergeCommit": "ae6b36eae23ed96aed2f0815442ab67634f87065",
+  "parents": [
+    "8a98a14e6713225801832918befd7c12d5cb74ba",
+    "151826e648da62784574573b0980da42d3b68beb"
+  ],
+  "workflow": {
+    "id": 37938454239,
+    "name": "CI",
+    "node_id": "WFR_kwLOSiJVMM8AAAAI1U7e3w",
+    "head_branch": "codex/p04-validation-retention-20261009",
+    "head_sha": "151826e648da62784574573b0980da42d3b68beb",
+    "path": ".github/workflows/gradle.yml",
+    "display_title": "fix(search): retain and pay direct AST validation work (P04 continuation)",
+    "run_number": 5994,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "workflow_id": 282724469,
+    "check_suite_id": 102791385539,
+    "check_suite_node_id": "CS_kwDOSiJVMM8AAAAX7tgRww",
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/37938454239",
+    "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/37938454239",
+    "pull_requests": [
+      {
+        "url": "https://api.github.com/repos/carstenartur/Regelsuche/pulls/1076",
+        "id": 4801208481,
+        "number": 1076,
+        "head": {
+          "ref": "codex/p04-validation-retention-20261009",
+          "sha": "151826e648da62784574573b0980da42d3b68beb",
+          "repo": {
+            "id": 1243764016,
+            "url": "https://api.github.com/repos/carstenartur/Regelsuche",
+            "name": "Regelsuche"
+          }
+        },
+        "base": {
+          "ref": "main",
+          "sha": "8a98a14e6713225801832918befd7c12d5cb74ba",
+          "repo": {
+            "id": 1243764016,
+            "url": "https://api.github.com/repos/carstenartur/Regelsuche",
+            "name": "Regelsuche"
+          }
+        }
+      }
+    ],
+    "created_at": "2026-10-09T13:39:54Z",
+    "updated_at": "2026-10-09T14:14:18Z",
+    "actor": {
+      "login": "carstenartur",
+      "id": 3164220,
+      "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/carstenartur",
+      "html_url": "https://github.com/carstenartur",
+      "followers_url": "https://api.github.com/users/carstenartur/followers",
+      "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+      "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+      "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+      "repos_url": "https://api.github.com/users/carstenartur/repos",
+      "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 1,
+    "referenced_workflows": [],
+    "run_started_at": "2026-10-09T13:39:54Z",
+    "triggering_actor": {
+      "login": "carstenartur",
+      "id": 3164220,
+      "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/carstenartur",
+      "html_url": "https://github.com/carstenartur",
+      "followers_url": "https://api.github.com/users/carstenartur/followers",
+      "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+      "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+      "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+      "repos_url": "https://api.github.com/users/carstenartur/repos",
+      "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/37938454239/jobs",
+    "logs_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/37938454239/logs",
+    "check_suite_url": "https://api.github.com/repos/carstenartur/Regelsuche/check-suites/102791385539",
+    "artifacts_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/37938454239/artifacts",
+    "cancel_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/37938454239/cancel",
+    "rerun_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/37938454239/rerun",
+    "previous_attempt_url": null,
+    "workflow_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/workflows/282724469",
+    "head_commit": {
+      "id": "151826e648da62784574573b0980da42d3b68beb",
+      "tree_id": "eb052f81047973154d99105273de5851b0c9b9a3",
+      "message": "fix(search): account direct AST validation scratch and failed attempts\n\nKeep P04 partial and the existing budgets, verifier and legacy interfaces unchanged.",
+      "timestamp": "2026-10-09T13:39:19Z",
+      "author": {
+        "name": "Carsten Hammer",
+        "email": "carsten.hammer@t-online.de"
+      },
+      "committer": {
+        "name": "Carsten Hammer",
+        "email": "carsten.hammer@t-online.de"
+      }
+    },
+    "repository": {
+      "id": 1243764016,
+      "node_id": "R_kgDOSiJVMA",
+      "name": "Regelsuche",
+      "full_name": "carstenartur/Regelsuche",
+      "private": false,
+      "owner": {
+        "login": "carstenartur",
+        "id": 3164220,
+        "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/carstenartur",
+        "html_url": "https://github.com/carstenartur",
+        "followers_url": "https://api.github.com/users/carstenartur/followers",
+        "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+        "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+        "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+        "repos_url": "https://api.github.com/users/carstenartur/repos",
+        "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/carstenartur/Regelsuche",
+      "description": "Experimental mathematics and symbolic discovery platform for rewrite search, equality saturation, hypothesis mining, counterexample search, proof workflows, and reproducible mathematical exploration. Regelsuche treats mathematics not as a collection of algorithms, but as a searchable game of transformations.",
+      "fork": false,
+      "url": "https://api.github.com/repos/carstenartur/Regelsuche",
+      "forks_url": "https://api.github.com/repos/carstenartur/Regelsuche/forks",
+      "keys_url": "https://api.github.com/repos/carstenartur/Regelsuche/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/carstenartur/Regelsuche/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/carstenartur/Regelsuche/teams",
+      "hooks_url": "https://api.github.com/repos/carstenartur/Regelsuche/hooks",
+      "issue_events_url": "https://api.github.com/repos/carstenartur/Regelsuche/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/carstenartur/Regelsuche/events",
+      "assignees_url": "https://api.github.com/repos/carstenartur/Regelsuche/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/carstenartur/Regelsuche/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/carstenartur/Regelsuche/tags",
+      "blobs_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/carstenartur/Regelsuche/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/carstenartur/Regelsuche/languages",
+      "stargazers_url": "https://api.github.com/repos/carstenartur/Regelsuche/stargazers",
+      "contributors_url": "https://api.github.com/repos/carstenartur/Regelsuche/contributors",
+      "subscribers_url": "https://api.github.com/repos/carstenartur/Regelsuche/subscribers",
+      "subscription_url": "https://api.github.com/repos/carstenartur/Regelsuche/subscription",
+      "commits_url": "https://api.github.com/repos/carstenartur/Regelsuche/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/carstenartur/Regelsuche/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/carstenartur/Regelsuche/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/carstenartur/Regelsuche/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/carstenartur/Regelsuche/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/carstenartur/Regelsuche/merges",
+      "archive_url": "https://api.github.com/repos/carstenartur/Regelsuche/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/carstenartur/Regelsuche/downloads",
+      "issues_url": "https://api.github.com/repos/carstenartur/Regelsuche/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/carstenartur/Regelsuche/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/carstenartur/Regelsuche/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/carstenartur/Regelsuche/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/carstenartur/Regelsuche/labels{/name}",
+      "releases_url": "https://api.github.com/repos/carstenartur/Regelsuche/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/carstenartur/Regelsuche/deployments"
+    },
+    "head_repository": {
+      "id": 1243764016,
+      "node_id": "R_kgDOSiJVMA",
+      "name": "Regelsuche",
+      "full_name": "carstenartur/Regelsuche",
+      "private": false,
+      "owner": {
+        "login": "carstenartur",
+        "id": 3164220,
+        "node_id": "MDQ6VXNlcjMxNjQyMjA=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/3164220?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/carstenartur",
+        "html_url": "https://github.com/carstenartur",
+        "followers_url": "https://api.github.com/users/carstenartur/followers",
+        "following_url": "https://api.github.com/users/carstenartur/following{/other_user}",
+        "gists_url": "https://api.github.com/users/carstenartur/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/carstenartur/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/carstenartur/subscriptions",
+        "organizations_url": "https://api.github.com/users/carstenartur/orgs",
+        "repos_url": "https://api.github.com/users/carstenartur/repos",
+        "events_url": "https://api.github.com/users/carstenartur/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/carstenartur/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/carstenartur/Regelsuche",
+      "description": "Experimental mathematics and symbolic discovery platform for rewrite search, equality saturation, hypothesis mining, counterexample search, proof workflows, and reproducible mathematical exploration. Regelsuche treats mathematics not as a collection of algorithms, but as a searchable game of transformations.",
+      "fork": false,
+      "url": "https://api.github.com/repos/carstenartur/Regelsuche",
+      "forks_url": "https://api.github.com/repos/carstenartur/Regelsuche/forks",
+      "keys_url": "https://api.github.com/repos/carstenartur/Regelsuche/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/carstenartur/Regelsuche/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/carstenartur/Regelsuche/teams",
+      "hooks_url": "https://api.github.com/repos/carstenartur/Regelsuche/hooks",
+      "issue_events_url": "https://api.github.com/repos/carstenartur/Regelsuche/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/carstenartur/Regelsuche/events",
+      "assignees_url": "https://api.github.com/repos/carstenartur/Regelsuche/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/carstenartur/Regelsuche/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/carstenartur/Regelsuche/tags",
+      "blobs_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/carstenartur/Regelsuche/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/carstenartur/Regelsuche/languages",
+      "stargazers_url": "https://api.github.com/repos/carstenartur/Regelsuche/stargazers",
+      "contributors_url": "https://api.github.com/repos/carstenartur/Regelsuche/contributors",
+      "subscribers_url": "https://api.github.com/repos/carstenartur/Regelsuche/subscribers",
+      "subscription_url": "https://api.github.com/repos/carstenartur/Regelsuche/subscription",
+      "commits_url": "https://api.github.com/repos/carstenartur/Regelsuche/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/carstenartur/Regelsuche/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/carstenartur/Regelsuche/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/carstenartur/Regelsuche/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/carstenartur/Regelsuche/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/carstenartur/Regelsuche/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/carstenartur/Regelsuche/merges",
+      "archive_url": "https://api.github.com/repos/carstenartur/Regelsuche/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/carstenartur/Regelsuche/downloads",
+      "issues_url": "https://api.github.com/repos/carstenartur/Regelsuche/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/carstenartur/Regelsuche/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/carstenartur/Regelsuche/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/carstenartur/Regelsuche/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/carstenartur/Regelsuche/labels{/name}",
+      "releases_url": "https://api.github.com/repos/carstenartur/Regelsuche/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/carstenartur/Regelsuche/deployments"
+    }
+  },
+  "jobs": [
+    {
+      "id": 113846398257,
+      "name": "Typed source-only learning comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run typed comparison and independent verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run checked-schema fresh-process lifecycle comparison",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Retain every outcome and test receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ]
+    },
+    {
+      "id": 113846398363,
+      "name": "External polynomial comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run the checkout-owned polynomial pilot and independent verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Retain complete evidence including negative outcomes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Post Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        }
+      ]
+    },
+    {
+      "id": 113846398409,
+      "name": "Isolated JMH authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install isolated benchmark prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run every JMH benchmark and fail-closed validator",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Retain isolated JMH evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ]
+    },
+    {
+      "id": 113846398580,
+      "name": "Checkout-local Gradle authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install checkout prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run the checkout-owned Gradle authority without duplicate JMH or loaded SymPy runtime work",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Retain Gradle verification evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ]
+    },
+    {
+      "id": 113846398654,
+      "name": "Isolated SymPy runtime authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install isolated SymPy runtime prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run the complete Gradle SymPy runtime test authority",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Retain isolated SymPy runtime evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ]
+    },
+    {
+      "id": 113846399190,
+      "name": "Complete Maven product and Docker authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install independent Maven checkout prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Verify the complete Maven product and Docker contract",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Retain Maven product verification evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        }
+      ]
+    },
+    {
+      "id": 113846399727,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 113846400034,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 113846400794,
+      "name": "Retained JMH precision study analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 113846400883,
+      "name": "Retained JMH precision study v2 analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 113860614642,
+      "name": "Checkout-local ciCheck",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Reject incomplete verification authority",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 2
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Download project-parallel Gradle coverage evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Download isolated SymPy coverage evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Download isolated JMH acceptance evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Verify complete cross-authority coverage",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Collect complete checkout-owned quality acceptance evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Retain quality acceptance index and bound source files",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Retain converged coverage evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Record complete verification authority",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        }
+      ]
+    },
+    {
+      "id": 113860809398,
+      "name": "Publish generated reports",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 37938454239,
+      "logs_url": null,
+      "steps": null
+    }
+  ],
+  "independentReview": "No Critical, Important or Minor findings; source-bound evidence packet",
+  "githubReview": "0 open findings, no unresolved threads",
+  "evidenceCommit": "321dfef46184f4ca5fb5e818595cdfa144f4c3bd",
+  "p04Complete": false
+}

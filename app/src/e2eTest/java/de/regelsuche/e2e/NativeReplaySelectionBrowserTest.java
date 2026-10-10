@@ -45,7 +45,7 @@ class NativeReplaySelectionBrowserTest {
         server.start();
         playwright = Playwright.create();
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
-        assertTrue(browser.version().startsWith("148."), "requires the checkout-pinned Chromium 148");
+        assertTrue(browser.version().startsWith("153."), "requires the checkout-pinned Chromium 153");
         System.out.println("nativeReplaySelectionBrowser=" + browser.version());
         System.out.println("nativeReplaySelectionPlaywright=" + Playwright.class.getProtectionDomain().getCodeSource().getLocation());
         page = browser.newPage(new Browser.NewPageOptions().setViewportSize(1360, 1000));

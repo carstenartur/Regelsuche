@@ -64,11 +64,14 @@ class PolynomialTemporaryOwnershipTest {
     @Test void sortingOwnsBothProducedKeysAndTheirActualTextBuffers(){
         var parser=new de.regelsuche.parse.ExpressionParser();
         var source=parser.parseTerm("x*y+u*v");var observation=sourceObservation(source);
+        var expected=parser.parseTerm("u*v+x*y");
         observation.wantedSortKeys=Set.of("u*v","x*y");
+        Expr actual;
         try(var scope=RetainedOperation.open(observation)){
             observation.scope=scope;
-            assertEquals(parser.parseTerm("u*v+x*y"),new PolynomialNormalizer().normalize(source).orElseThrow());
+            actual=new PolynomialNormalizer().normalize(source).orElseThrow();
         }
+        assertEquals(expected,actual);
         assertTrue(observation.sawSortKeys,"both real comparator keys overlap, including the first while building the second");
         assertTrue(observation.sortCopiesOverlap,"finished key Strings overlap their actual populated buffers");
         assertFalse(observation.missingInput);assertTrue(observation.work>12);
@@ -77,15 +80,18 @@ class PolynomialTemporaryOwnershipTest {
     @Test void sortingCanAbortAfterProducingKeysWithoutLosingTheirWorkOrOwners(){
         var parser=new de.regelsuche.parse.ExpressionParser();
         var source=parser.parseTerm("x*y+u*v");var observation=sourceObservation(source);
+        var expected=parser.parseTerm("u*v+x*y");
         observation.wantedSortKeys=Set.of("u*v","x*y");observation.abortAtSortKeys=true;
+        Expr actual;
         try(var scope=RetainedOperation.open(observation)){
             observation.scope=scope;
             assertThrows(CoefficientLimit.class,()->new PolynomialNormalizer().normalize(source));
             assertTrue(observation.sawSortKeys);assertTrue(observation.sortCopiesOverlap);
             assertFalse(observation.missingInput);assertTrue(observation.work>12);
             observation.abortAtSortKeys=false;
-            assertEquals(parser.parseTerm("u*v+x*y"),new PolynomialNormalizer().normalize(source).orElseThrow());
+            actual=new PolynomialNormalizer().normalize(source).orElseThrow();
         }
+        assertEquals(expected,actual);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().characters());
     }
     @Test void reusedVariablePowerStillPaysAndOwnsItsInputAndOptionalHandoff(){
@@ -131,9 +137,11 @@ class PolynomialTemporaryOwnershipTest {
     }
     @Test void singleFactorRenderingDoesNotAllocateAFactorList(){
         var source=new VariableExpr("x");var observation=sourceObservation(source);
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
+            observation.scope=scope;actual=new PolynomialNormalizer().normalize(source);
         }
+        assertEquals(Optional.of(source),actual);
         assertEquals(0,observation.renderedFactors,"one emitted variable needs no factor list or AST fold");
         assertTrue(observation.optionalEnvelope);assertFalse(observation.missingInput);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
@@ -143,9 +151,11 @@ class PolynomialTemporaryOwnershipTest {
         var source=new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,new BinaryExpr(x,BinaryOperator.ADD,y));
         var expected=new BinaryExpr(new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,x),BinaryOperator.SUB,y);
         var observation=sourceObservation(source);
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(Optional.of(expected),new PolynomialNormalizer().normalize(source));
+            observation.scope=scope;actual=new PolynomialNormalizer().normalize(source);
         }
+        assertEquals(Optional.of(expected),actual);
         assertEquals(2,observation.simultaneousPowers,"negating coefficients needs no copied variable powers or multiplication by a constant monomial");
         assertTrue(observation.work>0);assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
@@ -181,7 +191,9 @@ class PolynomialTemporaryOwnershipTest {
         for(var expression:List.of(new BinaryExpr(sum,BinaryOperator.MUL,sum),new BinaryExpr(sum,BinaryOperator.POW,new NumberExpr(3)))){
             var expected=normalizer.normalize(expression);assertTrue(expected.isPresent());
             var observation=new Observation();
-            try(var scope=RetainedOperation.open(observation)){observation.scope=scope;assertEquals(expected,normalizer.normalize(expression));}
+            Optional<Expr> actual;
+            try(var scope=RetainedOperation.open(observation)){observation.scope=scope;actual=normalizer.normalize(expression);}
+            assertEquals(expected,actual);
             assertTrue(observation.simultaneousTerms>=3,"left/right polynomial terms and the actual accumulating map overlap");
             assertTrue(observation.work>0);assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
         }
@@ -200,18 +212,22 @@ class PolynomialTemporaryOwnershipTest {
             BinaryOperator.MUL,new VariableExpr("z"));
         var normalizer=new PolynomialNormalizer();var expected=normalizer.normalize(product);
         var observation=new Observation();
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(expected,normalizer.normalize(product));
+            observation.scope=scope;actual=normalizer.normalize(product);
         }
+        assertEquals(expected,actual);
         assertEquals(3,observation.renderedFactors,"the actual three rendered Expr factors survive until the AST fold finishes");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
     @Test void actualOptionalResultEnvelopeOverlapsItsRenderedExpression(){
         var source=new VariableExpr("x");var normalizer=new PolynomialNormalizer();
         var expected=normalizer.normalize(source);var observation=new Observation();
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(expected,normalizer.normalize(source));
+            observation.scope=scope;actual=normalizer.normalize(source);
         }
+        assertEquals(expected,actual);
         assertTrue(observation.optionalEnvelope,"normalization constructs an Optional owner before handing off the Expr");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
@@ -231,7 +247,9 @@ class PolynomialTemporaryOwnershipTest {
         var source=new BinaryExpr(new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y")),BinaryOperator.POW,new NumberExpr(3));
         var normalizer=new PolynomialNormalizer();var expected=normalizer.normalize(source);
         var observation=sourceObservation(source);
-        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;assertEquals(expected,normalizer.normalize(source));}
+        Optional<Expr> actual;
+        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;actual=normalizer.normalize(source);}
+        assertEquals(expected,actual);
         assertFalse(observation.missingInput,"the outer input owner covers every actual nested checkpoint");
         assertTrue(observation.simultaneousTerms>=3);assertTrue(observation.optionalEnvelope);
         assertEquals(0,observation.sourceOnlyFrames,"recursive visits do not allocate frames for already-owned immutable source nodes");
@@ -250,9 +268,11 @@ class PolynomialTemporaryOwnershipTest {
 
     @Test void completedPolynomialTakesItsExclusiveAccumulatorWithoutCopyingIt(){
         var source=new VariableExpr("x");var observation=sourceObservation(source);
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
+            observation.scope=scope;actual=new PolynomialNormalizer().normalize(source);
         }
+        assertEquals(Optional.of(source),actual);
         assertEquals(1,observation.simultaneousTerms,"one private monomial accumulator becomes the completed polynomial's terms");
         assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
@@ -261,9 +281,11 @@ class PolynomialTemporaryOwnershipTest {
         var sum=new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y"));
         var source=new BinaryExpr(sum,BinaryOperator.SUB,sum);var normalizer=new PolynomialNormalizer();
         var before=normalizer.normalize(sum);var observation=sourceObservation(source);
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(Optional.of(new NumberExpr(0)),normalizer.normalize(source));
+            observation.scope=scope;actual=normalizer.normalize(source);
         }
+        assertEquals(Optional.of(new NumberExpr(0)),actual);
         assertTrue(observation.simultaneousTerms>=3,"separate left/right and accumulating maps still overlap");
         assertFalse(observation.missingInput);assertEquals(before,normalizer.normalize(sum));
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
@@ -281,9 +303,11 @@ class PolynomialTemporaryOwnershipTest {
 
     @Test void singletonMonomialTakesItsImmutablePowersWithoutACopy(){
         var source=new VariableExpr("x");var observation=sourceObservation(source);
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
+            observation.scope=scope;actual=new PolynomialNormalizer().normalize(source);
         }
+        assertEquals(Optional.of(source),actual);
         assertEquals(1,observation.simultaneousPowers,"the private monomial keeps its original immutable singleton powers");
         assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
@@ -295,9 +319,11 @@ class PolynomialTemporaryOwnershipTest {
         var expected=new BinaryExpr(new BinaryExpr(x,BinaryOperator.POW,new NumberExpr(2)),BinaryOperator.MUL,
             new BinaryExpr(y,BinaryOperator.POW,new NumberExpr(2)));
         var normalizer=new PolynomialNormalizer();var observation=sourceObservation(source);
+        Optional<Expr> actual;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(Optional.of(expected),normalizer.normalize(source));
+            observation.scope=scope;actual=normalizer.normalize(source);
         }
+        assertEquals(Optional.of(expected),actual);
         assertTrue(observation.simultaneousPowers>=3,"both operand powers and a distinct accumulation map remain owned");
         assertEquals(Optional.of(new BinaryExpr(x,BinaryOperator.MUL,y)),normalizer.normalize(xy));
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());

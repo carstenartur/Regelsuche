@@ -20,6 +20,7 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private long executionWork;
     private long validationWork,retentionWork,peakNodes,peakCharacters,peakReferences;
     private boolean complete=true;
+    private boolean resultAssembly;
     private String detail="";
     NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){
         this(problem,store,limits,false);
@@ -42,10 +43,31 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     @Override public void executionWork(long units){if(units<0)throw new IllegalArgumentException("negative native work");executionWork=Math.addExact(executionWork,units);}
     @Override public void validationWork(long units){if(units<0)throw new IllegalArgumentException("negative validation work");validationWork=Math.addExact(validationWork,units);}
     void validate(Expr expression){AstExpressionValidation.inspect(expression);}
+    /** Input observation can fail before the frontier owns the session. Its first checkpoint
+     * transports the recorded failure through the existing result/receipt path. */
+    void validateInputs() {
+        try {
+            validate(problem.source());
+            if (problem.context().goal() != null) validate(problem.context().goal());
+        } catch (SearchExecution.ResourceLimit exhausted) {
+            executionWork(exhausted.takeWork().total());
+            incomplete("NATIVE_RESOURCE_LIMIT");
+        }
+    }
     long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}
     @Override public long observedWork(){return work();}
     boolean complete(){return complete;}
-    @Override public void checkpoint(){observe(this,true);}
+    @Override public void checkpoint(){observe(this,!resultAssembly);}
+    /** Only the already finite metadata graph may finish after a recorded limit.
+     * Observations, failed peaks and work remain paid; no successful flag is restored. */
+    void beginResultAssembly() {
+        if(resultAssembly)throw new IllegalStateException("nested native result assembly");
+        resultAssembly=true;executionWork(1);
+    }
+    void endResultAssembly() {
+        if(!resultAssembly)throw new IllegalStateException("native result assembly not active");
+        resultAssembly=false;executionWork(1);
+    }
     void incomplete(String reason){complete=false;if(detail.isEmpty())detail=reason;}
     void fail(String reason){incomplete(reason);throw new SearchExecution.ResourceLimit();}
     private RetainedGraph.Observation observe(Object root,boolean enforce){

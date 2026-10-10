@@ -118,10 +118,11 @@ public final class ComputationOptimizer {
         request.plan().inputs().values().forEach(type -> kinds.add(NumericKind.fromType(type)));
         request.sourceTrace().occurrences().forEach(o -> kinds.add(o.evaluatedKind()));
         target.outputs().forEach(o -> kinds.add(NumericKind.fromType(o.type())));
-        boolean active=request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
-        boolean integral=active&&kinds.stream().anyMatch(NumericKind::integral);
-        boolean fp=active&&kinds.stream().anyMatch(NumericKind::floatingPoint);
         var replacement=SourceEvaluationTrace.fromPlan(target);
+        boolean active=request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
+        boolean integral=active&&(request.sourceTrace().occurrences().stream().anyMatch(o -> o.evaluatedKind().integral())
+            || replacement.occurrences().stream().anyMatch(o -> o.evaluatedKind().integral()));
+        boolean fp=active&&kinds.stream().anyMatch(NumericKind::floatingPoint);
         long checkWork=0;
         // A BigInteger-only fallback has no primitive numerical gate. Receiver
         // guards belong to the source adapter; it must account for their real cost.
