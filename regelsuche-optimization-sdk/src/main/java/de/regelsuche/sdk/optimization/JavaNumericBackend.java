@@ -43,7 +43,10 @@ final class JavaNumericBackend implements ComputationBackend {
             throw new IllegalArgumentException("UNSUPPORTED_BIG_INTEGER_OPERATION");
         long work = op == NumericOperation.MOD_POW ? 1000 : op == NumericOperation.MOD_MULTIPLY ? 10 : kind == NumericKind.BIG_INTEGER ? 4 : 1;
         if (op == NumericOperation.MOD_POW && function.arguments().size() == 3 && function.arguments().get(1) instanceof NumberExpr n && n.value().signum() >= 0)
-            work = Math.max(1, 2L * n.value().numerator().bitLength());
+            // Setup/conversion is not free for a small exponent. The former near-zero
+            // estimate prevented even a directly verified modular square from competing.
+            // This remains a coarse ranking heuristic, not a latency prediction.
+            work = 32L + 2L * n.value().numerator().bitLength();
         return new Operation(function.name(), argumentTypes, kind.type(), work, kind == NumericKind.BIG_INTEGER ? 2 : 1);
     }
     private List<Type> argumentTypes(FunctionExpr function, NumericKind kind, NumericOperation op) {

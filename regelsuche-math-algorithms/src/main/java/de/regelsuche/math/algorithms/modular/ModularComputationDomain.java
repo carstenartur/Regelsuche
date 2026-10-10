@@ -12,7 +12,7 @@ import java.util.*;
  * Proofs use the existing exact Polynomial representation, on the integer affine fragment.
  */
 public final class ModularComputationDomain {
-    public static final String REVISION = "regelsuche.modular-affine-domain/v2";
+    public static final String REVISION = "regelsuche.modular-affine-domain/v3";
     private static final int MAX_NODES = 2_048;
     private static final int MAX_DEPTH = 96;
     public record NormalizedInput(String value, String modulus) {
@@ -110,9 +110,26 @@ public final class ModularComputationDomain {
             if (exponent.exponent().equals(Polynomial.constant(Rational.ONE))
                     && normalized(exponent.base(), exponent.modulus())
                     && !candidates.add(current, exponent.base(), "modpow-unit-normalized")) return false;
+            if (!addSmallConstantPower(current, candidates)) return false;
             if (!addExponentDifferences(current, exponent, powers, candidates)) return false;
         }
         return true;
+    }
+
+    /** Bounded binary exponentiation proposals, still checked by the ordinary modular normal form. */
+    private boolean addSmallConstantPower(FunctionExpr current, Candidates candidates) {
+        if (!(current.arguments().get(1) instanceof NumberExpr number) || !number.value().isInteger()) return true;
+        BigInteger integer = number.value().numerator();
+        if (integer.compareTo(BigInteger.TWO) < 0 || integer.compareTo(BigInteger.valueOf(16)) > 0) return true;
+        int exponent = integer.intValueExact();
+        Expr factor = current.arguments().getFirst(), result = null, modulus = current.arguments().get(2);
+        while (exponent != 0) {
+            candidates.work.units++;
+            if ((exponent & 1) != 0) result = result == null ? factor : new FunctionExpr("modmul", List.of(result, factor, modulus));
+            exponent >>>= 1;
+            if (exponent != 0) factor = new FunctionExpr("modmul", List.of(factor, factor, modulus));
+        }
+        return candidates.add(current, result, "modpow-small-binary-chain");
     }
 
     private boolean addExponentDifferences(FunctionExpr current, Power exponent,

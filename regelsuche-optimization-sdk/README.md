@@ -111,3 +111,12 @@ modular products without introducing a second exponentiation of exponent one.
 This SDK change does not derive constructor-field, loop, or helper-method
 contracts from arbitrary Java code. The complete historic Bouncy Castle #2455
 constructor remains a source-adapter milestone, not a claimed acceptance result.
+
+Small constant modular powers (exponents 2 through 16) additionally propose a
+bounded binary multiplication chain through the existing modular domain. The
+ordinary independent proof still requires a positive modulus; no assumption is
+inferred from a method or variable name. Literal-exponent cost estimates include
+a fixed setup allowance (32 work units plus twice the exponent bit length), so
+a modular square can compete with `modPow`. This is a search-ranking heuristic,
+not a measured latency or a constant-time guarantee; consumers must account for
+their own receiver guards and fallback costs.
