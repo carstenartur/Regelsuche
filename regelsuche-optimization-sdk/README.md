@@ -131,3 +131,30 @@ The previous Candidate constructor remains available and explicitly means unreco
 history. An absent history differs from a recorded zero-edge path (an unchanged value
 graph with a different prepared schedule). Neither is padded with a fabricated rewrite.
 These immutable records are replayable data, not a signed audit log or a timing result.
+
+Small constant modular powers (exponents 2 through 16) additionally propose a
+bounded binary multiplication chain through the existing modular domain. The
+ordinary independent proof still requires a positive modulus; no assumption is
+inferred from a method or variable name. Literal-exponent cost estimates include
+a fixed setup allowance (32 work units plus twice the exponent bit length), so
+a modular square can compete with `modPow`. This is a search-ranking heuristic,
+not a measured latency or a constant-time guarantee; consumers must account for
+their own receiver guards and fallback costs.
+
+
+Plain `BigInteger.mod` now participates in the modular search bridge. A bounded,
+independent multiplicative residue normal form verifies nested reductions,
+computed bases and products with several bases. A reduction can disappear only
+when the result is already normalized for the same positive modulus; a bare
+unreduced product remains inadmissible. Additive subexpressions are treated as
+exact atoms, and nested exponents retain the affine and structural proof bounds.
+
+This allows the small-power candidate to be found inside a larger expression
+such as `x.modPow(TWO, m).add(x).mod(m)`. The adapter must still establish receiver
+and range contracts and account for the cost of any generated guards. In
+particular, removing one `mod` does not necessarily pay for new receiver checks.
+
+An optimizer-produced `Inconclusive` result reports consumed work so adapters can
+charge bounded retries without discarding the entire unused allocation. The old
+single-argument constructor remains available and marks work as unknown (`-1`);
+consumers must conservatively reserve the full allocation for that legacy case.

@@ -45,8 +45,8 @@ public final class ComputationOptimizer {
             // the incomplete status when no improvement was actually proved.
             long beforeFinal=work.used();
             var proof=checker.check(request.plan(),found.plan());
-            if(!proof.accepted()) return new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED");
             long total=Math.max(work.used(),Math.addExact(searchWork,work.used()-beforeFinal));
+            if(!proof.accepted()) return new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED",total);
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",total);
             var obligations=obligations(request,found.plan());
             var cost=cost(request,found.plan(),obligations);
@@ -60,7 +60,7 @@ public final class ComputationOptimizer {
             if(!improved && explorationLimited)
                 return new OptimizationResult.BudgetExceeded("SEARCH_BUDGET_EXCEEDED",total);
             if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
-                return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
+                return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION",total);
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
             var receipt = evidence(request,found.plan(),proof,obligations);
             long beforeDerivation = work.used();

@@ -9,6 +9,48 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class ModularComputationDomainTest {
+    @Test void boundedBinaryPowersRetainReductionAndRequireTheirModulus() {
+        for (int exponent = 2; exponent <= 16; exponent++) {
+            var source = List.of(pow(new NumberExpr(exponent)));
+            var generated = domain().generate(source, 64);
+            var replacement = generated.rewrites().stream().filter(r -> r.rule().equals("modpow-small-binary-chain")).findFirst().orElseThrow();
+            assertTrue(domain().verifyEquivalent(source, replacement.outputs()).accepted());
+            assertFalse(new ModularComputationDomain(Set.of(), Set.of(), Set.of()).verifyEquivalent(source, replacement.outputs()).accepted());
+        }
+        for (int exponent : new int[] {-1, 0, 1, 17, Integer.MAX_VALUE}) {
+            assertTrue(domain().generate(List.of(pow(new NumberExpr(exponent))), 64).rewrites().stream()
+                    .noneMatch(r -> r.rule().equals("modpow-small-binary-chain")));
+        }
+        assertTrue(domain().generate(List.of(pow(new NumberExpr(2))), 1).rewrites().size() <= 1);
+    }
+    @Test void reductionsComposeOnlyUnderTheirOwnPositiveModulus() {
+        Expr reduced = new FunctionExpr("mod", List.of(A, N));
+        Expr nested = new FunctionExpr("mod", List.of(reduced, N));
+        var checker = domain();
+        assertTrue(checker.generate(List.of(nested), 64).rewrites().stream().anyMatch(r -> r.outputs().equals(List.of(reduced))));
+        assertTrue(checker.verifyEquivalent(List.of(nested), List.of(reduced)).accepted());
+        var unnormalized = new ModularComputationDomain(Set.of(), Set.of("N", "M"), Set.of());
+        assertFalse(unnormalized.verifyEquivalent(List.of(nested), List.of(A)).accepted());
+        Expr other = new FunctionExpr("mod", List.of(reduced, new VariableExpr("M")));
+        assertFalse(unnormalized.verifyEquivalent(List.of(other), List.of(reduced)).accepted());
+        assertFalse(new ModularComputationDomain(Set.of(), Set.of(), Set.of()).verifyEquivalent(List.of(nested), List.of(reduced)).accepted());
+    }
+
+    @Test void computedBasesAndMixedProductsHaveBoundedIndependentResidueProofs() {
+        Expr sum = new BinaryExpr(A, ADD, new NumberExpr(1));
+        Expr base = new FunctionExpr("mod", List.of(sum, N));
+        Expr square = new FunctionExpr("modpow", List.of(base, new NumberExpr(2), N));
+        assertTrue(domain().verifyEquivalent(List.of(square), List.of(product(base, base))).accepted());
+        assertFalse(domain().verifyEquivalent(List.of(square), List.of(new BinaryExpr(base, MUL, base))).accepted());
+        assertFalse(domain().verifyEquivalent(List.of(square), List.of(product(base, A))).accepted());
+        Expr negative = new FunctionExpr("modpow", List.of(base, new NumberExpr(-1), N));
+        assertFalse(domain().verifyEquivalent(List.of(negative), List.of(negative)).accepted());
+        Expr deep = A;
+        for (int i = 0; i < 110; i++) deep = new FunctionExpr("mod", List.of(deep, N));
+        assertFalse(domain().verifyEquivalent(List.of(deep), List.of(base)).accepted());
+        assertTrue(domain().generate(List.of(square, new FunctionExpr("mod", List.of(base, N))), 1).rewrites().size() <= 1);
+    }
+
     private static final Expr A = new VariableExpr("a"), X = new VariableExpr("x"), N = new VariableExpr("N");
     private static final Expr XP1 = new BinaryExpr(X, ADD, new NumberExpr(1));
     private static final Expr TWOXP1 = new BinaryExpr(new BinaryExpr(new NumberExpr(2), MUL, X), ADD, new NumberExpr(1));
