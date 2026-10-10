@@ -123,10 +123,17 @@ actual0; the correction transfers the completed regeneration receipt once.
 All16 correction/ownership tests pass, and a fresh full run passes Core1151,
 Search696 and Learning1093 (2940 total, zero failures/errors/skips). The first
 full run's three reflection-fixture failures and the review RED remain retained.
-Frozen public differential, AI quality and hosted head-CI gates remain pending.
-P04 is not complete;
+Fresh MathAlgorithms320 tests also pass. The frozen default-V7 corpus produces
+13 byte-identical JSON outputs in each of two fresh JVMs, including the previous
+diagnostic24/26 and frozen-budget0/26 results; no failure is hidden. AI quality
+passes with the pinned extractor and unchanged thresholds, selectors and baseline.
+The tested source is local `d65456505bfb018d1baa78842ede56f2f2f249de`, published
+as tree-identical `df2b73a4f27badb7a615a2467583dd0f55dbfe0f`. Required hosted CI
+and regular PR review/integration remain pending. P04 is not complete;
 no P05–P12 or economic learning-success claim follows from this checkpoint.
 See [the recovery plan](../superpowers/plans/2026-10-10-native-execution-recovery.md).
+Raw attempts, fresh verification and source history are in
+[the evidence archive](evidence/work-replacement/p04-declared-execution-20261010/README.md).
 
 ### Integrated foundation history
 

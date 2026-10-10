@@ -94,4 +94,14 @@ search completeness cannot manufacture the kernel's bounded relation.
   No deferred review item. Correction GREEN: all16 focused tests pass. Fresh full
   Core1151/Search696/Learning1093 (2940 total) pass with zero failures/errors/skips
   and unchanged source hashes. Four public-corpus protocol tests also pass.
-  Frozen public differential, AI quality and required hosted head CI remain open.
+  Fresh MathAlgorithms320 and all four corpus-protocol tests also pass.
+- Frozen public corpus: two fresh JVMs reproduce all13 JSON outputs byte-for-byte
+  against the published V7 predecessor. All52 rows remain: diagnostic parity24/26,
+  frozen-budget parity0/26, no row errors, internal codec counts zero. These are
+  preserved diagnostic limits, not an execution or economic improvement claim.
+- AI quality gate on d65456505bfb018d1baa78842ede56f2f2f249de passes using pinned
+  extractor v0.1.10 (b409bed957c31d63ce7b6ef37205890f0f0ebd9a): all18 reports fresh,
+  17 hotspot checks pass, no threshold/baseline/selector/exception changed.
+- Corrected source is durably published as df2b73a4f27badb7a615a2467583dd0f55dbfe0f;
+  its tree aeee4597a445d9419ec5e53ce860df1ad4df66cc equals local d65456505b exactly.
+  Required hosted head CI and regular PR review/integration remain open.
