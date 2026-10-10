@@ -30,14 +30,14 @@ class SearchDerivationTest {
     }
     @Test void missingPathCannotExplainAnActuallyChangedPlan() {
         var f = fixture(NumericKind.INT);
-        reject(f, new SearchDerivation(f.candidate.evidence(), 64, List.of()));
+        reject(f, new SearchDerivation(f.candidate.evidence(), 64, f.request.budget().maximumWork(), List.of()));
     }
     @Test void ruleLabelMustBeAnActualGeneratedEdgeNotAFabricatedExplanation() {
         var f = fixture(NumericKind.INT);
         var steps = new ArrayList<>(trace(f).steps());
         var first = steps.getFirst();
         steps.set(0, new SearchDerivation.Step("fabricated-production-demo", first.before(), first.after()));
-        reject(f, new SearchDerivation(f.candidate.evidence(), 64, steps));
+        reject(f, new SearchDerivation(f.candidate.evidence(), 64, f.request.budget().maximumWork(), steps));
     }
     @Test void discontinuousOrChangedEndpointsAreRejected() {
         var f = fixture(NumericKind.INT);
@@ -45,18 +45,18 @@ class SearchDerivationTest {
         var steps = new ArrayList<>(original.steps());
         var first = steps.getFirst();
         steps.set(0, new SearchDerivation.Step(first.rule(), first.after(), first.after()));
-        reject(f, new SearchDerivation(f.candidate.evidence(), 64, steps));
+        reject(f, new SearchDerivation(f.candidate.evidence(), 64, f.request.budget().maximumWork(), steps));
         steps = new ArrayList<>(original.steps());
         var last = steps.getLast();
         Expr wrong = f.request.plan().withOutputs(List.of(JavaExpressions.literal(123))).expression();
         steps.set(steps.size() - 1, new SearchDerivation.Step(last.rule(), last.before(), wrong));
-        reject(f, new SearchDerivation(f.candidate.evidence(), 64, steps));
+        reject(f, new SearchDerivation(f.candidate.evidence(), 64, f.request.budget().maximumWork(), steps));
     }
     @Test void sameEndpointsCannotHideAForgedIntermediate() {
         var f = fixture(NumericKind.INT);
         Expr wrong = f.request.plan().withOutputs(List.of(JavaExpressions.literal(123))).expression();
         String rule = trace(f).steps().getFirst().rule();
-        reject(f, new SearchDerivation(f.candidate.evidence(), 64, List.of(
+        reject(f, new SearchDerivation(f.candidate.evidence(), 64, f.request.budget().maximumWork(), List.of(
                 new SearchDerivation.Step(rule, f.request.plan().expression(), wrong),
                 new SearchDerivation.Step(rule, wrong, f.candidate.plan().expression()))));
     }
@@ -69,10 +69,10 @@ class SearchDerivationTest {
     @Test void derivationCollectionsAreDefensiveAndBounded() {
         var f = fixture(NumericKind.INT);
         var list = new ArrayList<>(trace(f).steps());
-        var copy = new SearchDerivation(f.candidate.evidence(), 64, list);
+        var copy = new SearchDerivation(f.candidate.evidence(), 64, f.request.budget().maximumWork(), list);
         list.clear(); assertFalse(copy.steps().isEmpty());
         assertThrows(UnsupportedOperationException.class, () -> copy.steps().clear());
-        assertThrows(IllegalArgumentException.class, () -> new SearchDerivation(f.candidate.evidence(), 64,
+        assertThrows(IllegalArgumentException.class, () -> new SearchDerivation(f.candidate.evidence(), 64, f.request.budget().maximumWork(),
                 Collections.nCopies(SearchDerivation.MAX_STEPS + 1, copy.steps().getFirst())));
     }
     @Test void cancellationAndInsufficientBudgetCannotReturnPartialExplanation() {

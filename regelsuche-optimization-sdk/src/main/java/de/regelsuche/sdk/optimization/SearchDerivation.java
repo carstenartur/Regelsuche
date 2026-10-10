@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** Selected search edges, not a reconstructed algebra story or a complete primitive expansion. */
-public record SearchDerivation(VerificationEvidence evidence, int candidateLimit, List<Step> steps) {
+public record SearchDerivation(VerificationEvidence evidence, int candidateLimit, long generationBudget, List<Step> steps) {
     public static final int MAX_STEPS = 64;
     public record Step(String rule, Expr before, Expr after) {
         public Step {
@@ -17,7 +17,7 @@ public record SearchDerivation(VerificationEvidence evidence, int candidateLimit
     public SearchDerivation {
         Objects.requireNonNull(evidence);
         steps = List.copyOf(steps);
-        if (steps.size() > MAX_STEPS || candidateLimit < 1 || candidateLimit > 1024)
+        if (steps.size() > MAX_STEPS || candidateLimit < 1 || candidateLimit > 1024 || generationBudget < 1)
             throw new IllegalArgumentException("DERIVATION_STRUCTURAL_BOUND");
     }
 }
