@@ -16,6 +16,8 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -449,9 +451,15 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         }
     }
 
-    private static final class DoubleTermRule extends MetadataRule {
+    private static final class DoubleTermRule extends MetadataRule implements RetainedGraph.View {
         private DoubleTermRule() {
             super(RewriteKind.NORMALIZE, false, 0);
+        }
+
+        @Override
+        public void retainedReferences(RetainedGraph.Visitor visitor) {
+            // This final rule adds no fields; the inherited remaining metadata is scalar.
+            visitor.reference(kind());
         }
 
         @Override
@@ -466,32 +474,65 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
         @Override
         public Expr apply(Expr subtree) {
-            List<Expr> terms = flattenAddition(subtree);
-            int[] indices = findDuplicateTermIndices(terms);
-            if (indices == null) {
-                throw new IllegalArgumentException("Rule does not match subtree");
-            }
-            Expr duplicate = terms.get(indices[0]);
-            List<Expr> rewritten = new ArrayList<>(terms);
-            // Remove the later index first so the earlier index stays valid.
-            rewritten.remove(indices[1]);
-            rewritten.remove(indices[0]);
-            rewritten.add(new BinaryExpr(new NumberExpr(2), BinaryOperator.MUL, duplicate));
-            return buildAddition(rewritten);
+            Object[] pending = new Object[4];
+            var retained = RetainedOperation.retainCompleted(1, subtree, pending);
+            Throwable primary = null;
+            try {
+                List<Expr> terms = flattenAddition(subtree);
+                pending[0] = terms;
+                int[] indices = findDuplicateTermIndices(terms);
+                pending[1] = indices;
+                if (indices == null) {
+                    throw new IllegalArgumentException("Rule does not match subtree");
+                }
+                Expr duplicate = terms.get(indices[0]);
+                List<Expr> rewritten = new ArrayList<>(terms);
+                pending[2] = rewritten;
+                completed(terms.size() + 1L);
+                // Remove the later index first so the earlier index stays valid.
+                int laterRemoval = rewritten.size() - indices[1];
+                rewritten.remove(indices[1]);
+                RetainedOperation.work(laterRemoval);
+                int earlierRemoval = rewritten.size() - indices[0];
+                rewritten.remove(indices[0]);
+                RetainedOperation.work(earlierRemoval);
+                pending[3] = new NumberExpr(2);
+                completed(1);
+                pending[3] = new BinaryExpr((Expr) pending[3], BinaryOperator.MUL, duplicate);
+                completed(1);
+                rewritten.add((Expr) pending[3]);
+                completed(1);
+                return buildAddition(rewritten);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                throw failure;
+            } finally { release(retained, primary); }
         }
 
         private int[] findDuplicateTermIndices(Expr subtree) {
-            if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD) {
-                return null;
-            }
-            return findDuplicateTermIndices(flattenAddition(subtree));
+            Object[] pending = new Object[1];
+            var retained = RetainedOperation.retainCompleted(1, subtree, pending);
+            Throwable primary = null;
+            try {
+                RetainedOperation.work(1);
+                if (!(subtree instanceof BinaryExpr addition) || addition.operator() != BinaryOperator.ADD) {
+                    return null;
+                }
+                List<Expr> terms = flattenAddition(subtree);
+                pending[0] = terms;
+                return findDuplicateTermIndices(terms);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                throw failure;
+            } finally { release(retained, primary); }
         }
 
         private int[] findDuplicateTermIndices(List<Expr> terms) {
             for (int i = 0; i < terms.size(); i++) {
                 for (int j = i + 1; j < terms.size(); j++) {
+                    RetainedOperation.work(1);
                     if (terms.get(i).equals(terms.get(j))) {
-                        return new int[] { i, j };
+                        return RetainedOperation.produced(new int[] { i, j });
                     }
                 }
             }
@@ -499,24 +540,71 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         }
 
         private List<Expr> flattenAddition(Expr expression) {
+            RetainedOperation.work(1);
             if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.ADD) {
                 List<Expr> terms = new ArrayList<>();
-                terms.addAll(flattenAddition(binaryExpr.left()));
-                terms.addAll(flattenAddition(binaryExpr.right()));
-                return terms;
+                Object[] child = new Object[1];
+                var retained = RetainedOperation.retainCompleted(2, expression, terms, child);
+                Throwable primary = null;
+                try {
+                    List<Expr> left = flattenAddition(binaryExpr.left());
+                    child[0] = left;
+                    terms.addAll(left);
+                    completed(left.size());
+                    List<Expr> right = flattenAddition(binaryExpr.right());
+                    child[0] = right;
+                    terms.addAll(right);
+                    completed(right.size());
+                    return terms;
+                } catch (RuntimeException | Error failure) {
+                    primary = failure;
+                    throw failure;
+                } finally { release(retained, primary); }
             }
-            return List.of(expression);
+            return RetainedOperation.produced(List.of(expression));
         }
 
         private Expr buildAddition(List<Expr> terms) {
-            if (terms.isEmpty()) {
-                return new NumberExpr(0);
+            Expr[] current = new Expr[1];
+            var retained = RetainedOperation.retainCompleted(1, terms, current);
+            Throwable primary = null;
+            try {
+                if (terms.isEmpty()) {
+                    current[0] = new NumberExpr(0);
+                    completed(1);
+                    return current[0];
+                }
+                current[0] = terms.getFirst();
+                for (int i = 1; i < terms.size(); i++) {
+                    current[0] = new BinaryExpr(current[0], BinaryOperator.ADD, terms.get(i));
+                    completed(1);
+                }
+                return current[0];
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                throw failure;
+            } finally { release(retained, primary); }
+        }
+
+        private static void completed(long work) {
+            try {
+                RetainedOperation.work(work);
+                RetainedOperation.checkpoint();
+            } catch (RuntimeException | Error failure) {
+                try { RetainedOperation.checkpoint(); }
+                catch (RuntimeException | Error observation) {
+                    if (observation != failure) failure.addSuppressed(observation);
+                }
+                throw failure;
             }
-            Expr expression = terms.getFirst();
-            for (int i = 1; i < terms.size(); i++) {
-                expression = new BinaryExpr(expression, BinaryOperator.ADD, terms.get(i));
+        }
+
+        private static void release(RetainedOperation.Frame frame, Throwable primary) {
+            try { if (frame != null) frame.close(); }
+            catch (RuntimeException | Error cleanup) {
+                if (primary == null) throw cleanup;
+                if (cleanup != primary) primary.addSuppressed(cleanup);
             }
-            return expression;
         }
     }
 

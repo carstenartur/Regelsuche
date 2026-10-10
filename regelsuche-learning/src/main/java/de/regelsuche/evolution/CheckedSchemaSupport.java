@@ -254,17 +254,60 @@ final class CheckedSchemaSupport {
                 || number.value().numerator().signum() == 0)) {
             throw new DomainRejected("checked scalar division needs nonzero literal denominator");
         }
-        if (binary.operator() == BinaryOperator.POW && (!(binary.right() instanceof NumberExpr number)
-                || !number.value().isInteger() || number.value().numerator().signum() < 0
-                || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) > 0)) {
-            throw new DomainRejected("checked scalar power needs bounded nonnegative literal exponent");
+        if (binary.operator() == BinaryOperator.POW) {
+            if (!(binary.right() instanceof NumberExpr number)
+                    || !number.value().isInteger() || number.value().numerator().signum() < 0) {
+                throw new DomainRejected("checked scalar power needs bounded nonnegative literal exponent");
+            }
+            var maximum = java.math.BigInteger.valueOf(bounds.maximumExponent());
+            var retained = RetainedOperation.retainCompleted(1, binary, bounds, maximum);
+            Throwable primary = null;
+            boolean rejected;
+            try {
+                rejected = number.value().numerator().compareTo(maximum) > 0;
+                RetainedOperation.work(1);
+            } catch (RuntimeException | Error failure) {
+                primary = failure;
+                observeGuardFailure(failure);
+                throw failure;
+            } finally { closeGuard(retained, primary); }
+            if (rejected) throw new DomainRejected("checked scalar power needs bounded nonnegative literal exponent");
         }
     }
 
     private static void literal(ExactRational value, CheckedLearnedSchemaModel.Bounds bounds) {
-        if (value.numerator().abs().bitLength() > bounds.maximumCoefficientBits()
-                || value.denominator().bitLength() > bounds.maximumCoefficientBits()) {
-            throw new DomainRejected("checked rational literal size limit");
+        var absolute = value.numerator().abs();
+        var retained = RetainedOperation.retainCompleted(1, value, bounds, absolute);
+        Throwable primary = null;
+        boolean rejected;
+        try {
+            rejected = absolute.bitLength() > bounds.maximumCoefficientBits();
+            RetainedOperation.work(1);
+            if (!rejected) {
+                rejected = value.denominator().bitLength() > bounds.maximumCoefficientBits();
+                RetainedOperation.work(1);
+            }
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            observeGuardFailure(failure);
+            throw failure;
+        } finally { closeGuard(retained, primary); }
+        // A technical observation/release failure must never become a discarded domain rejection.
+        if (rejected) throw new DomainRejected("checked rational literal size limit");
+    }
+
+    private static void observeGuardFailure(Throwable failure) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+
+    private static void closeGuard(RetainedOperation.Frame retained, Throwable primary) {
+        try { if (retained != null) retained.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (primary == null) throw cleanup;
+            if (cleanup != primary) primary.addSuppressed(cleanup);
         }
     }
 

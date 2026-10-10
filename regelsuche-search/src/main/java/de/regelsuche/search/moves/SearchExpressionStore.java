@@ -8,7 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Objects;
 
 /** Per-run ownership. Optional FIFO index eviction never releases a still-owned expression. */
-public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.retention.RetainedGraph.View {
+public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.retention.RetainedGraph.View,ExpressionIdentity.Work {
     @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(limits);v.reference(index);v.reference(roots);v.reference(nodes);v.reference(textValues);}
     public record Limits(long nodes, long characters, long references, int indexEntries) implements de.regelsuche.retention.RetainedGraph.View {
         @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v) {}
@@ -36,6 +36,13 @@ public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.
     private int indexEntries;
     public long work(){return work;}
     void pay(long units){work=Math.addExact(work,units);}
+    @Override public void chargeIdentity(long units) {
+        if (units < 0) throw new IllegalArgumentException("negative identity work");
+        pay(units);
+    }
+    @Override public void checkIdentityScratch(long references, long characters) {
+        checkIndexScratch(references, characters);
+    }
     void checkIndexScratch(long references, long characters) {
         pay(1);
         if (references > limits.references() || characters > limits.characters()) throw new LimitExceeded();

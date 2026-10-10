@@ -32,8 +32,9 @@ class CanonicalizerTemporaryOwnershipTest {
                 }
                 if(abortAtContributions && termContributions)throw new BucketLimit();
                 if(value instanceof Map<?,?> map && map.keySet().equals(Set.of("f(x)","f(y)")))factorBuckets=true;
-                if(value instanceof BinaryExpr binary && value!=source && binary.operator()==BinaryOperator.POW
-                        && binary.right().equals(new NumberExpr(0)))discardedPower=true;
+                if(source instanceof BinaryExpr original && value instanceof BinaryExpr binary
+                        && value!=source && binary.operator()==BinaryOperator.POW
+                        && binary.left()==original.left() && binary.right()==original.right())discardedPower=true;
                 if(value instanceof RetainedGraph.View view)view.retainedReferences(visitor);
                 else if(value instanceof Map<?,?> map)map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
                 else if(value instanceof Collection<?> collection)collection.forEach(visitor::reference);
@@ -55,27 +56,35 @@ class CanonicalizerTemporaryOwnershipTest {
         var source=new FunctionExpr("f",List.of(call("g",plusZero("x")),call("h",plusZero("y"))));
         var expected=new FunctionExpr("f",List.of(call("g",new VariableExpr("x")),call("h",new VariableExpr("y"))));
         var observation=new Observation();var canonicalizer=new ExpressionCanonicalizer();
-        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;assertEquals(expected,canonicalizer.canonicalize(source));}
+        Expr actual;
+        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;actual=canonicalizer.canonicalize(source);}
+        assertEquals(expected,actual);
         assertTrue(observation.functionArguments,"the actual accumulated g(x),h(y) argument list must remain owned");released(observation);
     }
     @Test void canonicalAdditionRetainsActualCoefficientContributions(){
         var term=call("f",new VariableExpr("x"));var source=new BinaryExpr(term,BinaryOperator.ADD,term);
         var expected=new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,term);
         var observation=new Observation();var canonicalizer=new ExpressionCanonicalizer();
-        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;assertEquals(expected,canonicalizer.canonicalize(source));}
+        Expr actual;
+        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;actual=canonicalizer.canonicalize(source);}
+        assertEquals(expected,actual);
         assertTrue(observation.termContributions,"the bucket owns both real coefficient contributions before rendering");released(observation);
     }
     @Test void canonicalMultiplicationRetainsItsActualFactorBuckets(){
         var source=new BinaryExpr(call("f",new VariableExpr("x")),BinaryOperator.MUL,call("f",new VariableExpr("y")));
         var observation=new Observation();var canonicalizer=new ExpressionCanonicalizer();
-        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;assertEquals(source,canonicalizer.canonicalize(source));}
+        Expr actual;
+        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;actual=canonicalizer.canonicalize(source);}
+        assertEquals(source,actual);
         assertTrue(observation.factorBuckets,"both actual formatted keys and their owned factor buckets must overlap");released(observation);
     }
     @Test void assumptionAwarePowerExposesTheRebuiltTreeDiscardedByReduction(){
         var source=new BinaryExpr(new VariableExpr("x"),BinaryOperator.POW,new NumberExpr(0));
         var context=new AssumptionContext();var observation=new Observation();observation.source=source;
         var canonicalizer=new ExpressionCanonicalizer();
-        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;assertEquals(new NumberExpr(1),canonicalizer.canonicalize(source,context));}
+        Expr actual;
+        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;actual=canonicalizer.canonicalize(source,context);}
+        assertEquals(new NumberExpr(1),actual);
         assertFalse(context.isEmpty());
         assertTrue(observation.discardedPower,"the freshly rebuilt x^0 exists before its valid assumption-aware reduction");released(observation);
     }
@@ -109,12 +118,13 @@ class CanonicalizerTemporaryOwnershipTest {
         var first=call("g",new VariableExpr("x"));var last=call("h",new VariableExpr("z"));
         var source=new FunctionExpr("f",List.of(first,plusZero("y"),last));
         var observation=new Observation();observation.requiredRoot=source;
+        FunctionExpr result;
         try(var scope=RetainedOperation.open(observation)){
             observation.scope=scope;
-            var result=(FunctionExpr)new ExpressionCanonicalizer().canonicalize(source);
-            assertNotSame(source,result);assertSame(first,result.arguments().get(0));
-            assertEquals(new VariableExpr("y"),result.arguments().get(1));assertSame(last,result.arguments().get(2));
+            result=(FunctionExpr)new ExpressionCanonicalizer().canonicalize(source);
         }
+        assertNotSame(source,result);assertSame(first,result.arguments().get(0));
+        assertEquals(new VariableExpr("y"),result.arguments().get(1));assertSame(last,result.arguments().get(2));
         assertFalse(observation.missingRoot);released(observation);
     }
 

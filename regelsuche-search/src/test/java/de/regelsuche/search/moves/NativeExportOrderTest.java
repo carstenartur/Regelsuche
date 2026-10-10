@@ -75,13 +75,19 @@ class NativeExportOrderTest {
         @Override public void checkpoint(){
             executionWork(RetainedGraph.measure(this).work());
             Object current=references(operation).get(2);
-            if(!(current instanceof RetainedOperation.Frame frame))return;
-            var values=(Object[])references(frame).get(2);
-            if(values.length!=6 || !(values[0] instanceof Map<?,?> map))return;
-            if(map.isEmpty())previousAssessmentWork=work;
-            else if(map.size()>assessments){
-                assertEquals(assessments+1,map.size());deltas.add(work-previousAssessmentWork);
-                previousAssessmentWork=work;assessments=map.size();
+            // Component handoff frames can be nested inside the aggregate owner.
+            // Find that owner instead of depending on its being the topmost frame.
+            while(current instanceof RetainedOperation.Frame frame){
+                var references=references(frame);var values=(Object[])references.get(2);
+                if(values.length>=6 && values[0] instanceof Map<?,?> map){
+                    if(map.isEmpty())previousAssessmentWork=work;
+                    else if(map.size()>assessments){
+                        assertEquals(assessments+1,map.size());deltas.add(work-previousAssessmentWork);
+                        previousAssessmentWork=work;assessments=map.size();
+                    }
+                    return;
+                }
+                current=references.get(1);
             }
         }
     }

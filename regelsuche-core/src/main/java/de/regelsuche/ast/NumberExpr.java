@@ -17,4 +17,13 @@ public record NumberExpr(ExactRational value) implements Expr {
     public static NumberExpr exact(String literal) {
         return new NumberExpr(ExactRational.parse(literal));
     }
+    @Override public boolean equals(Object other) {
+        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.same(this, other);
+        return this == other || other instanceof NumberExpr number && value.equals(number.value);
+    }
+    @Override public int hashCode() {
+        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.valueHash(this);
+        return value.hashCode();
+    }
+
 }

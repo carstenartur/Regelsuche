@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedOperation;
 import java.util.Objects;
 import java.util.ServiceLoader;
 
@@ -15,21 +16,51 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
 
     public static ExactTheoryEvidence fromVerified(Object verifierOwnedEvidence) {
         Objects.requireNonNull(verifierOwnedEvidence, "verifierOwnedEvidence");
-        Binding accepted = null;
-        for (ExactTheoryEvidenceProvider provider : ServiceLoader.load(
-                ExactTheoryEvidenceProvider.class, ExactTheoryEvidence.class.getClassLoader())) {
-            var result = Objects.requireNonNull(provider.bind(verifierOwnedEvidence), "provider result");
-            if (result.isPresent()) {
-                if (accepted != null) {
-                    throw new IllegalArgumentException("ambiguous installed theory evidence providers");
+        // Keep the accepted Optional while later providers are consulted. Opaque
+        // unrecognized inputs remain the caller's input, not an admitted capability.
+        Object[] pending = new Object[2];
+        var retained = RetainedOperation.retainCompleted(1, (Object) pending);
+        Throwable primary = null;
+        try {
+            Binding accepted = null;
+            for (ExactTheoryEvidenceProvider provider : ServiceLoader.load(
+                    ExactTheoryEvidenceProvider.class, ExactTheoryEvidence.class.getClassLoader())) {
+                var result = Objects.requireNonNull(provider.bind(verifierOwnedEvidence), "provider result");
+                pending[1] = result;
+                RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
+                if (result.isPresent()) {
+                    if (accepted != null) {
+                        throw new IllegalArgumentException("ambiguous installed theory evidence providers");
+                    }
+                    accepted = result.orElseThrow();
+                    pending[0] = result;
+                    RetainedOperation.work(1);
                 }
-                accepted = result.orElseThrow();
             }
+            if (accepted == null) {
+                throw new IllegalArgumentException("no installed verifier recognizes this evidence capability");
+            }
+            return RetainedOperation.produced(new ExactTheoryEvidence(accepted));
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            try { RetainedOperation.checkpoint(); }
+            catch (RuntimeException | Error observation) {
+                if (observation != failure) failure.addSuppressed(observation);
+            }
+            throw failure;
+        } finally {
+            closeFrame(retained, primary);
         }
-        if (accepted == null) {
-            throw new IllegalArgumentException("no installed verifier recognizes this evidence capability");
+    }
+
+    private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
+        if (frame == null) return;
+        try { frame.close(); }
+        catch (RuntimeException | Error cleanup) {
+            if (primary == null) throw cleanup;
+            if (cleanup != primary) primary.addSuppressed(cleanup);
         }
-        return new ExactTheoryEvidence(accepted);
     }
 
     public Binding binding() { return binding; }
@@ -50,17 +81,20 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
             requireText(transformedExpression);
             requireText(theoryStepId);
             requireText(canonicalEvidenceJson);
-            for (String hash : new String[] { evidenceHash, receiptArtifactId, runArtifactId }) {
-                if (hash == null || !hash.matches("sha256:[0-9a-f]{64}")) {
-                    throw new IllegalArgumentException("invalid evidence/artifact identity");
-                }
-            }
+            requireHash(evidenceHash);
+            requireHash(receiptArtifactId);
+            requireHash(runArtifactId);
             if (sourceExpression.equals(transformedExpression) || canonicalWorkUnits < 1) {
                 throw new IllegalArgumentException("theory evidence needs a changed representation and positive work");
             }
         }
         private static void requireText(String value) {
             if (value == null || value.isBlank()) throw new IllegalArgumentException("blank evidence field");
+        }
+        private static void requireHash(String hash) {
+            if (hash == null || !hash.matches("sha256:[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("invalid evidence/artifact identity");
+            }
         }
     }
 }

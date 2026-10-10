@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.retention.RetainedOperation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -541,15 +542,52 @@ public record SchematicProofPlan(
     }
 
     static String hash(String value) {
+        // Publish each completed product before its debit; these are logical
+        // text/byte operations, not a mathematical validity check or JVM bytes.
+        Object[] products = new Object[4];
+        var retained = RetainedOperation.retainCompleted(1, value, products);
+        Throwable primary = null;
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                .digest(value.getBytes(StandardCharsets.UTF_8));
-            return "sha256:"
-                + java.util.HexFormat.of().formatHex(digest);
+            byte[] input = value.getBytes(StandardCharsets.UTF_8);
+            products[0] = input;
+            completedHashWork(Math.addExact((long) value.length(), input.length));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(input);
+            products[1] = digest;
+            completedHashWork(Math.addExact((long) input.length, digest.length));
+            String hex = java.util.HexFormat.of().formatHex(digest);
+            products[2] = hex;
+            completedHashWork(Math.addExact((long) digest.length, hex.length()));
+            String result = "sha256:" + hex;
+            products[3] = result;
+            completedHashWork(result.length());
+            return result;
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(
-                "SHA-256 unavailable",
-                exception);
+            var failure = new IllegalStateException("SHA-256 unavailable", exception);
+            primary = failure;
+            observeHashFailure(failure);
+            throw failure;
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            observeHashFailure(failure);
+            throw failure;
+        } finally {
+            try { if (retained != null) retained.close(); }
+            catch (RuntimeException | Error cleanup) {
+                if (primary == null) throw cleanup;
+                if (cleanup != primary) primary.addSuppressed(cleanup);
+            }
+        }
+    }
+
+    private static void completedHashWork(long units) {
+        RetainedOperation.work(units);
+        RetainedOperation.checkpoint();
+    }
+
+    private static void observeHashFailure(Throwable failure) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != failure) failure.addSuppressed(observation);
         }
     }
 

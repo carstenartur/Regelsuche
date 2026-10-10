@@ -10,6 +10,7 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.knowledge.RuleDescriptor;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.nio.charset.StandardCharsets;
@@ -182,23 +183,65 @@ public final class PreparedAstRewriteTransformationEngine
         AstRewriteTransport.requireBounded(root);
         int originalSize = canonicalAstNodeCount(root);
         Set<AstRewriteTransport.Step> steps = new LinkedHashSet<>();
-        try(var retained=RetainedOperation.retain(this,root,steps)) {
-        var rewritten=rewriteEverywhere(root,false);
-        try(var candidates=RetainedOperation.retain(rewritten)) {
-        for (RewriteResult result : rewritten) {
-            AstRewriteTransport.requireBounded(result.expression());
-            if (root.equals(result.expression())
-                    || canonicalAstNodeCount(result.expression()) - originalSize > maxAstSizeIncreasePerStep) continue;
+        Object[] pending = new Object[2];
+        var retained = RetainedOperation.retainCompleted(2, this, root, steps, pending);
+        Throwable primary = null;
+        try {
+            var rewritten = rewriteEverywhere(root, false);
+            pending[0] = rewritten;
+            RetainedOperation.checkpoint();
+            for (RewriteResult result : rewritten) {
+                AstRewriteTransport.requireBounded(result.expression());
+                if (root.equals(result.expression())
+                        || canonicalAstNodeCount(result.expression()) - originalSize > maxAstSizeIncreasePerStep) continue;
+                appendNativeStep(root, result, steps);
+                if (steps.size() >= maxCandidatesPerState) break;
+            }
+            var result = List.copyOf(steps);
+            pending[1] = result;
+            completed(steps.size() + 1L);
+            return result;
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            throw failure;
+        } finally { release(retained, primary); }
+    }
+
+    private static void appendNativeStep(Expr root, RewriteResult result, Set<AstRewriteTransport.Step> steps) {
+        Object[] pending = new Object[6];
+        var retained = RetainedOperation.retainCompleted(1, root, result, steps, pending);
+        Throwable primary = null;
+        try {
             var rule = result.rule();
-            steps.add(new AstRewriteTransport.Step(root, result.expression(), rule.id(), rule.kind(),
-                rule.mayIncreaseComplexity(), rule.estimatedCostDelta(), rule.isEquivalencePreservingByConstruction(),
-                result.assumptions().stream().map(Assumption::expression).toList(),
-                rule.descriptor().packId(), rule.descriptor().license()));
-            if (steps.size() >= maxCandidatesPerState) break;
-        }
-        return RetainedOperation.produced(List.copyOf(steps));
-        }
-        }
+            String id = rule.id();
+            pending[0] = id;
+            RewriteKind kind = rule.kind();
+            pending[1] = kind;
+            boolean mayIncrease = rule.mayIncreaseComplexity();
+            int estimatedCostDelta = rule.estimatedCostDelta();
+            boolean equivalencePreserving = rule.isEquivalencePreservingByConstruction();
+            List<String> assumptions = result.assumptions().stream().map(Assumption::expression).toList();
+            pending[2] = assumptions;
+            completed(assumptions.size() + 1L);
+            RuleDescriptor packDescriptor = rule.descriptor();
+            pending[3] = packDescriptor;
+            completed(1);
+            String packId = packDescriptor.packId();
+            // Preserve both original calls, including custom descriptor implementations.
+            RuleDescriptor licenseDescriptor = rule.descriptor();
+            pending[4] = licenseDescriptor;
+            completed(1);
+            var step = new AstRewriteTransport.Step(root, result.expression(), id, kind,
+                mayIncrease, estimatedCostDelta, equivalencePreserving, assumptions,
+                packId, licenseDescriptor.license());
+            pending[5] = step;
+            completed(1);
+            steps.add(step);
+            completed(1);
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            throw failure;
+        } finally { release(retained, primary); }
     }
 
     private List<RewriteResult> rewriteEverywhere(Expr subtree) {
@@ -219,10 +262,9 @@ public final class PreparedAstRewriteTransformationEngine
                     results = new ArrayList<>();
                     owned = RetainedOperation.retainCompleted(1, results, rewritten);
                 }
-                results.add(new RewriteResult(rule, rewritten, subtreeHash, rule.assumptions(subtree)));
+                results.add(rewriteResult(rule, rewritten, subtreeHash, rule.assumptions(subtree), retainLegacyHash));
                 if (!retainLegacyHash) {
-                    RetainedOperation.work(2);
-                    RetainedOperation.checkpoint();
+                    completed(1); // the result allocation was settled before insertion
                 }
             }
             if (subtree instanceof BinaryExpr binaryExpr) {
@@ -253,10 +295,10 @@ public final class PreparedAstRewriteTransformationEngine
             try (var child = retainLegacyHash || leftRewrites.isEmpty() ? null : RetainedOperation.retain(leftRewrites)) {
 
                 for (RewriteResult rewrite : leftRewrites) {
-                    results.add(new RewriteResult(rewrite.rule(),
+                    results.add(rewriteResult(rewrite.rule(),
                         new BinaryExpr(rewrite.expression(), binaryExpr.operator(), binaryExpr.right()),
-                        rewrite.sourceSubtreeHash(), rewrite.assumptions()));
-                    if (!retainLegacyHash) { RetainedOperation.work(2); RetainedOperation.checkpoint(); }
+                        rewrite.sourceSubtreeHash(), rewrite.assumptions(), retainLegacyHash));
+                    if (!retainLegacyHash) completed(1);
                 }
             }
             var rightRewrites = rewriteEverywhere(binaryExpr.right(), retainLegacyHash);
@@ -267,10 +309,10 @@ public final class PreparedAstRewriteTransformationEngine
             try (var child = retainLegacyHash || rightRewrites.isEmpty() ? null : RetainedOperation.retain(rightRewrites)) {
 
                 for (RewriteResult rewrite : rightRewrites) {
-                    results.add(new RewriteResult(rewrite.rule(),
+                    results.add(rewriteResult(rewrite.rule(),
                         new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rewrite.expression()),
-                        rewrite.sourceSubtreeHash(), rewrite.assumptions()));
-                    if (!retainLegacyHash) { RetainedOperation.work(2); RetainedOperation.checkpoint(); }
+                        rewrite.sourceSubtreeHash(), rewrite.assumptions(), retainLegacyHash));
+                    if (!retainLegacyHash) completed(1);
                 }
             }
             return results;
@@ -321,16 +363,58 @@ public final class PreparedAstRewriteTransformationEngine
         }
     }
 
+    private static void release(RetainedOperation.Frame frame, Throwable primary) {
+        if (primary != null) releaseAfterFailure(frame, primary);
+        else if (frame != null) frame.close();
+    }
+
+    private static void completed(long work) {
+        try {
+            RetainedOperation.work(work);
+            RetainedOperation.checkpoint();
+        } catch (RuntimeException | Error failure) {
+            try { RetainedOperation.checkpoint(); }
+            catch (RuntimeException | Error observation) {
+                if (observation != failure) failure.addSuppressed(observation);
+            }
+            throw failure;
+        }
+    }
+
+    private static RewriteResult rewriteResult(RewriteRule rule, Expr expression, String sourceSubtreeHash,
+            List<Assumption> assumptions, boolean retainLegacyHash) {
+        if (retainLegacyHash) return new RewriteResult(rule, expression, sourceSubtreeHash, assumptions);
+        var original = RetainedOperation.retain(rule, expression, assumptions);
+        Throwable primary = null;
+        try {
+            var result = new RewriteResult(rule, expression, sourceSubtreeHash, assumptions);
+            long copied = assumptions != null && result.assumptions() != assumptions
+                ? result.assumptions().size() + 1L : 0;
+            // The existing result-allocation unit moves here; an actual copy adds its own work.
+            var retained = RetainedOperation.retainCompleted(copied + 1, result);
+            try { return result; }
+            finally { if (retained != null) retained.close(); }
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            throw failure;
+        } finally { release(original, primary); }
+    }
+
     private void appendFunctionRewrite(FunctionExpr functionExpr, int position, RewriteResult rewrite,
             boolean retainLegacyHash, List<RewriteResult> results) {
         List<Expr> replaced = new ArrayList<>(functionExpr.arguments());
-        try (var argumentsHeld = retainLegacyHash ? null : RetainedOperation.retainCompleted(replaced.size(), replaced)) {
+        var argumentsHeld = retainLegacyHash ? null : RetainedOperation.retainCompleted(replaced.size(), replaced);
+        Throwable primary = null;
+        try {
             replaced.set(position, rewrite.expression());
             if (!retainLegacyHash) RetainedOperation.work(1);
-            results.add(new RewriteResult(rewrite.rule(), new FunctionExpr(functionExpr.name(), replaced),
-                rewrite.sourceSubtreeHash(), rewrite.assumptions()));
-            if (!retainLegacyHash) { RetainedOperation.work(replaced.size()+2L); RetainedOperation.checkpoint(); }
-        }
+            results.add(rewriteResult(rewrite.rule(), new FunctionExpr(functionExpr.name(), replaced),
+                rewrite.sourceSubtreeHash(), rewrite.assumptions(), retainLegacyHash));
+            if (!retainLegacyHash) completed(replaced.size() + 1L);
+        } catch (RuntimeException | Error failure) {
+            primary = failure;
+            throw failure;
+        } finally { release(argumentsHeld, primary); }
     }
 
     private static Expr applyIfMatched(RewriteRule rule, Expr subtree) {
