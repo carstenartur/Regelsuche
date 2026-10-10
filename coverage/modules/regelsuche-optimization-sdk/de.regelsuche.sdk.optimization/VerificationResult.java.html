@@ -9,7 +9,7 @@ public sealed interface VerificationResult {
     }
 <span class="fc" id="L10">    record Inconclusive(String diagnostic) implements VerificationResult {}</span>
 <span class="fc" id="L11">    record Unsupported(String diagnostic) implements VerificationResult {}</span>
-<span class="nc" id="L12">    record Cancelled(String diagnostic) implements VerificationResult {}</span>
-<span class="nc" id="L13">    record BudgetExceeded(String diagnostic, long work) implements VerificationResult {}</span>
+<span class="fc" id="L12">    record Cancelled(String diagnostic) implements VerificationResult {}</span>
+<span class="fc" id="L13">    record BudgetExceeded(String diagnostic, long work) implements VerificationResult {}</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

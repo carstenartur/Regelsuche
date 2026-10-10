@@ -1,0 +1,2803 @@
+{
+  "schema": "regelsuche.pr1081-review-evidence/v1",
+  "source": "d372e99b3dae354b73d5f7a23baa2f833d2ad732",
+  "base": "b3553e09c867b336e1f09e480ff51dc08c8809ae",
+  "qualification": "PARTIAL checkpoint; exact-head CI remains required",
+  "included": [
+    {
+      "path": "ai-gate/gradle.log",
+      "bytes": 1816,
+      "sha256": "1906f4120a2b85aea8ea111c59a8938831df03af5486b122788480d38d3491dc"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/benchmark.json",
+      "bytes": 1797,
+      "sha256": "d1d021179020a86689c61b73775f8c92f14045aa575b0af619f572c1f689bc96"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/capabilities.json",
+      "bytes": 147905,
+      "sha256": "eebb4040c44a0d9b91859270488752199b141ceb5dda4e518bbb0c7b6ce59792"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/check.json",
+      "bytes": 10185,
+      "sha256": "1493b8c0918fa99a93e2cde946bd806b91de0b0a7a5bf18809bb76e989541a36"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/claims.json",
+      "bytes": 10730,
+      "sha256": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/classes.json",
+      "bytes": 11242265,
+      "sha256": "bd4adf88eb4cfe49617eb7a276853b6cb75d4047e47a090e78176411b975069a"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/complexity.json",
+      "bytes": 20768,
+      "sha256": "c0285b69f797f0d4aac4a7fc2b46f336b0323646b019600e4756dd8bb0ef8cff"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/dependencies.json",
+      "bytes": 42433,
+      "sha256": "99a142724619182da2a8f98d58a5c445cd518829b77e041f355f952b59f20550"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/docs.json",
+      "bytes": 246146,
+      "sha256": "dd123d85f2b45e5e3a48e9fc6642eb471d59e9d14ef5ccc997a00078b85ec0cb"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/evidence.json",
+      "bytes": 1823,
+      "sha256": "56c41b2e17351c976d045cbdd9f40a957b9930da7fa72f48bdc16c808837fd10"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/index.json",
+      "bytes": 208,
+      "sha256": "ce2629e4884721203379c24f1b7b7ca5486d75dcde0dd06e40a8de47fa089de6"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/metrics-snapshot.json",
+      "bytes": 339,
+      "sha256": "a6bc54c096c24bd9f39ae91a71471ac4501edcffb9df8f4ebffae1b4a38b4bca"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/modules.json",
+      "bytes": 44919,
+      "sha256": "fa63a363e4f7005f0342f15fe4a555207c265dc4311191a9e6760d6bcf199720"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/optimization.json",
+      "bytes": 34008,
+      "sha256": "e07efedeba60480611c548fd3388463d77156cf12078ebbe491ac18f0c0551b2"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/review-context.md",
+      "bytes": 25491,
+      "sha256": "a31d806e121c320f7a61d4c10348c8d23e3821e0c36d24640822e72caa3c20e6"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/tests.json",
+      "bytes": 7662554,
+      "sha256": "664d5ccb3117d474ca1ee24782ce4e6622400679d19fe345825ade9d060577c0"
+    },
+    {
+      "path": "ai-gate/reports/build/ai-knowledge/trend.json",
+      "bytes": 1992,
+      "sha256": "e7c1c0dfd278a8798eb210dab8bc2efade53bee0697902871218ea5e8cb91d55"
+    },
+    {
+      "path": "ai-gate/reports/build/reports/quality/complexity-hotspot-report.json",
+      "bytes": 23881,
+      "sha256": "3ff470ee51c5d7f264e434152a98aac3e4df9838a0e9dff5ee0793f28bfaf79f"
+    },
+    {
+      "path": "ai-gate/reports/build/reports/quality/complexity-hotspot-report.md",
+      "bytes": 4649,
+      "sha256": "6a9e32af402334e50be3bd8d9928e4f5c1dcedc9888adf55b1791e1661a8c925"
+    },
+    {
+      "path": "ai-gate/source-binding.json",
+      "bytes": 970,
+      "sha256": "291d0db5a73b0cc76c240a1dadb8ae897a0323fd55d000d54f26b38192d1f7f3"
+    },
+    {
+      "path": "ai-gate/summary.json",
+      "bytes": 2860,
+      "sha256": "fab5c627e13c4fb5552f5117c903d94b0c5e3eaaee048da84e7d0ed4eca6b90c"
+    },
+    {
+      "path": "behavioral-red/gradle.log",
+      "bytes": 3671,
+      "sha256": "20bf63b7829d3659778f9d3d3c5ab6aabbcfba0d1a4902b71ba6fe3f5ea1495a"
+    },
+    {
+      "path": "behavioral-red/isolate-build.gradle",
+      "bytes": 288,
+      "sha256": "6aecc38b3f49154b51e6866f1006fdfff603e26fe9e87b28c71fbdcea7fe9859"
+    },
+    {
+      "path": "behavioral-red/regelsuche-search/TEST-de.regelsuche.search.moves.MoveSearchObjectiveWorkTest.xml",
+      "bytes": 692,
+      "sha256": "b9de69df18a071392bb4b9b3936d13bbecbb54ab2b0ecc0afb3f2f79cf21a75c"
+    },
+    {
+      "path": "behavioral-red/regelsuche-search/TEST-de.regelsuche.search.moves.NativeSourceOnlySearchTest.xml",
+      "bytes": 1278,
+      "sha256": "f1ee3d2ea6634365d52f8799aba4a1fa2b8f982a3dff4c4bd9438cf7437acb48"
+    },
+    {
+      "path": "behavioral-red/regelsuche-search/TEST-de.regelsuche.search.moves.TypedSourceOnlyBudgetBoundaryTest.xml",
+      "bytes": 54799,
+      "sha256": "0bc52698e3cc3a6392dc8d69de1c484ad47a26ed738e0919cd8c6fb7d3f689e5"
+    },
+    {
+      "path": "behavioral-red/source-binding.json",
+      "bytes": 471830,
+      "sha256": "296afc78073deab87db2df80a26b11dfdb2197a0fdff24fdce9d4e65d6705b63"
+    },
+    {
+      "path": "behavioral-red/summary.json",
+      "bytes": 266,
+      "sha256": "fd036e3867a58a4bbd8274b81424089a245a0210c6a033b33271680ee3c987b9"
+    },
+    {
+      "path": "behavioral-red/working-tree.patch",
+      "bytes": 3342,
+      "sha256": "dd7e0313a47c7ae74ece06e5760a2e8480deb792e5bb462e3c21c7a82a54a8c1"
+    },
+    {
+      "path": "corpus-tail-comparison.json",
+      "bytes": 171,
+      "sha256": "0ec0146083fbd224f72c430ea9b1ee1fac34375377569083a03c3242509471d1"
+    },
+    {
+      "path": "full-modules/gradle.log",
+      "bytes": 11010,
+      "sha256": "c360ce9392102b3e61abd9966568872839032c987a1764814e093f5f88979d3c"
+    },
+    {
+      "path": "full-modules/isolate-build.gradle",
+      "bytes": 288,
+      "sha256": "5fbfb7cc527d5b498e8d3a884e28226f483a33bd8b98ed815ec8530b0c7de3ce"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.algebra.QuadraticSymbolIdentityTest.xml",
+      "bytes": 1202,
+      "sha256": "90a651d518b3384945e98bb200f02ce044c5ceb30f18d20144289210bcb17375"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.assumption.AssumptionEvaluatorPortfolioTest.xml",
+      "bytes": 1876,
+      "sha256": "fc8646376f4556307d2f7afc993334aefb68d74bd2aadebdef0318fdd3b4023b"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.assumption.AssumptionSignatureOwnershipTest.xml",
+      "bytes": 1561,
+      "sha256": "99a81c0c3c92120fbf106ab155e65e2b344a306ee4b07674f8ca0ad7d12c7b06"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.assumption.AssumptionTest.xml",
+      "bytes": 1123,
+      "sha256": "9d9a7d21dd8969e6197bdd3539fdb88c292694db2b477ec08b6c9536e77e9deb"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.ast.ExpressionIdentityAccountingTest.xml",
+      "bytes": 1409,
+      "sha256": "8590e4bb4cd438ba45d441eb7e34745b156770fbdc3309aad02b3845d39898ba"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.calculus.CalculusDerivativeRulesTest.xml",
+      "bytes": 725,
+      "sha256": "c6afacc309e7b2a2442a7b26298c6431787f12ef464a44823f5429963cb48922"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.calculus.DerivativeDomainTest.xml",
+      "bytes": 2765,
+      "sha256": "61d95c5a7d2965cadeec3f827a080a6c7213b8d1a5abb2717528e6fa170a7caf"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.calculus.DifferentiatorDomainTest.xml",
+      "bytes": 1887,
+      "sha256": "1b550a5c074f580eb24d5f88d20a0336dfe7043c481030ef381e485f543ccf4e"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.calculus.DifferentiatorTest.xml",
+      "bytes": 2977,
+      "sha256": "1386310941da9d71d9fd8dee3f91b25b260ecfa99bcd0e688eee6374c50d8cc7"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.canonical.CanonicalizerDispatchCompatibilityTest.xml",
+      "bytes": 519,
+      "sha256": "eb147e666b5b55fa7a2dd9cd33d3b73ac9beec302fe578d669cbe2e83a6d4739"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.canonical.CanonicalizerTemporaryOwnershipTest.xml",
+      "bytes": 1516,
+      "sha256": "07746a037ef729c309ef3fb79e136aafece10552addc63f8f7df4e5a75e7870b"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.canonical.CanonicalizerWorkBoundaryTest.xml",
+      "bytes": 1136,
+      "sha256": "7a5fa9e1a253bbfc878ba2aec1524b8454229cdb5682ca11fcd460652725a394"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.canonical.ExpressionCanonicalizerSignedTermTest.xml",
+      "bytes": 666,
+      "sha256": "47e5baeecf0b69d3781fd6a64117df1798cf9353599d4648ba7a55af9c39a093"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.canonical.PolynomialNormalizerTest.xml",
+      "bytes": 3453,
+      "sha256": "96167c86fbc291615b4f1b1b92e8b9d6ef034fa2838774c8ce1958e9dc2bd440"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.canonical.PolynomialTemporaryOwnershipTest.xml",
+      "bytes": 3677,
+      "sha256": "72a065953f5e770435a6b9757b7c5dd55a034c40fc9633916ba04679e5f10733"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.json.JsonWriterOwnershipTest.xml",
+      "bytes": 1988,
+      "sha256": "8d05258193372015f2b40a301cb4ae47353a0d1b4f037b51a037320c56d01d6e"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.json.StreamingJsonWriterTest.xml",
+      "bytes": 1037,
+      "sha256": "33cd6076e24477e44339f8d41d7417224f89ce9b7bb4d4944afaa1555ec0a9b4"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.knowledge.CoreRuleCatalogTest.xml",
+      "bytes": 1286,
+      "sha256": "bf6c23d22319a84ed68f28b68e59aaccc9ca2722b290f4ed36fc618b08ee981f"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.knowledge.KnowledgePackCiGateTest.xml",
+      "bytes": 1058,
+      "sha256": "78e4683ce11184381a017dc61fbf3ea69510c49ab38d2ff3c0bd6710e1a0463a"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.knowledge.KnowledgePackLoaderJarConcurrencyTest.xml",
+      "bytes": 871,
+      "sha256": "99e7eba9e743feb5a1c366474a0bce4d4c1eafbd3dfd4c7a069ec80e1a9a25a9"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.knowledge.KnowledgePackRegistryTest.xml",
+      "bytes": 2331,
+      "sha256": "566f70e2cf2ebd5c2047cf5184482637325519b152cfb3a137ac261fc93ad9f0"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.knowledge.KnowledgePatternParserTest.xml",
+      "bytes": 920,
+      "sha256": "7834a0780a30d1cb7fe5073578b85bea7c232470badafe4043d5639e2c191bb7"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.knowledge.RuleInventoryManifestTest.xml",
+      "bytes": 873,
+      "sha256": "ed2b47bd2b7e50c22c423bd19ed2ce3c6a59a608cf93986c764f307e8a594c18"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.knowledge.SearchEffectClassificationTest.xml",
+      "bytes": 781,
+      "sha256": "2ac41b504f1f53c051b9e56252b35565ac3b9e97da9edcbd2a1c5d4dc561fa5c"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.linalg.MatrixVectorTest.xml",
+      "bytes": 799,
+      "sha256": "063ae48af425a21510fe777b21eb574299bb3f5a5bf14d26aa1563774d62f64a"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.moves.enumerate.TreePositionOwnershipTest.xml",
+      "bytes": 1802,
+      "sha256": "b9a8e637c49aaa5411a114c5db291cb6e50eed79cb0c39a215b2a9163b460dfa"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExactExpressionFormatterTest.xml",
+      "bytes": 790,
+      "sha256": "d1703fb376688cf36482a171aaa8085512c8a9968cd0e13542ee47793a83c2b9"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExactNumericAstTest.xml",
+      "bytes": 1913,
+      "sha256": "f305cf737dc55204eccc12a5eeeb9a81083e34c19369fe06fdba9920f4ba28aa"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExactParsedSubtermProjectorTest.xml",
+      "bytes": 1572,
+      "sha256": "2a3bbbe07cfc86decfec9d664694794d3c58411f610973ca31536fea296034a9"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExactPowerGroupingTest.xml",
+      "bytes": 2544,
+      "sha256": "c161cc5cc52e52527b28364e20947bb96b676da46028976321b589d1b5479762"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExpressionFormatterPowerGroupingTest.xml",
+      "bytes": 1610,
+      "sha256": "fabd3961cb87112e77ee87883be211ab2419362fcd6c3b8284a0c98fe762dbe4"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExpressionFormatterTemporaryOwnershipTest.xml",
+      "bytes": 3443,
+      "sha256": "b452d9deac4a05f23c6da538b2aa7315dd641ac25b614636c3a20a17507a9fe6"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExpressionParserExactLiteralTest.xml",
+      "bytes": 1420,
+      "sha256": "fcf91d2ba5fee6ac8fd28d34f743c890fc341bf2c0a6c92bb973754315e192d8"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExpressionParserNodeRangeTest.xml",
+      "bytes": 2666,
+      "sha256": "82e28f9a7dbefcf7d4168bed902231ed8b44e4286fba5181136df897b5896ab7"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.ExpressionParserTest.xml",
+      "bytes": 1484,
+      "sha256": "08004e11c6260f7e5233b584a1f5181ce4acd6d419217fa0288206aa01d7ed0a"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.FunctionExpressionParsingTest.xml",
+      "bytes": 722,
+      "sha256": "5eda2deace6e8178c5ff4f590f74682376920c13f66b10a5a1b84f7d2f9ebc9b"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.parse.NumericBoundaryRegressionTest.xml",
+      "bytes": 2277,
+      "sha256": "79d7a310a07f25aa3851464206f548b5d5af53cf865a91cfd936c0eda4eaa558"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.BinaryQuarticFactorizationEngineTest.xml",
+      "bytes": 1311,
+      "sha256": "7a8b7aba7f2d71d4e64ed2e592c36e110a3091968faecb4d597d1c08fe9b6683"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.DivisionEvidenceOptimizationTest.xml",
+      "bytes": 1487,
+      "sha256": "31a4da42fa77e3f984ffcfb76b2f9aad8643adb4614d44d6806f4c05780ceda8"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.ExactFactorizationExpressionRendererTest.xml",
+      "bytes": 1539,
+      "sha256": "06b46b00a521403477a2c8b5e8a5447203cb98f14e1c80834c1a34133c7f3d1d"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.ExactFactorizationTransformationPipelineTest.xml",
+      "bytes": 2071,
+      "sha256": "18d198f17275e291c1943f7f2a961a1e701bc95375e850ea7afd96495e2756b0"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.ExactParsedFactorizationPipelineTest.xml",
+      "bytes": 1365,
+      "sha256": "6aaa043804f277543f3143971ad94e28f379ef1f9eb5947505906439bc401b21"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.ExactParsedUnivariatePolynomialViewTest.xml",
+      "bytes": 1628,
+      "sha256": "8b0d6432ba4fc9f7d66b07e35a97569f88ef350b076b2b45e0f56cd29c5c6643"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.FactorizationEngineContractTest.xml",
+      "bytes": 646,
+      "sha256": "95b6f937e9810561d8cb21f12de9e45d4e502249d07babdd3959c8e1b8503ecd"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.FactorizationStructuralLimitsTest.xml",
+      "bytes": 504,
+      "sha256": "8e32ded25e89480ed9266abfc5c08658523525e15442ab3ff1199c7b98da1911"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.IndependentFactorizationCompletenessTest.xml",
+      "bytes": 1522,
+      "sha256": "583543a073cab21dc57395704e88966f538e647088eb4214684aee99309b4af1"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.IndependentOriginalDomainIrreducibilityTest.xml",
+      "bytes": 1572,
+      "sha256": "4f99d4363a58458594d43da6cb3d33a99b8a9f18c374ff37924c54af5f01668e"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.PolynomialDivisionBoundaryReviewTest.xml",
+      "bytes": 1059,
+      "sha256": "7cf1b17d6cbb1a6adaa399f36346cfa1d63ab0df60e702e78ba936667ea90aa4"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.PrimeFieldArithmeticTest.xml",
+      "bytes": 1029,
+      "sha256": "1ad589a990f6cf90458361e66d3d7babee78fa8097289ce40e5637089f52e792"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.PrimeFieldTest.xml",
+      "bytes": 852,
+      "sha256": "fae22fa1bb08f353ad203027386071864ea67fa95fc7526d7a6dd8b1c8b08f2c"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.SparsePolynomialTest.xml",
+      "bytes": 1036,
+      "sha256": "ce3280f89c0ce6a320293b94c457b993592ba62a9cecf57949b23be61d27a36c"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.polynomial.UnivariatePolynomialViewTest.xml",
+      "bytes": 968,
+      "sha256": "3abb6f50ab7e39bd5a1c089e3111d9db65f6ad9357331a440c4d988d71b2098f"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.python.runtime.ManagedPythonRuntimeTest.xml",
+      "bytes": 2069,
+      "sha256": "2981b69fc0a4067b02002c9c9a0fa700b70e6ae025b7f740ddf29bbedbc0a148"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.representation.RepresentationBridgeTest.xml",
+      "bytes": 791,
+      "sha256": "9023ae443ff428b29fb1a9e3ed42414efa7670f9e426ceee54dbeb81c5d27860"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.retention.RetainedGraphImmutableInventoryTest.xml",
+      "bytes": 3634,
+      "sha256": "b267db75a0454a5ec4c3397f08b07773bdfed2cad52c7e4f1b7bb4225be268b9"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.retention.RetainedGraphTest.xml",
+      "bytes": 2144,
+      "sha256": "4f8abe255185961b7cdedf15b12cb07babc255792fd76d5c1c3a522475e1dd8f"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.retention.RetainedJsonTest.xml",
+      "bytes": 2305,
+      "sha256": "2783c807a2b22e1d511685f2ed9dc9aa44ceafff4e9067fd6dde0dd89bf0b231"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.retention.RetainedOperationTest.xml",
+      "bytes": 1081,
+      "sha256": "3d40f215e804ea454d95624b31f6db66cafca8d8cf9454dd7a815ea617ad89e3"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.rules.DomainRulesTest.xml",
+      "bytes": 2226,
+      "sha256": "57e19bbe15c4ec00c2ebcf586a57ccee196855bba49ab463cc857089e52becfc"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.rules.PolynomialRulesTest.xml",
+      "bytes": 956,
+      "sha256": "794c2d1f81fd96a7d303f1e223c2d9aec09b1cb1d6e2132d0c5360d2a1280f76"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.rules.RationalRulesAssumptionsTest.xml",
+      "bytes": 617,
+      "sha256": "2886625cfb8e3dcb0859059c526c47c9ed6e31d8472a6be0d7d32164e6c1d4b2"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.rules.RationalRulesTest.xml",
+      "bytes": 1097,
+      "sha256": "32d6b7b7a4f0c35395be4fbc4f524bfc0753147b77a0ad4d0371ccfb8046b37c"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.scalar.ExactRationalCrossCancellationTest.xml",
+      "bytes": 931,
+      "sha256": "22d40a65af5478f7c9735e51b1fb5d6147b324ead7b108882b24b32a144d0d06"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.scalar.ExactRationalDomainTest.xml",
+      "bytes": 2302,
+      "sha256": "6e88e4effe3bec238258db49f4b0c7a764e5ce0dc93bd84524965d343bb36d60"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.scalar.ExactRationalEvidenceJsonCodecTest.xml",
+      "bytes": 1114,
+      "sha256": "0078486e6160a78746b11a2df3cc93ce47b9235503308e428de540f1ac379ba8"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.scalar.ExactRationalOwnershipTest.xml",
+      "bytes": 2786,
+      "sha256": "788de30e5376289e341e175fd9871835fd775e81dfaa0c1ec295f3148430d9fa"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.scalar.ExactRationalPolynomialContentJsonCodecTest.xml",
+      "bytes": 811,
+      "sha256": "cd756050aa6f88ee52c491999534d617a9240978f3d83919a9c56a2237022ad5"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.scalar.ExactRationalPolynomialContentNormalizerTest.xml",
+      "bytes": 1295,
+      "sha256": "4da61d36c208c89b7989e7aabc5b648275e6c3bcc336cd17f9c1749e15a16c90"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.symbol.ScopedSymbolIdentityTest.xml",
+      "bytes": 889,
+      "sha256": "e2195165ff11c6c2474e72e6b6d27d0dfa5c81a92688b2484cd22d0d2dc74d8b"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.symbol.SymbolIdTest.xml",
+      "bytes": 833,
+      "sha256": "c5e7f4a1d53b8e685459ff0de29ef14f75defdff24e3e9dc51f9f6458309974e"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.symbol.SymbolScopeConcurrencyTest.xml",
+      "bytes": 646,
+      "sha256": "6b16475c4dbce1f752646d024e6c7ccb0fbdd5377b5f4314e863452aea49c292"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.symbol.SymbolScopeTest.xml",
+      "bytes": 1284,
+      "sha256": "1d985df29b705835d28ec4ae5ec0dead01c3bf2eed73ee1e7cf750f7815f8c7f"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.symbol.SymbolicExpressionCodecDiagnosticsTest.xml",
+      "bytes": 1244,
+      "sha256": "308337bd6cc973f72044dc0247ff41e1a93120e0d4cf093583a116e962025f1d"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.symbol.SymbolicExpressionCodecTest.xml",
+      "bytes": 1388,
+      "sha256": "9a693a28c561cf0168cde8f72035a019aabce843ea0ff8971a280b4edc564d94"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.symbol.SymbolicExpressionTest.xml",
+      "bytes": 1555,
+      "sha256": "54596ad8b1f063a84df1092e2f5a8e0be296b97a5f9c3a7ba901a7bedfb4b474"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AcNormalizationPreparationSolverTest.xml",
+      "bytes": 1697,
+      "sha256": "f2691acd4f9a33111248443cfab7456f289ea598fc6eec5b0a12193cba48b315"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AcNormalizationPreparationTransformationEngineTest.xml",
+      "bytes": 1705,
+      "sha256": "656303071cd73b0296b6784c8872f94c84ebe41a13daff7edd8a7ddaacc44eae"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AdditivePairHypothesisOperatorTest.xml",
+      "bytes": 1744,
+      "sha256": "b3f05b8977508e91959560b52650eb94f8f3f15f4d68d1fa4aa9d6e178eafb16"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AstRewriteOccurrenceObservationTest.xml",
+      "bytes": 530,
+      "sha256": "678c7fbf14eb8bdc539cac337b5b2b3eb7b9505ace20dea56b81fe5c8c595708"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AstRewriteTransformationEngineAssumptionTest.xml",
+      "bytes": 526,
+      "sha256": "3b9c82711c6a1b608f42d73edd60b4e388e82dac9fb63cb2510723a5d2c4f07b"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AstRewriteTransformationEnginesTest.xml",
+      "bytes": 959,
+      "sha256": "497442e7f2bc6019c6219a7920de643549dac21d5bfd0a98e77ebb00229df519"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AstRewriteTransportAssumptionsTest.xml",
+      "bytes": 1157,
+      "sha256": "a5be98bebc73bebbc08bdfed608254c160dc831839fdd1d2ba6fd7be2d1f3de4"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AstRewriteTransportBoundaryTest.xml",
+      "bytes": 1132,
+      "sha256": "ec35fa677800b7518fb820be5884ff03a0ea4ec758b4174dd9e3543548986e6d"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.AstRewriteTransportTest.xml",
+      "bytes": 1880,
+      "sha256": "d023551e4c314cc94b83a87350ff0805976132c92a0397f0b09e8ef8359e97c4"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.BoundedRewriteReachabilityOracleTest.xml",
+      "bytes": 1598,
+      "sha256": "5f06ed08be3cdbf145172ba7676ac5d047de8b851fbcf466e83e0df0cff71d09"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.CompleteSquareBridgeOperatorFamilyTest.xml",
+      "bytes": 2290,
+      "sha256": "2cf75476b45a1b988f308bf651773428156fb9d3e3983d6caf5fdf3e4cef0791"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.CompleteSquareBridgeOperatorTest.xml",
+      "bytes": 786,
+      "sha256": "e31ed2b3ebacc0e5cd2df667587800c723aef7e5966a8882b3c329c8749e89f7"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperatorTest.xml",
+      "bytes": 999,
+      "sha256": "d0b1b6524cfeec72fae39329e4ccf9cfef93b1ab9b7e9d7efb5e95e833937f28"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.CuratedDerivationIntegrationTest.xml",
+      "bytes": 837,
+      "sha256": "b45c6e8f40977dd0253d182e20716d5d4740052759fb101865aa2c9688ce93a9"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.DelegatedTransformationWorkTest.xml",
+      "bytes": 511,
+      "sha256": "1a9b5b772e96e1231da570764a4c44907b6b4aae9fae96823601acd3061396c0"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.DifferenceOfSquaresPreparationOperatorFamilyTest.xml",
+      "bytes": 690,
+      "sha256": "f5f06a1331fe17920c2ed0d48ba705ae5bac2a588bfa8e6f393e613d5f4cf475"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.DifferenceOfSquaresRuleTest.xml",
+      "bytes": 608,
+      "sha256": "37bc79fc1701cb1c260496d61354877bda43de5021a80d1b3b531e11fe843dfe"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.DoubleTermOwnershipTest.xml",
+      "bytes": 1447,
+      "sha256": "cf073f24b7caafaddd830c9d4f65057cfc24e34e2a70e8271f5d098d8a38d126"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.EquivalenceAwarePatternContinuationTest.xml",
+      "bytes": 1549,
+      "sha256": "46ef85a0ce7d8359b76e796402577b5fe0ab3619aac9760567205a9e2bf3f280"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.EquivalenceAwarePatternMatcherTest.xml",
+      "bytes": 2862,
+      "sha256": "0b24470e29b73a7cd90245bb4673cb132d36b8e25468d2379daddc0ed3d9841d"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.ExactMonomialInferenceTest.xml",
+      "bytes": 3935,
+      "sha256": "e3b8f07c6a7a2afda0bca913532ac7012ccdd5ddd3ed92d9ee18da80de02658c"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.ExactMonomialOwnershipTest.xml",
+      "bytes": 1761,
+      "sha256": "836b08c39666feba31a7dfb8dcdf2d0ae368d574b93c6239105c2fcfefdc2e13"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.ExactMonomialScopedSymbolOwnershipTest.xml",
+      "bytes": 2239,
+      "sha256": "f0e85567a940879dabe469d0be997ab18783e8f1d31ba051c9690b99998ee9e3"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.ExactMonomialSquareExposureOperatorTest.xml",
+      "bytes": 1154,
+      "sha256": "b70f132156b4a585d0e6fd5d67cc89d53845880a9fe28c1dba4dd0bd94e02688"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.ExprMatcherOwnershipTest.xml",
+      "bytes": 8314,
+      "sha256": "a7cf9f66a2dc42dc0400b52fa7aede025962713a09611677b5c0df67865a872d"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.HiddenSquareDifferenceFamilyTest.xml",
+      "bytes": 1852,
+      "sha256": "0e1dca10ba962281b96931f91311481ceebac52e7eed0e6f7c0177ca0b031ca0"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.HypothesisOperatorTest.xml",
+      "bytes": 3216,
+      "sha256": "ddf90e1ee060d9bd852ba876150f6eb6b44303f6c4f8671168fdb0b7df7e2ced"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.HypothesisTransformationEngineTest.xml",
+      "bytes": 966,
+      "sha256": "db493861bc34ea493c63503a339c4d8880cd01c955a31e9ffc817ba886eecd23"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.KnownDerivationBenchmarkTest.xml",
+      "bytes": 628,
+      "sha256": "1a5ae8d80110b5ae64d732ce6255c1cf795df241cb276887ad3cd798c51bc751"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.LinearOffsetSimplificationRuleTest.xml",
+      "bytes": 637,
+      "sha256": "af06ecde9aeb96f9a3dc79c4e45685e3a9f4be17fe5394466edd9bf7a160e04b"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.MatcherAttemptOwnershipTest.xml",
+      "bytes": 2837,
+      "sha256": "515c843beb726421160164505f4edb78df63fafe36ad65b9311c944e80dc617a"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.MatcherDescriptorCompositionTest.xml",
+      "bytes": 1648,
+      "sha256": "c222f227c6a33a9c671ecddd530a2a3cd81cc4c9cbdc0ce94deaff960bc1c4c7"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.MatcherDescriptorOwnershipTest.xml",
+      "bytes": 964,
+      "sha256": "798d52dc6f1366a1f930d21cd1020c5d6ebdcd2a91cc22fe6490ddae02750226"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.MatcherLimitOwnershipTest.xml",
+      "bytes": 804,
+      "sha256": "c08ee9b8b555fdf20f0d95d1b9beb0a5d3cc01177d1436e9bb1b8fd66820b404"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.MeasuredPolynomialDecompositionPipelineTest.xml",
+      "bytes": 2154,
+      "sha256": "ea19f1373a7d9841c01dc7506d99d3e211f6b66bd46975e884e14fe757e61bf2"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.MonomialCommonFactorPreparationSolverTest.xml",
+      "bytes": 1296,
+      "sha256": "0c88a928162c6e6edcb52fee93a1f2f4e21ca3e97331c3bf823eaea6fd5bc3fa"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.MonomialCommonFactorPreparationTransformationEngineTest.xml",
+      "bytes": 1370,
+      "sha256": "a805cbdee6c6ac5cc9f0dc26ded91dde3a374cf0162aa187ef7d91ad65365f37"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PatternDescriptorOwnershipTest.xml",
+      "bytes": 1020,
+      "sha256": "a99b9cec234c153600edef36f30383624a6801f651e45371d89b4cdcef197bd7"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PatternMatchAnalyzerRepresentativeTest.xml",
+      "bytes": 512,
+      "sha256": "dd5493f5dc535e81bca93339015bbed299c211df086531fbd769a77476196ff2"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PatternMatchAnalyzerTest.xml",
+      "bytes": 1896,
+      "sha256": "2c71bda5c1bf9d20e609c0f2fc7ff64dded0eb8db80d0a9ed7386dbe8feacffb"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PatternMatcherTemporaryOwnershipTest.xml",
+      "bytes": 1704,
+      "sha256": "8cd239cee851480c29694b3b8e95654a52c74499624341c18348a1b2b2bd9190"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PatternRewriteRulePreparedMatchTest.xml",
+      "bytes": 980,
+      "sha256": "0161a2ebb26b2fcd58146eade1e50e7defdd19701c2c8669bb1db0e2a424a586"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PerfectSquareStructurePreparationSolverTest.xml",
+      "bytes": 1125,
+      "sha256": "339c3331e89ca90f28086060c6330571c0d0a2c0311dec10d29723fa15ba4e92"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PerfectSquareStructurePreparationTransformationEngineTest.xml",
+      "bytes": 1196,
+      "sha256": "802f452236617beb860bcc041dd6e12330cb1407d346a4cd2260e88e1ee57ad3"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PolynomialDecompositionSynthesisOperatorTest.xml",
+      "bytes": 1705,
+      "sha256": "5677efd93113aaa3524ba8446b57f51e8cc88e46f02f00c79363c57f1e8f32e3"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PolynomialTheorySubsumptionClassifierTest.xml",
+      "bytes": 1473,
+      "sha256": "a500cceda223330dee36b1ffdb9f2a5fde32f6e6263fd0e31914c7f3a5adbb62"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PreparedAstRewriteTransformationEngineTest.xml",
+      "bytes": 3181,
+      "sha256": "3e57b592675c10519b87ed2aa8685cf5d36fe27e0bd39cb125d32f2e540585ec"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PreparedResultOwnershipTest.xml",
+      "bytes": 835,
+      "sha256": "a2b635aa3c8f54d1b6020769923c423b16f2c2645a522e5681d11cc6983e6788"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.PreparedTransformationCursorTest.xml",
+      "bytes": 2461,
+      "sha256": "a88e6d7c6b7f7cdbb7667fdb47b80ee8ed3e39d605adaa648a83b694f0677323"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.QuadraticFactorizationHypothesisOperatorTest.xml",
+      "bytes": 510,
+      "sha256": "ca9c6e9fee359132910da059c199f795563d8ac91f3400ff44b8851b464329a6"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RationalCommonDenominatorPreparationSolverTest.xml",
+      "bytes": 1482,
+      "sha256": "9cb49340e0700facc538a1b6517f9d44b8aa354d644d90aaaf48e5611c533f83"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RationalCommonDenominatorPreparationTransformationEngineTest.xml",
+      "bytes": 1583,
+      "sha256": "a4e4a865c35d0f9317e32efb72fe25451fce0806931a6de82c52086119640057"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RationalNormalizationHypothesisOperatorAssumptionTest.xml",
+      "bytes": 1089,
+      "sha256": "9f2fd7758392d162fac095ba0ddcdd29396b309b40c2116c447e281af03829d7"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RationalRewriteRuleTest.xml",
+      "bytes": 1305,
+      "sha256": "138321f2d2103465ed5ae7dfbb73e36025a313231bcd416ba1631f217af18723"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RationalizationHypothesisOperatorTest.xml",
+      "bytes": 833,
+      "sha256": "8c50b0e1510bf0f91677cefa8a671aed65fe87efab95fa8d37250487c65d49b5"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RecognitionCoverageComparisonTest.xml",
+      "bytes": 678,
+      "sha256": "26623da08f76fe72e3f4408fce03331cfcee83abf0f4827fdbe38ee779210311"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RecognitionLearningTest.xml",
+      "bytes": 1361,
+      "sha256": "44da0d33942275a081630c1b0ed79b27e2d877e789a57a17c0d2f626114e064d"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RecognitionTheoryDomainTest.xml",
+      "bytes": 2045,
+      "sha256": "8ce1fbaca401669d752d3e4ae6fa64982b1e4f3b9f57b15423cb3401b3be472d"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RecordedExecutionTest.xml",
+      "bytes": 791,
+      "sha256": "d550ac409e46cfab34fdab8d111d2bcd7c20065d5a591ab035fc9301ae2695b1"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RewriteApplicabilitySchemaGuardInferenceTest.xml",
+      "bytes": 693,
+      "sha256": "59645d8e1afb372a027b8eebcd9b7f4ffeea78a10ef0c2e1be8de4fe252a1228"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RewriteApplicabilitySchemaTest.xml",
+      "bytes": 926,
+      "sha256": "7f1cbe3de977a0be57a0b54cc31f38506bb4dd42d3a7ba0b9274b3129d9cee42"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RewriteTemporaryOwnershipTest.xml",
+      "bytes": 3222,
+      "sha256": "ebd71025a7c09fcc3dd165875f70c9f260e020624dbcdf00bb35f10f88efba07"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RulePreparationPlannerTest.xml",
+      "bytes": 1617,
+      "sha256": "b33dc501b29001ea93c68a5999e515d7ede0b6e9cbf9f56e2e98995214c7806a"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RulePreparationTransformationEngineTest.xml",
+      "bytes": 2626,
+      "sha256": "109662d72cbbfae48ecb75c42ebf69da043a68417ae81577b8bd5e914202e78f"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.RuleShapeIndexTest.xml",
+      "bytes": 814,
+      "sha256": "b772d82048bdd51a56802d141a8811a687684a7fe38e8464c2afc605b98ae4cd"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.SafePreparationEngineRegistryTest.xml",
+      "bytes": 986,
+      "sha256": "9b65855828f7058e3b018aa8891b9cccf3b1b798fe7ba2050dc47dddb03ed53e"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.SquareBaseSignSymmetryOperatorTest.xml",
+      "bytes": 951,
+      "sha256": "69f7346792c13ce749caf49178dc8c8c25e4ec21f50520016f3f9fe5b05a2949"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.SubtreeHypothesisOperatorTest.xml",
+      "bytes": 1105,
+      "sha256": "8732fd6ca84f7bfdddef876cb1df3d4db9e5409c1903063c3a9901496295ec70"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.SumOfSquaresCompletionOperatorTest.xml",
+      "bytes": 934,
+      "sha256": "19d34f4a40fa05da1b87bd4fe1224a50d2f3f529ed9216cc13fd84313bfd20ec"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.TelescopingFractionFamilyTest.xml",
+      "bytes": 1534,
+      "sha256": "0e7e4b208533495e691049ff78d51278c63cef8f5be903c5dc72080a7fa7309a"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.TelescopingFractionHypothesisOperatorTest.xml",
+      "bytes": 964,
+      "sha256": "85979ef00e99a2aed31864f7a61b21865b6abf7615ece7b92045b7929ff55cc1"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.TransformationPrimitiveLineageTest.xml",
+      "bytes": 811,
+      "sha256": "823605edf31a58e15f3d19eb86d33540cb910f114c0835089caddcdf1ee3537a"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.TransformationProvenanceTest.xml",
+      "bytes": 987,
+      "sha256": "153b020b95d9c89541d57857cf1ca1a8fbc9590c67fc12637e791b5cc9b1fb05"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.transform.UnivariatePolynomialTest.xml",
+      "bytes": 646,
+      "sha256": "eca18f9fa6267c8126b659c7517cd4b359e0ba03f2e92e2e7a95c2501fb08cdb"
+    },
+    {
+      "path": "full-modules/regelsuche-core/TEST-de.regelsuche.util.AtomicJsonFileTest.xml",
+      "bytes": 1240,
+      "sha256": "0775ff0ceff21044638658d1c0c45024541127cb093dee9a0e7cced5a827a2f2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuc-BVCBI43UUF8QC.evolution.ExecutionProtocolBoundStratifiedEvolutionRewriteProgramPopulationRunnerTest.xml",
+      "bytes": 1412,
+      "sha256": "b1161d6847e49ce76fb265577d9318841bc49ec4af51fe93657a1b8d62e60bd3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.BindingAwareStrategyDispatchTest.xml",
+      "bytes": 1711,
+      "sha256": "500c27a407599cedc8bb0d8e5de5923820ad3c415d17faea7be2342c504367e3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CapabilityLandmarkSearchTest.xml",
+      "bytes": 505,
+      "sha256": "ff0c7a3411dc6d55a6bd96da1acd22e6e120480fbccc86ed7dc78c384ccee0fb"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedLearnedSchemaModelTest$NativeProviderAccounting.xml",
+      "bytes": 6946,
+      "sha256": "5df4c878abfab9182fae1f2802da11700a8780faa246ab33103a6ec0ea615dd4"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedLearnedSchemaModelTest.xml",
+      "bytes": 9120,
+      "sha256": "df53087f9764ef2342dc29f6466d19fc85a54624253798ec34d6f8b56f98c338"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaApplicationPhasesTest.xml",
+      "bytes": 2431,
+      "sha256": "da65585c91b2b970090050cc22b601e434575aac9ebddb21ef4a6d67f82d57e7"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaComparisonWorkerTest.xml",
+      "bytes": 995,
+      "sha256": "8c13431aa2ae8435ec24eceeb749b88ab901f79ecdcc55fd8eaadbec47b02606"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaCursorTest.xml",
+      "bytes": 2616,
+      "sha256": "b4e614bdd40fb40229dffcb2c09aaad7eb0cc1d843c2a5ab9e3c3cf55c0593c4"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaEvidenceWrapperOwnershipTest.xml",
+      "bytes": 2053,
+      "sha256": "5c4f5fece34e4377d1bf8ba55bbfc8db6b51a2d1dacac689b8d7e33d6941a9b3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaLazyIntegrationTest.xml",
+      "bytes": 1113,
+      "sha256": "33facda4411c3757c2e9a91efede81173e96b9b99ddeeba2a635b6ec19a3a398"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaLiteralOwnershipTest.xml",
+      "bytes": 1409,
+      "sha256": "8571bfe35fc14132a510a9faba7078deae636efe0ffe4720c92bc0268e58bc4b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaOrderingLimitsTest.xml",
+      "bytes": 1017,
+      "sha256": "1fd9638635566378d40dac960a7d9782e9a0f68f4f081014ca3eaa531bf38d0f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaProofBoundaryTest.xml",
+      "bytes": 1031,
+      "sha256": "67a21835c21f64214af192c79a79ed1ba4b039e08faa0f5e62da488d4d622707"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaQualitySelectionTest.xml",
+      "bytes": 677,
+      "sha256": "d4a90f6e4333ebc9ce293a56a68e5b536d7e162f5f0fb547577d6f926c58a4fd"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.CheckedSchemaWorkReplacementTest.xml",
+      "bytes": 1083,
+      "sha256": "dff87792e12c0b8dd06b9f91a297eb10bced75c036ea91fdb649a67d6917db1b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.DeterministicGenomeMutatorTest.xml",
+      "bytes": 801,
+      "sha256": "d67c9c2ec1ac2ae1678d50369f578613077f037a1e7d6d4171712d38d91fbf6f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.DeterministicRewriteProgramMutatorTest.xml",
+      "bytes": 1699,
+      "sha256": "b9850d036d5bc1e0c93b825b55bd3f406f197e01764d26bfff5069e12b8ea31c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionFinalTestArtifactTest.xml",
+      "bytes": 1265,
+      "sha256": "94dcf01ed8f557f76cefe29b9f5d1686a0399d3ffa9001f2ace6a344ccd49903"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionFinalTestContractValidationTest.xml",
+      "bytes": 2177,
+      "sha256": "1c59a03d6cf2ee937c8b930157e98a0bfd16ff2233093e864909e99943b75644"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionFinalTestRunnerTest.xml",
+      "bytes": 1301,
+      "sha256": "ca10c35a06a951a924820d10e305acc894dbf8899799f072e67ad7d9fdbc9fce"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionGenomeCompilerTest.xml",
+      "bytes": 775,
+      "sha256": "378313945c11379c1d056cbd9cf170249a4c65792cfd6135f28c4814d3281489"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionGenomeTest.xml",
+      "bytes": 1028,
+      "sha256": "d35620917a5da0b8ecaf918f51de8e5c4935960fa733c3adfcbab73553fcbe84"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionGenomeValidatorTest.xml",
+      "bytes": 1054,
+      "sha256": "cdaf89269f8b1c82bef5ec437e70551ebf014d23b7ae39c97507e551374d945a"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionPopulationCheckpointTest.xml",
+      "bytes": 661,
+      "sha256": "77b128a22f005e83f14ed77de00695093e2e511311aedb37e24fa74701992410"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionPopulationEngineTest.xml",
+      "bytes": 836,
+      "sha256": "338b71778c3d97d4a4bca31e37d80f8a853831f31a17d5755304d100677062b1"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramAlphaIdentityTest.xml",
+      "bytes": 674,
+      "sha256": "a1a2b7e0c2a431637fb364a9dbc0b3368ae599639b40bf025e671c6d3e6dbe21"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramBaselineAblationPlanTest.xml",
+      "bytes": 1034,
+      "sha256": "bd0fbc1f807b2c4d4057e33a80cc35ccdaf3e8ede7e5068e5efdbd4694489082"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramBaselineAblationSchemaContractTest.xml",
+      "bytes": 550,
+      "sha256": "ecc6894891214fa4377165634e552d4005d3cfb03027f9dacbb7b612f109e809"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramCheckpointArtifactTest.xml",
+      "bytes": 988,
+      "sha256": "570ed9ca77e662f7dfbc4c98bffa988c1c6bd0a380eb416559c09bf95b24d061"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramCompilerBackendTest.xml",
+      "bytes": 533,
+      "sha256": "b228f8fdb19d09af688076ff9103dc413818a48142588e06b7a23383c33a1104"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramCompilerTest.xml",
+      "bytes": 1449,
+      "sha256": "7740a3c4e23a75884f7de06e3e6324d1138766cd947995913bb2c3203ff17891"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramEvaluationProtocolTest.xml",
+      "bytes": 1049,
+      "sha256": "d9095ad752a54b19d4f4fa91ac5e8e1664a42e446c4f1608cd675e67f8e1fa16"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramFinalTestReviewTest.xml",
+      "bytes": 1443,
+      "sha256": "146cbb300c94b83593f0c7c9185515056adfddee364fff4e3cb1ff5a09bbfc4b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramFinalTestRunnerTest.xml",
+      "bytes": 2278,
+      "sha256": "4aa93acfe2e8e8b9c905ea7eba0c547ad26f62d2c3b68bffd8f07260b1210c0e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramFitnessSchemaContractTest.xml",
+      "bytes": 538,
+      "sha256": "d609ac1a8dd95aa603fae8fc5b59fd934fa57e7303e1abf27f853f0703445114"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramFreezeContractsTest.xml",
+      "bytes": 1026,
+      "sha256": "ad1fbd0f16a3894da5a82b13db92aeb70351c94c9f8b37c2155b2d3d1f8fc82c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramFreezeNegativeControlsTest.xml",
+      "bytes": 696,
+      "sha256": "606d14b7f8a75b32ab6a88a3f6f6d2068e7e8795a54a3777e4ff425ad787274f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramFreezeSchemaContractTest.xml",
+      "bytes": 526,
+      "sha256": "99a5a224f1843863ae5cd694f73e422f1021bb0a134e69fdc2e73a210c2aba29"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealAuthorizationSchemaTest.xml",
+      "bytes": 558,
+      "sha256": "4d4abf60e525d8d1d4d225c9cd9bb60dcb9037f034d77e95139b1dc7fe76da2e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealAuthorizationTest.xml",
+      "bytes": 899,
+      "sha256": "79a24baace92c26dfb601d33f58b3ed64c406552cf66bc7fc018f9cacd901417"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundleTest.xml",
+      "bytes": 875,
+      "sha256": "a18cd0a2e0eda1ace4ffc4753e59f9594bc4e28071ceea9b008d4c7a2f583f0c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealCodecSchemaTest.xml",
+      "bytes": 533,
+      "sha256": "c59c487a5d00bdf8132f388a79b95bca9248b2c7d62f8316b724ce7aad9d66a9"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealCodecTest.xml",
+      "bytes": 1005,
+      "sha256": "63425cf7a18dbcdb4acfaca74a4b984d0721bb2bc196b5700cccdbfc1db666a2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealSchemaContractTest.xml",
+      "bytes": 545,
+      "sha256": "8f30a67877fe1a470c57415602fae7b25ff3fca2f0d97202b6cff968d452cf30"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutSealSchemaTest.xml",
+      "bytes": 519,
+      "sha256": "2ddf4ec570f0667abeff9d5b397b7298d78c9107d99f48ae960ce8f4158be542"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramHeldOutSealToolTest.xml",
+      "bytes": 676,
+      "sha256": "086774a99c357f2e037b00b508b64e2b544ec9af3f6ad05a23e466358e70ad0a"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramMutationKindTest.xml",
+      "bytes": 512,
+      "sha256": "0f06467aebe1fab66b846f8663c4dd0c44c33a62f324d71dc221cb5b3c94f765"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramPlanCodecTest.xml",
+      "bytes": 811,
+      "sha256": "75578f767960ba4bc1fcd5660b204abe62194c6b70d8a8deef67f9a24d217707"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngineTest.xml",
+      "bytes": 1218,
+      "sha256": "7cfb1bc57ac1593baa9c63e2657d5f99caaf53a62953207b8a4e92f0424d46fe"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramPopulationExecutionProtocolTest.xml",
+      "bytes": 1085,
+      "sha256": "7561d1d3409aed3c2b74ea111a9ef31b1253dd655611618a4fe60ba76c5d07ed"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramPopulationSchemaContractTest.xml",
+      "bytes": 539,
+      "sha256": "de8a5c5e3d68ee3895ddf3624d12de3fc2535f72ef14a8d34a0281ae21b2d400"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramPrivateLedgerUtf8ReviewTest.xml",
+      "bytes": 1147,
+      "sha256": "de3a2a14ac09caf273d22f0a79770aa87bc5af8271d25ecaadc0581fc98c0ff2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramQualificationServiceTest.xml",
+      "bytes": 1126,
+      "sha256": "bf17604a2e453d0e3b9810d8099214b7cf6bd3e03178427ad0d4e5520b6d5b2f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramStructureAnalyzerTest.xml",
+      "bytes": 702,
+      "sha256": "f297df79f2ba6fa4529bfdd6abc182d48cb1b0c00a584c0f22878ff495baebaa"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramTrainCaseReferencesTest.xml",
+      "bytes": 688,
+      "sha256": "b70a484c9bd2b031ec18306b79f901d853cc54ae24b19de0348b49bd89140913"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramValidationRunnerTest.xml",
+      "bytes": 4010,
+      "sha256": "ff3d316fbae8d57bbe673236f6c8fdc9b2ab04751a8ffc17de4968bf0d429ebe"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionRewriteProgramWorkBudgetReviewTest.xml",
+      "bytes": 1072,
+      "sha256": "9cb84710c36134085c13a5944174456fd2c0cd9678391f83bbcc5c3b8de79d10"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionSchemaContractTest.xml",
+      "bytes": 485,
+      "sha256": "96e84d4c6b9e09e2db378d08116d0c7b22b47bbfbe416712f687b20d0f48a80a"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionStudyContractsTest.xml",
+      "bytes": 1542,
+      "sha256": "b9cf73fd4ff4057636f4b74ff8cb4a7b1be7b7bce8940e11bdfb00aceb3b8723"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionStudyPlanExampleTest.xml",
+      "bytes": 691,
+      "sha256": "218031f6624cbde9d7d4847c83462d25a6df97339c39b1374c9ba1fd8acbfe79"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionValidationCaseEvidenceTest.xml",
+      "bytes": 658,
+      "sha256": "04af65a7d79f84e3dcd0ffffb89f22aba97f710fc29d569c2c3bde357bfcf8fb"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.EvolutionValidationSelectionTest.xml",
+      "bytes": 1273,
+      "sha256": "52f2a0f444be0b6d2ebbeb5f1275cfb4d5f9f7b11b2fd41891016fdd3d000fe9"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifierTest.xml",
+      "bytes": 1442,
+      "sha256": "3bf7846026b38812028f06b8f4d3917da711302faa16771d8d754cb11973aec7"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifierTest.xml",
+      "bytes": 1583,
+      "sha256": "d3c5ff8f6a3fa35532cdb6a03ae15b5d3643594e4e6603f2d42ff65460e698c8"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanReplayConfirmationVerifierTest.xml",
+      "bytes": 1629,
+      "sha256": "95158f585abc6c7e052c891dae4ecd73ed7bacc473fb7aec2443688ff62952f5"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanReplayReceiptArtifactVerifierTest.xml",
+      "bytes": 1313,
+      "sha256": "042fe2e1777f0fe48c3d6f742837f33ef58ea0756af4d255748e6ed137997125"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifierTest.xml",
+      "bytes": 1192,
+      "sha256": "d18a3ced362c2b20b987028e866c0c8947d2d9adf05b1d9410603f9e43c090a0"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanResolverTest.xml",
+      "bytes": 1153,
+      "sha256": "0fcd00850e7af676f1d4a94038fa835fc0b142270e5db6222772028f7c614761"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanRunArtifactVerifierTest.xml",
+      "bytes": 1242,
+      "sha256": "c839dbd7fae06ab75cd1742e90780af0aa79d4b20b963c9939d396f83051c6db"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialPlanRunSubstitutionTest.xml",
+      "bytes": 536,
+      "sha256": "cec7520ed4ca8647c5451cd972c8a5b03ba589c0fcc0bddd578f8c20ff6902ba"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactFinitePolynomialTraceLearnerTest.xml",
+      "bytes": 4180,
+      "sha256": "38c3877acca7b389e1c59b0ab73e3d92a6eb44551364dba56490bf3843042230"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExactPolynomialPatternVerificationServiceTest.xml",
+      "bytes": 837,
+      "sha256": "83718feb1cfed25308611e3a2f4c582a2b30eebb73e72330bc691a997ab5845f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExecutionProtocolBoundCheckpointDocumentationContractTest.xml",
+      "bytes": 562,
+      "sha256": "253e32ae1d128cdb6e5f73826c8a718f1cd670fd5f890784ceb78bf94d2c15f5"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExecutionProtocolBoundEvolutionRewriteProgramCheckpointArtifactTest.xml",
+      "bytes": 1295,
+      "sha256": "caaad469f7bb3d0c6afc3a8b0a8ee906fe3979bc8635cd0b84124c601234e158"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ExternalPolynomialComparisonWorkerTest.xml",
+      "bytes": 1168,
+      "sha256": "d8ae947510cfde4a5b254d10ed826f62ed77aec3c7d89e54943e9a6fcea98f26"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.FinitePolynomialStrategySearchTest.xml",
+      "bytes": 3093,
+      "sha256": "ae523f3251876438b770436117721b66712551f7311ff557eda27142d0e2c104"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.IncrementalNativeMoveReplayTest.xml",
+      "bytes": 1503,
+      "sha256": "27344f38427e31b67a36875cd4f75601127997d9e50e123e067d94824c5a695e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.InformationParityRewriteProgramTrainFitnessEvaluatorTest.xml",
+      "bytes": 1466,
+      "sha256": "83d540d2391efa2d116c8b3020d0ab0283025cbc46291d988699e053e4990fa7"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LazyBindingStrategyDispatchTest.xml",
+      "bytes": 1526,
+      "sha256": "925f0dbd05f295054098b6803877126b1300168ea561090aa11934495c229a4c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedPatternRuleAuthorizationServiceTest.xml",
+      "bytes": 1848,
+      "sha256": "d2f3237bdbfbb5bd3a4ac90b17a9652bb8b1f26abee6888e42557257d04d9276"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedPatternRulePromoterTest.xml",
+      "bytes": 1379,
+      "sha256": "109ceca617499ba27e09bcd41a535a821754da81440ac6d3e03e8d499367941a"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedPatternStoredAuthorizationReplayTest.xml",
+      "bytes": 852,
+      "sha256": "d0334e2943016bb1e7ccd21056e4f268cf1fedc59e4cc4d1c1c882097ed0f71d"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedRewriteProgramAuthorizationServiceTest.xml",
+      "bytes": 1029,
+      "sha256": "df354e0b1eee5065eb76de3673fbd5c7807d068d34b37761f0b398a876d3815a"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedRewriteProgramReplayEvidenceTest.xml",
+      "bytes": 815,
+      "sha256": "29d5c0893dee92c761874ef847349c4b746e98744aaf217d788d7478425e391c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedRuleBaselineExperimentTest.xml",
+      "bytes": 541,
+      "sha256": "ffc99272bf3a46dc6bb0d6471ea3aeb9af0d154f6f3dd07969971843a539b45b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedRuntimeProductFixtureWriterTest.xml",
+      "bytes": 1194,
+      "sha256": "ce30ea2a7e8d4e0f4011fe4842108fe58217b862dc656d9b638a1c211cf1ca71"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedSchedulingStudyTest.xml",
+      "bytes": 1005,
+      "sha256": "083b77aab5e5bc583476c298031b6d35be602570dfe1dea36d17dbee0fbf16b0"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedSelectedProgramAuthorizationTest.xml",
+      "bytes": 1752,
+      "sha256": "b7447927c023962139e8ac41a3b12587acec4ce583a5cfc689f8d2b32780a4fe"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.LearnedSelectedProgramRuntimeReviewTest.xml",
+      "bytes": 873,
+      "sha256": "a6cab1448ccdd8c065d24920eca0b2330d6be05292a45bd5461de7366603b2d3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.PersistedAstBindingTransportTest.xml",
+      "bytes": 1194,
+      "sha256": "ec10865d22247c275cee412bcc5175feb1f458cf28a53dd86db0a5dca88dc372"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.PrimitiveReplayMoveVerifierTest.xml",
+      "bytes": 520,
+      "sha256": "253fe1c4402d23ca2307c20302e26abef6004853a3bc906dbc325c030d953309"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.PrimitiveTraceMinimalityVerifierTest.xml",
+      "bytes": 1374,
+      "sha256": "a46c551adda1a88e3ab7a55c0c0f451220f18ddb4c57ef5faecae1a418dc5b0c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ProofCarryingShowcaseCaseGeneratorTest.xml",
+      "bytes": 998,
+      "sha256": "8f24a8ebae5905dd4f8b6508c53550a62b86ff58e830e9a16e340ea21eb21f4a"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ProofCarryingShowcaseDrandChainInfoTest.xml",
+      "bytes": 833,
+      "sha256": "ad1f7d18ce199dcd767bff08b92eaa1472940dae6eba24f6d77ddacc09258040"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ProofCarryingShowcaseDrandVerificationEvidenceTest.xml",
+      "bytes": 876,
+      "sha256": "5f4a44fc0cefcdd1ca4ef317e0df98a2a06079ee3741368232eb1c157a3bc3fe"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ProofCarryingShowcasePlanTest.xml",
+      "bytes": 1590,
+      "sha256": "ffa59e481ee71560ce06df1af382df9e9347ee12133fd4aa0287bf18ff92c1a1"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ProofCarryingShowcaseSchemaContractTest.xml",
+      "bytes": 507,
+      "sha256": "1e2f9e4bc044fb0e9739effce57b2d8baa5d180cc73c3089bec00cc190c362e6"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ProofCarryingShowcaseTrainSelectionEvidenceTest.xml",
+      "bytes": 860,
+      "sha256": "5d2311ddc584339b8e048b1d809bc65c05886d868eb46c03a4f541658c26df8c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.ProofExportOwnershipTest.xml",
+      "bytes": 2063,
+      "sha256": "764999c1b7afcdc1c07a1c70c18f1b82c595cd12c91ae0dd1497d85e06557c3b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.RegisteredExactMoveSearchTest.xml",
+      "bytes": 516,
+      "sha256": "d83865e1a8d165ebe2c5cb3bd83de7028d3c82d3d09129b806f52bdf4e9c844e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.RepresentationLearningDiagnosisTest.xml",
+      "bytes": 867,
+      "sha256": "50627297f3294dd45bc178da70d35cfc3e5d34dbb476f2102bec6e126e5a3cee"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.RepresentationStrategyLearnerTest.xml",
+      "bytes": 860,
+      "sha256": "28e5ee437771c2f4e3102de3e8b135249a880c3088f3d30cad703afe4ba0e52b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.RetainedProtocolBoundEvolutionRewriteProgramPopulationRunnerTest.xml",
+      "bytes": 1556,
+      "sha256": "cbad07fee8978f05114ce4540cb7bb1a1d6ca4d04981cb42eaf6cf0980e60a42"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.SchematicProofPlanLifecycleTest.xml",
+      "bytes": 945,
+      "sha256": "0f6421be6d7c60c9dc87a80e8e62f6c60530f1dba5370eb8399812f49e910f34"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.SchematicProofPlanTest.xml",
+      "bytes": 1367,
+      "sha256": "a19b76603869e8ceec31cd655cb09859bc79bc431e465cfe401e67db69509e04"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.SearchTrainFitnessEvaluatorTest.xml",
+      "bytes": 1144,
+      "sha256": "5ca249f4300d67d7f8dab47a8592857d95ce5e3771705c6726696c745c02d057"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceBindingDispatchOccurrenceTest.xml",
+      "bytes": 518,
+      "sha256": "adfa8a459d8f7c7c987c44152ff6107761963ba3a9b05f8a6fad275de5f28a7b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceBindingLiteralContractTest.xml",
+      "bytes": 1299,
+      "sha256": "05e47a2ae92c69b39cc7858256edbf151a5949a143fd29c55d42131a65099351"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceBindingModelIntegrityTest.xml",
+      "bytes": 1754,
+      "sha256": "34dc733e553d87c752134f0a1f0da65c9f487af955840c6fe96906dad2bb4c22"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceBindingModelTest.xml",
+      "bytes": 1510,
+      "sha256": "7f9d9397eba311f5008315a2a39aaf698257a7c75538c00bd0474e861277e7e3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceDerivedPolynomialStrategyTest.xml",
+      "bytes": 2208,
+      "sha256": "14e1b50ebc0b2045aca33efd96f45bcf8d9dc6a0267c0927eb743e70399e2ff0"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceRewriteStrategyLearnerTest.xml",
+      "bytes": 1659,
+      "sha256": "50af67e8045dadddf85307c9467288731a0409a4e412db1a424c4f327f2e1002"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceStrategyDispatchExampleTest.xml",
+      "bytes": 515,
+      "sha256": "0a0e487475ebebd886ee598ff856552c0e460167a882c33678f595c8890493e3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceStrategyDispatchLearnerTest.xml",
+      "bytes": 1024,
+      "sha256": "e54a0a7bc87240824856c868a3b0030c8a5edc2c36f67c461e135d2a1d6b7821"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TraceStrategyTransferExampleTest.xml",
+      "bytes": 513,
+      "sha256": "27c487d4b93f500662b70bd85558da4f0f021478ef604fd841d9b33522ad6b82"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TypedExternalPolynomialComparisonWorkerTest.xml",
+      "bytes": 1192,
+      "sha256": "5cb4c9f3853c2dad6a0411dbb5f46e6065cc0799caec994e8cb733d8e2b5b9c3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TypedLearnedMoveInventoryTest.xml",
+      "bytes": 2231,
+      "sha256": "2566e4abc8609bfecece231f3bf6d9b9486090a68fff9eb9f781605de5766e6b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TypedLearningWorkStudyTest.xml",
+      "bytes": 664,
+      "sha256": "8ba2af403926435c1de8bd61b650e08587d787f588eb64dcc108ab67cc2dc45d"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TypedPolynomialSurfaceCostTest.xml",
+      "bytes": 898,
+      "sha256": "0ad83c96f32d789eda5a20dfc13a1ebc148ec3441ac0c22aa10b8283768d6f24"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TypedPrimitiveBindingTransportTest.xml",
+      "bytes": 1362,
+      "sha256": "12c7ea906f1f1eaeb33c2a03fef460a7e1371b4d621fa9f2d9186bbf51215d8f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.TypedPrimitiveReuseSessionTest.xml",
+      "bytes": 2096,
+      "sha256": "5cf42c6e7ded1b85febbc0a5b0bfb4603cce8a1fe2b10ef52a513925aafde116"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.VerifiedFinitePolynomialCandidateSourceTest.xml",
+      "bytes": 4871,
+      "sha256": "0315e7a5d8223598c53196c12bf8896326a787caa79522f1de011a3da5470fd7"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.evolution.VerifiedTheorySearchFrontierTest.xml",
+      "bytes": 2518,
+      "sha256": "f7247edc67f583681fc89789f10d2a1201b9c554b6370b28a781f97ebb6af3f1"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.CheckedSchemaPreparationLifecycleTest.xml",
+      "bytes": 374860,
+      "sha256": "46f32f13e94f67349527c633e4529aefd13e0f3ed6a84f41b4b32d40fa7897b1"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.HistoryStageBoundaryTest.xml",
+      "bytes": 488,
+      "sha256": "533df48a2bd1ee3a3236491d21005d6699477a21097acd71b16c311d0eb08538"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.RegisteredIncrementalAccountingTest.xml",
+      "bytes": 871,
+      "sha256": "3092a04ebf9801aac15c915acb268aa471028fc05f92ece04ab72149944d5b74"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.RuleActivityMemoryTest.xml",
+      "bytes": 654,
+      "sha256": "3f08c578f007c70d1b4110be24ac2d2a5a0342fbdad33f625867ffd9129fe6d8"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.RuleHistoryMemoryTest.xml",
+      "bytes": 819,
+      "sha256": "9d68c6441bccda77ce09a287d6fd5ae5f6e47742d5e46a913097b2b67fb9cd84"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.RuleUtilityScopeValidationTest.xml",
+      "bytes": 502,
+      "sha256": "97b00f2a87c48eceee87252f0a5e5ea64fa6e2e4201071891e2547f86fde6693"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.SelectionAccountingCompletenessTest.xml",
+      "bytes": 1366,
+      "sha256": "262a76908dc43bce19a6a651ecc500eddd32ea6aff7c5a27f741c5de201cfc68"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.SelectionLegacyArtifactTest.xml",
+      "bytes": 605,
+      "sha256": "3683a65945f7f796ae0328ae4916616e63516da556c90aa302ae7f0b54ca7df5"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.StructuralMoveContextOwnershipTest.xml",
+      "bytes": 664,
+      "sha256": "24775b0d184f6918861e7c1a990409dc26bcf729c4d8ae8e4fec3201900d06a9"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.TypedHistoryMovePolicyTest.xml",
+      "bytes": 1179,
+      "sha256": "d7e200e1944e3a2d3574690216a0b919a332a3488dfcb8b6e3cb30f35c41b236"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.TypedPolicySelectionTest.xml",
+      "bytes": 1278,
+      "sha256": "541d08ec95c95dc8fee8988f12081c7d25ee19669bd4a5b77446f5d0165eba82"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.TypedSourcePolicyQualitySelectionTest.xml",
+      "bytes": 2009,
+      "sha256": "09f0a2eb2ea1fb2959b8cd9e077134ed440636879cd9c1f89f8908f4927747a4"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.TypedSourcePolicySelectionTest.xml",
+      "bytes": 1159,
+      "sha256": "c716af39b3b3345d37120ce30db3acf4edd7f220d15693493a7f51e503a5dd6e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.WorkReplacementAccountingTest.xml",
+      "bytes": 836,
+      "sha256": "8af23b770bda781ebb9449bbcbcbd68e1fad2e4ff12159854736ae0e906330d1"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.WorkReplacementChildAccountingTest.xml",
+      "bytes": 941,
+      "sha256": "0bce183ce5c4de0dd17125c77e8810503533204c38a1eb0e98fdbcc0af49b88f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.WorkReplacementExperimentTest.xml",
+      "bytes": 2439,
+      "sha256": "26d8b8ee7612ba72a443ad4d60e02cd97ea40ab5d569b701a70b3167371c1e3b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.WorkReplacementLifecycleIntegrationTest.xml",
+      "bytes": 528,
+      "sha256": "7cc44a8a02c2b554fa17c4fad02df0558ae75450ad5dcfb3ee3344e92eb3c7c5"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.WorkReplacementManifestTest.xml",
+      "bytes": 1098,
+      "sha256": "87eb3124d2ec487147b0479f6fe705d35c20202f35642d485babbae992bb9e5f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.inventory.WorkReplacementProcessTimeoutTest.xml",
+      "bytes": 509,
+      "sha256": "90b1edbb7a5b6e646952b18d877d28955a75d904660c86dbdf71aadd2f5240a9"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.CrossFamilyBridgeQualificationGateTest.xml",
+      "bytes": 1139,
+      "sha256": "f4f1a0e89a58364139c0c0aac02b09d6128f76846f3758a3d6d7500eb4cc657c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.CrossFamilyBridgeTransferEvaluatorTest.xml",
+      "bytes": 1309,
+      "sha256": "ac5167334e9856a6c48628a9b180917f9f98e0abd7a5ccf5de787bc04980c60e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.CrossFamilyStructuralClustererTest.xml",
+      "bytes": 1583,
+      "sha256": "cc082325d8fa0ccc27c4a5f1c969c01785808eb41e3d1676e8bf98db6a8d9e95"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.DynamicCandidateRegistryTest.xml",
+      "bytes": 2042,
+      "sha256": "02a7eb95baaadea89875e0631f65f698f36065d021bd310fbac2986882d15bf7"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.DynamicOperatorCompilerTest.xml",
+      "bytes": 1720,
+      "sha256": "6e49b5f03080cf35f7941102d1fa422e416f755e44ee49d44f69baf4144493b8"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.DynamicPatternOperatorTest.xml",
+      "bytes": 1766,
+      "sha256": "6d9124bf4a81c0940002b766eff8d5d056da3277d4836d4e06409dc0ddad02e2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.DynamicRuleMoveEvidenceTest.xml",
+      "bytes": 498,
+      "sha256": "cc09c419314331e95e3210befdb07e065a81cbfca8372e5532e48adb8bf532de"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.EvidenceAwareInterestingnessAssessorTest.xml",
+      "bytes": 1319,
+      "sha256": "1277a19b8215f5eb9d30c704bae568ba6f65f62e2f7281719d6f73f7c6865725"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.FreshBindingGeneratorTest.xml",
+      "bytes": 622,
+      "sha256": "ffa905ff98d66fffcef8a3c873bebf9d558a0b920a5654d6df507de1d788b9f1"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.HypothesisCandidateTest.xml",
+      "bytes": 1172,
+      "sha256": "6950446eb305a617b6a1f461fba9ab2cb326a80f15039744f6795223c3645e12"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.HypothesisRankingStrategyTest.xml",
+      "bytes": 501,
+      "sha256": "f06c2eccf0d10ae1590a755eb29305348f9cdcf232c6c88a068030b255d8b825"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.HypothesisRefinementLoopTest.xml",
+      "bytes": 1869,
+      "sha256": "03e6b1cbfccb4c3e0c1a5dacbffc90428a150ad1e4974f7e6cee04817e7b2bf4"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.HypothesisRevisionTest.xml",
+      "bytes": 1524,
+      "sha256": "89fb593850e6420337eb276edcbab51d585a7bdcbd350a7bd2498465b96a987f"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InMemoryHypothesisRepositoryTest.xml",
+      "bytes": 1094,
+      "sha256": "dfb7c32f091e4c1840e174cd7a6a5319d3ae7f5c03f04da3bd66026a3218ba01"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessAcceptanceEvidenceTest.xml",
+      "bytes": 516,
+      "sha256": "dca4543779cf9dab211f11527ee7b003ac940bc0675f8c27f9e33946eb1ee2b3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessAcceptanceGateTest.xml",
+      "bytes": 1099,
+      "sha256": "2a6f823a8609749c69e8f969b03bc947a1f3eb77081a337b54366cdeccc8d0bc"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessAssessmentEvidenceTest.xml",
+      "bytes": 488,
+      "sha256": "cd5cf87b3c9f311a4946cfb260f408e2f88ce944d5db9f253ac2ee205642b5b8"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessBlindReviewPacketExporterTest.xml",
+      "bytes": 863,
+      "sha256": "dfee1cb03d717451baabe44dcc88775cac981db0def1b40d4b1ce976aa137584"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessCalibrationCorpusTest.xml",
+      "bytes": 1287,
+      "sha256": "574a8759e3c2aadc386537588ee57ec4635a9f6a6cf05590ff17871235603f23"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessIndependentReviewEvidenceTest.xml",
+      "bytes": 513,
+      "sha256": "cda9e2b3085a256e7d51cac4a911abd51d26102532abc97719428dbf4a188fd6"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessIndependentReviewIntakeTest.xml",
+      "bytes": 1377,
+      "sha256": "c6dd9556745d44d9c69058ddcf9d239f76aa302e65c2f2486719c1face6d5195"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessIndependentReviewStudyTest.xml",
+      "bytes": 1156,
+      "sha256": "28cab9de936fbee00e7def73367822ba6581f66329040534ab16a33d35e5d939"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessProfileCalibrationContractTest.xml",
+      "bytes": 689,
+      "sha256": "e254560759cf2b6528b21a076205bb96232c575b0dc5f748a928db7006c45979"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessProfileCalibrationTest.xml",
+      "bytes": 955,
+      "sha256": "cdba75a843137f031f4c41a7b2a9acb36617f744ba645acd9b38ca7f30fc4443"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.InterestingnessScoreTest.xml",
+      "bytes": 1504,
+      "sha256": "18efd3a731ffe32fc8e5891409f3138bcbb5c750a46002724b1753caf9faec8c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.MacroDomainInferrerTest.xml",
+      "bytes": 1217,
+      "sha256": "dc2d28ed0dbaa949038f2bb65100b42385eb998f2aef625e02f1fe6c8150efe6"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.NormalizedNodePowerGroupingTest.xml",
+      "bytes": 1804,
+      "sha256": "86159554f9239cb9300c3ec69f407fb03cfd08e8ae5d3c23443afbc036d92ddf"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.NormalizedNodeShapeTest.xml",
+      "bytes": 924,
+      "sha256": "68a71fb89ab6f5db1529d13541e6b91acb5f1e20faf871094e5cfeb909c05b94"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.OpenTargetConjectureEvaluatorTest.xml",
+      "bytes": 992,
+      "sha256": "8154562e406dc69e0aacf6c0e8db5b5ca2d649476c2316d40c6c7fc95dec7199"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.OpenTargetConjectureEvidenceTest.xml",
+      "bytes": 651,
+      "sha256": "2a772904dee0efbeb8afd9ad8248068aa336c574533ca57e67dc65ddf30921be"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.OpenTargetConjectureMinerTest.xml",
+      "bytes": 947,
+      "sha256": "bdc635414af708908ead4d890e6d8a867e28647e93a42050d1910a56c10e0fe3"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.OpenTargetConjectureNoveltyCheckerTest.xml",
+      "bytes": 1114,
+      "sha256": "95bcef39b4c4bc1dc6e0ca4cef7c9d2bbbf92f938a89969f9ad0e9538da0a80e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.OpenTargetConjectureProofGateTest.xml",
+      "bytes": 1112,
+      "sha256": "06cfd8d7aed5eb889983f922985a07e56a1890e4dca7d11dae4e6a213404adb2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.OpenTargetHypothesisCandidateAdapterTest.xml",
+      "bytes": 1108,
+      "sha256": "920caa1dda37d78c46577ff4b61c95d412a0d59cda9abef51af793f2a4146709"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.ParameterRelationProductTest.xml",
+      "bytes": 1853,
+      "sha256": "998e9b5cd7e95a850c63b6e2f5a5f56d8636803d8cccb033e8405e0fceba95ba"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.PatternGeneralizerAntiUnificationTest.xml",
+      "bytes": 1567,
+      "sha256": "50863bc5547817888bcdc4c462c0abd9c81fefec511252fd220c58cfbfed79b7"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.PatternGeneralizerNaturalOrderingTest.xml",
+      "bytes": 672,
+      "sha256": "1c996cfefa193f9c66422de80bdcea65e194d2a470436712214b06c9e5d918aa"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.PatternGeneralizerParameterClosureTest.xml",
+      "bytes": 1010,
+      "sha256": "8c071610ffa7be28f8e5d31ad41cb642538eb95013f36adaecc004b22587be21"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.PatternGeneralizerProductTest.xml",
+      "bytes": 492,
+      "sha256": "65b488c779d3531a8fde7f869dd9a7aa86e621250c4e233a7fdd383c9bedde1e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.PatternGeneralizerSharedStructureTest.xml",
+      "bytes": 2150,
+      "sha256": "718f8c6b158a796e8c2fc14bab5dab513972559be615f6d615e593036cfda3cf"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.PolynomialTheoryCandidateObserverTest.xml",
+      "bytes": 1013,
+      "sha256": "e9a5ec5a3dacbcda58aba923765232dc4030df93144df5c0053b8eda1e7e01b2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.ProductCandidateValidationTest.xml",
+      "bytes": 813,
+      "sha256": "5f4c03ce9fe861bf9e4c5249ad3f672e29b39020a79c1df0d2bcd41e41060a14"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RefinementStrategyTest.xml",
+      "bytes": 2456,
+      "sha256": "d10e1a9d780e52311cf3d2963b9bd5ecfd842a0ca26a42e3103b46027a947851"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RuleCandidateMinerFormationRoutingTest.xml",
+      "bytes": 1761,
+      "sha256": "a93cb64ce4710973837e33368612746fa4af4ae6f6d16ec42b03e445fdae8dde"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RulePatternInstantiatorTest.xml",
+      "bytes": 611,
+      "sha256": "a7f931caf3405c43522111a6b44803047392f3febdba31cfe113f8069e4fd1b9"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RulePatternLazySequenceMatcherTest.xml",
+      "bytes": 1505,
+      "sha256": "e354c7de956ab9c4499b94148253e213d5ad5c949d9fd299a4e579bc34a43230"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RulePatternMatcherBindingBacktrackingTest.xml",
+      "bytes": 1298,
+      "sha256": "9f3ead5dfcd5a91683f0d361d8f74d91a0cce6cd3440cbda13c29fe2f24e2998"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RulePatternMatcherEntryPointTest.xml",
+      "bytes": 650,
+      "sha256": "e38e49ddbcde4f7dfe4c0b85972bf1fd228c394f15f87e75b969f6f0cefd5b9e"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RulePatternMatcherTest.xml",
+      "bytes": 605,
+      "sha256": "140824ad43efabbe2fe59246fd092c6010d90b6d133a0e74808c83de93ceed94"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RulePatternParserTest.xml",
+      "bytes": 742,
+      "sha256": "9fc8e9d2f2aad3c0b395d4a4dd9d22b3fcbbb4553b91ee3d980ad9ab8f64105b"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.RulePatternSequenceMatcherTest.xml",
+      "bytes": 2177,
+      "sha256": "df5a11e5b8b40f75cb98ea077207ab1e61033ef3357f9ca43e68a709be3bfc18"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.ScopedSymbolPatternMatcherTest.xml",
+      "bytes": 990,
+      "sha256": "24950add1a7562d6f2d9d9a61c188a84b786cd1f2d631735b9c9ade035a9b8e2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.SharedExpressionBindingLearningTest.xml",
+      "bytes": 1151,
+      "sha256": "3c5c3447b71c5a157e572ff70856dc98d125cc7fc8b105f7a4b214474248cdc2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.TemplateSymbolicRegressionHypothesisSourceTest.xml",
+      "bytes": 1167,
+      "sha256": "914065ece99c14854996d3fcc5250d21b05e451e5ef0eb32f951a298c0617b07"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.TypedOutputPatternLimitTest.xml",
+      "bytes": 789,
+      "sha256": "cd65b84c2e41d6608f9aa2f015d56a540695314bde8f68a165d1275390f3cedd"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.TypedOutputPatternTest.xml",
+      "bytes": 1753,
+      "sha256": "8375e6d493c0b3dbaf77eb191d803e04b6d3bfc5a1c1dce1294852b43a91d43c"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.TypedPatternGeneralizerBoundaryTest.xml",
+      "bytes": 1232,
+      "sha256": "58ce58ada228318592eb9eac2d797bd38785c5a7e217510ad7a326600d1a1fc2"
+    },
+    {
+      "path": "full-modules/regelsuche-learning/TEST-de.regelsuche.mining.TypedPatternGeneralizerTest.xml",
+      "bytes": 1856,
+      "sha256": "feefbd2e1634a7ed5a961a04fd818f9be722a6d3507ae53a4bf1ecbd73c0779d"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.didactic.DidacticCostModelTest.xml",
+      "bytes": 701,
+      "sha256": "fc1cd9ab62bd0c81de580f3dc9dc1f0b0ece1f9019277e72f79a8dc470d34d12"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.scoring.ExpressionScoreRevisionTest.xml",
+      "bytes": 1254,
+      "sha256": "f565e8325e294eb8ec82e7d47a47bb05802749ea7bca8fe57b994d7354fcb450"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.scoring.PolicyScoreRevisionBindingTest.xml",
+      "bytes": 497,
+      "sha256": "5f3187f21ccd2f828e980a88889a979d2c4b379a4c5ae824b0144b9154f2d436"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.scoring.ScopedSymbolScoringTest.xml",
+      "bytes": 2977,
+      "sha256": "de103a57a46b2ee19e1f4b717dfdb62022ae9776a377bdbb6f84dee10752889b"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.scoring.ScoreRevisionAdmissionTest.xml",
+      "bytes": 1069,
+      "sha256": "be4915f65ada9ecc75614a1de98dfbd3fa3a23e52eaf3a382d5e00cd994b33d9"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.scoring.cost.TransformationGoalTest.xml",
+      "bytes": 2121,
+      "sha256": "a0dc83226fd549fe40705c7335ba83e808091e23bfff30b428dd5eca3fadeef2"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.BridgeAnalyticsTest.xml",
+      "bytes": 455,
+      "sha256": "34e402de79b64c540a76cb4d8b9d3ac2689756b4f146b03ea02fd96f875d52f2"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.SearchProfileTest.xml",
+      "bytes": 575,
+      "sha256": "583b32d1830d8601d67416ba0bea24e41bf7a03c1879f6c5a1282a7aef90a216"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.SearchSpaceAnalyticsServiceTest.xml",
+      "bytes": 725,
+      "sha256": "b752b51d0b4acade5ecb837610745c2959ab533016fe2972e50b32efad23173e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.SearchSpaceAnalyticsTest.xml",
+      "bytes": 609,
+      "sha256": "f24dd62b8704e46875a4a21a6cbec08696734e3fe708e04b3f5e9b43f56b7b96"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.convergence.ConvergentDiscoveryAnalysisTest.xml",
+      "bytes": 1571,
+      "sha256": "c44d5cf5aa39da3e9c5c71fec418939b2c4d5d4a242a67477a514daeae76cace"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.estimate.SearchSpaceEstimatorTest.xml",
+      "bytes": 1755,
+      "sha256": "86494ba195d85fa51fa17db89194330e0dc74deaf0783ff036703fe46ad03c91"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.index.RootSymbolTermRuleIndexTest.xml",
+      "bytes": 951,
+      "sha256": "89774c63b39e12e0b3116cd196a6d8576a803656294cb0c0eb95fa1fa9fda5ea"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.learning.ScoringProvenanceTest.xml",
+      "bytes": 1435,
+      "sha256": "f2f0af34666c23b56ae3c8dbf5b99a7a5fa2d99f8a266be4ab0787cf0aaa1c4e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.learning.SearchTrajectoryDatasetTest.xml",
+      "bytes": 1137,
+      "sha256": "5491027f5fb05acef10236079200c0e56ece0252a2acd06f1fff2b4912cd34a8"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.learning.SearchTrajectoryFailureTest.xml",
+      "bytes": 657,
+      "sha256": "81e98bfbe1571454ff8454c28b6e33c71c8305da5150e087bef6cbedf47083bc"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.learning.TransformationDescriptorTest.xml",
+      "bytes": 1422,
+      "sha256": "41b3c4f82cdeb09f45ce94b887703fd7218e3611c57f97cccac1b1683f20eae4"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.memory.CompactInMemorySearchTraceStoreTest.xml",
+      "bytes": 857,
+      "sha256": "347c476e86dd6ff19ba40b614d1f2a875fea09d523f1800b5b7825a8fb7239c5"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.memory.TranspositionTableIntegrationTest.xml",
+      "bytes": 1095,
+      "sha256": "e2827e863d7bcfd0b89904d5bb1c106691257da9288f5725639b3ad6e07630ae"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.FinalProducerOwnershipTest.xml",
+      "bytes": 1844,
+      "sha256": "710ee2e9f06a59a37214b22a8423db2e741c242ce97f6e9b5313a3775bcd4528"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.IncrementalMoveSearchContractTest.xml",
+      "bytes": 1206,
+      "sha256": "6b71968243f09f9be2078eb5f4c7a8e6d97a27f1ceedbc021224d85f4fa7e48c"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.IncrementalProviderContractTest.xml",
+      "bytes": 1636,
+      "sha256": "1d9d8b30f60ac974eccc734fff77dc45236198fdcae96f583c95a0e58a4953b3"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.MoveEvidenceValidationTest.xml",
+      "bytes": 505,
+      "sha256": "ba65a1a81b03fd02b74c79efc42db2ad8b7f0a14a2e847a23151533e3aade19a"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.MoveProviderIntegrationTest.xml",
+      "bytes": 895,
+      "sha256": "e6e75431aa396ccc31577fff69206dd7bffae39ac85846a8ddf1c362a0a18b76"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.MoveSearchDominanceTest.xml",
+      "bytes": 1162,
+      "sha256": "cf71a8a8d19d6c7423235e2c4aed821065ba9b8274ff9af36e43e13e533b15c3"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.MoveSearchObjectiveWorkTest.xml",
+      "bytes": 690,
+      "sha256": "d57b837e37e739b5c2a0d0060ff531ec1249364d710614961f2843805a25c5d4"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.MoveSearchVisitsTest.xml",
+      "bytes": 928,
+      "sha256": "c4c473ca4f11d04b2e9c4e477bec30ee9fb380c8c467b6821b9e5788ae562978"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeBatchCursorFailureTest.xml",
+      "bytes": 801,
+      "sha256": "17a408a6f2fd71d410ad4f557adf65fcd84ac2c7d932e3c3978ca3ca70e1f2f2"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeCapabilityRetentionTest.xml",
+      "bytes": 526,
+      "sha256": "268bb5867eeb454e837c2dd516ae0ede5b14e9d8adc676060256e7e536943282"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeConcurrentSessionsTest.xml",
+      "bytes": 581,
+      "sha256": "192073610e3e90d0055c5d83ada9a2929859a38ecd39a49384ae2d31d89cd28a"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeExportAccountingTest.xml",
+      "bytes": 850,
+      "sha256": "712bc0070ce8c32847e5f3169a61de87fa5980c33b45ceb9d2c8ccb2e1000ab0"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeExportCopyAccountingTest.xml",
+      "bytes": 2148,
+      "sha256": "8249f3838cb0935f1f2bfd87f0bd8fb59bc80fc74acc2b5f4169df01cd40e41b"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeExportOrderTest.xml",
+      "bytes": 16015,
+      "sha256": "2037d7d3e918596c8fb811901fa738a0512f58f77bb712865dac8dcbbd43b7d4"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeExternalRetentionTest.xml",
+      "bytes": 675,
+      "sha256": "ed23df6dbc34676bd8be5f0a80d650372d3252c3cb13b1759479a3a6e945a735"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeImmutableInventorySessionTest.xml",
+      "bytes": 701,
+      "sha256": "e6d234dd50e2110debb1b608ea3ff902d975c8ac0984f312358ebfd9047d33c7"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativePartialQualificationTest.xml",
+      "bytes": 690,
+      "sha256": "fa1902168adce1b0b7265c9aae8cf3564f2825aac2481e1447a59dc7da612408"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativePrimitiveWorkTest.xml",
+      "bytes": 513,
+      "sha256": "aae02ccb5b8c11fb0ae46071e0e69f297230af36f1b8592fa1515c8d353fc490"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeProgramMoveProviderTest.xml",
+      "bytes": 1317,
+      "sha256": "c1392b79af4a0b28b90142fa89f91e6e88ef8a4e7ac7566eda6cf1f74f3338d9"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativePullBudgetTest.xml",
+      "bytes": 1296,
+      "sha256": "1c2a8819d2022ecfa4ca4249ddab67b5be6d0c2f47d0ed98852b71669f7b3cf9"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeReplayAbortTest.xml",
+      "bytes": 1862,
+      "sha256": "ef35c5d0bc55ca62aa3f2ff7e0b2ef438953a358a732ed4078feb88fd0fcb919"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeReplayReceiptFailureTest.xml",
+      "bytes": 700,
+      "sha256": "a202e2415478f45c39ba654613a0a06af7b8c5140ab6ad87a14a129dba15290c"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeResultExportOwnershipTest.xml",
+      "bytes": 1513,
+      "sha256": "d48853430608e0850bb4c37b49f3041ed9de376f62a9fa91d4b16d3e41965888"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeRetentionSearchTest.xml",
+      "bytes": 2043,
+      "sha256": "c2a750b18b2f02598aba4870b446c99baa5ca6872327de83f9e3a9a3b88fd28f"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeSourceOnlySearchTest.xml",
+      "bytes": 1277,
+      "sha256": "e9ec94460f981907edffc0da9416ef81c9221a9af2fb80bfff0f577a37db8b3f"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeUnreturnedWorkTest.xml",
+      "bytes": 827,
+      "sha256": "b45766e29e4d409c12c7b3c8d031bc0daba33aeffde4f0ed179f26348b636675"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.NativeVerificationExportOwnershipTest.xml",
+      "bytes": 1792,
+      "sha256": "17f6c9b669c505ed662ed9079993a04b3db803cf1627fc5c7b32c7bafeb7364d"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.ObjectBackedMoveSearchTest.xml",
+      "bytes": 1169,
+      "sha256": "fc61dc4b34b318b8e0262904adeda6155c1bfe1bb873ecb0ef6ed7ce6fd885ad"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.PickerTemporaryOwnershipTest.xml",
+      "bytes": 1065,
+      "sha256": "76a333541788293164f271b88fc175eec74c72c74804347d316f4e958f0175f8"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.PrepaidApplicationWorkTest.xml",
+      "bytes": 1529,
+      "sha256": "a2dd22da683df6a9b5709012ed60dbd3ad9581a19d6e7f4182fbda68374a22a4"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.ResultAssemblyOwnershipTest.xml",
+      "bytes": 1863,
+      "sha256": "02ea15194743408544790f7a5ef86d528ef46df688394c7d628e85a4504184c9"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.SearchExpressionIdentityTest.xml",
+      "bytes": 3632,
+      "sha256": "33facadfae4c34ba7c0b4cbb229ef8e48016cb8894890ed49421dac35efd5a07"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.StagedIncrementalProviderTest.xml",
+      "bytes": 2089,
+      "sha256": "2b1be37be15cfd69115b6259701884ba52a57446c9aae8e14d1a5ae7357408ef"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.StagedMoveSearchTest.xml",
+      "bytes": 2542,
+      "sha256": "c5f9ecdd2e56e65c6fa79708597c7d4962d1b9181747d1cdbf3764dea448af5d"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.StateValueValidationTest.xml",
+      "bytes": 488,
+      "sha256": "a8d6420813335de66e7764c053bb17448a800cfa0a243de00deeea1b567f133b"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedPrimitiveCandidateCacheTest.xml",
+      "bytes": 2241,
+      "sha256": "0e7be1172482130b5694b218fe0175619480df7c1ec644decfb21b0d09a31c29"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedPrimitiveCandidateRetentionTest.xml",
+      "bytes": 513,
+      "sha256": "0151003d566ccc113f366e1e97ef44798e0461d5d3da716d8085b687f60a0092"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedPrimitiveReplayTest.xml",
+      "bytes": 494,
+      "sha256": "ca12fa9881b7ce474b3b506fdf1a5b81b4e24f42dfdefe42ac0e02aed0102f5e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedProgramMoveProviderTest.xml",
+      "bytes": 1535,
+      "sha256": "2541bbae5ecefff753aa6a0a16d02e53956e8b5fbfd74acdbc8f217fd93fce7d"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedSourceOnlyBudgetBoundaryTest.xml",
+      "bytes": 1359,
+      "sha256": "076a76497413594d0d0c263207212813ff340124b16e53f818093e4c59140b96"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedSourceOnlyContextTest.xml",
+      "bytes": 620,
+      "sha256": "eb3884d9d98a6f885daacc22576356eeec1815f9451f8389772bcb3cdc6040f1"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedSourceOnlyQualityTest.xml",
+      "bytes": 1480,
+      "sha256": "5f99a779419eb35f259cbe3db50f9e4d8e589e38414b7ef184cd6f3bfa0a5fbd"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedSourceOnlySearchTest.xml",
+      "bytes": 1365,
+      "sha256": "29cd02ea33fc13e729072e0ed77fea7ae50f5d80ee2f597ded12776e3459e47e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedStagedIncrementalProviderTest.xml",
+      "bytes": 1194,
+      "sha256": "c58792a1716992d23e6603acf305c1c1739a29a33f1902a3bb36ff69a3584cf7"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.moves.TypedStateValuationTest.xml",
+      "bytes": 641,
+      "sha256": "14cd6e4598a3dcc6c119250ce3c9e519f6b03cb3284bd1bdaac1cd99cfa61d7e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.policy.DescriptorPolicyTrainerTest.xml",
+      "bytes": 1280,
+      "sha256": "49c76ec40aeaf83430743cc09f6f3e4a89c5c239911198de5a65c60ae9aa536e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.policy.DescriptorSearchPolicyTest.xml",
+      "bytes": 1276,
+      "sha256": "de8e3f906452da5d07ac6c73ebd751e9b03ebd9fcaa446def3a64ef0daf62007"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.policy.ExplainableSearchPolicyTest.xml",
+      "bytes": 1434,
+      "sha256": "f40aa503214c89d9c19e62a0d20a7be7f2dd606e8dfa2c26e12e34eaa23dfc7a"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.policy.PairwiseGoalEvidenceTest.xml",
+      "bytes": 671,
+      "sha256": "25e3a2b46fd6bec901954dfdacdb94d10a39e63373ce1f61e2729f78b66e8b71"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.AstExpressionValidationTest.xml",
+      "bytes": 522,
+      "sha256": "171eeeb6ed83d924fa054c37aeaa14009ee0d6e41a1f3da41265abc289029fa3"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.AstHistoryValidationTest.xml",
+      "bytes": 1016,
+      "sha256": "9d10b9cb4adf4a708e3e653b309244f7619be291113c098ef1fb335b611a73ac"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.AstReplayTextOwnershipTest.xml",
+      "bytes": 1242,
+      "sha256": "3d1b756da31d7c37c4020f0659ddc3ecf5fe19524f22b825f0ebaca8e86dc972"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.AstTransportObservationTest.xml",
+      "bytes": 676,
+      "sha256": "bdfa12ed2498cfcc6a70fdd2d155da973a422b2b7f5e62d224479b50bd5a482f"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.AstValidationRetentionTest.xml",
+      "bytes": 2266,
+      "sha256": "5f307c2b768d9408e2f931f1764e9621bccf5cb788f6643069003152be9cc28b"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.BudgetedRewriteProgramCompositionTest.xml",
+      "bytes": 4630,
+      "sha256": "427bc56819158d83b2efc75b64270f242afedead684b72a00b7be88c97a1cc3d"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.BudgetedTransformationSourceExecutorTest.xml",
+      "bytes": 1015,
+      "sha256": "85a1b1caa5005d4339e234caaaf0bd0df045743c023f29e3c690f7bd87a56dc6"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.BudgetedTransformationSourceRewriteProgramTest.xml",
+      "bytes": 1095,
+      "sha256": "dd5746626c7f7b9af5e9337aa9eb874d618f4cfed232be297dd5f90a0bb39486"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.CompiledAstExpressionCacheTest.xml",
+      "bytes": 2143,
+      "sha256": "4846bed2055399ce33fe8862337c6806d412af09d6871534e2206ba278024beb"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.CompiledAstReplayBoundaryTest.xml",
+      "bytes": 1511,
+      "sha256": "35cac59eeabcee6db8ea0d2e6554a5049cce02aa94bd1e31dd7deb89bf5fc343"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.CompiledAstReplayCodecTest.xml",
+      "bytes": 2191,
+      "sha256": "566536a68277a896590b22b3841e2c7e7ca14774bdc9dc437d852ee5fb5f0f76"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.CompiledLinearRewriteEngineTest.xml",
+      "bytes": 1895,
+      "sha256": "ac064f8073b7ce4cc5e90274c2adfedf2a3ccbafd616de2ae8f4ee1f30a4f454"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.JointComputationDagBoundsTest.xml",
+      "bytes": 972,
+      "sha256": "f9a3036bbeb2db13b1e8aaa66ff56192a0bb18a6e2cb7b7a5d033999f875085e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.JointComputationPlanTest.xml",
+      "bytes": 966,
+      "sha256": "1e301f036acb4ce0e737ee83e24bdeae1f196a7bfb958af06d92d5ba6a2759bf"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.ProgramTemporaryOwnershipTest.xml",
+      "bytes": 692,
+      "sha256": "0cea8271d780ec75d7b8f33e103cb91c02a525e2a31756ac2e5371e450583c59"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.RewriteProgramInterpreterTest.xml",
+      "bytes": 1144,
+      "sha256": "fda4e4de6c2e0ddf30720a68e002a28b871ffb5945aeff57b27eef2b060969c2"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.RewriteProgramWorkMetricsTest.xml",
+      "bytes": 1005,
+      "sha256": "270a21a5516edece64baec92d013edf27807d2466ac29a62094c094b7ba79554"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.RewriteProgramsCompilationTest.xml",
+      "bytes": 508,
+      "sha256": "10996f25fd76143e7edf400cfd940316618ddd4e2464229aacb6d3a57f745aca"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.program.RewriteProgramsTypedApiTest.xml",
+      "bytes": 1297,
+      "sha256": "f28526855e647676f6c9f8c2a730352cd2990adcd7a7b19de495ac89d3d14dff"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.BoundedReachabilityOracleTest.xml",
+      "bytes": 1992,
+      "sha256": "c3dc99a8ee21359402302bce6b0f3190297fc3638307fa1e65916db1a1a78f93"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.ContextualOccurrenceRulePreparationCoordinatorTest.xml",
+      "bytes": 2800,
+      "sha256": "b85410311678adf9f8fa0b3278ddffa8e0f29f7fb3ddec185221f5fdcb96c9e3"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.OccurrenceAwareSharedRulePreparationCoordinatorTest.xml",
+      "bytes": 2461,
+      "sha256": "b05bcd4a1003b27b693d1bf1eed3719c6309b5482943df098a80d4b2661b9ffd"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.OccurrencePreparationConcreteVerifierTest.xml",
+      "bytes": 2106,
+      "sha256": "91c63e7ebaac55fc1391cf4640c4368680cdc7855eac69e980b76521c5bf53e4"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.OccurrencePreparationFailureContractTest.xml",
+      "bytes": 1441,
+      "sha256": "9c293989cf523cb97af4e63c2230ac46f8b1da16c747bc6563973ffe1bcff3e1"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.OccurrencePreparationGuardContractTest.xml",
+      "bytes": 807,
+      "sha256": "3ede27506b2407c27dd3001e703eacc3883c5a5f2d7c9b1e8a65e176372dd0be"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.OccurrencePreparationReplayContractTest.xml",
+      "bytes": 1444,
+      "sha256": "c3f28e6d58a77602de9e13ccf2d8398a48d4a092fef0a757423886cffe53ef9b"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.OccurrencePreparationVerificationBoundaryTest.xml",
+      "bytes": 1503,
+      "sha256": "1635098afd356a6574371f0b3be64ac6d40c31279d22e09683c84f1bbb28a136"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.OccurrencePreparationWorkContractTest.xml",
+      "bytes": 1888,
+      "sha256": "e351db0a9ddff2a3418fa406a2997fdc392fac2046a78615cea0ce3d0b5e7fa1"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearchTest.xml",
+      "bytes": 1557,
+      "sha256": "55cff33a80223b16bba71000c423ee2b8186e658eb12e9e74a0c4f251cf7c47b"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.RulePreparationCoordinatorGuardTest.xml",
+      "bytes": 872,
+      "sha256": "8619714bfc27ed9029d60ba65db5c39478dd0e438c1ea4fcb3f4f288d3ef7d4d"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.RulePreparationCoordinatorTest.xml",
+      "bytes": 996,
+      "sha256": "7018c6dde384eb5bb2e0fb2b1c7014e2e2b2419c8a3b2ce3cadb96268d9a7a9e"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.SharedMultiPrincipalPreparationTraversalTest.xml",
+      "bytes": 923,
+      "sha256": "0ca568c902ceef7e08dd3e17d493bd19b0c38d02fdb8c1ab049cb4d1e05cb402"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.SharedPreparationGuardFactsTest.xml",
+      "bytes": 697,
+      "sha256": "c69e7e44e29e993bd883e138995793520345dc37f40e42aaf66cd5bbd4f11d2f"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.SharedPreparationTraversalTest.xml",
+      "bytes": 1639,
+      "sha256": "3d5ab8cff1a9c2f8eba4cc66174cf11a353a3da2453160a1efffe38429557d41"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.SharedPreparedPrincipalReplayTest.xml",
+      "bytes": 707,
+      "sha256": "92f8137c94a67723bc45e99f6dc5a4cb9359a01f7e321148b98870aab903c2e9"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.SharedUnifiedRulePreparationCoordinatorTest.xml",
+      "bytes": 1109,
+      "sha256": "ecbb238ce56866e2b2dc7824364a96d55d592f7135d2c1449f0694a3e56f60d1"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.TypedRepresentationPreparationTest.xml",
+      "bytes": 716,
+      "sha256": "e9b2b4dce253652dd2e9a6faaedd67a99fd14bdb8575de01f644c1af6d30f848"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.reachability.UnifiedRulePreparationCoordinatorTest.xml",
+      "bytes": 1398,
+      "sha256": "dde6fd5f7f3b276aa7b967e71597dcc0519656a88461319afc3d227663f25c9a"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.BestFirstSearchTelemetryTest.xml",
+      "bytes": 1137,
+      "sha256": "e5a83157f9e3ec2896b6e1ca007d64a5462985413031480b958056bff1c15684"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.EqualitySaturationStrategyTest.xml",
+      "bytes": 1244,
+      "sha256": "9c24c85540ef7eeff958d0f8aa9b1b51e56b0b699aa0a901388589d8066e56ec"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.GoalAwareSearchTest.xml",
+      "bytes": 2489,
+      "sha256": "00d9bb7be4e3a4da5a8ba8c6325310ad40df1470d91288a29fe47fe9bdac6743"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.MonteCarloTreeSearchStrategyTest.xml",
+      "bytes": 626,
+      "sha256": "7690f357f93433a7d60ac23915e6b19e584193906fbdbd2dfd821b93dbe4b521"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.PolicyAwareBestFirstSearchStrategyTest.xml",
+      "bytes": 1419,
+      "sha256": "4da7260c43ac4def96ca58b49dfc32ad34bddfffbc7a4eafa167b5f15dbd2606"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.ReplayIntegrityTest.xml",
+      "bytes": 490,
+      "sha256": "308f2a2e9d667e73158ec2201c3dda7bde2d580a8367fa3797cb85be0df49be4"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.SearchRunDiagnosticsTest.xml",
+      "bytes": 1184,
+      "sha256": "9ef85ac5609aa8e4a024f8efd6b394cd0e1e17762b5313565fa6dfc7df5073f5"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.SearchStateRetentionTest.xml",
+      "bytes": 820,
+      "sha256": "1ee87dc2aa5e81d71f80cb9c57bf1d36a1cbc6e5b852a68b65873015560198d3"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.SearchStrategyTest.xml",
+      "bytes": 1085,
+      "sha256": "bfacd615e92622f0ff0b7d90a2881b62d657af1b0ee53c9ed6df278cfdb5fc69"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.TargetFreeWorkBudgetSearchTest.xml",
+      "bytes": 821,
+      "sha256": "e7a113672d32c119ea035e52c4daf9ef0e06b46b52b8c4605432b6f0aa204bb4"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategyTest.xml",
+      "bytes": 1029,
+      "sha256": "7c29761a715fb1c8003714a41aef6dff7739c85fa95ccd797f834abf6ffa1781"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.telemetry.SearchEventTest.xml",
+      "bytes": 472,
+      "sha256": "087041ee178e1231d58cf556be49f41d457605acdda043b31fb643fd25fb818a"
+    },
+    {
+      "path": "full-modules/regelsuche-search/TEST-de.regelsuche.search.telemetry.SearchTelemetryReplayTest.xml",
+      "bytes": 643,
+      "sha256": "fd52ec69bb329ebc5f3d2966460b0078e40dd471a75c22c01978569217762f3a"
+    },
+    {
+      "path": "full-modules/source-binding.json",
+      "bytes": 471599,
+      "sha256": "68f67f48d83c30477458cd459b197b72152846b7fc8c5b8628b5fae20259100b"
+    },
+    {
+      "path": "full-modules/summary.json",
+      "bytes": 619,
+      "sha256": "b3e8e03129be1d4ae9dbb8e912adcd580111f681505d0e5c40fda9c1fca98bd7"
+    },
+    {
+      "path": "green/gradle.log",
+      "bytes": 2917,
+      "sha256": "12fc776ace51ad7762587770acd1df9916058e651fe613752edf248722e88226"
+    },
+    {
+      "path": "green/isolate-build.gradle",
+      "bytes": 288,
+      "sha256": "7a6238a19ee44e1fb217a9c607e900eee3cedad9d5c6a6376efa628a182b1129"
+    },
+    {
+      "path": "green/regelsuche-search/TEST-de.regelsuche.search.moves.MoveSearchObjectiveWorkTest.xml",
+      "bytes": 692,
+      "sha256": "bb3a221d4d24ceeedf303b4a7f5b798208d9894e814b1d0c6f58a3abafff0095"
+    },
+    {
+      "path": "green/regelsuche-search/TEST-de.regelsuche.search.moves.NativeSourceOnlySearchTest.xml",
+      "bytes": 1279,
+      "sha256": "bb557306ac501f4a3b799eff02622c3ee4599d3a0c65f295d533b29e6913b2c0"
+    },
+    {
+      "path": "green/regelsuche-search/TEST-de.regelsuche.search.moves.TypedSourceOnlyBudgetBoundaryTest.xml",
+      "bytes": 1359,
+      "sha256": "e06d48b47c9752f1180c1b1547f6c36f0b3fa5d3c606bb485a2ab05bebec01d2"
+    },
+    {
+      "path": "green/source-binding.json",
+      "bytes": 471830,
+      "sha256": "e9bfec26a6d9683767c0a7394aa64deae633aedd7f678dcb75c3ba52ca58b1ed"
+    },
+    {
+      "path": "green/summary.json",
+      "bytes": 266,
+      "sha256": "08a896cbb461ad8d25a1eca42add851bc5729da44bbe0d86fd4743a98c4dfdcd"
+    },
+    {
+      "path": "green/working-tree.patch",
+      "bytes": 9322,
+      "sha256": "0b5ada09266cb09e7af43c8725d93bd364c4d6865375071da0ab6c9eb046eabc"
+    },
+    {
+      "path": "public-corpus/commands.json",
+      "bytes": 6784,
+      "sha256": "fbb7462d7a2ad1c4b1e188d2f935c39bb6100004920dcaca394a06d44a514f5f"
+    },
+    {
+      "path": "public-corpus/compile.log",
+      "bytes": 841,
+      "sha256": "6661d7ed12c9846794bf9b7ce7fe3e3c41c2eb431b50fd49612f4628ea614a1d"
+    },
+    {
+      "path": "public-corpus/run-1/cases.json",
+      "bytes": 2093671,
+      "sha256": "7d1ba2f9fcf9606bcb2cdacb8b9a36f041104654f7538dcb222e78e9ed4c624b"
+    },
+    {
+      "path": "public-corpus/run-1/comparison.json",
+      "bytes": 41296,
+      "sha256": "09fc0567d11d7a42403535ce1bce325ba89160a9929d3ccd7cb129243ac7c5a0"
+    },
+    {
+      "path": "public-corpus/run-1/continuation-contracts.json",
+      "bytes": 420,
+      "sha256": "b78cf521d20c0424f0c2c1853282c52742cfb9a66048dadecbbeb4d29e264129"
+    },
+    {
+      "path": "public-corpus/run-1/coverage.json",
+      "bytes": 327,
+      "sha256": "53dea0bb5fd71a9c215f16f55c62db47101592ce088afde3961680ec62ae76ba"
+    },
+    {
+      "path": "public-corpus/run-1/cursor-cases.json",
+      "bytes": 837125,
+      "sha256": "70631402e6b2d295e772c42763502f50e7a54aaa0d2a20fb867a638d7027d8f5"
+    },
+    {
+      "path": "public-corpus/run-1/identities.json",
+      "bytes": 7185,
+      "sha256": "07862e755d7c0ed16a5842aeaa69f9cecc84bcff5b6dbb28b90f3bbb4f76bf99"
+    },
+    {
+      "path": "public-corpus/run-1/measurement-boundaries.json",
+      "bytes": 702,
+      "sha256": "dc5d3239e9f1e33b3f550679869b663612784eaa7750612817818a3cc9d93fcc"
+    },
+    {
+      "path": "public-corpus/run-1/negative-replay.json",
+      "bytes": 16508,
+      "sha256": "c60d751397434896e1094ee2ade731714da38c103ee02ac8a33f503d8139899d"
+    },
+    {
+      "path": "public-corpus/run-1/protocol.json",
+      "bytes": 549,
+      "sha256": "61e2be40d2f6e3f66b8aab4125f204590c86ac9debdd133c5babbd5f5b9475b3"
+    },
+    {
+      "path": "public-corpus/run-1/quality-cases.json",
+      "bytes": 645780,
+      "sha256": "d0b245f5d930349d8fc5ed0bb7ac72817675d87be8a949b559959acdd1e13a2d"
+    },
+    {
+      "path": "public-corpus/run-1/state-identities.json",
+      "bytes": 1640,
+      "sha256": "6a160c62f1ff558ca36149ab18e75a74839189befa0e8f6c37ccb100b7966716"
+    },
+    {
+      "path": "public-corpus/run-1/symbol-bindings.json",
+      "bytes": 402,
+      "sha256": "54c62a6de25ec9925efa7ec1a5e82d93543de98e9838f4903cae6f68b76dded5"
+    },
+    {
+      "path": "public-corpus/run-1/training.json",
+      "bytes": 28653,
+      "sha256": "ab37b890b6a79124aafc5855845db57b3fd96839b01636daa2629f67fa89301d"
+    },
+    {
+      "path": "public-corpus/run-1.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "public-corpus/run-2/cases.json",
+      "bytes": 2093671,
+      "sha256": "7d1ba2f9fcf9606bcb2cdacb8b9a36f041104654f7538dcb222e78e9ed4c624b",
+      "sameContentAs": "public-corpus/run-1/cases.json"
+    },
+    {
+      "path": "public-corpus/run-2/comparison.json",
+      "bytes": 41296,
+      "sha256": "09fc0567d11d7a42403535ce1bce325ba89160a9929d3ccd7cb129243ac7c5a0",
+      "sameContentAs": "public-corpus/run-1/comparison.json"
+    },
+    {
+      "path": "public-corpus/run-2/continuation-contracts.json",
+      "bytes": 420,
+      "sha256": "b78cf521d20c0424f0c2c1853282c52742cfb9a66048dadecbbeb4d29e264129",
+      "sameContentAs": "public-corpus/run-1/continuation-contracts.json"
+    },
+    {
+      "path": "public-corpus/run-2/coverage.json",
+      "bytes": 327,
+      "sha256": "53dea0bb5fd71a9c215f16f55c62db47101592ce088afde3961680ec62ae76ba",
+      "sameContentAs": "public-corpus/run-1/coverage.json"
+    },
+    {
+      "path": "public-corpus/run-2/cursor-cases.json",
+      "bytes": 837125,
+      "sha256": "70631402e6b2d295e772c42763502f50e7a54aaa0d2a20fb867a638d7027d8f5",
+      "sameContentAs": "public-corpus/run-1/cursor-cases.json"
+    },
+    {
+      "path": "public-corpus/run-2/identities.json",
+      "bytes": 7185,
+      "sha256": "07862e755d7c0ed16a5842aeaa69f9cecc84bcff5b6dbb28b90f3bbb4f76bf99",
+      "sameContentAs": "public-corpus/run-1/identities.json"
+    },
+    {
+      "path": "public-corpus/run-2/measurement-boundaries.json",
+      "bytes": 702,
+      "sha256": "dc5d3239e9f1e33b3f550679869b663612784eaa7750612817818a3cc9d93fcc",
+      "sameContentAs": "public-corpus/run-1/measurement-boundaries.json"
+    },
+    {
+      "path": "public-corpus/run-2/negative-replay.json",
+      "bytes": 16508,
+      "sha256": "c60d751397434896e1094ee2ade731714da38c103ee02ac8a33f503d8139899d",
+      "sameContentAs": "public-corpus/run-1/negative-replay.json"
+    },
+    {
+      "path": "public-corpus/run-2/protocol.json",
+      "bytes": 549,
+      "sha256": "61e2be40d2f6e3f66b8aab4125f204590c86ac9debdd133c5babbd5f5b9475b3",
+      "sameContentAs": "public-corpus/run-1/protocol.json"
+    },
+    {
+      "path": "public-corpus/run-2/quality-cases.json",
+      "bytes": 645780,
+      "sha256": "d0b245f5d930349d8fc5ed0bb7ac72817675d87be8a949b559959acdd1e13a2d",
+      "sameContentAs": "public-corpus/run-1/quality-cases.json"
+    },
+    {
+      "path": "public-corpus/run-2/state-identities.json",
+      "bytes": 1640,
+      "sha256": "6a160c62f1ff558ca36149ab18e75a74839189befa0e8f6c37ccb100b7966716",
+      "sameContentAs": "public-corpus/run-1/state-identities.json"
+    },
+    {
+      "path": "public-corpus/run-2/symbol-bindings.json",
+      "bytes": 402,
+      "sha256": "54c62a6de25ec9925efa7ec1a5e82d93543de98e9838f4903cae6f68b76dded5",
+      "sameContentAs": "public-corpus/run-1/symbol-bindings.json"
+    },
+    {
+      "path": "public-corpus/run-2/training.json",
+      "bytes": 28653,
+      "sha256": "ab37b890b6a79124aafc5855845db57b3fd96839b01636daa2629f67fa89301d",
+      "sameContentAs": "public-corpus/run-1/training.json"
+    },
+    {
+      "path": "public-corpus/run-2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sameContentAs": "public-corpus/run-1.log"
+    },
+    {
+      "path": "public-corpus/source-binding.json",
+      "bytes": 144598,
+      "sha256": "3b9dc89ec862bbdf02538cd784b0af8df8a500bb759f12148ac278dc414e08b9"
+    },
+    {
+      "path": "public-corpus/toolchain.json",
+      "bytes": 2215,
+      "sha256": "99600c4ae294c6c574bd0d72628de609a1e42b44856b62ae6ad9d5a0d4017400"
+    },
+    {
+      "path": "public-corpus/verification.json",
+      "bytes": 2807,
+      "sha256": "ae524e7bf62db1d22282e9cb81f1ff101e68105cb2e509c6d5313962c1a8c10b"
+    },
+    {
+      "path": "public-corpus-driver.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sameContentAs": "public-corpus/run-1.log"
+    },
+    {
+      "path": "red/gradle.log",
+      "bytes": 4007,
+      "sha256": "361ca87ebfc5b0fb97f5d25fd3ad7a04ad0d38f5fb58b4bb7506c9e4873b36c9"
+    },
+    {
+      "path": "red/isolate-build.gradle",
+      "bytes": 288,
+      "sha256": "5c301fe9e4fd68c314a9bddb0ff05e8cf012815fc454989dec43ad2979872ff4"
+    },
+    {
+      "path": "red/source-binding.json",
+      "bytes": 471830,
+      "sha256": "46422b05e02ae21066217743d7cd79277d0da70b3d3fea86a3e1322828c86d6b"
+    },
+    {
+      "path": "red/summary.json",
+      "bytes": 266,
+      "sha256": "213fe3241e1616c8eb42f8865b0627f3a3f14b1cab3ba9a4a62314abf2ab3355"
+    },
+    {
+      "path": "red/working-tree.patch",
+      "bytes": 3233,
+      "sha256": "78305cec55bbbff0b8c0ecc45aaaccbdafc1646e6d916a848dbe76a11a9beccd"
+    },
+    {
+      "path": "review-fix.json",
+      "bytes": 1023,
+      "sha256": "1bc9f25a8b05ee0be56d65819d4216750fff764bd43aae68b4833cf6b9afdf0a"
+    },
+    {
+      "path": "run-ai-gate.py",
+      "bytes": 2800,
+      "sha256": "afd538d1ca49f325031e7efd703e2978f9999effdfbefd8dfa5ef03957840802"
+    },
+    {
+      "path": "run-focused.py",
+      "bytes": 4172,
+      "sha256": "97868bc971e9a0fea93882cb9acacd85c95f44c474dd6b7775676656cc4ad124"
+    },
+    {
+      "path": "run-full-modules.py",
+      "bytes": 3936,
+      "sha256": "124ae837c1fd592ec340cb41a4c3f39456945b244e316ff7e93de90104aac23e"
+    }
+  ],
+  "artifacts": {
+    "raw-evidence.tar.gz": {
+      "bytes": 2310191,
+      "sha256": "7fb27b0f220f2ddb34ce75db50322f4c15ef310437b0c295db9c28bc52a10fab"
+    },
+    "source-history.bundle": {
+      "bytes": 4618,
+      "sha256": "94c30a2e8b4f1664c5ef06258b49a6f36bf23e5518a164ded79f6178ca71801e"
+    }
+  }
+}

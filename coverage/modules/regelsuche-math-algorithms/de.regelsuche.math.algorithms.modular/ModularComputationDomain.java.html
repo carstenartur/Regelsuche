@@ -12,7 +12,7 @@ import java.util.*;
  * Proofs use the existing exact Polynomial representation, on the integer affine fragment.
  */
 public final class ModularComputationDomain {
-    public static final String REVISION = &quot;regelsuche.modular-affine-domain/v1&quot;;
+    public static final String REVISION = &quot;regelsuche.modular-affine-domain/v2&quot;;
     private static final int MAX_NODES = 2_048;
     private static final int MAX_DEPTH = 96;
     public record NormalizedInput(String value, String modulus) {
@@ -76,172 +76,225 @@ public final class ModularComputationDomain {
      */
     public Generation generate(List&lt;Expr&gt; outputs, int maximumCandidates) {
 <span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;positive candidate cap required&quot;);</span>
-<span class="fc" id="L79">        var work = new Work();</span>
+<span class="fc" id="L79">        var candidates = new Candidates(outputs, maximumCandidates);</span>
 <span class="fc" id="L80">        var powers = new LinkedHashSet&lt;FunctionExpr&gt;();</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (Expr output : outputs) collect(output, powers, work, 0);</span>
-<span class="fc" id="L82">        var result = new LinkedHashMap&lt;List&lt;Expr&gt;, Rewrite&gt;();</span>
-<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (var current : powers) {</span>
-            Power e;
-<span class="pc" id="L85">            try { e = power(current, work); } catch (IllegalArgumentException invalid) { continue; }</span>
-<span class="pc bpc" id="L86" title="3 of 4 branches missed.">            if (e.exponent().equals(Polynomial.constant(Rational.ONE)) &amp;&amp; normalized(e.base(), e.modulus())) {</span>
-<span class="nc" id="L87">                var changed = replace(outputs, current, e.base(), work);</span>
-<span class="nc" id="L88">                result.putIfAbsent(changed, new Rewrite(&quot;modpow-unit-normalized&quot;, changed));</span>
-<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (result.size() &gt;= maximumCandidates) return new Generation(List.copyOf(result.values()), work.units, false);</span>
+<span class="fc" id="L81">        var products = new LinkedHashSet&lt;FunctionExpr&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (Expr output : outputs) collect(output, powers, products, candidates.work, 0);</span>
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">        boolean complete = addReducingProducts(products, candidates) &amp;&amp; addAvailablePowers(powers, candidates);</span>
+<span class="fc" id="L84">        return new Generation(List.copyOf(candidates.rewrites.values()), candidates.work.units, complete);</span>
+    }
+
+    /** A residue may replace a unit power only at its matching reducing use. */
+    private boolean addReducingProducts(Set&lt;FunctionExpr&gt; products, Candidates candidates) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (var product : products) {</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (product.arguments().size() != 3) continue;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (int index = 0; index &lt; 2; index++) {</span>
+<span class="fc" id="L92">                Expr factor = product.arguments().get(index);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                if (!(factor instanceof FunctionExpr function)) continue;</span>
+<span class="fc" id="L94">                Power unit = supportedPower(function, candidates.work);</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">                if (unit == null || !unit.modulus().equals(product.arguments().get(2))</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                        || !unit.exponent().equals(Polynomial.constant(Rational.ONE))) continue;</span>
+<span class="fc" id="L97">                var arguments = new ArrayList&lt;&gt;(product.arguments());</span>
+<span class="fc" id="L98">                arguments.set(index, unit.base());</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                if (!candidates.add(product, new FunctionExpr(&quot;modmul&quot;, arguments), &quot;modmul-unit-power-residue&quot;))</span>
+<span class="nc" id="L100">                    return false;</span>
             }
-<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (var available : powers) {</span>
-<span class="fc" id="L92">                work.units++;</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">                if (current.equals(available)) continue;</span>
-                Power f;
-<span class="pc" id="L95">                try { f = power(available, work); } catch (IllegalArgumentException invalid) { continue; }</span>
-<span class="pc bpc" id="L96" title="2 of 6 branches missed.">                if (!e.base().equals(f.base()) || !e.modulus().equals(f.modulus()) || f.exponent().isZero()) continue;</span>
-<span class="fc" id="L97">                Polynomial difference = e.exponent().subtract(f.exponent());</span>
-<span class="fc" id="L98">                work.units += e.exponent().termCount() + f.exponent().termCount();</span>
-<span class="pc bpc" id="L99" title="1 of 4 branches missed.">                if (difference.isZero() || !nonnegative(difference)) continue;</span>
-<span class="fc" id="L100">                Expr residual = new FunctionExpr(&quot;modpow&quot;, List.of(e.base(), expression(difference), e.modulus()));</span>
-<span class="fc" id="L101">                Expr product = new FunctionExpr(&quot;modmul&quot;, List.of(available, residual, e.modulus()));</span>
-<span class="fc" id="L102">                var changed = replace(outputs, current, product, work);</span>
-<span class="fc" id="L103">                result.putIfAbsent(changed, new Rewrite(&quot;modpow-available-exponent-difference&quot;, changed));</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">                if (result.size() &gt;= maximumCandidates) return new Generation(List.copyOf(result.values()), work.units, false);</span>
-<span class="fc" id="L105">            }</span>
-<span class="fc" id="L106">        }</span>
-<span class="fc" id="L107">        return new Generation(List.copyOf(result.values()), work.units, true);</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        return true;</span>
+    }
+
+    private boolean addAvailablePowers(Set&lt;FunctionExpr&gt; powers, Candidates candidates) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (var current : powers) {</span>
+<span class="fc" id="L108">            Power exponent = supportedPower(current, candidates.work);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (exponent == null) continue;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (exponent.exponent().equals(Polynomial.constant(Rational.ONE))</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                    &amp;&amp; normalized(exponent.base(), exponent.modulus())</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                    &amp;&amp; !candidates.add(current, exponent.base(), &quot;modpow-unit-normalized&quot;)) return false;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (!addExponentDifferences(current, exponent, powers, candidates)) return false;</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc" id="L115">        return true;</span>
+    }
+
+    private boolean addExponentDifferences(FunctionExpr current, Power exponent,
+            Set&lt;FunctionExpr&gt; powers, Candidates candidates) {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (var available : powers) {</span>
+<span class="fc" id="L121">            candidates.work.units++;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (current.equals(available)) continue;</span>
+<span class="fc" id="L123">            Power known = supportedPower(available, candidates.work);</span>
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">            if (known == null || !exponent.base().equals(known.base())</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">                    || !exponent.modulus().equals(known.modulus()) || known.exponent().isZero()) continue;</span>
+<span class="fc" id="L126">            Polynomial difference = exponent.exponent().subtract(known.exponent());</span>
+<span class="fc" id="L127">            candidates.work.units += exponent.exponent().termCount() + known.exponent().termCount();</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">            if (difference.isZero() || !nonnegative(difference)) continue;</span>
+<span class="fc" id="L129">            Expr residual = new FunctionExpr(&quot;modpow&quot;, List.of(exponent.base(), expression(difference), exponent.modulus()));</span>
+<span class="fc" id="L130">            Expr product = new FunctionExpr(&quot;modmul&quot;, List.of(available, residual, exponent.modulus()));</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (!candidates.add(current, product, &quot;modpow-available-exponent-difference&quot;)) return false;</span>
+<span class="fc" id="L132">        }</span>
+<span class="fc" id="L133">        return true;</span>
+    }
+
+    private Power supportedPower(FunctionExpr expression, Work work) {
+<span class="fc" id="L137">        try { return power(expression, work); }</span>
+<span class="nc" id="L138">        catch (IllegalArgumentException outsideFragment) { return null; }</span>
+    }
+
+    /** Preserve insertion order, unique-output counting and one shared work ledger. */
+    private static final class Candidates {
+        private final List&lt;Expr&gt; outputs;
+        private final int maximum;
+<span class="fc" id="L145">        private final Work work = new Work();</span>
+<span class="fc" id="L146">        private final Map&lt;List&lt;Expr&gt;, Rewrite&gt; rewrites = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L147">        Candidates(List&lt;Expr&gt; outputs, int maximum) { this.outputs = outputs; this.maximum = maximum; }</span>
+        boolean add(Expr source, Expr replacement, String rule) {
+<span class="fc" id="L149">            var changed = replace(outputs, source, replacement, work);</span>
+<span class="fc" id="L150">            rewrites.putIfAbsent(changed, new Rewrite(rule, changed));</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            return rewrites.size() &lt; maximum;</span>
+        }
     }
 
     /** Independently compare exponent normal forms. Does not call generate or trust its rule labels. */
     public Verification verifyEquivalent(List&lt;Expr&gt; source, List&lt;Expr&gt; target) {
-<span class="fc" id="L112">        var work = new Work();</span>
+<span class="fc" id="L157">        var work = new Work();</span>
         try {
-<span class="pc bpc" id="L114" title="2 of 4 branches missed.">            if (source.size() != target.size() || source.isEmpty()) return new Verification(false, 1);</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            for (int i = 0; i &lt; source.size(); i++) {</span>
-<span class="fc" id="L116">                Power left = normalForm(source.get(i), null, work, 0);</span>
-<span class="fc" id="L117">                Power right = normalForm(target.get(i), left.modulus(), work, 0);</span>
-<span class="fc" id="L118">                work.units++;</span>
-<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (!left.equals(right)) return new Verification(false, work.units);</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">            if (source.size() != target.size() || source.isEmpty()) return new Verification(false, 1);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            for (int i = 0; i &lt; source.size(); i++) {</span>
+<span class="fc" id="L161">                Power left = normalForm(source.get(i), null, work, 0, false);</span>
+<span class="fc" id="L162">                Power right = normalForm(target.get(i), left.modulus(), work, 0, false);</span>
+<span class="fc" id="L163">                work.units++;</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                if (!left.equals(right)) return new Verification(false, work.units);</span>
             }
-<span class="fc" id="L121">            return new Verification(true, Math.max(1, work.units));</span>
-<span class="fc" id="L122">        } catch (IllegalArgumentException invalid) {</span>
-<span class="fc" id="L123">            return new Verification(false, Math.max(1, work.units));</span>
+<span class="fc" id="L166">            return new Verification(true, Math.max(1, work.units));</span>
+<span class="fc" id="L167">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L168">            return new Verification(false, Math.max(1, work.units));</span>
         }
     }
 
-    private Power normalForm(Expr expression, Expr expectedModulus, Work work, int depth) {
-<span class="fc" id="L128">        work.visit(depth);</span>
-<span class="fc bfc" id="L129" title="All 4 branches covered.">        if (expression instanceof FunctionExpr function &amp;&amp; function.name().equals(&quot;modpow&quot;)) {</span>
-<span class="fc" id="L130">            Power result = power(function, work);</span>
-<span class="pc bpc" id="L131" title="1 of 4 branches missed.">            if (expectedModulus != null &amp;&amp; !expectedModulus.equals(result.modulus())) throw new IllegalArgumentException(&quot;modulus differs&quot;);</span>
-<span class="fc" id="L132">            return result;</span>
+    private Power normalForm(Expr expression, Expr expectedModulus, Work work, int depth, boolean reducedByParent) {
+<span class="fc" id="L173">        work.visit(depth);</span>
+<span class="fc bfc" id="L174" title="All 4 branches covered.">        if (expression instanceof FunctionExpr function &amp;&amp; function.name().equals(&quot;modpow&quot;)) {</span>
+<span class="fc" id="L175">            Power result = power(function, work);</span>
+<span class="fc bfc" id="L176" title="All 4 branches covered.">            if (expectedModulus != null &amp;&amp; !expectedModulus.equals(result.modulus())) throw new IllegalArgumentException(&quot;modulus differs&quot;);</span>
+<span class="fc" id="L177">            return result;</span>
         }
-<span class="pc bpc" id="L134" title="2 of 6 branches missed.">        if (expression instanceof FunctionExpr function &amp;&amp; function.name().equals(&quot;modmul&quot;) &amp;&amp; function.arguments().size() == 3) {</span>
-<span class="fc" id="L135">            Expr modulus = function.arguments().get(2);</span>
-<span class="fc" id="L136">            requirePositive(modulus);</span>
-<span class="pc bpc" id="L137" title="2 of 4 branches missed.">            if (expectedModulus != null &amp;&amp; !expectedModulus.equals(modulus)) throw new IllegalArgumentException(&quot;modulus differs&quot;);</span>
-<span class="fc" id="L138">            Power left = normalForm(function.arguments().getFirst(), modulus, work, depth + 1);</span>
-<span class="fc" id="L139">            Power right = normalForm(function.arguments().get(1), modulus, work, depth + 1);</span>
-<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (!left.base().equals(right.base())) throw new IllegalArgumentException(&quot;product bases differ&quot;);</span>
-<span class="fc" id="L141">            work.units += left.exponent().termCount() + right.exponent().termCount();</span>
-<span class="fc" id="L142">            return new Power(left.base(), left.exponent().add(right.exponent()), modulus);</span>
+<span class="pc bpc" id="L179" title="2 of 6 branches missed.">        if (expression instanceof FunctionExpr function &amp;&amp; function.name().equals(&quot;modmul&quot;) &amp;&amp; function.arguments().size() == 3) {</span>
+<span class="fc" id="L180">            Expr modulus = function.arguments().get(2);</span>
+<span class="fc" id="L181">            requirePositive(modulus);</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">            if (expectedModulus != null &amp;&amp; !expectedModulus.equals(modulus)) throw new IllegalArgumentException(&quot;modulus differs&quot;);</span>
+<span class="fc" id="L183">            Power left = normalForm(function.arguments().getFirst(), modulus, work, depth + 1, true);</span>
+<span class="fc" id="L184">            Power right = normalForm(function.arguments().get(1), modulus, work, depth + 1, true);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            if (!left.base().equals(right.base())) throw new IllegalArgumentException(&quot;product bases differ&quot;);</span>
+<span class="fc" id="L186">            work.units += left.exponent().termCount() + right.exponent().termCount();</span>
+<span class="fc" id="L187">            return new Power(left.base(), left.exponent().add(right.exponent()), modulus);</span>
         }
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="pc bpc" id="L145" title="2 of 4 branches missed.">            var matches = normalized.stream().filter(p -&gt; p.value().equals(variable.name())</span>
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                &amp;&amp; (expectedModulus == null || expectedModulus.equals(new VariableExpr(p.modulus())))).toList();</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (matches.size() == 1) {</span>
-<span class="fc" id="L148">                Expr modulus = new VariableExpr(matches.getFirst().modulus());</span>
-<span class="fc" id="L149">                requirePositive(modulus);</span>
-<span class="fc" id="L150">                return new Power(variable, Polynomial.constant(Rational.ONE), modulus);</span>
+        // Congruent factors need not already be normalized: the parent modmul
+        // reduces their product. This permission must never reach a bare output.
+<span class="pc bpc" id="L191" title="4 of 8 branches missed.">        if (reducedByParent &amp;&amp; expectedModulus != null</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                &amp;&amp; (expression instanceof VariableExpr || expression instanceof NumberExpr n &amp;&amp; n.value().isInteger())) {</span>
+<span class="fc" id="L193">            requirePositive(expectedModulus);</span>
+<span class="fc" id="L194">            return new Power(expression, Polynomial.constant(Rational.ONE), expectedModulus);</span>
+        }
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="pc bnc" id="L197" title="All 4 branches missed.">            var matches = normalized.stream().filter(p -&gt; p.value().equals(variable.name())</span>
+<span class="pc bnc" id="L198" title="All 2 branches missed.">                &amp;&amp; (expectedModulus == null || expectedModulus.equals(new VariableExpr(p.modulus())))).toList();</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (matches.size() == 1) {</span>
+<span class="nc" id="L200">                Expr modulus = new VariableExpr(matches.getFirst().modulus());</span>
+<span class="nc" id="L201">                requirePositive(modulus);</span>
+<span class="nc" id="L202">                return new Power(variable, Polynomial.constant(Rational.ONE), modulus);</span>
             }
         }
-<span class="fc" id="L153">        throw new IllegalArgumentException(&quot;unsupported modular normal form&quot;);</span>
+<span class="fc" id="L205">        throw new IllegalArgumentException(&quot;unsupported modular normal form&quot;);</span>
     }
     private Power power(FunctionExpr expression, Work work) {
-<span class="pc bpc" id="L156" title="2 of 4 branches missed.">        if (!expression.name().equals(&quot;modpow&quot;) || expression.arguments().size() != 3) throw new IllegalArgumentException(&quot;modpow arity differs&quot;);</span>
-<span class="fc" id="L157">        Expr base = expression.arguments().getFirst(), modulus = expression.arguments().get(2);</span>
-<span class="pc bpc" id="L158" title="5 of 6 branches missed.">        if (!(base instanceof VariableExpr || base instanceof NumberExpr n &amp;&amp; n.value().isInteger())) throw new IllegalArgumentException(&quot;scalar base required&quot;);</span>
-<span class="fc" id="L159">        requirePositive(modulus);</span>
-<span class="fc" id="L160">        Polynomial exponent = affine(expression.arguments().get(1), work, 0);</span>
-<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (!nonnegative(exponent)) throw new IllegalArgumentException(&quot;nonnegative affine exponent not proved&quot;);</span>
-<span class="fc" id="L162">        return new Power(base, exponent, modulus);</span>
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">        if (!expression.name().equals(&quot;modpow&quot;) || expression.arguments().size() != 3) throw new IllegalArgumentException(&quot;modpow arity differs&quot;);</span>
+<span class="fc" id="L209">        Expr base = expression.arguments().getFirst(), modulus = expression.arguments().get(2);</span>
+<span class="pc bpc" id="L210" title="5 of 6 branches missed.">        if (!(base instanceof VariableExpr || base instanceof NumberExpr n &amp;&amp; n.value().isInteger())) throw new IllegalArgumentException(&quot;scalar base required&quot;);</span>
+<span class="fc" id="L211">        requirePositive(modulus);</span>
+<span class="fc" id="L212">        Polynomial exponent = affine(expression.arguments().get(1), work, 0);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (!nonnegative(exponent)) throw new IllegalArgumentException(&quot;nonnegative affine exponent not proved&quot;);</span>
+<span class="fc" id="L214">        return new Power(base, exponent, modulus);</span>
     }
     private Polynomial affine(Expr expression, Work work, int depth) {
-<span class="fc" id="L165">        work.visit(depth);</span>
+<span class="fc" id="L217">        work.visit(depth);</span>
         Polynomial result;
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (!number.value().isInteger()) throw new IllegalArgumentException(&quot;integer coefficient required&quot;);</span>
-<span class="fc" id="L169">            result = Polynomial.constant(Rational.fromExact(number.value()));</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable) result = Polynomial.variable(variable.name());</span>
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        else if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L172">            Polynomial left = affine(binary.left(), work, depth + 1), right = affine(binary.right(), work, depth + 1);</span>
-<span class="fc" id="L173">            work.units += (long) Math.max(1, left.termCount()) * Math.max(1, right.termCount());</span>
-<span class="pc bpc" id="L174" title="2 of 4 branches missed.">            result = switch (binary.operator()) {</span>
-<span class="fc" id="L175">                case ADD -&gt; left.add(right);</span>
-<span class="nc" id="L176">                case SUB -&gt; left.subtract(right);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (!number.value().isInteger()) throw new IllegalArgumentException(&quot;integer coefficient required&quot;);</span>
+<span class="fc" id="L221">            result = Polynomial.constant(Rational.fromExact(number.value()));</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable) result = Polynomial.variable(variable.name());</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L224">            Polynomial left = affine(binary.left(), work, depth + 1), right = affine(binary.right(), work, depth + 1);</span>
+<span class="fc" id="L225">            work.units += (long) Math.max(1, left.termCount()) * Math.max(1, right.termCount());</span>
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">            result = switch (binary.operator()) {</span>
+<span class="fc" id="L227">                case ADD -&gt; left.add(right);</span>
+<span class="nc" id="L228">                case SUB -&gt; left.subtract(right);</span>
                 case MUL -&gt; {
-<span class="fc bfc" id="L178" title="All 2 branches covered.">                    if (left.totalDegree() + right.totalDegree() &gt; 1) throw new IllegalArgumentException(&quot;affine exponent required&quot;);</span>
-<span class="fc" id="L179">                    yield left.multiply(right);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                    if (left.totalDegree() + right.totalDegree() &gt; 1) throw new IllegalArgumentException(&quot;affine exponent required&quot;);</span>
+<span class="fc" id="L231">                    yield left.multiply(right);</span>
                 }
-<span class="nc" id="L181">                default -&gt; throw new IllegalArgumentException(&quot;unsupported affine operator&quot;);</span>
+<span class="nc" id="L233">                default -&gt; throw new IllegalArgumentException(&quot;unsupported affine operator&quot;);</span>
             };
-<span class="pc" id="L183">        } else throw new IllegalArgumentException(&quot;unsupported affine expression&quot;);</span>
-<span class="pc bpc" id="L184" title="3 of 6 branches missed.">        if (result.termCount() &gt; 128 || result.terms().values().stream().anyMatch(c -&gt; c.numerator().bitLength() &gt; 4096))</span>
-<span class="nc" id="L185">            throw new IllegalArgumentException(&quot;affine proof bound exceeded&quot;);</span>
-<span class="fc" id="L186">        return result;</span>
+<span class="pc" id="L235">        } else throw new IllegalArgumentException(&quot;unsupported affine expression&quot;);</span>
+<span class="pc bpc" id="L236" title="3 of 6 branches missed.">        if (result.termCount() &gt; 128 || result.terms().values().stream().anyMatch(c -&gt; c.numerator().bitLength() &gt; 4096))</span>
+<span class="nc" id="L237">            throw new IllegalArgumentException(&quot;affine proof bound exceeded&quot;);</span>
+<span class="fc" id="L238">        return result;</span>
     }
     private boolean nonnegative(Polynomial polynomial) {
-<span class="pc bpc" id="L189" title="1 of 4 branches missed.">        return polynomial.totalDegree() &lt;= 1 &amp;&amp; polynomial.terms().entrySet().stream().allMatch(term -&gt;</span>
-<span class="pc bpc" id="L190" title="1 of 4 branches missed.">            term.getValue().numerator().signum() &gt;= 0 &amp;&amp; term.getValue().denominator().equals(BigInteger.ONE)</span>
-<span class="pc bpc" id="L191" title="1 of 6 branches missed.">                &amp;&amp; term.getKey().powers().keySet().stream().allMatch(name -&gt; nonnegative.contains(name) || positive.contains(name)));</span>
+<span class="pc bpc" id="L241" title="1 of 4 branches missed.">        return polynomial.totalDegree() &lt;= 1 &amp;&amp; polynomial.terms().entrySet().stream().allMatch(term -&gt;</span>
+<span class="pc bpc" id="L242" title="1 of 4 branches missed.">            term.getValue().numerator().signum() &gt;= 0 &amp;&amp; term.getValue().denominator().equals(BigInteger.ONE)</span>
+<span class="pc bpc" id="L243" title="1 of 6 branches missed.">                &amp;&amp; term.getKey().powers().keySet().stream().allMatch(name -&gt; nonnegative.contains(name) || positive.contains(name)));</span>
     }
     private void requirePositive(Expr modulus) {
-<span class="pc bpc" id="L194" title="1 of 4 branches missed.">        if (modulus instanceof VariableExpr v &amp;&amp; positive.contains(v.name())) return;</span>
-<span class="pc bpc" id="L195" title="5 of 6 branches missed.">        if (modulus instanceof NumberExpr n &amp;&amp; n.value().isInteger() &amp;&amp; n.value().signum() &gt; 0) return;</span>
-<span class="fc" id="L196">        throw new IllegalArgumentException(&quot;positive modulus not proved&quot;);</span>
+<span class="pc bpc" id="L246" title="1 of 4 branches missed.">        if (modulus instanceof VariableExpr v &amp;&amp; positive.contains(v.name())) return;</span>
+<span class="pc bpc" id="L247" title="5 of 6 branches missed.">        if (modulus instanceof NumberExpr n &amp;&amp; n.value().isInteger() &amp;&amp; n.value().signum() &gt; 0) return;</span>
+<span class="fc" id="L248">        throw new IllegalArgumentException(&quot;positive modulus not proved&quot;);</span>
     }
     private boolean normalized(Expr base, Expr modulus) {
-<span class="nc bnc" id="L199" title="All 6 branches missed.">        return base instanceof VariableExpr b &amp;&amp; modulus instanceof VariableExpr m &amp;&amp; normalized.contains(new NormalizedInput(b.name(), m.name()));</span>
+<span class="pc bpc" id="L251" title="3 of 6 branches missed.">        return base instanceof VariableExpr b &amp;&amp; modulus instanceof VariableExpr m &amp;&amp; normalized.contains(new NormalizedInput(b.name(), m.name()));</span>
     }
     private static BigInteger integer(Map&lt;String, ?&gt; inputs, String name) {
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (!(inputs.get(name) instanceof BigInteger value)) throw new IllegalArgumentException(&quot;integer input required: &quot; + name);</span>
-<span class="fc" id="L203">        return value;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (!(inputs.get(name) instanceof BigInteger value)) throw new IllegalArgumentException(&quot;integer input required: &quot; + name);</span>
+<span class="fc" id="L255">        return value;</span>
     }
     private static Expr expression(Polynomial polynomial) {
-<span class="fc" id="L206">        Expr result = null;</span>
-<span class="pc" id="L207">        var terms = polynomial.terms().entrySet().stream().sorted(Comparator.comparing(e -&gt; e.getKey().key())).toList();</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (var term : terms) {</span>
-<span class="fc" id="L209">            Expr coefficient = new NumberExpr(ExactRational.integer(term.getValue().numerator()));</span>
-<span class="fc" id="L210">            Expr value = coefficient;</span>
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (!term.getKey().powers().isEmpty()) {</span>
-<span class="fc" id="L212">                Expr variable = new VariableExpr(term.getKey().powers().keySet().iterator().next());</span>
-<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                value = term.getValue().isOne() ? variable : new BinaryExpr(coefficient, BinaryOperator.MUL, variable);</span>
+<span class="fc" id="L258">        Expr result = null;</span>
+<span class="pc" id="L259">        var terms = polynomial.terms().entrySet().stream().sorted(Comparator.comparing(e -&gt; e.getKey().key())).toList();</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (var term : terms) {</span>
+<span class="fc" id="L261">            Expr coefficient = new NumberExpr(ExactRational.integer(term.getValue().numerator()));</span>
+<span class="fc" id="L262">            Expr value = coefficient;</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            if (!term.getKey().powers().isEmpty()) {</span>
+<span class="fc" id="L264">                Expr variable = new VariableExpr(term.getKey().powers().keySet().iterator().next());</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                value = term.getValue().isOne() ? variable : new BinaryExpr(coefficient, BinaryOperator.MUL, variable);</span>
             }
-<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            result = result == null ? value : new BinaryExpr(result, BinaryOperator.ADD, value);</span>
-<span class="fc" id="L216">        }</span>
-<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        return result == null ? new NumberExpr(0) : result;</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            result = result == null ? value : new BinaryExpr(result, BinaryOperator.ADD, value);</span>
+<span class="fc" id="L268">        }</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        return result == null ? new NumberExpr(0) : result;</span>
     }
-    private static void collect(Expr expression, Set&lt;FunctionExpr&gt; powers, Work work, int depth) {
-<span class="fc" id="L220">        work.visit(depth);</span>
-<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (expression instanceof FunctionExpr f) {</span>
-<span class="fc bfc" id="L222" title="All 2 branches covered.">            for (var argument : f.arguments()) collect(argument, powers, work, depth + 1);</span>
-<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (f.name().equals(&quot;modpow&quot;)) powers.add(f);</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr b) {</span>
-<span class="fc" id="L225">            collect(b.left(), powers, work, depth + 1); collect(b.right(), powers, work, depth + 1);</span>
+    private static void collect(Expr expression, Set&lt;FunctionExpr&gt; powers, Set&lt;FunctionExpr&gt; products, Work work, int depth) {
+<span class="fc" id="L272">        work.visit(depth);</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (expression instanceof FunctionExpr f) {</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            for (var argument : f.arguments()) collect(argument, powers, products, work, depth + 1);</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (f.name().equals(&quot;modpow&quot;)) powers.add(f);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (f.name().equals(&quot;modmul&quot;)) products.add(f);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr b) {</span>
+<span class="fc" id="L278">            collect(b.left(), powers, products, work, depth + 1); collect(b.right(), powers, products, work, depth + 1);</span>
         }
-<span class="fc" id="L227">    }</span>
+<span class="fc" id="L280">    }</span>
     private static List&lt;Expr&gt; replace(List&lt;Expr&gt; outputs, Expr source, Expr target, Work work) {
-<span class="fc" id="L229">        return outputs.stream().map(output -&gt; replace(output, source, target, work)).toList();</span>
+<span class="fc" id="L282">        return outputs.stream().map(output -&gt; replace(output, source, target, work)).toList();</span>
     }
     private static Expr replace(Expr expression, Expr source, Expr target, Work work) {
-<span class="fc" id="L232">        work.units++;</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (expression.equals(source)) return target;</span>
-<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (expression instanceof FunctionExpr f) return new FunctionExpr(f.name(), f.arguments().stream().map(a -&gt; replace(a, source, target, work)).toList());</span>
-<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (expression instanceof BinaryExpr b) return new BinaryExpr(replace(b.left(), source, target, work), b.operator(), replace(b.right(), source, target, work));</span>
-<span class="fc" id="L236">        return expression;</span>
+<span class="fc" id="L285">        work.units++;</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (expression.equals(source)) return target;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (expression instanceof FunctionExpr f) return new FunctionExpr(f.name(), f.arguments().stream().map(a -&gt; replace(a, source, target, work)).toList());</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (expression instanceof BinaryExpr b) return new BinaryExpr(replace(b.left(), source, target, work), b.operator(), replace(b.right(), source, target, work));</span>
+<span class="fc" id="L289">        return expression;</span>
     }
-<span class="fc" id="L238">    private static final class Work {</span>
-<span class="fc" id="L239">        private long units = 1;</span>
+<span class="fc" id="L291">    private static final class Work {</span>
+<span class="fc" id="L292">        private long units = 1;</span>
         private int visits;
         void visit(int depth) {
-<span class="fc" id="L242">            units++;</span>
-<span class="pc bpc" id="L243" title="2 of 4 branches missed.">            if (++visits &gt; MAX_NODES || depth &gt; MAX_DEPTH) throw new IllegalArgumentException(&quot;modular proof structural bound exceeded&quot;);</span>
-<span class="fc" id="L244">        }</span>
+<span class="fc" id="L295">            units++;</span>
+<span class="pc bpc" id="L296" title="2 of 4 branches missed.">            if (++visits &gt; MAX_NODES || depth &gt; MAX_DEPTH) throw new IllegalArgumentException(&quot;modular proof structural bound exceeded&quot;);</span>
+<span class="fc" id="L297">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -5,9 +5,10 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -19,209 +20,536 @@ import java.util.TreeMap;
  * bit budgets apply before and during arithmetic. Symbolic divisors remain
  * outside this assumption-free fragment.&lt;/p&gt;
  */
-record BoundedExactMonomial(ExactRational coefficient, Map&lt;String, Integer&gt; powers) {
-<span class="fc" id="L23">    BoundedExactMonomial {</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">        powers = coefficient.isZero() ? Map.of()</span>
-<span class="fc" id="L25">            : Collections.unmodifiableMap(new TreeMap&lt;&gt;(powers));</span>
-<span class="fc" id="L26">    }</span>
+final class BoundedExactMonomial implements RetainedGraph.View {
+    private final ExactRational coefficient;
+    // The defensive natural-order copy never escapes or changes after construction.
+    // Owning it directly also avoids hiding its backing map behind a JDK view.
+    private final Map&lt;String, Integer&gt; powers;
+
+<span class="fc" id="L29">    BoundedExactMonomial(ExactRational coefficient, Map&lt;String, Integer&gt; powers) {</span>
+<span class="fc" id="L30">        this.coefficient = coefficient;</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        this.powers = coefficient.isZero() ? Map.of() : new TreeMap&lt;&gt;(powers);</span>
+<span class="fc" id="L32">        try (var completed = RetainedOperation.retainCompleted(</span>
+<span class="fc bfc" id="L33" title="All 4 branches covered.">                1L + (coefficient.isZero() ? 0 : 1L + powers.size()), powers, this)) { }</span>
+<span class="fc" id="L34">    }</span>
+
+    ExactRational coefficient() {
+<span class="fc" id="L37">        return coefficient;</span>
+    }
+
+    @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L41">        visitor.reference(coefficient); visitor.reference(powers);</span>
+<span class="fc" id="L42">    }</span>
 
     static Optional&lt;BoundedExactMonomial&gt; from(Expr expression, Budget budget) {
-<span class="fc" id="L29">        return from(expression, budget, 0);</span>
+        // Recursive visits borrow this single source owner.
+<span class="fc" id="L46">        var input = RetainedOperation.retain(expression, budget);</span>
+<span class="fc" id="L47">        Throwable inputFailure = null;</span>
+        try {
+<span class="fc" id="L49">            return from(expression, budget, 0);</span>
+<span class="fc" id="L50">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L51">            inputFailure = failure;</span>
+<span class="fc" id="L52">            throw failure;</span>
+        } finally {
+<span class="fc" id="L54">            closeFrame(input, inputFailure);</span>
+        }
     }
 
     private static Optional&lt;BoundedExactMonomial&gt; from(
         Expr expression, Budget budget, int depth
     ) {
-<span class="fc" id="L35">        budget.visit(depth);</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L37">            budget.coefficientBits(bits(number.value().numerator()), bits(number.value().denominator()));</span>
-<span class="fc" id="L38">            return Optional.of(new BoundedExactMonomial(number.value(), Map.of()));</span>
+<span class="fc" id="L61">        budget.visit(depth);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L63">            budget.coefficientBits(bits(number.value().numerator()), bits(number.value().denominator()));</span>
+<span class="fc" id="L64">            return optional(new BoundedExactMonomial(number.value(), Map.of()));</span>
         }
-<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L41">            return Optional.of(new BoundedExactMonomial(</span>
-<span class="fc" id="L42">                ExactRational.ONE, Map.of(variable.name(), 1)));</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L67">            var powers = Map.of(variable.name(), 1);</span>
+<span class="fc" id="L68">            var singleton = RetainedOperation.retainCompleted(2, powers);</span>
+<span class="fc" id="L69">            Throwable singletonFailure = null;</span>
+            try {
+<span class="fc" id="L71">                return optional(new BoundedExactMonomial(ExactRational.ONE, powers));</span>
+<span class="fc" id="L72">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L73">                singletonFailure = failure;</span>
+<span class="fc" id="L74">                throw failure;</span>
+            } finally {
+<span class="fc" id="L76">                closeFrame(singleton, singletonFailure);</span>
+            }
         }
-<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
-<span class="fc" id="L45">            return Optional.empty();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L80">            return Optional.empty();</span>
         }
-<span class="pc bpc" id="L47" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
-<span class="fc" id="L48">            case MUL, DIV -&gt; product(binary, budget, depth);</span>
-<span class="fc" id="L49">            case POW -&gt; power(binary, budget, depth);</span>
-<span class="nc" id="L50">            default -&gt; Optional.empty();</span>
+<span class="pc bpc" id="L82" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L83">            case MUL, DIV -&gt; product(binary, budget, depth);</span>
+<span class="fc" id="L84">            case POW -&gt; power(binary, budget, depth);</span>
+<span class="nc" id="L85">            default -&gt; Optional.empty();</span>
         };
     }
 
     private static Optional&lt;BoundedExactMonomial&gt; product(
         BinaryExpr binary, Budget budget, int depth
     ) {
-<span class="fc" id="L57">        var left = from(binary.left(), budget, depth + 1);</span>
-<span class="fc" id="L58">        var right = from(binary.right(), budget, depth + 1);</span>
-<span class="fc bfc" id="L59" title="All 4 branches covered.">        if (left.isEmpty() || right.isEmpty()) {</span>
-<span class="fc" id="L60">            return Optional.empty();</span>
+<span class="fc" id="L92">        var left = from(binary.left(), budget, depth + 1);</span>
+<span class="fc" id="L93">        var leftOwned = RetainedOperation.retain(left);</span>
+<span class="fc" id="L94">        Throwable leftOwnedFailure = null;</span>
+        try {
+<span class="fc" id="L96">            var right = from(binary.right(), budget, depth + 1);</span>
+<span class="fc" id="L97">            var rightOwned = RetainedOperation.retain(right);</span>
+<span class="fc" id="L98">            Throwable rightOwnedFailure = null;</span>
+            try {
+<span class="fc bfc" id="L100" title="All 4 branches covered.">                if (left.isEmpty() || right.isEmpty()) {</span>
+<span class="fc" id="L101">                    return Optional.empty();</span>
+                }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                boolean divide = binary.operator() == BinaryOperator.DIV;</span>
+                // Even x/x and 0/x retain an undefined point. There is no assumption
+                // context here that could authorize cancelling a symbolic denominator.
+<span class="fc bfc" id="L106" title="All 6 branches covered.">                if (divide &amp;&amp; (right.get().coefficient.isZero() || !right.get().powers.isEmpty())) {</span>
+<span class="fc" id="L107">                    return Optional.empty();</span>
+                }
+<span class="fc" id="L109">                return optional(left.get().combine(right.get(), divide, budget));</span>
+<span class="fc" id="L110">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L111">                rightOwnedFailure = failure;</span>
+<span class="fc" id="L112">                throw failure;</span>
+            } finally {
+<span class="fc" id="L114">                closeFrame(rightOwned, rightOwnedFailure);</span>
+            }
+<span class="fc" id="L116">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L117">            leftOwnedFailure = failure;</span>
+<span class="fc" id="L118">            throw failure;</span>
+        } finally {
+<span class="fc" id="L120">            closeFrame(leftOwned, leftOwnedFailure);</span>
         }
-<span class="fc bfc" id="L62" title="All 2 branches covered.">        boolean divide = binary.operator() == BinaryOperator.DIV;</span>
-        // Even x/x and 0/x retain an undefined point. There is no assumption
-        // context here that could authorize cancelling a symbolic denominator.
-<span class="fc bfc" id="L65" title="All 6 branches covered.">        if (divide &amp;&amp; (right.get().coefficient.isZero() || !right.get().powers.isEmpty())) {</span>
-<span class="fc" id="L66">            return Optional.empty();</span>
-        }
-<span class="fc" id="L68">        return Optional.of(left.get().combine(right.get(), divide, budget));</span>
     }
 
     private static Optional&lt;BoundedExactMonomial&gt; power(
         BinaryExpr binary, Budget budget, int depth
     ) {
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (!(binary.right() instanceof NumberExpr number)) {</span>
-<span class="nc" id="L75">            return Optional.empty();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (!(binary.right() instanceof NumberExpr number)) {</span>
+<span class="nc" id="L128">            return Optional.empty();</span>
         }
-<span class="fc" id="L77">        int exponent = positiveInteger(number.value());</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (exponent &lt; 1) {</span>
-<span class="fc" id="L79">            return Optional.empty();</span>
+<span class="fc" id="L130">        int exponent = positiveInteger(number.value());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (exponent &lt; 1) {</span>
+<span class="fc" id="L132">            return Optional.empty();</span>
         }
-<span class="fc" id="L81">        return from(binary.left(), budget, depth + 1)</span>
-<span class="fc" id="L82">            .map(base -&gt; base.pow(exponent, budget));</span>
+<span class="fc" id="L134">        var base = from(binary.left(), budget, depth + 1);</span>
+<span class="fc" id="L135">        var baseOwned = RetainedOperation.retain(base);</span>
+<span class="fc" id="L136">        Throwable baseOwnedFailure = null;</span>
+        try {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            return base.isEmpty() ? Optional.empty() : optional(base.get().pow(exponent, budget));</span>
+<span class="fc" id="L139">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L140">            baseOwnedFailure = failure;</span>
+<span class="fc" id="L141">            throw failure;</span>
+        } finally {
+<span class="fc" id="L143">            closeFrame(baseOwned, baseOwnedFailure);</span>
+        }
     }
 
     private BoundedExactMonomial combine(
         BoundedExactMonomial other, boolean divide, Budget budget
     ) {
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        ExactRational right = divide ? other.coefficient.reciprocal() : other.coefficient;</span>
-<span class="fc" id="L89">        budget.coefficientBits(</span>
-<span class="fc" id="L90">            (long) bits(coefficient.numerator()) + bits(right.numerator()),</span>
-<span class="fc" id="L91">            (long) bits(coefficient.denominator()) + bits(right.denominator()));</span>
-<span class="fc" id="L92">        Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (!divide) {</span>
-<span class="fc" id="L94">            other.powers.forEach((name, exponent) -&gt; result.merge(name, exponent,</span>
-<span class="fc" id="L95">                (first, second) -&gt; checkedExponent((long) first + second)));</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        ExactRational right = divide ? other.coefficient.reciprocal() : other.coefficient;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        var scalar = RetainedOperation.retainCompleted(divide ? 1 : 0, this, other, right);</span>
+<span class="fc" id="L152">        Throwable scalarFailure = null;</span>
+        try {
+<span class="fc" id="L154">            budget.coefficientBits(</span>
+<span class="fc" id="L155">                (long) bits(coefficient.numerator()) + bits(right.numerator()),</span>
+<span class="fc" id="L156">                (long) bits(coefficient.denominator()) + bits(right.denominator()));</span>
+<span class="fc" id="L157">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
+<span class="fc" id="L158">            var accumulator = RetainedOperation.retainCompleted(1L + powers.size(), result);</span>
+<span class="fc" id="L159">            Throwable accumulatorFailure = null;</span>
+            try {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                if (!divide) {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                    for (var entry : other.powers.entrySet()) {</span>
+<span class="fc" id="L163">                        result.merge(entry.getKey(), entry.getValue(),</span>
+<span class="fc" id="L164">                            (first, second) -&gt; checkedExponent((long) first + second));</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                        try (var updated = RetainedOperation.retainCompleted(1, result)) { }</span>
+<span class="fc" id="L166">                    }</span>
+                }
+<span class="fc" id="L168">                var product = coefficient.multiply(right);</span>
+<span class="fc" id="L169">                var value = RetainedOperation.retainCompleted(</span>
+<span class="pc bpc" id="L170" title="1 of 6 branches missed.">                        product == coefficient || product == right || product == ExactRational.ZERO ? 0 : 1, product);</span>
+<span class="fc" id="L171">                Throwable valueFailure = null;</span>
+                try {
+<span class="fc" id="L173">                    return new BoundedExactMonomial(product, result);</span>
+<span class="nc" id="L174">                } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L175">                    valueFailure = failure;</span>
+<span class="nc" id="L176">                    throw failure;</span>
+                } finally {
+<span class="fc" id="L178">                    closeFrame(value, valueFailure);</span>
+                }
+<span class="fc" id="L180">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L181">                accumulatorFailure = failure;</span>
+<span class="fc" id="L182">                throw failure;</span>
+            } finally {
+<span class="fc" id="L184">                closeFrame(accumulator, accumulatorFailure);</span>
+            }
+<span class="fc" id="L186">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L187">            scalarFailure = failure;</span>
+<span class="fc" id="L188">            throw failure;</span>
+        } finally {
+<span class="fc" id="L190">            closeFrame(scalar, scalarFailure);</span>
         }
-<span class="fc" id="L97">        return new BoundedExactMonomial(coefficient.multiply(right), result);</span>
     }
 
     private BoundedExactMonomial pow(int exponent, Budget budget) {
-<span class="fc" id="L101">        budget.coefficientBits(powerBits(coefficient.numerator(), exponent),</span>
-<span class="fc" id="L102">            powerBits(coefficient.denominator(), exponent));</span>
-<span class="fc" id="L103">        Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L104">        powers.forEach((name, power) -&gt;</span>
-<span class="fc" id="L105">            result.put(name, checkedExponent((long) power * exponent)));</span>
-<span class="fc" id="L106">        return new BoundedExactMonomial(coefficient.pow(exponent), result);</span>
+<span class="fc" id="L195">        budget.coefficientBits(powerBits(coefficient.numerator(), exponent),</span>
+<span class="fc" id="L196">            powerBits(coefficient.denominator(), exponent));</span>
+<span class="fc" id="L197">        Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L198">        var accumulator = RetainedOperation.retainCompleted(1, this, result);</span>
+<span class="fc" id="L199">        Throwable accumulatorFailure = null;</span>
+        try {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            for (var entry : powers.entrySet()) {</span>
+<span class="fc" id="L202">                result.put(entry.getKey(), checkedExponent((long) entry.getValue() * exponent));</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                try (var updated = RetainedOperation.retainCompleted(1, result)) { }</span>
+<span class="fc" id="L204">            }</span>
+<span class="fc" id="L205">            var powered = coefficient.pow(exponent);</span>
+<span class="fc" id="L206">            var scalar = RetainedOperation.retainCompleted(1, powered);</span>
+<span class="fc" id="L207">            Throwable scalarFailure = null;</span>
+            try {
+<span class="fc" id="L209">                return new BoundedExactMonomial(powered, result);</span>
+<span class="nc" id="L210">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L211">                scalarFailure = failure;</span>
+<span class="nc" id="L212">                throw failure;</span>
+            } finally {
+<span class="fc" id="L214">                closeFrame(scalar, scalarFailure);</span>
+            }
+<span class="fc" id="L216">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L217">            accumulatorFailure = failure;</span>
+<span class="fc" id="L218">            throw failure;</span>
+        } finally {
+<span class="fc" id="L220">            closeFrame(accumulator, accumulatorFailure);</span>
+        }
     }
 
     Optional&lt;BoundedExactMonomial&gt; exactRoot(int exponent, Budget budget) {
-<span class="fc bfc" id="L110" title="All 4 branches covered.">        if (coefficient.signum() &lt; 0 &amp;&amp; exponent % 2 == 0) {</span>
-<span class="fc" id="L111">            return Optional.empty();</span>
-        }
-<span class="fc" id="L113">        Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (var entry : powers.entrySet()) {</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (entry.getValue() % exponent != 0) {</span>
-<span class="fc" id="L116">                return Optional.empty();</span>
+<span class="fc" id="L225">        var input = RetainedOperation.retain(this, budget);</span>
+<span class="fc" id="L226">        Throwable inputFailure = null;</span>
+        try {
+<span class="fc bfc" id="L228" title="All 4 branches covered.">            if (coefficient.signum() &lt; 0 &amp;&amp; exponent % 2 == 0) {</span>
+<span class="fc" id="L229">                return Optional.empty();</span>
             }
-<span class="fc" id="L118">            result.put(entry.getKey(), entry.getValue() / exponent);</span>
-<span class="fc" id="L119">        }</span>
-<span class="fc" id="L120">        var numerator = integerRoot(coefficient.numerator().abs(), exponent, budget);</span>
-<span class="fc" id="L121">        var denominator = integerRoot(coefficient.denominator(), exponent, budget);</span>
-<span class="fc bfc" id="L122" title="All 4 branches covered.">        if (numerator.isEmpty() || denominator.isEmpty()) {</span>
-<span class="fc" id="L123">            return Optional.empty();</span>
+<span class="fc" id="L231">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L232">            var accumulator = RetainedOperation.retainCompleted(1, result);</span>
+<span class="fc" id="L233">            Throwable accumulatorFailure = null;</span>
+            try {
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                for (var entry : powers.entrySet()) {</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                    if (entry.getValue() % exponent != 0) {</span>
+<span class="fc" id="L237">                        return Optional.empty();</span>
+                    }
+<span class="fc" id="L239">                    result.put(entry.getKey(), entry.getValue() / exponent);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                    try (var updated = RetainedOperation.retainCompleted(1, result)) { }</span>
+<span class="fc" id="L241">                }</span>
+<span class="fc" id="L242">                var magnitude = coefficient.numerator().abs();</span>
+<span class="fc" id="L243">                var absolute = RetainedOperation.retainCompleted(</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                        magnitude == coefficient.numerator() ? 0 : 1, magnitude);</span>
+<span class="fc" id="L245">                Throwable absoluteFailure = null;</span>
+                try {
+<span class="fc" id="L247">                    var numerator = integerRoot(magnitude, exponent, budget);</span>
+<span class="fc" id="L248">                    var top = RetainedOperation.retain(numerator);</span>
+<span class="fc" id="L249">                    Throwable topFailure = null;</span>
+                    try {
+<span class="fc" id="L251">                        var denominator = integerRoot(coefficient.denominator(), exponent, budget);</span>
+<span class="fc" id="L252">                        var bottom = RetainedOperation.retain(denominator);</span>
+<span class="fc" id="L253">                        Throwable bottomFailure = null;</span>
+                        try {
+<span class="fc bfc" id="L255" title="All 4 branches covered.">                            if (numerator.isEmpty() || denominator.isEmpty()) {</span>
+<span class="fc" id="L256">                                return Optional.empty();</span>
+                            }
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                            BigInteger signed = coefficient.signum() &lt; 0 ? numerator.get().negate() : numerator.get();</span>
+<span class="fc" id="L259">                            var sign = RetainedOperation.retainCompleted(</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">                                    signed == numerator.get() ? 0 : 1, signed);</span>
+<span class="fc" id="L261">                            Throwable signFailure = null;</span>
+                            try {
+<span class="fc" id="L263">                                var rooted = new ExactRational(signed, denominator.get());</span>
+<span class="fc" id="L264">                                var scalar = RetainedOperation.retainCompleted(1, rooted);</span>
+<span class="fc" id="L265">                                Throwable scalarFailure = null;</span>
+                                try {
+<span class="fc" id="L267">                                    return optional(new BoundedExactMonomial(rooted, result));</span>
+<span class="nc" id="L268">                                } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L269">                                    scalarFailure = failure;</span>
+<span class="nc" id="L270">                                    throw failure;</span>
+                                } finally {
+<span class="fc" id="L272">                                    closeFrame(scalar, scalarFailure);</span>
+                                }
+<span class="nc" id="L274">                            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L275">                                signFailure = failure;</span>
+<span class="nc" id="L276">                                throw failure;</span>
+                            } finally {
+<span class="fc" id="L278">                                closeFrame(sign, signFailure);</span>
+                            }
+<span class="nc" id="L280">                        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L281">                            bottomFailure = failure;</span>
+<span class="nc" id="L282">                            throw failure;</span>
+                        } finally {
+<span class="fc" id="L284">                            closeFrame(bottom, bottomFailure);</span>
+                        }
+<span class="nc" id="L286">                    } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L287">                        topFailure = failure;</span>
+<span class="nc" id="L288">                        throw failure;</span>
+                    } finally {
+<span class="fc" id="L290">                        closeFrame(top, topFailure);</span>
+                    }
+<span class="fc" id="L292">                } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L293">                    absoluteFailure = failure;</span>
+<span class="fc" id="L294">                    throw failure;</span>
+                } finally {
+<span class="fc" id="L296">                    closeFrame(absolute, absoluteFailure);</span>
+                }
+<span class="fc" id="L298">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L299">                accumulatorFailure = failure;</span>
+<span class="fc" id="L300">                throw failure;</span>
+            } finally {
+<span class="fc" id="L302">                closeFrame(accumulator, accumulatorFailure);</span>
+            }
+<span class="fc" id="L304">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L305">            inputFailure = failure;</span>
+<span class="fc" id="L306">            throw failure;</span>
+        } finally {
+<span class="fc" id="L308">            closeFrame(input, inputFailure);</span>
         }
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        BigInteger signed = coefficient.signum() &lt; 0 ? numerator.get().negate() : numerator.get();</span>
-<span class="fc" id="L126">        return Optional.of(new BoundedExactMonomial(</span>
-<span class="fc" id="L127">            new ExactRational(signed, denominator.get()), result));</span>
     }
 
     /** No floating-point proposal can authorize a root. */
     private static Optional&lt;BigInteger&gt; integerRoot(BigInteger value, int exponent, Budget budget) {
-<span class="fc" id="L132">        budget.visit(0);</span>
-<span class="pc bpc" id="L133" title="1 of 4 branches missed.">        if (exponent == 1 || value.compareTo(BigInteger.ONE) &lt;= 0) {</span>
-<span class="fc" id="L134">            return Optional.of(value);</span>
+<span class="fc" id="L314">        budget.visit(0);</span>
+<span class="pc bpc" id="L315" title="1 of 4 branches missed.">        if (exponent == 1 || value.compareTo(BigInteger.ONE) &lt;= 0) {</span>
+<span class="fc" id="L316">            return RetainedOperation.produced(Optional.of(value));</span>
         }
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (exponent &gt; value.bitLength()) {</span>
-<span class="fc" id="L137">            return Optional.empty();</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (exponent &gt; value.bitLength()) {</span>
+<span class="fc" id="L319">            return Optional.empty();</span>
         }
-<span class="fc" id="L139">        BigInteger low = BigInteger.ZERO;</span>
-<span class="fc" id="L140">        BigInteger high = BigInteger.ONE.shiftLeft((value.bitLength() + exponent - 1) / exponent);</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">        while (high.subtract(low).compareTo(BigInteger.ONE) &gt; 0) {</span>
-<span class="fc" id="L142">            budget.visit(0);</span>
-<span class="fc" id="L143">            BigInteger middle = low.add(high).shiftRight(1);</span>
-<span class="fc" id="L144">            int comparison = middle.pow(exponent).compareTo(value);</span>
-<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (comparison == 0) {</span>
-<span class="fc" id="L146">                return Optional.of(middle);</span>
+<span class="fc" id="L321">        BigInteger high = BigInteger.ONE.shiftLeft((value.bitLength() + exponent - 1) / exponent);</span>
+<span class="fc" id="L322">        var upper = RetainedOperation.retainCompleted(1, high);</span>
+<span class="fc" id="L323">        Throwable upperFailure = null;</span>
+        try {
+<span class="fc" id="L325">            BigInteger[] bounds = {BigInteger.ZERO, high};</span>
+<span class="fc" id="L326">            var search = RetainedOperation.retainCompleted(1, (Object) bounds);</span>
+<span class="fc" id="L327">            Throwable searchFailure = null;</span>
+            try {
+                while (true) {
+<span class="fc" id="L330">                    var difference = bounds[1].subtract(bounds[0]);</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                    var gap = RetainedOperation.retainCompleted(difference == bounds[1] ? 0 : 1, difference);</span>
+<span class="fc" id="L332">                    Throwable gapFailure = null;</span>
+                    try {
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                        if (difference.compareTo(BigInteger.ONE) &lt;= 0) break;</span>
+<span class="fc" id="L335">                        budget.visit(0);</span>
+<span class="fc" id="L336">                        var sum = bounds[0].add(bounds[1]);</span>
+<span class="fc" id="L337">                        var added = RetainedOperation.retainCompleted(</span>
+<span class="pc bpc" id="L338" title="1 of 4 branches missed.">                                sum == bounds[0] || sum == bounds[1] ? 0 : 1, sum);</span>
+<span class="fc" id="L339">                        Throwable addedFailure = null;</span>
+                        try {
+<span class="fc" id="L341">                            BigInteger middle = sum.shiftRight(1);</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">                            var midpoint = RetainedOperation.retainCompleted(middle == sum ? 0 : 1, middle);</span>
+<span class="fc" id="L343">                            Throwable midpointFailure = null;</span>
+                            try {
+<span class="fc" id="L345">                                var powered = middle.pow(exponent);</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">                                var trial = RetainedOperation.retainCompleted(powered == middle ? 0 : 1, powered);</span>
+<span class="fc" id="L347">                                Throwable trialFailure = null;</span>
+                                try {
+<span class="fc" id="L349">                                    int comparison = powered.compareTo(value);</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                                    if (comparison == 0) {</span>
+<span class="fc" id="L351">                                        return RetainedOperation.produced(Optional.of(middle));</span>
+                                    }
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                                    bounds[comparison &lt; 0 ? 0 : 1] = middle;</span>
+<span class="fc" id="L354">                                    RetainedOperation.work(1);</span>
+<span class="fc" id="L355">                                } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L356">                                    trialFailure = failure;</span>
+<span class="fc" id="L357">                                    throw failure;</span>
+                                } finally {
+<span class="fc" id="L359">                                    closeFrame(trial, trialFailure);</span>
+                                }
+<span class="fc" id="L361">                            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L362">                                midpointFailure = failure;</span>
+<span class="fc" id="L363">                                throw failure;</span>
+                            } finally {
+<span class="fc" id="L365">                                closeFrame(midpoint, midpointFailure);</span>
+                            }
+<span class="fc" id="L367">                        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L368">                            addedFailure = failure;</span>
+<span class="fc" id="L369">                            throw failure;</span>
+                        } finally {
+<span class="fc" id="L371">                            closeFrame(added, addedFailure);</span>
+                        }
+<span class="fc" id="L373">                    } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L374">                        gapFailure = failure;</span>
+<span class="fc" id="L375">                        throw failure;</span>
+                    } finally {
+<span class="fc" id="L377">                        closeFrame(gap, gapFailure);</span>
+                    }
+<span class="fc" id="L379">                }</span>
+<span class="fc" id="L380">                var powered = bounds[0].pow(exponent);</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                var trial = RetainedOperation.retainCompleted(powered == bounds[0] ? 0 : 1, powered);</span>
+<span class="fc" id="L382">                Throwable trialFailure = null;</span>
+                try {
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                    return powered.equals(value) ? RetainedOperation.produced(Optional.of(bounds[0])) : Optional.empty();</span>
+<span class="nc" id="L385">                } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L386">                    trialFailure = failure;</span>
+<span class="nc" id="L387">                    throw failure;</span>
+                } finally {
+<span class="fc" id="L389">                    closeFrame(trial, trialFailure);</span>
+                }
+<span class="fc" id="L391">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L392">                searchFailure = failure;</span>
+<span class="fc" id="L393">                throw failure;</span>
+            } finally {
+<span class="fc" id="L395">                closeFrame(search, searchFailure);</span>
             }
-<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (comparison &lt; 0) {</span>
-<span class="fc" id="L149">                low = middle;</span>
-            } else {
-<span class="fc" id="L151">                high = middle;</span>
-            }
-<span class="fc" id="L153">        }</span>
-<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        return low.pow(exponent).equals(value) ? Optional.of(low) : Optional.empty();</span>
+<span class="fc" id="L397">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L398">            upperFailure = failure;</span>
+<span class="fc" id="L399">            throw failure;</span>
+        } finally {
+<span class="fc" id="L401">            closeFrame(upper, upperFailure);</span>
+        }
     }
 
     boolean equivalentTo(BoundedExactMonomial other) {
-<span class="fc bfc" id="L158" title="All 4 branches covered.">        return coefficient.equals(other.coefficient) &amp;&amp; powers.equals(other.powers);</span>
+<span class="fc bfc" id="L406" title="All 4 branches covered.">        return coefficient.equals(other.coefficient) &amp;&amp; powers.equals(other.powers);</span>
     }
 
     boolean isConstant(ExactRational expected) {
-<span class="fc bfc" id="L162" title="All 4 branches covered.">        return powers.isEmpty() &amp;&amp; coefficient.equals(expected);</span>
+<span class="fc bfc" id="L410" title="All 4 branches covered.">        return powers.isEmpty() &amp;&amp; coefficient.equals(expected);</span>
     }
 
     Expr toExpr() {
-<span class="fc" id="L166">        Expr result = null;</span>
-<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (!coefficient.isOne() || powers.isEmpty()) {</span>
-<span class="fc" id="L168">            result = coefficientExpression();</span>
-        }
-<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (var entry : powers.entrySet()) {</span>
-<span class="fc" id="L171">            Expr factor = new VariableExpr(entry.getKey());</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (entry.getValue() != 1) {</span>
-<span class="fc" id="L173">                factor = new BinaryExpr(factor, BinaryOperator.POW, new NumberExpr(entry.getValue()));</span>
+<span class="fc" id="L414">        Expr[] current = {null};</span>
+<span class="fc" id="L415">        var rendering = RetainedOperation.retainCompleted(1, this, current);</span>
+<span class="fc" id="L416">        Throwable renderingFailure = null;</span>
+        try {
+<span class="pc bpc" id="L418" title="1 of 4 branches missed.">            if (!coefficient.isOne() || powers.isEmpty()) {</span>
+<span class="fc" id="L419">                current[0] = coefficientExpression();</span>
             }
-<span class="fc bfc" id="L175" title="All 2 branches covered.">            result = result == null ? factor : new BinaryExpr(result, BinaryOperator.MUL, factor);</span>
-<span class="fc" id="L176">        }</span>
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        return result == null ? new NumberExpr(1) : result;</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            for (var entry : powers.entrySet()) {</span>
+<span class="fc" id="L422">                Expr factor = factorExpression(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L423">                var factorOwned = RetainedOperation.retain(factor);</span>
+<span class="fc" id="L424">                Throwable factorOwnedFailure = null;</span>
+                try {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                    current[0] = current[0] == null ? factor</span>
+<span class="fc" id="L427">                        : RetainedOperation.produced(new BinaryExpr(current[0], BinaryOperator.MUL, factor));</span>
+<span class="fc" id="L428">                    RetainedOperation.work(1);</span>
+<span class="nc" id="L429">                } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L430">                    factorOwnedFailure = failure;</span>
+<span class="nc" id="L431">                    throw failure;</span>
+                } finally {
+<span class="fc" id="L433">                    closeFrame(factorOwned, factorOwnedFailure);</span>
+                }
+<span class="fc" id="L435">            }</span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">            return current[0] == null ? RetainedOperation.produced(new NumberExpr(1)) : current[0];</span>
+<span class="fc" id="L437">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L438">            renderingFailure = failure;</span>
+<span class="fc" id="L439">            throw failure;</span>
+        } finally {
+<span class="fc" id="L441">            closeFrame(rendering, renderingFailure);</span>
+        }
     }
 
     private Expr coefficientExpression() {
-<span class="fc" id="L181">        return new NumberExpr(coefficient);</span>
+<span class="fc" id="L446">        return RetainedOperation.produced(new NumberExpr(coefficient));</span>
+    }
+
+    private static Expr factorExpression(String name, int exponent) {
+<span class="fc" id="L450">        var variable = new VariableExpr(name);</span>
+<span class="fc" id="L451">        var leaf = RetainedOperation.retainCompleted(1, variable);</span>
+<span class="fc" id="L452">        Throwable leafFailure = null;</span>
+        try {
+<span class="fc bfc" id="L454" title="All 2 branches covered.">            if (exponent == 1) return variable;</span>
+<span class="fc" id="L455">            var number = new NumberExpr(exponent);</span>
+<span class="fc" id="L456">            var power = RetainedOperation.retainCompleted(1, number);</span>
+<span class="fc" id="L457">            Throwable powerFailure = null;</span>
+            try {
+<span class="fc" id="L459">                return RetainedOperation.produced(new BinaryExpr(variable, BinaryOperator.POW, number));</span>
+<span class="fc" id="L460">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L461">                powerFailure = failure;</span>
+<span class="fc" id="L462">                throw failure;</span>
+            } finally {
+<span class="fc" id="L464">                closeFrame(power, powerFailure);</span>
+            }
+<span class="fc" id="L466">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L467">            leafFailure = failure;</span>
+<span class="fc" id="L468">            throw failure;</span>
+        } finally {
+<span class="fc" id="L470">            closeFrame(leaf, leafFailure);</span>
+        }
+    }
+
+    private static Optional&lt;BoundedExactMonomial&gt; optional(BoundedExactMonomial monomial) {
+<span class="fc" id="L475">        var value = RetainedOperation.retain(monomial);</span>
+<span class="fc" id="L476">        Throwable valueFailure = null;</span>
+        try {
+<span class="fc" id="L478">            return RetainedOperation.produced(Optional.of(monomial));</span>
+<span class="nc" id="L479">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L480">            valueFailure = failure;</span>
+<span class="nc" id="L481">            throw failure;</span>
+        } finally {
+<span class="fc" id="L483">            closeFrame(value, valueFailure);</span>
+        }
     }
 
     static int positiveInteger(ExactRational value) {
-<span class="pc bpc" id="L185" title="1 of 4 branches missed.">        return value.isInteger() &amp;&amp; value.signum() &gt; 0</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">                &amp;&amp; value.numerator().bitLength() &lt;= 31</span>
-<span class="fc" id="L187">            ? value.intValueExact() : -1;</span>
+<span class="pc bpc" id="L488" title="1 of 4 branches missed.">        return value.isInteger() &amp;&amp; value.signum() &gt; 0</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">                &amp;&amp; value.numerator().bitLength() &lt;= 31</span>
+<span class="fc" id="L490">            ? value.intValueExact() : -1;</span>
     }
 
     private static int checkedExponent(long value) {
-<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (value &gt; Integer.MAX_VALUE) {</span>
-<span class="fc" id="L192">            throw new LimitExceeded(&quot;ALGEBRAIC_EXPONENT_LIMIT&quot;);</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">        if (value &gt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L495">            throw new LimitExceeded(&quot;ALGEBRAIC_EXPONENT_LIMIT&quot;);</span>
         }
-<span class="fc" id="L194">        return (int) value;</span>
+<span class="fc" id="L497">        return (int) value;</span>
     }
 
     private static int bits(BigInteger value) {
-<span class="fc" id="L198">        return value.abs().bitLength();</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">        if (value.signum() &gt;= 0) return value.bitLength();</span>
+<span class="fc" id="L502">        var magnitude = value.abs();</span>
+<span class="fc" id="L503">        var absolute = RetainedOperation.retainCompleted(1, value, magnitude);</span>
+<span class="fc" id="L504">        Throwable absoluteFailure = null;</span>
+        try {
+<span class="fc" id="L506">            return magnitude.bitLength();</span>
+<span class="nc" id="L507">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L508">            absoluteFailure = failure;</span>
+<span class="nc" id="L509">            throw failure;</span>
+        } finally {
+<span class="fc" id="L511">            closeFrame(absolute, absoluteFailure);</span>
+        }
     }
 
     private static long powerBits(BigInteger value, int exponent) {
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        return value.abs().compareTo(BigInteger.ONE) &lt;= 0 ? 1L : (long) bits(value) * exponent;</span>
+<span class="fc" id="L516">        int magnitudeBits = bits(value);</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        return magnitudeBits &lt;= 1 ? 1L : (long) magnitudeBits * exponent;</span>
     }
 
+    /** A sink may repeat its primary error while settling a frame's already completed release. */
+    private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
+<span class="fc bfc" id="L522" title="All 2 branches covered.">        if (frame == null) return;</span>
+<span class="fc" id="L523">        try { frame.close(); }</span>
+<span class="fc" id="L524">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L527">        }</span>
+<span class="fc" id="L528">    }</span>
+
     /** Shared by every inference/pre-filter in one matcher invocation. */
-<span class="fc" id="L206">    static final class Budget implements de.regelsuche.retention.RetainedGraph.View {</span>
+<span class="fc" id="L531">    static final class Budget implements RetainedGraph.View {</span>
         private static final int MAX_VISITS = 10_000;
         private static final int MAX_DEPTH = 128;
         private static final int MAX_COEFFICIENT_BITS = 4_096;
-<span class="fc" id="L210">        private int remaining = MAX_VISITS;</span>
-<span class="nc" id="L211">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) { }</span>
+<span class="fc" id="L535">        private int remaining = MAX_VISITS;</span>
+<span class="fc" id="L536">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
 
         private void visit(int depth) {
-<span class="fc bfc" id="L214" title="All 4 branches covered.">            if (depth &gt; MAX_DEPTH || remaining-- &lt;= 0) {</span>
-<span class="fc" id="L215">                throw new LimitExceeded(&quot;ALGEBRAIC_WORK_LIMIT&quot;);</span>
+<span class="fc bfc" id="L539" title="All 4 branches covered.">            if (depth &gt; MAX_DEPTH || remaining-- &lt;= 0) {</span>
+<span class="fc" id="L540">                throw new LimitExceeded(&quot;ALGEBRAIC_WORK_LIMIT&quot;);</span>
             }
-<span class="fc" id="L217">        }</span>
+            // This visit is consumed before its debit can fail. It is never
+            // delegated through MatchAttempt.visitedBranches or settled again.
+<span class="fc" id="L544">            RetainedOperation.work(1);</span>
+<span class="fc" id="L545">        }</span>
 
         private void coefficientBits(long numerator, long denominator) {
-<span class="fc" id="L220">            visit(0);</span>
-<span class="fc bfc" id="L221" title="All 4 branches covered.">            if (numerator &gt; MAX_COEFFICIENT_BITS || denominator &gt; MAX_COEFFICIENT_BITS) {</span>
-<span class="fc" id="L222">                throw new LimitExceeded(&quot;ALGEBRAIC_COEFFICIENT_LIMIT&quot;);</span>
+<span class="fc" id="L548">            visit(0);</span>
+<span class="fc bfc" id="L549" title="All 4 branches covered.">            if (numerator &gt; MAX_COEFFICIENT_BITS || denominator &gt; MAX_COEFFICIENT_BITS) {</span>
+<span class="fc" id="L550">                throw new LimitExceeded(&quot;ALGEBRAIC_COEFFICIENT_LIMIT&quot;);</span>
             }
-<span class="fc" id="L224">        }</span>
+<span class="fc" id="L552">        }</span>
     }
 
     static final class LimitExceeded extends RuntimeException {
@@ -229,9 +557,9 @@ record BoundedExactMonomial(ExactRational coefficient, Map&lt;String, Integer&gt
         final String code;
 
         private LimitExceeded(String code) {
-<span class="fc" id="L232">            super(code, null, false, false);</span>
-<span class="fc" id="L233">            this.code = code;</span>
-<span class="fc" id="L234">        }</span>
+<span class="fc" id="L560">            super(code, null, false, false);</span>
+<span class="fc" id="L561">            this.code = code;</span>
+<span class="fc" id="L562">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

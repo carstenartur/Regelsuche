@@ -46,43 +46,54 @@ import java.util.List;
     public String key() {
 <span class="fc" id="L47">        var writer=new JsonWriter();</span>
 <span class="fc" id="L48">        try(var retained=RetainedOperation.retain(this,writer)) {</span>
-<span class="fc" id="L49">        String result=writer.beginObject().property(&quot;root&quot;, rootOperator).property(&quot;degree&quot;, degree).property(&quot;variables&quot;, variables)</span>
-<span class="fc" id="L50">            .property(&quot;products&quot;, products).property(&quot;powers&quot;, powers).property(&quot;repeated&quot;, repeatedSubtrees)</span>
-<span class="fc" id="L51">            .stringArray(&quot;assumptions&quot;, assumptions).stringArray(&quot;capabilities&quot;, capabilities).endObject().toString();</span>
-<span class="fc" id="L52">        RetainedOperation.work(result.length());return RetainedOperation.produced(result);</span>
+            try {
+<span class="fc" id="L50">                return writer.beginObject().property(&quot;root&quot;, rootOperator).property(&quot;degree&quot;, degree).property(&quot;variables&quot;, variables)</span>
+<span class="fc" id="L51">                    .property(&quot;products&quot;, products).property(&quot;powers&quot;, powers).property(&quot;repeated&quot;, repeatedSubtrees)</span>
+<span class="fc" id="L52">                    .stringArray(&quot;assumptions&quot;, assumptions).stringArray(&quot;capabilities&quot;, capabilities).endObject().toString();</span>
+<span class="nc" id="L53">            } catch(RuntimeException | Error failure) {</span>
+<span class="nc" id="L54">                closeAfterFailure(retained,failure);throw failure;</span>
+            }
         }
     }
     /** Prevents typed observations from silently changing frozen historical feature tables. */
     public String typedKey() {
-<span class="fc" id="L57">        String key=key();try(var retained=RetainedOperation.retain(key)){</span>
-<span class="fc" id="L58">            String result=&quot;regelsuche.typed-structural-context/v1:&quot;+key;</span>
-<span class="fc" id="L59">            RetainedOperation.work(result.length());return RetainedOperation.produced(result);</span>
+<span class="fc" id="L60">        String key=key();try(var retained=RetainedOperation.retain(key)){</span>
+            try {
+<span class="fc" id="L62">                String result=&quot;regelsuche.typed-structural-context/v1:&quot;+key;</span>
+<span class="fc" id="L63">                try(var output=RetainedOperation.retainCompleted(result.length()+1L,result)) {return result;}</span>
+<span class="fc" id="L64">            } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L65">                closeAfterFailure(retained,failure);throw failure;</span>
+            }
         }
     }
+    private static void closeAfterFailure(RetainedOperation.Frame frame,Throwable failure) {
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if(frame==null)return;</span>
+<span class="pc bnc" id="L71" title="All 2 branches missed.">        try{frame.close();}catch(RuntimeException | Error cleanup){if(cleanup!=failure)failure.addSuppressed(cleanup);}</span>
+<span class="fc" id="L72">    }</span>
     private static void collect(Expr expr, HashMap&lt;Expr, Integer&gt; seen, HashSet&lt;String&gt; variables, int[] counts) {
-<span class="fc" id="L63">        RetainedOperation.work(3);</span>
-<span class="fc" id="L64">        counts[0]++; seen.merge(expr, 1, Integer::sum);</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) variables.add(variable.name());</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        else if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.MUL) counts[1]++;</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW) counts[2]++;</span>
-<span class="fc" id="L69">            collect(binary.left(), seen, variables, counts); collect(binary.right(), seen, variables, counts);</span>
-<span class="fc bfc" id="L70" title="All 4 branches covered.">        } else if (expr instanceof FunctionExpr function) for (var argument : function.arguments()) collect(argument, seen, variables, counts);</span>
-<span class="fc" id="L71">    }</span>
+<span class="fc" id="L74">        RetainedOperation.work(3);</span>
+<span class="fc" id="L75">        counts[0]++; seen.merge(expr, 1, Integer::sum);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) variables.add(variable.name());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        else if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.MUL) counts[1]++;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW) counts[2]++;</span>
+<span class="fc" id="L80">            collect(binary.left(), seen, variables, counts); collect(binary.right(), seen, variables, counts);</span>
+<span class="fc bfc" id="L81" title="All 4 branches covered.">        } else if (expr instanceof FunctionExpr function) for (var argument : function.arguments()) collect(argument, seen, variables, counts);</span>
+<span class="fc" id="L82">    }</span>
     private static int degree(Expr expr) {
-<span class="fc" id="L73">        RetainedOperation.work(1);</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (expr instanceof VariableExpr) return 1;</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (expr instanceof NumberExpr) return 0;</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!(expr instanceof BinaryExpr binary)) return -1;</span>
-<span class="fc" id="L77">        int left = degree(binary.left()), right = degree(binary.right());</span>
-<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (left &lt; 0 || right &lt; 0) return -1;</span>
-<span class="pc bpc" id="L79" title="1 of 4 branches missed.">        return switch (binary.operator()) {</span>
-<span class="fc" id="L80">            case ADD, SUB -&gt; Math.max(left, right);</span>
-<span class="fc" id="L81">            case MUL -&gt; Math.min(1000, left + right);</span>
-<span class="pc bpc" id="L82" title="2 of 4 branches missed.">            case POW -&gt; binary.right() instanceof NumberExpr number &amp;&amp; number.value().isInteger()</span>
-<span class="pc bpc" id="L83" title="2 of 4 branches missed.">                &amp;&amp; number.value().numerator().signum() &gt;= 0 &amp;&amp; number.value().numerator().bitLength() &lt; 10</span>
-<span class="pc" id="L84">                ? Math.min(1000, left * number.value().numerator().intValueExact()) : -1;</span>
-<span class="nc bnc" id="L85" title="All 2 branches missed.">            case DIV -&gt; right == 0 ? left : -1;</span>
+<span class="fc" id="L84">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (expr instanceof VariableExpr) return 1;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (expr instanceof NumberExpr) return 0;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!(expr instanceof BinaryExpr binary)) return -1;</span>
+<span class="fc" id="L88">        int left = degree(binary.left()), right = degree(binary.right());</span>
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">        if (left &lt; 0 || right &lt; 0) return -1;</span>
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L91">            case ADD, SUB -&gt; Math.max(left, right);</span>
+<span class="fc" id="L92">            case MUL -&gt; Math.min(1000, left + right);</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">            case POW -&gt; binary.right() instanceof NumberExpr number &amp;&amp; number.value().isInteger()</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">                &amp;&amp; number.value().numerator().signum() &gt;= 0 &amp;&amp; number.value().numerator().bitLength() &lt; 10</span>
+<span class="pc" id="L95">                ? Math.min(1000, left * number.value().numerator().intValueExact()) : -1;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            case DIV -&gt; right == 0 ? left : -1;</span>
         };
     }
 }

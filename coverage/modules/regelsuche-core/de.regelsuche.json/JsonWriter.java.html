@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.json</a> &gt; <span class="el_source">JsonWriter.java</span></div><h1>JsonWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.json;
 
+import de.regelsuche.retention.RetainedOperation;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.Writer;
@@ -15,17 +16,23 @@ import java.util.function.Consumer;
  * &lt;p&gt;Replaces the previous string-concatenation approach to keep the JSON
  * export consistent (escaping, comma handling, ordering) without pulling in a
  * large external dependency.&lt;/p&gt;
+ *
+ * &lt;p&gt;Native work covers input visits, appended/copied code units, nesting
+ * transitions and stream writes. Ownership checkpoints observe the actual
+ * StringBuilder content at operation/chunk boundaries; its backing arrays
+ * remain JDK-internal storage, not separately declared writer allocations.&lt;/p&gt;
  */
 public final class JsonWriter implements de.regelsuche.retention.RetainedGraph.View {
-<span class="nc" id="L20">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(builder);v.reference(firstEntry);v.reference(sink);}</span>
-<span class="fc" id="L21">    private final StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L22">    private final Deque&lt;Boolean&gt; firstEntry = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L26">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(builder);v.reference(firstEntry);v.reference(sink);}</span>
+<span class="fc" id="L27">    private final StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L28">    private final Deque&lt;Boolean&gt; firstEntry = new ArrayDeque&lt;&gt;();</span>
     private static final int STREAM_BUFFER_SIZE = 8192;
     private final Writer sink;
 
-<span class="fc" id="L26">    public JsonWriter() {</span>
-<span class="fc" id="L27">        sink = null;</span>
-<span class="fc" id="L28">    }</span>
+<span class="fc" id="L32">    public JsonWriter() {</span>
+<span class="fc" id="L33">        sink = null;</span>
+<span class="fc" id="L34">        observeWorkspace();</span>
+<span class="fc" id="L35">    }</span>
 
     /**
      * Writes in bounded chunks instead of retaining the complete document.
@@ -33,222 +40,486 @@ public final class JsonWriter implements de.regelsuche.retention.RetainedGraph.V
      * this class never flushes or closes it. I/O failures are propagated as
      * {@link UncheckedIOException} so nested rendering callbacks stay usable.
      */
-<span class="fc" id="L36">    public JsonWriter(Writer sink) {</span>
-<span class="fc" id="L37">        this.sink = Objects.requireNonNull(sink, &quot;sink&quot;);</span>
-<span class="fc" id="L38">    }</span>
+<span class="fc" id="L43">    public JsonWriter(Writer sink) {</span>
+<span class="fc" id="L44">        this.sink = Objects.requireNonNull(sink, &quot;sink&quot;);</span>
+<span class="fc" id="L45">        observeWorkspace();</span>
+<span class="fc" id="L46">    }</span>
+
+    private void observeWorkspace() {
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        try (var workspace = RetainedOperation.retainCompleted(3, this)) { }</span>
+<span class="fc" id="L50">    }</span>
 
     /** Writes the remaining chunk without flushing or closing the caller's sink. */
     public void flush() {
-<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        if (sink == null || builder.isEmpty()) return;</span>
-        try {
-<span class="fc" id="L44">            sink.write(builder.toString());</span>
-<span class="fc" id="L45">            builder.setLength(0);</span>
-<span class="fc" id="L46">        } catch (IOException failure) {</span>
-<span class="fc" id="L47">            throw new UncheckedIOException(failure);</span>
-<span class="fc" id="L48">        }</span>
-<span class="fc" id="L49">    }</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">        if (sink == null || builder.isEmpty()) return;</span>
+<span class="fc" id="L55">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L57">                String chunk = builder.toString();</span>
+<span class="fc" id="L58">                try (var output = RetainedOperation.retainCompleted(chunk.length() + 1L, chunk)) {</span>
+                    try {
+<span class="fc" id="L60">                        worked(chunk.length() + 1L);</span>
+                        try {
+<span class="fc" id="L62">                            sink.write(chunk);</span>
+<span class="fc" id="L63">                        } catch (IOException failure) {</span>
+<span class="fc" id="L64">                            var wrapped = new UncheckedIOException(failure);</span>
+<span class="fc" id="L65">                            observeFailure(wrapped);</span>
+<span class="fc" id="L66">                            throw wrapped;</span>
+<span class="fc" id="L67">                        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L68">                            observeFailure(failure);</span>
+<span class="fc" id="L69">                            throw failure;</span>
+<span class="fc" id="L70">                        }</span>
+                        // The callback may have mutated its own audited state. Keep the
+                        // actual chunk and populated source buffer until that is observed.
+<span class="fc" id="L73">                        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L74">                        builder.setLength(0);</span>
+<span class="fc" id="L75">                        worked(1);</span>
+<span class="fc" id="L76">                    } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L77">                        closeAfterFailure(output, failure);</span>
+<span class="fc" id="L78">                        throw failure;</span>
+<span class="fc" id="L79">                    }</span>
+                }
+<span class="fc" id="L81">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L82">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L83">                throw failure;</span>
+<span class="fc" id="L84">            }</span>
+        }
+<span class="fc" id="L86">    }</span>
 
     private void drainIfNeeded() {
-<span class="fc bfc" id="L52" title="All 4 branches covered.">        if (sink != null &amp;&amp; builder.length() &gt;= STREAM_BUFFER_SIZE) flush();</span>
-<span class="fc" id="L53">    }</span>
+<span class="fc" id="L89">        worked(1);</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">        if (sink != null &amp;&amp; builder.length() &gt;= STREAM_BUFFER_SIZE) flush();</span>
+<span class="fc" id="L91">    }</span>
 
     public JsonWriter beginObject() {
-<span class="fc" id="L56">        drainIfNeeded();</span>
-<span class="fc" id="L57">        builder.append('{');</span>
-<span class="fc" id="L58">        firstEntry.push(true);</span>
-<span class="fc" id="L59">        return this;</span>
+<span class="fc" id="L94">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L96">                drainIfNeeded();</span>
+<span class="fc" id="L97">                append('{');</span>
+<span class="fc" id="L98">                firstEntry.push(true);</span>
+<span class="fc" id="L99">                worked(1);</span>
+<span class="fc" id="L100">                return observed();</span>
+<span class="nc" id="L101">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L102">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L103">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter endObject() {
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
-<span class="nc" id="L64">            throw new IllegalStateException(&quot;No open object&quot;);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
+<span class="nc" id="L110">            throw new IllegalStateException(&quot;No open object&quot;);</span>
         }
-<span class="fc" id="L66">        firstEntry.pop();</span>
-<span class="fc" id="L67">        drainIfNeeded();</span>
-<span class="fc" id="L68">        builder.append('}');</span>
-<span class="fc" id="L69">        return this;</span>
+<span class="fc" id="L112">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L114">                firstEntry.pop();</span>
+<span class="fc" id="L115">                worked(1);</span>
+<span class="fc" id="L116">                drainIfNeeded();</span>
+<span class="fc" id="L117">                append('}');</span>
+<span class="fc" id="L118">                return observed();</span>
+<span class="nc" id="L119">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L120">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L121">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter beginArray() {
-<span class="fc" id="L73">        drainIfNeeded();</span>
-<span class="fc" id="L74">        builder.append('[');</span>
-<span class="fc" id="L75">        firstEntry.push(true);</span>
-<span class="fc" id="L76">        return this;</span>
+<span class="fc" id="L127">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L129">                drainIfNeeded();</span>
+<span class="fc" id="L130">                append('[');</span>
+<span class="fc" id="L131">                firstEntry.push(true);</span>
+<span class="fc" id="L132">                worked(1);</span>
+<span class="fc" id="L133">                return observed();</span>
+<span class="nc" id="L134">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L135">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L136">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter endArray() {
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
-<span class="nc" id="L81">            throw new IllegalStateException(&quot;No open array&quot;);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
+<span class="nc" id="L143">            throw new IllegalStateException(&quot;No open array&quot;);</span>
         }
-<span class="fc" id="L83">        firstEntry.pop();</span>
-<span class="fc" id="L84">        drainIfNeeded();</span>
-<span class="fc" id="L85">        builder.append(']');</span>
-<span class="fc" id="L86">        return this;</span>
+<span class="fc" id="L145">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L147">                firstEntry.pop();</span>
+<span class="fc" id="L148">                worked(1);</span>
+<span class="fc" id="L149">                drainIfNeeded();</span>
+<span class="fc" id="L150">                append(']');</span>
+<span class="fc" id="L151">                return observed();</span>
+<span class="nc" id="L152">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L153">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L154">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter object(String key, Consumer&lt;JsonWriter&gt; body) {
-<span class="fc" id="L90">        comma();</span>
-<span class="fc" id="L91">        appendKey(key);</span>
-<span class="fc" id="L92">        beginObject();</span>
-<span class="fc" id="L93">        body.accept(this);</span>
-<span class="fc" id="L94">        return endObject();</span>
+<span class="fc" id="L160">        try (var owner = RetainedOperation.retain(this, key)) {</span>
+            try {
+<span class="fc" id="L162">                comma();</span>
+<span class="fc" id="L163">                appendKey(key);</span>
+<span class="fc" id="L164">                beginObject();</span>
+<span class="fc" id="L165">                invokeBody(body);</span>
+<span class="fc" id="L166">                return endObject();</span>
+<span class="fc" id="L167">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L168">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L169">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter array(String key, Consumer&lt;JsonWriter&gt; body) {
-<span class="fc" id="L98">        comma();</span>
-<span class="fc" id="L99">        appendKey(key);</span>
-<span class="fc" id="L100">        beginArray();</span>
-<span class="fc" id="L101">        body.accept(this);</span>
-<span class="fc" id="L102">        return endArray();</span>
+<span class="fc" id="L175">        try (var owner = RetainedOperation.retain(this, key)) {</span>
+            try {
+<span class="fc" id="L177">                comma();</span>
+<span class="fc" id="L178">                appendKey(key);</span>
+<span class="fc" id="L179">                beginArray();</span>
+<span class="fc" id="L180">                invokeBody(body);</span>
+<span class="fc" id="L181">                return endArray();</span>
+<span class="nc" id="L182">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L183">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L184">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter property(String key, String value) {
-<span class="fc" id="L106">        comma();</span>
-<span class="fc" id="L107">        appendKey(key);</span>
-<span class="fc" id="L108">        appendString(value);</span>
-<span class="fc" id="L109">        return this;</span>
+<span class="fc" id="L190">        try (var owner = RetainedOperation.retain(this, key, value)) {</span>
+            try {
+<span class="fc" id="L192">                comma();</span>
+<span class="fc" id="L193">                appendKey(key);</span>
+<span class="fc" id="L194">                appendString(value);</span>
+<span class="fc" id="L195">                return observed();</span>
+<span class="nc" id="L196">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L197">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L198">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter property(String key, int value) {
-<span class="fc" id="L113">        comma();</span>
-<span class="fc" id="L114">        appendKey(key);</span>
-<span class="fc" id="L115">        builder.append(value);</span>
-<span class="fc" id="L116">        return this;</span>
+<span class="fc" id="L204">        try (var owner = RetainedOperation.retain(this, key)) {</span>
+            try {
+<span class="fc" id="L206">                comma();</span>
+<span class="fc" id="L207">                appendKey(key);</span>
+<span class="fc" id="L208">                appendNumber(Integer.toString(value));</span>
+<span class="fc" id="L209">                return observed();</span>
+<span class="fc" id="L210">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L211">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L212">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter property(String key, long value) {
-<span class="fc" id="L120">        comma();</span>
-<span class="fc" id="L121">        appendKey(key);</span>
-<span class="fc" id="L122">        builder.append(value);</span>
-<span class="fc" id="L123">        return this;</span>
+<span class="fc" id="L218">        try (var owner = RetainedOperation.retain(this, key)) {</span>
+            try {
+<span class="fc" id="L220">                comma();</span>
+<span class="fc" id="L221">                appendKey(key);</span>
+<span class="fc" id="L222">                appendNumber(Long.toString(value));</span>
+<span class="fc" id="L223">                return observed();</span>
+<span class="fc" id="L224">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L225">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L226">                throw failure;</span>
+            }
+        }
     }
 
     /** Emits an exact JSON integer beyond the long range without changing existing overload resolution. */
     public JsonWriter integerProperty(String key, java.math.BigInteger value) {
-<span class="fc" id="L128">        Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L129">        comma();</span>
-<span class="fc" id="L130">        appendKey(key);</span>
-<span class="fc" id="L131">        builder.append(value);</span>
-<span class="fc" id="L132">        return this;</span>
+<span class="fc" id="L233">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L234">        try (var owner = RetainedOperation.retain(this, key, value)) {</span>
+            try {
+<span class="fc" id="L236">                comma();</span>
+<span class="fc" id="L237">                appendKey(key);</span>
+<span class="fc" id="L238">                appendNumber(value.toString());</span>
+<span class="fc" id="L239">                return observed();</span>
+<span class="fc" id="L240">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L241">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L242">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter property(String key, double value) {
-<span class="fc" id="L136">        comma();</span>
-<span class="fc" id="L137">        appendKey(key);</span>
-<span class="fc" id="L138">        builder.append(value);</span>
-<span class="fc" id="L139">        return this;</span>
+<span class="fc" id="L248">        try (var owner = RetainedOperation.retain(this, key)) {</span>
+            try {
+<span class="fc" id="L250">                comma();</span>
+<span class="fc" id="L251">                appendKey(key);</span>
+<span class="fc" id="L252">                appendNumber(Double.toString(value));</span>
+<span class="fc" id="L253">                return observed();</span>
+<span class="fc" id="L254">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L255">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L256">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter property(String key, boolean value) {
-<span class="fc" id="L143">        comma();</span>
-<span class="fc" id="L144">        appendKey(key);</span>
-<span class="fc" id="L145">        builder.append(value);</span>
-<span class="fc" id="L146">        return this;</span>
+<span class="fc" id="L262">        try (var owner = RetainedOperation.retain(this, key)) {</span>
+            try {
+<span class="fc" id="L264">                comma();</span>
+<span class="fc" id="L265">                appendKey(key);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">                append(value ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="fc" id="L267">                return observed();</span>
+<span class="nc" id="L268">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L269">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L270">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter nullProperty(String key) {
-<span class="fc" id="L150">        comma();</span>
-<span class="fc" id="L151">        appendKey(key);</span>
-<span class="fc" id="L152">        builder.append(&quot;null&quot;);</span>
-<span class="fc" id="L153">        return this;</span>
+<span class="fc" id="L276">        try (var owner = RetainedOperation.retain(this, key)) {</span>
+            try {
+<span class="fc" id="L278">                comma();</span>
+<span class="fc" id="L279">                appendKey(key);</span>
+<span class="fc" id="L280">                append(&quot;null&quot;);</span>
+<span class="fc" id="L281">                return observed();</span>
+<span class="nc" id="L282">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L283">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L284">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter stringArray(String key, List&lt;String&gt; values) {
-<span class="fc" id="L157">        return array(key, writer -&gt; values.forEach(writer::value));</span>
+<span class="fc" id="L290">        try (var owner = RetainedOperation.retain(this, key, values)) {</span>
+            try {
+<span class="fc" id="L292">                return array(key, writer -&gt; values.forEach(writer::value));</span>
+<span class="nc" id="L293">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L294">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L295">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter booleanArray(String key, List&lt;Boolean&gt; values) {
-<span class="fc" id="L161">        return array(key, writer -&gt; values.forEach(writer::value));</span>
+<span class="fc" id="L301">        try (var owner = RetainedOperation.retain(this, key, values)) {</span>
+            try {
+<span class="fc" id="L303">                return array(key, writer -&gt; values.forEach(writer::value));</span>
+<span class="nc" id="L304">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L305">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L306">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter value(String value) {
-<span class="fc" id="L165">        comma();</span>
-<span class="fc" id="L166">        appendString(value);</span>
-<span class="fc" id="L167">        return this;</span>
+<span class="fc" id="L312">        try (var owner = RetainedOperation.retain(this, value)) {</span>
+            try {
+<span class="fc" id="L314">                comma();</span>
+<span class="fc" id="L315">                appendString(value);</span>
+<span class="fc" id="L316">                return observed();</span>
+<span class="fc" id="L317">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L318">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L319">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter value(int value) {
-<span class="fc" id="L171">        comma();</span>
-<span class="fc" id="L172">        builder.append(value);</span>
-<span class="fc" id="L173">        return this;</span>
+<span class="fc" id="L325">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L327">                comma();</span>
+<span class="fc" id="L328">                appendNumber(Integer.toString(value));</span>
+<span class="fc" id="L329">                return observed();</span>
+<span class="nc" id="L330">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L331">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L332">                throw failure;</span>
+            }
+        }
     }
 
     /** Emit an explicitly numeric value inside an array context. */
     public JsonWriter numberValue(int value) {
-<span class="nc" id="L178">        return value(value);</span>
+<span class="nc" id="L339">        return value(value);</span>
     }
 
     public JsonWriter value(boolean value) {
-<span class="fc" id="L182">        comma();</span>
-<span class="fc" id="L183">        builder.append(value);</span>
-<span class="fc" id="L184">        return this;</span>
+<span class="fc" id="L343">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L345">                comma();</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                append(value ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="fc" id="L347">                return observed();</span>
+<span class="nc" id="L348">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L349">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L350">                throw failure;</span>
+            }
+        }
     }
 
     public JsonWriter objectValue(Consumer&lt;JsonWriter&gt; body) {
-<span class="fc" id="L188">        comma();</span>
-<span class="fc" id="L189">        beginObject();</span>
-<span class="fc" id="L190">        body.accept(this);</span>
-<span class="fc" id="L191">        return endObject();</span>
+<span class="fc" id="L356">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L358">                comma();</span>
+<span class="fc" id="L359">                beginObject();</span>
+<span class="fc" id="L360">                invokeBody(body);</span>
+<span class="fc" id="L361">                return endObject();</span>
+<span class="nc" id="L362">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L363">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L364">                throw failure;</span>
+            }
+        }
     }
 
     /** Emit a nested array value inside an array context. */
     public JsonWriter arrayValue(Consumer&lt;JsonWriter&gt; body) {
-<span class="fc" id="L196">        comma();</span>
-<span class="fc" id="L197">        beginArray();</span>
-<span class="fc" id="L198">        body.accept(this);</span>
-<span class="fc" id="L199">        return endArray();</span>
+<span class="fc" id="L371">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L373">                comma();</span>
+<span class="fc" id="L374">                beginArray();</span>
+<span class="fc" id="L375">                invokeBody(body);</span>
+<span class="fc" id="L376">                return endArray();</span>
+<span class="nc" id="L377">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L378">                closeAfterFailure(owner, failure);</span>
+<span class="nc" id="L379">                throw failure;</span>
+            }
+        }
     }
 
     private void comma() {
-<span class="fc" id="L203">        drainIfNeeded();</span>
-<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
-<span class="nc" id="L205">            return;</span>
+<span class="fc" id="L385">        drainIfNeeded();</span>
+<span class="fc" id="L386">        worked(1);</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (firstEntry.isEmpty()) {</span>
+<span class="fc" id="L388">            return;</span>
         }
-<span class="fc" id="L207">        boolean first = firstEntry.pop();</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (!first) {</span>
-<span class="fc" id="L209">            builder.append(',');</span>
+<span class="fc" id="L390">        boolean first = firstEntry.pop();</span>
+<span class="fc" id="L391">        worked(1);</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (!first) {</span>
+<span class="fc" id="L393">            append(',');</span>
         }
-<span class="fc" id="L211">        firstEntry.push(false);</span>
-<span class="fc" id="L212">    }</span>
+<span class="fc" id="L395">        firstEntry.push(false);</span>
+<span class="fc" id="L396">        worked(1);</span>
+<span class="fc" id="L397">    }</span>
 
     private void appendKey(String key) {
-<span class="fc" id="L215">        appendString(key);</span>
-<span class="fc" id="L216">        builder.append(':');</span>
-<span class="fc" id="L217">    }</span>
+<span class="fc" id="L400">        appendString(key);</span>
+<span class="fc" id="L401">        append(':');</span>
+<span class="fc" id="L402">    }</span>
 
     private void appendString(String value) {
-<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (value == null) {</span>
-<span class="fc" id="L221">            builder.append(&quot;null&quot;);</span>
-<span class="fc" id="L222">            return;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L406">            append(&quot;null&quot;);</span>
+<span class="fc" id="L407">            return;</span>
         }
-<span class="fc" id="L224">        builder.append('&quot;');</span>
-<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
-<span class="fc" id="L226">            drainIfNeeded();</span>
-<span class="fc" id="L227">            char current = value.charAt(i);</span>
-<span class="fc bfc" id="L228" title="All 8 branches covered.">            switch (current) {</span>
-<span class="fc" id="L229">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
-<span class="fc" id="L230">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
-<span class="fc" id="L231">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
-<span class="fc" id="L232">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
-<span class="fc" id="L233">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
-<span class="fc" id="L234">                case '\b' -&gt; builder.append(&quot;\\b&quot;);</span>
-<span class="fc" id="L235">                case '\f' -&gt; builder.append(&quot;\\f&quot;);</span>
+<span class="fc" id="L409">        append('&quot;');</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L411">            drainIfNeeded();</span>
+<span class="fc" id="L412">            char current = value.charAt(i);</span>
+<span class="fc" id="L413">            worked(1);</span>
+<span class="fc bfc" id="L414" title="All 8 branches covered.">            switch (current) {</span>
+<span class="fc" id="L415">                case '\\' -&gt; append(&quot;\\\\&quot;);</span>
+<span class="fc" id="L416">                case '&quot;' -&gt; append(&quot;\\\&quot;&quot;);</span>
+<span class="fc" id="L417">                case '\n' -&gt; append(&quot;\\n&quot;);</span>
+<span class="fc" id="L418">                case '\r' -&gt; append(&quot;\\r&quot;);</span>
+<span class="fc" id="L419">                case '\t' -&gt; append(&quot;\\t&quot;);</span>
+<span class="fc" id="L420">                case '\b' -&gt; append(&quot;\\b&quot;);</span>
+<span class="fc" id="L421">                case '\f' -&gt; append(&quot;\\f&quot;);</span>
                 default -&gt; {
-<span class="fc bfc" id="L237" title="All 2 branches covered.">                    if (current &lt; 0x20) {</span>
-<span class="fc" id="L238">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) current));</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">                    if (current &lt; 0x20) {</span>
+<span class="fc" id="L424">                        append(&quot;\\u00&quot;);</span>
+<span class="fc" id="L425">                        append(Character.forDigit(current &gt;&gt;&gt; 4, 16));</span>
+<span class="fc" id="L426">                        append(Character.forDigit(current &amp; 15, 16));</span>
                     } else {
-<span class="fc" id="L240">                        builder.append(current);</span>
+<span class="fc" id="L428">                        append(current);</span>
                     }
                 }
             }
         }
-<span class="fc" id="L245">        builder.append('&quot;');</span>
-<span class="fc" id="L246">    }</span>
+<span class="fc" id="L433">        append('&quot;');</span>
+<span class="fc" id="L434">    }</span>
+
+    private void append(char value) {
+<span class="fc" id="L437">        builder.append(value);</span>
+<span class="fc" id="L438">        worked(1);</span>
+<span class="fc" id="L439">    }</span>
+
+    private void append(String value) {
+<span class="fc" id="L442">        builder.append(value);</span>
+<span class="fc" id="L443">        worked(value.length());</span>
+<span class="fc" id="L444">    }</span>
+
+    private void appendNumber(String value) {
+        // StringBuilder.append(Object) historically accepts a null toString result.
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L449">            append(&quot;null&quot;);</span>
+<span class="fc" id="L450">            return;</span>
+        }
+<span class="fc" id="L452">        try (var number = RetainedOperation.retainCompleted(value.length() + 1L, value)) {</span>
+            try {
+<span class="fc" id="L454">                append(value);</span>
+<span class="fc" id="L455">                RetainedOperation.checkpoint();</span>
+<span class="nc" id="L456">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L457">                closeAfterFailure(number, failure);</span>
+<span class="nc" id="L458">                throw failure;</span>
+<span class="fc" id="L459">            }</span>
+        }
+<span class="fc" id="L461">    }</span>
+
+    private void invokeBody(Consumer&lt;JsonWriter&gt; body) {
+<span class="fc" id="L464">        worked(1);</span>
+        try {
+<span class="fc" id="L466">            body.accept(this);</span>
+<span class="fc" id="L467">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L468">            observeFailure(failure);</span>
+<span class="fc" id="L469">            throw failure;</span>
+<span class="fc" id="L470">        }</span>
+<span class="fc" id="L471">    }</span>
+
+    private JsonWriter observed() {
+<span class="fc" id="L474">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L475">        return this;</span>
+    }
+
+    /** Appends mutate an already retained writer; a failed debit still sees its current content. */
+    private static void worked(long units) {
+        try {
+<span class="fc" id="L481">            RetainedOperation.work(units);</span>
+<span class="fc" id="L482">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L483">            observeFailure(failure);</span>
+<span class="fc" id="L484">            throw failure;</span>
+<span class="fc" id="L485">        }</span>
+<span class="fc" id="L486">    }</span>
+
+    private static void observeFailure(Throwable failure) {
+<span class="fc" id="L489">        try { RetainedOperation.checkpoint(); }</span>
+<span class="fc" id="L490">        catch (RuntimeException | Error observation) {</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L492">        }</span>
+<span class="fc" id="L493">    }</span>
+
+    /** Close while the primary is known; an idempotent automatic close cannot self-suppress it. */
+    private static void closeAfterFailure(RetainedOperation.Frame frame, Throwable failure) {
+<span class="fc bfc" id="L497" title="All 2 branches covered.">        if (frame == null) return;</span>
+<span class="fc" id="L498">        try { frame.close(); }</span>
+<span class="fc" id="L499">        catch (RuntimeException | Error cleanup) {</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            if (cleanup != failure) failure.addSuppressed(cleanup);</span>
+<span class="fc" id="L501">        }</span>
+<span class="fc" id="L502">    }</span>
 
     @Override
     public String toString() {
-<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (sink != null) throw new IllegalStateException(&quot;Streaming JsonWriter does not retain its output&quot;);</span>
-<span class="fc" id="L251">        return builder.toString();</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        if (sink != null) throw new IllegalStateException(&quot;Streaming JsonWriter does not retain its output&quot;);</span>
+<span class="fc" id="L507">        try (var owner = RetainedOperation.retain(this)) {</span>
+            try {
+<span class="fc" id="L509">                String result = builder.toString();</span>
+<span class="fc" id="L510">                try (var output = RetainedOperation.retainCompleted(result.length() + 1L, result)) {</span>
+                    try {
+<span class="fc" id="L512">                        return result;</span>
+<span class="nc" id="L513">                    } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L514">                        closeAfterFailure(output, failure);</span>
+<span class="nc" id="L515">                        throw failure;</span>
+                    }
+                }
+<span class="fc" id="L518">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L519">                closeAfterFailure(owner, failure);</span>
+<span class="fc" id="L520">                throw failure;</span>
+            }
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

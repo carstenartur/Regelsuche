@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComputationExplanations.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">ComputationExplanations.java</span></div><h1>ComputationExplanations.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.search.program.PreparedJointComputation;
+import java.util.*;
+
+/** Headless, structured presentation data; the independent checker is the proof authority. */
+public final class ComputationExplanations {
+    private ComputationExplanations() {}
+    public record Step(int index, NumericKind kind, Expr expression, List&lt;Integer&gt; arguments, boolean shared) {
+<span class="fc" id="L12">        public Step { arguments = List.copyOf(arguments); }</span>
+    }
+    public record PlanView(List&lt;Step&gt; steps, Map&lt;String,Integer&gt; outputs) {
+<span class="fc" id="L15">        public PlanView { steps = List.copyOf(steps); outputs = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(outputs)); }</span>
+    }
+    public record Explanation(VerificationEvidence proof, Set&lt;SemanticAssumption&gt; assumptions,
+            RuntimeObligations obligations, PlanView original, PlanView replacement,
+            long originalModularPowers, long replacementModularPowers, long presentationWork) {
+<span class="fc" id="L20">        public Explanation { assumptions = Set.copyOf(assumptions); }</span>
+    }
+    public record Result(VerificationResult verification, Optional&lt;Explanation&gt; explanation) {
+<span class="fc" id="L23">        public Result {</span>
+<span class="fc" id="L24">            Objects.requireNonNull(verification); Objects.requireNonNull(explanation);</span>
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">            if (explanation.isPresent() &amp;&amp; !(verification instanceof VerificationResult.Verified))</span>
+<span class="nc" id="L26">                throw new IllegalArgumentException(&quot;EXPLANATION_REQUIRES_VERIFIED_RESULT&quot;);</span>
+<span class="fc" id="L27">        }</span>
+    }
+    public static Result describe(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
+<span class="fc" id="L30">        Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(token);</span>
+<span class="fc" id="L31">        var work = new VerificationWork(request, token);</span>
+<span class="fc" id="L32">        var verified = new ComputationOptimizer().reverifyWithin(request, candidate, work);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (!(verified instanceof VerificationResult.Verified proof)) return new Result(verified, Optional.empty());</span>
+<span class="fc" id="L34">        long verificationWork = work.used();</span>
+        try {
+<span class="fc" id="L36">            work.charge(1);</span>
+            // Always reconstruct presentation from the verified plan, not a rule
+            // label or a caller-supplied schedule/cost estimate.
+<span class="fc" id="L39">            var original = ComputationOptimizer.prepare(request.plan());</span>
+<span class="fc" id="L40">            var replacement = ComputationOptimizer.prepare(candidate.plan());</span>
+<span class="fc" id="L41">            work.charge(original.cost().inspectionWork() + replacement.cost().inspectionWork());</span>
+<span class="fc" id="L42">            var before = view(original, work);</span>
+<span class="fc" id="L43">            var after = view(replacement, work);</span>
+<span class="fc" id="L44">            long originalPowers = 0;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            for (var occurrence : request.sourceTrace().occurrences()) {</span>
+<span class="fc" id="L46">                work.charge(1);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                if (JavaExpressions.operationOf(occurrence.expression()).orElse(null) == NumericOperation.MOD_POW) originalPowers++;</span>
+<span class="fc" id="L48">            }</span>
+<span class="fc" id="L49">            long replacementPowers = after.steps().stream().filter(s -&gt;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                JavaExpressions.operationOf(s.expression()).orElse(null) == NumericOperation.MOD_POW).count();</span>
+<span class="fc" id="L51">            work.charge(after.steps().size());</span>
+<span class="fc" id="L52">            return new Result(verified, Optional.of(new Explanation(proof.evidence(), request.assumptions(),</span>
+<span class="fc" id="L53">                proof.obligations(), before, after, originalPowers, replacementPowers, work.used() - verificationWork)));</span>
+<span class="fc" id="L54">        } catch (VerificationWork.Stopped stopped) {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            return new Result(stopped.cancelled ? new VerificationResult.Cancelled(&quot;CANCELLED&quot;)</span>
+<span class="fc" id="L56">                : new VerificationResult.BudgetExceeded(&quot;EXPLANATION_BUDGET_EXCEEDED&quot;, work.used()), Optional.empty());</span>
+<span class="nc" id="L57">        } catch (IllegalArgumentException outsideBound) {</span>
+<span class="nc" id="L58">            return new Result(new VerificationResult.Unsupported(&quot;EXPLANATION_OUTSIDE_STRUCTURAL_BOUND&quot;), Optional.empty());</span>
+        }
+    }
+    private static PlanView view(PreparedJointComputation prepared, VerificationWork work) {
+<span class="fc" id="L62">        var nodes = prepared.nodes();</span>
+<span class="fc" id="L63">        int[] uses = new int[nodes.size()];</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (int output : prepared.outputBindings().values()) { work.charge(1); uses[output]++; }</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (var node : nodes) {</span>
+<span class="fc" id="L66">            work.charge(1 + node.arguments().size());</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">            if (!JavaExpressions.isLiteral(node.expression())) for (int argument : node.arguments()) uses[argument]++;</span>
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">        var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (int index = 0; index &lt; nodes.size(); index++) {</span>
+<span class="fc" id="L71">            work.charge(1);</span>
+<span class="fc" id="L72">            var node = nodes.get(index);</span>
+<span class="fc bfc" id="L73" title="All 4 branches covered.">            boolean shared = uses[index] &gt; 1 &amp;&amp; !(node.expression() instanceof VariableExpr)</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                    &amp;&amp; !JavaExpressions.isLiteral(node.expression());</span>
+<span class="fc" id="L75">            steps.add(new Step(index, NumericKind.fromType(node.type()), node.expression(), node.arguments(), shared));</span>
+        }
+<span class="fc" id="L77">        return new PlanView(steps, prepared.outputBindings());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

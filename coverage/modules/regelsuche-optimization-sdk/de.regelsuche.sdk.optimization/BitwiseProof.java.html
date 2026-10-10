@@ -40,19 +40,19 @@ final class BitwiseProof {
 <span class="fc" id="L40">        work.charge(1);</span>
 <span class="fc bfc" id="L41" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) { constants.add(e); return; }</span>
 <span class="fc" id="L42">        var op=JavaExpressions.operationOf(e).orElse(null);</span>
-<span class="pc bpc" id="L43" title="3 of 8 branches missed.">        if(op==NumericOperation.AND || op==NumericOperation.OR || op==NumericOperation.XOR || op==NumericOperation.NOT)</span>
+<span class="fc bfc" id="L43" title="All 8 branches covered.">        if(op==NumericOperation.AND || op==NumericOperation.OR || op==NumericOperation.XOR || op==NumericOperation.NOT)</span>
 <span class="fc" id="L44">            JavaExpressions.operands(e).forEach(child -&gt; collect(child,atoms));</span>
 <span class="fc" id="L45">        else atoms.add(e);</span>
 <span class="fc" id="L46">    }</span>
     private boolean value(Expr e,int bit,int assignment,List&lt;Expr&gt; atoms) {
 <span class="fc bfc" id="L48" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) return SemanticChecker.integer(JavaExpressions.literalValue(e)).testBit(bit);</span>
 <span class="fc" id="L49">        var op=JavaExpressions.operationOf(e).orElse(null); var args=JavaExpressions.operands(e);</span>
-<span class="pc bpc" id="L50" title="3 of 4 branches missed.">        if(op==NumericOperation.NOT) return !value(args.getFirst(),bit,assignment,atoms);</span>
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if(op==NumericOperation.AND) return value(args.getFirst(),bit,assignment,atoms)&amp;value(args.get(1),bit,assignment,atoms);</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if(op==NumericOperation.OR) return value(args.getFirst(),bit,assignment,atoms)|value(args.get(1),bit,assignment,atoms);</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">        if(op==NumericOperation.NOT) return !value(args.getFirst(),bit,assignment,atoms);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if(op==NumericOperation.AND) return value(args.getFirst(),bit,assignment,atoms)&amp;value(args.get(1),bit,assignment,atoms);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if(op==NumericOperation.OR) return value(args.getFirst(),bit,assignment,atoms)|value(args.get(1),bit,assignment,atoms);</span>
 <span class="fc bfc" id="L53" title="All 2 branches covered.">        if(op==NumericOperation.XOR) return value(args.getFirst(),bit,assignment,atoms)^value(args.get(1),bit,assignment,atoms);</span>
 <span class="fc" id="L54">        var representative=representatives.getOrDefault(e,e);</span>
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if(JavaExpressions.isLiteral(representative)) return SemanticChecker.integer(JavaExpressions.literalValue(representative)).testBit(bit);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(representative)) return SemanticChecker.integer(JavaExpressions.literalValue(representative)).testBit(bit);</span>
 <span class="fc bfc" id="L56" title="All 2 branches covered.">        return (assignment&amp;(1&lt;&lt;atoms.indexOf(representative)))!=0;</span>
     }
 }

@@ -81,7 +81,7 @@ public final class IncrementalProviderContract {
 <span class="fc" id="L81">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operations);v.reference(mathematics);v.reference(prepaidApplications);}</span>
 
         /** Frozen v2 shape/formula; serializers omit the absent prepaid extension. */
-<span class="nc" id="L84">        public Work(Map&lt;String, Long&gt; operations, ExecutionWork mathematics) { this(operations, mathematics, null); }</span>
+<span class="fc" id="L84">        public Work(Map&lt;String, Long&gt; operations, ExecutionWork mathematics) { this(operations, mathematics, null); }</span>
 <span class="fc" id="L85">        public Work {</span>
 <span class="fc" id="L86">            operations = de.regelsuche.retention.RetainedSortedMap.copyOf(operations);</span>
 <span class="fc" id="L87">            Objects.requireNonNull(mathematics);</span>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavaBitwiseCandidates.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">JavaBitwiseCandidates.java</span></div><h1>JavaBitwiseCandidates.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import java.util.List;
+
+/** Fixed-size, branchless proposals. The independent bitvector checker remains the authority. */
+final class JavaBitwiseCandidates {
+    private JavaBitwiseCandidates() {}
+
+    static Expr simplify(Expr source, NumericOperation join, NumericKind kind, List&lt;Expr&gt; operands) {
+<span class="pc bpc" id="L11" title="2 of 8 branches missed.">        if ((kind != NumericKind.INT &amp;&amp; kind != NumericKind.LONG)</span>
+                || (join != NumericOperation.OR &amp;&amp; join != NumericOperation.XOR)
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">                || operands.size() != 2) return source;</span>
+<span class="fc" id="L14">        Expr left = operands.getFirst(), right = operands.get(1);</span>
+<span class="fc bfc" id="L15" title="All 4 branches covered.">        if (!operation(left, NumericOperation.AND, kind) || !operation(right, NumericOperation.AND, kind))</span>
+<span class="fc" id="L16">            return source;</span>
+<span class="fc" id="L17">        var a = JavaExpressions.operands(left);</span>
+<span class="fc" id="L18">        var b = JavaExpressions.operands(right);</span>
+<span class="fc bfc" id="L19" title="All 4 branches covered.">        for (int i = 0; i &lt; 2; i++) for (int j = 0; j &lt; 2; j++) {</span>
+<span class="fc" id="L20">            Expr mask = a.get(i), otherMask = b.get(j);</span>
+<span class="fc" id="L21">            Expr positive = a.get(1 - i), negative = b.get(1 - j);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            if (mask.equals(otherMask)) {</span>
+                // (a &amp; m) JOIN (b &amp; m) = (a JOIN b) &amp; m. Applying this
+                // locally also reduces the three-term majority function.
+<span class="fc" id="L25">                return op(kind, NumericOperation.AND, op(kind, join, positive, negative), mask);</span>
+            }
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (complementOf(otherMask, mask, kind)) return choose(kind, mask, positive, negative);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (complementOf(mask, otherMask, kind)) return choose(kind, otherMask, negative, positive);</span>
+        }
+<span class="fc" id="L30">        return source;</span>
+    }
+
+    private static Expr choose(NumericKind kind, Expr mask, Expr positive, Expr negative) {
+        // Complementary masks are disjoint, so this holds for OR and XOR.
+        // No data-dependent branch, lookup, narrowing or arithmetic is introduced.
+<span class="fc" id="L36">        return op(kind, NumericOperation.XOR, negative,</span>
+<span class="fc" id="L37">                op(kind, NumericOperation.AND, mask, op(kind, NumericOperation.XOR, positive, negative)));</span>
+    }
+
+    private static boolean complementOf(Expr expression, Expr other, NumericKind kind) {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        return operation(expression, NumericOperation.NOT, kind)</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                &amp;&amp; JavaExpressions.operands(expression).getFirst().equals(other);</span>
+    }
+
+    private static boolean operation(Expr expression, NumericOperation expected, NumericKind kind) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        return JavaExpressions.operationOf(expression).orElse(null) == expected</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                &amp;&amp; JavaExpressions.resultKind(expression) == kind;</span>
+    }
+
+    private static Expr op(NumericKind kind, NumericOperation operation, Expr... operands) {
+<span class="fc" id="L51">        return JavaExpressions.operation(kind, operation, operands);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

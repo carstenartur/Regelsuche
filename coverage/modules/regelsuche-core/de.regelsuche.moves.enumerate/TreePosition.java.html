@@ -3,6 +3,8 @@
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -48,24 +50,29 @@ import java.util.stream.Collectors;
  * only the selected ancestor chain and preserves every untouched sibling by
  * object identity.&lt;/p&gt;
  */
-public record TreePosition(List&lt;Integer&gt; path, String text) implements Comparable&lt;TreePosition&gt; {
+public record TreePosition(List&lt;Integer&gt; path, String text) implements Comparable&lt;TreePosition&gt;, RetainedGraph.View {
+
+    @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L56">        visitor.reference(path);</span>
+<span class="fc" id="L57">        visitor.reference(text);</span>
+<span class="fc" id="L58">    }</span>
 
     /**
      * Numeric path order (root/empty first, then element-wise), then by subtree text,
      * for deterministic ordering. Compares path lists directly so that the root
      * (empty path) always precedes non-root positions regardless of their display form.
      */
-<span class="fc" id="L58">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
-<span class="fc" id="L59">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
-<span class="fc" id="L60">                    .thenComparing(TreePosition::text);</span>
+<span class="fc" id="L65">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L66">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
+<span class="fc" id="L67">                    .thenComparing(TreePosition::text);</span>
 
-<span class="fc" id="L62">    public TreePosition {</span>
-<span class="fc" id="L63">        path = List.copyOf(path);</span>
-<span class="fc" id="L64">    }</span>
+<span class="fc" id="L69">    public TreePosition {</span>
+<span class="fc" id="L70">        path = List.copyOf(path);</span>
+<span class="fc" id="L71">    }</span>
 
     /** {@code true} when this position denotes the whole expression. */
     public boolean isRoot() {
-<span class="fc" id="L68">        return path.isEmpty();</span>
+<span class="fc" id="L75">        return path.isEmpty();</span>
     }
 
     /**
@@ -75,12 +82,12 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * indices below 1000.
      */
     public String pathKey() {
-<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (path.isEmpty()) {</span>
-<span class="nc" id="L79">            return &quot;root&quot;;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (path.isEmpty()) {</span>
+<span class="nc" id="L86">            return &quot;root&quot;;</span>
         }
-<span class="nc" id="L81">        return path.stream()</span>
-<span class="nc" id="L82">                .map(index -&gt; String.format(&quot;%03d&quot;, index))</span>
-<span class="nc" id="L83">                .collect(Collectors.joining(&quot;.&quot;));</span>
+<span class="nc" id="L88">        return path.stream()</span>
+<span class="nc" id="L89">                .map(index -&gt; String.format(&quot;%03d&quot;, index))</span>
+<span class="nc" id="L90">                .collect(Collectors.joining(&quot;.&quot;));</span>
     }
 
     /**
@@ -90,10 +97,22 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * @return a typed success or failure result; invalid and absent paths remain distinct
      */
     public SelectionResult selectAt(Expr root) {
-<span class="fc" id="L93">        Navigation navigation = navigate(root);</span>
-<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        return navigation.status() == Status.SELECTED</span>
-<span class="fc" id="L95">                ? SelectionResult.selected(path, navigation.selected())</span>
-<span class="nc" id="L96">                : SelectionResult.failure(navigation.status(), path);</span>
+<span class="fc" id="L100">        Object[] pending = new Object[2];</span>
+<span class="fc" id="L101">        var retained = RetainedOperation.retainCompleted(1, this, root, pending);</span>
+<span class="fc" id="L102">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L104">            Navigation navigation = navigate(root);</span>
+<span class="fc" id="L105">            pending[0] = navigation;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            pending[1] = navigation.status() == Status.SELECTED</span>
+<span class="fc" id="L107">                    ? SelectionResult.selected(path, navigation.selected())</span>
+<span class="fc" id="L108">                    : SelectionResult.failure(navigation.status(), path);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            completed(navigation.status() == Status.SELECTED ? 2 : 1);</span>
+<span class="fc" id="L110">            return (SelectionResult) pending[1];</span>
+<span class="fc" id="L111">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L112">            primary = failure;</span>
+<span class="fc" id="L113">            observeFailure(failure);</span>
+<span class="fc" id="L114">            throw failure;</span>
+<span class="fc" id="L115">        } finally { close(retained, primary); }</span>
     }
 
     /**
@@ -101,7 +120,7 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * {@link #selectAt(Expr)} whenever the failure category is authoritative.
      */
     public Optional&lt;Expr&gt; subtreeAt(Expr root) {
-<span class="fc" id="L104">        return selectAt(root).selectedSubtree();</span>
+<span class="fc" id="L123">        return selectAt(root).selectedSubtree();</span>
     }
 
     /**
@@ -113,135 +132,205 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * @return a typed success or failure result; invalid and absent paths remain distinct
      */
     public ReplacementResult replaceAt(Expr root, Expr replacement) {
-<span class="fc" id="L116">        Objects.requireNonNull(replacement, &quot;replacement&quot;);</span>
-<span class="fc" id="L117">        Navigation navigation = navigate(root);</span>
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (navigation.status() != Status.SELECTED) {</span>
-<span class="nc" id="L119">            return ReplacementResult.failure(navigation.status(), path);</span>
-        }
+<span class="fc" id="L135">        Objects.requireNonNull(replacement, &quot;replacement&quot;);</span>
+<span class="fc" id="L136">        Object[] pending = new Object[3];</span>
+<span class="fc" id="L137">        var retained = RetainedOperation.retainCompleted(1, this, root, replacement, pending);</span>
+<span class="fc" id="L138">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L140">            Navigation navigation = navigate(root);</span>
+<span class="fc" id="L141">            pending[0] = navigation;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (navigation.status() != Status.SELECTED) {</span>
+<span class="nc" id="L143">                pending[2] = ReplacementResult.failure(navigation.status(), path);</span>
+<span class="nc" id="L144">                completed(1);</span>
+<span class="nc" id="L145">                return (ReplacementResult) pending[2];</span>
+            }
 
-<span class="fc" id="L122">        Expr rewritten = replacement;</span>
-<span class="fc" id="L123">        List&lt;ParentFrame&gt; parents = navigation.parents();</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int index = parents.size() - 1; index &gt;= 0; index--) {</span>
-<span class="fc" id="L125">            ParentFrame frame = parents.get(index);</span>
-<span class="fc" id="L126">            rewritten = rebuildParent(frame.parent(), frame.childIndex(), rewritten);</span>
-        }
-<span class="fc" id="L128">        return ReplacementResult.replaced(</span>
-                path,
-<span class="fc" id="L130">                navigation.selected(),</span>
-                rewritten,
-<span class="fc" id="L132">                parents.size());</span>
+<span class="fc" id="L148">            pending[1] = replacement;</span>
+<span class="fc" id="L149">            List&lt;ParentFrame&gt; parents = navigation.parents();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            for (int index = parents.size() - 1; index &gt;= 0; index--) {</span>
+<span class="fc" id="L151">                ParentFrame frame = parents.get(index);</span>
+<span class="fc" id="L152">                pending[1] = rebuildParent(frame.parent(), frame.childIndex(), (Expr) pending[1]);</span>
+            }
+<span class="fc" id="L154">            pending[2] = ReplacementResult.replaced(</span>
+<span class="fc" id="L155">                    path, navigation.selected(), (Expr) pending[1], parents.size());</span>
+<span class="fc" id="L156">            completed(3); // result and its two present Optional owners</span>
+<span class="fc" id="L157">            return (ReplacementResult) pending[2];</span>
+<span class="fc" id="L158">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L159">            primary = failure;</span>
+<span class="fc" id="L160">            observeFailure(failure);</span>
+<span class="fc" id="L161">            throw failure;</span>
+<span class="fc" id="L162">        } finally { close(retained, primary); }</span>
     }
 
     @Override
     public int compareTo(TreePosition other) {
-<span class="nc" id="L137">        return CANONICAL_ORDER.compare(this, other);</span>
+<span class="nc" id="L167">        return CANONICAL_ORDER.compare(this, other);</span>
     }
 
     private Navigation navigate(Expr root) {
-<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (root == null) {</span>
-<span class="nc" id="L142">            return Navigation.failure(Status.INVALID_PATH, path);</span>
-        }
-
-<span class="fc" id="L145">        Expr current = root;</span>
-<span class="fc" id="L146">        List&lt;ParentFrame&gt; parents = new ArrayList&lt;&gt;(path.size());</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int childIndex : path) {</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (childIndex &lt; 0) {</span>
-<span class="nc" id="L149">                return Navigation.failure(Status.INVALID_PATH, path);</span>
-            }
-
-            Expr child;
-<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (current instanceof BinaryExpr binary) {</span>
-<span class="pc bpc" id="L154" title="1 of 3 branches missed.">                child = switch (childIndex) {</span>
-<span class="fc" id="L155">                    case 0 -&gt; binary.left();</span>
-<span class="fc" id="L156">                    case 1 -&gt; binary.right();</span>
-<span class="nc" id="L157">                    default -&gt; null;</span>
-<span class="fc" id="L158">                };</span>
-<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                if (child == null) {</span>
-<span class="nc" id="L160">                    return Navigation.failure(Status.INVALID_PATH, path);</span>
+<span class="fc" id="L171">        List&lt;ParentFrame&gt; parents = new ArrayList&lt;&gt;(path.size());</span>
+<span class="fc" id="L172">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L173">        var retained = RetainedOperation.retainCompleted(2, this, root, parents, pending);</span>
+<span class="fc" id="L174">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L176">            Expr current = root;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            Status status = root == null ? Status.INVALID_PATH : Status.SELECTED;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (int childIndex : path) {</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                if (status != Status.SELECTED) break;</span>
+<span class="fc" id="L180">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                if (childIndex &lt; 0) {</span>
+<span class="fc" id="L182">                    status = Status.INVALID_PATH;</span>
+<span class="fc" id="L183">                    break;</span>
                 }
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            } else if (current instanceof FunctionExpr function) {</span>
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                if (childIndex &gt;= function.arguments().size()) {</span>
-<span class="nc" id="L164">                    return Navigation.failure(Status.INVALID_PATH, path);</span>
-                }
-<span class="fc" id="L166">                child = function.arguments().get(childIndex);</span>
-            } else {
-<span class="nc" id="L168">                return Navigation.failure(Status.POSITION_NOT_PRESENT, path);</span>
-            }
 
-<span class="fc" id="L171">            parents.add(new ParentFrame(current, childIndex));</span>
-<span class="fc" id="L172">            current = child;</span>
-<span class="fc" id="L173">        }</span>
-<span class="fc" id="L174">        return Navigation.selected(path, current, parents);</span>
+                Expr child;
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                if (current instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L188" title="1 of 3 branches missed.">                    child = switch (childIndex) {</span>
+<span class="fc" id="L189">                        case 0 -&gt; binary.left();</span>
+<span class="fc" id="L190">                        case 1 -&gt; binary.right();</span>
+<span class="nc" id="L191">                        default -&gt; null;</span>
+<span class="fc" id="L192">                    };</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                    if (child == null) {</span>
+<span class="nc" id="L194">                        status = Status.INVALID_PATH;</span>
+<span class="nc" id="L195">                        break;</span>
+                    }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                } else if (current instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                    if (childIndex &gt;= function.arguments().size()) {</span>
+<span class="nc" id="L199">                        status = Status.INVALID_PATH;</span>
+<span class="nc" id="L200">                        break;</span>
+                    }
+<span class="fc" id="L202">                    child = function.arguments().get(childIndex);</span>
+                } else {
+<span class="fc" id="L204">                    status = Status.POSITION_NOT_PRESENT;</span>
+<span class="fc" id="L205">                    break;</span>
+                }
+
+<span class="fc" id="L208">                parents.add(new ParentFrame(current, childIndex));</span>
+<span class="fc" id="L209">                current = child;</span>
+<span class="fc" id="L210">                completed(2); // parent frame and insertion into the actual navigation buffer</span>
+<span class="fc" id="L211">            }</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            pending[0] = status == Status.SELECTED</span>
+<span class="fc" id="L213">                    ? Navigation.selected(path, current, parents)</span>
+<span class="fc" id="L214">                    : Navigation.failure(status, path);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            completed(status == Status.SELECTED ? parents.size() + 1L : 1);</span>
+<span class="fc" id="L216">            return (Navigation) pending[0];</span>
+<span class="fc" id="L217">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L218">            primary = failure;</span>
+<span class="fc" id="L219">            observeFailure(failure);</span>
+<span class="fc" id="L220">            throw failure;</span>
+<span class="fc" id="L221">        } finally { close(retained, primary); }</span>
     }
 
     private static Expr rebuildParent(Expr parent, int childIndex, Expr rewrittenChild) {
-<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (parent instanceof BinaryExpr binary) {</span>
-<span class="pc bpc" id="L179" title="1 of 3 branches missed.">            return switch (childIndex) {</span>
-<span class="fc" id="L180">                case 0 -&gt; new BinaryExpr(rewrittenChild, binary.operator(), binary.right());</span>
-<span class="fc" id="L181">                case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);</span>
-<span class="nc" id="L182">                default -&gt; throw new IllegalStateException(</span>
-                        &quot;validated binary path became invalid&quot;);
-            };
-        }
-<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (parent instanceof FunctionExpr function) {</span>
-<span class="fc" id="L187">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
-<span class="fc" id="L188">            arguments.set(childIndex, rewrittenChild);</span>
-<span class="fc" id="L189">            return new FunctionExpr(function.name(), arguments);</span>
-        }
-<span class="nc" id="L191">        throw new IllegalStateException(&quot;validated path parent is not traversable&quot;);</span>
+<span class="fc" id="L225">        Object[] pending = new Object[2];</span>
+<span class="fc" id="L226">        var retained = RetainedOperation.retainCompleted(1, parent, rewrittenChild, pending);</span>
+<span class="fc" id="L227">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (parent instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L230" title="1 of 3 branches missed.">                pending[0] = switch (childIndex) {</span>
+<span class="fc" id="L231">                    case 0 -&gt; new BinaryExpr(rewrittenChild, binary.operator(), binary.right());</span>
+<span class="fc" id="L232">                    case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);</span>
+<span class="nc" id="L233">                    default -&gt; throw new IllegalStateException(&quot;validated binary path became invalid&quot;);</span>
+<span class="fc" id="L234">                };</span>
+<span class="fc" id="L235">                completed(1);</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            } else if (parent instanceof FunctionExpr function) {</span>
+<span class="fc" id="L237">                List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L238">                pending[1] = arguments;</span>
+<span class="fc" id="L239">                completed(arguments.size() + 1L);</span>
+<span class="fc" id="L240">                arguments.set(childIndex, rewrittenChild);</span>
+<span class="fc" id="L241">                RetainedOperation.work(1);</span>
+<span class="fc" id="L242">                pending[0] = new FunctionExpr(function.name(), arguments);</span>
+<span class="fc" id="L243">                completed(arguments.size() + 1L);</span>
+<span class="fc" id="L244">            } else {</span>
+<span class="nc" id="L245">                throw new IllegalStateException(&quot;validated path parent is not traversable&quot;);</span>
+            }
+<span class="fc" id="L247">            return (Expr) pending[0];</span>
+<span class="fc" id="L248">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L249">            primary = failure;</span>
+<span class="fc" id="L250">            observeFailure(failure);</span>
+<span class="fc" id="L251">            throw failure;</span>
+<span class="fc" id="L252">        } finally { close(retained, primary); }</span>
     }
 
+    /** Logical execution units only; callers retain the single mathematical application charge. */
+    private static void completed(long units) {
+<span class="fc" id="L257">        RetainedOperation.work(units);</span>
+<span class="fc" id="L258">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L259">    }</span>
+
+    private static void observeFailure(Throwable primary) {
+<span class="fc" id="L262">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L263">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (observation != primary) primary.addSuppressed(observation);</span>
+<span class="fc" id="L265">        }</span>
+<span class="fc" id="L266">    }</span>
+
+    private static void close(RetainedOperation.Frame frame, Throwable primary) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        try { if (frame != null) frame.close(); }</span>
+<span class="fc" id="L270">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L273">        }</span>
+<span class="fc" id="L274">    }</span>
+
     private static int comparePaths(List&lt;Integer&gt; a, List&lt;Integer&gt; b) {
-<span class="nc" id="L195">        int min = Math.min(a.size(), b.size());</span>
-<span class="nc bnc" id="L196" title="All 2 branches missed.">        for (int i = 0; i &lt; min; i++) {</span>
-<span class="nc" id="L197">            int cmp = Integer.compare(a.get(i), b.get(i));</span>
-<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (cmp != 0) {</span>
-<span class="nc" id="L199">                return cmp;</span>
+<span class="nc" id="L277">        int min = Math.min(a.size(), b.size());</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        for (int i = 0; i &lt; min; i++) {</span>
+<span class="nc" id="L279">            int cmp = Integer.compare(a.get(i), b.get(i));</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            if (cmp != 0) {</span>
+<span class="nc" id="L281">                return cmp;</span>
             }
         }
-<span class="nc" id="L202">        return Integer.compare(a.size(), b.size());</span>
+<span class="nc" id="L284">        return Integer.compare(a.size(), b.size());</span>
     }
 
     /** Outcome categories shared by iterative selection and replacement. */
-<span class="fc" id="L206">    public enum Status {</span>
-<span class="fc" id="L207">        SELECTED,</span>
-<span class="fc" id="L208">        REPLACED,</span>
-<span class="fc" id="L209">        INVALID_PATH,</span>
-<span class="fc" id="L210">        POSITION_NOT_PRESENT</span>
+<span class="fc" id="L288">    public enum Status implements RetainedGraph.View {</span>
+<span class="fc" id="L289">        SELECTED,</span>
+<span class="fc" id="L290">        REPLACED,</span>
+<span class="fc" id="L291">        INVALID_PATH,</span>
+<span class="fc" id="L292">        POSITION_NOT_PRESENT;</span>
+
+<span class="fc" id="L294">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {}</span>
     }
 
     /** Typed selection outcome. A successful result exposes the selected subtree. */
     public record SelectionResult(
             Status status,
             List&lt;Integer&gt; path,
-            Optional&lt;Expr&gt; selectedSubtree) {
-<span class="fc" id="L218">        public SelectionResult {</span>
-<span class="fc" id="L219">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L220">            path = List.copyOf(path);</span>
-<span class="fc" id="L221">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
-<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            boolean selected = status == Status.SELECTED;</span>
-<span class="pc bpc" id="L223" title="2 of 4 branches missed.">            if (status == Status.REPLACED || selected != selectedSubtree.isPresent()) {</span>
-<span class="nc" id="L224">                throw new IllegalArgumentException(&quot;tree selection status/payload mismatch&quot;);</span>
+            Optional&lt;Expr&gt; selectedSubtree) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L303">            visitor.reference(status);</span>
+<span class="fc" id="L304">            visitor.reference(path);</span>
+<span class="fc" id="L305">            visitor.reference(selectedSubtree);</span>
+<span class="fc" id="L306">        }</span>
+<span class="fc" id="L307">        public SelectionResult {</span>
+<span class="fc" id="L308">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L309">            path = List.copyOf(path);</span>
+<span class="fc" id="L310">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            boolean selected = status == Status.SELECTED;</span>
+<span class="pc bpc" id="L312" title="2 of 4 branches missed.">            if (status == Status.REPLACED || selected != selectedSubtree.isPresent()) {</span>
+<span class="nc" id="L313">                throw new IllegalArgumentException(&quot;tree selection status/payload mismatch&quot;);</span>
             }
-<span class="fc" id="L226">        }</span>
+<span class="fc" id="L315">        }</span>
 
         private static SelectionResult selected(List&lt;Integer&gt; path, Expr selectedSubtree) {
-<span class="fc" id="L229">            return new SelectionResult(</span>
+<span class="fc" id="L318">            return new SelectionResult(</span>
                     Status.SELECTED,
                     path,
-<span class="fc" id="L232">                    Optional.of(selectedSubtree));</span>
+<span class="fc" id="L321">                    Optional.of(selectedSubtree));</span>
         }
 
         private static SelectionResult failure(Status status, List&lt;Integer&gt; path) {
-<span class="nc bnc" id="L236" title="All 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
-<span class="nc" id="L237">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
+<span class="nc" id="L326">                throw new IllegalArgumentException(</span>
                         &quot;successful status cannot describe selection failure&quot;);
             }
-<span class="nc" id="L240">            return new SelectionResult(status, path, Optional.empty());</span>
+<span class="fc" id="L329">            return new SelectionResult(status, path, Optional.empty());</span>
         }
 
         public boolean success() {
-<span class="nc bnc" id="L244" title="All 2 branches missed.">            return status == Status.SELECTED;</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            return status == Status.SELECTED;</span>
         }
     }
 
@@ -254,96 +343,109 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
             List&lt;Integer&gt; path,
             Optional&lt;Expr&gt; selectedSubtree,
             Optional&lt;Expr&gt; rewrittenRoot,
-            int copiedAncestors) {
-<span class="fc" id="L258">        public ReplacementResult {</span>
-<span class="fc" id="L259">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L260">            path = List.copyOf(path);</span>
-<span class="fc" id="L261">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
-<span class="fc" id="L262">            rewrittenRoot = Objects.requireNonNull(rewrittenRoot, &quot;rewrittenRoot&quot;);</span>
-<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            if (copiedAncestors &lt; 0) {</span>
-<span class="nc" id="L264">                throw new IllegalArgumentException(&quot;copied ancestor count must not be negative&quot;);</span>
+            int copiedAncestors) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L348">            visitor.reference(status);</span>
+<span class="fc" id="L349">            visitor.reference(path);</span>
+<span class="fc" id="L350">            visitor.reference(selectedSubtree);</span>
+<span class="fc" id="L351">            visitor.reference(rewrittenRoot);</span>
+<span class="fc" id="L352">        }</span>
+<span class="fc" id="L353">        public ReplacementResult {</span>
+<span class="fc" id="L354">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L355">            path = List.copyOf(path);</span>
+<span class="fc" id="L356">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
+<span class="fc" id="L357">            rewrittenRoot = Objects.requireNonNull(rewrittenRoot, &quot;rewrittenRoot&quot;);</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (copiedAncestors &lt; 0) {</span>
+<span class="nc" id="L359">                throw new IllegalArgumentException(&quot;copied ancestor count must not be negative&quot;);</span>
             }
-<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            boolean replaced = status == Status.REPLACED;</span>
-<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            if (replaced != selectedSubtree.isPresent()</span>
-<span class="pc bpc" id="L268" title="4 of 6 branches missed.">                    || replaced != rewrittenRoot.isPresent()</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            boolean replaced = status == Status.REPLACED;</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            if (replaced != selectedSubtree.isPresent()</span>
+<span class="pc bpc" id="L363" title="4 of 6 branches missed.">                    || replaced != rewrittenRoot.isPresent()</span>
                     || !replaced &amp;&amp; copiedAncestors != 0) {
-<span class="nc" id="L270">                throw new IllegalArgumentException(&quot;tree replacement status/payload mismatch&quot;);</span>
+<span class="nc" id="L365">                throw new IllegalArgumentException(&quot;tree replacement status/payload mismatch&quot;);</span>
             }
-<span class="fc" id="L272">        }</span>
+<span class="fc" id="L367">        }</span>
 
         private static ReplacementResult replaced(
                 List&lt;Integer&gt; path,
                 Expr selectedSubtree,
                 Expr rewrittenRoot,
                 int copiedAncestors) {
-<span class="fc" id="L279">            return new ReplacementResult(</span>
+<span class="fc" id="L374">            return new ReplacementResult(</span>
                     Status.REPLACED,
                     path,
-<span class="fc" id="L282">                    Optional.of(selectedSubtree),</span>
-<span class="fc" id="L283">                    Optional.of(rewrittenRoot),</span>
+<span class="fc" id="L377">                    Optional.of(selectedSubtree),</span>
+<span class="fc" id="L378">                    Optional.of(rewrittenRoot),</span>
                     copiedAncestors);
         }
 
         private static ReplacementResult failure(Status status, List&lt;Integer&gt; path) {
-<span class="nc bnc" id="L288" title="All 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
-<span class="nc" id="L289">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L383" title="All 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
+<span class="nc" id="L384">                throw new IllegalArgumentException(</span>
                         &quot;successful status cannot describe replacement failure&quot;);
             }
-<span class="nc" id="L292">            return new ReplacementResult(</span>
+<span class="nc" id="L387">            return new ReplacementResult(</span>
                     status,
                     path,
-<span class="nc" id="L295">                    Optional.empty(),</span>
-<span class="nc" id="L296">                    Optional.empty(),</span>
+<span class="nc" id="L390">                    Optional.empty(),</span>
+<span class="nc" id="L391">                    Optional.empty(),</span>
                     0);
         }
 
         public boolean success() {
-<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            return status == Status.REPLACED;</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">            return status == Status.REPLACED;</span>
         }
     }
 
-    private record ParentFrame(Expr parent, int childIndex) {
-<span class="fc" id="L306">        private ParentFrame {</span>
-<span class="fc" id="L307">            Objects.requireNonNull(parent, &quot;parent&quot;);</span>
-<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (childIndex &lt; 0) {</span>
-<span class="nc" id="L309">                throw new IllegalArgumentException(&quot;child index must not be negative&quot;);</span>
+    private record ParentFrame(Expr parent, int childIndex) implements RetainedGraph.View {
+<span class="fc" id="L401">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(parent); }</span>
+<span class="fc" id="L402">        private ParentFrame {</span>
+<span class="fc" id="L403">            Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            if (childIndex &lt; 0) {</span>
+<span class="nc" id="L405">                throw new IllegalArgumentException(&quot;child index must not be negative&quot;);</span>
             }
-<span class="fc" id="L311">        }</span>
+<span class="fc" id="L407">        }</span>
     }
 
     private record Navigation(
             Status status,
             List&lt;Integer&gt; path,
             Expr selected,
-            List&lt;ParentFrame&gt; parents) {
-<span class="fc" id="L319">        private Navigation {</span>
-<span class="fc" id="L320">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L321">            path = List.copyOf(path);</span>
-<span class="fc" id="L322">            parents = List.copyOf(parents);</span>
-<span class="pc bpc" id="L323" title="4 of 8 branches missed.">            if ((status == Status.SELECTED) != (selected != null)</span>
-<span class="pc bpc" id="L324" title="2 of 4 branches missed.">                    || status == Status.SELECTED &amp;&amp; parents.size() != path.size()</span>
-<span class="nc bnc" id="L325" title="All 2 branches missed.">                    || status != Status.SELECTED &amp;&amp; !parents.isEmpty()) {</span>
-<span class="nc" id="L326">                throw new IllegalArgumentException(&quot;tree navigation status/payload mismatch&quot;);</span>
+            List&lt;ParentFrame&gt; parents) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L416">            visitor.reference(status);</span>
+<span class="fc" id="L417">            visitor.reference(path);</span>
+<span class="fc" id="L418">            visitor.reference(selected);</span>
+<span class="fc" id="L419">            visitor.reference(parents);</span>
+<span class="fc" id="L420">        }</span>
+<span class="fc" id="L421">        private Navigation {</span>
+<span class="fc" id="L422">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L423">            path = List.copyOf(path);</span>
+<span class="fc" id="L424">            parents = List.copyOf(parents);</span>
+<span class="pc bpc" id="L425" title="1 of 8 branches missed.">            if ((status == Status.SELECTED) != (selected != null)</span>
+<span class="pc bpc" id="L426" title="1 of 4 branches missed.">                    || status == Status.SELECTED &amp;&amp; parents.size() != path.size()</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                    || status != Status.SELECTED &amp;&amp; !parents.isEmpty()) {</span>
+<span class="nc" id="L428">                throw new IllegalArgumentException(&quot;tree navigation status/payload mismatch&quot;);</span>
             }
-<span class="fc" id="L328">        }</span>
+<span class="fc" id="L430">        }</span>
 
         private static Navigation selected(
                 List&lt;Integer&gt; path,
                 Expr selected,
                 List&lt;ParentFrame&gt; parents) {
-<span class="fc" id="L334">            return new Navigation(</span>
+<span class="fc" id="L436">            return new Navigation(</span>
                     Status.SELECTED,
                     path,
-<span class="fc" id="L337">                    Objects.requireNonNull(selected, &quot;selected&quot;),</span>
+<span class="fc" id="L439">                    Objects.requireNonNull(selected, &quot;selected&quot;),</span>
                     parents);
         }
 
         private static Navigation failure(Status status, List&lt;Integer&gt; path) {
-<span class="nc bnc" id="L342" title="All 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
-<span class="nc" id="L343">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L444" title="2 of 4 branches missed.">            if (status == Status.SELECTED || status == Status.REPLACED) {</span>
+<span class="nc" id="L445">                throw new IllegalArgumentException(</span>
                         &quot;successful status cannot describe navigation failure&quot;);
             }
-<span class="nc" id="L346">            return new Navigation(status, path, null, List.of());</span>
+<span class="fc" id="L448">            return new Navigation(status, path, null, List.of());</span>
         }
     }
 }

@@ -44,5 +44,15 @@ public record FunctionExpr(String name, List&lt;Expr&gt; arguments) implements E
     public Expr argument() {
 <span class="fc" id="L45">        return arguments.get(0);</span>
     }
+    @Override public boolean equals(Object other) {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.same(this, other);</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        return this == other || other instanceof FunctionExpr function</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">            &amp;&amp; name.equals(function.name) &amp;&amp; arguments.equals(function.arguments);</span>
+    }
+    @Override public int hashCode() {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.valueHash(this);</span>
+<span class="fc" id="L54">        return 31 * name.hashCode() + arguments.hashCode();</span>
+    }
+
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

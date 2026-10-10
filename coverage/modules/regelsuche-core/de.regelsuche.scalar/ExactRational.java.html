@@ -2,6 +2,8 @@
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.math.BigInteger;
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -21,66 +23,85 @@ public record ExactRational(
     BigInteger numerator,
     BigInteger denominator
 ) implements Comparable&lt;ExactRational&gt; {
-<span class="fc" id="L24">    public static final ExactRational ZERO =</span>
+    private static final boolean CONSTANTS_INITIALIZED;
+<span class="fc" id="L27">    public static final ExactRational ZERO =</span>
         new ExactRational(BigInteger.ZERO, BigInteger.ONE);
-<span class="fc" id="L26">    public static final ExactRational ONE =</span>
+<span class="fc" id="L29">    public static final ExactRational ONE =</span>
         new ExactRational(BigInteger.ONE, BigInteger.ONE);
-<span class="fc" id="L28">    public static final ExactRational NEGATIVE_ONE =</span>
-<span class="fc" id="L29">        new ExactRational(BigInteger.ONE.negate(), BigInteger.ONE);</span>
+<span class="fc" id="L31">    public static final ExactRational NEGATIVE_ONE =</span>
+<span class="fc" id="L32">        new ExactRational(BigInteger.ONE.negate(), BigInteger.ONE);</span>
 
-<span class="fc" id="L31">    public ExactRational {</span>
-<span class="fc" id="L32">        Objects.requireNonNull(numerator, &quot;numerator&quot;);</span>
-<span class="fc" id="L33">        Objects.requireNonNull(denominator, &quot;denominator&quot;);</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (denominator.signum() == 0) {</span>
-<span class="fc" id="L35">            throw new ArithmeticException(</span>
-                &quot;rational denominator must not be zero&quot;);
-        }
-<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (numerator.signum() == 0) {</span>
-<span class="fc" id="L39">            numerator = BigInteger.ZERO;</span>
-<span class="fc" id="L40">            denominator = BigInteger.ONE;</span>
-        } else {
-<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (denominator.signum() &lt; 0) {</span>
-<span class="fc" id="L43">                numerator = numerator.negate();</span>
-<span class="fc" id="L44">                denominator = denominator.negate();</span>
+    static {
+        // Shared constants are class initialization, not a query operation. A
+        // query budget must not abort initialization and poison this value type.
+<span class="fc" id="L37">        CONSTANTS_INITIALIZED = true;</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    public ExactRational(BigInteger numerator, BigInteger denominator) {</span>
+<span class="fc" id="L41">        var owned = Arithmetic.observe(numerator, denominator, 4);</span>
+<span class="fc" id="L42">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L44">            Objects.requireNonNull(numerator, &quot;numerator&quot;);</span>
+<span class="fc" id="L45">            Objects.requireNonNull(denominator, &quot;denominator&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (denominator.signum() == 0) {</span>
+<span class="fc" id="L47">                throw new ArithmeticException(</span>
+                    &quot;rational denominator must not be zero&quot;);
             }
-<span class="fc" id="L46">            BigInteger divisor = numerator.gcd(denominator);</span>
-<span class="fc" id="L47">            numerator = numerator.divide(divisor);</span>
-<span class="fc" id="L48">            denominator = denominator.divide(divisor);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (numerator.signum() == 0) {</span>
+<span class="fc" id="L51">                numerator = BigInteger.ZERO;</span>
+<span class="fc" id="L52">                denominator = BigInteger.ONE;</span>
+            } else {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (denominator.signum() &lt; 0) {</span>
+<span class="fc" id="L55">                    numerator = keep(owned, 0, numerator.negate());</span>
+<span class="fc" id="L56">                    denominator = keep(owned, 1, denominator.negate());</span>
+                }
+<span class="fc" id="L58">                BigInteger divisor = keep(owned, 2, numerator.gcd(denominator));</span>
+<span class="fc" id="L59">                numerator = keep(owned, 0, numerator.divide(divisor));</span>
+<span class="fc" id="L60">                denominator = keep(owned, 1, denominator.divide(divisor));</span>
+            }
+<span class="fc" id="L62">            this.numerator = numerator;</span>
+<span class="fc" id="L63">            this.denominator = denominator;</span>
+<span class="fc" id="L64">            keep(owned, 3, this);</span>
+<span class="fc" id="L65">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L66">            primary = failure;</span>
+<span class="fc" id="L67">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
-<span class="fc" id="L50">    }</span>
+<span class="fc" id="L71">    }</span>
 
     public static ExactRational integer(long value) {
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (value == 0) {</span>
-<span class="fc" id="L54">            return ZERO;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (value == 0) {</span>
+<span class="fc" id="L75">            return ZERO;</span>
         }
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (value == 1) {</span>
-<span class="fc" id="L57">            return ONE;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (value == 1) {</span>
+<span class="fc" id="L78">            return ONE;</span>
         }
-<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (value == -1) {</span>
-<span class="fc" id="L60">            return NEGATIVE_ONE;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (value == -1) {</span>
+<span class="fc" id="L81">            return NEGATIVE_ONE;</span>
         }
-<span class="fc" id="L62">        return new ExactRational(</span>
-<span class="fc" id="L63">            BigInteger.valueOf(value),</span>
+<span class="fc" id="L83">        return new ExactRational(</span>
+<span class="fc" id="L84">            BigInteger.valueOf(value),</span>
             BigInteger.ONE);
     }
 
     public static ExactRational integer(BigInteger value) {
-<span class="fc" id="L68">        Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (value.signum() == 0) {</span>
-<span class="fc" id="L70">            return ZERO;</span>
+<span class="fc" id="L89">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (value.signum() == 0) {</span>
+<span class="fc" id="L91">            return ZERO;</span>
         }
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (value.equals(BigInteger.ONE)) {</span>
-<span class="fc" id="L73">            return ONE;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (value.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L94">            return ONE;</span>
         }
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (value.equals(BigInteger.ONE.negate())) {</span>
-<span class="fc" id="L76">            return NEGATIVE_ONE;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (value.equals(NEGATIVE_ONE.numerator)) {</span>
+<span class="fc" id="L97">            return NEGATIVE_ONE;</span>
         }
-<span class="fc" id="L78">        return new ExactRational(value, BigInteger.ONE);</span>
+<span class="fc" id="L99">        return new ExactRational(value, BigInteger.ONE);</span>
     }
 
     /** Exact source input under the separately enforced literal grammar and limits. */
     public static ExactRational parse(String literal) {
-<span class="fc" id="L83">        return new ExactRationalDomain().parseValue(literal);</span>
+<span class="fc" id="L104">        return new ExactRationalDomain().parseValue(literal);</span>
     }
 
     /**
@@ -90,234 +111,387 @@ public record ExactRational(
      */
     @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
     public static ExactRational fromCanonicalText(String text) {
-<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (text == null || text.length() &gt; ExactRationalDomain.MAX_LITERAL_CHARACTERS</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">                || !text.matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;)) {</span>
-<span class="fc" id="L95">            throw new IllegalArgumentException(&quot;Invalid canonical rational text&quot;);</span>
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (text == null || text.length() &gt; ExactRationalDomain.MAX_LITERAL_CHARACTERS</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                || !text.matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;)) {</span>
+<span class="fc" id="L116">            throw new IllegalArgumentException(&quot;Invalid canonical rational text&quot;);</span>
         }
-<span class="fc" id="L97">        int slash = text.indexOf('/');</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">        ExactRational value = slash &lt; 0</span>
-<span class="fc" id="L99">            ? integer(new BigInteger(text))</span>
-<span class="fc" id="L100">            : new ExactRational(new BigInteger(text.substring(0, slash)),</span>
-<span class="fc" id="L101">                new BigInteger(text.substring(slash + 1)));</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (!value.canonicalText().equals(text)) {</span>
-<span class="fc" id="L103">            throw new IllegalArgumentException(&quot;Rational text is not normalized&quot;);</span>
+<span class="fc" id="L118">        int slash = text.indexOf('/');</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        ExactRational value = slash &lt; 0</span>
+<span class="fc" id="L120">            ? integer(new BigInteger(text))</span>
+<span class="fc" id="L121">            : new ExactRational(new BigInteger(text.substring(0, slash)),</span>
+<span class="fc" id="L122">                new BigInteger(text.substring(slash + 1)));</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (!value.canonicalText().equals(text)) {</span>
+<span class="fc" id="L124">            throw new IllegalArgumentException(&quot;Rational text is not normalized&quot;);</span>
         }
-<span class="fc" id="L105">        return value;</span>
+<span class="fc" id="L126">        return value;</span>
     }
 
     /** Exact conversion of an already typed decimal, without source provenance. */
     public static ExactRational fromDecimal(BigDecimal decimal) {
-<span class="nc" id="L110">        Objects.requireNonNull(decimal, &quot;decimal&quot;);</span>
-<span class="nc" id="L111">        int scale = decimal.scale();</span>
-<span class="nc bnc" id="L112" title="All 2 branches missed.">        return scale &lt; 0</span>
-<span class="nc" id="L113">            ? integer(decimal.unscaledValue().multiply(BigInteger.TEN.pow(Math.negateExact(scale))))</span>
-<span class="nc" id="L114">            : new ExactRational(decimal.unscaledValue(), BigInteger.TEN.pow(scale));</span>
+<span class="nc" id="L131">        Objects.requireNonNull(decimal, &quot;decimal&quot;);</span>
+<span class="nc" id="L132">        int scale = decimal.scale();</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        return scale &lt; 0</span>
+<span class="nc" id="L134">            ? integer(decimal.unscaledValue().multiply(BigInteger.TEN.pow(Math.negateExact(scale))))</span>
+<span class="nc" id="L135">            : new ExactRational(decimal.unscaledValue(), BigInteger.TEN.pow(scale));</span>
     }
 
     public ExactRational add(ExactRational other) {
-<span class="fc" id="L118">        Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (other.isZero()) {</span>
-<span class="fc" id="L120">            return this;</span>
+<span class="fc" id="L139">        var owned = Arithmetic.observe(this, other, 8);</span>
+<span class="fc" id="L140">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L142">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (other.isZero()) {</span>
+<span class="fc" id="L144">                return keep(owned, 7, this);</span>
+            }
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (isZero()) {</span>
+<span class="fc" id="L147">                return keep(owned, 7, other);</span>
+            }
+<span class="fc" id="L149">            BigInteger denominatorGcd = keep(owned, 0, denominator.gcd(other.denominator));</span>
+<span class="fc" id="L150">            BigInteger leftMultiplier = keep(owned, 1, other.denominator.divide(denominatorGcd));</span>
+<span class="fc" id="L151">            BigInteger rightMultiplier = keep(owned, 2, denominator.divide(denominatorGcd));</span>
+<span class="fc" id="L152">            BigInteger leftSummand = keep(owned, 3, numerator.multiply(leftMultiplier));</span>
+<span class="fc" id="L153">            BigInteger rightSummand = keep(owned, 4, other.numerator.multiply(rightMultiplier));</span>
+<span class="fc" id="L154">            BigInteger sum = keep(owned, 5, leftSummand.add(rightSummand));</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (sum.signum() == 0) {</span>
+<span class="fc" id="L156">                return keep(owned, 7, ZERO);</span>
+            }
+<span class="fc" id="L158">            BigInteger absoluteSum = keep(owned, 6, sum.abs());</span>
+<span class="fc" id="L159">            BigInteger cancellation = keep(owned, 6, absoluteSum.gcd(denominatorGcd));</span>
+<span class="fc" id="L160">            BigInteger top = keep(owned, 3, sum.divide(cancellation));</span>
+<span class="fc" id="L161">            BigInteger reducedDenominator = keep(owned, 4, denominator.divide(cancellation));</span>
+<span class="fc" id="L162">            BigInteger bottom = keep(owned, 4, reducedDenominator.multiply(leftMultiplier));</span>
+<span class="fc" id="L163">            return keep(owned, 7, new ExactRational(top, bottom));</span>
+<span class="fc" id="L164">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L165">            primary = failure;</span>
+<span class="fc" id="L166">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (isZero()) {</span>
-<span class="fc" id="L123">            return other;</span>
-        }
-<span class="fc" id="L125">        BigInteger denominatorGcd = denominator.gcd(other.denominator);</span>
-<span class="fc" id="L126">        BigInteger leftMultiplier =</span>
-<span class="fc" id="L127">            other.denominator.divide(denominatorGcd);</span>
-<span class="fc" id="L128">        BigInteger rightMultiplier =</span>
-<span class="fc" id="L129">            denominator.divide(denominatorGcd);</span>
-<span class="fc" id="L130">        BigInteger sum = numerator.multiply(leftMultiplier)</span>
-<span class="fc" id="L131">            .add(other.numerator.multiply(rightMultiplier));</span>
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (sum.signum() == 0) {</span>
-<span class="fc" id="L133">            return ZERO;</span>
-        }
-<span class="fc" id="L135">        BigInteger cancellation = sum.abs().gcd(denominatorGcd);</span>
-<span class="fc" id="L136">        return new ExactRational(</span>
-<span class="fc" id="L137">            sum.divide(cancellation),</span>
-<span class="fc" id="L138">            denominator.divide(cancellation).multiply(leftMultiplier));</span>
     }
 
     public ExactRational subtract(ExactRational other) {
-<span class="fc" id="L142">        return add(Objects.requireNonNull(other, &quot;other&quot;).negate());</span>
+<span class="fc" id="L173">        var owned = Arithmetic.observe(this, other, 2);</span>
+<span class="fc" id="L174">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L176">            var negated = keep(owned, 0, Objects.requireNonNull(other, &quot;other&quot;).negate());</span>
+<span class="fc" id="L177">            return keep(owned, 1, add(negated));</span>
+<span class="fc" id="L178">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L179">            primary = failure;</span>
+<span class="fc" id="L180">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
+        }
     }
 
     public ExactRational multiply(ExactRational other) {
-<span class="fc" id="L146">        Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (isZero() || other.isZero()) {</span>
-<span class="fc" id="L148">            return ZERO;</span>
-        }
-<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (isOne()) {</span>
-<span class="fc" id="L151">            return other;</span>
-        }
-<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (other.isOne()) {</span>
-<span class="fc" id="L154">            return this;</span>
-        }
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
-<span class="fc" id="L157">            return other.negate();</span>
-        }
-<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
-<span class="fc" id="L160">            return negate();</span>
-        }
+<span class="fc" id="L187">        var owned = Arithmetic.observe(this, other, 7);</span>
+<span class="fc" id="L188">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L190">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L191" title="All 4 branches covered.">            if (isZero() || other.isZero()) {</span>
+<span class="fc" id="L192">                return keep(owned, 6, ZERO);</span>
+            }
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (isOne()) {</span>
+<span class="fc" id="L195">                return keep(owned, 6, other);</span>
+            }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (other.isOne()) {</span>
+<span class="fc" id="L198">                return keep(owned, 6, this);</span>
+            }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (isNegativeOne()) {</span>
+<span class="fc" id="L201">                return keep(owned, 6, other.negate());</span>
+            }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (other.isNegativeOne()) {</span>
+<span class="fc" id="L204">                return keep(owned, 6, negate());</span>
+            }
 
-<span class="fc" id="L163">        BigInteger leftCancellation =</span>
-<span class="fc" id="L164">            numerator.abs().gcd(other.denominator);</span>
-<span class="fc" id="L165">        BigInteger rightCancellation =</span>
-<span class="fc" id="L166">            other.numerator.abs().gcd(denominator);</span>
-<span class="fc" id="L167">        return new ExactRational(</span>
-<span class="fc" id="L168">            numerator.divide(leftCancellation)</span>
-<span class="fc" id="L169">                .multiply(other.numerator.divide(rightCancellation)),</span>
-<span class="fc" id="L170">            denominator.divide(rightCancellation)</span>
-<span class="fc" id="L171">                .multiply(other.denominator.divide(leftCancellation)));</span>
+<span class="fc" id="L207">            BigInteger absoluteLeft = keep(owned, 0, numerator.abs());</span>
+<span class="fc" id="L208">            BigInteger leftCancellation = keep(owned, 0, absoluteLeft.gcd(other.denominator));</span>
+<span class="fc" id="L209">            BigInteger absoluteRight = keep(owned, 1, other.numerator.abs());</span>
+<span class="fc" id="L210">            BigInteger rightCancellation = keep(owned, 1, absoluteRight.gcd(denominator));</span>
+<span class="fc" id="L211">            BigInteger leftTop = keep(owned, 2, numerator.divide(leftCancellation));</span>
+<span class="fc" id="L212">            BigInteger rightTop = keep(owned, 3, other.numerator.divide(rightCancellation));</span>
+<span class="fc" id="L213">            BigInteger top = keep(owned, 4, leftTop.multiply(rightTop));</span>
+<span class="fc" id="L214">            BigInteger leftBottom = keep(owned, 2, denominator.divide(rightCancellation));</span>
+<span class="fc" id="L215">            BigInteger rightBottom = keep(owned, 3, other.denominator.divide(leftCancellation));</span>
+<span class="fc" id="L216">            BigInteger bottom = keep(owned, 5, leftBottom.multiply(rightBottom));</span>
+<span class="fc" id="L217">            return keep(owned, 6, new ExactRational(top, bottom));</span>
+<span class="fc" id="L218">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L219">            primary = failure;</span>
+<span class="fc" id="L220">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
+        }
     }
 
     public ExactRational divide(ExactRational other) {
-<span class="fc" id="L175">        Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (other.isZero()) {</span>
-<span class="fc" id="L177">            throw new ArithmeticException(&quot;division by zero rational&quot;);</span>
-        }
-<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (isZero()) {</span>
-<span class="fc" id="L180">            return ZERO;</span>
-        }
-<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (other.isOne()) {</span>
-<span class="fc" id="L183">            return this;</span>
-        }
-<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
-<span class="fc" id="L186">            return negate();</span>
-        }
+<span class="fc" id="L227">        var owned = Arithmetic.observe(this, other, 7);</span>
+<span class="fc" id="L228">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L230">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (other.isZero()) {</span>
+<span class="fc" id="L232">                throw new ArithmeticException(&quot;division by zero rational&quot;);</span>
+            }
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (isZero()) {</span>
+<span class="fc" id="L235">                return keep(owned, 6, ZERO);</span>
+            }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (other.isOne()) {</span>
+<span class="fc" id="L238">                return keep(owned, 6, this);</span>
+            }
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (other.isNegativeOne()) {</span>
+<span class="fc" id="L241">                return keep(owned, 6, negate());</span>
+            }
 
-<span class="fc" id="L189">        BigInteger numeratorCancellation =</span>
-<span class="fc" id="L190">            numerator.abs().gcd(other.numerator.abs());</span>
-<span class="fc" id="L191">        BigInteger denominatorCancellation =</span>
-<span class="fc" id="L192">            denominator.gcd(other.denominator);</span>
-<span class="fc" id="L193">        return new ExactRational(</span>
-<span class="fc" id="L194">            numerator.divide(numeratorCancellation)</span>
-<span class="fc" id="L195">                .multiply(</span>
-<span class="fc" id="L196">                    other.denominator.divide(denominatorCancellation)),</span>
-<span class="fc" id="L197">            denominator.divide(denominatorCancellation)</span>
-<span class="fc" id="L198">                .multiply(</span>
-<span class="fc" id="L199">                    other.numerator.divide(numeratorCancellation)));</span>
+<span class="fc" id="L244">            BigInteger absoluteLeft = keep(owned, 0, numerator.abs());</span>
+<span class="fc" id="L245">            BigInteger absoluteRight = keep(owned, 1, other.numerator.abs());</span>
+<span class="fc" id="L246">            BigInteger numeratorCancellation = keep(owned, 0, absoluteLeft.gcd(absoluteRight));</span>
+<span class="fc" id="L247">            BigInteger denominatorCancellation = keep(owned, 1, denominator.gcd(other.denominator));</span>
+<span class="fc" id="L248">            BigInteger leftTop = keep(owned, 2, numerator.divide(numeratorCancellation));</span>
+<span class="fc" id="L249">            BigInteger rightTop = keep(owned, 3, other.denominator.divide(denominatorCancellation));</span>
+<span class="fc" id="L250">            BigInteger top = keep(owned, 4, leftTop.multiply(rightTop));</span>
+<span class="fc" id="L251">            BigInteger leftBottom = keep(owned, 2, denominator.divide(denominatorCancellation));</span>
+<span class="fc" id="L252">            BigInteger rightBottom = keep(owned, 3, other.numerator.divide(numeratorCancellation));</span>
+<span class="fc" id="L253">            BigInteger bottom = keep(owned, 5, leftBottom.multiply(rightBottom));</span>
+<span class="fc" id="L254">            return keep(owned, 6, new ExactRational(top, bottom));</span>
+<span class="fc" id="L255">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L256">            primary = failure;</span>
+<span class="fc" id="L257">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
+        }
     }
 
     public ExactRational negate() {
-<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (isZero()) {</span>
-<span class="fc" id="L204">            return ZERO;</span>
+<span class="fc" id="L264">        var owned = Arithmetic.observe(this, null, 2);</span>
+<span class="fc" id="L265">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (isZero()) {</span>
+<span class="fc" id="L268">                return keep(owned, 1, ZERO);</span>
+            }
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (isOne()) {</span>
+<span class="fc" id="L271">                return keep(owned, 1, NEGATIVE_ONE);</span>
+            }
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            if (isNegativeOne()) {</span>
+<span class="fc" id="L274">                return keep(owned, 1, ONE);</span>
+            }
+<span class="fc" id="L276">            BigInteger top = keep(owned, 0, numerator.negate());</span>
+<span class="fc" id="L277">            return keep(owned, 1, new ExactRational(top, denominator));</span>
+<span class="fc" id="L278">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L279">            primary = failure;</span>
+<span class="fc" id="L280">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
-<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (isOne()) {</span>
-<span class="fc" id="L207">            return NEGATIVE_ONE;</span>
-        }
-<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
-<span class="fc" id="L210">            return ONE;</span>
-        }
-<span class="fc" id="L212">        return new ExactRational(numerator.negate(), denominator);</span>
     }
 
     public ExactRational abs() {
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        return numerator.signum() &lt; 0 ? negate() : this;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        return numerator.signum() &lt; 0 ? negate() : this;</span>
     }
 
     public ExactRational reciprocal() {
-<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (isZero()) {</span>
-<span class="fc" id="L221">            throw new ArithmeticException(</span>
-                &quot;zero rational has no reciprocal&quot;);
+<span class="fc" id="L291">        var owned = Arithmetic.observe(this, null, 1);</span>
+<span class="fc" id="L292">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            if (isZero()) {</span>
+<span class="fc" id="L295">                throw new ArithmeticException(</span>
+                    &quot;zero rational has no reciprocal&quot;);
+            }
+<span class="fc" id="L298">            return keep(owned, 0, new ExactRational(denominator, numerator));</span>
+<span class="fc" id="L299">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L300">            primary = failure;</span>
+<span class="fc" id="L301">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
-<span class="fc" id="L224">        return new ExactRational(denominator, numerator);</span>
     }
 
     public ExactRational pow(int exponent) {
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (exponent &lt; 0) {</span>
-<span class="fc" id="L229">            throw new IllegalArgumentException(</span>
-                &quot;exact rational exponent must not be negative&quot;);
+<span class="fc" id="L308">        var owned = Arithmetic.observe(this, null, 3);</span>
+<span class="fc" id="L309">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (exponent &lt; 0) {</span>
+<span class="fc" id="L312">                throw new IllegalArgumentException(</span>
+                    &quot;exact rational exponent must not be negative&quot;);
+            }
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (exponent == 0) {</span>
+<span class="fc" id="L316">                return keep(owned, 2, ONE);</span>
+            }
+<span class="fc" id="L318">            BigInteger top = keep(owned, 0, numerator.pow(exponent));</span>
+<span class="fc" id="L319">            BigInteger bottom = keep(owned, 1, denominator.pow(exponent));</span>
+<span class="fc" id="L320">            return keep(owned, 2, new ExactRational(top, bottom));</span>
+<span class="fc" id="L321">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L322">            primary = failure;</span>
+<span class="fc" id="L323">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
-<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (exponent == 0) {</span>
-<span class="nc" id="L233">            return ONE;</span>
-        }
-<span class="fc" id="L235">        return new ExactRational(</span>
-<span class="fc" id="L236">            numerator.pow(exponent),</span>
-<span class="fc" id="L237">            denominator.pow(exponent));</span>
     }
 
     public int signum() {
-<span class="fc" id="L241">        return numerator.signum();</span>
+<span class="fc" id="L330">        return numerator.signum();</span>
     }
 
     public boolean isZero() {
-<span class="fc bfc" id="L245" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
     }
 
     public boolean isOne() {
-<span class="fc bfc" id="L249" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE)</span>
-<span class="fc bfc" id="L250" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE)</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
     }
 
     public boolean isNegativeOne() {
-<span class="fc bfc" id="L254" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE.negate())</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        return numerator.equals(NEGATIVE_ONE.numerator)</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
     }
 
     public boolean isInteger() {
-<span class="fc" id="L259">        return denominator.equals(BigInteger.ONE);</span>
+<span class="fc" id="L348">        return denominator.equals(BigInteger.ONE);</span>
     }
 
     public boolean equalsInteger(long value) {
-<span class="fc bfc" id="L263" title="All 4 branches covered.">        return isInteger() &amp;&amp; numerator.equals(BigInteger.valueOf(value));</span>
+<span class="fc bfc" id="L352" title="All 4 branches covered.">        return isInteger() &amp;&amp; numerator.equals(BigInteger.valueOf(value));</span>
     }
 
     public int intValueExact() {
-<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (!isInteger()) {</span>
-<span class="nc" id="L268">            throw new ArithmeticException(&quot;rational is not an integer&quot;);</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (!isInteger()) {</span>
+<span class="nc" id="L357">            throw new ArithmeticException(&quot;rational is not an integer&quot;);</span>
         }
-<span class="fc" id="L270">        return numerator.intValueExact();</span>
+<span class="fc" id="L359">        return numerator.intValueExact();</span>
     }
 
     public long longValueExact() {
-<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (!isInteger()) {</span>
-<span class="fc" id="L275">            throw new ArithmeticException(&quot;rational is not an integer&quot;);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (!isInteger()) {</span>
+<span class="fc" id="L364">            throw new ArithmeticException(&quot;rational is not an integer&quot;);</span>
         }
-<span class="fc" id="L277">        return numerator.longValueExact();</span>
+<span class="fc" id="L366">        return numerator.longValueExact();</span>
     }
 
     /** Explicitly rounded projection for numerical diagnostics, never equality. */
     public BigDecimal toBigDecimal(MathContext context) {
-<span class="nc" id="L282">        return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);</span>
+<span class="nc" id="L371">        return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);</span>
     }
 
     /** A root exists here only when both integer components are perfect squares. */
     public Optional&lt;ExactRational&gt; sqrtExact() {
-<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (signum() &lt; 0) {</span>
-<span class="nc" id="L288">            return Optional.empty();</span>
+<span class="fc" id="L376">        var owned = Arithmetic.observe(this, null, 4);</span>
+<span class="fc" id="L377">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (signum() &lt; 0) {</span>
+<span class="fc" id="L380">                return keep(owned, 3, Optional.empty());</span>
+            }
+<span class="fc" id="L382">            BigInteger[] top = keep(owned, 0, numerator.sqrtAndRemainder());</span>
+<span class="fc" id="L383">            BigInteger[] bottom = keep(owned, 1, denominator.sqrtAndRemainder());</span>
+<span class="pc bpc" id="L384" title="1 of 4 branches missed.">            if (top[1].signum() != 0 || bottom[1].signum() != 0) {</span>
+<span class="fc" id="L385">                return keep(owned, 3, Optional.empty());</span>
+            }
+<span class="fc" id="L387">            var root = keep(owned, 2, new ExactRational(top[0], bottom[0]));</span>
+<span class="fc" id="L388">            return keep(owned, 3, Optional.of(root));</span>
+<span class="fc" id="L389">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L390">            primary = failure;</span>
+<span class="fc" id="L391">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
-<span class="fc" id="L290">        BigInteger[] top = numerator.sqrtAndRemainder();</span>
-<span class="fc" id="L291">        BigInteger[] bottom = denominator.sqrtAndRemainder();</span>
-<span class="pc bpc" id="L292" title="1 of 4 branches missed.">        return top[1].signum() == 0 &amp;&amp; bottom[1].signum() == 0</span>
-<span class="fc" id="L293">            ? Optional.of(new ExactRational(top[0], bottom[0])) : Optional.empty();</span>
     }
 
     @JsonValue
     public String canonicalText() {
-<span class="fc bfc" id="L298" title="All 2 branches covered.">        return isInteger()</span>
-<span class="fc" id="L299">            ? numerator.toString()</span>
-<span class="fc" id="L300">            : numerator + &quot;/&quot; + denominator;</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        return isInteger()</span>
+<span class="fc" id="L400">            ? numerator.toString()</span>
+<span class="fc" id="L401">            : numerator + &quot;/&quot; + denominator;</span>
     }
 
     @Override
     public int compareTo(ExactRational other) {
-<span class="fc" id="L305">        Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="pc bpc" id="L306" title="2 of 4 branches missed.">        if (this == other || equals(other)) {</span>
-<span class="nc" id="L307">            return 0;</span>
+<span class="fc" id="L406">        var owned = Arithmetic.observe(this, other, 5);</span>
+<span class="fc" id="L407">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L409">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L410" title="1 of 4 branches missed.">            if (this == other || equals(other)) {</span>
+<span class="fc" id="L411">                return 0;</span>
+            }
+<span class="fc" id="L413">            BigInteger denominatorGcd = keep(owned, 0, denominator.gcd(other.denominator));</span>
+<span class="fc" id="L414">            BigInteger leftMultiplier = keep(owned, 1, other.denominator.divide(denominatorGcd));</span>
+<span class="fc" id="L415">            BigInteger left = keep(owned, 3, numerator.multiply(leftMultiplier));</span>
+<span class="fc" id="L416">            BigInteger rightMultiplier = keep(owned, 2, denominator.divide(denominatorGcd));</span>
+<span class="fc" id="L417">            BigInteger right = keep(owned, 4, other.numerator.multiply(rightMultiplier));</span>
+<span class="fc" id="L418">            return left.compareTo(right);</span>
+<span class="fc" id="L419">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L420">            primary = failure;</span>
+<span class="fc" id="L421">            throw failure;</span>
+        } finally {
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
-<span class="fc" id="L309">        BigInteger denominatorGcd =</span>
-<span class="fc" id="L310">            denominator.gcd(other.denominator);</span>
-<span class="fc" id="L311">        return numerator.multiply(</span>
-<span class="fc" id="L312">                other.denominator.divide(denominatorGcd))</span>
-<span class="fc" id="L313">            .compareTo(</span>
-<span class="fc" id="L314">                other.numerator.multiply(</span>
-<span class="fc" id="L315">                    denominator.divide(denominatorGcd)));</span>
+    }
+
+    /** Publishes a real temporary before a debit can fail; does not charge arithmetic again. */
+    private static &lt;T&gt; T keep(Arithmetic owned, int slot, T value) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (owned != null) {</span>
+<span class="fc" id="L430">            Object previous = owned.temporaries[slot];</span>
+<span class="fc" id="L431">            owned.temporaries[slot] = value;</span>
+<span class="fc" id="L432">            try (var publication = RetainedOperation.retainCompleted(2, owned, previous)) {</span>
+                // Slot read/write and the old/new overlap are observer work, not another arithmetic debit.
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">            }</span>
+        }
+<span class="fc" id="L436">        return value;</span>
+    }
+
+    /** Fixed lexical scratch, absent for historical calls without a native observer. */
+    private static final class Arithmetic implements RetainedGraph.View {
+        private final Object[] temporaries;
+        private final RetainedOperation.Frame inputs;
+        private RetainedOperation.Frame frame;
+
+<span class="fc" id="L445">        private Arithmetic(int slots, RetainedOperation.Frame inputs) {</span>
+<span class="fc" id="L446">            temporaries = new Object[slots];</span>
+<span class="fc" id="L447">            this.inputs = inputs;</span>
+<span class="fc" id="L448">        }</span>
+
+        private static Arithmetic observe(Object left, Object right, int slots) {
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            if (!CONSTANTS_INITIALIZED) return null;</span>
+<span class="fc" id="L452">            var inputs = RetainedOperation.retain(left, right);</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">            if (inputs == null) return null;</span>
+            try {
+<span class="fc" id="L455">                var owned = new Arithmetic(slots, inputs);</span>
+<span class="fc" id="L456">                owned.frame = RetainedOperation.retainCompleted(2, owned);</span>
+<span class="fc" id="L457">                return owned;</span>
+<span class="fc" id="L458">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L459">                try { inputs.close(); }</span>
+<span class="nc" id="L460">                catch (RuntimeException | Error cleanup) {</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                    if (cleanup != failure) failure.addSuppressed(cleanup);</span>
+<span class="fc" id="L462">                }</span>
+<span class="fc" id="L463">                throw failure;</span>
+            }
+        }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L468">            visitor.reference(temporaries);</span>
+<span class="fc" id="L469">            visitor.reference(inputs);</span>
+<span class="fc" id="L470">            visitor.reference(frame);</span>
+<span class="fc" id="L471">        }</span>
+
+        private void close(Throwable primary) {
+            try {
+<span class="fc" id="L475">                close(frame, primary);</span>
+<span class="fc" id="L476">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L477">                close(inputs, failure);</span>
+<span class="fc" id="L478">                throw failure;</span>
+<span class="fc" id="L479">            }</span>
+<span class="fc" id="L480">            close(inputs, primary);</span>
+<span class="fc" id="L481">        }</span>
+
+        private static void close(RetainedOperation.Frame frame, Throwable primary) {
+<span class="fc" id="L484">            try { frame.close(); }</span>
+<span class="fc" id="L485">            catch (RuntimeException | Error cleanup) {</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">                if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">                if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L488">            }</span>
+<span class="fc" id="L489">        }</span>
     }
 
     @Override
     public String toString() {
-<span class="fc" id="L320">        return canonicalText();</span>
+<span class="fc" id="L494">        return canonicalText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

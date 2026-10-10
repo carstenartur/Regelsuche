@@ -17,5 +17,14 @@ public record NumberExpr(ExactRational value) implements Expr {
     public static NumberExpr exact(String literal) {
 <span class="fc" id="L18">        return new NumberExpr(ExactRational.parse(literal));</span>
     }
+    @Override public boolean equals(Object other) {
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.same(this, other);</span>
+<span class="fc bfc" id="L22" title="All 6 branches covered.">        return this == other || other instanceof NumberExpr number &amp;&amp; value.equals(number.value);</span>
+    }
+    @Override public int hashCode() {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.valueHash(this);</span>
+<span class="fc" id="L26">        return value.hashCode();</span>
+    }
+
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

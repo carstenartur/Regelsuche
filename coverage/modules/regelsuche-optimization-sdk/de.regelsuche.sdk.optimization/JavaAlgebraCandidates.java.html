@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavaAlgebraCandidates.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">JavaAlgebraCandidates.java</span></div><h1>JavaAlgebraCandidates.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.knowledge.RuleDescriptor;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.search.program.JointComputationPlan;
+import de.regelsuche.search.program.JointPlanSearch;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransport;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Representation adapter to the ordinary Regelsuche algebra rule engine. It
+ * contains no mathematical rewrite, constructor recognition or target formula.
+ * Rational-algebra proposals are never proof of Java arithmetic equivalence:
+ * every edge and the final plan still go through SemanticChecker.
+ */
+final class JavaAlgebraCandidates {
+    private final VerificationWork work;
+    private final List&lt;RewriteRule&gt; rules;
+    private final long expansionAllowance;
+    private long expansionWork;
+    private boolean exhausted;
+    private static final class ExpansionLimit extends RuntimeException { }
+<span class="fc" id="L39">    private final Map&lt;Expr, View&gt; views = new IdentityHashMap&lt;&gt;();</span>
+
+    JavaAlgebraCandidates(VerificationWork work, long maximumWork) {
+<span class="fc" id="L42">        this(work, AstRewriteTransformationEngine.defaultRules(), maximumWork);</span>
+<span class="fc" id="L43">    }</span>
+
+<span class="fc" id="L45">    JavaAlgebraCandidates(VerificationWork work, List&lt;RewriteRule&gt; mathematicalRules, long maximumWork) {</span>
+<span class="fc" id="L46">        this.work = work;</span>
+        // Reserve most of the request allowance for frontier bookkeeping, all
+        // independent checks and final preparation. Exhaustion is not a proof.
+<span class="fc" id="L49">        this.expansionAllowance = Math.max(1, maximumWork / 8);</span>
+<span class="fc" id="L50">        this.rules = mathematicalRules.stream().&lt;RewriteRule&gt;map(rule -&gt; new LiftedRule(rule)).toList();</span>
+<span class="fc" id="L51">    }</span>
+
+    JointPlanSearch.Generation generate(JointComputationPlan plan, int maximum) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (maximum &lt; 1) throw new IllegalArgumentException(&quot;POSITIVE_CANDIDATE_LIMIT_REQUIRED&quot;);</span>
+<span class="fc" id="L55">        long before = work.used();</span>
+<span class="fc" id="L56">        work.charge(1);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (exhausted) return new JointPlanSearch.Generation(List.of(), 1, false);</span>
+<span class="fc" id="L58">        views.clear();</span>
+<span class="fc" id="L59">        List&lt;JointPlanSearch.Proposal&gt; proposals = new ArrayList&lt;&gt;();</span>
+        boolean complete;
+<span class="fc" id="L61">        try (var observation = RetainedOperation.open(new RetainedOperation.Sink() {</span>
+<span class="fc" id="L62">            @Override public void executionWork(long units) { expansionCharge(units); }</span>
+<span class="fc" id="L63">            @Override public void validationWork(long units) { expansionCharge(units); }</span>
+<span class="fc" id="L64">            @Override public void checkpoint() { work.charge(0); }</span>
+<span class="nc" id="L65">            @Override public long observedWork() { return work.used(); }</span>
+<span class="nc" id="L66">            @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
+        })) {
+<span class="fc" id="L68">            var engine = new AstRewriteTransport(rules, 12, maximum + 1);</span>
+<span class="fc" id="L69">            var steps = engine.generate(plan.expression());</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            for (var step : steps) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                if (proposals.size() == maximum) break;</span>
+<span class="fc" id="L72">                proposals.add(new JointPlanSearch.Proposal(&quot;core-algebra/&quot; + step.rule(), step.target()));</span>
+<span class="fc" id="L73">            }</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            complete = steps.size() &lt;= maximum;</span>
+<span class="fc" id="L75">        } catch (ExpansionLimit limited) {</span>
+<span class="fc" id="L76">            proposals = List.of();</span>
+<span class="fc" id="L77">            complete = false;</span>
+        } finally {
+<span class="fc" id="L79">            views.clear();</span>
+        }
+        // Closing the native observation scope also consumes work.
+<span class="fc" id="L82">        return new JointPlanSearch.Generation(proposals, Math.max(1, work.used() - before), complete);</span>
+    }
+
+    private void expansionCharge(long units) {
+<span class="fc" id="L86">        work.charge(units);</span>
+<span class="fc" id="L87">        expansionWork += units;</span>
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (!exhausted &amp;&amp; expansionWork &gt; expansionAllowance) {</span>
+<span class="fc" id="L89">            exhausted = true;</span>
+<span class="fc" id="L90">            throw new ExpansionLimit();</span>
+        }
+<span class="fc" id="L92">    }</span>
+
+    /** Lift one existing mathematical rule, not its implementation, to typed values. */
+    private final class LiftedRule implements RewriteRule {
+        private final RewriteRule mathematical;
+        private Expr matched;
+        private Expr replacement;
+<span class="fc" id="L99">        LiftedRule(RewriteRule mathematical) { this.mathematical = mathematical; }</span>
+<span class="fc" id="L100">        @Override public String id() { return mathematical.id(); }</span>
+<span class="fc" id="L101">        @Override public RewriteKind kind() { return mathematical.kind(); }</span>
+<span class="fc" id="L102">        @Override public boolean mayIncreaseComplexity() { return mathematical.mayIncreaseComplexity(); }</span>
+<span class="fc" id="L103">        @Override public int estimatedCostDelta() { return mathematical.estimatedCostDelta(); }</span>
+<span class="fc" id="L104">        @Override public boolean isEquivalencePreservingByConstruction() { return false; }</span>
+<span class="fc" id="L105">        @Override public RuleDescriptor descriptor() { return mathematical.descriptor(); }</span>
+        @Override public boolean matches(Expr expression) {
+<span class="fc" id="L107">            work.charge(1);</span>
+<span class="fc" id="L108">            matched = null; replacement = null;</span>
+<span class="fc bfc" id="L109" title="All 4 branches covered.">            if (!(expression instanceof FunctionExpr f) || !f.name().startsWith(&quot;j_&quot;)) return false;</span>
+            try {
+<span class="fc" id="L111">                var kind = JavaExpressions.resultKind(expression);</span>
+<span class="fc bfc" id="L112" title="All 6 branches covered.">                if (kind != NumericKind.INT &amp;&amp; kind != NumericKind.LONG &amp;&amp; kind != NumericKind.BIG_INTEGER) return false;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                if (!algebraic(expression)) return false;</span>
+<span class="fc" id="L114">                var view = views.computeIfAbsent(expression, node -&gt; new View(kind, node));</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                if (!mathematical.matches(view.expression)) return false;</span>
+                // A source-side fact is never silently added to the Java request.
+                // Conditional mathematical rules need an explicit discharge API.
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                if (!mathematical.assumptions(view.expression).isEmpty()) return false;</span>
+<span class="fc" id="L119">                Expr result = view.decode(mathematical.apply(view.expression), 0);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                if (result.equals(expression)) return false;</span>
+<span class="fc" id="L121">                matched = expression; replacement = result;</span>
+<span class="fc" id="L122">                return true;</span>
+<span class="nc" id="L123">            } catch (IllegalArgumentException | ArithmeticException outsideRepresentableAlgebra) {</span>
+<span class="nc" id="L124">                return false;</span>
+            }
+        }
+        @Override public Expr apply(Expr expression) {
+<span class="fc" id="L128">            work.charge(1);</span>
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">            if (matched != expression || replacement == null) throw new IllegalArgumentException(&quot;RULE_NOT_MATCHED&quot;);</span>
+<span class="fc" id="L130">            Expr result = replacement; matched = null; replacement = null;</span>
+<span class="fc" id="L131">            return result;</span>
+        }
+    }
+
+    private static boolean algebraic(Expr expression) {
+<span class="fc" id="L136">        var op = JavaExpressions.operationOf(expression).orElse(null);</span>
+<span class="pc bpc" id="L137" title="1 of 10 branches missed.">        return op == NumericOperation.ADD || op == NumericOperation.SUBTRACT</span>
+                || op == NumericOperation.MULTIPLY || op == NumericOperation.DIVIDE || op == NumericOperation.NEGATE;
+    }
+
+    /** The kind is attached to an entire arithmetic island. Casts and other operations are atoms. */
+    private final class View {
+        private final NumericKind kind;
+<span class="fc" id="L144">        private final Map&lt;Expr, VariableExpr&gt; atoms = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L145">        private final Map&lt;String, Expr&gt; values = new LinkedHashMap&lt;&gt;();</span>
+        private final Expr expression;
+<span class="fc" id="L147">        View(NumericKind kind, Expr source) { this.kind = kind; this.expression = encode(source, 0); }</span>
+
+        private Expr encode(Expr source, int depth) {
+<span class="fc" id="L150">            bounded(depth);</span>
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">            if (!(source instanceof VariableExpr) &amp;&amp; JavaExpressions.resultKind(source) == kind) {</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                if (JavaExpressions.isLiteral(source)) {</span>
+<span class="fc" id="L153">                    Object value = JavaExpressions.literalValue(source);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                    BigInteger integer = value instanceof BigInteger b ? b : BigInteger.valueOf(((Number)value).longValue());</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                    if (integer.abs().bitLength() &gt; 4096) throw new IllegalArgumentException(&quot;ALGEBRA_LITERAL_BOUND&quot;);</span>
+<span class="fc" id="L156">                    return new NumberExpr(ExactRational.integer(integer));</span>
+                }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                if (algebraic(source)) {</span>
+<span class="fc" id="L159">                    var arguments = JavaExpressions.operands(source);</span>
+<span class="fc" id="L160">                    var operation = JavaExpressions.operationOf(source).orElseThrow();</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                    if (operation == NumericOperation.NEGATE)</span>
+<span class="nc" id="L162">                        return new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, encode(arguments.getFirst(), depth + 1));</span>
+<span class="pc bpc" id="L163" title="1 of 5 branches missed.">                    var operator = switch (operation) {</span>
+<span class="fc" id="L164">                        case ADD -&gt; BinaryOperator.ADD;</span>
+<span class="fc" id="L165">                        case SUBTRACT -&gt; BinaryOperator.SUB;</span>
+<span class="fc" id="L166">                        case MULTIPLY -&gt; BinaryOperator.MUL;</span>
+<span class="fc" id="L167">                        case DIVIDE -&gt; BinaryOperator.DIV;</span>
+<span class="nc" id="L168">                        default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_ALGEBRA_OPERATOR&quot;);</span>
+                    };
+<span class="fc" id="L170">                    return new BinaryExpr(encode(arguments.getFirst(), depth + 1), operator, encode(arguments.get(1), depth + 1));</span>
+                }
+            }
+<span class="fc" id="L173">            return atoms.computeIfAbsent(source, value -&gt; {</span>
+<span class="fc" id="L174">                String name = &quot;atom&quot; + atoms.size();</span>
+<span class="fc" id="L175">                values.put(name, value);</span>
+<span class="fc" id="L176">                return new VariableExpr(name);</span>
+            });
+        }
+
+        private Expr decode(Expr target, int depth) {
+<span class="fc" id="L181">            bounded(depth);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (target instanceof VariableExpr variable) {</span>
+<span class="fc" id="L183">                Expr value = values.get(variable.name());</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                if (value == null) throw new IllegalArgumentException(&quot;UNBOUND_ALGEBRA_ATOM&quot;);</span>
+<span class="fc" id="L185">                return value;</span>
+            }
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (target instanceof NumberExpr number) {</span>
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">                if (!number.value().isInteger() || number.value().numerator().abs().bitLength() &gt; 4096)</span>
+<span class="nc" id="L189">                    throw new IllegalArgumentException(&quot;UNREPRESENTABLE_ALGEBRA_LITERAL&quot;);</span>
+<span class="fc" id="L190">                BigInteger value = number.value().numerator();</span>
+<span class="pc bpc" id="L191" title="1 of 4 branches missed.">                return switch (kind) {</span>
+<span class="fc" id="L192">                    case INT -&gt; JavaExpressions.literal(value.intValueExact());</span>
+<span class="fc" id="L193">                    case LONG -&gt; JavaExpressions.literal(value.longValueExact());</span>
+<span class="fc" id="L194">                    case BIG_INTEGER -&gt; JavaExpressions.literal(value);</span>
+<span class="nc" id="L195">                    default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_ALGEBRA_KIND&quot;);</span>
+                };
+            }
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (!(target instanceof BinaryExpr binary)) throw new IllegalArgumentException(&quot;UNSUPPORTED_ALGEBRA_NODE&quot;);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">                if (!(binary.right() instanceof NumberExpr n) || !n.value().isInteger()</span>
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">                        || n.value().signum() &lt; 0 || n.value().numerator().compareTo(BigInteger.valueOf(64)) &gt; 0)</span>
+<span class="nc" id="L202">                    throw new IllegalArgumentException(&quot;UNSUPPORTED_ALGEBRA_POWER&quot;);</span>
+<span class="fc" id="L203">                Expr factor = decode(binary.left(), depth + 1);</span>
+<span class="fc" id="L204">                int exponent = n.value().numerator().intValueExact();</span>
+<span class="fc" id="L205">                Expr result = null;</span>
+                // Lower a nonnegative integer power into the same Java multiplication domain.
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                while (exponent &gt; 0) {</span>
+<span class="fc" id="L208">                    work.charge(1);</span>
+<span class="fc bfc" id="L209" title="All 4 branches covered.">                    if ((exponent &amp; 1) != 0) result = result == null ? factor</span>
+<span class="fc" id="L210">                            : JavaExpressions.operation(kind, NumericOperation.MULTIPLY, result, factor);</span>
+<span class="fc" id="L211">                    exponent &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                    if (exponent &gt; 0) factor = JavaExpressions.operation(kind, NumericOperation.MULTIPLY, factor, factor);</span>
+                }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                return result == null ? decode(new NumberExpr(1), depth + 1) : result;</span>
+            }
+<span class="pc bpc" id="L216" title="1 of 5 branches missed.">            var operation = switch (binary.operator()) {</span>
+<span class="fc" id="L217">                case ADD -&gt; NumericOperation.ADD;</span>
+<span class="fc" id="L218">                case SUB -&gt; NumericOperation.SUBTRACT;</span>
+<span class="fc" id="L219">                case MUL -&gt; NumericOperation.MULTIPLY;</span>
+<span class="fc" id="L220">                case DIV -&gt; NumericOperation.DIVIDE;</span>
+<span class="nc" id="L221">                default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_ALGEBRA_OPERATOR&quot;);</span>
+            };
+<span class="fc" id="L223">            return JavaExpressions.operation(kind, operation, decode(binary.left(), depth + 1), decode(binary.right(), depth + 1));</span>
+        }
+        private void bounded(int depth) {
+<span class="fc" id="L226">            work.charge(1);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            if (depth &gt; 64) throw new IllegalArgumentException(&quot;ALGEBRA_VIEW_DEPTH_BOUND&quot;);</span>
+<span class="fc" id="L228">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

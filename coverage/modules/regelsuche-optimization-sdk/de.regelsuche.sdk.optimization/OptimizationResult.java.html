@@ -30,6 +30,6 @@ public sealed interface OptimizationResult {
     record Refuted(String diagnostic, Map&lt;String, Object&gt; counterexample) implements OptimizationResult {
 <span class="nc" id="L31">        public Refuted { counterexample = Map.copyOf(counterexample); }</span>
     }
-<span class="nc" id="L33">    record Inconclusive(String diagnostic) implements OptimizationResult {}</span>
+<span class="fc" id="L33">    record Inconclusive(String diagnostic) implements OptimizationResult {}</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

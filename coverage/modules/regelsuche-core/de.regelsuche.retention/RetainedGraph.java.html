@@ -121,8 +121,8 @@ public final class RetainedGraph {
 <span class="fc" id="L121">            accountingReferences=Math.max(accountingReferences,Math.addExact(5,Math.addExact(2L*seen.size(),pending.size())));</span>
 <span class="fc" id="L122">        }</span>
         void inspect(Object value){
-<span class="pc bpc" id="L124" title="9 of 39 branches missed.">            switch(value) {</span>
-<span class="nc" id="L125">                case Equation equation -&gt; { reference(equation.left());reference(equation.right()); }</span>
+<span class="pc bpc" id="L124" title="8 of 39 branches missed.">            switch(value) {</span>
+<span class="fc" id="L125">                case Equation equation -&gt; { reference(equation.left());reference(equation.right()); }</span>
 <span class="fc" id="L126">                case BinaryExpr binary -&gt; { node();reference(binary.left());reference(binary.operator());reference(binary.right()); }</span>
 <span class="fc" id="L127">                case FunctionExpr function -&gt; { node();reference(function.name());reference(function.arguments()); }</span>
 <span class="fc" id="L128">                case VariableExpr variable -&gt; { node();reference(variable.name());reference(variable.symbol().orElse(null)); }</span>
@@ -167,7 +167,7 @@ public final class RetainedGraph {
 <span class="fc" id="L167">                }</span>
 <span class="fc bfc" id="L168" title="All 2 branches covered.">                case Collection&lt;?&gt; collection when standardContainer(collection) -&gt; {</span>
 <span class="fc" id="L169">                    reference(null);</span>
-<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                    if(collection instanceof SortedSet&lt;?&gt; sorted)reference(sorted.comparator());</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                    if(collection instanceof SortedSet&lt;?&gt; sorted)reference(sorted.comparator());</span>
 <span class="pc bpc" id="L171" title="1 of 2 branches missed.">                    if(collection instanceof PriorityQueue&lt;?&gt; queue)reference(queue.comparator());</span>
 <span class="fc bfc" id="L172" title="All 2 branches covered.">                    for(Object entry:collection)reference(entry);</span>
 <span class="fc" id="L173">                }</span>
@@ -190,7 +190,7 @@ public final class RetainedGraph {
         boolean standardContainer(Object value){
 <span class="fc" id="L191">            Class&lt;?&gt; type=value.getClass();</span>
 <span class="fc bfc" id="L192" title="All 4 branches covered.">            if(type==TreeMap.class)return ((TreeMap&lt;?,?&gt;)value).comparator()==null;</span>
-<span class="pc bpc" id="L193" title="3 of 4 branches missed.">            if(type==TreeSet.class)return ((TreeSet&lt;?&gt;)value).comparator()==null;</span>
+<span class="pc bpc" id="L193" title="1 of 4 branches missed.">            if(type==TreeSet.class)return ((TreeSet&lt;?&gt;)value).comparator()==null;</span>
 <span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if(type==PriorityQueue.class) {</span>
 <span class="nc" id="L195">                var comparator=((PriorityQueue&lt;?&gt;)value).comparator();</span>
 <span class="nc bnc" id="L196" title="All 4 branches missed.">                return comparator==null || comparator instanceof View;</span>

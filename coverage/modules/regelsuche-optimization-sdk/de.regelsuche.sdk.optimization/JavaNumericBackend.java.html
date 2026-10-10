@@ -76,12 +76,12 @@ final class JavaNumericBackend implements ComputationBackend {
         }
 <span class="fc bfc" id="L77" title="All 2 branches covered.">        if (action.startsWith(&quot;cast_&quot;)) return cast(arguments.getFirst(), kind);</span>
 <span class="fc" id="L78">        var op = NumericOperation.valueOf(action.toUpperCase(Locale.ROOT));</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        Object x = arguments.getFirst(); Object y = arguments.size() &gt; 1 ? arguments.get(1) : null;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        Object x = arguments.getFirst(); Object y = arguments.size() &gt; 1 ? arguments.get(1) : null;</span>
 <span class="fc bfc" id="L80" title="All 4 branches covered.">        if (kind == NumericKind.BIG_INTEGER) return big(op, (BigInteger)x, y, arguments.size() &gt; 2 ? (BigInteger) arguments.get(2) : null);</span>
 <span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (kind == NumericKind.FLOAT) return floating32(op, (Float)x, y == null ? 0 : (Float)y);</span>
 <span class="pc bpc" id="L82" title="1 of 4 branches missed.">        if (kind == NumericKind.DOUBLE) return floating64(op, (Double)x, y == null ? 0 : (Double)y);</span>
-<span class="pc bpc" id="L83" title="1 of 4 branches missed.">        if (kind == NumericKind.INT) return integral32(op, ((Number)x).intValue(), y == null ? 0 : ((Number)y).intValue());</span>
-<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        return integral64(op, ((Number)x).longValue(), y == null ? 0 : ((Number)y).longValue());</span>
+<span class="fc bfc" id="L83" title="All 4 branches covered.">        if (kind == NumericKind.INT) return integral32(op, ((Number)x).intValue(), y == null ? 0 : ((Number)y).intValue());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        return integral64(op, ((Number)x).longValue(), y == null ? 0 : ((Number)y).longValue());</span>
     }
     private static Object big(NumericOperation op, BigInteger x, Object other, BigInteger modulus) {
 <span class="pc bpc" id="L87" title="1 of 2 branches missed.">        BigInteger y = other instanceof BigInteger value ? value : null;</span>
@@ -96,19 +96,19 @@ final class JavaNumericBackend implements ComputationBackend {
         };
     }
     private static int integral32(NumericOperation op, int x, int y) {
-<span class="pc bpc" id="L99" title="10 of 19 branches missed.">        return switch (op) {</span>
+<span class="pc bpc" id="L99" title="7 of 19 branches missed.">        return switch (op) {</span>
 <span class="fc" id="L100">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
 <span class="pc" id="L101">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
-<span class="pc" id="L102">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
+<span class="fc" id="L102">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
 <span class="nc" id="L103">            case ADD_EXACT -&gt; Math.addExact(x, y); case SUBTRACT_EXACT -&gt; Math.subtractExact(x, y);</span>
 <span class="nc" id="L104">            case MULTIPLY_EXACT -&gt; Math.multiplyExact(x, y); case NEGATE_EXACT -&gt; Math.negateExact(x);</span>
 <span class="nc" id="L105">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_INTEGRAL_OPERATION&quot;);</span>
         };
     }
     private static long integral64(NumericOperation op, long x, long y) {
-<span class="pc bpc" id="L109" title="17 of 19 branches missed.">        return switch (op) {</span>
+<span class="pc bpc" id="L109" title="11 of 19 branches missed.">        return switch (op) {</span>
 <span class="pc" id="L110">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
-<span class="nc" id="L111">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
+<span class="pc" id="L111">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
 <span class="pc" id="L112">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
 <span class="nc" id="L113">            case ADD_EXACT -&gt; Math.addExact(x, y); case SUBTRACT_EXACT -&gt; Math.subtractExact(x, y);</span>
 <span class="nc" id="L114">            case MULTIPLY_EXACT -&gt; Math.multiplyExact(x, y); case NEGATE_EXACT -&gt; Math.negateExact(x);</span>

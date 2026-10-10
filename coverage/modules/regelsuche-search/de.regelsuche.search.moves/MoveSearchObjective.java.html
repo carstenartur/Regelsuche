@@ -36,14 +36,15 @@ final class MoveSearchObjective&lt;S,M,V&gt; implements de.regelsuche.retention.
 <span class="fc" id="L36">        return assessment.work();</span>
     }
 <span class="pc bpc" id="L38" title="1 of 6 branches missed.">    boolean satisfied() { return stopAtQuality &amp;&amp; incumbent != null &amp;&amp; outputScore &lt;= maximumOutputScore; }</span>
-    long finish() {
+    long finish(boolean materializationPaidByEnvironment) {
 <span class="fc" id="L40">        witness = path.steps();</span>
-<span class="fc" id="L41">        return witness.size() + 1L;</span>
+        // An unrelated outer observer cannot pay the historical search's own ledger.
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        return materializationPaidByEnvironment ? 0 : witness.size() + 1L;</span>
     }
-<span class="fc" id="L43">    S incumbent() { return incumbent; }</span>
-<span class="fc" id="L44">    long inputScore() { return inputScore; }</span>
-<span class="fc" id="L45">    long outputScore() { return outputScore; }</span>
-<span class="fc" id="L46">    long objectiveWork() { return objectiveWork; }</span>
-<span class="fc" id="L47">    List&lt;SearchExecution.Step&lt;S,M,V&gt;&gt; witness() { return witness; }</span>
+<span class="fc" id="L44">    S incumbent() { return incumbent; }</span>
+<span class="fc" id="L45">    long inputScore() { return inputScore; }</span>
+<span class="fc" id="L46">    long outputScore() { return outputScore; }</span>
+<span class="fc" id="L47">    long objectiveWork() { return objectiveWork; }</span>
+<span class="fc" id="L48">    List&lt;SearchExecution.Step&lt;S,M,V&gt;&gt; witness() { return witness; }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

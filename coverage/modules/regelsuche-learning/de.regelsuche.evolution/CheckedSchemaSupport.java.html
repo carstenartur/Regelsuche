@@ -254,27 +254,70 @@ final class CheckedSchemaSupport {
 <span class="pc bpc" id="L254" title="1 of 2 branches missed.">                || number.value().numerator().signum() == 0)) {</span>
 <span class="fc" id="L255">            throw new DomainRejected(&quot;checked scalar division needs nonzero literal denominator&quot;);</span>
         }
-<span class="fc bfc" id="L257" title="All 4 branches covered.">        if (binary.operator() == BinaryOperator.POW &amp;&amp; (!(binary.right() instanceof NumberExpr number)</span>
-<span class="pc bpc" id="L258" title="1 of 4 branches missed.">                || !number.value().isInteger() || number.value().numerator().signum() &lt; 0</span>
-<span class="fc bfc" id="L259" title="All 2 branches covered.">                || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) &gt; 0)) {</span>
-<span class="fc" id="L260">            throw new DomainRejected(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (!(binary.right() instanceof NumberExpr number)</span>
+<span class="pc bpc" id="L259" title="1 of 4 branches missed.">                    || !number.value().isInteger() || number.value().numerator().signum() &lt; 0) {</span>
+<span class="fc" id="L260">                throw new DomainRejected(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
+            }
+<span class="fc" id="L262">            var maximum = java.math.BigInteger.valueOf(bounds.maximumExponent());</span>
+<span class="fc" id="L263">            var retained = RetainedOperation.retainCompleted(1, binary, bounds, maximum);</span>
+<span class="fc" id="L264">            Throwable primary = null;</span>
+            boolean rejected;
+            try {
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                rejected = number.value().numerator().compareTo(maximum) &gt; 0;</span>
+<span class="fc" id="L268">                RetainedOperation.work(1);</span>
+<span class="nc" id="L269">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L270">                primary = failure;</span>
+<span class="nc" id="L271">                observeGuardFailure(failure);</span>
+<span class="nc" id="L272">                throw failure;</span>
+<span class="fc" id="L273">            } finally { closeGuard(retained, primary); }</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if (rejected) throw new DomainRejected(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
         }
-<span class="fc" id="L262">    }</span>
+<span class="fc" id="L276">    }</span>
 
     private static void literal(ExactRational value, CheckedLearnedSchemaModel.Bounds bounds) {
-<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (value.numerator().abs().bitLength() &gt; bounds.maximumCoefficientBits()</span>
-<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                || value.denominator().bitLength() &gt; bounds.maximumCoefficientBits()) {</span>
-<span class="fc" id="L267">            throw new DomainRejected(&quot;checked rational literal size limit&quot;);</span>
-        }
-<span class="fc" id="L269">    }</span>
+<span class="fc" id="L279">        var absolute = value.numerator().abs();</span>
+<span class="fc" id="L280">        var retained = RetainedOperation.retainCompleted(1, value, bounds, absolute);</span>
+<span class="fc" id="L281">        Throwable primary = null;</span>
+        boolean rejected;
+        try {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            rejected = absolute.bitLength() &gt; bounds.maximumCoefficientBits();</span>
+<span class="fc" id="L285">            RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            if (!rejected) {</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                rejected = value.denominator().bitLength() &gt; bounds.maximumCoefficientBits();</span>
+<span class="fc" id="L288">                RetainedOperation.work(1);</span>
+            }
+<span class="nc" id="L290">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L291">            primary = failure;</span>
+<span class="nc" id="L292">            observeGuardFailure(failure);</span>
+<span class="nc" id="L293">            throw failure;</span>
+<span class="fc" id="L294">        } finally { closeGuard(retained, primary); }</span>
+        // A technical observation/release failure must never become a discarded domain rejection.
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (rejected) throw new DomainRejected(&quot;checked rational literal size limit&quot;);</span>
+<span class="fc" id="L297">    }</span>
+
+    private static void observeGuardFailure(Throwable failure) {
+<span class="nc" id="L300">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L301">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="nc" id="L303">        }</span>
+<span class="nc" id="L304">    }</span>
+
+    private static void closeGuard(RetainedOperation.Frame retained, Throwable primary) {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        try { if (retained != null) retained.close(); }</span>
+<span class="nc" id="L308">        catch (RuntimeException | Error cleanup) {</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L311">        }</span>
+<span class="fc" id="L312">    }</span>
 
     private static String polynomialText(Expr expression) {
-<span class="pc bpc" id="L272" title="1 of 4 branches missed.">        return switch (expression) {</span>
-<span class="fc" id="L273">            case NumberExpr number -&gt; &quot;(&quot; + number.value().canonicalText() + &quot;)&quot;;</span>
-<span class="fc" id="L274">            case VariableExpr variable -&gt; variable.name();</span>
-<span class="fc" id="L275">            case BinaryExpr binary -&gt; &quot;(&quot; + polynomialText(binary.left()) + binary.operator().symbol()</span>
-<span class="fc" id="L276">                + polynomialText(binary.right()) + &quot;)&quot;;</span>
-<span class="nc" id="L277">            default -&gt; throw new IllegalArgumentException(&quot;not a symbolic polynomial&quot;);</span>
+<span class="pc bpc" id="L315" title="1 of 4 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L316">            case NumberExpr number -&gt; &quot;(&quot; + number.value().canonicalText() + &quot;)&quot;;</span>
+<span class="fc" id="L317">            case VariableExpr variable -&gt; variable.name();</span>
+<span class="fc" id="L318">            case BinaryExpr binary -&gt; &quot;(&quot; + polynomialText(binary.left()) + binary.operator().symbol()</span>
+<span class="fc" id="L319">                + polynomialText(binary.right()) + &quot;)&quot;;</span>
+<span class="nc" id="L320">            default -&gt; throw new IllegalArgumentException(&quot;not a symbolic polynomial&quot;);</span>
         };
     }
 }

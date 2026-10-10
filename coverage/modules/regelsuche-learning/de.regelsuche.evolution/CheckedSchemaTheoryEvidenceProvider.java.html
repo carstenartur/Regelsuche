@@ -1,24 +1,70 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CheckedSchemaTheoryEvidenceProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CheckedSchemaTheoryEvidenceProvider.java</span></div><h1>CheckedSchemaTheoryEvidenceProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.transform.ExactTheoryEvidence;
 import de.regelsuche.transform.NativeExactTheoryEvidence;
 import de.regelsuche.transform.ExactTheoryEvidenceProvider;
 import java.util.Optional;
 
 /** Installed bridge accepts only the model's privately issued, immutable application capability. */
-<span class="fc" id="L10">public final class CheckedSchemaTheoryEvidenceProvider implements ExactTheoryEvidenceProvider,RetainedGraph.View {</span>
-<span class="fc" id="L11">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L11">public final class CheckedSchemaTheoryEvidenceProvider implements ExactTheoryEvidenceProvider,RetainedGraph.View {</span>
+<span class="fc" id="L12">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
     @Override public Optional&lt;ExactTheoryEvidence.Binding&gt; bind(Object value) {
-<span class="fc bfc" id="L13" title="All 2 branches covered.">        return value instanceof CheckedLearnedSchemaModel.VerifiedApplication application</span>
-<span class="fc" id="L14">            ? Optional.of(application.binding()) : Optional.empty();</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
+<span class="fc" id="L15">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L16">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
+<span class="fc" id="L17">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L19">            var binding = application.binding();</span>
+<span class="fc" id="L20">            pending[0] = binding;</span>
+<span class="fc" id="L21">            RetainedOperation.work(1);</span>
+<span class="fc" id="L22">            return RetainedOperation.produced(Optional.of(binding));</span>
+<span class="fc" id="L23">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L24">            primary = failure;</span>
+<span class="fc" id="L25">            observeFailure(failure);</span>
+<span class="fc" id="L26">            throw failure;</span>
+        } finally {
+<span class="fc" id="L28">            closeFrame(retained, primary);</span>
+        }
     }
     @Override public Optional&lt;NativeExactTheoryEvidence.Binding&gt; bindNative(Object value) {
-<span class="fc bfc" id="L17" title="All 2 branches covered.">        return value instanceof CheckedLearnedSchemaModel.VerifiedApplication application?Optional.of(application.nativeBinding()):Optional.empty();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
+<span class="fc" id="L33">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L34">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
+<span class="fc" id="L35">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L37">            var binding = application.nativeBinding();</span>
+<span class="fc" id="L38">            pending[0] = binding;</span>
+<span class="fc" id="L39">            RetainedOperation.work(1);</span>
+<span class="fc" id="L40">            return RetainedOperation.produced(Optional.of(binding));</span>
+<span class="fc" id="L41">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L42">            primary = failure;</span>
+<span class="fc" id="L43">            observeFailure(failure);</span>
+<span class="fc" id="L44">            throw failure;</span>
+        } finally {
+<span class="fc" id="L46">            closeFrame(retained, primary);</span>
+        }
     }
+
+    private static void observeFailure(Throwable failure) {
+<span class="fc" id="L51">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L52">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">    }</span>
+
+    private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (frame == null) return;</span>
+<span class="fc" id="L59">        try { frame.close(); }</span>
+<span class="fc" id="L60">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">    }</span>
     @Override public Object exportNative(Object value) {
-<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if(!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication))throw new IllegalArgumentException(&quot;private checked application required&quot;);</span>
-<span class="fc" id="L21">        return value;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if(!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication))throw new IllegalArgumentException(&quot;private checked application required&quot;);</span>
+<span class="fc" id="L67">        return value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

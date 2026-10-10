@@ -88,7 +88,7 @@ final class ModularBridge {
     }
     static Expr fromModular(Expr expression) {
 <span class="fc bfc" id="L90" title="All 4 branches covered.">        if (expression instanceof VariableExpr || expression instanceof NumberExpr) return expression;</span>
-<span class="pc bpc" id="L91" title="3 of 6 branches missed.">        if (expression instanceof BinaryExpr b) return JavaExpressions.operation(NumericKind.BIG_INTEGER, switch(b.operator()) {</span>
+<span class="pc bpc" id="L91" title="2 of 6 branches missed.">        if (expression instanceof BinaryExpr b) return JavaExpressions.operation(NumericKind.BIG_INTEGER, switch(b.operator()) {</span>
 <span class="pc" id="L92">            case ADD -&gt; NumericOperation.ADD; case SUB -&gt; NumericOperation.SUBTRACT; case MUL -&gt; NumericOperation.MULTIPLY;</span>
 <span class="nc" id="L93">            default -&gt; throw new IllegalArgumentException(&quot;OUTSIDE_MODULAR_FRAGMENT&quot;);</span>
 <span class="fc" id="L94">        }, fromModular(b.left()), fromModular(b.right()));</span>

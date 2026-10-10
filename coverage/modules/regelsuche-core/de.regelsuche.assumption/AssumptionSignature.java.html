@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AssumptionSignature.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">AssumptionSignature.java</span></div><h1>AssumptionSignature.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
 
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -8,100 +10,187 @@ import java.util.TreeSet;
 /**
  * Normalized, comparable signature for a set of assumptions.
  */
-public record AssumptionSignature(List&lt;String&gt; normalizedAssumptions, String fingerprint) {
-<span class="fc" id="L12">    public AssumptionSignature {</span>
-<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        normalizedAssumptions = normalizedAssumptions == null ? List.of() : List.copyOf(normalizedAssumptions);</span>
-<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        fingerprint = fingerprint == null ? &quot;&quot; : fingerprint;</span>
-<span class="fc" id="L15">    }</span>
+public record AssumptionSignature(List&lt;String&gt; normalizedAssumptions, String fingerprint) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L15">        visitor.reference(normalizedAssumptions);</span>
+<span class="fc" id="L16">        visitor.reference(fingerprint);</span>
+<span class="fc" id="L17">    }</span>
+
+<span class="fc" id="L19">    public AssumptionSignature(List&lt;String&gt; normalizedAssumptions, String fingerprint) {</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        this.normalizedAssumptions = normalizedAssumptions == null ? List.of() : List.copyOf(normalizedAssumptions);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        this.fingerprint = fingerprint == null ? &quot;&quot; : fingerprint;</span>
+<span class="pc bpc" id="L22" title="1 of 4 branches missed.">        long copyWork = normalizedAssumptions != null &amp;&amp; this.normalizedAssumptions != normalizedAssumptions</span>
+<span class="fc" id="L23">            ? this.normalizedAssumptions.size() + 1L : 0;</span>
+        // The fully initialized record and both lists exist before a completed-copy debit.
+<span class="fc" id="L25">        var retained = RetainedOperation.retainCompleted(copyWork + 1, normalizedAssumptions, fingerprint, this);</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (retained != null) retained.close();</span>
+<span class="fc" id="L27">    }</span>
 
     public static AssumptionSignature ofExpressions(Collection&lt;String&gt; assumptions) {
-<span class="pc bpc" id="L18" title="1 of 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
-<span class="fc" id="L19">            return new AssumptionSignature(List.of(), &quot;&quot;);</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
+<span class="fc" id="L31">            return new AssumptionSignature(List.of(), &quot;&quot;);</span>
         }
-<span class="fc" id="L21">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
-<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (String assumption : assumptions) {</span>
-<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (assumption == null) {</span>
-<span class="nc" id="L24">                continue;</span>
-            }
-<span class="fc" id="L26">            String canonical = normalizeExpression(assumption);</span>
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            if (!canonical.isBlank()) {</span>
-<span class="fc" id="L28">                normalized.add(canonical);</span>
-            }
-<span class="fc" id="L30">        }</span>
-<span class="fc" id="L31">        List&lt;String&gt; list = List.copyOf(normalized);</span>
-<span class="fc" id="L32">        return new AssumptionSignature(list, String.join(&quot;;&quot;, list));</span>
+<span class="fc" id="L33">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L34">        Object[] pending = new Object[4];</span>
+<span class="fc" id="L35">        var retained = RetainedOperation.retainCompleted(3, assumptions, normalized, pending);</span>
+<span class="fc" id="L36">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            for (String assumption : assumptions) {</span>
+<span class="fc" id="L39">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                if (assumption != null) add(normalized, pending, normalizeExpression(assumption));</span>
+<span class="fc" id="L41">            }</span>
+<span class="fc" id="L42">            return finish(normalized, pending);</span>
+<span class="fc" id="L43">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L44">            primary = failure;</span>
+<span class="fc" id="L45">            observeFailure(failure);</span>
+<span class="fc" id="L46">            throw failure;</span>
+<span class="fc" id="L47">        } finally { close(retained, primary); }</span>
     }
 
     public static AssumptionSignature ofAssumptions(Collection&lt;Assumption&gt; assumptions) {
-<span class="pc bpc" id="L36" title="1 of 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
-<span class="fc" id="L37">            return new AssumptionSignature(List.of(), &quot;&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
+<span class="fc" id="L52">            return new AssumptionSignature(List.of(), &quot;&quot;);</span>
         }
-<span class="fc" id="L39">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
-<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (Assumption assumption : assumptions) {</span>
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (assumption == null) {</span>
-<span class="nc" id="L42">                continue;</span>
-            }
-<span class="fc" id="L44">            String canonical = assumption.kind() + &quot;|&quot; + normalizeExpression(assumption.expression());</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (!canonical.isBlank()) {</span>
-<span class="fc" id="L46">                normalized.add(canonical);</span>
-            }
-<span class="fc" id="L48">        }</span>
-<span class="fc" id="L49">        List&lt;String&gt; list = List.copyOf(normalized);</span>
-<span class="fc" id="L50">        return new AssumptionSignature(list, String.join(&quot;;&quot;, list));</span>
+<span class="fc" id="L54">        TreeSet&lt;String&gt; normalized = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L55">        Object[] pending = new Object[4];</span>
+<span class="fc" id="L56">        var retained = RetainedOperation.retainCompleted(3, assumptions, normalized, pending);</span>
+<span class="fc" id="L57">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (Assumption assumption : assumptions) {</span>
+<span class="fc" id="L60">                RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                if (assumption == null) continue;</span>
+<span class="fc" id="L62">                pending[0] = normalizeExpression(assumption.expression());</span>
+<span class="fc" id="L63">                completed(1);</span>
+<span class="fc" id="L64">                pending[1] = assumption.kind() + &quot;|&quot; + pending[0];</span>
+<span class="fc" id="L65">                completed(((String) pending[1]).length() + 1L);</span>
+<span class="fc" id="L66">                add(normalized, pending, (String) pending[1]);</span>
+<span class="fc" id="L67">                pending[1] = null;</span>
+<span class="fc" id="L68">            }</span>
+<span class="fc" id="L69">            return finish(normalized, pending);</span>
+<span class="nc" id="L70">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L71">            primary = failure;</span>
+<span class="nc" id="L72">            observeFailure(failure);</span>
+<span class="nc" id="L73">            throw failure;</span>
+<span class="fc" id="L74">        } finally { close(retained, primary); }</span>
     }
 
     public static AssumptionSignature merge(AssumptionSignature left, AssumptionSignature right) {
-<span class="nc" id="L54">        Objects.requireNonNull(left, &quot;left&quot;);</span>
-<span class="nc" id="L55">        Objects.requireNonNull(right, &quot;right&quot;);</span>
-<span class="nc" id="L56">        TreeSet&lt;String&gt; merged = new TreeSet&lt;&gt;(left.normalizedAssumptions());</span>
-<span class="nc" id="L57">        merged.addAll(right.normalizedAssumptions());</span>
-<span class="nc" id="L58">        List&lt;String&gt; list = List.copyOf(merged);</span>
-<span class="nc" id="L59">        return new AssumptionSignature(list, String.join(&quot;;&quot;, list));</span>
+<span class="fc" id="L78">        Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L79">        Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L80">        TreeSet&lt;String&gt; merged = new TreeSet&lt;&gt;(left.normalizedAssumptions());</span>
+<span class="fc" id="L81">        Object[] pending = new Object[4];</span>
+<span class="fc" id="L82">        var retained = RetainedOperation.retainCompleted(left.normalizedAssumptions().size() + 3L, left, right, merged, pending);</span>
+<span class="fc" id="L83">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L85">            merged.addAll(right.normalizedAssumptions());</span>
+<span class="fc" id="L86">            completed(right.normalizedAssumptions().size() + 1L);</span>
+<span class="fc" id="L87">            return finish(merged, pending);</span>
+<span class="nc" id="L88">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L89">            primary = failure;</span>
+<span class="nc" id="L90">            observeFailure(failure);</span>
+<span class="nc" id="L91">            throw failure;</span>
+<span class="fc" id="L92">        } finally { close(retained, primary); }</span>
+    }
+
+    private static void add(TreeSet&lt;String&gt; normalized, Object[] pending, String canonical) {
+<span class="fc" id="L96">        pending[0] = canonical;</span>
+<span class="fc" id="L97">        completed(canonical.length() + 1L);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!canonical.isBlank()) {</span>
+<span class="fc" id="L99">            normalized.add(canonical);</span>
+<span class="fc" id="L100">            completed(1);</span>
+        }
+<span class="fc" id="L102">        pending[0] = null;</span>
+<span class="fc" id="L103">    }</span>
+
+    private static AssumptionSignature finish(TreeSet&lt;String&gt; normalized, Object[] pending) {
+<span class="fc" id="L106">        List&lt;String&gt; list = List.copyOf(normalized);</span>
+<span class="fc" id="L107">        pending[1] = list;</span>
+<span class="fc" id="L108">        completed(list.size() + 1L);</span>
+<span class="fc" id="L109">        pending[2] = String.join(&quot;;&quot;, list);</span>
+<span class="fc" id="L110">        completed(((String) pending[2]).length() + 1L);</span>
+<span class="fc" id="L111">        pending[3] = new AssumptionSignature(list, (String) pending[2]);</span>
+<span class="fc" id="L112">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L113">        return (AssumptionSignature) pending[3];</span>
     }
 
     /**
      * Normalize common textual variants of assumptions.
      */
     public static String normalizeExpression(String expression) {
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (expression == null) {</span>
-<span class="nc" id="L67">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L121">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L69">        String canonical = expression.trim()</span>
-<span class="fc" id="L70">            .replace(&quot;≠&quot;, &quot;!=&quot;)</span>
-<span class="fc" id="L71">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;)</span>
-<span class="fc" id="L72">            .replaceAll(&quot;^not\\((.*)=0\\)$&quot;, &quot;$1 != 0&quot;)</span>
-<span class="fc" id="L73">            .replaceAll(&quot;\\s*!=\\s*&quot;, &quot; != &quot;)</span>
-<span class="fc" id="L74">            .replaceAll(&quot;\\s*&gt;=\\s*&quot;, &quot; &gt;= &quot;)</span>
-<span class="fc" id="L75">            .replaceAll(&quot;\\s*&lt;=\\s*&quot;, &quot; &lt;= &quot;)</span>
-<span class="fc" id="L76">            .replaceAll(&quot;\\s*&gt;(?!=)\\s*&quot;, &quot; &gt; &quot;)</span>
-<span class="fc" id="L77">            .replaceAll(&quot;\\s*&lt;(?!=)\\s*&quot;, &quot; &lt; &quot;)</span>
-<span class="fc" id="L78">            .trim();</span>
-<span class="fc" id="L79">        int notEquals = canonical.indexOf(&quot; != &quot;);</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (notEquals &gt;= 0) {</span>
-<span class="fc" id="L81">            String left = canonical.substring(0, notEquals).trim();</span>
-<span class="fc" id="L82">            String right = canonical.substring(notEquals + 4).trim();</span>
-<span class="fc" id="L83">            left = stripOuterParens(left);</span>
-<span class="fc" id="L84">            right = stripOuterParens(right);</span>
-<span class="pc bpc" id="L85" title="1 of 4 branches missed.">            if (isZero(left) &amp;&amp; !right.isBlank()) {</span>
-<span class="fc" id="L86">                return right + &quot; != 0&quot;;</span>
+        // Current expression, left/right operands, and the next completed string.
+<span class="fc" id="L124">        String[] text = { expression, null, null, null };</span>
+<span class="fc" id="L125">        var retained = RetainedOperation.retainCompleted(1, expression, text);</span>
+<span class="fc" id="L126">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L128">            update(text, 0, text[0].trim());</span>
+<span class="fc" id="L129">            update(text, 0, text[0].replace(&quot;≠&quot;, &quot;!=&quot;));</span>
+<span class="fc" id="L130">            update(text, 0, text[0].replaceAll(&quot;\\s+&quot;, &quot; &quot;));</span>
+<span class="fc" id="L131">            update(text, 0, text[0].replaceAll(&quot;^not\\((.*)=0\\)$&quot;, &quot;$1 != 0&quot;));</span>
+<span class="fc" id="L132">            update(text, 0, text[0].replaceAll(&quot;\\s*!=\\s*&quot;, &quot; != &quot;));</span>
+<span class="fc" id="L133">            update(text, 0, text[0].replaceAll(&quot;\\s*&gt;=\\s*&quot;, &quot; &gt;= &quot;));</span>
+<span class="fc" id="L134">            update(text, 0, text[0].replaceAll(&quot;\\s*&lt;=\\s*&quot;, &quot; &lt;= &quot;));</span>
+<span class="fc" id="L135">            update(text, 0, text[0].replaceAll(&quot;\\s*&gt;(?!=)\\s*&quot;, &quot; &gt; &quot;));</span>
+<span class="fc" id="L136">            update(text, 0, text[0].replaceAll(&quot;\\s*&lt;(?!=)\\s*&quot;, &quot; &lt; &quot;));</span>
+<span class="fc" id="L137">            update(text, 0, text[0].trim());</span>
+<span class="fc" id="L138">            int notEquals = text[0].indexOf(&quot; != &quot;);</span>
+<span class="fc" id="L139">            RetainedOperation.work(text[0].length() + 1L);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (notEquals &gt;= 0) {</span>
+<span class="fc" id="L141">                update(text, 1, text[0].substring(0, notEquals));</span>
+<span class="fc" id="L142">                update(text, 1, text[1].trim());</span>
+<span class="fc" id="L143">                update(text, 2, text[0].substring(notEquals + 4));</span>
+<span class="fc" id="L144">                update(text, 2, text[2].trim());</span>
+<span class="fc" id="L145">                stripOuterParens(text, 1);</span>
+<span class="fc" id="L146">                stripOuterParens(text, 2);</span>
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">                if (isZero(text[1]) &amp;&amp; !text[2].isBlank()) update(text, 0, text[2] + &quot; != 0&quot;);</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">                else if (isZero(text[2]) &amp;&amp; !text[1].isBlank()) update(text, 0, text[1] + &quot; != 0&quot;);</span>
             }
-<span class="pc bpc" id="L88" title="1 of 4 branches missed.">            if (isZero(right) &amp;&amp; !left.isBlank()) {</span>
-<span class="fc" id="L89">                return left + &quot; != 0&quot;;</span>
-            }
-        }
-<span class="fc" id="L92">        return canonical;</span>
+<span class="fc" id="L150">            return text[0];</span>
+<span class="fc" id="L151">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L152">            primary = failure;</span>
+<span class="fc" id="L153">            observeFailure(failure);</span>
+<span class="fc" id="L154">            throw failure;</span>
+<span class="fc" id="L155">        } finally { close(retained, primary); }</span>
     }
 
     private static boolean isZero(String value) {
-<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        return value.equals(&quot;0&quot;) || value.equals(&quot;0.0&quot;);</span>
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">        return value.equals(&quot;0&quot;) || value.equals(&quot;0.0&quot;);</span>
     }
 
-    private static String stripOuterParens(String value) {
-<span class="fc" id="L100">        String result = value;</span>
-<span class="pc bpc" id="L101" title="2 of 6 branches missed.">        while (result.startsWith(&quot;(&quot;) &amp;&amp; result.endsWith(&quot;)&quot;) &amp;&amp; result.length() &gt; 1) {</span>
-<span class="fc" id="L102">            result = result.substring(1, result.length() - 1).trim();</span>
+    private static void stripOuterParens(String[] text, int index) {
+<span class="pc bpc" id="L163" title="2 of 6 branches missed.">        while (text[index].startsWith(&quot;(&quot;) &amp;&amp; text[index].endsWith(&quot;)&quot;) &amp;&amp; text[index].length() &gt; 1) {</span>
+<span class="fc" id="L164">            update(text, index, text[index].substring(1, text[index].length() - 1));</span>
+<span class="fc" id="L165">            update(text, index, text[index].trim());</span>
         }
-<span class="fc" id="L104">        return result;</span>
-    }
+<span class="fc" id="L167">    }</span>
+
+    private static void update(String[] text, int index, String next) {
+<span class="fc" id="L170">        text[3] = next;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        completed((text[index] == null ? 0L : text[index].length()) + next.length() + 1L);</span>
+<span class="fc" id="L172">        text[index] = next;</span>
+<span class="fc" id="L173">        text[3] = null;</span>
+<span class="fc" id="L174">    }</span>
+
+    private static void completed(long work) {
+<span class="fc" id="L177">        RetainedOperation.work(work);</span>
+<span class="fc" id="L178">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L179">    }</span>
+
+    private static void observeFailure(Throwable failure) {
+<span class="fc" id="L182">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L183">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L185">        }</span>
+<span class="fc" id="L186">    }</span>
+
+    private static void close(RetainedOperation.Frame retained, Throwable primary) {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        try { if (retained != null) retained.close(); }</span>
+<span class="fc" id="L190">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

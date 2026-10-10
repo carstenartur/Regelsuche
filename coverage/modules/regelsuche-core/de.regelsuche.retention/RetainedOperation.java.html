@@ -19,60 +19,62 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
     private boolean closed;
 <span class="fc" id="L20">    private RetainedOperation(Sink sink){this.sink=Objects.requireNonNull(sink);previous=CURRENT.get();sink.executionWork(1);CURRENT.set(this);}</span>
 <span class="fc" id="L21">    public static RetainedOperation open(Sink sink){return new RetainedOperation(sink);}</span>
-<span class="nc bnc" id="L22" title="All 2 branches missed.">    public static long observedWork(){var scope=CURRENT.get();return scope==null?0:scope.sink.observedWork();}</span>
-<span class="fc bfc" id="L23" title="All 2 branches covered.">    public static void work(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.executionWork(units);}</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">    public static void validation(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.validationWork(units);}</span>
+    /** Representation helpers preserve their historical unobserved execution path. */
+<span class="fc bfc" id="L23" title="All 2 branches covered.">    public static boolean isObserved(){return CURRENT.get()!=null;}</span>
+<span class="nc bnc" id="L24" title="All 2 branches missed.">    public static long observedWork(){var scope=CURRENT.get();return scope==null?0:scope.sink.observedWork();}</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">    public static void work(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.executionWork(units);}</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">    public static void validation(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.validationWork(units);}</span>
     /** Retains the actual mutable collections/objects, so later checkpoints observe their current fields. */
     public static Frame retain(Object... values){
-<span class="fc" id="L27">        return acquire(values,0);</span>
+<span class="fc" id="L29">        return acquire(values,0);</span>
     }
     /** Publish actual completed allocations before settling their work and observing the frame. */
     public static Frame retainCompleted(long completedWork,Object... values){
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if(completedWork&lt;0)throw new IllegalArgumentException(&quot;negative completed work&quot;);</span>
-<span class="fc" id="L32">        return acquire(values,completedWork);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if(completedWork&lt;0)throw new IllegalArgumentException(&quot;negative completed work&quot;);</span>
+<span class="fc" id="L34">        return acquire(values,completedWork);</span>
     }
     private static Frame acquire(Object[] values,long producedWork){
-<span class="fc bfc" id="L35" title="All 2 branches covered.">        var scope=CURRENT.get();if(scope==null)return null;</span>
-<span class="fc" id="L36">        var frame=new Frame(scope,values);scope.current=frame;</span>
-<span class="fc" id="L37">        boolean observationAttempted=false;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        var scope=CURRENT.get();if(scope==null)return null;</span>
+<span class="fc" id="L38">        var frame=new Frame(scope,values);scope.current=frame;</span>
+<span class="fc" id="L39">        boolean observationAttempted=false;</span>
         try {
-<span class="fc bfc" id="L39" title="All 2 branches covered.">            if(producedWork!=0)scope.sink.executionWork(producedWork);</span>
-<span class="fc" id="L40">            scope.sink.executionWork(2);</span>
-<span class="fc" id="L41">            observationAttempted=true;scope.sink.checkpoint();return frame;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if(producedWork!=0)scope.sink.executionWork(producedWork);</span>
+<span class="fc" id="L42">            scope.sink.executionWork(2);</span>
+<span class="fc" id="L43">            observationAttempted=true;scope.sink.checkpoint();return frame;</span>
         }
-<span class="fc" id="L43">        catch(RuntimeException | Error failure){</span>
+<span class="fc" id="L45">        catch(RuntimeException | Error failure){</span>
             // Values were already allocated by the caller: a failed acquisition
             // debit must still observe their ownership before restoring the parent.
-<span class="fc bfc" id="L46" title="All 2 branches covered.">            if(!observationAttempted) {</span>
-<span class="fc" id="L47">                try{scope.sink.checkpoint();}</span>
-<span class="pc bnc" id="L48" title="All 2 branches missed.">                catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if(!observationAttempted) {</span>
+<span class="fc" id="L49">                try{scope.sink.checkpoint();}</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}</span>
             }
-<span class="pc bnc" id="L50" title="All 2 branches missed.">            try{frame.close();}catch(RuntimeException | Error cleanup){if(cleanup!=failure)failure.addSuppressed(cleanup);}</span>
-<span class="fc" id="L51">            throw failure;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            try{frame.close();}catch(RuntimeException | Error cleanup){if(cleanup!=failure)failure.addSuppressed(cleanup);}</span>
+<span class="fc" id="L53">            throw failure;</span>
         }
     }
-<span class="fc bfc" id="L54" title="All 2 branches covered.">    public static void checkpoint(){var scope=CURRENT.get();if(scope!=null)scope.sink.checkpoint();}</span>
-<span class="fc" id="L55">    public static &lt;T&gt; T produced(T value){try(var frame=acquire(new Object[]{value},1)){return value;}}</span>
-<span class="fc" id="L56">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(previous);v.reference(sink);v.reference(current);}</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">    public static void checkpoint(){var scope=CURRENT.get();if(scope!=null)scope.sink.checkpoint();}</span>
+<span class="fc" id="L57">    public static &lt;T&gt; T produced(T value){try(var frame=acquire(new Object[]{value},1)){return value;}}</span>
+<span class="fc" id="L58">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(previous);v.reference(sink);v.reference(current);}</span>
     @Override public void close(){
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if(closed)return;</span>
-<span class="pc bpc" id="L59" title="3 of 6 branches missed.">        if(Thread.currentThread().threadId()!=owner || CURRENT.get()!=this || current!=null)throw new IllegalStateException(&quot;native operation scope order&quot;);</span>
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        closed=true;if(previous==null)CURRENT.remove();else CURRENT.set(previous);</span>
-<span class="fc" id="L61">        var charged=sink;previous=null;sink=null;charged.executionWork(3);</span>
-<span class="fc" id="L62">    }</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if(closed)return;</span>
+<span class="pc bpc" id="L61" title="3 of 6 branches missed.">        if(Thread.currentThread().threadId()!=owner || CURRENT.get()!=this || current!=null)throw new IllegalStateException(&quot;native operation scope order&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        closed=true;if(previous==null)CURRENT.remove();else CURRENT.set(previous);</span>
+<span class="fc" id="L63">        var charged=sink;previous=null;sink=null;charged.executionWork(3);</span>
+<span class="fc" id="L64">    }</span>
     public static final class Frame implements AutoCloseable,RetainedGraph.View {
         private RetainedOperation scope;
         private Frame previous;
         private Object[] values;
         private boolean closed;
-<span class="fc" id="L68">        private Frame(RetainedOperation scope,Object[] values){this.scope=scope;previous=scope.current;this.values=values;}</span>
-<span class="fc" id="L69">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);v.reference(previous);v.reference(values);}</span>
+<span class="fc" id="L70">        private Frame(RetainedOperation scope,Object[] values){this.scope=scope;previous=scope.current;this.values=values;}</span>
+<span class="fc" id="L71">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(scope);v.reference(previous);v.reference(values);}</span>
         @Override public void close(){
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if(closed)return;</span>
-<span class="pc bpc" id="L72" title="2 of 4 branches missed.">            if(Thread.currentThread().threadId()!=scope.owner || scope.current!=this)throw new IllegalStateException(&quot;native retained frame order&quot;);</span>
-<span class="fc" id="L73">            closed=true;scope.current=previous;</span>
-<span class="fc" id="L74">            var charged=scope.sink;values=null;previous=null;scope=null;charged.executionWork(4);</span>
-<span class="fc" id="L75">        }</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if(closed)return;</span>
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">            if(Thread.currentThread().threadId()!=scope.owner || scope.current!=this)throw new IllegalStateException(&quot;native retained frame order&quot;);</span>
+<span class="fc" id="L75">            closed=true;scope.current=previous;</span>
+<span class="fc" id="L76">            var charged=scope.sink;values=null;previous=null;scope=null;charged.executionWork(4);</span>
+<span class="fc" id="L77">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

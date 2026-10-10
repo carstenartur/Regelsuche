@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeVerification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">NativeVerification.java</span></div><h1>NativeVerification.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import java.util.List;
@@ -8,26 +9,77 @@ import java.util.List;
 /** Typed recheck receipt. Complete producer structure, never a digest, determines equality. */
 public record NativeVerification(boolean accepted,long work,NativeMoveProof checkedProof,String ruleId,String reason)
         implements SearchExecution.Verification,RetainedGraph.View {
-<span class="fc" id="L11">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(checkedProof);v.reference(ruleId);v.reference(reason);}</span>
+<span class="fc" id="L12">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(checkedProof);v.reference(ruleId);v.reference(reason);}</span>
 
-<span class="fc" id="L13">    public NativeVerification {</span>
-<span class="pc bpc" id="L14" title="4 of 10 branches missed.">        if(work&lt;0 || reason==null || (accepted &amp;&amp; (checkedProof==null || ruleId==null)))throw new IllegalArgumentException(&quot;invalid native verification&quot;);</span>
-<span class="fc" id="L15">    }</span>
+<span class="fc" id="L14">    public NativeVerification {</span>
+<span class="pc bpc" id="L15" title="4 of 10 branches missed.">        if(work&lt;0 || reason==null || (accepted &amp;&amp; (checkedProof==null || ruleId==null)))throw new IllegalArgumentException(&quot;invalid native verification&quot;);</span>
+<span class="fc" id="L16">    }</span>
     public MoveVerifier.Verification exportLegacy(){
-<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if(!accepted)return new MoveVerifier.Verification(false,work,List.of(),reason);</span>
-<span class="pc bpc" id="L18" title="1 of 3 branches missed.">        String receipt=switch(checkedProof) {</span>
-<span class="fc" id="L19">            case NativeMoveProof.Primitive primitive -&gt; {</span>
-<span class="fc" id="L20">                var codec=new CompiledAstReplayCodec();</span>
-<span class="fc" id="L21">                var text=new String[2];</span>
-<span class="fc" id="L22">                try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {</span>
-<span class="fc" id="L23">                    text[0]=codec.encodeExpression(primitive.source());text[1]=codec.encodeExpression(primitive.target());</span>
-<span class="fc" id="L24">                    yield &quot;typed-primitive-replay:&quot;+NativeSearchMove.digest(text[0]+&quot;\n&quot;+text[1]+&quot;\n&quot;+ruleId);</span>
-<span class="fc" id="L25">                }</span>
-            }
-<span class="fc" id="L27">            case NativeMoveProof.Program program -&gt; &quot;typed-program-replay:&quot;+program.exportLegacy().applicationKey();</span>
-<span class="nc" id="L28">            case NativeMoveProof.Exact exact -&gt; &quot;checked-schema-application:&quot;+exact.evidence().exportLegacy().binding().evidenceHash();</span>
-<span class="fc" id="L29">        };</span>
-<span class="fc" id="L30">        return new MoveVerifier.Verification(true,work,List.of(receipt),reason);</span>
+        // Actual transport/evidence, digest, receipt and list survive until the
+        // immutable verification takes its already immutable receipt list.
+<span class="fc" id="L20">        Object[] pending = new Object[4];</span>
+<span class="fc" id="L21">        var retained = RetainedOperation.retainCompleted(1, this, pending);</span>
+<span class="fc" id="L22">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            if (!accepted) return RetainedOperation.produced(new MoveVerifier.Verification(false,work,List.of(),reason));</span>
+<span class="pc bpc" id="L25" title="1 of 3 branches missed.">            String receipt = switch (checkedProof) {</span>
+<span class="fc" id="L26">                case NativeMoveProof.Primitive primitive -&gt; {</span>
+<span class="fc" id="L27">                    var codec = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L28">                    var text = new String[2];</span>
+<span class="fc" id="L29">                    pending[0] = text;</span>
+<span class="fc" id="L30">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L31">                    RetainedOperation.checkpoint();</span>
+<span class="fc" id="L32">                    text[0] = codec.encodeExpression(primitive.source());</span>
+<span class="fc" id="L33">                    text[1] = codec.encodeExpression(primitive.target());</span>
+<span class="fc" id="L34">                    String joined = text[0]+&quot;\n&quot;+text[1]+&quot;\n&quot;+ruleId;</span>
+<span class="fc" id="L35">                    pending[1] = joined;</span>
+<span class="fc" id="L36">                    RetainedOperation.work(1L + joined.length());</span>
+<span class="fc" id="L37">                    RetainedOperation.checkpoint();</span>
+<span class="fc" id="L38">                    String digest = NativeSearchMove.digest(joined);</span>
+<span class="fc" id="L39">                    pending[1] = digest;</span>
+<span class="fc" id="L40">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L41">                    yield &quot;typed-primitive-replay:&quot;+digest;</span>
+                }
+<span class="fc" id="L43">                case NativeMoveProof.Program program -&gt; {</span>
+<span class="fc" id="L44">                    var exported = program.exportLegacy();</span>
+<span class="fc" id="L45">                    pending[0] = exported;</span>
+<span class="fc" id="L46">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L47">                    yield &quot;typed-program-replay:&quot;+exported.applicationKey();</span>
+                }
+<span class="nc" id="L49">                case NativeMoveProof.Exact exact -&gt; {</span>
+<span class="nc" id="L50">                    var exported = exact.evidence().exportLegacy();</span>
+<span class="nc" id="L51">                    pending[0] = exported;</span>
+<span class="nc" id="L52">                    RetainedOperation.work(1);</span>
+<span class="nc" id="L53">                    yield &quot;checked-schema-application:&quot;+exported.binding().evidenceHash();</span>
+                }
+<span class="fc" id="L55">            };</span>
+<span class="fc" id="L56">            pending[2] = receipt;</span>
+<span class="fc" id="L57">            RetainedOperation.work(1L + receipt.length());</span>
+<span class="fc" id="L58">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L59">            var receipts = List.of(receipt);</span>
+<span class="fc" id="L60">            pending[3] = receipts;</span>
+<span class="fc" id="L61">            RetainedOperation.work(2);</span>
+<span class="fc" id="L62">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L63">            return RetainedOperation.produced(new MoveVerifier.Verification(true,work,receipts,reason));</span>
+<span class="fc" id="L64">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L65">            primary = failure;</span>
+<span class="fc" id="L66">            try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L67">            catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L69">            }</span>
+<span class="fc" id="L70">            throw failure;</span>
+        } finally {
+<span class="fc" id="L72">            closeFrame(retained, primary);</span>
+        }
     }
+
+    private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (frame == null) return;</span>
+<span class="fc" id="L78">        try { frame.close(); }</span>
+<span class="fc" id="L79">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

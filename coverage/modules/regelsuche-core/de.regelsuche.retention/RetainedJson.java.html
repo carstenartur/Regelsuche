@@ -146,13 +146,13 @@ public final class RetainedJson {
     }
 <span class="fc" id="L147">    private static final NodeFactory NODES=new NodeFactory();</span>
     private static final class ObjectValue extends ObjectNode implements RetainedGraph.View {
-<span class="fc" id="L149">        ObjectValue(){super(NODES,new LinkedHashMap&lt;&gt;());RetainedOperation.work(2);}</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        ObjectValue(){super(NODES,new LinkedHashMap&lt;&gt;());try(var allocated=RetainedOperation.retainCompleted(2,this)) {}}</span>
 <span class="fc" id="L150">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(_children);}</span>
     }
     private static final class ArrayValue extends ArrayNode implements RetainedGraph.View {
         private final ArrayList&lt;JsonNode&gt; owned;
 <span class="fc" id="L154">        ArrayValue(){this(new ArrayList&lt;&gt;());}</span>
-<span class="fc" id="L155">        private ArrayValue(ArrayList&lt;JsonNode&gt; values){super(NODES,values);owned=values;RetainedOperation.work(2);}</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        private ArrayValue(ArrayList&lt;JsonNode&gt; values){super(NODES,values);owned=values;try(var allocated=RetainedOperation.retainCompleted(2,this)) {}}</span>
 <span class="fc" id="L156">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(_nodeFactory);v.reference(owned);v.reference(owned);}</span>
     }
 <span class="fc" id="L158">    private static final class TextOutput extends Writer implements RetainedGraph.View {</span>

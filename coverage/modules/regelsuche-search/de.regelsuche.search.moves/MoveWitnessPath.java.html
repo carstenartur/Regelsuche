@@ -1,27 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveWitnessPath.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MoveWitnessPath.java</span></div><h1>MoveWitnessPath.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /** Immutable shared witness prefixes; appending never copies the complete ancestral path. */
 final class MoveWitnessPath&lt;S,M,V&gt; implements de.regelsuche.retention.RetainedGraph.View {
-<span class="fc" id="L9">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(parent);v.reference(step);}</span>
-<span class="fc" id="L10">    static &lt;S,M,V&gt; MoveWitnessPath&lt;S,M,V&gt; root() { return new MoveWitnessPath&lt;&gt;(null,null); }</span>
+<span class="fc" id="L10">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(parent);v.reference(step);}</span>
+<span class="fc" id="L11">    static &lt;S,M,V&gt; MoveWitnessPath&lt;S,M,V&gt; root() { return new MoveWitnessPath&lt;&gt;(null,null); }</span>
     private final MoveWitnessPath&lt;S,M,V&gt; parent;
     private final SearchExecution.Step&lt;S,M,V&gt; step;
-<span class="fc" id="L13">    private MoveWitnessPath(MoveWitnessPath&lt;S,M,V&gt; parent, SearchExecution.Step&lt;S,M,V&gt; step) {</span>
-<span class="fc" id="L14">        this.parent = parent;</span>
-<span class="fc" id="L15">        this.step = step;</span>
-<span class="fc" id="L16">    }</span>
+<span class="fc" id="L14">    private MoveWitnessPath(MoveWitnessPath&lt;S,M,V&gt; parent, SearchExecution.Step&lt;S,M,V&gt; step) {</span>
+<span class="fc" id="L15">        this.parent = parent;</span>
+<span class="fc" id="L16">        this.step = step;</span>
+<span class="fc" id="L17">    }</span>
     MoveWitnessPath&lt;S,M,V&gt; append(SearchExecution.Step&lt;S,M,V&gt; next) {
-<span class="fc" id="L18">        return new MoveWitnessPath&lt;&gt;(this, java.util.Objects.requireNonNull(next));</span>
+<span class="fc" id="L19">        return new MoveWitnessPath&lt;&gt;(this, java.util.Objects.requireNonNull(next));</span>
     }
     List&lt;SearchExecution.Step&lt;S,M,V&gt;&gt; steps() {
-<span class="fc" id="L21">        var steps = new ArrayList&lt;SearchExecution.Step&lt;S,M,V&gt;&gt;();</span>
-<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (var cursor = this; cursor.step != null; cursor = cursor.parent) steps.add(cursor.step);</span>
-<span class="fc" id="L23">        Collections.reverse(steps);</span>
-<span class="fc" id="L24">        return List.copyOf(steps);</span>
+<span class="fc" id="L22">        var steps = new ArrayList&lt;SearchExecution.Step&lt;S,M,V&gt;&gt;();</span>
+<span class="fc" id="L23">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L24">        var retained = RetainedOperation.retainCompleted(2, this, steps, pending);</span>
+<span class="fc" id="L25">        Throwable primary = null;</span>
+        try {
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            for (var cursor = this; cursor.step != null; cursor = cursor.parent) {</span>
+<span class="fc" id="L28">                steps.add(cursor.step);</span>
+<span class="fc" id="L29">                SearchExecution.completed(1);</span>
+            }
+<span class="fc" id="L31">            Collections.reverse(steps);</span>
+<span class="fc" id="L32">            SearchExecution.completed(steps.size() / 2L);</span>
+<span class="fc" id="L33">            return SearchExecution.copied(pending, 0, List.copyOf(steps), steps, steps.size());</span>
+<span class="fc" id="L34">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L35">            primary = failure;</span>
+<span class="fc" id="L36">            SearchExecution.observeFailure(failure);</span>
+<span class="fc" id="L37">            throw failure;</span>
+<span class="fc" id="L38">        } finally { SearchExecution.close(retained, primary); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

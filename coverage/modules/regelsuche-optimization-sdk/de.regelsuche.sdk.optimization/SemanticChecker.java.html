@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    static final String REVISION = &quot;java-numeric-independent/v5&quot;;
+    static final String REVISION = &quot;java-numeric-independent/v6&quot;;
 <span class="fc" id="L11">    record Proof(boolean accepted, List&lt;String&gt; methods, long work) { Proof { methods = List.copyOf(methods); } }</span>
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -170,7 +170,7 @@ final class SemanticChecker {
 <span class="fc bfc" id="L170" title="All 2 branches covered.">                if (proof.accepted()) { methods.add(&quot;AFFINE_MODULAR_NORMAL_FORM&quot;); return true; }</span>
 <span class="fc" id="L171">            } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }</span>
         }
-<span class="pc bpc" id="L173" title="1 of 4 branches missed.">        if (kind.integral() &amp;&amp; new BitwiseProof(work).equivalent(a,b,kind)) { methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;); return true; }</span>
+<span class="fc bfc" id="L173" title="All 4 branches covered.">        if (kind.integral() &amp;&amp; new BitwiseProof(work).equivalent(a,b,kind)) { methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;); return true; }</span>
 <span class="fc" id="L174">        return false;</span>
     }
     /** Independent proof-view normalization, never a generator call. Universal word
@@ -187,7 +187,7 @@ final class SemanticChecker {
 <span class="fc" id="L187">        Expr result = new FunctionExpr(((FunctionExpr) expression).name(), arguments);</span>
 <span class="fc" id="L188">        var kind = JavaExpressions.resultKind(result);</span>
 <span class="fc" id="L189">        var operation = JavaExpressions.operationOf(result).orElse(null);</span>
-<span class="pc bpc" id="L190" title="4 of 12 branches missed.">        if ((kind == NumericKind.INT || kind == NumericKind.LONG)</span>
+<span class="pc bpc" id="L190" title="1 of 12 branches missed.">        if ((kind == NumericKind.INT || kind == NumericKind.LONG)</span>
                 &amp;&amp; (operation == NumericOperation.XOR || operation == NumericOperation.AND
                     || operation == NumericOperation.OR || operation == NumericOperation.NOT)) {
 <span class="fc" id="L193">            var representatives = new ArrayList&lt;Expr&gt;();</span>

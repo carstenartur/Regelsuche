@@ -159,3 +159,27 @@ formatting and application-side export helpers), qualify the full native public
 differential under its declared revision, and rerun complete accounting/retention
 acceptance. P04 has no completion checkmark. P05–P12 remain subsequent work, and
 no economic learning advantage is asserted.
+
+### Reviewed native ownership checkpoint, 2026-10-09
+
+Local head `2efdd698393f47045cf62a670955b2fd80579eca` closes the concrete atomic
+ownership findings and independent review corrections R1–R4. Production source
+`1a09fdb3dd2940973c85d0f10c21e2fa2324afee` passes 2,907 fresh core/search/learning
+tests. Later changes only refactor test graph dispatch; all affected tests and
+the full unchanged AI-quality gate pass. The public corpus is byte-identical in
+two fresh JVMs, with zero internal AST-JSON calls. Its ample-budget strict
+comparison is 24/26; the two differences are the intentionally false native
+completeness flag. Frozen-budget negative rows remain unchanged.
+
+[The checkpoint](evidence/work-replacement/p04-native-ownership-20261009/README.md)
+retains source history, raw failures/successes and independent review. P04 is
+still incomplete: complete cost coverage requires an explicit bounded contract
+for every admitted callback and delegated execution path, followed by exact-head
+CI and integration. V7/V3 remain PARTIAL; P05–P12 remain subsequent work.
+
+PR #1081 review additionally reproduced a legacy witness-copy charge lost under
+an unrelated enclosing observer. The explicit environment contract in
+`d372e99b3dae354b73d5f7a23baa2f833d2ad732` fixes both false budget success and the
+missing work; 2,909 fresh module tests pass. Two new corpus JVMs reproduce all 13
+earlier result files byte-for-byte. The [separate correction evidence](evidence/work-replacement/pr1081-ambient-ledger-fix/README.md)
+preserves the earlier failed attempts and does not promote native coverage.

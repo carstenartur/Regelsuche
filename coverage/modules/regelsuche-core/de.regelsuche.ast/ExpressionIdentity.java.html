@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExpressionIdentity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast</a> &gt; <span class="el_source">ExpressionIdentity.java</span></div><h1>ExpressionIdentity.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast;
+
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+
+/** One iterative value-identity traversal, shared by AST callers and the bounded search index.
+ * Java value hashes remain compatible; index fingerprints remain a separate historical format.
+ * Work and scratch ownership are charged only through the supplied or active account. */
+public final class ExpressionIdentity implements RetainedGraph.View {
+    public interface Work extends RetainedGraph.View {
+        void chargeIdentity(long units);
+        void checkIdentityScratch(long references, long characters);
+    }
+<span class="fc" id="L17">    private enum ActiveWork implements Work {</span>
+<span class="fc" id="L18">        INSTANCE;</span>
+<span class="fc" id="L19">        @Override public void chargeIdentity(long units) { RetainedOperation.work(units); }</span>
+        @Override public void checkIdentityScratch(long references, long characters) {
+            // The active ownership account enforces its complete live-graph limits
+            // at the traversal's bounded checkpoints; no global expression cache.
+<span class="fc" id="L23">        }</span>
+<span class="fc" id="L24">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {}</span>
+    }
+    private final Work store;
+    private final boolean valueHash;
+    private final Expr left, right;
+    // Monotone ownership between bounded checkpoints preserves intermediate peaks
+    // without rescanning the whole search at each edge. Local limits also apply
+    // when there is no enclosing search observer.
+    private static final int CHECKPOINT_GROWTH = 4096;
+<span class="fc" id="L33">    private final ArrayList&lt;HashFrame&gt; hashing = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L34">    private final IdentityHashMap&lt;Expr, Integer&gt; hashes = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L35">    private final ArrayList&lt;Pair&gt; comparing = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L36">    private final IdentityHashMap&lt;Expr, IdentityHashMap&lt;Expr, Boolean&gt;&gt; pairs = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L37">    private final IdentityHashMap&lt;BigInteger, EncodedInteger&gt; encodings = new IdentityHashMap&lt;&gt;();</span>
+    private HashFrame currentHash;
+    private Pair current;
+    private EncodedInteger pendingEncoding;
+    private long pairEntries, encodingBytes;
+    private int growthSinceCheckpoint;
+
+<span class="fc" id="L44">    private ExpressionIdentity(Work store, Expr left, Expr right, boolean valueHash) {</span>
+<span class="fc" id="L45">        this.store = store; this.left = left; this.right = right; this.valueHash = valueHash;</span>
+<span class="fc" id="L46">    }</span>
+
+    public static int valueHash(Expr expression) {
+<span class="fc" id="L49">        return hash(ActiveWork.INSTANCE, expression, true);</span>
+    }
+    public static boolean same(Expr expression, Object other) {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!(other instanceof Expr right)) { RetainedOperation.work(1); return false; }</span>
+<span class="fc" id="L53">        return same(ActiveWork.INSTANCE, expression, right);</span>
+    }
+    public static int hash(Work store, Expr expression) {
+<span class="nc" id="L56">        return hash(store, expression, false);</span>
+    }
+    private static int hash(Work store, Expr expression, boolean valueHash) {
+<span class="fc" id="L59">        var identity = new ExpressionIdentity(store, expression, null, valueHash);</span>
+<span class="fc" id="L60">        RetainedOperation.Frame retained = null;</span>
+<span class="fc" id="L61">        Throwable failure = null;</span>
+        try {
+<span class="fc" id="L63">            retained = RetainedOperation.retain(identity);</span>
+<span class="fc" id="L64">            store.chargeIdentity(6); // published observer and five scratch containers</span>
+<span class="fc" id="L65">            return identity.hash();</span>
+<span class="fc" id="L66">        } catch (RuntimeException | Error thrown) { failure = thrown; throw thrown; }</span>
+<span class="fc" id="L67">        finally { identity.finish(retained, failure); }</span>
+    }
+
+    public static boolean same(Work store, Expr left, Expr right) {
+<span class="fc" id="L71">        store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (left == right) return true;</span>
+<span class="fc" id="L73">        var identity = new ExpressionIdentity(store, left, right, false);</span>
+<span class="fc" id="L74">        RetainedOperation.Frame retained = null;</span>
+<span class="fc" id="L75">        Throwable failure = null;</span>
+        try {
+<span class="fc" id="L77">            retained = RetainedOperation.retain(identity);</span>
+<span class="fc" id="L78">            store.chargeIdentity(6); // published observer and five scratch containers</span>
+<span class="fc" id="L79">            return identity.same();</span>
+<span class="fc" id="L80">        } catch (RuntimeException | Error thrown) { failure = thrown; throw thrown; }</span>
+<span class="fc" id="L81">        finally { identity.finish(retained, failure); }</span>
+    }
+
+    @Override public void retainedReferences(RetainedGraph.Visitor v) {
+<span class="fc" id="L85">        v.reference(store); v.reference(left); v.reference(right); v.reference(hashing); v.reference(hashes);</span>
+<span class="fc" id="L86">        v.reference(comparing); v.reference(pairs); v.reference(encodings); v.reference(currentHash);</span>
+<span class="fc" id="L87">        v.reference(current); v.reference(pendingEncoding);</span>
+<span class="fc" id="L88">    }</span>
+
+    private int hash() {
+<span class="fc" id="L91">        currentHash = new HashFrame(left, null); hashing.add(currentHash); store.chargeIdentity(3);</span>
+<span class="fc" id="L92">        grew();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        while (currentHash != null) {</span>
+<span class="fc" id="L94">            var frame = currentHash; store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (!frame.initialized) {</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                frame.hash = valueHash ? valueLabelHash(frame.expression) : labelHash(frame.expression); frame.initialized = true; store.chargeIdentity(1);</span>
+            }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (frame.nextChild &lt; children(frame.expression)) {</span>
+<span class="fc" id="L99">                Expr child = child(frame.expression, frame.nextChild);</span>
+<span class="fc" id="L100">                Integer known = hashes.get(child); store.chargeIdentity(2);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (known == null) {</span>
+<span class="fc" id="L102">                    currentHash = new HashFrame(child, frame); hashing.add(currentHash); store.chargeIdentity(3);</span>
+<span class="fc" id="L103">                    grew();</span>
+                }
+                else {
+<span class="pc bpc" id="L106" title="1 of 6 branches missed.">                    if (valueHash &amp;&amp; frame.expression instanceof BinaryExpr binary &amp;&amp; frame.nextChild == 0)</span>
+<span class="fc" id="L107">                        frame.hash = mix(known, binary.operator().hashCode());</span>
+<span class="fc" id="L108">                    else frame.hash = mix(frame.hash, known);</span>
+<span class="fc" id="L109">                    frame.nextChild++; store.chargeIdentity(2);</span>
+                }
+<span class="fc" id="L111">            } else {</span>
+<span class="pc bpc" id="L112" title="1 of 4 branches missed.">                int completedHash = valueHash &amp;&amp; frame.expression instanceof FunctionExpr function</span>
+<span class="fc" id="L113">                    ? mix(textHash(function.name()), frame.hash) : frame.hash;</span>
+<span class="fc" id="L114">                hashes.put(frame.expression, completedHash); currentHash = frame.parent; store.chargeIdentity(2);</span>
+<span class="fc" id="L115">                grew();</span>
+            }
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L119">        store.chargeIdentity(1); return hashes.get(left);</span>
+    }
+
+    private int valueLabelHash(Expr expression) {
+<span class="fc" id="L123">        store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L124" title="All 4 branches covered.">        return switch (expression) {</span>
+<span class="fc" id="L125">            case VariableExpr variable -&gt; {</span>
+<span class="fc" id="L126">                var symbol = variable.identitySymbol();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                if (symbol == null) yield textHash(variable.name());</span>
+<span class="fc" id="L128">                store.chargeIdentity(3); // UUID and ordinal are fixed-size value fields</span>
+<span class="fc" id="L129">                yield symbol.hashCode();</span>
+            }
+<span class="fc" id="L131">            case NumberExpr number -&gt; mix(javaIntegerHash(number.value().numerator()), javaIntegerHash(number.value().denominator()));</span>
+<span class="fc" id="L132">            case BinaryExpr ignored -&gt; 0;</span>
+<span class="fc" id="L133">            case FunctionExpr ignored -&gt; 1; // List.hashCode starts at one</span>
+        };
+    }
+    private int javaIntegerHash(BigInteger value) {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (value.getClass() != BigInteger.class) {</span>
+            // Preserve legacy Java value semantics; native validation rejects opaque scalar subclasses.
+<span class="nc" id="L139">            store.chargeIdentity(1); return value.hashCode();</span>
+        }
+<span class="fc" id="L141">        var encoded = encoding(value);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (!encoded.hashed) {</span>
+<span class="fc" id="L143">            store.chargeIdentity(1L + (encoded.bytes.length + 3L) / 4L);</span>
+<span class="fc" id="L144">            encoded.hash = value.hashCode(); encoded.hashed = true;</span>
+        }
+<span class="fc" id="L146">        return encoded.hash;</span>
+    }
+
+    private int labelHash(Expr expression) {
+<span class="nc" id="L150">        store.chargeIdentity(1);</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        return switch (expression) {</span>
+<span class="nc" id="L152">            case VariableExpr variable -&gt; mix(2, textHash(variable.name()));</span>
+<span class="nc" id="L153">            case NumberExpr number -&gt; mix(mix(1, integerHash(number.value().numerator())), integerHash(number.value().denominator()));</span>
+<span class="nc" id="L154">            case BinaryExpr binary -&gt; mix(3, binary.operator().ordinal());</span>
+<span class="nc" id="L155">            case FunctionExpr function -&gt; mix(mix(4, textHash(function.name())), function.arguments().size());</span>
+        };
+    }
+
+    private boolean same() {
+<span class="fc" id="L160">        comparing.add(new Pair(left, right)); store.chargeIdentity(2);</span>
+<span class="fc" id="L161">        grew();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (int position = 0; position &lt; comparing.size(); position++) {</span>
+<span class="fc" id="L163">            current = comparing.get(position); store.chargeIdentity(2);</span>
+<span class="fc" id="L164">            Expr a = current.left(), b = current.right();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if (a == b) continue;</span>
+<span class="fc" id="L166">            var row = pairs.get(a); store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (row == null) { row = new IdentityHashMap&lt;&gt;(); pairs.put(a, row); store.chargeIdentity(2); grew(); }</span>
+<span class="fc" id="L168">            store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (row.put(b, Boolean.TRUE) != null) continue;</span>
+<span class="fc" id="L170">            pairEntries++; store.chargeIdentity(1);</span>
+<span class="fc" id="L171">            grew();</span>
+            // Every new identity pair checks its label and schedules all children.
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (!sameLabel(a, b)) { RetainedOperation.checkpoint(); return false; }</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            for (int i = 0; i &lt; children(a); i++) {</span>
+<span class="fc" id="L175">                comparing.add(new Pair(child(a, i), child(b, i))); store.chargeIdentity(4);</span>
+<span class="fc" id="L176">                grew();</span>
+            }
+        }
+<span class="fc" id="L179">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L180">        return true;</span>
+    }
+
+    private boolean sameLabel(Expr a, Expr b) {
+<span class="fc" id="L184">        store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L185" title="All 4 branches covered.">        return switch (a) {</span>
+            // Scoped names are the lossless SymbolId identifier, never a display name.
+            // VariableExpr's constructors reserve/validate that identifier namespace.
+<span class="fc bfc" id="L188" title="All 4 branches covered.">            case VariableExpr x -&gt; b instanceof VariableExpr y &amp;&amp; sameText(x.name(), y.name());</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            case NumberExpr x -&gt; b instanceof NumberExpr y</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                &amp;&amp; sameInteger(x.value().numerator(), y.value().numerator())</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                &amp;&amp; sameInteger(x.value().denominator(), y.value().denominator());</span>
+<span class="fc bfc" id="L192" title="All 4 branches covered.">            case BinaryExpr x -&gt; b instanceof BinaryExpr y &amp;&amp; x.operator() == y.operator();</span>
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">            case FunctionExpr x -&gt; b instanceof FunctionExpr y &amp;&amp; x.arguments().size() == y.arguments().size()</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                &amp;&amp; sameText(x.name(), y.name());</span>
+        };
+    }
+
+    private int textHash(String text) {
+<span class="fc" id="L199">        int hash = 0;</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) { hash = mix(hash, text.charAt(i)); store.chargeIdentity(1); }</span>
+<span class="fc" id="L201">        return hash;</span>
+    }
+    private boolean sameText(String a, String b) {
+<span class="fc" id="L204">        store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (a == b) return true;</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (a.length() != b.length()) return false;</span>
+<span class="fc bfc" id="L207" title="All 4 branches covered.">        for (int i = 0; i &lt; a.length(); i++) { store.chargeIdentity(1); if (a.charAt(i) != b.charAt(i)) return false; }</span>
+<span class="fc" id="L208">        return true;</span>
+    }
+    private int integerHash(BigInteger value) {
+<span class="nc" id="L211">        var encoded = encoding(value); store.chargeIdentity(1);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (!encoded.hashed) {</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            for (byte valueByte : encoded.bytes) { encoded.hash = mix(encoded.hash, valueByte); store.chargeIdentity(1); }</span>
+<span class="nc" id="L214">            encoded.hashed = true; store.chargeIdentity(1);</span>
+        }
+<span class="nc" id="L216">        return encoded.hash;</span>
+    }
+    private boolean sameInteger(BigInteger a, BigInteger b) {
+<span class="fc" id="L219">        store.chargeIdentity(1);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (a == b) return true;</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">        if (a.getClass() != BigInteger.class || b.getClass() != BigInteger.class) {</span>
+<span class="nc" id="L222">            store.chargeIdentity(1); return a.equals(b);</span>
+        }
+<span class="fc" id="L224">        var leftEncoding = encoding(a); var rightEncoding = encoding(b);</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        boolean equal = leftEncoding.bytes.length == rightEncoding.bytes.length;</span>
+<span class="pc bpc" id="L226" title="1 of 4 branches missed.">        for (int i = 0; equal &amp;&amp; i &lt; leftEncoding.bytes.length; i++) {</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            store.chargeIdentity(1); equal = leftEncoding.bytes[i] == rightEncoding.bytes[i];</span>
+        }
+<span class="fc" id="L229">        return equal;</span>
+    }
+    private EncodedInteger encoding(BigInteger value) {
+<span class="fc" id="L232">        requireScalar(value);</span>
+<span class="fc" id="L233">        var known = encodings.get(value); store.chargeIdentity(1);</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (known != null) return known;</span>
+<span class="fc" id="L235">        pendingEncoding = new EncodedInteger(value.toByteArray());</span>
+<span class="fc" id="L236">        store.chargeIdentity(2L + pendingEncoding.bytes.length);</span>
+<span class="fc" id="L237">        encodings.put(value, pendingEncoding); store.chargeIdentity(1);</span>
+<span class="fc" id="L238">        encodingBytes = Math.addExact(encodingBytes, pendingEncoding.bytes.length);</span>
+<span class="fc" id="L239">        grew();</span>
+<span class="fc" id="L240">        return pendingEncoding;</span>
+    }
+    private void grew() {
+        // Lower bound from actual scratch slots; the enclosing observer still
+        // measures the complete ownership graph, including its own scan storage.
+<span class="fc" id="L245">        long references = 3L * hashing.size() + 2L * hashes.size() + 3L * comparing.size()</span>
+<span class="fc" id="L246">            + 3L * pairs.size() + 2L * pairEntries + 3L * encodings.size();</span>
+<span class="fc" id="L247">        store.checkIdentityScratch(references, encodingBytes);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (++growthSinceCheckpoint &gt;= CHECKPOINT_GROWTH) {</span>
+<span class="fc" id="L249">            growthSinceCheckpoint = 0;</span>
+<span class="fc" id="L250">            RetainedOperation.checkpoint();</span>
+        }
+<span class="fc" id="L252">    }</span>
+    private void requireScalar(BigInteger value) {
+<span class="fc" id="L254">        store.chargeIdentity(1);</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (value.getClass() != BigInteger.class) throw new IllegalArgumentException(&quot;unsupported scalar retention subclass&quot;);</span>
+<span class="fc" id="L256">    }</span>
+<span class="fc" id="L257">    private static int mix(int a, int b) { return 31 * a + b; }</span>
+    private static int children(Expr expression) {
+<span class="fc bfc" id="L259" title="All 3 branches covered.">        return switch (expression) { case BinaryExpr ignored -&gt; 2; case FunctionExpr f -&gt; f.arguments().size(); default -&gt; 0; };</span>
+    }
+    private static Expr child(Expr expression, int index) {
+<span class="pc bpc" id="L262" title="1 of 3 branches missed.">        return switch (expression) {</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            case BinaryExpr b -&gt; index == 0 ? b.left() : b.right();</span>
+<span class="fc" id="L264">            case FunctionExpr f -&gt; f.arguments().get(index);</span>
+<span class="nc" id="L265">            default -&gt; throw new IllegalArgumentException(&quot;leaf has no children&quot;);</span>
+        };
+    }
+    private void release() {
+        try {
+<span class="fc" id="L270">            store.chargeIdentity(Math.addExact(3L + hashing.size() + comparing.size() + 2L * encodings.size(),</span>
+<span class="fc" id="L271">                Math.addExact(2L * hashes.size(), Math.addExact(2L * pairs.size(), 2L * pairEntries))));</span>
+        } finally {
+<span class="fc" id="L273">            hashing.clear(); hashes.clear(); comparing.clear(); pairs.clear(); encodings.clear();</span>
+<span class="fc" id="L274">            currentHash = null; current = null; pendingEncoding = null;</span>
+        }
+<span class="fc" id="L276">    }</span>
+    private void finish(RetainedOperation.Frame retained, Throwable failure) {
+<span class="pc bpc" id="L278" title="1 of 4 branches missed.">        if (failure != null &amp;&amp; retained != null) {</span>
+            // An exceptional exit may precede the next batch/terminal observation.
+<span class="fc" id="L280">            try { RetainedOperation.checkpoint(); }</span>
+<span class="pc bnc" id="L281" title="All 2 branches missed.">            catch (RuntimeException | Error observation) { if (observation != failure) failure.addSuppressed(observation); }</span>
+        }
+<span class="fc" id="L283">        try { release(); }</span>
+<span class="fc" id="L284">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            if (failure == null) { failure = cleanup; throw cleanup; }</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">            if (cleanup != failure) failure.addSuppressed(cleanup);</span>
+<span class="fc" id="L287">        } finally { close(retained, failure); }</span>
+<span class="fc" id="L288">    }</span>
+    private static void close(RetainedOperation.Frame retained, Throwable failure) {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (retained == null) return;</span>
+<span class="fc" id="L291">        try { retained.close(); }</span>
+<span class="fc" id="L292">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            if (failure == null) throw cleanup;</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            if (cleanup != failure) failure.addSuppressed(cleanup);</span>
+<span class="fc" id="L295">        }</span>
+<span class="fc" id="L296">    }</span>
+    private static final class HashFrame implements RetainedGraph.View {
+        final Expr expression;
+        final HashFrame parent;
+        int nextChild, hash;
+        boolean initialized;
+<span class="fc" id="L302">        HashFrame(Expr expression, HashFrame parent) { this.expression = expression; this.parent = parent; }</span>
+<span class="fc" id="L303">        @Override public void retainedReferences(RetainedGraph.Visitor v) { v.reference(expression); v.reference(parent); }</span>
+    }
+<span class="fc" id="L305">    private record Pair(Expr left, Expr right) implements RetainedGraph.View {</span>
+<span class="fc" id="L306">        @Override public void retainedReferences(RetainedGraph.Visitor v) { v.reference(left); v.reference(right); }</span>
+    }
+    private static final class EncodedInteger implements RetainedGraph.View {
+        final byte[] bytes;
+        int hash;
+        boolean hashed;
+<span class="fc" id="L312">        EncodedInteger(byte[] bytes) { this.bytes = bytes; }</span>
+<span class="fc" id="L313">        @Override public void retainedReferences(RetainedGraph.Visitor v) { v.reference(bytes); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

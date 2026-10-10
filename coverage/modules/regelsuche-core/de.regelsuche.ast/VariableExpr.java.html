@@ -42,22 +42,26 @@ public final class VariableExpr implements Expr {
 <span class="fc" id="L42">        return Optional.ofNullable(symbol);</span>
     }
 
+    // Core identity avoids allocating an Optional while inspecting a value label.
+<span class="fc" id="L46">    SymbolId identitySymbol() { return symbol; }</span>
+
     @Override
     public boolean equals(Object other) {
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (this == other) return true;</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!(other instanceof VariableExpr variable)) return false;</span>
-<span class="pc bpc" id="L49" title="1 of 6 branches missed.">        return symbol == null ? variable.symbol == null &amp;&amp; name.equals(variable.name)</span>
-<span class="fc" id="L50">            : symbol.equals(variable.symbol);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.same(this, other);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (this == other) return true;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!(other instanceof VariableExpr variable)) return false;</span>
+<span class="pc bpc" id="L53" title="1 of 6 branches missed.">        return symbol == null ? variable.symbol == null &amp;&amp; name.equals(variable.name) : symbol.equals(variable.symbol);</span>
     }
 
     @Override
     public int hashCode() {
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        return symbol == null ? name.hashCode() : symbol.hashCode();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (de.regelsuche.retention.RetainedOperation.isObserved()) return ExpressionIdentity.valueHash(this);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        return symbol == null ? name.hashCode() : symbol.hashCode();</span>
     }
 
     @Override
     public String toString() {
-<span class="fc" id="L60">        return &quot;VariableExpr[name=&quot; + name + &quot;]&quot;;</span>
+<span class="fc" id="L64">        return &quot;VariableExpr[name=&quot; + name + &quot;]&quot;;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

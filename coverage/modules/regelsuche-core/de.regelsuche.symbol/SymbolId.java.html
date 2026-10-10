@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolId.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.symbol</a> &gt; <span class="el_source">SymbolId.java</span></div><h1>SymbolId.java</h1><pre class="source lang-java linenums">package de.regelsuche.symbol;
 
+import de.regelsuche.retention.RetainedOperation;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -7,45 +8,123 @@ import java.util.regex.Pattern;
 /** Stable symbol identity; neither a display name nor a mathematical proof. */
 public record SymbolId(UUID namespace, long ordinal) {
     public static final String IDENTIFIER_PREFIX = &quot;rsym_&quot;;
-<span class="fc" id="L10">    private static final Pattern IDENTIFIER = Pattern.compile(&quot;rsym_[0-9a-f]{32}_[1-9][0-9]{0,18}&quot;);</span>
+<span class="fc" id="L11">    private static final Pattern IDENTIFIER = Pattern.compile(&quot;rsym_[0-9a-f]{32}_[1-9][0-9]{0,18}&quot;);</span>
 
-<span class="fc" id="L12">    public SymbolId {</span>
-<span class="fc" id="L13">        Objects.requireNonNull(namespace, &quot;namespace&quot;);</span>
-<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (ordinal &lt; 1) {</span>
-<span class="fc" id="L15">            throw new IllegalArgumentException(&quot;symbol ordinal must be positive&quot;);</span>
+<span class="fc" id="L13">    public SymbolId {</span>
+<span class="fc" id="L14">        Objects.requireNonNull(namespace, &quot;namespace&quot;);</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if (ordinal &lt; 1) {</span>
+<span class="fc" id="L16">            throw new IllegalArgumentException(&quot;symbol ordinal must be positive&quot;);</span>
         }
-<span class="fc" id="L17">    }</span>
+<span class="fc" id="L18">    }</span>
 
     public String canonicalText() {
-<span class="fc" id="L20">        return namespace + &quot;:&quot; + ordinal;</span>
+<span class="fc" id="L21">        return namespace + &quot;:&quot; + ordinal;</span>
     }
 
     /** Reserved identifier understood by the existing expression parser and text engines. */
     public String identifier() {
-<span class="fc" id="L25">        return IDENTIFIER_PREFIX + namespace.toString().replace(&quot;-&quot;, &quot;&quot;) + &quot;_&quot; + ordinal;</span>
+<span class="fc" id="L26">        return IDENTIFIER_PREFIX + namespace.toString().replace(&quot;-&quot;, &quot;&quot;) + &quot;_&quot; + ordinal;</span>
     }
 
     public static SymbolId fromCanonicalText(String text) {
-<span class="fc" id="L29">        Objects.requireNonNull(text, &quot;text&quot;);</span>
-<span class="pc bpc" id="L30" title="1 of 6 branches missed.">        if (text.length() &lt; 38 || text.length() &gt; 56 || text.charAt(36) != ':') {</span>
-<span class="fc" id="L31">            throw new IllegalArgumentException(&quot;invalid canonical symbol ID&quot;);</span>
+<span class="fc" id="L30">        Objects.requireNonNull(text, &quot;text&quot;);</span>
+<span class="pc bpc" id="L31" title="1 of 6 branches missed.">        if (text.length() &lt; 38 || text.length() &gt; 56 || text.charAt(36) != ':') {</span>
+<span class="fc" id="L32">            throw new IllegalArgumentException(&quot;invalid canonical symbol ID&quot;);</span>
         }
-<span class="fc" id="L33">        var id = new SymbolId(UUID.fromString(text.substring(0, 36)), Long.parseLong(text.substring(37)));</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!id.canonicalText().equals(text)) {</span>
-<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;noncanonical symbol ID&quot;);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (RetainedOperation.isObserved()) return observedCanonicalText(text);</span>
+<span class="fc" id="L35">        var id = new SymbolId(UUID.fromString(text.substring(0, 36)), Long.parseLong(text.substring(37)));</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (!id.canonicalText().equals(text)) {</span>
+<span class="fc" id="L37">            throw new IllegalArgumentException(&quot;noncanonical symbol ID&quot;);</span>
         }
-<span class="fc" id="L37">        return id;</span>
+<span class="fc" id="L39">        return id;</span>
     }
 
     public static SymbolId fromIdentifier(String identifier) {
-<span class="fc" id="L41">        Objects.requireNonNull(identifier, &quot;identifier&quot;);</span>
-<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        if (identifier.length() &gt; 57 || !IDENTIFIER.matcher(identifier).matches()) {</span>
-<span class="fc" id="L43">            throw new IllegalArgumentException(&quot;invalid reserved symbol identifier&quot;);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(identifier, &quot;identifier&quot;);</span>
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        if (identifier.length() &gt; 57 || !IDENTIFIER.matcher(identifier).matches()) {</span>
+<span class="fc" id="L45">            throw new IllegalArgumentException(&quot;invalid reserved symbol identifier&quot;);</span>
         }
-<span class="fc" id="L45">        String hex = identifier.substring(5, 37);</span>
-<span class="fc" id="L46">        String uuid = hex.substring(0, 8) + &quot;-&quot; + hex.substring(8, 12) + &quot;-&quot; + hex.substring(12, 16)</span>
-<span class="fc" id="L47">            + &quot;-&quot; + hex.substring(16, 20) + &quot;-&quot; + hex.substring(20);</span>
-<span class="fc" id="L48">        return fromCanonicalText(uuid + &quot;:&quot; + identifier.substring(38));</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (RetainedOperation.isObserved()) return observedIdentifier(identifier);</span>
+<span class="fc" id="L48">        String hex = identifier.substring(5, 37);</span>
+<span class="fc" id="L49">        String uuid = hex.substring(0, 8) + &quot;-&quot; + hex.substring(8, 12) + &quot;-&quot; + hex.substring(12, 16)</span>
+<span class="fc" id="L50">            + &quot;-&quot; + hex.substring(16, 20) + &quot;-&quot; + hex.substring(20);</span>
+<span class="fc" id="L51">        return fromCanonicalText(uuid + &quot;:&quot; + identifier.substring(38));</span>
     }
+
+    /** Preserve the ordinary conversion while publishing its actual completed intermediates. */
+    private static SymbolId observedIdentifier(String identifier) {
+<span class="fc" id="L56">        Object[] parts = new Object[10];</span>
+<span class="fc" id="L57">        var retained = RetainedOperation.retainCompleted(1, identifier, parts);</span>
+<span class="fc" id="L58">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L60">            String hex = text(parts, 0, identifier.substring(5, 37));</span>
+<span class="fc" id="L61">            String first = text(parts, 1, hex.substring(0, 8));</span>
+<span class="fc" id="L62">            String second = text(parts, 2, hex.substring(8, 12));</span>
+<span class="fc" id="L63">            String third = text(parts, 3, hex.substring(12, 16));</span>
+<span class="fc" id="L64">            String fourth = text(parts, 4, hex.substring(16, 20));</span>
+<span class="fc" id="L65">            String fifth = text(parts, 5, hex.substring(20));</span>
+<span class="fc" id="L66">            String uuid = text(parts, 6, first + &quot;-&quot; + second + &quot;-&quot; + third + &quot;-&quot; + fourth + &quot;-&quot; + fifth);</span>
+<span class="fc" id="L67">            String ordinal = text(parts, 7, identifier.substring(38));</span>
+<span class="fc" id="L68">            String canonical = text(parts, 8, uuid + &quot;:&quot; + ordinal);</span>
+<span class="fc" id="L69">            var result = fromCanonicalText(canonical);</span>
+<span class="fc" id="L70">            parts[9] = result;</span>
+<span class="fc" id="L71">            RetainedOperation.work(1); // Handoff only; the nested conversion owns the symbol allocation.</span>
+<span class="fc" id="L72">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L73">            return result;</span>
+<span class="fc" id="L74">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L75">            primary = failure; observeFailure(failure); throw failure;</span>
+        } finally {
+<span class="fc" id="L77">            closeFrame(retained, primary);</span>
+        }
+    }
+
+    private static SymbolId observedCanonicalText(String canonical) {
+<span class="fc" id="L82">        Object[] parts = new Object[6];</span>
+<span class="fc" id="L83">        var retained = RetainedOperation.retainCompleted(1, canonical, parts);</span>
+<span class="fc" id="L84">        Throwable primary = null;</span>
+        try {
+<span class="fc" id="L86">            String uuid = text(parts, 0, canonical.substring(0, 36));</span>
+<span class="fc" id="L87">            UUID namespace = UUID.fromString(uuid);</span>
+<span class="fc" id="L88">            parts[1] = namespace;</span>
+<span class="fc" id="L89">            RetainedOperation.work(2);</span>
+<span class="fc" id="L90">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L91">            String ordinal = text(parts, 2, canonical.substring(37));</span>
+<span class="fc" id="L92">            var result = new SymbolId(namespace, Long.parseLong(ordinal));</span>
+<span class="fc" id="L93">            parts[3] = result;</span>
+<span class="fc" id="L94">            RetainedOperation.work(2);</span>
+<span class="fc" id="L95">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L96">            String namespaceText = text(parts, 4, namespace.toString());</span>
+<span class="fc" id="L97">            String normalized = text(parts, 5, namespaceText + &quot;:&quot; + result.ordinal());</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (!normalized.equals(canonical)) throw new IllegalArgumentException(&quot;noncanonical symbol ID&quot;);</span>
+<span class="fc" id="L99">            return result;</span>
+<span class="fc" id="L100">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L101">            primary = failure; observeFailure(failure); throw failure;</span>
+        } finally {
+<span class="fc" id="L103">            closeFrame(retained, primary);</span>
+        }
+    }
+
+    private static String text(Object[] owner, int index, String value) {
+<span class="fc" id="L108">        owner[index] = value;</span>
+<span class="fc" id="L109">        RetainedOperation.work(value.length() + 2L); // Completed text copy/allocation and holder write.</span>
+<span class="fc" id="L110">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L111">        return value;</span>
+    }
+
+    private static void observeFailure(Throwable failure) {
+<span class="fc" id="L115">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L116">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L118">        }</span>
+<span class="fc" id="L119">    }</span>
+
+    private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (frame == null) return;</span>
+<span class="fc" id="L123">        try { frame.close(); }</span>
+<span class="fc" id="L124">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
