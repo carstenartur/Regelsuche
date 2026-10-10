@@ -56,14 +56,14 @@ jobs:
           text = text.replace(conflict, '    static final String REVISION = "java-numeric-independent/v6";')
           assert '<<<<<<<' not in text and '>>>>>>>' not in text
           path.write_text(text)
-          # Main's versions contain every earlier test plus the later cost and
-          # proof-receipt regressions. Preserve their bytes without weakening them.
+          # Preserve main's additional cost and proof-receipt regressions byte-for-byte.
           for test in tests:
               Path(test).write_bytes(subprocess.check_output(['git','show','c1815c00813659de26fddfe0dbfc1cd212421d29:'+test]))
           subprocess.run(['git','add',checker,*tests],check=True)
           assert not subprocess.check_output(['git','diff','--name-only','--diff-filter=U']).strip()
           PY
-          git diff --cached --check
+          # Check this PR's delta, not pre-existing raw evidence logs brought in from main.
+          git diff --cached --check c1815c00813659de26fddfe0dbfc1cd212421d29
           git write-tree > "$RUNNER_TEMP/source-tree.txt"
           git diff --cached c1815c00813659de26fddfe0dbfc1cd212421d29 --stat >> "$RUNNER_TEMP/merge-audit.txt"
           cat "$RUNNER_TEMP/merge-audit.txt"
