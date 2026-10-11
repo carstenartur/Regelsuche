@@ -8,7 +8,7 @@ import java.util.*;
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
     // Exact quotient proofs and metered structural modular verification share this evidence revision.
-    static final String REVISION = "java-numeric-independent/v7";
+    static final String REVISION = "java-numeric-independent/v8";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
