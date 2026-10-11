@@ -3,6 +3,7 @@ package de.regelsuche.sdk.optimization;
 import de.regelsuche.search.program.*;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 public sealed interface OptimizationResult {
     enum SearchCompletion { EXHAUSTED_BOUNDED_SPACE, IMPROVEMENT_FOUND }
@@ -10,7 +11,13 @@ public sealed interface OptimizationResult {
             PreparedJointComputation.Cost sourceCost, PreparedJointComputation.Cost candidateCost,
             boolean estimatedRuntimeImprovement) {}
     record Candidate(JointComputationPlan plan, PreparedJointComputation prepared, VerificationEvidence evidence,
-            RuntimeObligations obligations, CostAssessment cost, SearchCompletion searchCompletion, long work) implements OptimizationResult {
+            RuntimeObligations obligations, CostAssessment cost, SearchCompletion searchCompletion, long work,
+            Optional<SearchDerivation> derivation) implements OptimizationResult {
+        /** Older/manual candidates remain usable, but no search history is invented for them. */
+        public Candidate(JointComputationPlan plan, PreparedJointComputation prepared, VerificationEvidence evidence,
+                RuntimeObligations obligations, CostAssessment cost, SearchCompletion searchCompletion, long work) {
+            this(plan, prepared, evidence, obligations, cost, searchCompletion, work, Optional.empty());
+        }
         public Candidate {
             var trusted = ComputationOptimizer.prepare(Objects.requireNonNull(plan));
             if (prepared == null || !trusted.nodes().equals(prepared.nodes())
@@ -19,7 +26,7 @@ public sealed interface OptimizationResult {
                 throw new IllegalArgumentException("PREPARED_PLAN_BINDING_DIFFERS");
             prepared = trusted;
             Objects.requireNonNull(evidence); Objects.requireNonNull(obligations);
-            Objects.requireNonNull(cost); Objects.requireNonNull(searchCompletion);
+            Objects.requireNonNull(cost); Objects.requireNonNull(searchCompletion); Objects.requireNonNull(derivation);
             if (work < 0) throw new IllegalArgumentException("NEGATIVE_OPTIMIZATION_WORK");
         }
     }
@@ -30,5 +37,9 @@ public sealed interface OptimizationResult {
     record Refuted(String diagnostic, Map<String, Object> counterexample) implements OptimizationResult {
         public Refuted { counterexample = Map.copyOf(counterexample); }
     }
-    record Inconclusive(String diagnostic) implements OptimizationResult {}
+    record Inconclusive(String diagnostic, long work) implements OptimizationResult {
+        /** Legacy/manual outcomes have unknown work; adapters must reserve their allocation. */
+        public Inconclusive(String diagnostic) { this(diagnostic, -1); }
+        public Inconclusive { if (work < -1) throw new IllegalArgumentException("NEGATIVE_OPTIMIZATION_WORK"); }
+    }
 }

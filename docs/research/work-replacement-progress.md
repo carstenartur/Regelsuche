@@ -102,6 +102,41 @@ the unchanged-source rerun completed. P03 is the accepted predecessor for P04.
 
 ## P04 — additive foundation, total qualification incomplete
 
+### 2026-10-10 recovery and declared-inventory follow-up
+
+#1081 was integrated at `c1815c00813659de26fddfe0dbfc1cd212421d29` after full
+required head CI37987198320, including aggregate ciCheck114021652224 with passed
+coverage. The current reconstruction starts from main
+`fba017704a95f58cb99d1f66cdeece013cdb901e`, preserving the intervening SDK changes.
+Automatic workspace maintenance removed the unpublished follow-up and local
+evidence, so it is reconstructed under new source identities, not passed off as
+byte-identical recovery. The published predecessor evidence remains unchanged.
+
+Fresh unchanged-base verification: Core1147, Search673 and Learning1089 tests,
+zero failures/errors/skips. The opt-in V8/V4 reconstruction has 28 passing focused
+tests (Core4/Search20/Learning4), including actual learning/load, one lazy selected
+application and a fresh JVM with positive load/compile/query/export charges.
+The initial reconstruction RED is an absent-API compilation failure, not a
+claimed behavioral RED. The independent review found a lost paid failure prefix
+in primitive verification. Three behavioral RED tests reproduce expected4 versus
+actual0; the correction transfers the completed regeneration receipt once.
+All16 correction/ownership tests pass, and a fresh full run passes Core1151,
+Search696 and Learning1093 (2940 total, zero failures/errors/skips). The first
+full run's three reflection-fixture failures and the review RED remain retained.
+Fresh MathAlgorithms320 tests also pass. The frozen default-V7 corpus produces
+13 byte-identical JSON outputs in each of two fresh JVMs, including the previous
+diagnostic24/26 and frozen-budget0/26 results; no failure is hidden. AI quality
+passes with the pinned extractor and unchanged thresholds, selectors and baseline.
+The tested source is local `d65456505bfb018d1baa78842ede56f2f2f249de`, published
+as tree-identical `df2b73a4f27badb7a615a2467583dd0f55dbfe0f`. Required hosted CI
+and regular PR review/integration remain pending. P04 is not complete;
+no P05–P12 or economic learning-success claim follows from this checkpoint.
+See [the recovery plan](../superpowers/plans/2026-10-10-native-execution-recovery.md).
+Raw attempts, fresh verification and source history are in
+[the evidence archive](evidence/work-replacement/p04-declared-execution-20261010/README.md).
+
+### Integrated foundation history
+
 [PR #1054](https://github.com/carstenartur/Regelsuche/pull/1054) prepares native
 immutable Expr execution through the existing shared frontier, pickers and
 managed cursor lifecycle. Primitive rules, the existing compiled-program

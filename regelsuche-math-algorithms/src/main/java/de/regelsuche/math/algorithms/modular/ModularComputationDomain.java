@@ -12,7 +12,7 @@ import java.util.*;
  * Proofs use the existing exact Polynomial representation, on the integer affine fragment.
  */
 public final class ModularComputationDomain {
-    public static final String REVISION = "regelsuche.modular-affine-domain/v1";
+    public static final String REVISION = "regelsuche.modular-affine-domain/v4";
     private static final int MAX_NODES = 2_048;
     private static final int MAX_DEPTH = 96;
     public record NormalizedInput(String value, String modulus) {
@@ -53,7 +53,7 @@ public final class ModularComputationDomain {
 
     /** Exact execution semantics. All local modpow/modmul premises are checked at use as well. */
     public BigInteger evaluate(String operation, List<BigInteger> arguments) {
-        int arity = switch (operation) { case "modpow", "modmul" -> 3; case "add", "sub", "mul" -> 2;
+        int arity = switch (operation) { case "modpow", "modmul" -> 3; case "add", "sub", "mul", "mod" -> 2;
             default -> throw new IllegalArgumentException("unsupported modular operator"); };
         if (arguments.size() != arity || arguments.stream().anyMatch(Objects::isNull)) throw new IllegalArgumentException("operator arity/value differs");
         BigInteger left = arguments.getFirst(), right = arguments.get(1);
@@ -62,6 +62,7 @@ public final class ModularComputationDomain {
             case "add" -> left.add(right);
             case "sub" -> left.subtract(right);
             case "mul" -> left.multiply(right);
+            case "mod" -> left.mod(right);
             case "modmul" -> left.multiply(right).mod(arguments.get(2));
             case "modpow" -> {
                 if (right.signum() < 0) throw new IllegalArgumentException("nonnegative integer exponent required");
@@ -76,35 +77,109 @@ public final class ModularComputationDomain {
      */
     public Generation generate(List<Expr> outputs, int maximumCandidates) {
         if (maximumCandidates < 1) throw new IllegalArgumentException("positive candidate cap required");
-        var work = new Work();
+        var candidates = new Candidates(outputs, maximumCandidates);
         var powers = new LinkedHashSet<FunctionExpr>();
-        for (Expr output : outputs) collect(output, powers, work, 0);
-        var result = new LinkedHashMap<List<Expr>, Rewrite>();
-        for (var current : powers) {
-            Power e;
-            try { e = power(current, work); } catch (IllegalArgumentException invalid) { continue; }
-            if (e.exponent().equals(Polynomial.constant(Rational.ONE)) && normalized(e.base(), e.modulus())) {
-                var changed = replace(outputs, current, e.base(), work);
-                result.putIfAbsent(changed, new Rewrite("modpow-unit-normalized", changed));
-                if (result.size() >= maximumCandidates) return new Generation(List.copyOf(result.values()), work.units, false);
-            }
-            for (var available : powers) {
-                work.units++;
-                if (current.equals(available)) continue;
-                Power f;
-                try { f = power(available, work); } catch (IllegalArgumentException invalid) { continue; }
-                if (!e.base().equals(f.base()) || !e.modulus().equals(f.modulus()) || f.exponent().isZero()) continue;
-                Polynomial difference = e.exponent().subtract(f.exponent());
-                work.units += e.exponent().termCount() + f.exponent().termCount();
-                if (difference.isZero() || !nonnegative(difference)) continue;
-                Expr residual = new FunctionExpr("modpow", List.of(e.base(), expression(difference), e.modulus()));
-                Expr product = new FunctionExpr("modmul", List.of(available, residual, e.modulus()));
-                var changed = replace(outputs, current, product, work);
-                result.putIfAbsent(changed, new Rewrite("modpow-available-exponent-difference", changed));
-                if (result.size() >= maximumCandidates) return new Generation(List.copyOf(result.values()), work.units, false);
+        var products = new LinkedHashSet<FunctionExpr>();
+        var reductions = new LinkedHashSet<FunctionExpr>();
+        for (Expr output : outputs) collect(output, powers, products, reductions, candidates.work, 0);
+        boolean complete = addReductions(reductions, candidates) && addReducingProducts(products, candidates) && addAvailablePowers(powers, candidates);
+        return new Generation(List.copyOf(candidates.rewrites.values()), candidates.work.units, complete);
+    }
+
+    private boolean addReductions(Set<FunctionExpr> reductions, Candidates candidates) {
+        for (var reduction : reductions) {
+            if (reduction.arguments().size() != 2) continue;
+            Expr value = reduction.arguments().getFirst(), modulus = reduction.arguments().get(1);
+            // Propose only an already normalized value; the checker proves the premises.
+            if (modulus.equals(outputModulus(value, modulus))
+                    && !candidates.add(reduction, value, "mod-already-reduced")) return false;
+        }
+        return true;
+    }
+
+    /** A residue may replace a unit power only at its matching reducing use. */
+    private boolean addReducingProducts(Set<FunctionExpr> products, Candidates candidates) {
+        for (var product : products) {
+            if (product.arguments().size() != 3) continue;
+            for (int index = 0; index < 2; index++) {
+                Expr factor = product.arguments().get(index);
+                if (!(factor instanceof FunctionExpr function)) continue;
+                Power unit = supportedPower(function, candidates.work);
+                if (unit == null || !unit.modulus().equals(product.arguments().get(2))
+                        || !unit.exponent().equals(Polynomial.constant(Rational.ONE))) continue;
+                var arguments = new ArrayList<>(product.arguments());
+                arguments.set(index, unit.base());
+                if (!candidates.add(product, new FunctionExpr("modmul", arguments), "modmul-unit-power-residue"))
+                    return false;
             }
         }
-        return new Generation(List.copyOf(result.values()), work.units, true);
+        return true;
+    }
+
+    private boolean addAvailablePowers(Set<FunctionExpr> powers, Candidates candidates) {
+        for (var current : powers) {
+            Power exponent = supportedPower(current, candidates.work);
+            if (exponent == null) continue;
+            if (exponent.exponent().equals(Polynomial.constant(Rational.ONE))
+                    && normalized(exponent.base(), exponent.modulus())
+                    && !candidates.add(current, exponent.base(), "modpow-unit-normalized")) return false;
+            if (!addSmallConstantPower(current, candidates)) return false;
+            if (!addExponentDifferences(current, exponent, powers, candidates)) return false;
+        }
+        return true;
+    }
+
+    /** Bounded binary exponentiation proposals, still checked by the ordinary modular normal form. */
+    private boolean addSmallConstantPower(FunctionExpr current, Candidates candidates) {
+        if (!(current.arguments().get(1) instanceof NumberExpr number) || !number.value().isInteger()) return true;
+        BigInteger integer = number.value().numerator();
+        if (integer.compareTo(BigInteger.TWO) < 0 || integer.compareTo(BigInteger.valueOf(16)) > 0) return true;
+        int exponent = integer.intValueExact();
+        Expr factor = current.arguments().getFirst(), result = null, modulus = current.arguments().get(2);
+        while (exponent != 0) {
+            candidates.work.units++;
+            if ((exponent & 1) != 0) result = result == null ? factor : new FunctionExpr("modmul", List.of(result, factor, modulus));
+            exponent >>>= 1;
+            if (exponent != 0) factor = new FunctionExpr("modmul", List.of(factor, factor, modulus));
+        }
+        return candidates.add(current, result, "modpow-small-binary-chain");
+    }
+
+    private boolean addExponentDifferences(FunctionExpr current, Power exponent,
+            Set<FunctionExpr> powers, Candidates candidates) {
+        for (var available : powers) {
+            candidates.work.units++;
+            if (current.equals(available)) continue;
+            Power known = supportedPower(available, candidates.work);
+            if (known == null || !exponent.base().equals(known.base())
+                    || !exponent.modulus().equals(known.modulus()) || known.exponent().isZero()) continue;
+            Polynomial difference = exponent.exponent().subtract(known.exponent());
+            candidates.work.units += exponent.exponent().termCount() + known.exponent().termCount();
+            if (difference.isZero() || !nonnegative(difference)) continue;
+            Expr residual = new FunctionExpr("modpow", List.of(exponent.base(), expression(difference), exponent.modulus()));
+            Expr product = new FunctionExpr("modmul", List.of(available, residual, exponent.modulus()));
+            if (!candidates.add(current, product, "modpow-available-exponent-difference")) return false;
+        }
+        return true;
+    }
+
+    private Power supportedPower(FunctionExpr expression, Work work) {
+        try { return power(expression, work); }
+        catch (IllegalArgumentException outsideFragment) { return null; }
+    }
+
+    /** Preserve insertion order, unique-output counting and one shared work ledger. */
+    private static final class Candidates {
+        private final List<Expr> outputs;
+        private final int maximum;
+        private final Work work = new Work();
+        private final Map<List<Expr>, Rewrite> rewrites = new LinkedHashMap<>();
+        Candidates(List<Expr> outputs, int maximum) { this.outputs = outputs; this.maximum = maximum; }
+        boolean add(Expr source, Expr replacement, String rule) {
+            var changed = replace(outputs, source, replacement, work);
+            rewrites.putIfAbsent(changed, new Rewrite(rule, changed));
+            return rewrites.size() < maximum;
+        }
     }
 
     /** Independently compare exponent normal forms. Does not call generate or trust its rule labels. */
@@ -113,10 +188,20 @@ public final class ModularComputationDomain {
         try {
             if (source.size() != target.size() || source.isEmpty()) return new Verification(false, 1);
             for (int i = 0; i < source.size(); i++) {
-                Power left = normalForm(source.get(i), null, work, 0);
-                Power right = normalForm(target.get(i), left.modulus(), work, 0);
+                boolean equal = false;
+                try {
+                    Power left = normalForm(source.get(i), null, work, 0, false);
+                    equal = left.equals(normalForm(target.get(i), left.modulus(), work, 0, false));
+                } catch (IllegalArgumentException outsideSingleBase) { /* Try the product residue fragment. */ }
+                if (!equal) {
+                    Expr modulus = outputModulus(source.get(i), null);
+                    if (modulus == null || !modulus.equals(outputModulus(target.get(i), modulus)))
+                        return new Verification(false, work.units);
+                    requirePositive(modulus);
+                    equal = residue(source.get(i), modulus, work, 0).equals(residue(target.get(i), modulus, work, 0));
+                }
                 work.units++;
-                if (!left.equals(right)) return new Verification(false, work.units);
+                if (!equal) return new Verification(false, work.units);
             }
             return new Verification(true, Math.max(1, work.units));
         } catch (IllegalArgumentException invalid) {
@@ -124,7 +209,88 @@ public final class ModularComputationDomain {
         }
     }
 
-    private Power normalForm(Expr expression, Expr expectedModulus, Work work, int depth) {
+    /** A bare output must be normalized, not merely congruent modulo the modulus. */
+    private Expr outputModulus(Expr expression, Expr expected) {
+        if (expression instanceof FunctionExpr f) {
+            if (f.name().equals("mod") && f.arguments().size() == 2) return f.arguments().get(1);
+            if ((f.name().equals("modpow") || f.name().equals("modmul")) && f.arguments().size() == 3)
+                return f.arguments().get(2);
+        }
+        if (expression instanceof VariableExpr v) {
+            var matches = normalized.stream().filter(p -> p.value().equals(v.name())
+                    && (expected == null || expected.equals(new VariableExpr(p.modulus())))).toList();
+            if (matches.size() == 1) return new VariableExpr(matches.getFirst().modulus());
+        }
+        return null;
+    }
+
+    /** Independent multiplicative residue normal form. Additive subexpressions are
+     * exact opaque atoms; no distribution or unbounded polynomial expansion is needed.
+     * Inner reductions are erased only under the same positive outer modulus.
+     */
+    private Map<Expr, Polynomial> residue(Expr expression, Expr modulus, Work work, int depth) {
+        work.visit(depth);
+        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL)
+            return product(residue(binary.left(), modulus, work, depth + 1), residue(binary.right(), modulus, work, depth + 1), work);
+        if (expression instanceof FunctionExpr f && modulus.equals(outputModulus(f, modulus))) {
+            requirePositive(modulus);
+            if (f.name().equals("mod")) return residue(f.arguments().getFirst(), modulus, work, depth + 1);
+            if (f.name().equals("modmul")) return product(residue(f.arguments().getFirst(), modulus, work, depth + 1),
+                    residue(f.arguments().get(1), modulus, work, depth + 1), work);
+            if (f.name().equals("modpow")) {
+                Polynomial exponent = affine(f.arguments().get(1), work, 0);
+                if (!nonnegative(exponent)) throw new IllegalArgumentException("nonnegative exponent required");
+                var result = new HashMap<Expr, Polynomial>();
+                for (var entry : residue(f.arguments().getFirst(), modulus, work, depth + 1).entrySet()) {
+                    // Keep the established affine proof bound, even for nested powers.
+                    if (entry.getValue().totalDegree() + exponent.totalDegree() > 1)
+                        throw new IllegalArgumentException("affine combined exponent required");
+                    work.units += (long) Math.max(1, entry.getValue().termCount()) * Math.max(1, exponent.termCount());
+                    Polynomial power = entry.getValue().multiply(exponent);
+                    if (!power.isZero()) result.put(entry.getKey(), boundedExponent(power));
+                }
+                return result;
+            }
+        }
+        validateValue(expression, work, depth + 1);
+        return Map.of(expression, Polynomial.constant(Rational.ONE));
+    }
+
+    private static Map<Expr, Polynomial> product(Map<Expr, Polynomial> left, Map<Expr, Polynomial> right, Work work) {
+        var result = new HashMap<>(left);
+        for (var entry : right.entrySet()) {
+            Polynomial previous = result.getOrDefault(entry.getKey(), Polynomial.zero());
+            work.units += previous.termCount() + entry.getValue().termCount();
+            result.put(entry.getKey(), boundedExponent(previous.add(entry.getValue())));
+        }
+        if (result.size() > 128) throw new IllegalArgumentException("residue atom bound exceeded");
+        return result;
+    }
+
+    private static Polynomial boundedExponent(Polynomial exponent) {
+        if (exponent.termCount() > 128 || exponent.terms().values().stream().anyMatch(c -> c.numerator().bitLength() > 4096))
+            throw new IllegalArgumentException("residue exponent bound exceeded");
+        return exponent;
+    }
+
+    private void validateValue(Expr expression, Work work, int depth) {
+        work.visit(depth);
+        if (expression instanceof VariableExpr || expression instanceof NumberExpr n && n.value().isInteger()) return;
+        if (expression instanceof BinaryExpr b && Set.of(BinaryOperator.ADD, BinaryOperator.SUB, BinaryOperator.MUL).contains(b.operator())) {
+            validateValue(b.left(), work, depth + 1); validateValue(b.right(), work, depth + 1); return;
+        }
+        if (expression instanceof FunctionExpr f && outputModulus(f, null) != null) {
+            requirePositive(outputModulus(f, null));
+            validateValue(f.arguments().getFirst(), work, depth + 1);
+            if (f.name().equals("modmul")) validateValue(f.arguments().get(1), work, depth + 1);
+            if (f.name().equals("modpow") && !nonnegative(affine(f.arguments().get(1), work, 0)))
+                throw new IllegalArgumentException("nonnegative exponent required");
+            return;
+        }
+        throw new IllegalArgumentException("unsupported integer value");
+    }
+
+    private Power normalForm(Expr expression, Expr expectedModulus, Work work, int depth, boolean reducedByParent) {
         work.visit(depth);
         if (expression instanceof FunctionExpr function && function.name().equals("modpow")) {
             Power result = power(function, work);
@@ -135,11 +301,18 @@ public final class ModularComputationDomain {
             Expr modulus = function.arguments().get(2);
             requirePositive(modulus);
             if (expectedModulus != null && !expectedModulus.equals(modulus)) throw new IllegalArgumentException("modulus differs");
-            Power left = normalForm(function.arguments().getFirst(), modulus, work, depth + 1);
-            Power right = normalForm(function.arguments().get(1), modulus, work, depth + 1);
+            Power left = normalForm(function.arguments().getFirst(), modulus, work, depth + 1, true);
+            Power right = normalForm(function.arguments().get(1), modulus, work, depth + 1, true);
             if (!left.base().equals(right.base())) throw new IllegalArgumentException("product bases differ");
             work.units += left.exponent().termCount() + right.exponent().termCount();
             return new Power(left.base(), left.exponent().add(right.exponent()), modulus);
+        }
+        // Congruent factors need not already be normalized: the parent modmul
+        // reduces their product. This permission must never reach a bare output.
+        if (reducedByParent && expectedModulus != null
+                && (expression instanceof VariableExpr || expression instanceof NumberExpr n && n.value().isInteger())) {
+            requirePositive(expectedModulus);
+            return new Power(expression, Polynomial.constant(Rational.ONE), expectedModulus);
         }
         if (expression instanceof VariableExpr variable) {
             var matches = normalized.stream().filter(p -> p.value().equals(variable.name())
@@ -155,7 +328,7 @@ public final class ModularComputationDomain {
     private Power power(FunctionExpr expression, Work work) {
         if (!expression.name().equals("modpow") || expression.arguments().size() != 3) throw new IllegalArgumentException("modpow arity differs");
         Expr base = expression.arguments().getFirst(), modulus = expression.arguments().get(2);
-        if (!(base instanceof VariableExpr || base instanceof NumberExpr n && n.value().isInteger())) throw new IllegalArgumentException("scalar base required");
+        validateValue(base, work, 0);
         requirePositive(modulus);
         Polynomial exponent = affine(expression.arguments().get(1), work, 0);
         if (!nonnegative(exponent)) throw new IllegalArgumentException("nonnegative affine exponent not proved");
@@ -216,13 +389,15 @@ public final class ModularComputationDomain {
         }
         return result == null ? new NumberExpr(0) : result;
     }
-    private static void collect(Expr expression, Set<FunctionExpr> powers, Work work, int depth) {
+    private static void collect(Expr expression, Set<FunctionExpr> powers, Set<FunctionExpr> products, Set<FunctionExpr> reductions, Work work, int depth) {
         work.visit(depth);
         if (expression instanceof FunctionExpr f) {
-            for (var argument : f.arguments()) collect(argument, powers, work, depth + 1);
+            for (var argument : f.arguments()) collect(argument, powers, products, reductions, work, depth + 1);
             if (f.name().equals("modpow")) powers.add(f);
+            if (f.name().equals("modmul")) products.add(f);
+            if (f.name().equals("mod")) reductions.add(f);
         } else if (expression instanceof BinaryExpr b) {
-            collect(b.left(), powers, work, depth + 1); collect(b.right(), powers, work, depth + 1);
+            collect(b.left(), powers, products, reductions, work, depth + 1); collect(b.right(), powers, products, reductions, work, depth + 1);
         }
     }
     private static List<Expr> replace(List<Expr> outputs, Expr source, Expr target, Work work) {

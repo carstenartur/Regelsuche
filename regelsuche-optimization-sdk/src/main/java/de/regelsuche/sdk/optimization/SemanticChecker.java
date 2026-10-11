@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    static final String REVISION = "java-numeric-independent/v5";
+    static final String REVISION = "java-numeric-independent/v6";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;

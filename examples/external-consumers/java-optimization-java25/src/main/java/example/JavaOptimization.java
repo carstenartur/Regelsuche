@@ -25,6 +25,13 @@ public final class JavaOptimization {
         if (!Integer.valueOf(Integer.MAX_VALUE).equals(candidate.prepared().execute(Map.of("x", Integer.MAX_VALUE)).get("out")))
             throw new AssertionError("Java wraparound changed");
         System.out.println("optimization=VERIFIED");
+        var explained = ComputationExplanations.describe(preserve, candidate, CancellationToken.NONE);
+        var derivation = explained.explanation().orElseThrow().derivation().orElseThrow();
+        if (derivation.steps().isEmpty()
+                || !derivation.steps().getFirst().before().equals(source.expression())
+                || !derivation.steps().getLast().after().equals(candidate.plan().expression()))
+            throw new AssertionError("selected search path lost in standalone distribution");
+        System.out.println("derivation=REPLAYED_SELECTED_PATH");
         var checked = request(source, SafetyProfile.CHECKED_THROW);
         var checkedCandidate = requireCandidate(optimizer.optimize(checked, CancellationToken.NONE));
         try {

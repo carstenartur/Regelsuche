@@ -27,7 +27,9 @@ class IndependentCandidateTest {
         var result = optimizer.optimize(request, CancellationToken.NONE);
         var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result::toString);
         assertEquals(X, candidate.plan().outputExpressions().getFirst());
-        assertEquals(unsafe, candidate.plan().outputExpressions().get(1));
+        // General algebra may commute pure multiplication operands. The division
+        // must still be present: cancelling it would change overflow behavior.
+        assertEquals(NumericOperation.DIVIDE, JavaExpressions.operationOf(candidate.plan().outputExpressions().get(1)).orElseThrow());
         assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request, candidate, CancellationToken.NONE));
         for (int x : new int[] {0, 1, -1, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
             var inputs = Map.<String, Object>of("x", x, "y", Integer.MAX_VALUE);
@@ -44,7 +46,11 @@ class IndependentCandidateTest {
         var request = request(plan, Set.of());
         var result = optimizer.optimize(request, CancellationToken.NONE);
         var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result::toString);
-        assertEquals(operation(NumericOperation.ADD, X, unsafe), candidate.plan().outputExpressions().getFirst());
+        Expr rewritten = candidate.plan().outputExpressions().getFirst();
+        assertEquals(NumericOperation.ADD, JavaExpressions.operationOf(rewritten).orElseThrow());
+        assertTrue(JavaExpressions.operands(rewritten).contains(X));
+        assertTrue(JavaExpressions.operands(rewritten).stream().anyMatch(e ->
+                JavaExpressions.operationOf(e).orElse(null) == NumericOperation.DIVIDE));
         assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request, candidate, CancellationToken.NONE));
         var inputs = Map.<String, Object>of("x", Integer.MAX_VALUE, "y", Integer.MIN_VALUE);
         assertEquals(ComputationOptimizer.prepare(plan).execute(inputs), candidate.prepared().execute(inputs));

@@ -6,6 +6,7 @@ import de.regelsuche.retention.*;
 final class NativeExportSession implements RetainedOperation.Sink {
     private NativeMoveSearch.Result source;
     private final long budget;
+    private final boolean qualificationRequested,executionQualified;
     private final SearchExpressionStore.Limits limits;
     private RetainedOperation operation;
     private RetainedJson.Scope json;
@@ -16,6 +17,8 @@ final class NativeExportSession implements RetainedOperation.Sink {
     private NativeExportSession(NativeMoveSearch.Result source,long budget,SearchExpressionStore.Limits limits){
         if(budget<0)throw new IllegalArgumentException("negative export work budget");
         this.source=java.util.Objects.requireNonNull(source);this.budget=budget;this.limits=java.util.Objects.requireNonNull(limits);work=3;
+        qualificationRequested=source.qualificationRequested();executionQualified=source.accountingComplete();
+        if(qualificationRequested)executionWork(2);
     }
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(limits);v.reference(operation);v.reference(json);v.reference(projection);v.reference(detail);}
     @Override public void executionWork(long amount){if(amount<0)throw new IllegalArgumentException("negative export work");work=Math.addExact(work,amount);}
@@ -47,7 +50,8 @@ final class NativeExportSession implements RetainedOperation.Sink {
             finally{json=null;operation.close();operation=null;source=null;executionWork(3);}
         }
         if(work>budget)fail("NATIVE_EXPORT_WORK_EXHAUSTED");if(!complete)projection=null;
-        var receipt=new NativeMoveSearch.ExportAccounting(budget);
+        var receipt=new NativeMoveSearch.ExportAccounting(budget,qualificationRequested,executionQualified);
+        if(qualificationRequested)executionWork(2);
         var output=new NativeMoveSearch.ExportResult(projection,receipt);
         var retained=new RetainedGraph.Usage(0,0,0);
         boolean changed;

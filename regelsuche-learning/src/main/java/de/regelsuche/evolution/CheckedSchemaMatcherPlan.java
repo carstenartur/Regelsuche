@@ -110,6 +110,10 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
         return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));
     }
     final class NativeProvider implements ExprIncrementalProvider,RetainedGraph.View {
+        boolean ownedBy(CheckedLearnedSchemaModel expected){
+            de.regelsuche.retention.RetainedOperation.work(1);
+            return model==expected && expected.ownsApplication(application);
+        }
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}
         private NativeProvider() {}
         @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
