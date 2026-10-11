@@ -34,10 +34,9 @@ public final class ModularJointPlans implements ComputationBackend, JointPlanSea
         };
         else if (expression instanceof FunctionExpr function && (function.name().equals("modpow") || function.name().equals("modmul"))) {
             id = function.name(); arity = 3;
-            // Declared static estimates, not timing claims. Small literal exponents have a bounded bit-cost.
-            work = id.equals("modmul") ? 10 : 1_000;
-            if (id.equals("modpow") && function.arguments().size() == 3 && function.arguments().get(1) instanceof NumberExpr n
-                    && n.value().isInteger() && n.value().signum() >= 0) work = Math.max(1, 2L * n.value().numerator().bitLength());
+            work = id.equals("modmul") ? ModularOperationCosts.MULTIPLY_WORK : ModularOperationCosts.POWER_FALLBACK_WORK;
+            if (id.equals("modpow") && function.arguments().size() == 3)
+                work = ModularOperationCosts.powerWork(function.arguments().get(1));
         } else throw new IllegalArgumentException("unsupported modular operation");
         return new Operation(id, Collections.nCopies(arity, INTEGER), INTEGER, work, 1);
     }

@@ -9,6 +9,20 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class ModularComputationDomainTest {
+    @Test void boundedBinaryPowersRetainReductionAndRequireTheirModulus() {
+        for (int exponent = 2; exponent <= 16; exponent++) {
+            var source = List.of(pow(new NumberExpr(exponent)));
+            var generated = domain().generate(source, 64);
+            var replacement = generated.rewrites().stream().filter(r -> r.rule().equals("modpow-small-binary-chain")).findFirst().orElseThrow();
+            assertTrue(domain().verifyEquivalent(source, replacement.outputs()).accepted());
+            assertFalse(new ModularComputationDomain(Set.of(), Set.of(), Set.of()).verifyEquivalent(source, replacement.outputs()).accepted());
+        }
+        for (int exponent : new int[] {-1, 0, 1, 17, Integer.MAX_VALUE}) {
+            assertTrue(domain().generate(List.of(pow(new NumberExpr(exponent))), 64).rewrites().stream()
+                    .noneMatch(r -> r.rule().equals("modpow-small-binary-chain")));
+        }
+        assertTrue(domain().generate(List.of(pow(new NumberExpr(2))), 1).rewrites().size() <= 1);
+    }
     private static final Expr A = new VariableExpr("a"), X = new VariableExpr("x"), N = new VariableExpr("N");
     private static final Expr XP1 = new BinaryExpr(X, ADD, new NumberExpr(1));
     private static final Expr TWOXP1 = new BinaryExpr(new BinaryExpr(new NumberExpr(2), MUL, X), ADD, new NumberExpr(1));

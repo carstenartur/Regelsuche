@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-core-algebra-proposals/v1";
+    static final String REVISION = "java-core-algebra-proposals/v2";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
