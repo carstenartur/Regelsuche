@@ -7,12 +7,12 @@ import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.*;
 
-/** Bounded affine modular laws and their independent semantic checker.
+/** Bounded modular arithmetic and affine exponent laws with their independent semantic checker.
  * No search engine, desired target, variable-name convention or special exponent is built in.
  * Proofs use the existing exact Polynomial representation, on the integer affine fragment.
  */
 public final class ModularComputationDomain {
-    public static final String REVISION = "regelsuche.modular-affine-domain/v4";
+    public static final String REVISION = "regelsuche.modular-affine-domain/v5";
     private static final int MAX_NODES = 2_048;
     private static final int MAX_DEPTH = 96;
     public record NormalizedInput(String value, String modulus) {
@@ -29,6 +29,13 @@ public final class ModularComputationDomain {
     }
     public record Verification(boolean accepted, long work) {}
     private record Power(Expr base, Polynomial exponent, Expr modulus) {}
+    private record ArithmeticReduction(Expr value, boolean removed) {}
+    private sealed interface ResidueAtom permits ExactAtom, AdditiveAtom {}
+    private record ExactAtom(Expr value, Expr modulus) implements ResidueAtom {}
+    private record AdditiveAtom(BinaryOperator operator, Map<Integer, Polynomial> left,
+            Map<Integer, Polynomial> right, Expr modulus) implements ResidueAtom {
+        AdditiveAtom { left = Map.copyOf(left); right = Map.copyOf(right); }
+    }
     private final Set<String> nonnegative;
     private final Set<String> positive;
     private final Set<NormalizedInput> normalized;
@@ -82,7 +89,15 @@ public final class ModularComputationDomain {
         var products = new LinkedHashSet<FunctionExpr>();
         var reductions = new LinkedHashSet<FunctionExpr>();
         for (Expr output : outputs) collect(output, powers, products, reductions, candidates.work, 0);
-        boolean complete = addReductions(reductions, candidates) && addReducingProducts(products, candidates) && addAvailablePowers(powers, candidates);
+        boolean complete = addReductions(reductions, candidates)
+            && addReducingProducts(products, candidates) && addAvailablePowers(powers, candidates);
+        if (complete) {
+            try { complete = addArithmeticReductions(reductions, products, candidates); }
+            catch (StructuralBoundExceeded exhausted) {
+                // Additional exploration must not discard already generated legacy proposals.
+                complete = false;
+            }
+        }
         return new Generation(List.copyOf(candidates.rewrites.values()), candidates.work.units, complete);
     }
 
@@ -95,6 +110,52 @@ public final class ModularComputationDomain {
                     && !candidates.add(reduction, value, "mod-already-reduced")) return false;
         }
         return true;
+    }
+
+    /** Erase congruent inner reductions only inside a retained positive reducing root.
+     * This is a syntactic proposal; it does not call the independent residue checker.
+     */
+    private boolean addArithmeticReductions(Set<FunctionExpr> reductions, Set<FunctionExpr> products, Candidates candidates) {
+        var roots = new LinkedHashSet<>(reductions);
+        roots.addAll(products);
+        for (var root : roots) {
+            Expr modulus = outputModulus(root, null);
+            if (modulus == null) continue;
+            try { requirePositive(modulus); }
+            catch (IllegalArgumentException unprovedModulus) { continue; }
+            Expr value = root.name().equals("mod") ? root.arguments().getFirst()
+                : new BinaryExpr(root.arguments().getFirst(), BinaryOperator.MUL, root.arguments().get(1));
+            var reduced = eraseInnerArithmeticReductions(value, modulus, candidates.work, 0);
+            // Do not introduce a fused-to-ordinary conversion unless an inner reduction was removed.
+            // Replace this whole root: an inner value may also be a separately normalized output.
+            if (reduced.removed() && !candidates.add(root,
+                    new FunctionExpr("mod", List.of(reduced.value(), modulus)), "mod-arithmetic-inner-reductions")) return false;
+        }
+        return true;
+    }
+
+    private ArithmeticReduction eraseInnerArithmeticReductions(Expr value, Expr modulus, Work work, int depth) {
+        work.visit(depth);
+        if (value instanceof BinaryExpr binary && Set.of(BinaryOperator.ADD, BinaryOperator.SUB, BinaryOperator.MUL).contains(binary.operator())) {
+            var left = eraseInnerArithmeticReductions(binary.left(), modulus, work, depth + 1);
+            var right = eraseInnerArithmeticReductions(binary.right(), modulus, work, depth + 1);
+            boolean removed = left.removed() || right.removed();
+            return new ArithmeticReduction(removed ? new BinaryExpr(left.value(), binary.operator(), right.value()) : value, removed);
+        }
+        if (value instanceof FunctionExpr function && modulus.equals(outputModulus(function, modulus))) {
+            if (function.name().equals("mod")) {
+                var inner = eraseInnerArithmeticReductions(function.arguments().getFirst(), modulus, work, depth + 1);
+                return new ArithmeticReduction(inner.value(), true);
+            }
+            if (function.name().equals("modmul")) {
+                var left = eraseInnerArithmeticReductions(function.arguments().getFirst(), modulus, work, depth + 1);
+                var right = eraseInnerArithmeticReductions(function.arguments().get(1), modulus, work, depth + 1);
+                return new ArithmeticReduction(new BinaryExpr(left.value(), BinaryOperator.MUL, right.value()), true);
+            }
+        }
+        // A different modulus stops the entire traversal. Exponents, modulus arguments,
+        // modpow calls and all other operators are opaque to this proposal.
+        return new ArithmeticReduction(value, false);
     }
 
     /** A residue may replace a unit power only at its matching reducing use. */
@@ -182,7 +243,7 @@ public final class ModularComputationDomain {
         }
     }
 
-    /** Independently compare exponent normal forms. Does not call generate or trust its rule labels. */
+    /** Independently compare residue/exponent normal forms. Does not call generate or trust its rule labels. */
     public Verification verifyEquivalent(List<Expr> source, List<Expr> target) {
         var work = new Work();
         try {
@@ -224,14 +285,21 @@ public final class ModularComputationDomain {
         return null;
     }
 
-    /** Independent multiplicative residue normal form. Additive subexpressions are
-     * exact opaque atoms; no distribution or unbounded polynomial expansion is needed.
+    /** Independent multiplicative residue normal form with ordered congruent additive atoms.
+     * Additive operands are compared recursively without distribution or polynomial expansion.
      * Inner reductions are erased only under the same positive outer modulus.
      */
-    private Map<Expr, Polynomial> residue(Expr expression, Expr modulus, Work work, int depth) {
+    private Map<Integer, Polynomial> residue(Expr expression, Expr modulus, Work work, int depth) {
         work.visit(depth);
-        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL)
-            return product(residue(binary.left(), modulus, work, depth + 1), residue(binary.right(), modulus, work, depth + 1), work);
+        if (expression instanceof BinaryExpr binary) {
+            if (binary.operator() == BinaryOperator.MUL)
+                return product(residue(binary.left(), modulus, work, depth + 1), residue(binary.right(), modulus, work, depth + 1), work);
+            if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB) {
+                var left = residue(binary.left(), modulus, work, depth + 1);
+                var right = residue(binary.right(), modulus, work, depth + 1);
+                return Map.of(work.atom(new AdditiveAtom(binary.operator(), left, right, modulus)), Polynomial.constant(Rational.ONE));
+            }
+        }
         if (expression instanceof FunctionExpr f && modulus.equals(outputModulus(f, modulus))) {
             requirePositive(modulus);
             if (f.name().equals("mod")) return residue(f.arguments().getFirst(), modulus, work, depth + 1);
@@ -240,7 +308,7 @@ public final class ModularComputationDomain {
             if (f.name().equals("modpow")) {
                 Polynomial exponent = affine(f.arguments().get(1), work, 0);
                 if (!nonnegative(exponent)) throw new IllegalArgumentException("nonnegative exponent required");
-                var result = new HashMap<Expr, Polynomial>();
+                var result = new HashMap<Integer, Polynomial>();
                 for (var entry : residue(f.arguments().getFirst(), modulus, work, depth + 1).entrySet()) {
                     // Keep the established affine proof bound, even for nested powers.
                     if (entry.getValue().totalDegree() + exponent.totalDegree() > 1)
@@ -253,10 +321,10 @@ public final class ModularComputationDomain {
             }
         }
         validateValue(expression, work, depth + 1);
-        return Map.of(expression, Polynomial.constant(Rational.ONE));
+        return Map.of(work.atom(new ExactAtom(expression, modulus)), Polynomial.constant(Rational.ONE));
     }
 
-    private static Map<Expr, Polynomial> product(Map<Expr, Polynomial> left, Map<Expr, Polynomial> right, Work work) {
+    private static Map<Integer, Polynomial> product(Map<Integer, Polynomial> left, Map<Integer, Polynomial> right, Work work) {
         var result = new HashMap<>(left);
         for (var entry : right.entrySet()) {
             Polynomial previous = result.getOrDefault(entry.getKey(), Polynomial.zero());
@@ -410,12 +478,27 @@ public final class ModularComputationDomain {
         if (expression instanceof BinaryExpr b) return new BinaryExpr(replace(b.left(), source, target, work), b.operator(), replace(b.right(), source, target, work));
         return expression;
     }
+    private static final class StructuralBoundExceeded extends IllegalArgumentException {
+        StructuralBoundExceeded() { super("modular proof structural bound exceeded"); }
+    }
     private static final class Work {
         private long units = 1;
         private int visits;
+        private final Map<ResidueAtom, Integer> atoms = new HashMap<>();
+        /** Shared only by this verification. Child identifiers make additive-key hashing
+         * and equality shallow; the modulus is part of every key's congruence context.
+         */
+        int atom(ResidueAtom atom) {
+            units++;
+            if (atom instanceof AdditiveAtom additive) {
+                units += additive.left().values().stream().mapToLong(p -> Math.max(1, p.termCount())).sum();
+                units += additive.right().values().stream().mapToLong(p -> Math.max(1, p.termCount())).sum();
+            }
+            return atoms.computeIfAbsent(atom, ignored -> atoms.size());
+        }
         void visit(int depth) {
             units++;
-            if (++visits > MAX_NODES || depth > MAX_DEPTH) throw new IllegalArgumentException("modular proof structural bound exceeded");
+            if (++visits > MAX_NODES || depth > MAX_DEPTH) throw new StructuralBoundExceeded();
         }
     }
 }
