@@ -81,6 +81,7 @@ final class ModularBridge {
             case ADD -> new BinaryExpr(args.getFirst(), BinaryOperator.ADD, args.get(1));
             case SUBTRACT -> new BinaryExpr(args.getFirst(), BinaryOperator.SUB, args.get(1));
             case MULTIPLY -> new BinaryExpr(args.getFirst(), BinaryOperator.MUL, args.get(1));
+            case MOD -> new FunctionExpr("mod", args);
             case MOD_POW -> new FunctionExpr("modpow", args);
             case MOD_MULTIPLY -> new FunctionExpr("modmul", args);
             default -> throw new IllegalArgumentException("OUTSIDE_MODULAR_FRAGMENT");
@@ -94,7 +95,7 @@ final class ModularBridge {
         }, fromModular(b.left()), fromModular(b.right()));
         var f = (FunctionExpr)expression;
         return JavaExpressions.operation(NumericKind.BIG_INTEGER, switch(f.name()) {
-            case "modpow" -> NumericOperation.MOD_POW; case "modmul" -> NumericOperation.MOD_MULTIPLY;
+            case "mod" -> NumericOperation.MOD; case "modpow" -> NumericOperation.MOD_POW; case "modmul" -> NumericOperation.MOD_MULTIPLY;
             default -> throw new IllegalArgumentException("OUTSIDE_MODULAR_FRAGMENT");
         }, f.arguments().stream().map(ModularBridge::fromModular).toArray(Expr[]::new));
     }

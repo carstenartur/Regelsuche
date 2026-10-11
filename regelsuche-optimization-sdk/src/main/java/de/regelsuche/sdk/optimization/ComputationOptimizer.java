@@ -45,9 +45,9 @@ public final class ComputationOptimizer {
             // the incomplete status when no improvement was actually proved.
             long beforeFinal=work.used();
             var proof=checker.check(request.plan(),found.plan());
-            if(!proof.accepted()) return new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED");
             long total=Math.max(work.used(),Math.addExact(searchWork,work.used()-beforeFinal));
-            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",total);
+            var finalOutcome=finalVerificationOutcome(proof.accepted(),total,budget.maximumWork());
+            if(finalOutcome.isPresent()) return finalOutcome.get();
             var obligations=obligations(request,found.plan());
             var cost=cost(request,found.plan(),obligations);
             long preparationWork=cost.sourceCost().inspectionWork()+2*cost.candidateCost().inspectionWork();
@@ -60,7 +60,7 @@ public final class ComputationOptimizer {
             if(!improved && explorationLimited)
                 return new OptimizationResult.BudgetExceeded("SEARCH_BUDGET_EXCEEDED",total);
             if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
-                return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION");
+                return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION",total);
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
             var receipt = evidence(request,found.plan(),proof,obligations);
             long beforeDerivation = work.used();
@@ -72,6 +72,12 @@ public final class ComputationOptimizer {
         } catch(VerificationWork.Stopped stopped) {
             return stopped.cancelled ? new OptimizationResult.Cancelled("CANCELLED") : new OptimizationResult.BudgetExceeded("OPTIMIZATION_BUDGET_EXCEEDED",work.used());
         } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }
+    }
+    /** Classify aggregate search/proof work before any final proof outcome or preparation. */
+    static Optional<OptimizationResult> finalVerificationOutcome(boolean proofAccepted,long totalWork,long maximumWork) {
+        if(totalWork>maximumWork) return Optional.of(new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",totalWork));
+        if(!proofAccepted) return Optional.of(new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED",totalWork));
+        return Optional.empty();
     }
     public VerificationResult verify(OptimizationRequest request, JointComputationPlan candidate, CancellationToken token) {
         Objects.requireNonNull(request); Objects.requireNonNull(candidate);
