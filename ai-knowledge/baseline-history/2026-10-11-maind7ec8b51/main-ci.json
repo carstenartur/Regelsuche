@@ -1,0 +1,142 @@
+{
+  "repository": "carstenartur/Regelsuche",
+  "run": {
+    "id": 38134140137,
+    "name": "CI",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "d7ec8b51d164dc58dbb3e9e328af8bb356425b93",
+    "head_branch": "main",
+    "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/38134140137",
+    "run_attempt": 1,
+    "created_at": "2026-10-11T11:02:56Z",
+    "updated_at": "2026-10-11T11:55:51Z"
+  },
+  "jobs": [
+    {
+      "id": 114454431384,
+      "name": "Isolated JMH authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454431512,
+      "name": "Complete Maven product and Docker authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454431516,
+      "name": "External polynomial comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454431533,
+      "name": "Checked Lean and SMT proof authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454431534,
+      "name": "Typed source-only learning comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454431569,
+      "name": "Checkout-local Gradle authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454431636,
+      "name": "Isolated SymPy runtime authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454432025,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454432149,
+      "name": "Retained JMH precision study v2 analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454432186,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114454432552,
+      "name": "Retained JMH precision study analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114463624241,
+      "name": "Checkout-local ciCheck",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    },
+    {
+      "id": 114463735755,
+      "name": "Publish generated reports",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38134140137
+    }
+  ],
+  "corroboratingArtifact": {
+    "id": 11701386604,
+    "name": "quality-acceptance-evidence",
+    "size_in_bytes": 29172778,
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/11701386604",
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/11701386604/zip",
+    "expired": false,
+    "created_at": "2026-10-11T11:55:06Z",
+    "expires_at": "2027-01-09T11:02:56Z",
+    "updated_at": "2026-10-11T11:55:06Z",
+    "digest": "sha256:d65b2b2063839367183d4d66b050ff24259e6ba846367e3df3ab2c6897a7d0fd",
+    "workflow_run": {
+      "id": 38134140137,
+      "repository_id": 1243764016,
+      "head_repository_id": 1243764016,
+      "head_branch": "main",
+      "head_sha": "d7ec8b51d164dc58dbb3e9e328af8bb356425b93"
+    }
+  },
+  "zipBytesDownloadedAndDigestVerified": true,
+  "retainedReports": {
+    "check.json": {
+      "nativeSha256": "0076917437d17d653814cbdf28183505774dfa0ff8465bd1a36590cc42150118",
+      "retainedMainCiSha256": "0076917437d17d653814cbdf28183505774dfa0ff8465bd1a36590cc42150118",
+      "byteIdentical": true
+    },
+    "complexity.json": {
+      "nativeSha256": "2a9afa3300014e94ed890ac5eb6ab32b3901bda0614701e1f78df94ae1cc4d48",
+      "retainedMainCiSha256": "2a9afa3300014e94ed890ac5eb6ab32b3901bda0614701e1f78df94ae1cc4d48",
+      "byteIdentical": true
+    }
+  },
+  "retention": "Original API records, quality-acceptance index, baseline, check, complexity and hotspot report are in supporting-evidence.tar.gz. The ZIP itself remains an independently digest-verified source, not a committed duplicate."
+}
