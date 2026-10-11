@@ -5,6 +5,8 @@ import de.regelsuche.ast.NumberExpr;
 
 /** Shared static ranking estimates for the modular and Java computation backends, not timing claims. */
 public final class ModularOperationCosts {
+    public static final long ARITHMETIC_WORK = 4;
+    /** Work for the fused modular multiplication operation. */
     public static final long MULTIPLY_WORK = 10;
     public static final long POWER_FALLBACK_WORK = 1_000;
 
@@ -12,9 +14,9 @@ public final class ModularOperationCosts {
 
     /** Include setup/conversion work so a small literal power can compete with its multiplication chain. */
     public static long powerWork(Expr exponent) {
-<span class="pc bpc" id="L15" title="1 of 6 branches missed.">        if (exponent instanceof NumberExpr number &amp;&amp; number.value().isInteger() &amp;&amp; number.value().signum() &gt;= 0)</span>
-<span class="fc" id="L16">            return 32L + 2L * number.value().numerator().bitLength();</span>
-<span class="fc" id="L17">        return POWER_FALLBACK_WORK;</span>
+<span class="pc bpc" id="L17" title="1 of 6 branches missed.">        if (exponent instanceof NumberExpr number &amp;&amp; number.value().isInteger() &amp;&amp; number.value().signum() &gt;= 0)</span>
+<span class="fc" id="L18">            return 32L + 2L * number.value().numerator().bitLength();</span>
+<span class="fc" id="L19">        return POWER_FALLBACK_WORK;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

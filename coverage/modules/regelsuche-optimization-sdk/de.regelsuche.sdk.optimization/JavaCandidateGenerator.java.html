@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = &quot;java-core-algebra-proposals/v3&quot;;
+    static final String REVISION = &quot;java-core-algebra-proposals/v4&quot;;
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -133,7 +133,7 @@ final class JavaCandidateGenerator {
     private Expr simplifyProductsAndBitwise(Expr result, NumericOperation op, NumericKind kind,
                                            List&lt;Expr&gt; arguments, Expr left, Expr right) {
 <span class="fc bfc" id="L135" title="All 2 branches covered.">        if (op == NumericOperation.MULTIPLY) {</span>
-<span class="pc bpc" id="L136" title="2 of 4 branches missed.">            if (number(right, 1)) return left; if (number(left, 1)) return right;</span>
+<span class="fc bfc" id="L136" title="All 4 branches covered.">            if (number(right, 1)) return left; if (number(left, 1)) return right;</span>
 <span class="fc bfc" id="L137" title="All 4 branches covered.">            if (number(right, 0) || number(left, 0)) return constant(kind, 0);</span>
         }
 <span class="fc bfc" id="L139" title="All 2 branches covered.">        if (op == NumericOperation.DIVIDE) {</span>

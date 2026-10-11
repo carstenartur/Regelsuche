@@ -71,9 +71,9 @@ final class ModularBridge {
         // The modular checker still independently establishes positivity and matching modulus.
 <span class="fc bfc" id="L72" title="All 2 branches covered.">        if (JavaExpressions.operationOf(expression).orElse(null)==NumericOperation.MOD) {</span>
 <span class="fc" id="L73">            var original=JavaExpressions.operands(expression);</span>
-<span class="pc bpc" id="L74" title="2 of 4 branches missed.">            if(original.size()==2 &amp;&amp; JavaExpressions.operationOf(original.getFirst()).orElse(null)==NumericOperation.MULTIPLY) {</span>
-<span class="nc" id="L75">                var product=JavaExpressions.operands(original.getFirst());</span>
-<span class="nc" id="L76">                return new FunctionExpr(&quot;modmul&quot;,List.of(toModular(product.getFirst()),toModular(product.get(1)),toModular(original.get(1))));</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if(original.size()==2 &amp;&amp; JavaExpressions.operationOf(original.getFirst()).orElse(null)==NumericOperation.MULTIPLY) {</span>
+<span class="fc" id="L75">                var product=JavaExpressions.operands(original.getFirst());</span>
+<span class="fc" id="L76">                return new FunctionExpr(&quot;modmul&quot;,List.of(toModular(product.getFirst()),toModular(product.get(1)),toModular(original.get(1))));</span>
             }
         }
 <span class="fc" id="L79">        var args = JavaExpressions.operands(expression).stream().map(ModularBridge::toModular).toList();</span>

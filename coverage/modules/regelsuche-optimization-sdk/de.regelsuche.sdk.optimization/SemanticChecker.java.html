@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    static final String REVISION = &quot;java-numeric-independent/v6&quot;;
+    static final String REVISION = &quot;java-numeric-independent/v7&quot;;
 <span class="fc" id="L11">    record Proof(boolean accepted, List&lt;String&gt; methods, long work) { Proof { methods = List.copyOf(methods); } }</span>
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -240,7 +240,7 @@ final class SemanticChecker {
 <span class="fc" id="L240">        return plan.outputs().stream().map(output -&gt; List.&lt;Object&gt;of(output.name(),output.type())).toList();</span>
     }
 <span class="fc" id="L242">    private boolean has(SemanticAssumption.Kind kind,String name) { return request.assumptions().stream().anyMatch(a -&gt;</span>
-<span class="pc bpc" id="L243" title="1 of 6 branches missed.">        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE &amp;&amp; a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)</span>
+<span class="fc bfc" id="L243" title="All 6 branches covered.">        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE &amp;&amp; a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)</span>
 <span class="fc bfc" id="L244" title="All 2 branches covered.">            &amp;&amp; a.subject().equals(name)); }</span>
     private boolean positive(Expr expression) {
 <span class="fc bfc" id="L246" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) return has(SemanticAssumption.Kind.POSITIVE,v.name());</span>
@@ -256,7 +256,7 @@ final class SemanticChecker {
 <span class="nc" id="L256">                throw new IllegalArgumentException(&quot;POSSIBLE_DIVISION_EXCEPTION&quot;);</span>
         }
 <span class="fc bfc" id="L258" title="All 7 branches covered.">        if (kind==NumericKind.BIG_INTEGER) switch(op.get()) {</span>
-<span class="pc bpc" id="L259" title="1 of 2 branches missed.">            case MOD -&gt; { if (!positive(args.get(1))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            case MOD -&gt; { if (!positive(args.get(1))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
             case MOD_POW -&gt; {
                 try {
 <span class="fc" id="L262">                    var proof = new ModularBridge(request.assumptions()).verify(expression,expression); work.charge(proof.work());</span>

@@ -26,10 +26,10 @@ public final class ModularJointPlans implements ComputationBackend, JointPlanSea
 <span class="nc" id="L26">    @Override public Object literal(NumberExpr literal) { literalType(literal); return literal.value().numerator(); }</span>
     @Override public Operation operation(Expr expression) {
         String id;
-<span class="fc" id="L29">        long work = 1;</span>
+<span class="fc" id="L29">        long work = ModularOperationCosts.ARITHMETIC_WORK;</span>
 <span class="fc" id="L30">        int arity = 2;</span>
-<span class="pc bpc" id="L31" title="5 of 6 branches missed.">        if (expression instanceof BinaryExpr binary) id = switch (binary.operator()) {</span>
-<span class="nc" id="L32">            case ADD -&gt; &quot;add&quot;; case SUB -&gt; &quot;sub&quot;; case MUL -&gt; &quot;mul&quot;;</span>
+<span class="pc bpc" id="L31" title="1 of 6 branches missed.">        if (expression instanceof BinaryExpr binary) id = switch (binary.operator()) {</span>
+<span class="fc" id="L32">            case ADD -&gt; &quot;add&quot;; case SUB -&gt; &quot;sub&quot;; case MUL -&gt; &quot;mul&quot;;</span>
 <span class="nc" id="L33">            default -&gt; throw new IllegalArgumentException(&quot;unsupported integer operation&quot;);</span>
         };
 <span class="pc bpc" id="L35" title="1 of 4 branches missed.">        else if (expression instanceof FunctionExpr function &amp;&amp; function.name().equals(&quot;mod&quot;)) id = &quot;mod&quot;;</span>
