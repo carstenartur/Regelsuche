@@ -225,12 +225,12 @@ final class SemanticChecker {
 <span class="fc bfc" id="L225" title="All 4 branches covered.">        if (JavaExpressions.castSourceKind(result).isEmpty() || !JavaExpressions.isLiteral(args.getFirst())) return result;</span>
 <span class="fc" id="L226">        var backend=new JavaNumericBackend(request.plan().inputs());</span>
 <span class="fc" id="L227">        var value=backend.apply(backend.operation(result),List.of(JavaExpressions.literalValue(args.getFirst())));</span>
-<span class="pc bpc" id="L228" title="4 of 8 branches missed.">        return switch(JavaExpressions.resultKind(result)) {</span>
+<span class="pc bpc" id="L228" title="3 of 8 branches missed.">        return switch(JavaExpressions.resultKind(result)) {</span>
 <span class="fc" id="L229">            case BYTE -&gt; JavaExpressions.literal((Byte)value);</span>
 <span class="fc" id="L230">            case SHORT -&gt; JavaExpressions.literal((Short)value);</span>
 <span class="fc" id="L231">            case CHAR -&gt; JavaExpressions.literal((Character)value);</span>
 <span class="fc" id="L232">            case INT -&gt; JavaExpressions.literal((Integer)value);</span>
-<span class="nc" id="L233">            case LONG -&gt; JavaExpressions.literal((Long)value);</span>
+<span class="fc" id="L233">            case LONG -&gt; JavaExpressions.literal((Long)value);</span>
 <span class="nc" id="L234">            case FLOAT -&gt; JavaExpressions.literal((Float)value);</span>
 <span class="nc" id="L235">            case DOUBLE -&gt; JavaExpressions.literal((Double)value);</span>
 <span class="nc" id="L236">            case BIG_INTEGER -&gt; throw new IllegalArgumentException(&quot;NO_IMPLICIT_BIG_INTEGER_CONVERSION&quot;);</span>

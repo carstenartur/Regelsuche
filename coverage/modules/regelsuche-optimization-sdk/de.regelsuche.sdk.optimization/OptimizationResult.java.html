@@ -37,6 +37,10 @@ public sealed interface OptimizationResult {
     record Refuted(String diagnostic, Map&lt;String, Object&gt; counterexample) implements OptimizationResult {
 <span class="nc" id="L38">        public Refuted { counterexample = Map.copyOf(counterexample); }</span>
     }
-<span class="fc" id="L40">    record Inconclusive(String diagnostic) implements OptimizationResult {}</span>
+    record Inconclusive(String diagnostic, long work) implements OptimizationResult {
+        /** Legacy/manual outcomes have unknown work; adapters must reserve their allocation. */
+<span class="fc" id="L42">        public Inconclusive(String diagnostic) { this(diagnostic, -1); }</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        public Inconclusive { if (work &lt; -1) throw new IllegalArgumentException(&quot;NEGATIVE_OPTIMIZATION_WORK&quot;); }</span>
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
