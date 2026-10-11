@@ -9,8 +9,9 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * {@link ProofWorker} that emits an SMT-LIB 2 script and—when Z3 or CVC5 is
- * present on the system PATH—executes it to obtain a confirmed proof.
+ * {@link ProofWorker} that emits a typed SMT-LIB 2 artifact and can confirm
+ * its exact obligation through the checked Z3 adapter. Raw transport, including
+ * the current cvc5 executor, cannot authorize a mathematical proof.
  *
  * &lt;p&gt;Without an executor the worker behaves identically to the old
  * {@link SmtProofBridge}: it generates a {@code .smt2} script and reports
@@ -19,41 +20,48 @@ import java.util.Objects;
 public final class SmtProofWorker implements ProofWorker {
 
     private final ProofBridgeService service;
+    private final ProverExecutor executor;
 
-    /** Skeleton-only constructor (no artifact written, no executor). */
+    /** Generation-only constructor (no artifact written, no executor). */
     public SmtProofWorker() {
-<span class="fc" id="L25">        this(null, null);</span>
-<span class="fc" id="L26">    }</span>
+<span class="fc" id="L27">        this(null, null);</span>
+<span class="fc" id="L28">    }</span>
 
     /** Writes artifacts to {@code artifactDirectory}; tries to run Z3. */
     public SmtProofWorker(Path artifactDirectory) {
-<span class="nc" id="L30">        this(artifactDirectory, ProverExecutor.z3());</span>
-<span class="nc" id="L31">    }</span>
+<span class="nc" id="L32">        this(artifactDirectory, ProverExecutor.z3());</span>
+<span class="nc" id="L33">    }</span>
 
     /** Full constructor — caller chooses the executor (Z3, CVC5, …). */
-<span class="fc" id="L34">    public SmtProofWorker(Path artifactDirectory, ProverExecutor executor) {</span>
-<span class="fc" id="L35">        this.service = new ProofBridgeService(new SmtProofBridge(), artifactDirectory, executor);</span>
-<span class="fc" id="L36">    }</span>
+<span class="fc" id="L36">    public SmtProofWorker(Path artifactDirectory, ProverExecutor executor) {</span>
+<span class="fc" id="L37">        this.executor = executor;</span>
+<span class="fc" id="L38">        this.service = new ProofBridgeService(new SmtProofBridge(), artifactDirectory, executor);</span>
+<span class="fc" id="L39">    }</span>
 
     @Override
     public Result prove(RuleCandidate candidate, List&lt;Assumption&gt; assumptions) {
-<span class="fc" id="L40">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L41">        Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
-<span class="fc" id="L42">        long start = System.currentTimeMillis();</span>
-<span class="fc" id="L43">        ProofBridgeService.ProofAttemptOutcome outcome = service.attemptWithDetails(candidate, assumptions);</span>
-<span class="fc" id="L44">        long duration = System.currentTimeMillis() - start;</span>
-<span class="fc" id="L45">        return new Result(</span>
-<span class="fc" id="L46">            outcome.candidate(),</span>
-<span class="fc" id="L47">            outcome.candidate().proofStatus(),</span>
-<span class="fc" id="L48">            outcome.attempt().artifact(),</span>
-<span class="fc" id="L49">            outcome.attempt().tool(),</span>
+<span class="fc" id="L43">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L45">        long start = System.currentTimeMillis();</span>
+<span class="fc" id="L46">        ProofBridgeService.ProofAttemptOutcome outcome = service.attemptWithDetails(candidate, assumptions);</span>
+<span class="fc" id="L47">        long duration = System.currentTimeMillis() - start;</span>
+<span class="fc" id="L48">        return new Result(</span>
+<span class="fc" id="L49">            outcome.candidate(),</span>
+<span class="fc" id="L50">            outcome.candidate().proofStatus(),</span>
+<span class="fc" id="L51">            outcome.attempt().artifact(),</span>
+<span class="fc" id="L52">            outcome.attempt().tool(),</span>
             duration
         );
     }
 
     @Override
+    public String cacheIdentity() {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        return executor == null ? &quot;proof-cache/v2/smtlib2/generation-only&quot; : executor.cacheIdentity();</span>
+    }
+
+    @Override
     public String workerId() {
-<span class="fc" id="L56">        return &quot;smtlib2&quot;;</span>
+<span class="fc" id="L64">        return &quot;smtlib2&quot;;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -33,8 +33,10 @@ public record ProverExecutionResult(
 <span class="fc" id="L33">        PROVER_TIMEOUT,</span>
         /** The prover finished, but reported a non-success exit code. */
 <span class="fc" id="L35">        PROVER_FAILED,</span>
-        /** The prover finished and signalled success. */
-<span class="fc" id="L37">        PROVER_CONFIRMED</span>
+        /** A custom command succeeded without checked mathematical evidence. */
+<span class="fc" id="L37">        PROCESS_SUCCEEDED,</span>
+        /** The exact typed obligation was confirmed by a checked backend. */
+<span class="fc" id="L39">        PROVER_CONFIRMED</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

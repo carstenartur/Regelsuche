@@ -240,7 +240,7 @@ final class SemanticChecker {
 <span class="fc" id="L240">        return plan.outputs().stream().map(output -&gt; List.&lt;Object&gt;of(output.name(),output.type())).toList();</span>
     }
 <span class="fc" id="L242">    private boolean has(SemanticAssumption.Kind kind,String name) { return request.assumptions().stream().anyMatch(a -&gt;</span>
-<span class="fc bfc" id="L243" title="All 6 branches covered.">        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE &amp;&amp; a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)</span>
+<span class="pc bpc" id="L243" title="1 of 6 branches missed.">        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE &amp;&amp; a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)</span>
 <span class="fc bfc" id="L244" title="All 2 branches covered.">            &amp;&amp; a.subject().equals(name)); }</span>
     private boolean positive(Expr expression) {
 <span class="fc bfc" id="L246" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) return has(SemanticAssumption.Kind.POSITIVE,v.name());</span>

@@ -209,89 +209,96 @@ public final class ProofJobScheduler implements AutoCloseable {
 <span class="nc" id="L209">            return;</span>
         }
 
-        // Check proof cache before dispatching
-<span class="fc" id="L213">        ProofCacheKey cacheKey = ProofCacheKey.of(</span>
-<span class="fc" id="L214">            job.leftPattern(), job.rightPattern(), job.assumptions(), worker.workerId());</span>
-<span class="fc" id="L215">        Optional&lt;CandidateProofStatus&gt; cached = proofCache.get(cacheKey);</span>
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (cached.isPresent()) {</span>
-<span class="fc" id="L217">            jobRepository.save(job.withDone(cached.get()));</span>
-<span class="fc" id="L218">            return;</span>
+        // Status-only caches cannot establish a formal proof, even with a current key.
+        // A future reusable proof cache must independently replay its retained evidence.
+<span class="fc" id="L214">        String cacheIdentity = worker.cacheIdentity();</span>
+<span class="fc" id="L215">        ProofCacheKey cacheKey = ProofCacheKey.of(</span>
+<span class="fc" id="L216">            job.leftPattern(), job.rightPattern(), job.assumptions(), cacheIdentity);</span>
+<span class="fc" id="L217">        Optional&lt;CandidateProofStatus&gt; cached = proofCache.get(cacheKey)</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            .filter(status -&gt; status != CandidateProofStatus.FORMALLY_PROVED);</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">        if (cached.isPresent() &amp;&amp; cacheIdentity.equals(worker.cacheIdentity())) {</span>
+<span class="fc" id="L220">            jobRepository.save(job.withDone(cached.get()));</span>
+<span class="fc" id="L221">            return;</span>
         }
 
         // Mark as RUNNING
-<span class="fc" id="L222">        jobRepository.save(job.withStatus(ProofJobStatus.RUNNING));</span>
+<span class="fc" id="L225">        jobRepository.save(job.withStatus(ProofJobStatus.RUNNING));</span>
 
         // Build a minimal RuleCandidate for the worker
-<span class="fc" id="L225">        RuleCandidate candidate = new RuleCandidate(</span>
-<span class="fc" id="L226">            job.leftPattern(),</span>
-<span class="fc" id="L227">            job.rightPattern(),</span>
+<span class="fc" id="L228">        RuleCandidate candidate = new RuleCandidate(</span>
+<span class="fc" id="L229">            job.leftPattern(),</span>
+<span class="fc" id="L230">            job.rightPattern(),</span>
             0,
             0.0,
             0,
             false,
             false,
             false,
-<span class="fc" id="L234">            List.of(),</span>
+<span class="fc" id="L237">            List.of(),</span>
             RuleStatus.NEW,
             CandidateProofStatus.OBSERVED,
             &quot;&quot;
         );
 
         // Submit to the shared worker executor with timeout
-<span class="fc" id="L241">        Future&lt;ProofWorker.Result&gt; future = workerExecutor</span>
-<span class="fc" id="L242">            .submit(() -&gt; worker.prove(candidate, job.assumptions()));</span>
-<span class="fc" id="L243">        runningFutures.put(job.id(), future);</span>
+<span class="fc" id="L244">        Future&lt;ProofWorker.Result&gt; future = workerExecutor</span>
+<span class="fc" id="L245">            .submit(() -&gt; worker.prove(candidate, job.assumptions()));</span>
+<span class="fc" id="L246">        runningFutures.put(job.id(), future);</span>
         try {
-<span class="fc" id="L245">            ProofWorker.Result result = future.get(jobTimeoutMillis, TimeUnit.MILLISECONDS);</span>
-<span class="fc" id="L246">            runningFutures.remove(job.id());</span>
+<span class="fc" id="L248">            ProofWorker.Result result = future.get(jobTimeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L249">            runningFutures.remove(job.id());</span>
 
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (cancelRequests.contains(job.id())) {</span>
-<span class="nc" id="L249">                cancelRequests.remove(job.id());</span>
-<span class="nc" id="L250">                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
-<span class="nc" id="L251">                return;</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (cancelRequests.contains(job.id())) {</span>
+<span class="nc" id="L252">                cancelRequests.remove(job.id());</span>
+<span class="nc" id="L253">                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
+<span class="nc" id="L254">                return;</span>
             }
 
-<span class="fc" id="L254">            CandidateProofStatus status = result.status();</span>
-<span class="fc" id="L255">            proofCache.put(cacheKey, status);</span>
-<span class="fc" id="L256">            writeArtifactBundle(job, result, status, null);</span>
-<span class="fc" id="L257">            jobRepository.save(job.withDone(status));</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (!cacheIdentity.equals(worker.cacheIdentity())) {</span>
+<span class="fc" id="L258">                handleFailure(job, &quot;proof configuration changed during the attempt&quot;);</span>
+<span class="fc" id="L259">                return;</span>
+            }
+<span class="fc" id="L261">            CandidateProofStatus status = result.status();</span>
+<span class="fc" id="L262">            proofCache.put(cacheKey, status);</span>
+<span class="fc" id="L263">            writeArtifactBundle(job, result, status, null);</span>
+<span class="fc" id="L264">            jobRepository.save(job.withDone(status));</span>
 
             // Update RuleInventory if we have a positive result
-<span class="pc bpc" id="L260" title="1 of 4 branches missed.">            if (inventoryRepository != null &amp;&amp; status.isPositive()) {</span>
-<span class="fc" id="L261">                updateInventory(job, status);</span>
+<span class="pc bpc" id="L267" title="1 of 4 branches missed.">            if (inventoryRepository != null &amp;&amp; status.isPositive()) {</span>
+<span class="fc" id="L268">                updateInventory(job, status);</span>
             }
 
-<span class="nc" id="L264">        } catch (TimeoutException ex) {</span>
-<span class="nc" id="L265">            future.cancel(true);</span>
-<span class="nc" id="L266">            runningFutures.remove(job.id());</span>
-<span class="nc" id="L267">            handleFailure(job, &quot;timeout after &quot; + jobTimeoutMillis + &quot;ms&quot;);</span>
-<span class="fc" id="L268">        } catch (InterruptedException ex) {</span>
-<span class="fc" id="L269">            Thread.currentThread().interrupt();</span>
-<span class="fc" id="L270">            runningFutures.remove(job.id());</span>
-<span class="fc" id="L271">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
-<span class="fc" id="L272">        } catch (CancellationException ex) {</span>
-<span class="fc" id="L273">            runningFutures.remove(job.id());</span>
-<span class="fc" id="L274">            cancelRequests.remove(job.id());</span>
-<span class="fc" id="L275">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
-<span class="fc" id="L276">        } catch (Exception ex) {</span>
+<span class="nc" id="L271">        } catch (TimeoutException ex) {</span>
+<span class="nc" id="L272">            future.cancel(true);</span>
+<span class="nc" id="L273">            runningFutures.remove(job.id());</span>
+<span class="nc" id="L274">            handleFailure(job, &quot;timeout after &quot; + jobTimeoutMillis + &quot;ms&quot;);</span>
+<span class="fc" id="L275">        } catch (InterruptedException ex) {</span>
+<span class="fc" id="L276">            Thread.currentThread().interrupt();</span>
 <span class="fc" id="L277">            runningFutures.remove(job.id());</span>
-<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (cancelRequests.contains(job.id())) {</span>
-<span class="nc" id="L279">                cancelRequests.remove(job.id());</span>
-<span class="nc" id="L280">                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
-<span class="nc" id="L281">                return;</span>
+<span class="fc" id="L278">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
+<span class="fc" id="L279">        } catch (CancellationException ex) {</span>
+<span class="fc" id="L280">            runningFutures.remove(job.id());</span>
+<span class="fc" id="L281">            cancelRequests.remove(job.id());</span>
+<span class="fc" id="L282">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
+<span class="fc" id="L283">        } catch (Exception ex) {</span>
+<span class="fc" id="L284">            runningFutures.remove(job.id());</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            if (cancelRequests.contains(job.id())) {</span>
+<span class="nc" id="L286">                cancelRequests.remove(job.id());</span>
+<span class="nc" id="L287">                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
+<span class="nc" id="L288">                return;</span>
             }
-<span class="pc bpc" id="L283" title="1 of 2 branches missed.">            handleFailure(job, ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());</span>
-<span class="pc" id="L284">        }</span>
-<span class="fc" id="L285">    }</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            handleFailure(job, ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());</span>
+<span class="pc" id="L291">        }</span>
+<span class="fc" id="L292">    }</span>
 
     private void handleFailure(ProofJob job, String reason) {
-<span class="fc" id="L288">        writeArtifactBundle(job, null, CandidateProofStatus.OBSERVED, reason);</span>
-<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (job.canRetry()) {</span>
-<span class="fc" id="L290">            jobRepository.save(job.withRetry());</span>
+<span class="fc" id="L295">        writeArtifactBundle(job, null, CandidateProofStatus.OBSERVED, reason);</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (job.canRetry()) {</span>
+<span class="fc" id="L297">            jobRepository.save(job.withRetry());</span>
         } else {
-<span class="fc" id="L292">            jobRepository.save(job.withFailed(reason));</span>
+<span class="fc" id="L299">            jobRepository.save(job.withFailed(reason));</span>
         }
-<span class="fc" id="L294">    }</span>
+<span class="fc" id="L301">    }</span>
 
     /**
      * Persist a structured per-job artifact bundle. Always writes
@@ -306,42 +313,42 @@ public final class ProofJobScheduler implements AutoCloseable {
         CandidateProofStatus status,
         String errorReason
     ) {
-<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (artifactRepository == null) {</span>
-<span class="fc" id="L310">            return;</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (artifactRepository == null) {</span>
+<span class="fc" id="L317">            return;</span>
         }
         try {
-<span class="nc bnc" id="L313" title="All 2 branches missed.">            String tool = result == null ? worker.workerId() : result.tool();</span>
-<span class="nc bnc" id="L314" title="All 2 branches missed.">            String body = result == null ? &quot;&quot; : result.artifact();</span>
-<span class="nc bnc" id="L315" title="All 2 branches missed.">            long durationMs = result == null ? 0L : result.durationMillis();</span>
-<span class="nc bnc" id="L316" title="All 4 branches missed.">            if (body != null &amp;&amp; !body.isBlank()) {</span>
-<span class="nc" id="L317">                String suffix = bodyExtension(tool);</span>
-<span class="nc" id="L318">                artifactRepository.storeJobArtifact(job.id(), &quot;proof&quot; + suffix, body);</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">            String tool = result == null ? worker.workerId() : result.tool();</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            String body = result == null ? &quot;&quot; : result.artifact();</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            long durationMs = result == null ? 0L : result.durationMillis();</span>
+<span class="nc bnc" id="L323" title="All 4 branches missed.">            if (body != null &amp;&amp; !body.isBlank()) {</span>
+<span class="nc" id="L324">                String suffix = bodyExtension(tool);</span>
+<span class="nc" id="L325">                artifactRepository.storeJobArtifact(job.id(), &quot;proof&quot; + suffix, body);</span>
             }
             // Placeholder stdout/stderr so the bundle layout is uniform.
-<span class="nc" id="L321">            artifactRepository.storeJobArtifact(job.id(), &quot;stdout.txt&quot;, &quot;&quot;);</span>
-<span class="nc" id="L322">            artifactRepository.storeJobArtifact(job.id(), &quot;stderr.txt&quot;,</span>
-<span class="nc bnc" id="L323" title="All 2 branches missed.">                errorReason == null ? &quot;&quot; : errorReason);</span>
-<span class="nc" id="L324">            String metadata = renderMetadataJson(job, tool, status, durationMs, errorReason);</span>
-<span class="nc" id="L325">            artifactRepository.storeJobArtifact(job.id(), &quot;metadata.json&quot;, metadata);</span>
-<span class="nc" id="L326">        } catch (java.io.IOException ex) {</span>
+<span class="nc" id="L328">            artifactRepository.storeJobArtifact(job.id(), &quot;stdout.txt&quot;, &quot;&quot;);</span>
+<span class="nc" id="L329">            artifactRepository.storeJobArtifact(job.id(), &quot;stderr.txt&quot;,</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">                errorReason == null ? &quot;&quot; : errorReason);</span>
+<span class="nc" id="L331">            String metadata = renderMetadataJson(job, tool, status, durationMs, errorReason);</span>
+<span class="nc" id="L332">            artifactRepository.storeJobArtifact(job.id(), &quot;metadata.json&quot;, metadata);</span>
+<span class="nc" id="L333">        } catch (java.io.IOException ex) {</span>
             // Never let artifact-write errors derail the scheduler loop.
-<span class="nc" id="L328">            System.err.println(&quot;Failed to persist artifact bundle for job &quot;</span>
-<span class="nc" id="L329">                + job.id() + &quot;: &quot; + ex.getMessage());</span>
-<span class="nc" id="L330">        }</span>
-<span class="nc" id="L331">    }</span>
+<span class="nc" id="L335">            System.err.println(&quot;Failed to persist artifact bundle for job &quot;</span>
+<span class="nc" id="L336">                + job.id() + &quot;: &quot; + ex.getMessage());</span>
+<span class="nc" id="L337">        }</span>
+<span class="nc" id="L338">    }</span>
 
     private static String bodyExtension(String tool) {
-<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (tool == null) {</span>
-<span class="nc" id="L335">            return &quot;.txt&quot;;</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (tool == null) {</span>
+<span class="nc" id="L342">            return &quot;.txt&quot;;</span>
         }
-<span class="nc" id="L337">        String lower = tool.toLowerCase(java.util.Locale.ROOT);</span>
-<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (lower.contains(&quot;lean&quot;)) {</span>
-<span class="nc" id="L339">            return &quot;.lean&quot;;</span>
+<span class="nc" id="L344">        String lower = tool.toLowerCase(java.util.Locale.ROOT);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (lower.contains(&quot;lean&quot;)) {</span>
+<span class="nc" id="L346">            return &quot;.lean&quot;;</span>
         }
-<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (lower.contains(&quot;smt&quot;)) {</span>
-<span class="nc" id="L342">            return &quot;.smt2&quot;;</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (lower.contains(&quot;smt&quot;)) {</span>
+<span class="nc" id="L349">            return &quot;.smt2&quot;;</span>
         }
-<span class="nc" id="L344">        return &quot;.txt&quot;;</span>
+<span class="nc" id="L351">        return &quot;.txt&quot;;</span>
     }
 
     private static String renderMetadataJson(
@@ -351,86 +358,86 @@ public final class ProofJobScheduler implements AutoCloseable {
         long durationMillis,
         String errorReason
     ) {
-<span class="nc" id="L354">        StringBuilder builder = new StringBuilder(&quot;{&quot;);</span>
-<span class="nc" id="L355">        builder.append(&quot;\&quot;jobId\&quot;:&quot;).append(jsonString(job.id()));</span>
-<span class="nc" id="L356">        builder.append(&quot;,\&quot;workerId\&quot;:&quot;).append(jsonString(job.workerType()));</span>
-<span class="nc" id="L357">        builder.append(&quot;,\&quot;tool\&quot;:&quot;).append(jsonString(tool));</span>
-<span class="nc bnc" id="L358" title="All 2 branches missed.">        builder.append(&quot;,\&quot;status\&quot;:&quot;).append(jsonString(status == null ? &quot;&quot; : status.name()));</span>
-<span class="nc" id="L359">        builder.append(&quot;,\&quot;durationMillis\&quot;:&quot;).append(durationMillis);</span>
-<span class="nc" id="L360">        builder.append(&quot;,\&quot;leftPattern\&quot;:&quot;).append(jsonString(job.leftPattern()));</span>
-<span class="nc" id="L361">        builder.append(&quot;,\&quot;rightPattern\&quot;:&quot;).append(jsonString(job.rightPattern()));</span>
-<span class="nc" id="L362">        builder.append(&quot;,\&quot;priority\&quot;:&quot;).append(job.priority());</span>
-<span class="nc" id="L363">        builder.append(&quot;,\&quot;retryCount\&quot;:&quot;).append(job.retryCount());</span>
-<span class="nc" id="L364">        builder.append(&quot;,\&quot;maxRetries\&quot;:&quot;).append(job.maxRetries());</span>
-<span class="nc" id="L365">        builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(jsonString(job.createdAt().toString()));</span>
-<span class="nc" id="L366">        builder.append(&quot;,\&quot;completedAt\&quot;:&quot;).append(jsonString(java.time.Instant.now().toString()));</span>
-<span class="nc bnc" id="L367" title="All 2 branches missed.">        builder.append(&quot;,\&quot;error\&quot;:&quot;).append(jsonString(errorReason == null ? &quot;&quot; : errorReason));</span>
-<span class="nc" id="L368">        builder.append('}');</span>
-<span class="nc" id="L369">        return builder.toString();</span>
+<span class="nc" id="L361">        StringBuilder builder = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L362">        builder.append(&quot;\&quot;jobId\&quot;:&quot;).append(jsonString(job.id()));</span>
+<span class="nc" id="L363">        builder.append(&quot;,\&quot;workerId\&quot;:&quot;).append(jsonString(job.workerType()));</span>
+<span class="nc" id="L364">        builder.append(&quot;,\&quot;tool\&quot;:&quot;).append(jsonString(tool));</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        builder.append(&quot;,\&quot;status\&quot;:&quot;).append(jsonString(status == null ? &quot;&quot; : status.name()));</span>
+<span class="nc" id="L366">        builder.append(&quot;,\&quot;durationMillis\&quot;:&quot;).append(durationMillis);</span>
+<span class="nc" id="L367">        builder.append(&quot;,\&quot;leftPattern\&quot;:&quot;).append(jsonString(job.leftPattern()));</span>
+<span class="nc" id="L368">        builder.append(&quot;,\&quot;rightPattern\&quot;:&quot;).append(jsonString(job.rightPattern()));</span>
+<span class="nc" id="L369">        builder.append(&quot;,\&quot;priority\&quot;:&quot;).append(job.priority());</span>
+<span class="nc" id="L370">        builder.append(&quot;,\&quot;retryCount\&quot;:&quot;).append(job.retryCount());</span>
+<span class="nc" id="L371">        builder.append(&quot;,\&quot;maxRetries\&quot;:&quot;).append(job.maxRetries());</span>
+<span class="nc" id="L372">        builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(jsonString(job.createdAt().toString()));</span>
+<span class="nc" id="L373">        builder.append(&quot;,\&quot;completedAt\&quot;:&quot;).append(jsonString(java.time.Instant.now().toString()));</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        builder.append(&quot;,\&quot;error\&quot;:&quot;).append(jsonString(errorReason == null ? &quot;&quot; : errorReason));</span>
+<span class="nc" id="L375">        builder.append('}');</span>
+<span class="nc" id="L376">        return builder.toString();</span>
     }
 
     private static String jsonString(String value) {
-<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (value == null) {</span>
-<span class="nc" id="L374">            return &quot;\&quot;\&quot;&quot;;</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L381">            return &quot;\&quot;\&quot;&quot;;</span>
         }
-<span class="nc" id="L376">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
-<span class="nc bnc" id="L377" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
-<span class="nc" id="L378">            char c = value.charAt(i);</span>
-<span class="nc bnc" id="L379" title="All 6 branches missed.">            switch (c) {</span>
-<span class="nc" id="L380">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
-<span class="nc" id="L381">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
-<span class="nc" id="L382">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
-<span class="nc" id="L383">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
-<span class="nc" id="L384">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L383">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L385">            char c = value.charAt(i);</span>
+<span class="nc bnc" id="L386" title="All 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L387">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L388">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L389">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L390">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L391">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
                 default -&gt; {
-<span class="nc bnc" id="L386" title="All 2 branches missed.">                    if (c &lt; 0x20) {</span>
-<span class="nc" id="L387">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L394">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
                     } else {
-<span class="nc" id="L389">                        builder.append(c);</span>
+<span class="nc" id="L396">                        builder.append(c);</span>
                     }
                 }
             }
         }
-<span class="nc" id="L394">        builder.append('&quot;');</span>
-<span class="nc" id="L395">        return builder.toString();</span>
+<span class="nc" id="L401">        builder.append('&quot;');</span>
+<span class="nc" id="L402">        return builder.toString();</span>
     }
 
     private void updateInventory(ProofJob job, CandidateProofStatus status) {
-<span class="fc" id="L399">        inventoryRepository.findAll().stream()</span>
-<span class="pc bnc" id="L400" title="All 2 branches missed.">            .filter(r -&gt; r.leftPattern().equals(job.leftPattern())</span>
-<span class="nc bnc" id="L401" title="All 2 branches missed.">                &amp;&amp; r.rightPattern().equals(job.rightPattern()))</span>
-<span class="fc" id="L402">            .findFirst()</span>
-<span class="fc" id="L403">            .ifPresent(rule -&gt; {</span>
-<span class="nc bnc" id="L404" title="All 2 branches missed.">                if (rule.proofStatus().ordinal() &lt; status.ordinal()) {</span>
-<span class="nc" id="L405">                    inventoryRepository.save(new ReusableRule(</span>
-<span class="nc" id="L406">                        rule.id(),</span>
-<span class="nc" id="L407">                        rule.leftPattern(),</span>
-<span class="nc" id="L408">                        rule.rightPattern(),</span>
-<span class="nc" id="L409">                        rule.parameterRelations(),</span>
+<span class="fc" id="L406">        inventoryRepository.findAll().stream()</span>
+<span class="pc bnc" id="L407" title="All 2 branches missed.">            .filter(r -&gt; r.leftPattern().equals(job.leftPattern())</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                &amp;&amp; r.rightPattern().equals(job.rightPattern()))</span>
+<span class="fc" id="L409">            .findFirst()</span>
+<span class="fc" id="L410">            .ifPresent(rule -&gt; {</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">                if (rule.proofStatus().ordinal() &lt; status.ordinal()) {</span>
+<span class="nc" id="L412">                    inventoryRepository.save(new ReusableRule(</span>
+<span class="nc" id="L413">                        rule.id(),</span>
+<span class="nc" id="L414">                        rule.leftPattern(),</span>
+<span class="nc" id="L415">                        rule.rightPattern(),</span>
+<span class="nc" id="L416">                        rule.parameterRelations(),</span>
                         status,
-<span class="nc" id="L411">                        rule.knownRuleStatus(),</span>
-<span class="nc" id="L412">                        rule.supportingExamples(),</span>
-<span class="nc" id="L413">                        rule.averageImprovement(),</span>
-<span class="nc" id="L414">                        rule.createdAt(),</span>
-<span class="nc" id="L415">                        rule.canonicalHash(),</span>
-<span class="nc" id="L416">                        Instant.now(),</span>
-<span class="nc" id="L417">                        rule.usageCount()</span>
+<span class="nc" id="L418">                        rule.knownRuleStatus(),</span>
+<span class="nc" id="L419">                        rule.supportingExamples(),</span>
+<span class="nc" id="L420">                        rule.averageImprovement(),</span>
+<span class="nc" id="L421">                        rule.createdAt(),</span>
+<span class="nc" id="L422">                        rule.canonicalHash(),</span>
+<span class="nc" id="L423">                        Instant.now(),</span>
+<span class="nc" id="L424">                        rule.usageCount()</span>
                     ));
                 }
-<span class="nc" id="L420">            });</span>
-<span class="fc" id="L421">    }</span>
+<span class="nc" id="L427">            });</span>
+<span class="fc" id="L428">    }</span>
 
     @Override
     public void close() {
-<span class="fc" id="L425">        scheduler.shutdownNow();</span>
-<span class="fc" id="L426">        workerExecutor.shutdownNow();</span>
+<span class="fc" id="L432">        scheduler.shutdownNow();</span>
+<span class="fc" id="L433">        workerExecutor.shutdownNow();</span>
         try {
-<span class="fc" id="L428">            scheduler.awaitTermination(2, TimeUnit.SECONDS);</span>
-<span class="fc" id="L429">            workerExecutor.awaitTermination(2, TimeUnit.SECONDS);</span>
-<span class="nc" id="L430">        } catch (InterruptedException ex) {</span>
-<span class="nc" id="L431">            Thread.currentThread().interrupt();</span>
-<span class="fc" id="L432">        }</span>
-<span class="fc" id="L433">    }</span>
+<span class="fc" id="L435">            scheduler.awaitTermination(2, TimeUnit.SECONDS);</span>
+<span class="fc" id="L436">            workerExecutor.awaitTermination(2, TimeUnit.SECONDS);</span>
+<span class="nc" id="L437">        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L438">            Thread.currentThread().interrupt();</span>
+<span class="fc" id="L439">        }</span>
+<span class="fc" id="L440">    }</span>
 
     /**
      * @return whether the shared worker executor has fully shut down. Exposed
@@ -438,7 +445,7 @@ public final class ProofJobScheduler implements AutoCloseable {
      *         executor resources.
      */
     public boolean isWorkerExecutorTerminated() {
-<span class="fc" id="L441">        return workerExecutor.isTerminated();</span>
+<span class="fc" id="L448">        return workerExecutor.isTerminated();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

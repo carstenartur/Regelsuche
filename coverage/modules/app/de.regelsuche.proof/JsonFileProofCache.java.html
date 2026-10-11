@@ -120,10 +120,10 @@ public final class JsonFileProofCache implements ProofCache {
 <span class="fc" id="L120">        builder.append(&quot;{\n  \&quot;entries\&quot;: [\n&quot;);</span>
 <span class="fc" id="L121">        List&lt;Map.Entry&lt;ProofCacheKey, ProofCacheEntry&gt;&gt; sorted = new ArrayList&lt;&gt;(entries.entrySet());</span>
 <span class="fc" id="L122">        sorted.sort(Comparator</span>
-<span class="pc" id="L123">            .&lt;Map.Entry&lt;ProofCacheKey, ProofCacheEntry&gt;, String&gt;comparing(e -&gt; e.getKey().canonicalLeft())</span>
-<span class="pc" id="L124">            .thenComparing(e -&gt; e.getKey().canonicalRight())</span>
-<span class="pc" id="L125">            .thenComparing(e -&gt; e.getKey().assumptionsSorted())</span>
-<span class="pc" id="L126">            .thenComparing(e -&gt; e.getKey().proverVersion()));</span>
+<span class="fc" id="L123">            .&lt;Map.Entry&lt;ProofCacheKey, ProofCacheEntry&gt;, String&gt;comparing(e -&gt; e.getKey().canonicalLeft())</span>
+<span class="fc" id="L124">            .thenComparing(e -&gt; e.getKey().canonicalRight())</span>
+<span class="fc" id="L125">            .thenComparing(e -&gt; e.getKey().assumptionsSorted())</span>
+<span class="fc" id="L126">            .thenComparing(e -&gt; e.getKey().proverVersion()));</span>
 <span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int i = 0; i &lt; sorted.size(); i++) {</span>
 <span class="fc" id="L128">            ProofCacheKey key = sorted.get(i).getKey();</span>
 <span class="fc" id="L129">            ProofCacheEntry value = sorted.get(i).getValue();</span>
@@ -138,8 +138,8 @@ public final class JsonFileProofCache implements ProofCache {
 <span class="fc" id="L138">            builder.append(&quot;,\&quot;outputDigest\&quot;:&quot;).append(quote(value.outputDigest()));</span>
 <span class="fc" id="L139">            builder.append(&quot;,\&quot;durationMillis\&quot;:&quot;).append(value.durationMillis());</span>
 <span class="fc" id="L140">            builder.append('}');</span>
-<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (i &lt; sorted.size() - 1) {</span>
-<span class="nc" id="L142">                builder.append(',');</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (i &lt; sorted.size() - 1) {</span>
+<span class="fc" id="L142">                builder.append(',');</span>
             }
 <span class="fc" id="L144">            builder.append('\n');</span>
         }

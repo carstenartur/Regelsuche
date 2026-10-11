@@ -175,10 +175,10 @@ import java.util.Set;
 <span class="fc" id="L175">        Binary binary = (Binary) expression;</span>
 <span class="fc" id="L176">        String left = expression(binary.left(), issues);</span>
 <span class="fc" id="L177">        String right = expression(binary.right(), issues);</span>
-<span class="pc bpc" id="L178" title="3 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="pc bpc" id="L178" title="2 of 5 branches missed.">        return switch (binary.operator()) {</span>
 <span class="fc" id="L179">            case ADD -&gt; &quot;(+ &quot; + left + ' ' + right + ')';</span>
 <span class="nc" id="L180">            case SUBTRACT -&gt; &quot;(- &quot; + left + ' ' + right + ')';</span>
-<span class="nc" id="L181">            case MULTIPLY -&gt; &quot;(* &quot; + left + ' ' + right + ')';</span>
+<span class="fc" id="L181">            case MULTIPLY -&gt; &quot;(* &quot; + left + ' ' + right + ')';</span>
 <span class="fc" id="L182">            case DIVIDE -&gt; &quot;(/ &quot; + left + ' ' + right + ')';</span>
 <span class="nc" id="L183">            case POWER -&gt; power(binary, left, right, issues);</span>
         };

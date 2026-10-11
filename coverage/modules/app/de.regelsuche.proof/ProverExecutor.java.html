@@ -10,8 +10,8 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Executes a generated prover artifact against a real external tool such as
- * {@code lean} or {@code z3}.
+ * Separates raw process execution from checked mathematical evidence for
+ * Lean and Z3. Custom constructors are transport-only, even with a success predicate.
  *
  * &lt;p&gt;The executor writes the script to a temporary file, invokes the tool
  * with a hard timeout, captures {@code stdout}/{@code stderr} and reports
@@ -31,10 +31,15 @@ public final class ProverExecutor {
     private final String artifactSuffix;
     private final long timeoutMillis;
     private final SuccessPredicate successPredicate;
+    private final CheckedKind checkedKind;
+    private final Path leanProject;
+    private final Path evidenceRoot;
+<span class="fc" id="L37">    private enum CheckedKind { NONE, LEAN, Z3 }</span>
+
 
     public ProverExecutor(List&lt;String&gt; command, String toolName, String artifactSuffix) {
-<span class="fc" id="L36">        this(command, toolName, artifactSuffix, Duration.ofMillis(DEFAULT_TIMEOUT_MILLIS), defaultSuccess());</span>
-<span class="fc" id="L37">    }</span>
+<span class="fc" id="L41">        this(command, toolName, artifactSuffix, Duration.ofMillis(DEFAULT_TIMEOUT_MILLIS), defaultSuccess());</span>
+<span class="fc" id="L42">    }</span>
 
     public ProverExecutor(
         List&lt;String&gt; command,
@@ -42,119 +47,156 @@ public final class ProverExecutor {
         String artifactSuffix,
         Duration timeout,
         SuccessPredicate successPredicate
-<span class="fc" id="L45">    ) {</span>
-<span class="fc" id="L46">        Objects.requireNonNull(command, &quot;command&quot;);</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (command.isEmpty()) {</span>
-<span class="nc" id="L48">            throw new IllegalArgumentException(&quot;command must not be empty&quot;);</span>
+<span class="fc" id="L50">    ) {</span>
+<span class="fc" id="L51">        Objects.requireNonNull(command, &quot;command&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (command.isEmpty()) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;command must not be empty&quot;);</span>
         }
-<span class="fc" id="L50">        Objects.requireNonNull(toolName, &quot;toolName&quot;);</span>
-<span class="fc" id="L51">        Objects.requireNonNull(artifactSuffix, &quot;artifactSuffix&quot;);</span>
-<span class="fc" id="L52">        Objects.requireNonNull(timeout, &quot;timeout&quot;);</span>
-<span class="fc" id="L53">        Objects.requireNonNull(successPredicate, &quot;successPredicate&quot;);</span>
-<span class="fc" id="L54">        this.command = List.copyOf(command);</span>
-<span class="fc" id="L55">        this.toolName = toolName;</span>
-<span class="fc" id="L56">        this.artifactSuffix = artifactSuffix;</span>
-<span class="fc" id="L57">        this.timeoutMillis = Math.max(100L, timeout.toMillis());</span>
-<span class="fc" id="L58">        this.successPredicate = successPredicate;</span>
-<span class="fc" id="L59">    }</span>
+<span class="fc" id="L55">        Objects.requireNonNull(toolName, &quot;toolName&quot;);</span>
+<span class="fc" id="L56">        Objects.requireNonNull(artifactSuffix, &quot;artifactSuffix&quot;);</span>
+<span class="fc" id="L57">        Objects.requireNonNull(timeout, &quot;timeout&quot;);</span>
+<span class="fc" id="L58">        Objects.requireNonNull(successPredicate, &quot;successPredicate&quot;);</span>
+<span class="fc" id="L59">        this.checkedKind = CheckedKind.NONE;</span>
+<span class="fc" id="L60">        this.leanProject = null;</span>
+<span class="fc" id="L61">        this.evidenceRoot = null;</span>
+<span class="fc" id="L62">        this.command = List.copyOf(command);</span>
+<span class="fc" id="L63">        this.toolName = toolName;</span>
+<span class="fc" id="L64">        this.artifactSuffix = artifactSuffix;</span>
+<span class="fc" id="L65">        this.timeoutMillis = Math.max(100L, timeout.toMillis());</span>
+<span class="fc" id="L66">        this.successPredicate = successPredicate;</span>
+<span class="fc" id="L67">    }</span>
+
+<span class="fc" id="L69">    private ProverExecutor(CheckedKind kind, Path project, Path evidence) {</span>
+<span class="fc" id="L70">        this.checkedKind = kind;</span>
+<span class="fc" id="L71">        this.leanProject = project;</span>
+<span class="fc" id="L72">        this.evidenceRoot = Objects.requireNonNull(evidence).toAbsolutePath().normalize();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        this.toolName = kind == CheckedKind.LEAN ? &quot;lean4&quot; : &quot;smtlib2&quot;;</span>
+<span class="fc" id="L74">        this.command = List.of();</span>
+<span class="fc" id="L75">        this.artifactSuffix = &quot;&quot;;</span>
+<span class="fc" id="L76">        this.timeoutMillis = 20_000L;</span>
+<span class="fc" id="L77">        this.successPredicate = defaultSuccess();</span>
+<span class="fc" id="L78">    }</span>
+
+    /** Only factory-created, semantically checked backends can grant proof status. */
+<span class="fc bfc" id="L81" title="All 2 branches covered.">    boolean checksMathematicalEvidence() { return checkedKind != CheckedKind.NONE; }</span>
+
+    /** Re-evaluated for each queued request; formal proof statuses are never replayed from this key. */
+    public String cacheIdentity() {
+        String configuration;
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (checkedKind == CheckedKind.LEAN) {</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            configuration = leanProject == null ? &quot;unconfigured&quot;</span>
+<span class="fc" id="L88">                : new de.regelsuche.solver.portfolio.LeanSolverBackend(leanProject, evidenceRoot).configurationHash();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        } else if (checkedKind == CheckedKind.Z3) {</span>
+<span class="fc" id="L90">            var detected = de.regelsuche.solver.portfolio.Z3SmtSolverBackend.detectSystemZ3();</span>
+<span class="fc" id="L91">            configuration = detected.availability() + &quot;\n&quot;</span>
+<span class="fc" id="L92">                + detected.backend().descriptor().backendVersion() + &quot;\n&quot;</span>
+<span class="fc" id="L93">                + detected.backend().configurationHash();</span>
+<span class="fc" id="L94">        } else {</span>
+<span class="fc" id="L95">            configuration = command + &quot;\n&quot; + artifactSuffix + &quot;\n&quot; + timeoutMillis</span>
+<span class="fc" id="L96">                + &quot;\n&quot; + successPredicate.getClass().getName();</span>
+        }
+<span class="fc" id="L98">        return &quot;proof-cache/v2/&quot; + toolName + &quot;/&quot;</span>
+<span class="fc" id="L99">            + de.regelsuche.solver.ir.SolverIr.sha256(checkedKind + &quot;\n&quot; + configuration);</span>
+    }
 
     public String toolName() {
-<span class="nc" id="L62">        return toolName;</span>
+<span class="nc" id="L103">        return toolName;</span>
     }
 
     public ProverExecutionResult execute(String artifact) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (checksMathematicalEvidence()) return checkedExecute(artifact, null);</span>
         Path scriptFile;
         try {
-<span class="fc" id="L68">            scriptFile = Files.createTempFile(&quot;regelsuche_prover_&quot;, artifactSuffix);</span>
-<span class="fc" id="L69">            Files.writeString(scriptFile, artifact, StandardCharsets.UTF_8);</span>
-<span class="nc" id="L70">        } catch (IOException ex) {</span>
-<span class="nc" id="L71">            return new ProverExecutionResult(</span>
+<span class="fc" id="L110">            scriptFile = Files.createTempFile(&quot;regelsuche_prover_&quot;, artifactSuffix);</span>
+<span class="fc" id="L111">            Files.writeString(scriptFile, artifact, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L112">        } catch (IOException ex) {</span>
+<span class="nc" id="L113">            return new ProverExecutionResult(</span>
                 ProverExecutionResult.Status.PROVER_FAILED,
                 -1,
                 &quot;&quot;,
-<span class="nc" id="L75">                &quot;Failed to write prover script: &quot; + ex.getMessage(),</span>
+<span class="nc" id="L117">                &quot;Failed to write prover script: &quot; + ex.getMessage(),</span>
                 0L,
                 toolName
             );
-<span class="fc" id="L79">        }</span>
+<span class="fc" id="L121">        }</span>
 
         try {
-<span class="fc" id="L82">            return runProcess(scriptFile);</span>
+<span class="fc" id="L124">            return runProcess(scriptFile);</span>
         } finally {
             try {
-<span class="fc" id="L85">                Files.deleteIfExists(scriptFile);</span>
-<span class="nc" id="L86">            } catch (IOException ignored) {</span>
+<span class="fc" id="L127">                Files.deleteIfExists(scriptFile);</span>
+<span class="nc" id="L128">            } catch (IOException ignored) {</span>
                 // best-effort cleanup
-<span class="fc" id="L88">            }</span>
+<span class="fc" id="L130">            }</span>
         }
     }
 
     private ProverExecutionResult runProcess(Path scriptFile) {
-<span class="fc" id="L93">        java.util.List&lt;String&gt; fullCommand = new java.util.ArrayList&lt;&gt;(command.size() + 1);</span>
-<span class="fc" id="L94">        fullCommand.addAll(command);</span>
-<span class="fc" id="L95">        fullCommand.add(scriptFile.toAbsolutePath().toString());</span>
+<span class="fc" id="L135">        java.util.List&lt;String&gt; fullCommand = new java.util.ArrayList&lt;&gt;(command.size() + 1);</span>
+<span class="fc" id="L136">        fullCommand.addAll(command);</span>
+<span class="fc" id="L137">        fullCommand.add(scriptFile.toAbsolutePath().toString());</span>
 
-<span class="fc" id="L97">        ProcessBuilder builder = new ProcessBuilder(fullCommand)</span>
-<span class="fc" id="L98">            .redirectErrorStream(false);</span>
-<span class="fc" id="L99">        long start = System.currentTimeMillis();</span>
+<span class="fc" id="L139">        ProcessBuilder builder = new ProcessBuilder(fullCommand)</span>
+<span class="fc" id="L140">            .redirectErrorStream(false);</span>
+<span class="fc" id="L141">        long start = System.currentTimeMillis();</span>
         Process process;
         try {
-<span class="fc" id="L102">            process = builder.start();</span>
-<span class="fc" id="L103">        } catch (IOException ex) {</span>
-<span class="fc" id="L104">            return new ProverExecutionResult(</span>
+<span class="fc" id="L144">            process = builder.start();</span>
+<span class="fc" id="L145">        } catch (IOException ex) {</span>
+<span class="fc" id="L146">            return new ProverExecutionResult(</span>
                 ProverExecutionResult.Status.PROVER_NOT_AVAILABLE,
                 -1,
                 &quot;&quot;,
-<span class="fc" id="L108">                &quot;Could not start '&quot; + command.get(0) + &quot;': &quot; + ex.getMessage(),</span>
-<span class="fc" id="L109">                System.currentTimeMillis() - start,</span>
+<span class="fc" id="L150">                &quot;Could not start '&quot; + command.get(0) + &quot;': &quot; + ex.getMessage(),</span>
+<span class="fc" id="L151">                System.currentTimeMillis() - start,</span>
                 toolName
             );
-<span class="fc" id="L112">        }</span>
+<span class="fc" id="L154">        }</span>
         try {
-<span class="fc" id="L114">            process.getOutputStream().close();</span>
-<span class="nc" id="L115">        } catch (IOException ignored) {</span>
+<span class="fc" id="L156">            process.getOutputStream().close();</span>
+<span class="nc" id="L157">        } catch (IOException ignored) {</span>
             // process may not accept stdin; ignore
-<span class="fc" id="L117">        }</span>
+<span class="fc" id="L159">        }</span>
 
         boolean finished;
         try {
-<span class="fc" id="L121">            finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);</span>
-<span class="nc" id="L122">        } catch (InterruptedException ex) {</span>
-<span class="nc" id="L123">            Thread.currentThread().interrupt();</span>
-<span class="nc" id="L124">            process.destroyForcibly();</span>
-<span class="nc" id="L125">            return new ProverExecutionResult(</span>
+<span class="fc" id="L163">            finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L164">        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L165">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L166">            process.destroyForcibly();</span>
+<span class="nc" id="L167">            return new ProverExecutionResult(</span>
                 ProverExecutionResult.Status.PROVER_FAILED,
                 -1,
                 &quot;&quot;,
                 &quot;Interrupted while waiting for prover&quot;,
-<span class="nc" id="L130">                System.currentTimeMillis() - start,</span>
+<span class="nc" id="L172">                System.currentTimeMillis() - start,</span>
                 toolName
             );
-<span class="fc" id="L133">        }</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (!finished) {</span>
-<span class="fc" id="L135">            process.destroyForcibly();</span>
+<span class="fc" id="L175">        }</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (!finished) {</span>
+<span class="fc" id="L177">            process.destroyForcibly();</span>
             try {
-<span class="fc" id="L137">                process.waitFor(2, TimeUnit.SECONDS);</span>
-<span class="nc" id="L138">            } catch (InterruptedException ignored) {</span>
-<span class="nc" id="L139">                Thread.currentThread().interrupt();</span>
-<span class="fc" id="L140">            }</span>
-<span class="fc" id="L141">            return new ProverExecutionResult(</span>
+<span class="fc" id="L179">                process.waitFor(2, TimeUnit.SECONDS);</span>
+<span class="nc" id="L180">            } catch (InterruptedException ignored) {</span>
+<span class="nc" id="L181">                Thread.currentThread().interrupt();</span>
+<span class="fc" id="L182">            }</span>
+<span class="fc" id="L183">            return new ProverExecutionResult(</span>
                 ProverExecutionResult.Status.PROVER_TIMEOUT,
                 -1,
-<span class="fc" id="L144">                readQuietly(process.getInputStream()),</span>
-<span class="fc" id="L145">                readQuietly(process.getErrorStream()),</span>
-<span class="fc" id="L146">                System.currentTimeMillis() - start,</span>
+<span class="fc" id="L186">                readQuietly(process.getInputStream()),</span>
+<span class="fc" id="L187">                readQuietly(process.getErrorStream()),</span>
+<span class="fc" id="L188">                System.currentTimeMillis() - start,</span>
                 toolName
             );
         }
 
-<span class="fc" id="L151">        int exitCode = process.exitValue();</span>
-<span class="fc" id="L152">        String stdout = readQuietly(process.getInputStream());</span>
-<span class="fc" id="L153">        String stderr = readQuietly(process.getErrorStream());</span>
-<span class="fc" id="L154">        long duration = System.currentTimeMillis() - start;</span>
-<span class="fc" id="L155">        boolean ok = successPredicate.isSuccess(exitCode, stdout, stderr);</span>
-<span class="fc" id="L156">        return new ProverExecutionResult(</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            ok ? ProverExecutionResult.Status.PROVER_CONFIRMED : ProverExecutionResult.Status.PROVER_FAILED,</span>
+<span class="fc" id="L193">        int exitCode = process.exitValue();</span>
+<span class="fc" id="L194">        String stdout = readQuietly(process.getInputStream());</span>
+<span class="fc" id="L195">        String stderr = readQuietly(process.getErrorStream());</span>
+<span class="fc" id="L196">        long duration = System.currentTimeMillis() - start;</span>
+<span class="fc" id="L197">        boolean ok = successPredicate.isSuccess(exitCode, stdout, stderr);</span>
+<span class="fc" id="L198">        return new ProverExecutionResult(</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            ok ? ProverExecutionResult.Status.PROCESS_SUCCEEDED : ProverExecutionResult.Status.PROVER_FAILED,</span>
             exitCode,
             stdout,
             stderr,
@@ -164,53 +206,93 @@ public final class ProverExecutor {
     }
 
     private static String readQuietly(java.io.InputStream stream) {
-<span class="fc" id="L167">        try (stream) {</span>
-<span class="fc" id="L168">            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L169">        } catch (IOException ex) {</span>
-<span class="fc" id="L170">            return &quot;&quot;;</span>
+<span class="fc" id="L209">        try (stream) {</span>
+<span class="fc" id="L210">            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L211">        } catch (IOException ex) {</span>
+<span class="fc" id="L212">            return &quot;&quot;;</span>
         }
     }
 
-    /**
-     * @return a {@link ProverExecutor} for the Lean 4 elaborator
-     *         ({@code lean}). Success is exit code 0 with no error/warning
-     *         containing {@code &quot;sorry&quot;} (so a {@code sorry}-only skeleton is
-     *         not counted as proved).
-     */
+    /** Uses a configured, pinned Lean/mathlib project; never falls back to a raw exit check. */
     public static ProverExecutor lean() {
-<span class="nc" id="L181">        return new ProverExecutor(</span>
-<span class="nc" id="L182">            List.of(&quot;lean&quot;),</span>
-            &quot;lean4&quot;,
-            &quot;.lean&quot;,
-<span class="nc" id="L185">            Duration.ofSeconds(20),</span>
-<span class="nc bnc" id="L186" title="All 4 branches missed.">            (exit, out, err) -&gt; exit == 0 &amp;&amp; !(out + err).toLowerCase().contains(&quot;sorry&quot;)</span>
-        );
+<span class="nc" id="L218">        String project = System.getProperty(&quot;regelsuche.lean.project&quot;, System.getenv(&quot;REGELSUCHE_LEAN_PROJECT&quot;));</span>
+<span class="nc" id="L219">        return new ProverExecutor(CheckedKind.LEAN,</span>
+<span class="nc bnc" id="L220" title="All 4 branches missed.">            project == null || project.isBlank() ? null : Path.of(project), defaultEvidence());</span>
     }
 
-    /** @return a {@link ProverExecutor} for {@code z3 -smt2 &lt;file&gt;}. */
-    public static ProverExecutor z3() {
-<span class="nc" id="L192">        return new ProverExecutor(</span>
-<span class="nc" id="L193">            List.of(&quot;z3&quot;, &quot;-smt2&quot;),</span>
-            &quot;smtlib2&quot;,
-            &quot;.smt2&quot;,
-<span class="nc" id="L196">            Duration.ofSeconds(20),</span>
-<span class="nc bnc" id="L197" title="All 4 branches missed.">            (exit, out, err) -&gt; exit == 0 &amp;&amp; out.toLowerCase().contains(&quot;unsat&quot;)</span>
-        );
+    public static ProverExecutor lean(Path project, Path evidenceRoot) {
+<span class="fc" id="L224">        return new ProverExecutor(CheckedKind.LEAN, Objects.requireNonNull(project), evidenceRoot);</span>
     }
 
-    /** @return a {@link ProverExecutor} for {@code cvc5 --lang=smt2 &lt;file&gt;}. */
+<span class="nc" id="L227">    public static ProverExecutor z3() { return z3(defaultEvidence()); }</span>
+    public static ProverExecutor z3(Path evidenceRoot) {
+<span class="fc" id="L229">        return new ProverExecutor(CheckedKind.Z3, null, evidenceRoot);</span>
+    }
+
+    /** Raw cvc5 transport. It does not grant proof status without a checked artifact adapter. */
     public static ProverExecutor cvc5() {
-<span class="nc" id="L203">        return new ProverExecutor(</span>
-<span class="nc" id="L204">            List.of(&quot;cvc5&quot;, &quot;--lang=smt2&quot;),</span>
-            &quot;smtlib2&quot;,
-            &quot;.smt2&quot;,
-<span class="nc" id="L207">            Duration.ofSeconds(20),</span>
-<span class="nc bnc" id="L208" title="All 4 branches missed.">            (exit, out, err) -&gt; exit == 0 &amp;&amp; out.toLowerCase().contains(&quot;unsat&quot;)</span>
-        );
+<span class="nc" id="L234">        return new ProverExecutor(List.of(&quot;cvc5&quot;, &quot;--lang=smt2&quot;), &quot;smtlib2&quot;, &quot;.smt2&quot;,</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            Duration.ofSeconds(20), (exit, out, err) -&gt; exit == 0);</span>
+    }
+
+    private static Path defaultEvidence() {
+<span class="nc" id="L239">        return Path.of(System.getProperty(&quot;regelsuche.proof.evidence&quot;, &quot;proof-evidence&quot;));</span>
+    }
+
+    ProverExecutionResult executeBound(String artifact, de.regelsuche.solver.ir.SolverIr.Obligation expected) {
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        return checksMathematicalEvidence() ? checkedExecute(artifact, Objects.requireNonNull(expected)) : execute(artifact);</span>
+    }
+
+    private ProverExecutionResult checkedExecute(String artifact,
+            de.regelsuche.solver.ir.SolverIr.Obligation expected) {
+<span class="fc" id="L248">        long start = System.currentTimeMillis();</span>
+        try {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            var request = checkedKind == CheckedKind.LEAN</span>
+<span class="fc" id="L251">                ? de.regelsuche.solver.portfolio.LeanSolverBackend.readArtifact(artifact)</span>
+<span class="pc" id="L252">                : de.regelsuche.solver.portfolio.SmtProofArtifacts.readArtifact(artifact);</span>
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">            if (expected != null &amp;&amp; !request.contentHash().equals(expected.contentHash()))</span>
+<span class="fc" id="L254">                throw new IllegalArgumentException(&quot;artifact does not match the current goal and premises&quot;);</span>
+            de.regelsuche.solver.ir.SolverExecution execution;
+            Path directory;
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            if (checkedKind == CheckedKind.LEAN) {</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                if (leanProject == null) return result(ProverExecutionResult.Status.PROVER_NOT_AVAILABLE,</span>
+                    -1, &quot;&quot;, &quot;Configure a pinned Lean/mathlib project&quot;, start);
+<span class="nc" id="L260">                var attempt = new de.regelsuche.solver.portfolio.LeanSolverBackend(leanProject, evidenceRoot)</span>
+<span class="nc" id="L261">                    .executeWithEvidence(request);</span>
+<span class="nc" id="L262">                execution = attempt.execution(); directory = attempt.directory();</span>
+<span class="nc" id="L263">            } else {</span>
+<span class="nc" id="L264">                var detection = de.regelsuche.solver.portfolio.Z3SmtSolverBackend.detectSystemZ3();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                if (detection.availability() != de.regelsuche.solver.portfolio.BackendAvailability.AVAILABLE)</span>
+<span class="nc" id="L266">                    return result(ProverExecutionResult.Status.PROVER_NOT_AVAILABLE, -1, &quot;&quot;, detection.detail(), start);</span>
+<span class="nc" id="L267">                var attempt = detection.backend().executeWithEvidence(request, evidenceRoot);</span>
+<span class="nc" id="L268">                execution = attempt.execution(); directory = attempt.directory();</span>
+            }
+<span class="nc" id="L270">            var answer = execution.result();</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            boolean bound = execution.obligationHash().equals(request.contentHash())</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                &amp;&amp; answer.goalHash().equals(request.goalHash())</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                &amp;&amp; answer.assumptionsHash().equals(request.assumptionsHash());</span>
+<span class="nc bnc" id="L274" title="All 4 branches missed.">            boolean proved = bound &amp;&amp; answer.status() == de.regelsuche.solver.ir.SolverIr.ResultStatus.CONFIRMED</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">                &amp;&amp; answer.translationStatus() == de.regelsuche.solver.ir.SolverIr.TranslationStatus.LOSSLESS</span>
+<span class="nc bnc" id="L276" title="All 4 branches missed.">                &amp;&amp; answer.translationIssues().isEmpty() &amp;&amp; !answer.certificateHash().isEmpty();</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">            ProverExecutionResult.Status status = proved ? ProverExecutionResult.Status.PROVER_CONFIRMED</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                : answer.status() == de.regelsuche.solver.ir.SolverIr.ResultStatus.TIMEOUT</span>
+<span class="nc" id="L279">                    ? ProverExecutionResult.Status.PROVER_TIMEOUT : ProverExecutionResult.Status.PROVER_FAILED;</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            return result(status, proved ? 0 : -1,</span>
+<span class="nc" id="L281">                answer.toCanonicalJson() + &quot;\nEvidence: &quot; + directory,</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                proved ? &quot;&quot; : answer.message(), start);</span>
+<span class="fc" id="L283">        } catch (Exception failure) {</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (failure instanceof InterruptedException) Thread.currentThread().interrupt();</span>
+<span class="fc" id="L285">            return result(ProverExecutionResult.Status.PROVER_FAILED, -1, &quot;&quot;, failure.toString(), start);</span>
+        }
+    }
+
+    private ProverExecutionResult result(ProverExecutionResult.Status status, int exit,
+                                         String out, String err, long start) {
+<span class="fc" id="L291">        return new ProverExecutionResult(status, exit, out, err, System.currentTimeMillis() - start, toolName);</span>
     }
 
     private static SuccessPredicate defaultSuccess() {
-<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        return (exit, out, err) -&gt; exit == 0;</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        return (exit, out, err) -&gt; exit == 0;</span>
     }
 
     /** Pluggable predicate for deciding whether the prover output indicates success. */

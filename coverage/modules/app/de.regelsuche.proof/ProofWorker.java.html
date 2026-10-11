@@ -12,9 +12,9 @@ import java.util.concurrent.CompletableFuture;
  * &lt;p&gt;Unlike the lower-level {@link ProofBridge} / {@link ProofBridgeService}
  * pair—which only handle a single synchronous artifact-generation + execution
  * step—{@code ProofWorker} is the unit that the {@link ProofJobScheduler}
- * dispatches to.  It carries a stable {@link #workerId()} that becomes part
- * of the {@link ProofCacheKey}, ensuring cached results are not reused across
- * incompatible prover versions.&lt;/p&gt;
+ * dispatches to. Its display identity is {@link #workerId()}, while the
+ * versioned {@link #cacheIdentity()} binds reusable non-proof results to the
+ * configured prover. A status-only cache cannot establish a formal proof.&lt;/p&gt;
  */
 public interface ProofWorker {
 
@@ -37,10 +37,15 @@ public interface ProofWorker {
     }
 
     /**
-     * Stable identifier used for cache-key versioning and job tracking
+     * Stable display identifier used for job tracking
      * (e.g. {@code &quot;lean4&quot;}, {@code &quot;smtlib2&quot;}, {@code &quot;composite(lean4,smtlib2)&quot;}).
      */
     String workerId();
+
+    /** Versioned cache scope; display/worker IDs are not proof configuration identities. */
+    default String cacheIdentity() {
+<span class="fc" id="L47">        return &quot;proof-cache/v2/&quot; + workerId();</span>
+    }
 
     /** Full outcome of a single proof attempt. */
     record Result(
@@ -50,16 +55,16 @@ public interface ProofWorker {
         String tool,
         long durationMillis
     ) {
-<span class="fc" id="L53">        public Result {</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (updatedCandidate == null) {</span>
-<span class="nc" id="L55">                throw new IllegalArgumentException(&quot;updatedCandidate must not be null&quot;);</span>
+<span class="fc" id="L58">        public Result {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (updatedCandidate == null) {</span>
+<span class="nc" id="L60">                throw new IllegalArgumentException(&quot;updatedCandidate must not be null&quot;);</span>
             }
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if (status == null) {</span>
-<span class="nc" id="L58">                throw new IllegalArgumentException(&quot;status must not be null&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (status == null) {</span>
+<span class="nc" id="L63">                throw new IllegalArgumentException(&quot;status must not be null&quot;);</span>
             }
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            artifact = artifact == null ? &quot;&quot; : artifact;</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            tool = tool == null ? &quot;unknown&quot; : tool;</span>
-<span class="fc" id="L62">        }</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            artifact = artifact == null ? &quot;&quot; : artifact;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            tool = tool == null ? &quot;unknown&quot; : tool;</span>
+<span class="fc" id="L67">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
