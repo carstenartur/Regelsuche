@@ -5,6 +5,8 @@ import de.regelsuche.ast.NumberExpr;
 
 /** Shared static ranking estimates for the modular and Java computation backends, not timing claims. */
 public final class ModularOperationCosts {
+    public static final long ARITHMETIC_WORK = 4;
+    /** Work for the fused modular multiplication operation. */
     public static final long MULTIPLY_WORK = 10;
     public static final long POWER_FALLBACK_WORK = 1_000;
 
