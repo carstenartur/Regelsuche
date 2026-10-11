@@ -23,6 +23,16 @@ tasks.named('test') {
     systemProperty 'regelsuche.repositoryRoot', rootProject.projectDir.absolutePath
 }
 
+// Package the already-tested Java reporter for the convergence job. This
+// adapter provisions its runtime only; Maven/JUnit owns the reporting behavior.
+tasks.register('nativeCoverageRuntime', Sync) {
+    group = 'reporting'
+    description = 'Stages the Java native-coverage reporter and its existing runtime dependencies.'
+    from tasks.named('jar')
+    from configurations.runtimeClasspath
+    into layout.buildDirectory.dir('native-coverage-runtime')
+}
+
 // The existing coverage policy fails closed on every emitted JaCoCo XML and
 // requires an evidence-backed floor for each declared module. This new module
 // intentionally does not emit a coverage report in its bootstrap tranche: a
