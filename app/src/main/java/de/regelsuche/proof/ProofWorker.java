@@ -12,9 +12,9 @@ import java.util.concurrent.CompletableFuture;
  * <p>Unlike the lower-level {@link ProofBridge} / {@link ProofBridgeService}
  * pair—which only handle a single synchronous artifact-generation + execution
  * step—{@code ProofWorker} is the unit that the {@link ProofJobScheduler}
- * dispatches to.  It carries a stable {@link #workerId()} that becomes part
- * of the {@link ProofCacheKey}, ensuring cached results are not reused across
- * incompatible prover versions.</p>
+ * dispatches to. Its display identity is {@link #workerId()}, while the
+ * versioned {@link #cacheIdentity()} binds reusable non-proof results to the
+ * configured prover. A status-only cache cannot establish a formal proof.</p>
  */
 public interface ProofWorker {
 
@@ -37,10 +37,15 @@ public interface ProofWorker {
     }
 
     /**
-     * Stable identifier used for cache-key versioning and job tracking
+     * Stable display identifier used for job tracking
      * (e.g. {@code "lean4"}, {@code "smtlib2"}, {@code "composite(lean4,smtlib2)"}).
      */
     String workerId();
+
+    /** Versioned cache scope; display/worker IDs are not proof configuration identities. */
+    default String cacheIdentity() {
+        return "proof-cache/v2/" + workerId();
+    }
 
     /** Full outcome of a single proof attempt. */
     record Result(

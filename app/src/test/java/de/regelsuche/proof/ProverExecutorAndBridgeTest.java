@@ -42,10 +42,10 @@ class ProverExecutorAndBridgeTest {
     }
 
     @Test
-    void proofBridgeRunsLeanWhenAvailable() {
+    void successfulTransportDoesNotCountAsLeanConfirmation() {
         // We invoke a guaranteed-success tool ("true") with a custom success
         // predicate. This simulates a prover whose binary is present and
-        // returns success — the candidate should be lifted to FORMALLY_PROVED.
+        // returns success, but cannot supply mathematical evidence.
         ProverExecutor executor = new ProverExecutor(
             List.of("true"),
             "lean4",
@@ -59,8 +59,8 @@ class ProverExecutorAndBridgeTest {
             List.of(Assumption.nonZero("x"))
         );
         assertNotNull(outcome.execution());
-        assertEquals(ProverExecutionResult.Status.PROVER_CONFIRMED, outcome.execution().status());
-        assertEquals(CandidateProofStatus.FORMALLY_PROVED, outcome.candidate().proofStatus());
+        assertEquals(ProverExecutionResult.Status.PROCESS_SUCCEEDED, outcome.execution().status());
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, outcome.candidate().proofStatus());
     }
 
     @Test

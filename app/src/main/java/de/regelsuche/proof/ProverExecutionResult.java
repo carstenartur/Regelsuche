@@ -33,7 +33,9 @@ public record ProverExecutionResult(
         PROVER_TIMEOUT,
         /** The prover finished, but reported a non-success exit code. */
         PROVER_FAILED,
-        /** The prover finished and signalled success. */
+        /** A custom command succeeded without checked mathematical evidence. */
+        PROCESS_SUCCEEDED,
+        /** The exact typed obligation was confirmed by a checked backend. */
         PROVER_CONFIRMED
     }
 }

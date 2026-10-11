@@ -209,11 +209,14 @@ public final class ProofJobScheduler implements AutoCloseable {
             return;
         }
 
-        // Check proof cache before dispatching
+        // Status-only caches cannot establish a formal proof, even with a current key.
+        // A future reusable proof cache must independently replay its retained evidence.
+        String cacheIdentity = worker.cacheIdentity();
         ProofCacheKey cacheKey = ProofCacheKey.of(
-            job.leftPattern(), job.rightPattern(), job.assumptions(), worker.workerId());
-        Optional<CandidateProofStatus> cached = proofCache.get(cacheKey);
-        if (cached.isPresent()) {
+            job.leftPattern(), job.rightPattern(), job.assumptions(), cacheIdentity);
+        Optional<CandidateProofStatus> cached = proofCache.get(cacheKey)
+            .filter(status -> status != CandidateProofStatus.FORMALLY_PROVED);
+        if (cached.isPresent() && cacheIdentity.equals(worker.cacheIdentity())) {
             jobRepository.save(job.withDone(cached.get()));
             return;
         }
@@ -251,6 +254,10 @@ public final class ProofJobScheduler implements AutoCloseable {
                 return;
             }
 
+            if (!cacheIdentity.equals(worker.cacheIdentity())) {
+                handleFailure(job, "proof configuration changed during the attempt");
+                return;
+            }
             CandidateProofStatus status = result.status();
             proofCache.put(cacheKey, status);
             writeArtifactBundle(job, result, status, null);

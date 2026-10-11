@@ -46,7 +46,7 @@ class ProofBridgeServiceTest {
     }
 
     @Test
-    void doesNotLowerExistingProvedStatus() {
+    void currentAttemptRequiresFreshEvidenceRatherThanAnIncomingFlag() {
         ProofBridgeService service = new ProofBridgeService(new SmtProofBridge());
         RuleCandidate provedCandidate = new RuleCandidate(
             "A + 0",
@@ -64,6 +64,6 @@ class ProofBridgeServiceTest {
             List.of()
         );
         RuleCandidate result = service.attempt(provedCandidate, List.of());
-        assertEquals(CandidateProofStatus.FORMALLY_PROVED, result.proofStatus());
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, result.proofStatus());
     }
 }

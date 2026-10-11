@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class LeanProofBridgeTest {
     @Test
-    void emitsSkeletonAndMarksFormallyProvable() {
+    void emitsActualProofAndRealTypedAssumptions() {
         LeanProofBridge bridge = new LeanProofBridge();
         ProofBridge.ProofAttempt attempt = bridge.prove(
             "a / b * b",
@@ -20,8 +20,9 @@ class LeanProofBridgeTest {
         assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, attempt.status());
         assertEquals("lean4", attempt.tool());
         assertTrue(attempt.artifact().contains("theorem regelsuche_lemma"));
-        assertTrue(attempt.artifact().contains("≠ 0"));
-        assertTrue(attempt.artifact().contains("(h1 : True)"));
-        assertTrue(attempt.artifact().contains("sorry"));
+        assertTrue(attempt.artifact().contains("rs_b ≠ (0 : Real)"));
+        assertTrue(attempt.artifact().contains("(rs_x : Real)"));
+        assertTrue(attempt.artifact().contains("Lean.collectAxioms"));
+        org.junit.jupiter.api.Assertions.assertFalse(attempt.artifact().contains("sorry"));
     }
 }

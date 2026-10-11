@@ -33,14 +33,14 @@ class ProofWorkerTest {
     // ── LeanProofWorker ────────────────────────────────────────────────────
 
     @Test
-    void leanWorkerGeneratesSkeletonWithoutExecutor() {
+    void leanWorkerGeneratesActualUncheckedTacticsWithoutExecutor() {
         LeanProofWorker worker = new LeanProofWorker();
         ProofWorker.Result result = worker.prove(candidate(), List.of());
 
         assertEquals("lean4", result.tool());
         assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, result.status());
-        assertTrue(result.artifact().contains("sorry"),
-            "Lean skeleton must contain 'sorry'");
+        assertTrue(result.artifact().contains("Lean.collectAxioms"),
+            "generated proof must include the checked axiom audit");
         assertNotNull(result.updatedCandidate());
     }
 
@@ -55,7 +55,7 @@ class ProofWorkerTest {
     }
 
     @Test
-    void leanWorkerDoesNotLowerAlreadyProvedStatus() {
+    void leanWorkerCannotReuseAnUnboundProofFlag() {
         RuleCandidate proved = new RuleCandidate(
             "A + 0", "A", 3, 1.0, 2, true, true, false,
             List.of(), RuleStatus.MATCHES_KNOWN_RULE, CandidateProofStatus.FORMALLY_PROVED, "h"
@@ -63,8 +63,8 @@ class ProofWorkerTest {
         LeanProofWorker worker = new LeanProofWorker();
         ProofWorker.Result result = worker.prove(proved, List.of());
 
-        assertEquals(CandidateProofStatus.FORMALLY_PROVED, result.status(),
-            "status must not be lowered below FORMALLY_PROVED");
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, result.status(),
+            "an incoming flag is not fresh goal-bound proof evidence");
     }
 
     @Test
