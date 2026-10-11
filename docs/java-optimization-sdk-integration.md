@@ -41,8 +41,26 @@ verification is not authorization to reuse evidence for the original program.
 unaltered original trace, source assumptions and checker revision. The SDK
 cannot prove that an adapter supplied a faithful trace of Java source it never
 receives. The adapter must recheck source/environment freshness before applying.
-The checker revision is now `java-numeric-independent/v4`; public API signatures
+The checker revision is now `java-numeric-independent/v7`; public API signatures
 are unchanged, while evidence issued under previous checker revisions is stale.
+
+## Congruence inside a positive modular reduction
+
+The modular domain can propose removing same-modulus inner reductions through
+addition, subtraction and multiplication while retaining the enclosing positive
+reduction. For example, `((x*x mod n)*x mod n + 4) mod n` can become
+`(x*x*x + 4) mod n`. This is a generic arithmetic law; the SDK receives no source
+algorithm name or desired target. Proposals replace the complete reducing
+expression so other normalized outputs remain observable.
+
+The independent checker compares products and ordered additive operands in the
+same residue ring. It interns shallow, modulus-specific atom identities, without
+distributing products of sums. Its existing node, depth, atom and affine-exponent
+bounds still apply. A different modulus stays opaque, exponent/modulus positions
+are not treated as values in the outer residue ring, and a bare congruent value
+cannot replace a normalized output. The Java facade still checks every original
+and candidate intermediate's magnitude and totality, then applies the unchanged
+runtime cost gate; congruence alone does not authorize an optimization.
 
 ## Current qualification boundary
 

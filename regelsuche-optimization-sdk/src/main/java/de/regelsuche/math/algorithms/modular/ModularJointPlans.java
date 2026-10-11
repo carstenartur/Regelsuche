@@ -26,7 +26,7 @@ public final class ModularJointPlans implements ComputationBackend, JointPlanSea
     @Override public Object literal(NumberExpr literal) { literalType(literal); return literal.value().numerator(); }
     @Override public Operation operation(Expr expression) {
         String id;
-        long work = 1;
+        long work = ModularOperationCosts.ARITHMETIC_WORK;
         int arity = 2;
         if (expression instanceof BinaryExpr binary) id = switch (binary.operator()) {
             case ADD -> "add"; case SUB -> "sub"; case MUL -> "mul";
