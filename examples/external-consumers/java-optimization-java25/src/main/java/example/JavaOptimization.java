@@ -40,6 +40,13 @@ public final class JavaOptimization {
         } catch (ArithmeticException expected) {
             System.out.println("checked=ORIGINAL_OVERFLOW_DETECTED");
         }
+        var domains = IntegralDomainAnalysis.compare(source, SourceEvaluationTrace.fromPlan(source),
+                source.withOutputs(List.of(x)));
+        if (!(domains instanceof IntegralDomainAnalysis.Verified verified)
+                || !verified.source().inputRange().maximum().equals(java.math.BigInteger.valueOf(Integer.MAX_VALUE - 1L))
+                || !verified.candidate().inputRange().maximum().equals(java.math.BigInteger.valueOf(Integer.MAX_VALUE)))
+            throw new AssertionError("shared exact integral domains unavailable in standalone SDK");
+        System.out.println("domains=ORIGINAL_AND_CANDIDATE_VERIFIED");
     }
     private static OptimizationRequest request(JointComputationPlan plan, SafetyProfile profile) {
         return new OptimizationRequest(plan, SourceEvaluationTrace.fromPlan(plan), Set.of(NumericKind.INT),

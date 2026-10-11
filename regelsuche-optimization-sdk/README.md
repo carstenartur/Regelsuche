@@ -56,6 +56,28 @@ External receiver guards must be charged by the source adapter before it
 claims runtime improvement. Unsupported effects, aliasing, control flow,
 dispatch, exceptions and observations are rejected at the source boundary.
 
+## Shared integral domains
+
+`IntegralDomainAnalysis.analyze(plan, sourceTrace)` reports an exact local input
+interval and affine outputs for the supported one-input primitive integral
+fragment. `compare(source, sourceTrace, candidate)` independently checks equal
+named outputs and that the candidate's no-overflow domain includes the original
+domain. Both original and candidate ranges are returned separately. Source trace
+occurrences retain dead intermediates; nested operations and narrowing casts are
+also constrained, even when they are absent from a supplied trace.
+
+For example, the `int` expression `(2*x)/2` has the exact no-overflow interval
+`[-1073741824, 1073741823]`, while `x` spans the full `int` interval. This does
+not prove Java wraparound equivalence outside the original interval. Adapters
+must explicitly authorize changed overflow behavior; these results do not add
+caller assumptions. Nonlinear products, bit operations, inexact division and
+multiple independent inputs return `Unsupported`, as do exhausted work bounds
+and cancellation. Overloads share a deterministic work limit across comparison.
+Each graph resolution reserves 20,000 work units before calling the core's
+structurally bounded resolver; the default allowance is 100,000. Declared and
+evaluated trace kinds both constrain the reported interval.
+The migrated affine calculation retains its original EPL-2.0 notice.
+
 ## Reproducible local distribution
 
 The normal Maven/Gradle module coordinate is
@@ -154,7 +176,41 @@ such as `x.modPow(TWO, m).add(x).mod(m)`. The adapter must still establish recei
 and range contracts and account for the cost of any generated guards. In
 particular, removing one `mod` does not necessarily pay for new receiver checks.
 
+The modular bridge also transports `BigInteger.shiftLeft(int)` for established
+literal distances from 0 through 4095, using the exact integer identity
+`x * 2^distance`. Signed bases are supported. Scalar distances keep their Java
+`int` type when restored, and unchanged output/context branches keep their
+original operations. Negative, variable, unevaluated and oversized distances
+remain outside this bridge fragment. Both original and replacement magnitude
+checks, positive-modulus requirements and original trace work remain mandatory.
+
 An optimizer-produced `Inconclusive` result reports consumed work so adapters can
 charge bounded retries without discarding the entire unused allocation. The old
 single-argument constructor remains available and marks work as unknown (`-1`);
 consumers must conservatively reserve the full allocation for that legacy case.
+
+## Established premises for core algebra
+
+The ordinary core rule inventory can now use the caller's established `POSITIVE`
+and `NON_NEGATIVE` facts. A `NON_NEGATIVE_UPPER_BOUND` also establishes
+nonnegativity. The adapter resolves each canonical `NON_ZERO`, `POSITIVE`, or
+`NON_NEGATIVE` rule premise against an actual encoded source subtree and its
+original typed Java value. Fresh subjects, mismatched predicate text, ambiguous
+subject renderings, and other predicate kinds remain unproved. Facts about an
+input do not pass through an opaque cast or unrelated arithmetic atom.
+
+Exact typed literals establish their own signs. Bounded sign reasoning for
+BigInteger addition, subtraction, multiplication, and negation can discharge a
+composite subject. For example, nonnegative `d` establishes that `d + 1` is
+positive. Primitive arithmetic remains unknown to this sign fragment because
+overflow can change its sign or turn a product into zero. No fact is added to
+the request, and experimental rule packs retain their existing opt-in status.
+
+Discharging a premise only authorizes a proposal. The independent checker proves
+an exact quotient by establishing `N = D * Q` over integers and `D != 0`.
+This supports BigInteger factor cancellation, including composite divisors, and
+retains both source and replacement range gates for checked or guarded primitive
+arithmetic. It does not certify rational distribution over Java truncating
+division, undo earlier truncation, or cancel an overflowing primitive product in
+`PRESERVE_JAVA`. Existing assumption guards, BigInteger magnitude contracts,
+work limits, cancellation, and independent derivation replay still apply.

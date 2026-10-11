@@ -1,5 +1,14 @@
 # Third Party Notices
 
+## Sandbox affine integral domain analysis
+
+`IntegralDomainAnalysis` in the optimization SDK incorporates the affine range
+calculation from Sandbox's `IntegralMathematicalDomain` (Copyright 2026 Carsten
+Hammer), preserving its EPL-2.0 license. The license text is retained in
+`regelsuche-optimization-sdk/src/main/resources/META-INF/licenses/Sandbox-EPL-2.0.txt`
+and included, together with these notices, in the standalone binary, sources,
+Javadoc and distribution archives. The source is available in this repository.
+
 ## Embedded GraalPy and SymPy factorization runtime
 
 The optional `regelsuche-math-sympy` module embeds the following pinned runtime

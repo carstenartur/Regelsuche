@@ -7,7 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class GeneratorRevisionContractTest {
     @ParameterizedTest
-    @ValueSource(strings = {"java-core-algebra-proposals/v1", "java-core-algebra-proposals/v2"})
+    @ValueSource(strings = {"java-core-algebra-proposals/v1", "java-core-algebra-proposals/v2", "java-core-algebra-proposals/v3"})
     void rejectsEvidenceFromEarlierGeneratorRevisions(String staleGeneratorRevision) {
         var source = OptimizationContractTest.plan(NumericKind.INT,
                 JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD,

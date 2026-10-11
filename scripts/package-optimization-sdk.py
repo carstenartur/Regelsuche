@@ -80,8 +80,13 @@ def package(root, external, output, java_home, skip_consumer=False):
     if not dependencies:
         raise ValueError('external runtime dependency directory is empty')
     jars += dependencies
+    notices = {
+        'META-INF/licenses/Regelsuche-LICENSE': (root / 'LICENSE').read_bytes(),
+        'META-INF/licenses/Sandbox-EPL-2.0.txt': (root / 'regelsuche-optimization-sdk/src/main/resources/META-INF/licenses/Sandbox-EPL-2.0.txt').read_bytes(),
+        'META-INF/THIRD_PARTY_NOTICES.md': (root / 'THIRD_PARTY_NOTICES.md').read_bytes(),
+    }
     entries = shade(jars)
-    entries['META-INF/licenses/Regelsuche-LICENSE'] = (root / 'LICENSE').read_bytes()
+    entries.update(notices)
     entries['META-INF/MANIFEST.MF'] = (
         'Manifest-Version: 1.0\r\n'
         'Implementation-Title: Regelsuche Optimization SDK\r\n'
@@ -110,12 +115,15 @@ def package(root, external, output, java_home, skip_consumer=False):
     for module in MODULES:
         for path in sorted((root / module / 'src/main/java').rglob('*.java')):
             sources[str(path.relative_to(root / module / 'src/main/java'))] = path.read_bytes()
+    sources.update(notices)
     write_zip(coordinate / f'{basename}-sources.jar', sources)
     docs = root / 'regelsuche-optimization-sdk/target' / f'regelsuche-optimization-sdk-{product}-javadoc.jar'
     if not docs.is_file():
         raise ValueError('sdk-release Maven profile must build SDK Javadoc first')
     with zipfile.ZipFile(docs) as archive:
-        write_zip(coordinate / f'{basename}-javadoc.jar', {n: archive.read(n) for n in archive.namelist() if not n.endswith('/')})
+        documentation = {n: archive.read(n) for n in archive.namelist() if not n.endswith('/')}
+    documentation.update(notices)
+    write_zip(coordinate / f'{basename}-javadoc.jar', documentation)
     consumer = root / 'examples/external-consumers/java-optimization-java25'
     if not skip_consumer:
         with tempfile.TemporaryDirectory(prefix='optimization-sdk-consumer-') as temporary:
@@ -140,6 +148,7 @@ def package(root, external, output, java_home, skip_consumer=False):
     members = {str(path.relative_to(output)): path.read_bytes() for path in sorted(coordinate.iterdir())}
     members[manifest.name] = manifest.read_bytes()
     members['LICENSE'] = (root / 'LICENSE').read_bytes()
+    members.update(notices)
     members['README.md'] = (root / 'regelsuche-optimization-sdk/README.md').read_bytes()
     for path in sorted(consumer.rglob('*')):
         if path.is_file() and not any(part in ('target', 'build', '.gradle') for part in path.relative_to(consumer).parts):

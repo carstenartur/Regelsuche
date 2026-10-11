@@ -7,7 +7,8 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    static final String REVISION = "java-core-algebra-proposals/v3";
+    // Established core premises and structural modular operand transport share this revision.
+    static final String REVISION = "java-core-algebra-proposals/v4";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -21,7 +22,7 @@ final class JavaCandidateGenerator {
     JavaCandidateGenerator(OptimizationRequest request, VerificationWork work, long generationBudget) {
         if (generationBudget < 1) throw new IllegalArgumentException("POSITIVE_GENERATION_BUDGET_REQUIRED");
         this.request = request; this.work = work; backend = new JavaNumericBackend(request.plan().inputs());
-        algebra = new JavaAlgebraCandidates(work, generationBudget);
+        algebra = new JavaAlgebraCandidates(request, work, generationBudget);
     }
     JointPlanSearch.Generation generate(JointComputationPlan source, int maximum) {
         if (maximum < 1) throw new IllegalArgumentException("POSITIVE_CANDIDATE_LIMIT_REQUIRED");

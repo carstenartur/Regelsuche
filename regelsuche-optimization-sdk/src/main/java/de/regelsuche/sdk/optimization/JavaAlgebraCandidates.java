@@ -31,6 +31,7 @@ import java.util.Map;
  */
 final class JavaAlgebraCandidates {
     private final VerificationWork work;
+    private final EstablishedNumericFacts facts;
     private final List<RewriteRule> rules;
     private final long expansionAllowance;
     private long expansionWork;
@@ -43,7 +44,17 @@ final class JavaAlgebraCandidates {
     }
 
     JavaAlgebraCandidates(VerificationWork work, List<RewriteRule> mathematicalRules, long maximumWork) {
+        this(work, mathematicalRules, maximumWork, new EstablishedNumericFacts(work));
+    }
+
+    JavaAlgebraCandidates(OptimizationRequest request, VerificationWork work, long maximumWork) {
+        this(work, AstRewriteTransformationEngine.defaultRules(), maximumWork, new EstablishedNumericFacts(request, work));
+    }
+
+    private JavaAlgebraCandidates(VerificationWork work, List<RewriteRule> mathematicalRules, long maximumWork,
+            EstablishedNumericFacts facts) {
         this.work = work;
+        this.facts = facts;
         // Reserve most of the request allowance for frontier bookkeeping, all
         // independent checks and final preparation. Exhaustion is not a proof.
         this.expansionAllowance = Math.max(1, maximumWork / 8);
@@ -113,9 +124,7 @@ final class JavaAlgebraCandidates {
                 if (!algebraic(expression)) return false;
                 var view = views.computeIfAbsent(expression, node -> new View(kind, node));
                 if (!mathematical.matches(view.expression)) return false;
-                // A source-side fact is never silently added to the Java request.
-                // Conditional mathematical rules need an explicit discharge API.
-                if (!mathematical.assumptions(view.expression).isEmpty()) return false;
+                if (!view.premises.discharge(mathematical.assumptions(view.expression))) return false;
                 Expr result = view.decode(mathematical.apply(view.expression), 0);
                 if (result.equals(expression)) return false;
                 matched = expression; replacement = result;
@@ -143,11 +152,23 @@ final class JavaAlgebraCandidates {
         private final NumericKind kind;
         private final Map<Expr, VariableExpr> atoms = new LinkedHashMap<>();
         private final Map<String, Expr> values = new LinkedHashMap<>();
+        private final List<JavaRulePremises.SourceTerm> terms = new ArrayList<>();
         private final Expr expression;
-        View(NumericKind kind, Expr source) { this.kind = kind; this.expression = encode(source, 0); }
+        private final JavaRulePremises premises;
+        View(NumericKind kind, Expr source) {
+            this.kind = kind;
+            this.expression = encode(source, 0);
+            this.premises = new JavaRulePremises(facts, work, terms);
+        }
 
         private Expr encode(Expr source, int depth) {
             bounded(depth);
+            Expr mathematical = encodeHere(source, depth);
+            terms.add(new JavaRulePremises.SourceTerm(mathematical, source));
+            return mathematical;
+        }
+
+        private Expr encodeHere(Expr source, int depth) {
             if (!(source instanceof VariableExpr) && JavaExpressions.resultKind(source) == kind) {
                 if (JavaExpressions.isLiteral(source)) {
                     Object value = JavaExpressions.literalValue(source);

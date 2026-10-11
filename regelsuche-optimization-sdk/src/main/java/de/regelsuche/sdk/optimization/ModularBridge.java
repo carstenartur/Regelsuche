@@ -3,10 +3,14 @@ package de.regelsuche.sdk.optimization;
 import de.regelsuche.ast.*;
 import de.regelsuche.math.algorithms.modular.ModularComputationDomain;
 import de.regelsuche.search.program.JointComputationPlan;
+import java.math.BigInteger;
 import java.util.*;
 
 /** Type-preserving bridge to the existing affine modular generator and independent checker. */
 final class ModularBridge {
+    // The existing affine checker admits coefficients of at most 4096 bits.
+    // Check the distance before allocating 2^distance, independently of Java's size gate.
+    private static final int MAX_SHIFT_DISTANCE = 4095;
     private final ModularComputationDomain domain;
     ModularBridge(Set<SemanticAssumption> assumptions) {
         var nonnegative = new HashSet<String>(); var positive = new HashSet<String>();
@@ -40,7 +44,11 @@ final class ModularBridge {
         for (var rewrite : generated.rewrites()) {
             var restored = new ArrayList<>(expressions);
             for (int index = 0; index < indices.size(); index++) {
-                Expr replacement = fromModular(rewrite.outputs().get(index));
+                Expr modularReplacement = rewrite.outputs().get(index);
+                // Transport normalizes shifts and recognizes their inverse. Do not
+                // let that proof view rewrite an unrelated, unchanged Java output.
+                if (modularReplacement.equals(modular.get(index))) continue;
+                Expr replacement = restore(modularReplacement, expressions.get(indices.get(index)), modular.get(index));
                 inspections += inspectionSize(replacement);
                 restored.set(indices.get(index), replacement);
             }
@@ -62,11 +70,60 @@ final class ModularBridge {
         return count;
     }
     ModularComputationDomain.Verification verify(Expr source, Expr target) {
-        return domain.verifyEquivalent(List.of(toModular(source)), List.of(toModular(target)));
+        long inspections = inspectionSize(source) + inspectionSize(target);
+        var proof = domain.verifyEquivalent(List.of(toModular(source)), List.of(toModular(target)));
+        return new ModularComputationDomain.Verification(proof.accepted(), inspections + proof.work());
+    }
+
+    /** Retain the original typed Java context at every unchanged branch. A
+     * modular rewrite may occur beside an exact product with the same proof
+     * expression as a shift; structural equality of their values must not lose
+     * that distinction outside the reducing context.
+     */
+    private static Expr restore(Expr replacement, Expr original, Expr transported) {
+        if (replacement.equals(transported)) return original;
+        if (original instanceof FunctionExpr function) {
+            boolean shift = JavaExpressions.operationOf(original).orElse(null) == NumericOperation.SHIFT_LEFT;
+            // A zero shift vanished from the proof view. Keep its Java context
+            // when the rewrite changes only the base inside that source operation.
+            if (shift && (Integer) JavaExpressions.literalValue(function.arguments().get(1)) == 0)
+                return JavaExpressions.operation(NumericKind.BIG_INTEGER, NumericOperation.SHIFT_LEFT,
+                        restore(replacement, function.arguments().getFirst(), transported), function.arguments().get(1));
+            boolean matching = transported instanceof BinaryExpr beforeBinary && replacement instanceof BinaryExpr afterBinary
+                    && beforeBinary.operator() == afterBinary.operator()
+                    || transported instanceof FunctionExpr beforeFunction && replacement instanceof FunctionExpr afterFunction
+                    && beforeFunction.name().equals(afterFunction.name()) && beforeFunction.arguments().size() == afterFunction.arguments().size();
+            if (matching) {
+                var before = modularOperands(transported); var after = modularOperands(replacement);
+                if (function.arguments().size() == before.size() && (!shift || before.get(1).equals(after.get(1)))) {
+                    var restored = new ArrayList<Expr>();
+                    for (int i = 0; i < before.size(); i++) restored.add(restore(after.get(i), function.arguments().get(i), before.get(i)));
+                    return new FunctionExpr(function.name(), restored);
+                }
+            }
+        }
+        return fromModular(replacement);
+    }
+    private static List<Expr> modularOperands(Expr expression) {
+        return expression instanceof BinaryExpr binary ? List.of(binary.left(), binary.right()) : JavaExpressions.operands(expression);
     }
     static Expr toModular(Expr expression) {
         if (expression instanceof VariableExpr || expression instanceof NumberExpr) return expression;
         if (JavaExpressions.resultKind(expression) != NumericKind.BIG_INTEGER) throw new IllegalArgumentException("MODULAR_BIG_INTEGER_REQUIRED");
+        if (JavaExpressions.operationOf(expression).orElse(null) == NumericOperation.SHIFT_LEFT) {
+            var arguments = JavaExpressions.operands(expression);
+            if (arguments.size() != 2 || !JavaExpressions.isLiteral(arguments.get(1))
+                    || JavaExpressions.resultKind(arguments.get(1)) != NumericKind.INT)
+                throw new IllegalArgumentException("MODULAR_SHIFT_REQUIRES_CONSTANT_INT_DISTANCE");
+            int distance = (Integer) JavaExpressions.literalValue(arguments.get(1));
+            if (distance < 0 || distance > MAX_SHIFT_DISTANCE)
+                throw new IllegalArgumentException("MODULAR_SHIFT_DISTANCE_OUTSIDE_BOUND");
+            Expr base = toModular(arguments.getFirst());
+            // BigInteger shifts multiply signed integers, with no Java word masking.
+            // The original trace and both Java magnitude proofs remain authoritative.
+            return distance == 0 ? base : new BinaryExpr(base, BinaryOperator.MUL,
+                    JavaExpressions.literal(BigInteger.ONE.shiftLeft(distance)));
+        }
         // Ordinary Java emission spells the existing fused modmul as a.multiply(b).mod(m).
         // The modular checker still independently establishes positivity and matching modulus.
         if (JavaExpressions.operationOf(expression).orElse(null)==NumericOperation.MOD) {
@@ -89,10 +146,19 @@ final class ModularBridge {
     }
     static Expr fromModular(Expr expression) {
         if (expression instanceof VariableExpr || expression instanceof NumberExpr) return expression;
-        if (expression instanceof BinaryExpr b) return JavaExpressions.operation(NumericKind.BIG_INTEGER, switch(b.operator()) {
-            case ADD -> NumericOperation.ADD; case SUB -> NumericOperation.SUBTRACT; case MUL -> NumericOperation.MULTIPLY;
-            default -> throw new IllegalArgumentException("OUTSIDE_MODULAR_FRAGMENT");
-        }, fromModular(b.left()), fromModular(b.right()));
+        if (expression instanceof BinaryExpr b) {
+            if (b.operator() == BinaryOperator.MUL && b.right() instanceof NumberExpr number && number.value().isInteger()) {
+                BigInteger coefficient = number.value().numerator();
+                int distance = coefficient.getLowestSetBit();
+                if (coefficient.signum() > 0 && distance > 0 && distance <= MAX_SHIFT_DISTANCE && coefficient.bitCount() == 1)
+                    return JavaExpressions.operation(NumericKind.BIG_INTEGER, NumericOperation.SHIFT_LEFT,
+                            fromModular(b.left()), JavaExpressions.literal(distance));
+            }
+            return JavaExpressions.operation(NumericKind.BIG_INTEGER, switch(b.operator()) {
+                case ADD -> NumericOperation.ADD; case SUB -> NumericOperation.SUBTRACT; case MUL -> NumericOperation.MULTIPLY;
+                default -> throw new IllegalArgumentException("OUTSIDE_MODULAR_FRAGMENT");
+            }, fromModular(b.left()), fromModular(b.right()));
+        }
         var f = (FunctionExpr)expression;
         return JavaExpressions.operation(NumericKind.BIG_INTEGER, switch(f.name()) {
             case "mod" -> NumericOperation.MOD; case "modpow" -> NumericOperation.MOD_POW; case "modmul" -> NumericOperation.MOD_MULTIPLY;
