@@ -43,7 +43,8 @@ final class JavaNumericBackend implements ComputationBackend {
         if (kind == NumericKind.BIG_INTEGER && (op.name().endsWith("EXACT") || op == NumericOperation.UNSIGNED_SHIFT_RIGHT))
             throw new IllegalArgumentException("UNSUPPORTED_BIG_INTEGER_OPERATION");
         long work = op == NumericOperation.MOD_POW ? ModularOperationCosts.POWER_FALLBACK_WORK
-                : op == NumericOperation.MOD_MULTIPLY ? ModularOperationCosts.MULTIPLY_WORK : kind == NumericKind.BIG_INTEGER ? 4 : 1;
+                : op == NumericOperation.MOD_MULTIPLY ? ModularOperationCosts.MULTIPLY_WORK
+                : kind == NumericKind.BIG_INTEGER ? ModularOperationCosts.ARITHMETIC_WORK : 1;
         if (op == NumericOperation.MOD_POW && function.arguments().size() == 3)
             work = ModularOperationCosts.powerWork(function.arguments().get(1));
         return new Operation(function.name(), argumentTypes, kind.type(), work, kind == NumericKind.BIG_INTEGER ? 2 : 1);
