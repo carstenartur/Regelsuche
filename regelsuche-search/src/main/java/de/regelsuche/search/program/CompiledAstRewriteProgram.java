@@ -112,6 +112,16 @@ public final class CompiledAstRewriteProgram implements RetainedGraph.View {
             ((PreparedAstRewriteTransformationEngine) source.engine()).astTransport())).toList();
     }
 
+    /** Inspect every actual owned stage; a final program wrapper alone is not cost authority. */
+    public boolean hasBoundedExecutionInventory() {
+        RetainedOperation.work(1);
+        for (var stage : stages) {
+            RetainedOperation.work(1);
+            if (!stage.transport().hasBoundedExecutionInventory()) return false;
+        }
+        return true;
+    }
+
     /** Complete paths only. Exceeding a candidate/structural limit throws, never silently truncates. */
     public Batch transformMeasured(Expr expression) {
         Objects.requireNonNull(expression, "expression");

@@ -46,8 +46,8 @@ public final class ComputationOptimizer {
             long beforeFinal=work.used();
             var proof=checker.check(request.plan(),found.plan());
             long total=Math.max(work.used(),Math.addExact(searchWork,work.used()-beforeFinal));
-            if(!proof.accepted()) return new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED",total);
-            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",total);
+            var finalOutcome=finalVerificationOutcome(proof.accepted(),total,budget.maximumWork());
+            if(finalOutcome.isPresent()) return finalOutcome.get();
             var obligations=obligations(request,found.plan());
             var cost=cost(request,found.plan(),obligations);
             long preparationWork=cost.sourceCost().inspectionWork()+2*cost.candidateCost().inspectionWork();
@@ -72,6 +72,12 @@ public final class ComputationOptimizer {
         } catch(VerificationWork.Stopped stopped) {
             return stopped.cancelled ? new OptimizationResult.Cancelled("CANCELLED") : new OptimizationResult.BudgetExceeded("OPTIMIZATION_BUDGET_EXCEEDED",work.used());
         } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }
+    }
+    /** Classify aggregate search/proof work before any final proof outcome or preparation. */
+    static Optional<OptimizationResult> finalVerificationOutcome(boolean proofAccepted,long totalWork,long maximumWork) {
+        if(totalWork>maximumWork) return Optional.of(new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",totalWork));
+        if(!proofAccepted) return Optional.of(new OptimizationResult.Inconclusive("FINAL_INDEPENDENT_CHECK_NOT_PROVED",totalWork));
+        return Optional.empty();
     }
     public VerificationResult verify(OptimizationRequest request, JointComputationPlan candidate, CancellationToken token) {
         Objects.requireNonNull(request); Objects.requireNonNull(candidate);

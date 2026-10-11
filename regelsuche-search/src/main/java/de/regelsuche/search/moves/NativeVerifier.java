@@ -42,6 +42,22 @@ public interface NativeVerifier {
     final class Registered implements NativeVerifier,de.regelsuche.retention.RetainedGraph.View {
         private final java.util.Map<MoveProvider.Descriptor,NativeVerifier> verifiers;
         private Registered(java.util.Map<MoveProvider.Descriptor,NativeVerifier> verifiers){this.verifiers=java.util.Map.copyOf(verifiers);}
+        boolean coversKnownExecution(NativeMoveProvider candidate) {
+            boolean covered = false;
+            // Scan every entry: Map.copyOf iteration order must not change the paid units.
+            for (var verifier : verifiers.values()) {
+                de.regelsuche.retention.RetainedOperation.work(1);
+                if (verifier instanceof Builtin builtin && builtin.provider == candidate) {
+                    if (candidate instanceof NativeMoveSearch.Primitive primitive)
+                        covered |= primitive.transport().hasBoundedExecutionInventory();
+                    if (candidate instanceof NativeProgramMoveProvider program)
+                        covered |= program.program().hasBoundedExecutionInventory();
+                } else if (verifier instanceof NativeVerifierProvider.ExecutionInventory installed) {
+                    covered |= installed.executionRevision(candidate) != null;
+                }
+            }
+            return covered;
+        }
         @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(verifiers);}
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove proposal,TypedMoveSearch.Context context){
             var verifier=verifiers.get(proposal.descriptor());

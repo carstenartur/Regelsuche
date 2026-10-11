@@ -17,6 +17,11 @@ public final class SearchExecution {
         private long mechanical,verification;
         private ExecutionWork mathematics=ExecutionWork.ZERO;
         ResourceLimit() {}
+        ResourceLimit paidSearch(long units) {
+            if (units < 0) throw new IllegalArgumentException("negative aborted search work");
+            mechanical = Math.addExact(mechanical, units);
+            return this;
+        }
         public ResourceLimit paidGeneration(TransformationWorkMetrics work) {
             long updated=Math.addExact(mechanical,work.totalWorkUnits());
             var updatedMath=mathematics.plus(work.candidateWork());

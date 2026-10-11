@@ -32,6 +32,7 @@ public final class ModularJointPlans implements ComputationBackend, JointPlanSea
             case ADD -> "add"; case SUB -> "sub"; case MUL -> "mul";
             default -> throw new IllegalArgumentException("unsupported integer operation");
         };
+        else if (expression instanceof FunctionExpr function && function.name().equals("mod")) id = "mod";
         else if (expression instanceof FunctionExpr function && (function.name().equals("modpow") || function.name().equals("modmul"))) {
             id = function.name(); arity = 3;
             work = id.equals("modmul") ? ModularOperationCosts.MULTIPLY_WORK : ModularOperationCosts.POWER_FALLBACK_WORK;
