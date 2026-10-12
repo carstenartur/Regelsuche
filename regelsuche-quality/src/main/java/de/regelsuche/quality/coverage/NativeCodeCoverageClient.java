@@ -66,18 +66,17 @@ public final class NativeCodeCoverageClient {
                 HttpResponse<byte[]> checked = null;
                 try { checked = send(http, statusUri, token, null, Duration.ofNanos(Math.min(REQUEST_TIMEOUT.toNanos(), remaining))); }
                 catch (IOException ignored) { /* Transient status queries remain bounded by the processing deadline. */ }
-                if (checked != null) {
-                    JsonNode state = object(checked.body());
-                    int statusCode = checked.statusCode();
-                    if (statusCode >= 400 && statusCode < 500)
-                        return receipt("FAILED", code, id, status, "Processing query HTTP " + statusCode + ": " + state.path("message").asText(), token);
-                    if (statusCode >= 200 && statusCode < 300) {
-                        status = state.path("processing_status").asText(null);
-                        if ("succeeded".equals(status)) return receipt("PROCESSED", code, id, status, null, token);
-                        if ("failed".equals(status)) return receipt("FAILED", code, id, status, "Processing failed: " + state.path("errors"), token);
-                    }
-                }
                 delay = Math.min(delay * 2, Duration.ofSeconds(60).toNanos());
+                if (checked == null) continue;
+                JsonNode state = object(checked.body());
+                int statusCode = checked.statusCode();
+                if (statusCode >= 400 && statusCode < 500)
+                    return receipt("FAILED", code, id, status, "Processing query HTTP " + statusCode + ": " + state.path("message").asText(), token);
+                if (statusCode >= 200 && statusCode < 300) {
+                    status = state.path("processing_status").asText(null);
+                    if ("succeeded".equals(status)) return receipt("PROCESSED", code, id, status, null, token);
+                    if ("failed".equals(status)) return receipt("FAILED", code, id, status, "Processing failed: " + state.path("errors"), token);
+                }
             }
             return receipt("FAILED", code, id, status, "Timed out waiting 160 seconds for coverage processing", token);
         } catch (InterruptedException exception) {
