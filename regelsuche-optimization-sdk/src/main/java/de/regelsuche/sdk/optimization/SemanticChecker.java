@@ -7,11 +7,15 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    static final String REVISION = "java-numeric-independent/v7";
+    // Exact quotient proofs and metered structural modular verification share this evidence revision.
+    static final String REVISION = "java-numeric-independent/v8";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
-    SemanticChecker(OptimizationRequest request, VerificationWork work) { this.request = request; this.work = work; }
+    private final EstablishedNumericFacts facts;
+    SemanticChecker(OptimizationRequest request, VerificationWork work) {
+        this.request = request; this.work = work; this.facts = new EstablishedNumericFacts(request, work);
+    }
     void validate() {
         var bounds = new BigIntegerBounds(request, work);
         work.charge(1);
@@ -159,6 +163,12 @@ final class SemanticChecker {
                 return true;
             }
         } catch (PolynomialProof.OutsideFragment bounded) { /* A larger polynomial is unknown, never proved. */ }
+        if (exact) try {
+            if (new IntegerQuotientProof(facts, work).equivalent(a, b, kind)) {
+                methods.add("EXACT_INTEGER_QUOTIENT_IDENTITY");
+                return true;
+            }
+        } catch (PolynomialProof.OutsideFragment bounded) { /* Divisibility was not established within the proof bounds. */ }
         if (kind==NumericKind.BIG_INTEGER) {
             // This is an exact typed expansion, not equality modulo an unspecified modulus.
             // Both traces and every intermediate range have already been checked by the caller.
@@ -252,7 +262,7 @@ final class SemanticChecker {
         var kind=JavaExpressions.resultKind(expression); var args=JavaExpressions.operands(expression);
         if (op.get().name().endsWith("EXACT")) throw new IllegalArgumentException("EXISTING_EXACT_CHECK_MUST_REMAIN");
         if ((op.get()==NumericOperation.DIVIDE || op.get()==NumericOperation.REMAINDER) && !kind.floatingPoint()) {
-            if (!JavaExpressions.isLiteral(args.get(1)) || integer(JavaExpressions.literalValue(args.get(1))).signum()==0)
+            if (!facts.nonzero(args.get(1)))
                 throw new IllegalArgumentException("POSSIBLE_DIVISION_EXCEPTION");
         }
         if (kind==NumericKind.BIG_INTEGER) switch(op.get()) {

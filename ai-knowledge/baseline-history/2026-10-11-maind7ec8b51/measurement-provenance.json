@@ -1,0 +1,183 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "status": "candidate-for-independent-review",
+  "sourceCommit": "d7ec8b51d164dc58dbb3e9e328af8bb356425b93",
+  "sourceTree": "2e9dd708951e02d68a786aa7871dee7b4a4a6347",
+  "sourceStatusBefore": "",
+  "sourceStatusAfter": "",
+  "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorTree": "0cb8e41b91c831705f9c86633580181372da6e14",
+  "extractorStatusBefore": "",
+  "extractorStatusAfter": "",
+  "sourceBaselineSha256": "47ca2375967a95763395ad65bad1bff60a0f8e82ed9246684b0ea8dfea2f28ef",
+  "policySha256": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+  "lifecycleSha256": "f1df0d336d519f10a0bf35129e1b80cd8cbbad5d0d3939e0fffd2cd5d7ee91b8",
+  "repositoryBindings": {
+    "ai-knowledge/complexity-baseline.json": "47ca2375967a95763395ad65bad1bff60a0f8e82ed9246684b0ea8dfea2f28ef",
+    "ai-knowledge-verification/build.gradle": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+    "gradle/ai-knowledge-verification.gradle": "f1df0d336d519f10a0bf35129e1b80cd8cbbad5d0d3939e0fffd2cd5d7ee91b8",
+    "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+    "settings.gradle": "94a43f75ca24cdba052ff86535c03cf287ac1b207ab571fd7b56d19f67a195cc",
+    "ai-knowledge/capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+    "ai-knowledge/claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+    "config/ai-knowledge-capability-coverage.json": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+    "config/quality/complexity-hotspots.json": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4",
+    "scripts/verify-ai-knowledge-artifacts.py": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b",
+    "scripts/test_ai_knowledge_coverage.py": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4",
+    "scripts/verify-complexity-hotspots.py": "d792435d075d8102bbe5504af83f84d6c660a20b1234e8516f8a5d5ac3775bfa",
+    "gradle/wrapper/gradle-wrapper.properties": "fe16e98ae855f18c4aa933e9a477e23c55e35d81ef8a9b2729146d58694d727e",
+    "gradle/wrapper/gradle-wrapper.jar": "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d"
+  },
+  "extractorBindings": {
+    "build.gradle": "c49482b2bdbaaf82f507135314df3b96eb42e21f1e135cf2d10510d03c1e4158",
+    "settings.gradle": "e5b4053a579890380d9b1e9e3a63a79246f7bde39426e0af1eb59f8be15fef76",
+    "gradle.properties": "ce5127016f4158cad59c63c96b11a5292a5a0066e76991a5e9ea7271d8ce7496",
+    "core/build.gradle": "09fcb94672f4b3200fc25817e5ac6e7f2d1049f26a078a58c11f276183cd62ca",
+    "gradle-plugin/build.gradle": "2d42f5c384da203e8ec03d70c42f16a6285748cb91d97eecf8837282f4b32f6a",
+    "core/src/main/java/org/aiknowledge/core/repositoryscan/RepositoryFileInventoryScanner.java": "b89b02132c1f4f4fc753ef3bbe7b4752a8696dc9b3a12d1c37b79052a56756e0",
+    "core/src/main/java/org/aiknowledge/core/ReportAnalyzer.java": "7d7bc7cd0220a5424c287c1c019d3bf488c578b81f3a303633cbd85ee13bd700",
+    "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae",
+    "core/src/main/java/org/aiknowledge/core/ModelProfileSupport.java": "bef8660d98b698de5fcca5fb092436de2e99ba18b7c9bcbf97cc224f8439b4c0",
+    "core/src/main/java/org/aiknowledge/core/KnowledgeExtractionPipeline.java": "ac405ba819f41cd9f5deb59682dac10b36be6e7facf1f015a04ec9f85fb6cdf9",
+    "gradle-plugin/src/main/java/org/aiknowledge/gradle/AiKnowledgePlugin.java": "4f418fe79ebab1439d032d9340c5a4781936d247d823e0eb04d269cb6c78d850",
+    "gradle-plugin/src/main/java/org/aiknowledge/gradle/AiKnowledgeExtension.java": "eee09031ba2bd1402325160c7f1f09dc6429eddec35a9554b7124a4ab84aad58"
+  },
+  "javaReleaseSha256": "10442d5ef7930f4220a3336d65f020b24812660824ea995a51ba29f278aed30b",
+  "initializerSha256": "35f1944def395ee7ecbe79a629640ddf5a86eb400dacdee3261469d197e79c54",
+  "runtimeLauncherSha256": "0038c62663e33daef5252cde1020261a622953b83a86ca92b7d71197801327f3",
+  "command": "./gradlew --no-daemon --no-configuration-cache --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx1024m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8' --init-script /dev/shm/regelsuche-pr1088-predecessor/ai-knowledge/baseline-history/2026-09-20-main81ea9ac7-java25-extractor.init.gradle -PuseLocalAiKnowledgeExtractor=true -PaiKnowledgeExtractorCheckout=/dev/shm/regelsuche-pr1088-extractor aiKnowledgeCheck --console=plain --stacktrace --info -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=38959 -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=38959",
+  "runtimeEnvironment": {
+    "JAVA_HOME": "/workspace/scratch/4ae3214a4451/runtime/toolchains/jdk-25.0.2+10",
+    "GRADLE_USER_HOME": "/dev/shm/regelsuche-pr1088-gradle",
+    "AI_KNOWLEDGE_EXTRACTOR_ENABLED": "true",
+    "TMPDIR": "/dev/shm/regelsuche-pr1088-temp",
+    "JDK_JAVA_OPTIONS": "-XX:-UsePerfData -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts -Djava.net.preferIPv4Stack=true -Djava.io.tmpdir=/dev/shm/regelsuche-pr1088-temp -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=38959 -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=38959"
+  },
+  "startedAt": "2026-10-11T18:26:57.489559+00:00",
+  "finishedAt": "2026-10-11T18:31:44.081948+00:00",
+  "exitCode": 0,
+  "additionalCacheInitializerApplied": false,
+  "qualification": {
+    "mergedPullRequest": 1068,
+    "sourcePrHead": "1f4d63d9f1af5ad181ca39727ccea0c68c460be9",
+    "sourcePrTreeMatchesMain": true,
+    "sourcePrCiRun": 38129395135,
+    "mainCiRun": 38134140137,
+    "independentReview": "pending; no baseline copy or candidate qualification"
+  },
+  "snapshot": {
+    "schemaVersion": 1,
+    "estimatedContextTokens": 696505.0,
+    "conceptRadius": 99.0,
+    "dependencyRadius": 295.0,
+    "knowledgeDensity": 195.0,
+    "contextLocality": 0.0,
+    "compressionRatio": 0.01722887847179848,
+    "aiCognitiveComplexity": 844.005,
+    "aiCognitiveDebt": 772.405,
+    "aiContextDebt": 15.05,
+    "contextDebtModelVersion": "context-footprint-v3"
+  },
+  "snapshotSha256": "d2146a9f97686f724e49d5e710f46470674b39038b8595eae71dd2983c35c12b",
+  "inventoryAudit": {
+    "classes": {
+      "entries": 1697,
+      "pathsAbsentFromSourceTree": []
+    },
+    "tests": {
+      "entries": 1191,
+      "pathsAbsentFromSourceTree": []
+    },
+    "docs": {
+      "entries": 427,
+      "pathsAbsentFromSourceTree": []
+    },
+    "modules": {
+      "entries": 67,
+      "pathsAbsentFromSourceTree": []
+    }
+  },
+  "retainedMainCiComparison": {
+    "check.json": {
+      "nativeSha256": "0076917437d17d653814cbdf28183505774dfa0ff8465bd1a36590cc42150118",
+      "retainedMainCiSha256": "0076917437d17d653814cbdf28183505774dfa0ff8465bd1a36590cc42150118",
+      "byteIdentical": true
+    },
+    "complexity.json": {
+      "nativeSha256": "2a9afa3300014e94ed890ac5eb6ab32b3901bda0614701e1f78df94ae1cc4d48",
+      "retainedMainCiSha256": "2a9afa3300014e94ed890ac5eb6ab32b3901bda0614701e1f78df94ae1cc4d48",
+      "byteIdentical": true
+    }
+  },
+  "check": {
+    "passed": true,
+    "trendPassed": true,
+    "trendViolationCount": 0,
+    "warningCount": 6,
+    "failOnWarnings": false,
+    "claimFailureCount": 0
+  },
+  "artifacts": {
+    "measured-main/benchmark.html": "ec63650be2561d2bdd75decbcdb2cbd2ddd08d6f2cfe815927554deaea01692b",
+    "measured-main/benchmark.json": "1d6d0109cbb1c26ca09707a0cec68ae23920fb870763a3ff71eb08d77994a4a5",
+    "measured-main/capabilities.json": "6991ee58e1a093af8dd93ee97c94067e526d047e2afcdcf36b08252422d6dccd",
+    "measured-main/check.json": "0076917437d17d653814cbdf28183505774dfa0ff8465bd1a36590cc42150118",
+    "measured-main/claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+    "measured-main/classes.json": "5a17dbe7ba6ea7af4ad8a638ee59ecced16c15c20ca013607723454c35785ad2",
+    "measured-main/complexity-hotspot-report.json": "3ff470ee51c5d7f264e434152a98aac3e4df9838a0e9dff5ee0793f28bfaf79f",
+    "measured-main/complexity.html": "dcd6f093581b2294144f3f96306cab3deae3ec3720e3c5bab531b3d539bbdd02",
+    "measured-main/complexity.json": "2a9afa3300014e94ed890ac5eb6ab32b3901bda0614701e1f78df94ae1cc4d48",
+    "measured-main/context-packs/counterexample-search.json": "038292a5801d44ef8c106b80fc0e0a09fc23ccac3f4e32f25e8a798b265d88b3",
+    "measured-main/context-packs/discovery.json": "7155c92cdb8359b19f062aee8761cb865114910ccbd54164829eb78fcfb1edc5",
+    "measured-main/context-packs/equality-saturation.json": "f61bdbf23a1e50f37cf20b01406e91e86b3abf6cb82cc013dfde741104c11784",
+    "measured-main/context-packs/exact-matrix-representation.json": "975a23e14b1294114d1873a4cb8eeafbffc0ccfe687a3fd349f05138dbb1f3d2",
+    "measured-main/context-packs/historical-rediscovery-diagnostics.json": "0ee56d713ca06653a036d0d9f4cb817dc55f40c1bfb03cd219bb64c1c4759975",
+    "measured-main/context-packs/hypothesis-mining.json": "e1923520c7db76caf3f9efcda0ceb52499c3b12eb3b707e1836f7cd0aa88da17",
+    "measured-main/context-packs/index.json": "17dd56eed2f9237d9b2a5d2af230ef122323e2488ba53215a155948712473279",
+    "measured-main/context-packs/maven-build-contract.json": "71ac265c052fba6d9278a11308d33ffc7333f9123e27851bf53ac069a62cfceb",
+    "measured-main/context-packs/persistence.json": "16194642c5dda56a47117a35609f72684d4a91671d15d3d01b90194aeebe6d07",
+    "measured-main/context-packs/polynomial-factorization.json": "a3fe759145d8fa0fd1ae41417fd67d9927421f282328ff58510d5647db214ea7",
+    "measured-main/context-packs/proof-carrying-showcase.json": "d1967d09258a552268621e3ad489be7db35556548f8dfd187a95e9ef3d6a4526",
+    "measured-main/context-packs/proof-workflows.json": "d566f59cae14fb06fd137f7846ece09f445f903b141b9720d242b1f592e9dcac",
+    "measured-main/context-packs/public-java-sdk.json": "50e1efd8602644cc600194b6b9900102d7a300f8dbbb7eb92d3db7221527669d",
+    "measured-main/context-packs/rewrite-search.json": "a3ffc537ab354a07fef70a9f967ac2a3fc7c641c3615cc3ea910e6013f6c91f9",
+    "measured-main/context-packs/schematic-exact-plan-replay.json": "64285551e31bf644e722c910f3f07878379eded4386c422175d78721bdf18583",
+    "measured-main/context-packs/static-reference-publication.json": "54339d738168b55990472c08121059b2dfadce953484e1b76c11ce4b9aa5bbf5",
+    "measured-main/context-packs/verified-trace-strategy-learning.json": "7d365b35775efd2fa11ab17e6bbdfde4eba47bc54d27d5f5e9e8f4a3ff2b9130",
+    "measured-main/context-packs/web-workbench.json": "d99bc6f417991b96bb16a5c958ea64acd6896f5dd1fa1b442d400b9f9d44ae0e",
+    "measured-main/dependencies.json": "a8416732473218d57699d09ede4e8964008a45e1198275d91160f89861f8b1fc",
+    "measured-main/docs.json": "0557826f96b84712288a6fb08139892abdeaa79e8a66af519d92cb52855e810c",
+    "measured-main/evidence.json": "57ac41024e2cc12c2c06762d53df1f652e991ebde0de55b5ffebe25822371acd",
+    "measured-main/index.json": "8c5041145a93b8e31bdfba9dcdd6cdc1d57654fb1f2b0c0f094e97ba8831d739",
+    "measured-main/metrics-snapshot.json": "d2146a9f97686f724e49d5e710f46470674b39038b8595eae71dd2983c35c12b",
+    "measured-main/modules.json": "1ad2eb9b94acbd548d32df198447ad246a8507240d948f76b2246d148c623d75",
+    "measured-main/optimization.html": "ae761523fb82a32b68e23260ba72e9f237c98f73b875ff6b3acdb8b0d5d3aed1",
+    "measured-main/optimization.json": "b87acc4fdca35aea9ad5247a4544c39f64a7769a218f0b3696a5810d8f9a62e9",
+    "measured-main/review-context.md": "db2a4026014f15ad19d48d00d2d13f13629c3f69177414eae7f436b52de109c2",
+    "measured-main/tests.json": "40a43d1f178d7bf85f230bd8b2b4adf1763bb9fe875b80dbc2947e8183838875",
+    "measured-main/trend.html": "1def1d0f314880ecd56cec736a7f003bd7ffbfb289377f19703af556e75f68ef",
+    "measured-main/trend.json": "629aebd35de8bfa161a8d3bf1a1a6653581434650d285f530f465d3eb22a5a03",
+    "previous-baseline.json": "47ca2375967a95763395ad65bad1bff60a0f8e82ed9246684b0ea8dfea2f28ef",
+    "aiKnowledgeCheck.log": "61ca237307fc92532ad88937b10bc5993c631dc4f6ec45aadcaca45696cebc49",
+    "native-gate-receipt.json": "0679a893a1ba027d613c7349aa174c2803640f8c0c66ef20874187f24cf4f45d",
+    "predecessor-source-before.json": "66747f9df2d16f9e73dbabb76106b61abbc52ede15bdae9aff48075b0247e12b",
+    "extractor-before.json": "ab4d6c7030eae2ad92e991c46a22885de09d5ec529ee15fd3d673c59389b0183",
+    "gradle-distribution-receipt.json": "d0b10a399df2cf5459e16a0fc3486ffcafa981ef2beee75bbcfd041220ee7364",
+    "run-native-ai-knowledge.py": "0038c62663e33daef5252cde1020261a622953b83a86ca92b7d71197801327f3",
+    "predecessor-main-commit.json": "7c5a69df38b5afa37a0fa4c9ea7677767ede7603554244415ed04163f6bfa98d",
+    "predecessor-pr-head-commit.json": "0630565db87d2e04ca8ba21b36d96f8c9515333e4990baf17f7e6997cd4d2efc",
+    "predecessor-merged-pr.json": "f874fdd43f490f2f1b7b7c01fe81bb72d6eaca2244dd92d81a7ad88d8784e885",
+    "predecessor-main-ci-jobs.json": "9bf5c93ab4e71ffd7567136bc6fd65e40b5b98b6a6488d1bedbd886b5951eff0",
+    "predecessor-main-ci-artifacts.json": "d075884062fd6d270922bf47cf0ae79d057f726f8830c9c613b57f03c0c71466",
+    "predecessor-main-ci-runs.json": "9e709a759527b2d97338f6b7a70a09586952ec1be2a1b1be6567c08d17608807",
+    "parent-main-quality-verified-bindings.json": "c844ace146a6625bb621ca3721c05bcd8da7ad2e0a92d5d4b76df7b98b43ca79",
+    "diagnosis-data.json": "741dbdf3e351f56e4dc938544ed6ec0c2e5405e74e0eb61bc20882057535c290",
+    "measured-main-raw-reports.tar.gz": "d6b9c747affd6a9c201c2e39b228c7466d37eef79db8dd3af17d76104888904b",
+    "native-gradle-dependencies.json": "b29992d421d6da5713c2b5d28cb4f7e7a75195f2503bbac7d5f7b571dbc811f2"
+  },
+  "historicalAttempts": {
+    "native-attempt-1": "Failed before gate tasks in unchanged Foojay settings-plugin resolution. Preserved original launcher, receipt and complete log.",
+    "successfulTransport": "Current configured proxy values were also passed as native Gradle CLI system properties. The unused cache initializer was not applied."
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "repository": "carstenartur/Regelsuche",
+  "pullRequest": 1088,
+  "run": {
+    "id": 38161359304,
+    "name": "CI",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "failure",
+    "head_sha": "2452f1d679bf9e4de7641759efbe30c88af2588c",
+    "head_branch": "math/generic-domains-20261011",
+    "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/38161359304",
+    "run_attempt": 1,
+    "created_at": "2026-10-11T17:51:05Z",
+    "updated_at": "2026-10-11T18:17:54Z",
+    "run_started_at": "2026-10-11T17:51:05Z",
+    "jobs_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/38161359304/jobs",
+    "artifacts_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/38161359304/artifacts"
+  },
+  "jobs": [
+    {
+      "id": 114534770710,
+      "name": "Checkout-local Gradle authority",
+      "status": "completed",
+      "conclusion": "failure",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534770844,
+      "name": "Isolated JMH authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534770862,
+      "name": "Isolated SymPy runtime authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534770888,
+      "name": "External polynomial comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534770930,
+      "name": "Typed source-only learning comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534770945,
+      "name": "Checked Lean and SMT proof authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534770964,
+      "name": "Complete Maven product and Docker authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534771609,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534771941,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534772145,
+      "name": "Retained JMH precision study v2 analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114534772368,
+      "name": "Retained JMH precision study analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114540267316,
+      "name": "Checkout-local ciCheck",
+      "status": "completed",
+      "conclusion": "failure",
+      "run_id": 38161359304
+    },
+    {
+      "id": 114540296488,
+      "name": "Publish generated reports",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 38161359304
+    }
+  ],
+  "artifact": {
+    "id": 11710512388,
+    "name": "repository-verification",
+    "size_in_bytes": 1624574,
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/11710512388",
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/11710512388/zip",
+    "expired": false,
+    "created_at": "2026-10-11T17:53:15Z",
+    "expires_at": "2027-01-09T17:51:05Z",
+    "updated_at": "2026-10-11T17:53:15Z",
+    "digest": "sha256:80f4de406a93753dbd1bf44e08440c063ed101fb39af1de6d2b58d6ebf72d9ef",
+    "workflow_run": {
+      "id": 38161359304,
+      "repository_id": 1243764016,
+      "head_repository_id": 1243764016,
+      "head_branch": "math/generic-domains-20261011",
+      "head_sha": "2452f1d679bf9e4de7641759efbe30c88af2588c"
+    }
+  },
+  "zipBytesDownloadedAndDigestVerified": true,
+  "retention": "Original metrics, check and trend are adjacent; all eight diagnosed raw reports, complete failed Gradle job log, original ci-check log, and API run/job/artifact records are in supporting-evidence.tar.gz.",
+  "reports": {
+    "rejected-pr1088-metrics-snapshot.json": "2a6f88d40768ffdce016f0fdda5f15f4aa00ca79299df2a5d7981716613e4e35",
+    "rejected-pr1088-check.json": "fa02a8d387fa0c82c765e97637a8fafd97d44ca8ba1185c0f54d799f4c1fa122",
+    "rejected-pr1088-trend.json": "558ae6333c04a75ac224b18d8eefea053acec1cbdf7b2949cb81c8260c41e375"
+  },
+  "baselineUse": "Rejected feature reports are diagnostic evidence only and supply no baseline values."
+}
