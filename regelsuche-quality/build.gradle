@@ -134,8 +134,8 @@ rootProject.subprojects.findAll { it.name in coverageModules }.each { module ->
                     into retainedInputs
                     duplicatesStrategy = DuplicatesStrategy.FAIL
                     from(report.executionData.filter { it.isFile() }) { into 'execution-data' }
-                    from(report.classDirectories, report.additionalClassDirs) { into 'classes' }
-                    from(report.sourceDirectories, report.additionalSourceDirs) { into 'sources' }
+                    from(module.files(report.classDirectories, report.additionalClassDirs)) { into 'classes' }
+                    from(module.files(report.sourceDirectories, report.additionalSourceDirs)) { into 'sources' }
                 }
             }
         }
