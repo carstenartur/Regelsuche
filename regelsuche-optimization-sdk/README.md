@@ -42,6 +42,9 @@ never prove. Heavy BigInteger operations are not executed for constant
 folding or counterexample diagnostics; cheap diagnostic intermediates are
 limited to 4096 bits. Budgets and cancellation are charged during proof,
 generation and final preparation.
+Final cost assessment reuses immutable costs from source validation and the
+selected prepared search result within the same request. The independent final
+proof and the trusted Candidate constructor's preparation remain fully charged.
 
 `verify` checks a proposed plan independently; `reverify` additionally binds
 all versioned evidence and runtime obligations to the current request.
