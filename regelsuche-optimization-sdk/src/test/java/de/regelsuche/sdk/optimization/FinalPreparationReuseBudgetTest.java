@@ -20,30 +20,9 @@ class FinalPreparationReuseBudgetTest {
         assertTrue(reference.derivation().isPresent());
         assertTrue(reference.derivation().orElseThrow().steps().isEmpty());
 
-        // Temporary characterization only: smaller budgets also change exploration.
-        // Record a real final-preparation failure, then freeze its allowance before the fix.
-        long duplicatePreparation = reference.cost().sourceCost().inspectionWork()
-                + reference.cost().candidateCost().inspectionWork();
-        long emptyDerivationWork = 2 + referenceRequest.plan().searchExpression().work()
-                + reference.plan().searchExpression().work();
-        long allowance = -1;
-        var observed = new java.util.TreeMap<String, Integer>();
-        for (long limit = 256; limit <= reference.work(); limit++) {
-            var result = optimizer.optimize(request(limit), CancellationToken.NONE);
-            String outcome = result instanceof OptimizationResult.BudgetExceeded exceeded
-                    ? exceeded.diagnostic() : result.getClass().getSimpleName();
-            observed.merge(outcome, 1, Integer::sum);
-            if (result instanceof OptimizationResult.BudgetExceeded exceeded
-                    && exceeded.diagnostic().equals("FINAL_PREPARATION_BUDGET_EXCEEDED")
-                    && exceeded.work() - duplicatePreparation + emptyDerivationWork <= limit) {
-                allowance = limit;
-                System.out.printf("FINAL_PREPARATION_REUSE_RED allowance=%d exceededWork=%d "
-                        + "duplicatePreparation=%d emptyDerivationWork=%d outcomes=%s%n",
-                        allowance, exceeded.work(), duplicatePreparation, emptyDerivationWork, observed);
-                break;
-            }
-        }
-        assertTrue(allowance > 0, "No final-preparation counterexample observed: " + observed);
+        // Native baseline: final preparation used 1,200 at this fixed allowance.
+        // Reusing costs saves 134, leaving 26 for the unchanged empty derivation capture.
+        long allowance = 1_092;
 
         var constrainedRequest = request(allowance);
         var constrained = optimizer.optimize(constrainedRequest, CancellationToken.NONE);

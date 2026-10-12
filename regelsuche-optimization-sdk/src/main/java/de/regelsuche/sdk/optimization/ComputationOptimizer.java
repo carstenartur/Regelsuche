@@ -15,7 +15,7 @@ public final class ComputationOptimizer {
     public OptimizationResult optimize(OptimizationRequest request, CancellationToken token) {
         Objects.requireNonNull(request); var work=new VerificationWork(request,token);
         try {
-            var checker=new SemanticChecker(request,work); checker.validate();
+            var checker=new SemanticChecker(request,work); var sourceCost=checker.validate();
             long setup=work.used();
             var generator=new JavaCandidateGenerator(request,work);
             var domain=new JointPlanSearch.Domain() {
@@ -49,8 +49,10 @@ public final class ComputationOptimizer {
             var finalOutcome=finalVerificationOutcome(proof.accepted(),total,budget.maximumWork());
             if(finalOutcome.isPresent()) return finalOutcome.get();
             var obligations=obligations(request,found.plan());
-            var cost=cost(request,found.plan(),obligations);
-            long preparationWork=cost.sourceCost().inspectionWork()+2*cost.candidateCost().inspectionWork();
+            var cost=cost(request,sourceCost,found.prepared().cost(),obligations);
+            // Both costs came from preparations already charged in this request.
+            // Reserve the trusted Candidate constructor's independent preparation.
+            long preparationWork=cost.candidateCost().inspectionWork();
             work.charge(preparationWork); total=Math.addExact(total,preparationWork);
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             boolean improved=cost.candidateScore()<cost.sourceScore();
@@ -170,8 +172,8 @@ public final class ComputationOptimizer {
             case READABILITY -> new JointPlanSearch.Weights(1,0,0,1);
         };
     }
-    private static OptimizationResult.CostAssessment cost(OptimizationRequest request,JointComputationPlan target,RuntimeObligations obligations) {
-        var source=prepare(request.plan()).cost(); var candidate=prepare(target).cost();
+    private static OptimizationResult.CostAssessment cost(OptimizationRequest request,
+            PreparedJointComputation.Cost source,PreparedJointComputation.Cost candidate,RuntimeObligations obligations) {
         var backend=new JavaNumericBackend(request.plan().inputs());
         long originalWork=0;
         for(var occurrence:request.sourceTrace().occurrences()) originalWork+=backend.operation(occurrence.expression()).work();
