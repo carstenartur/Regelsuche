@@ -52,12 +52,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build/logs
-          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
-            capture "$PWD" "$RUNNER_TEMP/native-coverage-gradle-source.txt"
-          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace :regelsuche-quality:nativeCoverageRuntime 2>&1 | tee build/logs/ci-check.log
-          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
-            confirm "$PWD" "$RUNNER_TEMP/native-coverage-gradle-source.txt" \
-            build/reports/quality/native-coverage/gradle-source.txt
+          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
       - name: Retain Gradle verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -66,7 +61,6 @@ jobs:
           path: |
             build/logs/**
             build/distributions/regelsuche-sdk-*.zip
-            regelsuche-quality/build/native-coverage-runtime/**
             build/reports/**
             build/ai-knowledge/**
             build/independent-reproduction/**
@@ -149,13 +143,7 @@ jobs:
             patchelf=0.14.3-1 \
             python3-venv
       - name: Run the complete Gradle SymPy runtime test authority
-        run: |
-          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
-            capture "$PWD" "$RUNNER_TEMP/native-coverage-sympy-source.txt"
-          bash gradle/run-isolated-sympy-runtime-authority.sh
-          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
-            confirm "$PWD" "$RUNNER_TEMP/native-coverage-sympy-source.txt" \
-            regelsuche-math-sympy/build/native-coverage/sympy-source.txt
+        run: bash gradle/run-isolated-sympy-runtime-authority.sh
       - name: Retain isolated SymPy runtime evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -165,7 +153,6 @@ jobs:
             regelsuche-math-sympy/build/test-results/**
             regelsuche-math-sympy/build/reports/tests/**
             regelsuche-math-sympy/build/reports/jacoco/**
-            regelsuche-math-sympy/build/native-coverage/**
           include-hidden-files: true
           if-no-files-found: error
 
@@ -324,15 +311,13 @@ jobs:
     if: >-
       ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
-    permissions: { actions: read, contents: read, code-quality: write }
+    timeout-minutes: 5
     steps:
       - name: Reject incomplete verification authority
         if: >-
           ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success')) }}
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 2 }
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with: { distribution: temurin, java-version: '25', verify-signature: true }
       - name: Download project-parallel Gradle coverage evidence
@@ -356,6 +341,11 @@ jobs:
           --root "$PWD"
           --isolated-report
           build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
+      - name: Generate complete standard JaCoCo coverage report
+        run: >-
+          python3 -B scripts/generate-ci-pages.py --coverage-only
+          --sympy-inputs
+          build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/inputs
       - name: Collect complete checkout-owned quality acceptance evidence
         id: acceptance_evidence
         run: >-
@@ -369,16 +359,6 @@ jobs:
           path: build/reports/quality/acceptance-evidence/**
           include-hidden-files: true
           if-no-files-found: error
-      - name: Export and submit source-bound native Java coverage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >-
-          java -cp 'regelsuche-quality/build/native-coverage-runtime/*'
-          de.regelsuche.quality.coverage.NativeCodeCoverageMain
-          --root "$PWD"
-          --gradle-source build/reports/quality/native-coverage/gradle-source.txt
-          --sympy-source build/authority-evidence/sympy/regelsuche-math-sympy/build/native-coverage/sympy-source.txt
-          --output build/reports/quality/native-coverage/report
       - name: Retain converged coverage evidence
         if: >-
           ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && needs.sympy-runtime-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}
@@ -388,7 +368,7 @@ jobs:
           path: |
             build/reports/quality/coverage-report.json
             build/reports/quality/coverage-report.md
-            build/reports/quality/native-coverage/**
+            public/coverage/**
           include-hidden-files: true
           if-no-files-found: error
       - name: Record complete verification authority
@@ -406,6 +386,8 @@ jobs:
         with: { name: repository-verification, path: . }
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: jmh-verification, path: . }
+      - name: Remove producer-local coverage before restoring the complete report
+        run: rm -rf public/coverage
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: coverage-verification, path: . }
       - name: Assemble the static site

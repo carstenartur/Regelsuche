@@ -16,7 +16,7 @@ final class SemanticChecker {
     SemanticChecker(OptimizationRequest request, VerificationWork work) {
         this.request = request; this.work = work; this.facts = new EstablishedNumericFacts(request, work);
     }
-    void validate() {
+    PreparedJointComputation.Cost validate() {
         var bounds = new BigIntegerBounds(request, work);
         work.charge(1);
         if (!ComputationOptimizer.SEMANTICS_REVISION.equals(request.semanticsRevision())) throw new IllegalArgumentException("UNKNOWN_SEMANTICS_REVISION");
@@ -43,6 +43,7 @@ final class SemanticChecker {
                 (!request.checkedPolicy().requireFinite() || !request.checkedPolicy().compareFloatingPointBits()))
             throw new IllegalArgumentException("CHECKED_FINITE_AND_BITWISE_COMPARISON_REQUIRED");
         validateAssumptions(plan);
+        return prepared.cost();
     }
     private void validateSourceTrace(JointComputationPlan plan, PreparedJointComputation prepared, BigIntegerBounds bounds) {
         if (request.sourceTrace().occurrences().size() > JointComputationPlan.MAX_NODES) throw new IllegalArgumentException("TRACE_STRUCTURAL_BOUND");

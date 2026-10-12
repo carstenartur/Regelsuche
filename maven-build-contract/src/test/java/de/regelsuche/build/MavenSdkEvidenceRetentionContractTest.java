@@ -15,7 +15,6 @@ class MavenSdkEvidenceRetentionContractTest {
     private static final List<String> RETAINED = List.of(
         "build/logs/**",
         "build/distributions/regelsuche-sdk-*.zip",
-        "regelsuche-quality/build/native-coverage-runtime/**",
         "build/reports/**",
         "build/ai-knowledge/**",
         "build/independent-reproduction/**",
@@ -76,11 +75,6 @@ class MavenSdkEvidenceRetentionContractTest {
         List<String> missingReports = new ArrayList<>(expected);
         missingReports.remove("**/build/test-results/**");
         assertThrows(AssertionError.class, () -> validatePatterns(missingReports));
-
-        List<String> missingCoverageRuntime = new ArrayList<>(expected);
-        missingCoverageRuntime.remove("regelsuche-quality/build/native-coverage-runtime/**");
-        assertThrows(AssertionError.class,
-            () -> validatePatterns(missingCoverageRuntime));
 
         List<String> laterReinclusion = new ArrayList<>(expected);
         laterReinclusion.add("build/reports/**");
