@@ -198,7 +198,7 @@ import java.util.*;
 <span class="fc bfc" id="L198" title="All 2 branches covered.">        for(var probe:probes) {</span>
 <span class="fc" id="L199">            work.charge(1);</span>
 <span class="fc" id="L200">            try { RuntimeChecks.validateAssumptions(request,probe); }</span>
-<span class="pc" id="L201">            catch(IllegalArgumentException assumptionViolated) { continue; }</span>
+<span class="fc" id="L201">            catch(IllegalArgumentException assumptionViolated) { continue; }</span>
             try {
 <span class="fc" id="L203">                var left=source.execute(probe); var right=target.execute(probe);</span>
 <span class="pc bpc" id="L204" title="1 of 6 branches missed.">                if(!left.keySet().equals(right.keySet()) || left.keySet().stream().anyMatch(name -&gt; !RuntimeChecks.same(left.get(name),right.get(name)))) return probe;</span>
@@ -229,9 +229,9 @@ import java.util.*;
 <span class="fc" id="L229">        } catch(IllegalArgumentException outsideBound) { return false; }</span>
     }
     private static List&lt;Object&gt; samples(NumericKind kind) {
-<span class="pc bpc" id="L232" title="5 of 8 branches missed.">        return switch(kind) {</span>
+<span class="pc bpc" id="L232" title="4 of 8 branches missed.">        return switch(kind) {</span>
 <span class="fc" id="L233">            case INT -&gt; List.of(1,Integer.MAX_VALUE,Integer.MIN_VALUE,0,-1,2,-2,1&lt;&lt;30);</span>
-<span class="nc" id="L234">            case LONG -&gt; List.of(1L,Long.MAX_VALUE,Long.MIN_VALUE,0L,-1L,2L,-2L,1L&lt;&lt;62);</span>
+<span class="fc" id="L234">            case LONG -&gt; List.of(1L,Long.MAX_VALUE,Long.MIN_VALUE,0L,-1L,2L,-2L,1L&lt;&lt;62);</span>
 <span class="nc" id="L235">            case BYTE -&gt; List.of((byte)1,Byte.MIN_VALUE,Byte.MAX_VALUE,(byte)0,(byte)-1);</span>
 <span class="nc" id="L236">            case SHORT -&gt; List.of((short)1,Short.MIN_VALUE,Short.MAX_VALUE,(short)0,(short)-1);</span>
 <span class="nc" id="L237">            case CHAR -&gt; List.of((char)1,Character.MIN_VALUE,Character.MAX_VALUE);</span>

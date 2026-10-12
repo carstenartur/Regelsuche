@@ -60,7 +60,7 @@ final class JavaNumericBackend implements ComputationBackend {
 <span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (kind.floatingPoint()) throw new IllegalArgumentException(&quot;FLOATING_SHIFT_UNSUPPORTED&quot;);</span>
 <span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (function.arguments().size() != 2) throw new IllegalArgumentException(&quot;OPERATOR_ARITY&quot;);</span>
 <span class="fc" id="L62">            var distance = JavaExpressions.kindOf(function.arguments().get(1), inputs);</span>
-<span class="pc bpc" id="L63" title="1 of 4 branches missed.">            if (kind == NumericKind.BIG_INTEGER &amp;&amp; distance != NumericKind.INT) throw new IllegalArgumentException(&quot;BIG_INTEGER_SHIFT_REQUIRES_INT&quot;);</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">            if (kind == NumericKind.BIG_INTEGER &amp;&amp; distance != NumericKind.INT) throw new IllegalArgumentException(&quot;BIG_INTEGER_SHIFT_REQUIRES_INT&quot;);</span>
 <span class="pc bpc" id="L64" title="1 of 4 branches missed.">            if (distance != NumericKind.INT &amp;&amp; distance != NumericKind.LONG) throw new IllegalArgumentException(&quot;SHIFT_DISTANCE_PROMOTION&quot;);</span>
 <span class="fc" id="L65">            argumentTypes.set(1, distance.type());</span>
         }
@@ -87,12 +87,12 @@ final class JavaNumericBackend implements ComputationBackend {
 <span class="fc bfc" id="L87" title="All 2 branches covered.">        return integral64(op, ((Number)x).longValue(), y == null ? 0 : ((Number)y).longValue());</span>
     }
     private static Object big(NumericOperation op, BigInteger x, Object other, BigInteger modulus) {
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        BigInteger y = other instanceof BigInteger value ? value : null;</span>
-<span class="pc bpc" id="L91" title="12 of 18 branches missed.">        return switch (op) {</span>
-<span class="pc" id="L92">            case ADD -&gt; x.add(y); case SUBTRACT -&gt; x.subtract(y); case MULTIPLY -&gt; x.multiply(y);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        BigInteger y = other instanceof BigInteger value ? value : null;</span>
+<span class="pc bpc" id="L91" title="10 of 18 branches missed.">        return switch (op) {</span>
+<span class="fc" id="L92">            case ADD -&gt; x.add(y); case SUBTRACT -&gt; x.subtract(y); case MULTIPLY -&gt; x.multiply(y);</span>
 <span class="pc" id="L93">            case DIVIDE -&gt; x.divide(y); case REMAINDER -&gt; x.remainder(y); case MOD -&gt; x.mod(y);</span>
 <span class="nc" id="L94">            case NEGATE -&gt; x.negate(); case ABS -&gt; x.abs(); case AND -&gt; x.and(y); case OR -&gt; x.or(y);</span>
-<span class="nc" id="L95">            case XOR -&gt; x.xor(y); case NOT -&gt; x.not(); case SHIFT_LEFT -&gt; x.shiftLeft(((Number)other).intValue());</span>
+<span class="pc" id="L95">            case XOR -&gt; x.xor(y); case NOT -&gt; x.not(); case SHIFT_LEFT -&gt; x.shiftLeft(((Number)other).intValue());</span>
 <span class="nc" id="L96">            case SHIFT_RIGHT -&gt; x.shiftRight(((Number)other).intValue()); case POW -&gt; x.pow((Integer)other);</span>
 <span class="fc" id="L97">            case MOD_POW -&gt; x.modPow(y, modulus); case MOD_MULTIPLY -&gt; x.multiply(y).mod(modulus);</span>
 <span class="nc" id="L98">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_BIG_INTEGER_OPERATION&quot;);</span>
@@ -109,7 +109,7 @@ final class JavaNumericBackend implements ComputationBackend {
         };
     }
     private static long integral64(NumericOperation op, long x, long y) {
-<span class="pc bpc" id="L112" title="11 of 19 branches missed.">        return switch (op) {</span>
+<span class="pc bpc" id="L112" title="10 of 19 branches missed.">        return switch (op) {</span>
 <span class="pc" id="L113">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
 <span class="pc" id="L114">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
 <span class="pc" id="L115">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>

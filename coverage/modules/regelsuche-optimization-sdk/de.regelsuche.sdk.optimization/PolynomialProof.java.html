@@ -55,7 +55,7 @@ final class PolynomialProof {
 <span class="nc" id="L55">            case NEGATE -&gt; multiply(constant(BigInteger.ONE.negate()), normalize(args.getFirst(), depth+1));</span>
 <span class="fc" id="L56">            case MULTIPLY -&gt; multiply(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1));</span>
             case DIVIDE -&gt; {
-<span class="pc bpc" id="L58" title="1 of 4 branches missed.">                if (!exactDivision || !JavaExpressions.isLiteral(args.get(1))) yield atom(expression);</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">                if (!exactDivision || !JavaExpressions.isLiteral(args.get(1))) yield atom(expression);</span>
 <span class="fc" id="L59">                Object divisorValue = JavaExpressions.literalValue(args.get(1));</span>
 <span class="fc bfc" id="L60" title="All 2 branches covered.">                BigInteger divisor = divisorValue instanceof BigInteger b ? b : BigInteger.valueOf(((Number)divisorValue).longValue());</span>
 <span class="pc bpc" id="L61" title="1 of 2 branches missed.">                if (divisor.signum() == 0) throw new OutsideFragment();</span>

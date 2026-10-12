@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntegralDomainAnalysis.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">IntegralDomainAnalysis.java</span></div><h1>IntegralDomainAnalysis.java</h1><pre class="source lang-java linenums">/* Copyright (c) 2026 Carsten Hammer. SPDX-License-Identifier: EPL-2.0
+ * Affine range calculation moved from Sandbox's IntegralMathematicalDomain.
+ */
+package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.search.program.JointComputationPlan;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Exact local no-overflow domains for affine primitive integral computations of
+ * one input. All nested operations, casts, declared outputs and original trace
+ * occurrences (including dead operations) constrain the domain. Division is
+ * admitted only when exact for every integer input in the affine expression.
+ *
+ * &lt;p&gt;This is domain analysis, not a Java-equivalence proof outside that domain
+ * and not a source of caller assumptions. A source adapter must retain the real
+ * evaluation trace and explicitly authorize any change to overflow behavior.
+ * Nonlinear, bitwise, floating-point and BigInteger computations return an
+ * explicit unsupported result. Ranges do not erase the operations' Java kinds.
+ */
+public final class IntegralDomainAnalysis {
+    public static final String REVISION = &quot;integral-affine-domain/v1&quot;;
+    private static final long DEFAULT_MAXIMUM_WORK = 100_000;
+    private static final int MAX_COEFFICIENT_BITS = 4096;
+
+    private IntegralDomainAnalysis() { }
+
+    public sealed interface Result permits Domain, Unsupported { }
+    public sealed interface Comparison permits Verified, Unsupported { }
+
+    public record Range(BigInteger minimum, BigInteger maximum) {
+<span class="fc" id="L39">        public Range {</span>
+<span class="fc" id="L40">            Objects.requireNonNull(minimum); Objects.requireNonNull(maximum);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (minimum.compareTo(maximum) &gt; 0) throw unsupported(&quot;EMPTY_INTEGRAL_DOMAIN&quot;);</span>
+<span class="fc" id="L42">        }</span>
+        public boolean includes(Range other) {
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">            return minimum.compareTo(other.minimum) &lt;= 0 &amp;&amp; maximum.compareTo(other.maximum) &gt;= 0;</span>
+        }
+<span class="fc" id="L46">        @Override public String toString() { return &quot;[&quot; + minimum + &quot;, &quot; + maximum + &quot;]&quot;; }</span>
+    }
+
+    /** The exact mathematical output is coefficient * input + constant. */
+<span class="fc" id="L50">    public record AffineOutput(String name, NumericKind kind, BigInteger coefficient, BigInteger constant) { }</span>
+
+    public record Domain(String input, NumericKind inputKind, Range inputRange,
+            List&lt;AffineOutput&gt; outputs) implements Result {
+<span class="fc" id="L54">        public Domain { outputs = List.copyOf(outputs); }</span>
+    }
+
+    /** Equal named outputs, with the candidate defined throughout the original domain. */
+<span class="fc" id="L58">    public record Verified(Domain source, Domain candidate) implements Comparison { }</span>
+<span class="fc" id="L59">    public record Unsupported(String diagnostic) implements Result, Comparison { }</span>
+
+    public static Result analyze(JointComputationPlan plan, SourceEvaluationTrace trace) {
+<span class="fc" id="L62">        return analyze(plan, trace, DEFAULT_MAXIMUM_WORK, CancellationToken.NONE);</span>
+    }
+
+    public static Result analyze(JointComputationPlan plan, SourceEvaluationTrace trace, CancellationToken cancellation) {
+<span class="nc" id="L66">        return analyze(plan, trace, DEFAULT_MAXIMUM_WORK, cancellation);</span>
+    }
+
+    /** Deterministic work and structural/coefficient bounds apply even without a cancellation token.
+     * Each graph resolution conservatively reserves twice {@link JointComputationPlan#MAX_NODES}
+     * units before entering the structurally bounded resolver.
+     */
+    public static Result analyze(JointComputationPlan plan, SourceEvaluationTrace trace,
+            long maximumWork, CancellationToken cancellation) {
+<span class="fc" id="L75">        var work = new Work(maximumWork, cancellation);</span>
+        try {
+<span class="fc" id="L77">            return new Analysis(plan, trace, work).domain();</span>
+<span class="fc" id="L78">        } catch (IllegalArgumentException | ArithmeticException failure) {</span>
+<span class="fc" id="L79">            return new Unsupported(failure.getMessage());</span>
+        }
+    }
+
+    public static Comparison compare(JointComputationPlan source, SourceEvaluationTrace sourceTrace,
+            JointComputationPlan candidate) {
+<span class="fc" id="L85">        return compare(source, sourceTrace, candidate, DEFAULT_MAXIMUM_WORK, CancellationToken.NONE);</span>
+    }
+
+    public static Comparison compare(JointComputationPlan source, SourceEvaluationTrace sourceTrace,
+            JointComputationPlan candidate, CancellationToken cancellation) {
+<span class="nc" id="L90">        return compare(source, sourceTrace, candidate, DEFAULT_MAXIMUM_WORK, cancellation);</span>
+    }
+
+    /** Both analyses share the supplied work budget; candidate intermediates are derived from its graph. */
+    public static Comparison compare(JointComputationPlan source, SourceEvaluationTrace sourceTrace,
+            JointComputationPlan candidate, long maximumWork, CancellationToken cancellation) {
+<span class="fc" id="L96">        var work = new Work(maximumWork, cancellation);</span>
+        try {
+<span class="fc" id="L98">            work.charge(1);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (!source.inputs().equals(candidate.inputs())) throw unsupported(&quot;DOMAIN_INPUTS_DIFFER&quot;);</span>
+<span class="fc" id="L100">            Domain before = new Analysis(source, sourceTrace, work).domain();</span>
+<span class="fc" id="L101">            Domain after = new Analysis(candidate, new SourceEvaluationTrace(List.of()), work).domain();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (!before.outputs().equals(after.outputs())) throw unsupported(&quot;AFFINE_OUTPUTS_DIFFER&quot;);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (!after.inputRange().includes(before.inputRange())) throw unsupported(&quot;CANDIDATE_DOMAIN_NARROWER&quot;);</span>
+<span class="fc" id="L104">            return new Verified(before, after);</span>
+<span class="fc" id="L105">        } catch (IllegalArgumentException | ArithmeticException failure) {</span>
+<span class="fc" id="L106">            return new Unsupported(failure.getMessage());</span>
+        }
+    }
+
+    private record Affine(BigInteger coefficient, BigInteger constant) {
+<span class="fc" id="L111">        Affine {</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">            if (coefficient.abs().bitLength() &gt; MAX_COEFFICIENT_BITS || constant.abs().bitLength() &gt; MAX_COEFFICIENT_BITS)</span>
+<span class="nc" id="L113">                throw unsupported(&quot;DOMAIN_COEFFICIENT_BOUND&quot;);</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc" id="L115">        Affine add(Affine other) { return new Affine(coefficient.add(other.coefficient), constant.add(other.constant)); }</span>
+<span class="fc" id="L116">        Affine scale(BigInteger factor) { return new Affine(coefficient.multiply(factor), constant.multiply(factor)); }</span>
+    }
+
+<span class="fc" id="L119">    private record Cached(Affine value, int height) { }</span>
+
+    private static final class Analysis {
+        private final JointComputationPlan plan;
+        private final String input;
+        private final NumericKind inputKind;
+        private final Work work;
+        private final JavaNumericBackend backend;
+<span class="fc" id="L127">        private final Map&lt;Expr, Cached&gt; expressions = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L128">        private final List&lt;AffineOutput&gt; outputs = new ArrayList&lt;&gt;();</span>
+        private Range range;
+
+<span class="fc" id="L131">        Analysis(JointComputationPlan plan, SourceEvaluationTrace trace, Work work) {</span>
+<span class="fc" id="L132">            this.plan = Objects.requireNonNull(plan);</span>
+<span class="fc" id="L133">            this.work = work;</span>
+<span class="fc" id="L134">            work.charge(1);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (plan.inputs().size() != 1) throw unsupported(&quot;ONE_INTEGRAL_INPUT_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (trace.occurrences().size() &gt; JointComputationPlan.MAX_NODES) throw unsupported(&quot;DOMAIN_TRACE_BOUND&quot;);</span>
+<span class="fc" id="L137">            input = plan.inputs().keySet().iterator().next();</span>
+<span class="fc" id="L138">            inputKind = NumericKind.fromType(plan.inputs().get(input));</span>
+<span class="fc" id="L139">            range = limits(inputKind);</span>
+<span class="fc" id="L140">            backend = new JavaNumericBackend(plan.inputs());</span>
+            // The core resolver bounds visits at MAX_NODES and returns visits +
+            // output count. Reserve that upper bound before any unmetered work.
+<span class="fc" id="L143">            work.charge(2L * JointComputationPlan.MAX_NODES);</span>
+<span class="fc" id="L144">            var resolved = plan.resolveOutputs();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (resolved.expandedNodes() &gt; JointComputationPlan.MAX_NODES) throw unsupported(&quot;DOMAIN_GRAPH_BOUND&quot;);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            for (var occurrence : trace.occurrences()) {</span>
+<span class="fc" id="L147">                work.charge(1);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (JavaExpressions.kindOf(occurrence.expression(), plan.inputs()) != occurrence.evaluatedKind())</span>
+<span class="nc" id="L149">                    throw unsupported(&quot;DOMAIN_TRACE_KIND_DIFFERS&quot;);</span>
+<span class="fc" id="L150">                Affine value = value(occurrence.expression(), 0);</span>
+<span class="fc" id="L151">                constrain(value, limits(occurrence.evaluatedKind()));</span>
+<span class="fc" id="L152">                constrain(value, limits(occurrence.declaredKind()));</span>
+<span class="fc" id="L153">            }</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            for (int index = 0; index &lt; plan.outputs().size(); index++) {</span>
+<span class="fc" id="L155">                var output = plan.outputs().get(index);</span>
+<span class="fc" id="L156">                var expression = resolved.expressions().get(index);</span>
+<span class="fc" id="L157">                NumericKind kind = NumericKind.fromType(output.type());</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                if (JavaExpressions.kindOf(expression, plan.inputs()) != kind) throw unsupported(&quot;DOMAIN_OUTPUT_KIND_DIFFERS&quot;);</span>
+<span class="fc" id="L159">                Affine affine = value(expression, 0);</span>
+<span class="fc" id="L160">                constrain(affine, limits(kind));</span>
+<span class="fc" id="L161">                outputs.add(new AffineOutput(output.name(), kind, affine.coefficient, affine.constant));</span>
+            }
+<span class="fc" id="L163">        }</span>
+
+<span class="fc" id="L165">        Domain domain() { return new Domain(input, inputKind, range, outputs); }</span>
+
+        private Affine value(Expr expression, int depth) {
+<span class="fc" id="L168">            work.charge(1);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            if (depth &gt; JointComputationPlan.MAX_DEPTH) throw unsupported(&quot;DOMAIN_DEPTH_BOUND&quot;);</span>
+<span class="fc" id="L170">            Cached cached = expressions.get(expression);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (cached != null) {</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                if (depth + cached.height &gt; JointComputationPlan.MAX_DEPTH) throw unsupported(&quot;DOMAIN_DEPTH_BOUND&quot;);</span>
+<span class="fc" id="L173">                return cached.value;</span>
+            }
+<span class="fc" id="L175">            NumericKind kind = JavaExpressions.kindOf(expression, plan.inputs());</span>
+<span class="fc" id="L176">            Range resultLimits = limits(kind);</span>
+            Affine result;
+            int height;
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (expression instanceof VariableExpr variable) {</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                if (!variable.name().equals(input)) throw unsupported(&quot;UNBOUND_DOMAIN_INPUT&quot;);</span>
+<span class="fc" id="L181">                result = new Affine(BigInteger.ONE, BigInteger.ZERO);</span>
+<span class="fc" id="L182">                height = 0;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            } else if (JavaExpressions.isLiteral(expression)) {</span>
+<span class="fc" id="L184">                Object literal = JavaExpressions.literalValue(expression);</span>
+<span class="fc" id="L185">                result = new Affine(BigInteger.ZERO,</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                        BigInteger.valueOf(literal instanceof Character c ? c : ((Number) literal).longValue()));</span>
+<span class="fc" id="L187">                height = 1; // The typed literal wraps its exact integer payload.</span>
+<span class="fc" id="L188">            } else {</span>
+<span class="fc" id="L189">                var operands = JavaExpressions.operands(expression);</span>
+<span class="fc" id="L190">                var signature = backend.operation(expression);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                if (operands.size() != signature.arguments().size()) throw unsupported(&quot;DOMAIN_OPERATOR_ARITY&quot;);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                for (int index = 0; index &lt; operands.size(); index++) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                    if (!JavaExpressions.kindOf(operands.get(index), plan.inputs()).type().equals(signature.arguments().get(index)))</span>
+<span class="fc" id="L194">                        throw unsupported(&quot;DOMAIN_OPERAND_KIND_DIFFERS&quot;);</span>
+                }
+<span class="fc" id="L196">                Affine left = value(operands.getFirst(), depth + 1);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                if (JavaExpressions.castSourceKind(expression).isPresent()) {</span>
+<span class="fc" id="L198">                    limits(JavaExpressions.castSourceKind(expression).orElseThrow());</span>
+<span class="fc" id="L199">                    result = left;</span>
+                } else {
+<span class="pc bpc" id="L201" title="1 of 6 branches missed.">                    result = switch (JavaExpressions.operationOf(expression).orElseThrow()) {</span>
+<span class="fc" id="L202">                        case ADD, ADD_EXACT -&gt; left.add(value(operands.get(1), depth + 1));</span>
+<span class="nc" id="L203">                        case SUBTRACT, SUBTRACT_EXACT -&gt; left.add(value(operands.get(1), depth + 1).scale(BigInteger.ONE.negate()));</span>
+<span class="fc" id="L204">                        case NEGATE, NEGATE_EXACT -&gt; left.scale(BigInteger.ONE.negate());</span>
+                        case MULTIPLY, MULTIPLY_EXACT -&gt; {
+<span class="fc" id="L206">                            Affine right = value(operands.get(1), depth + 1);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                            if (left.coefficient.signum() == 0) yield right.scale(left.constant);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                            if (right.coefficient.signum() == 0) yield left.scale(right.constant);</span>
+<span class="fc" id="L209">                            throw unsupported(&quot;NON_AFFINE_PRODUCT&quot;);</span>
+                        }
+                        case DIVIDE -&gt; {
+<span class="fc" id="L212">                            Affine right = value(operands.get(1), depth + 1);</span>
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">                            if (right.coefficient.signum() != 0 || right.constant.signum() == 0</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                                    || left.coefficient.remainder(right.constant).signum() != 0</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                                    || left.constant.remainder(right.constant).signum() != 0)</span>
+<span class="fc" id="L216">                                throw unsupported(&quot;NON_EXACT_AFFINE_DIVISION&quot;);</span>
+<span class="fc" id="L217">                            yield new Affine(left.coefficient.divide(right.constant), left.constant.divide(right.constant));</span>
+                        }
+<span class="fc" id="L219">                        default -&gt; throw unsupported(&quot;UNSUPPORTED_DOMAIN_OPERATION&quot;);</span>
+                    };
+                }
+<span class="fc" id="L222">                height = 1 + operands.stream().mapToInt(operand -&gt; expressions.get(operand).height).max().orElse(0);</span>
+            }
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            if (depth + height &gt; JointComputationPlan.MAX_DEPTH) throw unsupported(&quot;DOMAIN_DEPTH_BOUND&quot;);</span>
+<span class="fc" id="L225">            constrain(result, resultLimits);</span>
+<span class="fc" id="L226">            expressions.put(expression, new Cached(result, height));</span>
+<span class="fc" id="L227">            return result;</span>
+        }
+
+        private void constrain(Affine affine, Range limits) {
+<span class="fc" id="L231">            work.charge(1);</span>
+<span class="fc" id="L232">            BigInteger a = affine.coefficient, b = affine.constant;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (a.signum() == 0) {</span>
+<span class="pc bpc" id="L234" title="2 of 4 branches missed.">                if (b.compareTo(limits.minimum) &lt; 0 || b.compareTo(limits.maximum) &gt; 0)</span>
+<span class="nc" id="L235">                    throw unsupported(&quot;EMPTY_INTEGRAL_DOMAIN&quot;);</span>
+<span class="fc" id="L236">                return;</span>
+            }
+<span class="fc" id="L238">            BigInteger low = limits.minimum.subtract(b), high = limits.maximum.subtract(b);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (a.signum() &lt; 0) {</span>
+<span class="fc" id="L240">                BigInteger previousLow = low;</span>
+<span class="fc" id="L241">                low = high.negate(); high = previousLow.negate(); a = a.negate();</span>
+            }
+<span class="fc" id="L243">            range = new Range(range.minimum.max(floor(low.negate(), a).negate()), range.maximum.min(floor(high, a)));</span>
+<span class="fc" id="L244">        }</span>
+    }
+
+    private static BigInteger floor(BigInteger numerator, BigInteger positiveDenominator) {
+<span class="fc" id="L248">        BigInteger[] parts = numerator.divideAndRemainder(positiveDenominator);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        return parts[1].signum() &lt; 0 ? parts[0].subtract(BigInteger.ONE) : parts[0];</span>
+    }
+
+    private static Range limits(NumericKind kind) {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (!kind.integral()) throw unsupported(&quot;PRIMITIVE_INTEGRAL_DOMAIN_REQUIRED&quot;);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        return kind == NumericKind.CHAR ? new Range(BigInteger.ZERO, BigInteger.valueOf(65535))</span>
+<span class="fc" id="L255">                : new Range(BigInteger.ONE.shiftLeft(kind.bits() - 1).negate(),</span>
+<span class="fc" id="L256">                        BigInteger.ONE.shiftLeft(kind.bits() - 1).subtract(BigInteger.ONE));</span>
+    }
+
+    private static final class Work {
+        private final long maximum;
+        private final CancellationToken cancellation;
+        private long used;
+<span class="fc" id="L263">        Work(long maximum, CancellationToken cancellation) {</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (maximum &lt; 1) throw unsupported(&quot;INVALID_DOMAIN_WORK_BOUND&quot;);</span>
+<span class="fc" id="L265">            this.maximum = maximum;</span>
+<span class="fc" id="L266">            this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L267">        }</span>
+        void charge(long amount) {
+<span class="pc bpc" id="L269" title="1 of 4 branches missed.">            if (cancellation.isCancelled() || Thread.currentThread().isInterrupted()) throw unsupported(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L270" title="1 of 4 branches missed.">            if (amount &lt; 0 || amount &gt; maximum - used) throw unsupported(&quot;DOMAIN_WORK_BOUND&quot;);</span>
+<span class="fc" id="L271">            used += amount;</span>
+<span class="fc" id="L272">        }</span>
+    }
+
+<span class="fc" id="L275">    private static IllegalArgumentException unsupported(String diagnostic) { return new IllegalArgumentException(diagnostic); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

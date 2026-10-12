@@ -109,7 +109,7 @@ final class RuntimeChecks {
 <span class="fc" id="L109">                        throw new AssumptionGuardFailure(&quot;NUMERIC_UPPER_BOUND_ASSUMPTION_VIOLATED&quot;);</span>
 <span class="fc" id="L110">                }</span>
 <span class="pc bpc" id="L111" title="1 of 2 branches missed.">                case NON_NEGATIVE -&gt; { if(SemanticChecker.integer(supplied).signum()&lt;0) throw new AssumptionGuardFailure(&quot;NONNEGATIVE_ASSUMPTION_VIOLATED&quot;); }</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                case POSITIVE -&gt; { if(SemanticChecker.integer(supplied).signum()&lt;=0) throw new AssumptionGuardFailure(&quot;POSITIVE_ASSUMPTION_VIOLATED&quot;); }</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                case POSITIVE -&gt; { if(SemanticChecker.integer(supplied).signum()&lt;=0) throw new AssumptionGuardFailure(&quot;POSITIVE_ASSUMPTION_VIOLATED&quot;); }</span>
                 case NORMALIZED_MODULAR_INPUT -&gt; {
 <span class="nc" id="L114">                    var value=SemanticChecker.integer(supplied); var modulus=SemanticChecker.integer(inputs.get(assumption.parameter()));</span>
 <span class="nc bnc" id="L115" title="All 6 branches missed.">                    if(modulus.signum()&lt;=0 || value.signum()&lt;0 || value.compareTo(modulus)&gt;=0) throw new AssumptionGuardFailure(&quot;NORMALIZATION_ASSUMPTION_VIOLATED&quot;);</span>

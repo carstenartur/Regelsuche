@@ -157,9 +157,48 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted predecessor for generic numeric domains (2026-10-11)
+
+The active baseline is the exact generated snapshot of accepted main
+`d7ec8b51d164dc58dbb3e9e328af8bb356425b93`, tree
+`2e9dd708951e02d68a786aa7871dee7b4a4a6347`, integrated by PR #1068.
+Its byte-identical source PR passed
+[CI run 38129395135](https://github.com/carstenartur/Regelsuche/actions/runs/38129395135),
+and [post-merge main CI](https://github.com/carstenartur/Regelsuche/actions/runs/38134140137)
+passed all seven mandatory authorities and `ciCheck` before this promotion.
+
+A fresh clean checkout passed the complete unchanged old-baseline
+`aiKnowledgeCheck` with the pinned v0.1.10 extractor: 696505 context tokens,
++13670 against the previous 682835 baseline, below the unchanged 15000 allowance.
+All 12 actionable tasks executed, all eight coverage controls passed, and all
+17 hotspot checks passed. The original main CI `check.json` and `complexity.json`
+are byte-identical to the new native reports. The smaller main
+`quality-acceptance-evidence` ZIP was downloaded and its SHA256 matched the
+API-reported digest; the larger repository artifact was not downloaded.
+
+[Independent review](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/independent-review.md)
+approved only this exact predecessor snapshot. The active file is byte-identical
+to the [accepted snapshot](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/metrics-snapshot.json),
+SHA256 `d2146a9f97686f724e49d5e710f46470674b39038b8595eae71dd2983c35c12b`.
+[Promotion provenance](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/provenance.json)
+maps every original measurement artifact into the retained files and portable
+archives. The original pre-review provenance, full raw reports, native command
+and log, source/tool bindings, CI identities, previous baseline and rejected
+PR #1088 reports remain retained.
+
+The [rejected PR #1088 trend](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/rejected-pr1088-trend.json)
+measured 698325 tokens: +15490 against the previous baseline, exceeding its
+allowance by 490, and +1820 against the independently accepted predecessor.
+Those rejected values supply no baseline input. Thresholds, selectors, claims,
+exceptions, mathematical rules, SDK sources and packaging/build inputs remain
+unchanged. The runtime SDK source pin stays at
+`2452f1d679bf9e4de7641759efbe30c88af2588c`; the later baseline/evidence revision
+requires its own native gate and hosted final-head CI, recorded separately.
+This promotion does not qualify the feature, a new SDK binary, or performance.
+
 ### Accepted predecessor for checked solver integration (2026-10-09)
 
-The baseline is the exact generated snapshot of accepted main
+The preceding baseline was the exact generated snapshot of accepted main
 `ae6b36eae23ed96aed2f0815442ab67634f87065`, tree
 `eb052f81047973154d99105273de5851b0c9b9a3`, integrated by PR #1076.
 Its byte-identical source PR passed all six authorities and `ciCheck` in
@@ -171,7 +210,7 @@ and seventeen hotspot checks passed with the pinned v0.1.10 extractor.
 [Provenance](../ai-knowledge/baseline-history/2026-10-09-mainae6b36e/provenance.json)
 and the [independent review](../ai-knowledge/baseline-history/2026-10-09-mainae6b36e/independent-review.md)
 bind the actual plugin policy, selectors, source inventories and raw reports.
-The active baseline is byte-identical to the
+That baseline was byte-identical to the
 [accepted snapshot](../ai-knowledge/baseline-history/2026-10-09-mainae6b36e/metrics-snapshot.json),
 SHA256 `47ca2375967a95763395ad65bad1bff60a0f8e82ed9246684b0ea8dfea2f28ef`.
 The first local run included two ignored working notes and was rejected; its

@@ -37,7 +37,7 @@ final class BigIntegerBounds {
 <span class="fc" id="L37">            var args = JavaExpressions.operands(expression);</span>
 <span class="fc" id="L38">            var operation = JavaExpressions.operationOf(expression).orElseThrow();</span>
 <span class="fc" id="L39">            long left = bits(args.getFirst());</span>
-<span class="pc bpc" id="L40" title="5 of 12 branches missed.">            bound = switch (operation) {</span>
+<span class="pc bpc" id="L40" title="4 of 12 branches missed.">            bound = switch (operation) {</span>
 <span class="nc" id="L41">                case NEGATE, ABS -&gt; left;</span>
 <span class="nc" id="L42">                case NOT -&gt; left + 1;</span>
 <span class="fc" id="L43">                case ADD, SUBTRACT, AND, OR, XOR -&gt; Math.max(left, bits(args.get(1))) + 1;</span>
@@ -52,10 +52,10 @@ final class BigIntegerBounds {
 <span class="pc bpc" id="L52" title="1 of 2 branches missed.">                    yield exponent == 0 ? 1 : Math.multiplyExact(left, exponent);</span>
                 }
                 case SHIFT_LEFT, SHIFT_RIGHT -&gt; {
-<span class="nc bnc" id="L55" title="All 2 branches missed.">                    long distance = JavaExpressions.isLiteral(args.get(1))</span>
-<span class="nc" id="L56">                        ? SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).longValueExact()</span>
-<span class="nc" id="L57">                        : nonnegativeScalar(args.get(1));</span>
-<span class="nc bnc" id="L58" title="All 2 branches missed.">                    yield left + (operation == NumericOperation.SHIFT_LEFT ? Math.max(0, distance) : Math.max(0, -distance));</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                    long distance = JavaExpressions.isLiteral(args.get(1))</span>
+<span class="fc" id="L56">                        ? SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).longValueExact()</span>
+<span class="pc" id="L57">                        : nonnegativeScalar(args.get(1));</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                    yield left + (operation == NumericOperation.SHIFT_LEFT ? Math.max(0, distance) : Math.max(0, -distance));</span>
                 }
 <span class="nc" id="L60">                default -&gt; throw new IllegalArgumentException(&quot;BIG_INTEGER_MAGNITUDE_OPERATION_UNSUPPORTED&quot;);</span>
             };

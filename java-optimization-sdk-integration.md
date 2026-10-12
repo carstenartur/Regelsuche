@@ -41,8 +41,11 @@ verification is not authorization to reuse evidence for the original program.
 unaltered original trace, source assumptions and checker revision. The SDK
 cannot prove that an adapter supplied a faithful trace of Java source it never
 receives. The adapter must recheck source/environment freshness before applying.
-The checker revision is now `java-numeric-independent/v7`; public API signatures
-are unchanged, while evidence issued under previous checker revisions is stale.
+The combined implementation uses checker revision `java-numeric-independent/v8`
+and generator revision `java-core-algebra-proposals/v5` for established premises,
+typed shift transport and modular arithmetic congruence. The preceding feature
+branches independently used checker v7 and generator v4; their evidence is stale
+for this combined implementation. Public API signatures are unchanged.
 
 ## Congruence inside a positive modular reduction
 
