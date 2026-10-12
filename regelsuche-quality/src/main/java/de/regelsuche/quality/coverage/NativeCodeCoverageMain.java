@@ -1,18 +1,19 @@
 package de.regelsuche.quality.coverage;
 
+import static de.regelsuche.quality.coverage.NativeCoverageSourceReceipt.git;
+import static de.regelsuche.quality.coverage.NativeCoverageSourceReceipt.hash;
+import static de.regelsuche.quality.coverage.NativeCoverageSourceReceipt.verifyInputs;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 /** Converts measured coverage and binds native uploads to the actual producer and PR/default-branch source. */
 public final class NativeCodeCoverageMain {
@@ -116,25 +117,5 @@ public final class NativeCodeCoverageMain {
         String value = values.get(key);
         if (value == null || value.isBlank()) throw new IllegalArgumentException("Missing native coverage input: " + key);
         return value;
-    }
-    private static void verifyInputs(Path root) throws IOException, InterruptedException {
-        git(root, "diff", "--quiet", "HEAD", "--", "*.java", "config");
-        if (!git(root, "ls-files", "--others", "--", ":(glob)*/src/main/java/**").isEmpty())
-            throw new IOException("Untracked Java inputs are absent from measured source");
-    }
-    private static String hash(String value) throws IOException {
-        if (!value.matches("[0-9a-f]{40}")) throw new IOException("Invalid source commit SHA");
-        return value;
-    }
-    private static String git(Path root, String... arguments) throws IOException, InterruptedException {
-        List<String> command = new ArrayList<>(List.of("git", "-C", root.toString())); command.addAll(List.of(arguments));
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-        try {
-            if (!process.waitFor(15, TimeUnit.SECONDS)) throw new IOException("Timed out resolving coverage source");
-            String text = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
-            if (process.exitValue() != 0) throw new IOException(arguments[0].equals("diff")
-                ? "Tracked Java/config inputs differ from measured source" : "Cannot resolve coverage source: " + text);
-            return text;
-        } finally { if (process.isAlive()) process.destroyForcibly(); }
     }
 }

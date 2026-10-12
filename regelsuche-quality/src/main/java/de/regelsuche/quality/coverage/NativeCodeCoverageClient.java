@@ -33,13 +33,7 @@ public final class NativeCodeCoverageClient {
 
     public Receipt upload(URI api, String repository, String token, String commit, Long pullRequest, String ref, byte[] cobertura)
             throws IOException, InterruptedException {
-        boolean hasRef = ref != null && !ref.isBlank();
-        if (api == null || !validApi(api) || repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-                || token == null || token.isBlank() || commit == null || !commit.matches("[0-9a-fA-F]{40}")
-                || (pullRequest != null) == hasRef || (pullRequest != null && pullRequest <= 0)
-                || (hasRef && !ref.startsWith("refs/heads/")) || cobertura == null || cobertura.length == 0) {
-            throw new IllegalArgumentException("Invalid native coverage upload context");
-        }
+        validateContext(api, repository, token, commit, pullRequest, ref, cobertura);
         var compressed = new ByteArrayOutputStream();
         try (var gzip = new GZIPOutputStream(compressed)) { gzip.write(cobertura); }
         var payload = JSON.createObjectNode().put("commit_oid", commit)
@@ -90,6 +84,17 @@ public final class NativeCodeCoverageClient {
             Thread.currentThread().interrupt();
             throw exception;
         } finally { http.shutdownNow(); }
+    }
+
+    private static void validateContext(URI api, String repository, String token, String commit,
+            Long pullRequest, String ref, byte[] cobertura) {
+        boolean hasRef = ref != null && !ref.isBlank();
+        if (api == null || !validApi(api) || repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+                || token == null || token.isBlank() || commit == null || !commit.matches("[0-9a-fA-F]{40}")
+                || (pullRequest != null) == hasRef || (pullRequest != null && pullRequest <= 0)
+                || (hasRef && !ref.startsWith("refs/heads/")) || cobertura == null || cobertura.length == 0) {
+            throw new IllegalArgumentException("Invalid native coverage upload context");
+        }
     }
 
     private static HttpResponse<byte[]> send(HttpClient http, URI uri, String token, byte[] payload, Duration timeout)

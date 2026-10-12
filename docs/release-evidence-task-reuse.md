@@ -98,6 +98,6 @@ coherently fabricated and rehashed campaign as a real execution. Existing
 scientific authorities, report schemas and independent reproductions remain
 unchanged.
 
-The [implementation plan](superpowers/plans/2026-09-13-release-evidence-task-reuse.md)
-records the bounded scope. Existing Java/JUnit performance-history rendering and
-the shared promotion-pipeline test fixture already address other parts of #514.
+This is the bounded local generator-reuse part of #514. Existing Java/JUnit
+performance-history rendering and the shared promotion-pipeline test fixture
+already address its other implemented parts.

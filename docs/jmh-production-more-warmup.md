@@ -66,3 +66,17 @@ by the current contract, historical replay, wrong-unit/duration rejection,
 precise regression failure and fail-closed INCONCLUSIVE. Synthetic controls do
 not demonstrate actual precision or performance. Current-head CI must execute
 and retain the complete benchmark inventory before this migration is accepted.
+
+### Historical implementation evidence (2026-09-19)
+
+The initial eleven migration controls failed because the new policies were absent.
+After implementation and the synthetic JMH batch-size correction, all eleven passed,
+alongside historical v2 controls (2 positive / 6 negative), v3 controls (4 passes /
+1 inconclusive / 12 rejections), 22 quality-collection tests, four v1 preregistration
+tests, seven v2 policy/metric tests and thirteen JAR-identity tests. The complete v1
+harness exceeded local invocation limits, and Gradle distribution resolution was
+blocked by DNS; local Java 25 compilation, real measurements and full CI were not
+claimed. Copilot review then reproduced CRLF drift in all three new policies and
+duplicated duration ownership (thirteen tests, five initially failing assertions).
+LF normalization and execution-owned durations addressed those findings while
+preserving historical files and ceilings.

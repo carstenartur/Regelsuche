@@ -52,16 +52,12 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build/logs
-          git diff --exit-code HEAD
-          NATIVE_COVERAGE_UNTRACKED=$(git ls-files --others -- ':(glob)*/src/main/java/**')
-          test -z "$NATIVE_COVERAGE_UNTRACKED"
-          git rev-parse HEAD 'HEAD^{tree}' > "$RUNNER_TEMP/native-coverage-gradle-source.txt"
-          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" :regelsuche-quality:nativeCoverageRuntime --parallel --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
-          git diff --exit-code HEAD -- ':(glob)**/src/main/java/**' config/quality/coverage-policy.json
-          NATIVE_COVERAGE_UNTRACKED=$(git ls-files --others -- ':(glob)*/src/main/java/**')
-          test -z "$NATIVE_COVERAGE_UNTRACKED"
-          mkdir -p build/reports/quality/native-coverage
-          cp "$RUNNER_TEMP/native-coverage-gradle-source.txt" build/reports/quality/native-coverage/gradle-source.txt
+          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
+            capture "$PWD" "$RUNNER_TEMP/native-coverage-gradle-source.txt"
+          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace :regelsuche-quality:nativeCoverageRuntime 2>&1 | tee build/logs/ci-check.log
+          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
+            confirm "$PWD" "$RUNNER_TEMP/native-coverage-gradle-source.txt" \
+            build/reports/quality/native-coverage/gradle-source.txt
       - name: Retain Gradle verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -154,16 +150,12 @@ jobs:
             python3-venv
       - name: Run the complete Gradle SymPy runtime test authority
         run: |
-          git diff --exit-code HEAD
-          NATIVE_COVERAGE_UNTRACKED=$(git ls-files --others -- ':(glob)*/src/main/java/**')
-          test -z "$NATIVE_COVERAGE_UNTRACKED"
-          git rev-parse HEAD 'HEAD^{tree}' > "$RUNNER_TEMP/native-coverage-sympy-source.txt"
+          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
+            capture "$PWD" "$RUNNER_TEMP/native-coverage-sympy-source.txt"
           bash gradle/run-isolated-sympy-runtime-authority.sh
-          git diff --exit-code HEAD -- ':(glob)**/src/main/java/**' config/quality/coverage-policy.json
-          NATIVE_COVERAGE_UNTRACKED=$(git ls-files --others -- ':(glob)*/src/main/java/**')
-          test -z "$NATIVE_COVERAGE_UNTRACKED"
-          mkdir -p regelsuche-math-sympy/build/native-coverage
-          cp "$RUNNER_TEMP/native-coverage-sympy-source.txt" regelsuche-math-sympy/build/native-coverage/sympy-source.txt
+          java regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/NativeCoverageSourceReceipt.java \
+            confirm "$PWD" "$RUNNER_TEMP/native-coverage-sympy-source.txt" \
+            regelsuche-math-sympy/build/native-coverage/sympy-source.txt
       - name: Retain isolated SymPy runtime evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

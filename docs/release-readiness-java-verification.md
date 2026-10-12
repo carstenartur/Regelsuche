@@ -13,6 +13,9 @@ Gradle and Docker producers remain in place; this tranche does not complete issu
 
 ## Maven production and verification parity
 
+The Maven integration follows the #749 source audit/design at commit
+`42f5050a28d07fe81bef6fe897b7694699d8f79f`.
+
 The first lifecycle-integration step now also uses current Maven production:
 
 1. `HiddenRulePilotCampaignTest` writes the unchanged twenty-case report and its

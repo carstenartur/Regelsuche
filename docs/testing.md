@@ -316,6 +316,88 @@ Unter `.github/workflows/` verbleiben nur Plattformadapter:
 `verifyWorkflowSemantics` blockiert workfloweigene Assertions, alternative
 Testauswahl und fachliche Parallelpipelines.
 
+### Native Java-Coverage
+
+Nach erfolgreicher Konvergenz übermittelt der Java-Reporter dieselben kanonischen
+JaCoCo-Messungen aus Gradle und der isolierten SymPy-Autorität an GitHub. Alle 23
+Policy-Module, unbedeckten Zeilen und Coverage-Grenzen bleiben erhalten;
+`config/quality/coverage-policy.json` und
+`build/reports/quality/coverage-report.json` bleiben die numerische Autorität.
+
+`JacocoCoberturaExporter` erzeugt eine Cobertura-Klasse je Repository-Quelldatei.
+Innere Klassen verdoppeln keine Zeilen; gleiche Dateinamen verschiedener Module
+behalten ihre getrennten relativen Pfade. JaCoCo-Instruktionen bestimmen binäre
+Zeilentreffer, keine erfundenen Ausführungszahlen. Zeilen- und Branchsummen müssen
+auf Quell-, Modul- und Aggregatebene exakt übereinstimmen. Komplexität übernimmt
+die tatsächlichen covered-plus-missed-Zähler auf Quell-, Package- und Reportebene;
+nur Quellen ohne ausführbare Zeilen dürfen einen fehlenden Zähler als nicht
+verfügbaren Nullwert ausweisen. SHA-256 bindet Policy, Aggregat, jedes XML und jede
+gemeldete Quelle. Fehlende/zusätzliche Module, ungültige Zähler, Pfad-/Symlink-Flucht
+und externe XML-Entitäten werden abgewiesen. Üblicher JaCoCo-DOCTYPE wird ohne
+DTD-Nachladen akzeptiert; Tests prüfen die Ausgabe gegen die erhaltene strikte
+Cobertura-04-DTD ohne Netzwerkzugriff.
+
+Die Produzenten starten die ausschließlich vom JDK abhängige Java-25-Quelldatei
+`NativeCoverageSourceReceipt` mit `capture <root> <temporary-receipt>` vor ihrer
+Messung und `confirm <root> <temporary-receipt> <retained-receipt>` danach.
+Capture verlangt einen vollständig unveränderten getrackten Checkout und lehnt
+auch ignorierte ungetrackte Java-Dateien unter `*/src/main/java/**` ab. Confirm
+prüft diese ungetrackten Quellen ebenfalls und verlangt bytegenau `HEAD\nTREE\n`
+des ursprünglichen Belegs sowie unveränderte Java-/Config-Eingaben, bevor der
+aufzubewahrende Beleg geschrieben wird. Relative Belegpfade werden zu root aufgelöst;
+generierte Buildkopien liegen außerhalb der kanonischen Modulquellen.
+`NativeCodeCoverageMain` verwendet dieselben `git`-, `hash`- und `verifyInputs`-Helfer
+auch vor und nach dem Export. Bei Konvergenz
+müssen beide Produzentenbelege zum Checkout passen und dessen Tree zum Upload-Ziel.
+Ein PR-Upload bindet den tatsächlichen Head desselben Repositorys; ein separater
+Test-Merge ist nur mit identischem Tree zulässig.
+
+`:regelsuche-quality:nativeCoverageRuntime` wird im selben Gradle-Aufruf angefordert
+und stellt das JAR samt bestehenden Abhängigkeiten bereit. Die Java-25-Konvergenz
+benötigt die Merge-Eltern (Checkout-Tiefe 2) und startet Main mit `--root`,
+`--gradle-source`, `--sympy-source` und `--output`. Im Konvergenzjob erhält nur der
+Upload-Schritt `GITHUB_TOKEN`; dieser Job besitzt `code-quality: write`. Uploads
+gelten für PRs desselben Repositorys und Pushes auf den Default-Branch; Fork-PRs
+und andere Ereignisse behalten einen expliziten Skip ohne Upload. Ein
+`pull_request_target`-Pfad ist dafür nicht vorgesehen.
+
+Versionsquelle des Java-Clients ist das Protokoll der
+[upload-code-coverage-Action](https://github.com/actions/upload-code-coverage/tree/2b21a77928be8d5168c2b9581a67f2adbebacc52)
+in `upload_coverage.py`, `resolve_upload_context.py` und `action.yml`.
+Ein PUT an `/repos/{repository}/code-coverage/report` sendet Base64/GZIP-Cobertura
+mit Sprache Java, dem Label `code-coverage/jacoco` und genau einer PR-/Ref-Zuordnung.
+GET `/repos/{repository}/code-coverage/reports/{id}` prüft die Verarbeitung nach
+anfänglich fünf Sekunden, exponentiell bis maximal 60 Sekunden Wartezeit, innerhalb
+einer monotonen 160-Sekunden-Frist mit maximal 30 Sekunden je Anfrage. Nur eine Report-ID
+mit Status `succeeded` besteht. HTTP 200 ohne ID dokumentiert übersprungenes
+Speichern und lässt einen unterstützten Upload fehlschlagen; transiente Abfragefehler
+dürfen weder Ablehnung noch Frist verdecken. PUT wird nicht blind wiederholt,
+Zugangsdaten werden redigiert, Abbruch und Timeout schlagen fehl.
+
+Das Artefakt `coverage-verification` erhält `coverage.cobertura.xml`,
+`coverage-manifest.json` und `native-coverage-outcome.json` unter
+`build/reports/quality/native-coverage`; das Outcome bindet beide Produzenten,
+deren ursprüngliche Belege zusätzlich in den Produzentenartefakten liegen.
+Die Code-Quality-Einrichtung des Repositorys, native Minimum-/Drop-Regeln,
+Base-Branch-Vergleich und Review-Anforderungen müssen separat erfüllt sein.
+Ein Merge belegt ihre Auswertung nicht; künstliche Checkruns, administrative
+Umgehungen und eine Identität als offizielle Action sind kein Teil dieses Reporters.
+Die Implementierung nutzt Java 25 und bestehendes Jackson, ohne neue Abhängigkeit
+oder Python-Automation. Proofs, arithmetische Kosten, Java-Guards und der qualifizierte
+SDK-Pin bleiben unverändert; die Runtime liegt außerhalb der standalone SDK-Closure.
+
+Die ursprünglichen 30 Exporter- und 35 Client-/Main-Tests bestanden unabhängig lokal.
+Der damalige vollständige Quality-Suite-Versuch war am bestehenden Scanner-Download
+blockiert. Erst normale CI qualifiziert Runtime-Staging, den vollständigen Export
+und tatsächliche native Verarbeitung; die historischen Kontrollen ersetzen das nicht.
+Die Integrationsbasis war SDK-PR #1087, Merge
+`e4ea0d9eedda28868a181df61fc3fd6cb1c4ee3a`, mit demselben Tree wie die qualifizierte
+Quelle `6a29154e217ea8748257cfda0340eb463ff157b2`. Die getrennten Produkt-/Help-Belege
+und der Vergleich über 3.109 Quellen bleiben Sandbox-PR #1695, Merge
+`7e11fd618733a390268d38fbd7e12014b0948f23`, zugeordnet. Frühere Ausführungsbelege
+behalten ihre tatsächliche Quellrevision. Für diese Berichtsintegration gilt ein
+Review-Ziel von 1.500 und eine harte Grenze von 2.000 geänderten Textzeilen.
+
 ## Siehe auch
 
 - [Testing-Strategie](testing-strategy.md)
