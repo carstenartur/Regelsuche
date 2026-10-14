@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NumericStabilityCost.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.scoring.cost</a> &gt; <span class="el_source">NumericStabilityCost.java</span></div><h1>NumericStabilityCost.java</h1><pre class="source lang-java linenums">package de.regelsuche.scoring.cost;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scoring.ExpressionScore;
+
+/**
+ * Penalises operations that are known to amplify floating-point error:
+ * subtraction of similar quantities (catastrophic cancellation), division
+ * by potentially small numbers, and constant powers above three computed via
+ * repeated multiplication of large coefficients.
+ *
+ * &lt;p&gt;The model is intentionally heuristic — it operates on the symbolic
+ * AST rather than IEEE-754 — but it captures the textbook reasoning that
+ * Horner-form is preferred over the expanded polynomial and that
+ * {@code (a - b)/c} is suspicious when {@code a} and {@code b} look
+ * structurally similar.&lt;/p&gt;
+ */
+<span class="fc" id="L23">public final class NumericStabilityCost implements CostModel {</span>
+
+    @Override
+    public int cost(String expression, Expr parsedAst, ExpressionScore score) {
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (parsedAst == null) {</span>
+<span class="nc" id="L28">            return boundedCost((long) score.operatorCount() + score.nestingDepth());</span>
+        }
+<span class="fc" id="L30">        return boundedCost((long) StructuralCostModel.countOperators(parsedAst) + instabilityPenalty(parsedAst));</span>
+    }
+
+    @Override
+    public String id() {
+<span class="fc" id="L35">        return &quot;numeric-stability&quot;;</span>
+    }
+
+    private int instabilityPenalty(Expr expression) {
+<span class="fc" id="L39">        long penalty = 0;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">            switch (binary.operator()) {</span>
+                case SUB -&gt; {
+                    // catastrophic cancellation: a - b with similarly-shaped
+                    // operands or both numeric is suspect.
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                    if (binary.left().equals(binary.right())) {</span>
+<span class="fc" id="L46">                        penalty += 6;</span>
+<span class="pc bpc" id="L47" title="3 of 4 branches missed.">                    } else if (binary.left() instanceof NumberExpr &amp;&amp; binary.right() instanceof NumberExpr) {</span>
+<span class="nc" id="L48">                        penalty += 2;</span>
+                    }
+                }
+                case DIV -&gt; {
+                    // division by a small or potentially zero denominator
+<span class="nc bnc" id="L53" title="All 4 branches missed.">                    if (binary.right() instanceof NumberExpr number &amp;&amp; number.value().abs().compareTo(de.regelsuche.scalar.ExactRational.ONE) &lt; 0) {</span>
+<span class="nc" id="L54">                        penalty += 5;</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                    } else if (!(binary.right() instanceof NumberExpr)) {</span>
+<span class="nc" id="L56">                        penalty += 2;</span>
+                    }
+                }
+                case POW -&gt; {
+                    // High constant powers expanded raise instability vs. Horner
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    if (binary.right() instanceof NumberExpr number) {</span>
+<span class="fc" id="L62">                        penalty += powerPenalty(number.value());</span>
+                    }
+<span class="fc" id="L64">                }</span>
+                default -&gt; {
+                    /* ADD, MUL: no extra penalty */
+                }
+            }
+<span class="fc" id="L69">            penalty += instabilityPenalty(binary.left());</span>
+<span class="fc" id="L70">            penalty += instabilityPenalty(binary.right());</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L73">                penalty += instabilityPenalty(argument);</span>
+<span class="nc" id="L74">            }</span>
+        }
+<span class="fc" id="L76">        return boundedCost(penalty);</span>
+    }
+
+    private static int powerPenalty(ExactRational exponent) {
+<span class="fc" id="L80">        ExactRational excess = exponent.subtract(ExactRational.integer(3));</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (excess.signum() &lt;= 0) {</span>
+<span class="nc" id="L82">            return 0;</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (excess.compareTo(ExactRational.integer(Integer.MAX_VALUE)) &gt;= 0) {</span>
+<span class="fc" id="L85">            return Integer.MAX_VALUE;</span>
+        }
+<span class="fc" id="L87">        return excess.numerator().divide(excess.denominator()).intValueExact();</span>
+    }
+
+    private static int boundedCost(long value) {
+<span class="fc" id="L91">        return (int) Math.clamp(value, 0, Integer.MAX_VALUE);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

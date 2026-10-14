@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LeanSourceRenderer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">LeanSourceRenderer.java</span></div><h1>LeanSourceRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.*;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/** Lossless real-expression translation; never invents axioms or opaque analytic functions. */
+<span class="fc" id="L11">public final class LeanSourceRenderer {</span>
+    private static final String TACTICS = &quot;&quot;&quot;
+          solve
+          | simp_all [Real.log_exp, Real.exp_log, Real.exp_add, Real.log_mul,
+              Real.log_div, Real.rpow_zero, Real.rpow_one]
+          | ring
+          | field_simp &lt;;&gt; ring
+          | positivity
+          | nlinarith
+        &quot;&quot;&quot;;
+
+    public record Material(String theoremType, String proof, Map&lt;String, String&gt; mapping,
+                           List&lt;String&gt; issues) {
+<span class="fc" id="L24">        public Material {</span>
+<span class="fc" id="L25">            mapping = Map.copyOf(mapping);</span>
+<span class="fc" id="L26">            issues = List.copyOf(issues);</span>
+<span class="fc" id="L27">        }</span>
+<span class="fc" id="L28">        public boolean supported() { return issues.isEmpty(); }</span>
+    }
+
+    public Material render(Obligation obligation) {
+<span class="fc" id="L32">        List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (obligation.declarations().size() &gt; 128 || obligation.assumptions().size() &gt; 128) {</span>
+<span class="nc" id="L34">            return new Material(&quot;&quot;, &quot;&quot;, Map.of(), List.of(&quot;OBLIGATION_SIZE_LIMIT&quot;));</span>
+        }
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (Theory theory : obligation.theories()) {</span>
+<span class="fc bfc" id="L37" title="All 4 branches covered.">            if (theory != Theory.REAL_ARITHMETIC &amp;&amp; theory != Theory.TRANSCENDENTAL_FUNCTIONS)</span>
+<span class="fc" id="L38">                issues.add(&quot;UNSUPPORTED_THEORY:&quot; + theory);</span>
+<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">        StringBuilder binders = new StringBuilder();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (SymbolDeclaration declaration : obligation.declarations()) {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (declaration.sort() != Sort.REAL) issues.add(&quot;UNSUPPORTED_SORT:&quot; + declaration.sort());</span>
+<span class="fc" id="L43">            binders.append(&quot; (rs_&quot;).append(declaration.name()).append(&quot; : Real)&quot;);</span>
+<span class="fc" id="L44">        }</span>
+<span class="fc" id="L45">        StringBuilder body = new StringBuilder();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (Predicate predicate : obligation.assumptions()) {</span>
+<span class="fc" id="L47">            body.append(relation(predicate.relation(), predicate.left(), predicate.right(),</span>
+<span class="fc" id="L48">                obligation, issues)).append(&quot; → &quot;);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        body.append(relation(obligation.goal().relation(), obligation.goal().left(),</span>
+<span class="fc" id="L51">            obligation.goal().right(), obligation, issues));</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        String type = (binders.isEmpty() ? &quot;&quot; : &quot;∀&quot; + binders + &quot;, &quot;) + body;</span>
+<span class="pc bpc" id="L53" title="3 of 4 branches missed.">        String intros = (binders.isEmpty() &amp;&amp; obligation.assumptions().isEmpty()) ? &quot;&quot; : &quot;  intros\n&quot;;</span>
+<span class="fc" id="L54">        return new Material(type, &quot;by\n&quot; + intros + TACTICS,</span>
+<span class="fc" id="L55">            Map.of(&quot;goal.closedType&quot;, type,</span>
+<span class="fc" id="L56">                &quot;goal.left&quot;, expression(obligation.goal().left(), obligation, issues, 0),</span>
+<span class="fc" id="L57">                &quot;goal.right&quot;, expression(obligation.goal().right(), obligation, issues, 0)),</span>
+<span class="fc" id="L58">            issues.stream().distinct().sorted().toList());</span>
+    }
+
+    private static String relation(Relation relation, Expression left, Expression right,
+                                   Obligation obligation, List&lt;String&gt; issues) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (relation == Relation.IS_INTEGER) {</span>
+<span class="fc" id="L64">            issues.add(&quot;UNSUPPORTED_RELATION:IS_INTEGER&quot;);</span>
+<span class="fc" id="L65">            return &quot;False&quot;;</span>
+        }
+<span class="pc bpc" id="L67" title="4 of 7 branches missed.">        String op = switch (relation) {</span>
+<span class="fc" id="L68">            case EQUALS -&gt; &quot;=&quot;;</span>
+<span class="fc" id="L69">            case NOT_EQUALS -&gt; &quot;≠&quot;;</span>
+<span class="nc" id="L70">            case LESS_THAN -&gt; &quot;&lt;&quot;;</span>
+<span class="nc" id="L71">            case LESS_OR_EQUAL -&gt; &quot;≤&quot;;</span>
+<span class="fc" id="L72">            case GREATER_THAN -&gt; &quot;&gt;&quot;;</span>
+<span class="nc" id="L73">            case GREATER_OR_EQUAL -&gt; &quot;≥&quot;;</span>
+<span class="nc" id="L74">            case IS_INTEGER -&gt; throw new IllegalStateException();</span>
+        };
+<span class="fc" id="L76">        return &quot;(&quot; + expression(left, obligation, issues, 0) + &quot; &quot; + op + &quot; &quot;</span>
+<span class="fc" id="L77">            + expression(right, obligation, issues, 0) + &quot;)&quot;;</span>
+    }
+
+    private static String expression(Expression expression, Obligation obligation,
+                                     List&lt;String&gt; issues, int depth) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (depth &gt; 128) { issues.add(&quot;EXPRESSION_DEPTH_LIMIT&quot;); return &quot;0&quot;; }</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (expression instanceof Literal literal) return literal(literal, issues);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (expression instanceof Symbol symbol) return &quot;rs_&quot; + symbol.name();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (expression instanceof Binary binary) return binary(binary, obligation, issues, depth);</span>
+<span class="fc" id="L86">        return call((Call) expression, obligation, issues, depth);</span>
+    }
+
+    private static String literal(Literal literal, List&lt;String&gt; issues) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (literal.value().length() &gt; 4096) { issues.add(&quot;LITERAL_SIZE_LIMIT&quot;); return &quot;0&quot;; }</span>
+<span class="fc" id="L91">        BigDecimal d = new BigDecimal(literal.value());</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (d.scale() &lt;= 0) return &quot;(&quot; + d.toBigIntegerExact() + &quot; : Real)&quot;;</span>
+<span class="nc" id="L93">        return &quot;((&quot; + d.unscaledValue() + &quot; : Real) / &quot; + java.math.BigInteger.TEN.pow(d.scale()) + &quot;)&quot;;</span>
+    }
+
+    private static String binary(Binary b, Obligation obligation, List&lt;String&gt; issues, int depth) {
+<span class="fc" id="L97">        String left = expression(b.left(), obligation, issues, depth + 1);</span>
+<span class="fc" id="L98">        String right = expression(b.right(), obligation, issues, depth + 1);</span>
+<span class="fc bfc" id="L99" title="All 4 branches covered.">        if (b.operator() == BinaryOperator.DIVIDE &amp;&amp; !nonzero(b.right(), obligation))</span>
+<span class="fc" id="L100">            issues.add(&quot;DIVISION_DOMAIN_NOT_ENCODED:&quot; + b.right().canonicalMaterial());</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (b.operator() == BinaryOperator.POWER) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (b.right() instanceof Literal l) {</span>
+<span class="fc" id="L103">                BigDecimal d = new BigDecimal(l.value());</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">                if (d.signum() &gt;= 0 &amp;&amp; d.stripTrailingZeros().scale() &lt;= 0)</span>
+<span class="fc" id="L105">                    return &quot;(&quot; + left + &quot; ^ (&quot; + d.toBigIntegerExact() + &quot; : Nat))&quot;;</span>
+            }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (!positive(b.left(), obligation)) issues.add(&quot;REAL_POWER_POSITIVE_BASE_REQUIRED&quot;);</span>
+<span class="fc" id="L108">            return &quot;(Real.rpow &quot; + left + &quot; &quot; + right + &quot;)&quot;;</span>
+        }
+<span class="pc bpc" id="L110" title="2 of 5 branches missed.">        String operator = switch (b.operator()) {</span>
+<span class="pc" id="L111">            case ADD -&gt; &quot;+&quot;; case SUBTRACT -&gt; &quot;-&quot;; case MULTIPLY -&gt; &quot;*&quot;; case DIVIDE -&gt; &quot;/&quot;;</span>
+<span class="nc" id="L112">            case POWER -&gt; throw new IllegalStateException();</span>
+        };
+<span class="fc" id="L114">        return &quot;(&quot; + left + &quot; &quot; + operator + &quot; &quot; + right + &quot;)&quot;;</span>
+    }
+
+    private static String call(Call call, Obligation obligation, List&lt;String&gt; issues, int depth) {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        int arity = call.function().equals(&quot;pow&quot;) ? 2 : 1;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (call.arguments().size() != arity) { issues.add(&quot;UNSUPPORTED_ARITY:&quot; + call.function()); return &quot;0&quot;; }</span>
+<span class="fc" id="L120">        Expression argument = call.arguments().get(0);</span>
+<span class="fc" id="L121">        String a = expression(argument, obligation, issues, depth + 1);</span>
+<span class="pc bpc" id="L122" title="1 of 6 branches missed.">        return switch (call.function()) {</span>
+<span class="fc" id="L123">            case &quot;exp&quot; -&gt; &quot;(Real.exp &quot; + a + &quot;)&quot;;</span>
+            case &quot;log&quot;, &quot;ln&quot; -&gt; {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                if (!positive(argument, obligation)) issues.add(&quot;LOG_POSITIVE_ARGUMENT_REQUIRED:&quot; + argument.canonicalMaterial());</span>
+<span class="fc" id="L126">                yield &quot;(Real.log &quot; + a + &quot;)&quot;;</span>
+            }
+            case &quot;sqrt&quot; -&gt; {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                if (!nonnegative(argument, obligation)) issues.add(&quot;SQRT_NONNEGATIVE_ARGUMENT_REQUIRED&quot;);</span>
+<span class="fc" id="L130">                yield &quot;(Real.sqrt &quot; + a + &quot;)&quot;;</span>
+            }
+<span class="nc" id="L132">            case &quot;abs&quot; -&gt; &quot;(abs &quot; + a + &quot;)&quot;;</span>
+<span class="fc" id="L133">            case &quot;pow&quot; -&gt; expression(new Binary(BinaryOperator.POWER, argument,</span>
+<span class="fc" id="L134">                call.arguments().get(1)), obligation, issues, depth + 1);</span>
+<span class="fc" id="L135">            default -&gt; { issues.add(&quot;UNSUPPORTED_CALL:&quot; + call.function()); yield &quot;0&quot;; }</span>
+        };
+    }
+
+    private static boolean zero(Expression expression) {
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">        return expression instanceof Literal l &amp;&amp; new BigDecimal(l.value()).signum() == 0;</span>
+    }
+    private static boolean positive(Expression e, Obligation o) {
+<span class="pc bpc" id="L143" title="3 of 4 branches missed.">        if (e instanceof Literal l) return new BigDecimal(l.value()).signum() &gt; 0;</span>
+<span class="pc bpc" id="L144" title="2 of 6 branches missed.">        if (e instanceof Call c &amp;&amp; c.function().equals(&quot;exp&quot;) &amp;&amp; c.arguments().size() == 1) return true;</span>
+<span class="fc" id="L145">        return o.assumptions().stream().anyMatch(p -&gt;</span>
+<span class="pc bpc" id="L146" title="2 of 6 branches missed.">            p.relation() == Relation.GREATER_THAN &amp;&amp; p.left().equals(e) &amp;&amp; zero(p.right())</span>
+<span class="pc bpc" id="L147" title="5 of 6 branches missed.">            || p.relation() == Relation.LESS_THAN &amp;&amp; p.right().equals(e) &amp;&amp; zero(p.left()));</span>
+    }
+    private static boolean nonnegative(Expression e, Obligation o) {
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">        if (positive(e,o) || zero(e)) return true;</span>
+<span class="fc" id="L151">        return o.assumptions().stream().anyMatch(p -&gt;</span>
+<span class="nc bnc" id="L152" title="All 6 branches missed.">            p.relation() == Relation.GREATER_OR_EQUAL &amp;&amp; p.left().equals(e) &amp;&amp; zero(p.right())</span>
+<span class="nc bnc" id="L153" title="All 6 branches missed.">            || p.relation() == Relation.LESS_OR_EQUAL &amp;&amp; p.right().equals(e) &amp;&amp; zero(p.left()));</span>
+    }
+    private static boolean nonzero(Expression e, Obligation o) {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (positive(e,o)) return true;</span>
+<span class="pc bpc" id="L157" title="3 of 4 branches missed.">        if (e instanceof Literal l) return new BigDecimal(l.value()).signum() != 0;</span>
+<span class="fc" id="L158">        return o.assumptions().stream().anyMatch(p -&gt;</span>
+<span class="pc bpc" id="L159" title="3 of 4 branches missed.">            (p.relation() == Relation.NOT_EQUALS || p.relation() == Relation.LESS_THAN</span>
+<span class="pc bnc" id="L160" title="All 2 branches missed.">             || p.relation() == Relation.GREATER_THAN)</span>
+<span class="pc bpc" id="L161" title="6 of 8 branches missed.">             &amp;&amp; (p.left().equals(e) &amp;&amp; zero(p.right()) || e.equals(p.right()) &amp;&amp; zero(p.left())));</span>
+    }
+
+    public String source(Obligation obligation, String nonce) {
+<span class="fc" id="L165">        Material material = render(obligation);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (!material.supported()) throw new IllegalArgumentException(String.join(&quot;,&quot;, material.issues()));</span>
+<span class="fc" id="L167">        return &quot;import Mathlib\nimport Lean.Util.CollectAxioms\n&quot;</span>
+            + &quot;set_option autoImplicit false\nset_option Elab.async false\nset_option maxHeartbeats 1000000\n&quot;
+<span class="fc" id="L169">            + &quot;theorem regelsuche_lemma : &quot; + material.theoremType() + &quot; := &quot; + material.proof()</span>
+<span class="fc" id="L170">            + audit(material.theoremType(), obligation.contentHash(), nonce);</span>
+    }
+
+    /** The wrapper kernel-checks the exact closed request, not merely the printed goal. */
+    public String audit(String expectedType, String obligationHash, String nonce) {
+<span class="pc bpc" id="L175" title="2 of 4 branches missed.">        if (!obligationHash.matches(&quot;sha256:[0-9a-f]{64}&quot;) || !nonce.matches(&quot;[0-9a-f]{32}&quot;))</span>
+<span class="nc" id="L176">            throw new IllegalArgumentException(&quot;invalid audit binding&quot;);</span>
+<span class="fc" id="L177">        return &quot;\ntheorem regelsuche_bound : &quot; + expectedType + &quot; := @regelsuche_lemma\n&quot;</span>
+            + &quot;open Lean Elab Command in\nrun_cmd do\n&quot;
+            + &quot;  let env ← getEnv\n&quot;
+            + &quot;  match env.find? `regelsuche_bound with\n&quot;
+            + &quot;  | some (.thmInfo _) =&gt; pure ()\n&quot;
+            + &quot;  | _ =&gt; throwError \&quot;expected a checked theorem\&quot;\n&quot;
+            + &quot;  let axioms ← Lean.collectAxioms `regelsuche_bound\n&quot;
+            + &quot;  let allowed := #[`propext, `Classical.choice, `Quot.sound]\n&quot;
+            + &quot;  for ax in axioms do\n&quot;
+            + &quot;    unless allowed.contains ax do\n&quot;
+            + &quot;      throwError m!\&quot;unapproved proof axiom: {ax}\&quot;\n&quot;
+            + &quot;  let report := Json.mkObj [(\&quot;schema\&quot;, toJson \&quot;regelsuche.lean-audit/v1\&quot;),\n&quot;
+            + &quot;    (\&quot;obligationHash\&quot;, toJson \&quot;&quot; + obligationHash + &quot;\&quot;),\n&quot;
+            + &quot;    (\&quot;nonce\&quot;, toJson \&quot;&quot; + nonce + &quot;\&quot;),\n&quot;
+            + &quot;    (\&quot;theorem\&quot;, toJson \&quot;regelsuche_bound\&quot;),\n&quot;
+            + &quot;    (\&quot;axioms\&quot;, toJson (axioms.map Name.toString))]\n&quot;
+            + &quot;  liftIO &lt;| IO.println (\&quot;REGELSUCHE_LEAN_AUDIT \&quot; ++ report.compress)\n&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

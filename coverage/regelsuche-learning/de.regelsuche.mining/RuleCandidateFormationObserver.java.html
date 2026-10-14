@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RuleCandidateFormationObserver.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">RuleCandidateFormationObserver.java</span></div><h1>RuleCandidateFormationObserver.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Receives one fully formed rule candidate together with the immutable
+ * evidence that led to that formation.
+ *
+ * &lt;p&gt;The callback is deliberately positioned after candidate formation. It
+ * must not mutate, promote or replace the candidate. It explicitly routes the
+ * unchanged candidate to ordinary review or exclusively to a derived cache.
+ * A configured observer is
+ * part of the fail-closed formation lifecycle: if it rejects the evidence, the
+ * mining call does not pretend that post-formation processing succeeded.&lt;/p&gt;
+ */
+@FunctionalInterface
+public interface RuleCandidateFormationObserver {
+    Disposition onCandidateFormed(RuleCandidate candidate, Evidence evidence);
+
+<span class="fc" id="L23">    enum Disposition {</span>
+<span class="fc" id="L24">        RETAIN_FOR_REVIEW,</span>
+<span class="fc" id="L25">        DERIVED_CACHE_ONLY</span>
+    }
+
+    /**
+     * Formation evidence retained independently from any later theory
+     * classification, cache decision, novelty decision or promotion policy.
+     */
+    record Evidence(
+        List&lt;String&gt; appliedRuleIds,
+        List&lt;String&gt; sourceProvenance,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; validationEvidence
+    ) {
+<span class="fc" id="L38">        public Evidence {</span>
+<span class="fc" id="L39">            appliedRuleIds = normalized(</span>
+                appliedRuleIds,
+                &quot;appliedRuleIds&quot;);
+<span class="fc" id="L42">            sourceProvenance = normalized(</span>
+                sourceProvenance,
+                &quot;sourceProvenance&quot;);
+<span class="fc" id="L45">            assumptions = normalized(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L46">            validationEvidence = normalized(</span>
+                validationEvidence,
+                &quot;validationEvidence&quot;);
+<span class="fc" id="L49">        }</span>
+
+        public static Evidence fromPaths(
+            List&lt;SuccessfulTransformationPath&gt; paths
+        ) {
+<span class="fc" id="L54">            Objects.requireNonNull(paths, &quot;paths&quot;);</span>
+<span class="fc" id="L55">            List&lt;String&gt; appliedRuleIds = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L56">            List&lt;String&gt; sourceProvenance = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L57">            List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L58">            List&lt;String&gt; validationEvidence = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (SuccessfulTransformationPath path : paths) {</span>
+<span class="fc" id="L60">                SuccessfulTransformationPath checked =</span>
+<span class="fc" id="L61">                    Objects.requireNonNull(path, &quot;path&quot;);</span>
+<span class="fc" id="L62">                appliedRuleIds.addAll(checked.rules());</span>
+<span class="fc" id="L63">                sourceProvenance.add(checked.id());</span>
+<span class="fc" id="L64">                assumptions.addAll(checked.assumptions());</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                if (checked.equivalenceEvidence() != null</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                        &amp;&amp; !checked.equivalenceEvidence().isBlank()) {</span>
+<span class="fc" id="L67">                    validationEvidence.add(</span>
+<span class="fc" id="L68">                        checked.equivalenceEvidence());</span>
+                }
+<span class="fc" id="L70">            }</span>
+<span class="fc" id="L71">            return new Evidence(</span>
+                appliedRuleIds,
+                sourceProvenance,
+                assumptions,
+                validationEvidence);
+        }
+
+        private static List&lt;String&gt; normalized(
+            List&lt;String&gt; values,
+            String name
+        ) {
+<span class="fc" id="L82">            Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L83">            LinkedHashSet&lt;String&gt; normalized = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (String value : values) {</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L86">                    throw new IllegalArgumentException(</span>
+                        name + &quot; must not contain blank entries&quot;);
+                }
+<span class="fc" id="L89">                normalized.add(value);</span>
+<span class="fc" id="L90">            }</span>
+<span class="fc" id="L91">            return List.copyOf(normalized);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

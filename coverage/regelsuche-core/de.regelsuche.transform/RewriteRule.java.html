@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RewriteRule.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RewriteRule.java</span></div><h1>RewriteRule.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleDescriptor;
+import java.util.List;
+import java.util.Optional;
+
+public interface RewriteRule {
+    String id();
+
+    RewriteKind kind();
+
+    boolean mayIncreaseComplexity();
+
+    int estimatedCostDelta();
+
+    /**
+     * Whether a matching application preserves equivalence under all conditions
+     * returned by {@link #assumptions(Expr)}. Callers must retain or discharge
+     * those concrete conditions; callers without an assumption channel must
+     * reject applications that introduce any conditions.
+     */
+    boolean isEquivalencePreservingByConstruction();
+
+    boolean matches(Expr subtree);
+
+    Expr apply(Expr subtree);
+
+    /** Symbolic side conditions introduced by this concrete application. */
+    default List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="fc" id="L32">        return List.of();</span>
+    }
+
+    /** Static declaration that this rule can emit a side condition. */
+    default boolean mayEmitAssumptions() {
+<span class="fc" id="L37">        return false;</span>
+    }
+
+    /**
+     * Explicit opt-in contract for custom schema-directed preparation. No
+     * caller may infer this contract from IDs, classes, examples or benchmarks.
+     */
+    default Optional&lt;RewriteApplicabilitySchema&gt; explicitApplicabilitySchema() {
+<span class="fc" id="L45">        return Optional.empty();</span>
+    }
+
+    default RuleDescriptor descriptor() {
+<span class="fc" id="L49">        return RuleDescriptor.core(id(), List.of());</span>
+    }
+
+    /**
+     * Capability implemented by algorithmic/custom rules whose complete source
+     * applicability and guard contract is explicitly reviewable.
+     */
+    interface RewriteApplicabilitySchemaProvider extends RewriteRule {
+        RewriteApplicabilitySchema applicabilitySchema();
+
+        @Override
+        default Optional&lt;RewriteApplicabilitySchema&gt;
+                explicitApplicabilitySchema() {
+<span class="fc" id="L62">            return Optional.of(applicabilitySchema());</span>
+        }
+
+        /** Builds the standard exact source-pattern contract for this rule. */
+        default RewriteApplicabilitySchema exactSource(
+            PatternExpr pattern,
+            RequiredAssumptionTemplate... requiredAssumptions
+        ) {
+<span class="fc" id="L70">            return new RewriteApplicabilitySchema(</span>
+<span class="fc" id="L71">                &quot;algorithmic-source/v1:&quot; + id(),</span>
+                this,
+                pattern,
+<span class="fc" id="L74">                RecognitionProfile.exact(),</span>
+<span class="fc" id="L75">                List.of(requiredAssumptions));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

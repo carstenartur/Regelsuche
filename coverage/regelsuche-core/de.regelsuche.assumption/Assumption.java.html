@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Assumption.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">Assumption.java</span></div><h1>Assumption.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
+
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Symbolic side condition attached to a rule, candidate or transformation
+ * step.
+ *
+ * &lt;p&gt;Assumptions are kept as a small first-class model so that downstream
+ * components (proof bridges, validation, inventory exports) can reason about
+ * the conditions a rule depends on. They are intentionally lightweight: the
+ * {@link Kind} enum covers the most common cases (non-zero divisor, positive
+ * argument for a logarithm, domain of a function, custom predicate); a
+ * free-form {@link #expression()} carries the actual symbolic statement
+ * (e.g. {@code &quot;b != 0&quot;} or {@code &quot;x &gt; 0&quot;}).&lt;/p&gt;
+ */
+public record Assumption(Kind kind, String expression, List&lt;String&gt; symbols) implements de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L19">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(kind);v.reference(expression);v.reference(symbols);}</span>
+<span class="fc" id="L20">    public Assumption {</span>
+<span class="fc" id="L21">        Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        symbols = symbols == null ? List.of() : List.copyOf(symbols);</span>
+<span class="fc" id="L26">    }</span>
+
+    public Assumption(Kind kind, String expression) {
+<span class="nc" id="L29">        this(kind, expression, List.of());</span>
+<span class="nc" id="L30">    }</span>
+
+    /** Most common assumption kinds. */
+<span class="fc" id="L33">    public enum Kind {</span>
+        /** Denominator (or other given subterm) must be non-zero. */
+<span class="fc" id="L35">        NON_ZERO,</span>
+        /** Argument must be strictly positive. */
+<span class="fc" id="L37">        POSITIVE,</span>
+        /** Argument must be non-negative. */
+<span class="fc" id="L39">        NON_NEGATIVE,</span>
+        /** Variable is known to be integer-valued. */
+<span class="fc" id="L41">        INTEGER,</span>
+        /** Variable is known to be a natural number. */
+<span class="fc" id="L43">        NATURAL,</span>
+        /** Expression admits a multiplicative inverse. */
+<span class="fc" id="L45">        INVERTIBLE,</span>
+        /** Variable belongs to a particular domain (e.g. integer). */
+<span class="fc" id="L47">        DOMAIN_MEMBERSHIP,</span>
+        /** Free-form predicate with no dedicated structural kind. */
+<span class="fc" id="L49">        CUSTOM_PREDICATE,</span>
+        /** Variable is known to be real-valued. */
+<span class="fc" id="L51">        REAL,</span>
+        /** Variable is known to be rational-valued. */
+<span class="fc" id="L53">        RATIONAL,</span>
+        /** Explicitly unknown / inconclusive domain information. */
+<span class="fc" id="L55">        UNKNOWN,</span>
+        /** @deprecated Use {@link #DOMAIN_MEMBERSHIP}. */
+<span class="fc" id="L57">        @Deprecated</span>
+        DOMAIN,
+        /** @deprecated Use {@link #CUSTOM_PREDICATE}. */
+<span class="fc" id="L60">        @Deprecated</span>
+        CUSTOM
+    }
+
+    /**
+     * Common factory: a divisor that must be non-zero. The {@code denominator}
+     * is rendered verbatim into the assumption expression.
+     */
+    public static Assumption nonZero(String denominator) {
+<span class="fc" id="L69">        return new Assumption(Kind.NON_ZERO, denominator + &quot; != 0&quot;, List.of(denominator));</span>
+    }
+
+    public static Assumption nonzero(String denominator) {
+<span class="nc" id="L73">        return nonZero(denominator);</span>
+    }
+
+    /** {@code argument &gt; 0}, useful for logarithm/root domains. */
+    public static Assumption positive(String argument) {
+<span class="fc" id="L78">        return new Assumption(Kind.POSITIVE, argument + &quot; &gt; 0&quot;, List.of(argument));</span>
+    }
+
+    /** {@code argument &gt;= 0}, useful for square-root identities. */
+    public static Assumption nonNegative(String argument) {
+<span class="fc" id="L83">        return new Assumption(Kind.NON_NEGATIVE, argument + &quot; &gt;= 0&quot;, List.of(argument));</span>
+    }
+
+    public static Assumption real(String symbol) {
+<span class="fc" id="L87">        return new Assumption(Kind.REAL, symbol + &quot; ∈ R&quot;, List.of(symbol));</span>
+    }
+
+    public static Assumption integer(String symbol) {
+<span class="fc" id="L91">        return new Assumption(Kind.INTEGER, symbol + &quot; ∈ Z&quot;, List.of(symbol));</span>
+    }
+
+    public static Assumption natural(String symbol) {
+<span class="fc" id="L95">        return new Assumption(Kind.NATURAL, symbol + &quot; ∈ N&quot;, List.of(symbol));</span>
+    }
+
+    public static Assumption invertible(String expression) {
+<span class="nc" id="L99">        return new Assumption(Kind.INVERTIBLE, expression + &quot; invertible&quot;, List.of(expression));</span>
+    }
+
+    public static Assumption domainMembership(String expression, String domain) {
+<span class="nc" id="L103">        return new Assumption(Kind.DOMAIN_MEMBERSHIP, expression + &quot; ∈ &quot; + domain, List.of(expression));</span>
+    }
+
+    public static Assumption customPredicate(String predicate, List&lt;String&gt; symbols) {
+<span class="fc" id="L107">        return new Assumption(Kind.CUSTOM_PREDICATE, predicate, symbols);</span>
+    }
+
+    public static Assumption rational(String symbol) {
+<span class="fc" id="L111">        return new Assumption(Kind.RATIONAL, symbol + &quot; ∈ Q&quot;, List.of(symbol));</span>
+    }
+
+    public static Assumption unknown(String symbol) {
+<span class="fc" id="L115">        return new Assumption(Kind.UNKNOWN, symbol + &quot; ? unknown&quot;, List.of(symbol));</span>
+    }
+
+    public AssumptionTruthValue truthValueUnder(Iterable&lt;Assumption&gt; knownAssumptions) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (kind == Kind.UNKNOWN) {</span>
+<span class="nc" id="L120">            return AssumptionTruthValue.UNKNOWN;</span>
+        }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (knownAssumptions == null) {</span>
+<span class="nc" id="L123">            return AssumptionTruthValue.UNKNOWN;</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (Assumption known : knownAssumptions) {</span>
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">            if (known == null || !sameSymbols(known)) {</span>
+<span class="nc" id="L127">                continue;</span>
+            }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (known.expression().equals(expression())) {</span>
+<span class="fc" id="L130">                return AssumptionTruthValue.TRUE;</span>
+            }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (implies(known.kind(), kind)) {</span>
+<span class="fc" id="L133">                return AssumptionTruthValue.TRUE;</span>
+            }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (contradicts(known.kind(), kind)) {</span>
+<span class="nc" id="L136">                return AssumptionTruthValue.FALSE;</span>
+            }
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return AssumptionTruthValue.UNKNOWN;</span>
+    }
+
+    private boolean sameSymbols(Assumption other) {
+<span class="fc" id="L143">        return symbols.equals(other.symbols);</span>
+    }
+
+    private static boolean implies(Kind known, Kind required) {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (known == required) {</span>
+            // Unlike numeric kinds, custom predicates carry their meaning in
+            // the expression. Exact identity was already checked by the caller.
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">            return required != Kind.CUSTOM_PREDICATE &amp;&amp; required != Kind.CUSTOM;</span>
+        }
+<span class="pc bpc" id="L152" title="3 of 5 branches missed.">        return switch (required) {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            case NON_ZERO -&gt; known == Kind.POSITIVE;</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            case INTEGER -&gt; known == Kind.NATURAL;</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">            case RATIONAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL;</span>
+<span class="pc bpc" id="L156" title="5 of 10 branches missed.">            case REAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL</span>
+                || known == Kind.RATIONAL || known == Kind.POSITIVE || known == Kind.NON_NEGATIVE;
+<span class="nc" id="L158">            default -&gt; false;</span>
+        };
+    }
+
+    private static boolean contradicts(Kind known, Kind required) {
+<span class="fc" id="L163">        return false;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L168">        return kind + &quot;(&quot; + expression + &quot;)&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

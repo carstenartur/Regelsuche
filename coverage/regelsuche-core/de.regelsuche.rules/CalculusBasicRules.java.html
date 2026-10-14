@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CalculusBasicRules.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.rules</a> &gt; <span class="el_source">CalculusBasicRules.java</span></div><h1>CalculusBasicRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.rules;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.RewriteRule.RewriteApplicabilitySchemaProvider;
+import java.util.List;
+
+/** Basic real exponential/natural-logarithm rewrite rules. */
+public final class CalculusBasicRules {
+    private CalculusBasicRules() {
+    }
+
+    public static List&lt;RewriteRule&gt; rules() {
+<span class="fc" id="L22">        return List.of(new ExpOfLnRule(), new LnOfExpRule(), new ExpOfZeroRule());</span>
+    }
+
+    /** {@code exp(ln(x)) -&gt; x} with {@code x &gt; 0}. */
+<span class="fc" id="L26">    static final class ExpOfLnRule implements RewriteApplicabilitySchemaProvider {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L29">            return &quot;calculus_exp_of_ln&quot;;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="nc" id="L34">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="nc" id="L39">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="nc" id="L44">            return -3;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="fc" id="L49">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            return inner(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L59">            Expr inner = inner(subtree);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (inner == null) {</span>
+<span class="nc" id="L61">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="fc" id="L63">            return inner;</span>
+        }
+
+        @Override
+        public boolean mayEmitAssumptions() {
+<span class="nc" id="L68">            return true;</span>
+        }
+
+        @Override
+        public List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="fc" id="L73">            Expr inner = inner(subtree);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            return inner == null</span>
+<span class="nc" id="L75">                ? List.of()</span>
+<span class="fc" id="L76">                : List.of(Assumption.positive(ExpressionFormatter.format(inner)));</span>
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+<span class="fc" id="L81">            PatternExpr value = PatternExpr.var(&quot;X&quot;);</span>
+<span class="fc" id="L82">            return exactSource(</span>
+<span class="fc" id="L83">                PatternExpr.fn(&quot;exp&quot;, PatternExpr.fn(&quot;ln&quot;, value)),</span>
+<span class="fc" id="L84">                RequiredAssumptionTemplate.positive(value));</span>
+        }
+
+        private static Expr inner(Expr subtree) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (!(subtree instanceof FunctionExpr exp)</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                    || !&quot;exp&quot;.equals(exp.name())</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                    || exp.arguments().size() != 1</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                    || !(exp.arguments().getFirst() instanceof FunctionExpr ln)</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                    || !&quot;ln&quot;.equals(ln.name())</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                    || ln.arguments().size() != 1) {</span>
+<span class="fc" id="L94">                return null;</span>
+            }
+<span class="fc" id="L96">            return ln.arguments().getFirst();</span>
+        }
+    }
+
+    /** {@code ln(exp(x)) -&gt; x} for every real {@code x}. */
+<span class="fc" id="L101">    static final class LnOfExpRule implements RewriteApplicabilitySchemaProvider {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L104">            return &quot;calculus_ln_of_exp&quot;;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="nc" id="L109">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="nc" id="L114">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="nc" id="L119">            return -3;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="fc" id="L124">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            return inner(subtree) != null;</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="nc" id="L134">            Expr inner = inner(subtree);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (inner == null) {</span>
+<span class="nc" id="L136">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="nc" id="L138">            return inner;</span>
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+<span class="fc" id="L143">            PatternExpr value = PatternExpr.var(&quot;X&quot;);</span>
+<span class="fc" id="L144">            return exactSource(PatternExpr.fn(</span>
+<span class="fc" id="L145">                &quot;ln&quot;, PatternExpr.fn(&quot;exp&quot;, value)));</span>
+        }
+
+        private static Expr inner(Expr subtree) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (!(subtree instanceof FunctionExpr ln)</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                    || !&quot;ln&quot;.equals(ln.name())</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                    || ln.arguments().size() != 1</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                    || !(ln.arguments().getFirst() instanceof FunctionExpr exp)</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                    || !&quot;exp&quot;.equals(exp.name())</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                    || exp.arguments().size() != 1) {</span>
+<span class="fc" id="L155">                return null;</span>
+            }
+<span class="nc" id="L157">            return exp.arguments().getFirst();</span>
+        }
+    }
+
+    /** {@code exp(0) -&gt; 1}. */
+<span class="fc" id="L162">    static final class ExpOfZeroRule implements RewriteApplicabilitySchemaProvider {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L165">            return &quot;calculus_exp_of_zero&quot;;</span>
+        }
+
+        @Override
+        public RewriteKind kind() {
+<span class="nc" id="L170">            return RewriteKind.SIMPLIFY;</span>
+        }
+
+        @Override
+        public boolean mayIncreaseComplexity() {
+<span class="nc" id="L175">            return false;</span>
+        }
+
+        @Override
+        public int estimatedCostDelta() {
+<span class="nc" id="L180">            return -2;</span>
+        }
+
+        @Override
+        public boolean isEquivalencePreservingByConstruction() {
+<span class="fc" id="L185">            return true;</span>
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc" id="L190">            return subtree instanceof FunctionExpr fn</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                &amp;&amp; &quot;exp&quot;.equals(fn.name())</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                &amp;&amp; fn.arguments().getFirst() instanceof NumberExpr n</span>
+<span class="pc bpc" id="L194" title="3 of 4 branches missed.">                &amp;&amp; n.value().equalsInteger(0);</span>
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (!matches(subtree)) {</span>
+<span class="nc" id="L200">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+            }
+<span class="nc" id="L202">            return new NumberExpr(1);</span>
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+<span class="fc" id="L207">            return exactSource(PatternExpr.fn(&quot;exp&quot;, PatternExpr.num(0)));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

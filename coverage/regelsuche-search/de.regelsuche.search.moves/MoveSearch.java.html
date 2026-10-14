@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MoveSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MoveSearch.java</span></div><h1>MoveSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.ToDoubleFunction;
+
+/** A frontier of states AND suspended expansions. Old mechanical v1/v2 replay remains unchanged. */
+<span class="fc" id="L14">public final class MoveSearch {</span>
+<span class="fc" id="L15">    public enum Mode { FAST, COMPLETE_BOUNDED_REFERENCE }</span>
+<span class="fc" id="L16">    public enum Scheduling { EAGER_CONTROL, STAGED, INCREMENTAL_NATIVE_ORDER, STAGED_INCREMENTAL }</span>
+<span class="fc" id="L17">    public enum Outcome { TARGET_REACHED, BOUNDED_EXHAUSTED, INCONCLUSIVE, WORK_EXHAUSTED, STATE_LIMIT, QUALITY_REACHED }</span>
+<span class="fc" id="L18">    public enum Decision { ENQUEUED, DUPLICATE, PATH_BOUND, ASSUMPTION_REJECTED, PROOF_REJECTED, COMPLEXITY_BOUND, WORK_LIMIT, DOMINATED }</span>
+    public record Budget(int maxPrimitiveSteps, int maxSearchDepth, long maxTheoryWork, int maxStates, long totalWork, int maxComplexityDebt) implements de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L20">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v) {}</span>
+<span class="fc" id="L21">        public Budget(int primitive, int depth, long theory, int states, long work) { this(primitive, depth, theory, states, work, Integer.MAX_VALUE); }</span>
+<span class="fc" id="L22">        public Budget {</span>
+<span class="pc bpc" id="L23" title="6 of 12 branches missed.">            if (maxPrimitiveSteps &lt; 0 || maxSearchDepth &lt; 0 || maxTheoryWork &lt; 0 || maxStates &lt; 1 || totalWork &lt; 1 || maxComplexityDebt &lt; 0)</span>
+<span class="nc" id="L24">                throw new IllegalArgumentException(&quot;invalid move search budget&quot;);</span>
+<span class="fc" id="L25">        }</span>
+    }
+    public record Problem(String source, MoveContext context, List&lt;MoveProvider&gt; providers, MovePriorityPolicy policy,
+            MoveVerifier verifier, ToDoubleFunction&lt;MoveState&gt; stateScore, Mode mode, Scheduling scheduling, Budget budget, StateValue stateValue) {
+        public Problem(String source, MoveContext context, List&lt;MoveProvider&gt; providers, MovePriorityPolicy policy,
+                MoveVerifier verifier, ToDoubleFunction&lt;MoveState&gt; score, Mode mode, Scheduling scheduling, Budget budget) {
+<span class="fc" id="L31">            this(source, context, providers, policy, verifier, score, mode, scheduling, budget, StateValue.NONE);</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        public Problem {</span>
+<span class="fc" id="L34">            java.util.Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="fc" id="L35">            java.util.Objects.requireNonNull(providers, &quot;providers&quot;);</span>
+<span class="fc" id="L36">            providers = List.copyOf(providers);</span>
+<span class="fc" id="L37">            java.util.Objects.requireNonNull(verifier); java.util.Objects.requireNonNull(policy);</span>
+<span class="fc" id="L38">            java.util.Objects.requireNonNull(stateScore); java.util.Objects.requireNonNull(mode);</span>
+<span class="fc" id="L39">            java.util.Objects.requireNonNull(scheduling); java.util.Objects.requireNonNull(budget); java.util.Objects.requireNonNull(stateValue);</span>
+<span class="pc bpc" id="L40" title="3 of 6 branches missed.">            if (source == null || source.isBlank() || context.phase() == MoveContext.Phase.PRODUCTION)</span>
+<span class="nc" id="L41">                throw new IllegalArgumentException(&quot;experimental scheduling is not production-qualified (#745)&quot;);</span>
+<span class="fc" id="L42">            validateScheduling(scheduling, providers, policy);</span>
+<span class="fc" id="L43">        }</span>
+    }
+
+    private static void validateScheduling(Scheduling scheduling, List&lt;MoveProvider&gt; providers, MovePriorityPolicy policy) {
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (scheduling == Scheduling.INCREMENTAL_NATIVE_ORDER) {</span>
+<span class="fc bfc" id="L48" title="All 6 branches covered.">            if (policy != MovePriorityPolicy.INVENTORY_ORDER || providers.stream().anyMatch(provider -&gt; !(provider instanceof NativeIncrementalMoveProvider)))</span>
+<span class="fc" id="L49">                throw new IllegalArgumentException(&quot;incremental native ordering requires native providers and INVENTORY_ORDER&quot;);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        } else if (scheduling == Scheduling.STAGED_INCREMENTAL) {</span>
+<span class="fc bfc" id="L51" title="All 4 branches covered.">            if (providers.stream().anyMatch(provider -&gt; !StagedIncrementalSources.supported(provider)))</span>
+<span class="fc" id="L52">                throw new IllegalArgumentException(&quot;staged incremental requires an explicit supported provider contract&quot;);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        } else if (providers.stream().anyMatch(provider -&gt; provider instanceof IncrementalMoveProvider)) {</span>
+<span class="fc" id="L54">            throw new IllegalArgumentException(&quot;incremental providers require INCREMENTAL_NATIVE_ORDER scheduling&quot;);</span>
+        }
+<span class="fc" id="L56">    }</span>
+    /** The full attempted target identity is retained even when admission rejects it. */
+<span class="fc" id="L58">    public record Event(MoveState source, MoveState target, SearchMove move, Decision decision, MoveVerifier.Verification verification) implements de.regelsuche.retention.RetainedGraph.View {</span>
+<span class="fc" id="L59">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(decision);v.reference(verification);}</span>
+
+        /** Empty means NOT_PERFORMED, not a failed or free mathematical verification. JSON retains explicit null. */
+<span class="fc" id="L62">        public java.util.Optional&lt;MoveVerifier.Verification&gt; verificationResult() { return java.util.Optional.ofNullable(verification); }</span>
+    }
+<span class="fc" id="L64">    public record WitnessStep(MoveState source, MoveState target, SearchMove move, MoveVerifier.Verification verification) implements de.regelsuche.retention.RetainedGraph.View {</span>
+<span class="fc" id="L65">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(verification);}</span>
+}
+    public record Metrics(long generatedSuccessors, long consumedSuccessors, long discardedSuccessors, long unconsumedSuccessors,
+            long duplicates, long deadEnds, long exploredStates, long expandedStates, long primitiveWork, long searchWork,
+            long verificationWork, int firstHitDepth, int firstHitPrimitiveDepth, Map&lt;String, Long&gt; familyMatches) implements de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L70">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(familyMatches);}</span>
+<span class="fc" id="L71">        public Metrics { familyMatches = de.regelsuche.retention.RetainedSortedMap.copyOf(familyMatches); }</span>
+<span class="fc" id="L72">        public long totalWork() { return Math.addExact(Math.addExact(primitiveWork, searchWork), verificationWork); }</span>
+        /** Explicit nonoverlapping charged dimensions; historical totals and serializers are unchanged. */
+        public Map&lt;String, Long&gt; chargedComponents() {
+<span class="nc" id="L75">            return Map.of(&quot;primitive&quot;, primitiveWork, &quot;search&quot;, searchWork, &quot;verification&quot;, verificationWork);</span>
+        }
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        public double effectiveBranchingFactor() { return expandedStates == 0 ? 0 : (double) (consumedSuccessors - discardedSuccessors) / expandedStates; }</span>
+    }
+    public record Result(Outcome outcome, List&lt;WitnessStep&gt; witness, List&lt;Event&gt; events, Set&lt;MoveState&gt; reachedStates, List&lt;MoveState&gt; deadEndStates,
+            Metrics metrics, boolean completeBoundedRelation, Map&lt;MoveState, StateValue.Assessment&gt; stateAssessments,
+            IncrementalMoveExecution incrementalExecution, StagedIncrementalMoveExecution stagedIncrementalExecution) implements de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L82">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(incrementalExecution);v.reference(stagedIncrementalExecution);}</span>
+
+        public Result(Outcome outcome, List&lt;WitnessStep&gt; witness, List&lt;Event&gt; events, Set&lt;MoveState&gt; reachedStates,
+                List&lt;MoveState&gt; deadEndStates, Metrics metrics, boolean completeBoundedRelation,
+                Map&lt;MoveState, StateValue.Assessment&gt; stateAssessments, IncrementalMoveExecution incrementalExecution) {
+<span class="nc" id="L87">            this(outcome, witness, events, reachedStates, deadEndStates, metrics, completeBoundedRelation,</span>
+                stateAssessments, incrementalExecution, null);
+<span class="nc" id="L89">        }</span>
+        /** Historical constructor and exports retain their original work contract. */
+        public Result(Outcome outcome, List&lt;WitnessStep&gt; witness, List&lt;Event&gt; events, Set&lt;MoveState&gt; reachedStates,
+                List&lt;MoveState&gt; deadEndStates, Metrics metrics, boolean completeBoundedRelation,
+                Map&lt;MoveState, StateValue.Assessment&gt; stateAssessments) {
+<span class="nc" id="L94">            this(outcome, witness, events, reachedStates, deadEndStates, metrics, completeBoundedRelation, stateAssessments, null);</span>
+<span class="nc" id="L95">        }</span>
+<span class="fc" id="L96">        public Result { witness = List.copyOf(witness); events = List.copyOf(events); reachedStates = Set.copyOf(reachedStates); deadEndStates = List.copyOf(deadEndStates); stateAssessments = Map.copyOf(stateAssessments); }</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        public boolean reached() { return outcome == Outcome.TARGET_REACHED; }</span>
+        public boolean accountingComplete() {
+<span class="pc bpc" id="L99" title="3 of 4 branches missed.">            return stagedIncrementalExecution == null || stagedIncrementalExecution.accountingComplete();</span>
+        }
+    }
+    /** A caller-supplied quality objective, not a desired expression or mathematical authority. */
+    public record ObjectiveScore(long value, long work) {
+<span class="fc" id="L104">        public ObjectiveScore {</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (work &lt; 1) throw new IllegalArgumentException(&quot;objective inspection must report positive work&quot;);</span>
+<span class="fc" id="L106">        }</span>
+    }
+    @FunctionalInterface public interface Objective { ObjectiveScore evaluate(MoveState state); }
+    public record QualityResult(Result search, MoveState incumbent, long inputScore, long outputScore,
+            List&lt;WitnessStep&gt; witness, long objectiveWork) {
+<span class="fc" id="L111">        public QualityResult { witness = List.copyOf(witness); }</span>
+    }
+
+<span class="fc" id="L114">    public Result search(Problem problem) { return search(problem, SearchContinuationContract.PATH_SENSITIVE); }</span>
+    public Result search(Problem problem,SearchContinuationContract contract) {
+<span class="fc" id="L116">        var raw = new MoveSearchKernel&lt;String,MoveState,SearchMove,StateValue.Assessment,MoveVerifier.Verification&gt;()</span>
+<span class="fc" id="L117">            .search(new LegacySearchExecution(problem),contract,null);</span>
+<span class="fc" id="L118">        return LegacySearchExecution.project(problem,raw);</span>
+    }
+    public QualityResult searchUntil(Problem problem,Objective objective,long maximumOutputScore,SearchContinuationContract contract) {
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        if (!problem.context().goal().isEmpty() || problem.mode()!=Mode.FAST)</span>
+<span class="fc" id="L122">            throw new IllegalArgumentException(&quot;quality stopping requires source-only FAST search&quot;);</span>
+<span class="fc" id="L123">        var online = new MoveSearchObjective&lt;MoveState,SearchMove,MoveVerifier.Verification&gt;(objective::evaluate,maximumOutputScore);</span>
+<span class="fc" id="L124">        var raw = new MoveSearchKernel&lt;String,MoveState,SearchMove,StateValue.Assessment,MoveVerifier.Verification&gt;()</span>
+<span class="fc" id="L125">            .search(new LegacySearchExecution(problem),contract,online);</span>
+<span class="fc" id="L126">        return new QualityResult(LegacySearchExecution.project(problem,raw),online.incumbent(),online.inputScore(),online.outputScore(),</span>
+<span class="fc" id="L127">            online.witness().stream().map(LegacySearchExecution::step).toList(),online.objectiveWork());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

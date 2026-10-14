@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TrigonometricRules.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.rules</a> &gt; <span class="el_source">TrigonometricRules.java</span></div><h1>TrigonometricRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.rules;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.RewriteRule.RewriteApplicabilitySchemaProvider;
+import java.util.List;
+
+/** Curated trigonometric rewrite rules. */
+public final class TrigonometricRules {
+    private TrigonometricRules() {}
+
+    public static List&lt;RewriteRule&gt; rules() {
+<span class="fc" id="L23">        PatternExpr a = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L24">        PatternExpr sinA = PatternExpr.fn(&quot;sin&quot;, a);</span>
+<span class="fc" id="L25">        PatternExpr cosA = PatternExpr.fn(&quot;cos&quot;, a);</span>
+<span class="fc" id="L26">        PatternExpr sinSquared = PatternExpr.op(BinaryOperator.POW, sinA, PatternExpr.num(2));</span>
+<span class="fc" id="L27">        PatternExpr cosSquared = PatternExpr.op(BinaryOperator.POW, cosA, PatternExpr.num(2));</span>
+<span class="fc" id="L28">        return List.of(</span>
+            new PatternRewriteRule(&quot;trig_pythagorean_sin_cos&quot;,
+<span class="fc" id="L30">                PatternExpr.op(BinaryOperator.ADD, sinSquared, cosSquared),</span>
+<span class="fc" id="L31">                PatternExpr.num(1), RewriteKind.SIMPLIFY, false, -4, true),</span>
+            new PatternRewriteRule(&quot;trig_pythagorean_cos_sin&quot;,
+<span class="fc" id="L33">                PatternExpr.op(BinaryOperator.ADD, cosSquared, sinSquared),</span>
+<span class="fc" id="L34">                PatternExpr.num(1), RewriteKind.SIMPLIFY, false, -4, true),</span>
+            new PatternRewriteRule(&quot;trig_one_minus_sin_squared&quot;,
+<span class="fc" id="L36">                PatternExpr.op(BinaryOperator.SUB, PatternExpr.num(1), sinSquared),</span>
+                cosSquared, RewriteKind.NORMALIZE, false, 0, true),
+            new PatternRewriteRule(&quot;trig_one_minus_cos_squared&quot;,
+<span class="fc" id="L39">                PatternExpr.op(BinaryOperator.SUB, PatternExpr.num(1), cosSquared),</span>
+                sinSquared, RewriteKind.NORMALIZE, false, 0, true),
+            new TanToSinOverCosRule(),
+            new PatternRewriteRule(&quot;trig_double_angle_sin&quot;,
+<span class="fc" id="L43">                PatternExpr.fn(&quot;sin&quot;, PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), a)),</span>
+<span class="fc" id="L44">                PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L45">                    PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), sinA), cosA),</span>
+                RewriteKind.EXPAND, true, 4, true),
+            new PatternRewriteRule(&quot;trig_double_angle_cos&quot;,
+<span class="fc" id="L48">                PatternExpr.fn(&quot;cos&quot;, PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(2), a)),</span>
+<span class="fc" id="L49">                PatternExpr.op(BinaryOperator.SUB, cosSquared, sinSquared),</span>
+                RewriteKind.EXPAND, true, 4, true));
+    }
+
+    /** {@code tan(A) -&gt; sin(A) / cos(A)} with {@code cos(A) != 0}. */
+<span class="fc" id="L54">    static final class TanToSinOverCosRule implements RewriteApplicabilitySchemaProvider {</span>
+        @Override
+<span class="fc" id="L56">        public String id() { return &quot;trig_tan_to_sin_over_cos&quot;; }</span>
+        @Override
+<span class="nc" id="L58">        public RewriteKind kind() { return RewriteKind.NORMALIZE; }</span>
+        @Override
+<span class="nc" id="L60">        public boolean mayIncreaseComplexity() { return true; }</span>
+        @Override
+<span class="nc" id="L62">        public int estimatedCostDelta() { return 2; }</span>
+        @Override
+<span class="fc" id="L64">        public boolean isEquivalencePreservingByConstruction() { return true; }</span>
+        @Override
+        public boolean matches(Expr subtree) {
+<span class="fc" id="L67">            return subtree instanceof FunctionExpr function</span>
+<span class="pc bpc" id="L68" title="3 of 6 branches missed.">                &amp;&amp; &quot;tan&quot;.equals(function.name()) &amp;&amp; function.arguments().size() == 1;</span>
+        }
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L72">            FunctionExpr tan = (FunctionExpr) subtree;</span>
+<span class="fc" id="L73">            Expr argument = tan.arguments().getFirst();</span>
+<span class="fc" id="L74">            return new BinaryExpr(new FunctionExpr(&quot;sin&quot;, argument), BinaryOperator.DIV,</span>
+                new FunctionExpr(&quot;cos&quot;, argument));
+        }
+        @Override
+<span class="nc" id="L78">        public boolean mayEmitAssumptions() { return true; }</span>
+        @Override
+        public List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (!matches(subtree)) return List.of();</span>
+<span class="fc" id="L82">            Expr argument = ((FunctionExpr) subtree).arguments().getFirst();</span>
+<span class="fc" id="L83">            return List.of(Assumption.nonZero(</span>
+<span class="fc" id="L84">                &quot;cos(&quot; + ExpressionFormatter.format(argument) + &quot;)&quot;));</span>
+        }
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+<span class="fc" id="L88">            PatternExpr argument = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L89">            return exactSource(PatternExpr.fn(&quot;tan&quot;, argument),</span>
+<span class="fc" id="L90">                RequiredAssumptionTemplate.nonZero(PatternExpr.fn(&quot;cos&quot;, argument)));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

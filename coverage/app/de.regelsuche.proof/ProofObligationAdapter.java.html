@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProofObligationAdapter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">ProofObligationAdapter.java</span></div><h1>ProofObligationAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.solver.ir.CoreExpressionIrAdapter;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.*;
+import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.StructuredAssumptionParser;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Legacy app inputs are translated once into the authoritative typed obligation. */
+final class ProofObligationAdapter {
+    private ProofObligationAdapter() { }
+
+    static Obligation equality(String left, String right, List&lt;Assumption&gt; supplied) {
+<span class="fc" id="L19">        List&lt;Assumption&gt; assumptions = List.copyOf(Objects.requireNonNull(supplied));</span>
+<span class="fc" id="L20">        List&lt;String&gt; predicates = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L21">        List&lt;String&gt; realDeclarations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L22">        StructuredAssumptionParser parser = new StructuredAssumptionParser();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        for (Assumption assumption : assumptions) {</span>
+<span class="pc bpc" id="L24" title="4 of 6 branches missed.">            switch (assumption.kind()) {</span>
+<span class="fc" id="L25">                case REAL -&gt; realDeclarations.add(domainSymbol(assumption, &quot;R&quot;));</span>
+<span class="nc" id="L26">                case INTEGER -&gt; predicates.add(domainSymbol(assumption, &quot;Z&quot;) + &quot; is integer&quot;);</span>
+                case NATURAL -&gt; {
+<span class="nc" id="L28">                    String name = domainSymbol(assumption, &quot;N&quot;);</span>
+<span class="nc" id="L29">                    predicates.add(name + &quot; is integer&quot;); predicates.add(name + &quot; &gt;= 0&quot;);</span>
+<span class="nc" id="L30">                }</span>
+                case NON_ZERO, POSITIVE, NON_NEGATIVE -&gt; {
+<span class="fc" id="L32">                    var parsed = parser.parse(List.of(assumption.expression()));</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">                    Relation expected = switch (assumption.kind()) {</span>
+<span class="fc" id="L34">                        case NON_ZERO -&gt; Relation.NOT_EQUALS;</span>
+<span class="fc" id="L35">                        case POSITIVE -&gt; Relation.GREATER_THAN;</span>
+<span class="nc" id="L36">                        case NON_NEGATIVE -&gt; Relation.GREATER_OR_EQUAL;</span>
+<span class="nc" id="L37">                        default -&gt; throw new IllegalArgumentException();</span>
+                    };
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">                    if (parsed.size() != 1 || parsed.get(0).relation() != expected</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                            || !parsed.get(0).right().equals(new Literal(&quot;0&quot;)))</span>
+<span class="nc" id="L41">                        throw new IllegalArgumentException(&quot;assumption kind and predicate disagree&quot;);</span>
+<span class="fc" id="L42">                    predicates.add(assumption.expression());</span>
+<span class="fc" id="L43">                }</span>
+                case CUSTOM_PREDICATE, CUSTOM -&gt; {
+                    // Only explicitly parseable comparisons, never a named True fallback.
+<span class="nc" id="L46">                    parser.parse(List.of(assumption.expression()));</span>
+<span class="nc" id="L47">                    predicates.add(assumption.expression());</span>
+<span class="nc" id="L48">                }</span>
+<span class="nc" id="L49">                default -&gt; throw new IllegalArgumentException(&quot;unsupported assumption: &quot; + assumption.kind());</span>
+            }
+<span class="fc" id="L51">        }</span>
+<span class="fc" id="L52">        Obligation original = new SolverObligationFactory().equality(&quot;app-proof-request&quot;, left, right,</span>
+            predicates, RequestedEvidence.FORMAL_PROOF,
+            new SourceProvenance(&quot;application-proof-request&quot;, &quot;typed-bridge/v1&quot;,
+<span class="fc" id="L55">                SolverIr.sha256(left + &quot;\n&quot; + right + &quot;\n&quot; + assumptions)));</span>
+<span class="fc" id="L56">        TreeMap&lt;String, SymbolDeclaration&gt; declarations = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L57">        original.declarations().forEach(d -&gt; declarations.put(d.name(), d));</span>
+<span class="fc" id="L58">        realDeclarations.forEach(name -&gt; declarations.putIfAbsent(name, new SymbolDeclaration(name, Sort.REAL)));</span>
+<span class="fc" id="L59">        return Obligation.create(original.obligationId(), List.copyOf(declarations.values()),</span>
+<span class="fc" id="L60">            original.theories(), original.assumptions(), original.goal(), original.requestedEvidence(),</span>
+<span class="fc" id="L61">            original.provenance());</span>
+    }
+
+    private static String domainSymbol(Assumption a, String domain) {
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (a.symbols().size() != 1) throw new IllegalArgumentException(&quot;one domain symbol required&quot;);</span>
+<span class="fc" id="L66">        String name = a.symbols().get(0);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!(new CoreExpressionIrAdapter().parse(name) instanceof Symbol)</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                || !a.expression().equals(name + &quot; ∈ &quot; + domain))</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;unsupported domain predicate&quot;);</span>
+<span class="fc" id="L70">        return name;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

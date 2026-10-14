@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MoveSearchVisits.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MoveSearchVisits.java</span></div><h1>MoveSearchVisits.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.LongConsumer;
+
+/** Per-search admitted labels. A proposal enters this index only after successful admission. */
+final class MoveSearchVisits&lt;S extends SearchExecution.Position&lt;?&gt;&gt; implements de.regelsuche.retention.RetainedGraph.View {
+<span class="fc" id="L14">    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(live);v.reference(positions);v.reference(charge);}</span>
+<span class="fc" id="L15">    private record Label&lt;S extends SearchExecution.Position&lt;?&gt;&gt;(S state, long theoryWork) implements de.regelsuche.retention.RetainedGraph.View {</span>
+<span class="fc" id="L16">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(state);}</span>
+        boolean noMoreExpensiveThan(Label&lt;S&gt; other) {
+<span class="fc bfc" id="L18" title="All 2 branches covered.">            return state.searchDepth() &lt;= other.state.searchDepth()</span>
+<span class="fc bfc" id="L19" title="All 4 branches covered.">                &amp;&amp; state.primitiveDepth() &lt;= other.state.primitiveDepth()</span>
+                &amp;&amp; theoryWork &lt;= other.theoryWork
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                &amp;&amp; state.complexityDebt() &lt;= other.state.complexityDebt();</span>
+        }
+    }
+<span class="fc" id="L24">    private record Position(Object expression, List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities) implements de.regelsuche.retention.RetainedGraph.View {</span>
+<span class="fc" id="L25">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(expression);v.reference(assumptions);v.reference(capabilities);}</span>
+        static Position of(SearchExecution.Position&lt;?&gt; state) {
+<span class="fc" id="L27">            return new Position(state.expression(), state.assumptions(), state.capabilities());</span>
+        }
+    }
+    private final boolean stateLocal;
+    private final LongConsumer charge;
+<span class="fc" id="L32">    private final Set&lt;Label&lt;S&gt;&gt; live = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L33">    private final Map&lt;Position, List&lt;Label&lt;S&gt;&gt;&gt; positions = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L35">    MoveSearchVisits(SearchContinuationContract contract, LongConsumer charge) {</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        stateLocal = Objects.requireNonNull(contract) == SearchContinuationContract.DECLARED_STATE_LOCAL;</span>
+<span class="fc" id="L37">        this.charge = Objects.requireNonNull(charge);</span>
+<span class="fc" id="L38">    }</span>
+
+    MoveSearch.Decision rejection(S state, long theoryWork) {
+<span class="fc" id="L41">        var proposed = new Label&lt;&gt;(state, theoryWork);</span>
+<span class="fc bfc" id="L42" title="All 4 branches covered.">        if (!stateLocal) return live.contains(proposed) ? MoveSearch.Decision.DUPLICATE : null;</span>
+<span class="fc" id="L43">        charge.accept(1);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (var admitted : positions.getOrDefault(Position.of(state), List.of())) {</span>
+<span class="fc" id="L45">            charge.accept(1);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (admitted.noMoreExpensiveThan(proposed)) {</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                return admitted.equals(proposed) ? MoveSearch.Decision.DUPLICATE : MoveSearch.Decision.DOMINATED;</span>
+            }
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        return null;</span>
+    }
+
+    void add(S state, long theoryWork) {
+<span class="fc" id="L54">        var admitted = new Label&lt;&gt;(state, theoryWork);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (stateLocal) {</span>
+<span class="fc" id="L56">            charge.accept(1);</span>
+<span class="fc" id="L57">            var alternatives = positions.computeIfAbsent(Position.of(state), ignored -&gt; new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L58">            var iterator = alternatives.iterator();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            while (iterator.hasNext()) {</span>
+<span class="fc" id="L60">                charge.accept(1);</span>
+<span class="fc" id="L61">                var previous = iterator.next();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                if (admitted.noMoreExpensiveThan(previous)) {</span>
+<span class="fc" id="L63">                    iterator.remove();</span>
+<span class="fc" id="L64">                    live.remove(previous);</span>
+<span class="fc" id="L65">                    charge.accept(1);</span>
+                }
+<span class="fc" id="L67">            }</span>
+<span class="fc" id="L68">            alternatives.add(admitted);</span>
+        }
+<span class="fc" id="L70">        live.add(admitted);</span>
+<span class="fc" id="L71">    }</span>
+
+    /** Invalidated tickets must not open or resume a picker, or consume another state slot. */
+    boolean current(S state, long theoryWork) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (!stateLocal) return true;</span>
+<span class="fc" id="L76">        charge.accept(1);</span>
+<span class="fc" id="L77">        return live.contains(new Label&lt;&gt;(state, theoryWork));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

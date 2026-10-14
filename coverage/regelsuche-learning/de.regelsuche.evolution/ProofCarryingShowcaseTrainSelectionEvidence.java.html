@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseTrainSelectionEvidence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseTrainSelectionEvidence.java</span></div><h1>ProofCarryingShowcaseTrainSelectionEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.CandidateEvaluation;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.TerminalOutcome;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Content-addressed terminal TRAIN selection evidence that remains representable
+ * when no candidate satisfies the preregistered freeze policy.
+ *
+ * &lt;p&gt;This artifact is deliberately earlier than a candidate freeze. A null
+ * selection retains every terminal alternative and its blockers while creating
+ * no randomness boundary and authorizing no later-stage material.&lt;/p&gt;
+ */
+public record ProofCarryingShowcaseTrainSelectionEvidence(
+    String schema,
+    String showcaseId,
+    String planContentHash,
+    String retainedPopulationRunHash,
+    String populationRunHash,
+    String finalGenerationReportHash,
+    TerminalOutcome populationTerminalOutcome,
+    String selectionPolicy,
+    List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+        alternatives,
+    String selectedCandidateHash,
+    String selectedCandidateAlphaStructuralHash,
+    String selectedPlanHash,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.proof-carrying-showcase-train-selection-evidence/v1&quot;;
+    public static final String ELIGIBLE =
+        &quot;ELIGIBLE_CANDIDATE_AVAILABLE_FINAL_TEST_UNSEEN&quot;;
+    public static final String NONE =
+        &quot;NO_ELIGIBLE_TRAIN_ALTERNATIVE_FINAL_TEST_UNSEEN&quot;;
+    public static final String SELECTION_POLICY =
+        ProofCarryingShowcaseCandidateFreezer.CandidateSelection.SELECTION_POLICY;
+
+<span class="fc" id="L47">    public ProofCarryingShowcaseTrainSelectionEvidence {</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(</span>
+                &quot;unsupported showcase TRAIN selection-evidence schema&quot;);
+        }
+<span class="fc" id="L52">        showcaseId = ProofCarryingShowcaseJsonSupport.requireText(</span>
+            showcaseId, &quot;showcaseId&quot;);
+<span class="fc" id="L54">        EvolutionGenome.requireSha256(planContentHash, &quot;planContentHash&quot;);</span>
+<span class="fc" id="L55">        EvolutionGenome.requireSha256(</span>
+            retainedPopulationRunHash, &quot;retainedPopulationRunHash&quot;);
+<span class="fc" id="L57">        EvolutionGenome.requireSha256(populationRunHash, &quot;populationRunHash&quot;);</span>
+<span class="fc" id="L58">        EvolutionGenome.requireSha256(</span>
+            finalGenerationReportHash, &quot;finalGenerationReportHash&quot;);
+<span class="fc" id="L60">        Objects.requireNonNull(</span>
+            populationTerminalOutcome, &quot;populationTerminalOutcome&quot;);
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (!SELECTION_POLICY.equals(selectionPolicy)) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;unsupported showcase TRAIN selection policy&quot;);
+        }
+<span class="fc" id="L66">        alternatives = canonicalAlternatives(alternatives);</span>
+<span class="fc" id="L67">        var selected = select(alternatives);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        String expectedStatus = selected == null ? NONE : ELIGIBLE;</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (!expectedStatus.equals(status)) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(</span>
+                &quot;TRAIN selection-evidence status differs from alternatives&quot;);
+        }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (selected == null) {</span>
+<span class="pc bpc" id="L74" title="3 of 6 branches missed.">            if (selectedCandidateHash != null</span>
+                    || selectedCandidateAlphaStructuralHash != null
+                    || selectedPlanHash != null) {
+<span class="nc" id="L77">                throw new IllegalArgumentException(</span>
+                    &quot;null TRAIN selection must not retain selected identities&quot;);
+            }
+        } else {
+<span class="fc" id="L81">            EvolutionGenome.requireSha256(</span>
+                selectedCandidateHash, &quot;selectedCandidateHash&quot;);
+<span class="fc" id="L83">            EvolutionGenome.requireSha256(</span>
+                selectedCandidateAlphaStructuralHash,
+                &quot;selectedCandidateAlphaStructuralHash&quot;);
+<span class="fc" id="L86">            EvolutionGenome.requireSha256(selectedPlanHash, &quot;selectedPlanHash&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if (!selected.candidateHash().equals(selectedCandidateHash)</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                    || !selected.alphaStructuralHash().equals(</span>
+                        selectedCandidateAlphaStructuralHash)
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                    || !selected.planHash().equals(selectedPlanHash)) {</span>
+<span class="nc" id="L91">                throw new IllegalArgumentException(</span>
+                    &quot;selected TRAIN candidate differs from deterministic ranking&quot;);
+            }
+        }
+<span class="fc" id="L95">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L96">        String expectedHash = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
+<span class="fc" id="L97">            payload(</span>
+                showcaseId,
+                planContentHash,
+                retainedPopulationRunHash,
+                populationRunHash,
+                finalGenerationReportHash,
+                populationTerminalOutcome,
+                alternatives,
+                selectedCandidateHash,
+                selectedCandidateAlphaStructuralHash,
+                selectedPlanHash,
+                status));
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!expectedHash.equals(contentHash)) {</span>
+<span class="nc" id="L110">            throw new IllegalArgumentException(</span>
+                &quot;showcase TRAIN selection-evidence contentHash mismatch&quot;);
+        }
+<span class="fc" id="L113">    }</span>
+
+    public static ProofCarryingShowcaseTrainSelectionEvidence create(
+        ProofCarryingShowcasePlan showcasePlan,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun protocolBoundRun,
+        EvolutionRewriteProgramStudyPlan study,
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds
+    ) {
+<span class="nc" id="L121">        Objects.requireNonNull(showcasePlan, &quot;showcasePlan&quot;);</span>
+<span class="nc" id="L122">        Objects.requireNonNull(protocolBoundRun, &quot;protocolBoundRun&quot;);</span>
+<span class="nc" id="L123">        Objects.requireNonNull(study, &quot;study&quot;);</span>
+<span class="nc" id="L124">        Objects.requireNonNull(seeds, &quot;seeds&quot;);</span>
+<span class="nc" id="L125">        RetainedEvolutionRewriteProgramPopulationRun retained =</span>
+<span class="nc" id="L126">            protocolBoundRun.retainedPopulation();</span>
+<span class="nc" id="L127">        requireBindings(protocolBoundRun, retained, study, seeds);</span>
+
+<span class="nc" id="L129">        Set&lt;String&gt; seedHashes = seeds.stream()</span>
+<span class="nc" id="L130">            .map(EvolutionRewriteProgramCandidate::contentHash)</span>
+<span class="nc" id="L131">            .collect(java.util.stream.Collectors.toUnmodifiableSet());</span>
+<span class="nc" id="L132">        Set&lt;String&gt; seedAlphaHashes = seeds.stream()</span>
+<span class="nc" id="L133">            .map(EvolutionRewriteProgramCandidate::alphaStructuralHash)</span>
+<span class="nc" id="L134">            .collect(java.util.stream.Collectors.toUnmodifiableSet());</span>
+<span class="nc" id="L135">        Map&lt;String, CandidateEvaluation&gt; evaluations = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L136">        retained.finalEvaluations().forEach(evaluation -&gt;</span>
+<span class="nc" id="L137">            evaluations.put(evaluation.candidateHash(), evaluation));</span>
+<span class="nc" id="L138">        int minimumDepth = showcasePlan.candidateFormation()</span>
+<span class="nc" id="L139">            .requiredCandidateProperties()</span>
+<span class="nc" id="L140">            .minimumPrimitiveStepsOnSuccessfulPath();</span>
+        List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+<span class="nc" id="L142">            alternatives = retained.finalCandidates().stream()</span>
+<span class="nc" id="L143">                .map(value -&gt; ProofCarryingShowcaseCandidateFreezer.alternative(</span>
+                    value,
+<span class="nc" id="L145">                    evaluations.get(value.candidateHash()),</span>
+                    seedHashes,
+                    seedAlphaHashes,
+                    minimumDepth))
+<span class="nc" id="L149">                .toList();</span>
+<span class="nc" id="L150">        var run = retained.populationRun();</span>
+<span class="nc" id="L151">        return createFromAlternatives(</span>
+<span class="nc" id="L152">            showcasePlan.showcaseId(),</span>
+<span class="nc" id="L153">            showcasePlan.contentHash(),</span>
+<span class="nc" id="L154">            retained.contentHash(),</span>
+<span class="nc" id="L155">            run.contentHash(),</span>
+<span class="nc" id="L156">            run.generationReports().getLast().contentHash(),</span>
+<span class="nc" id="L157">            run.terminalOutcome(),</span>
+            alternatives);
+    }
+
+    static ProofCarryingShowcaseTrainSelectionEvidence createFromAlternatives(
+        String showcaseId,
+        String planContentHash,
+        String retainedPopulationRunHash,
+        String populationRunHash,
+        String finalGenerationReportHash,
+        TerminalOutcome terminalOutcome,
+        List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+            alternatives
+    ) {
+        List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+<span class="fc" id="L172">            canonical = canonicalAlternatives(alternatives);</span>
+<span class="fc" id="L173">        var selected = select(canonical);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        String selectedHash = selected == null ? null : selected.candidateHash();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        String selectedAlpha = selected == null</span>
+<span class="fc" id="L176">            ? null : selected.alphaStructuralHash();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        String selectedPlan = selected == null ? null : selected.planHash();</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        String status = selected == null ? NONE : ELIGIBLE;</span>
+<span class="fc" id="L179">        String hash = ProofCarryingShowcaseJsonSupport.hashPayload(payload(</span>
+            showcaseId,
+            planContentHash,
+            retainedPopulationRunHash,
+            populationRunHash,
+            finalGenerationReportHash,
+            terminalOutcome,
+            canonical,
+            selectedHash,
+            selectedAlpha,
+            selectedPlan,
+            status));
+<span class="fc" id="L191">        return new ProofCarryingShowcaseTrainSelectionEvidence(</span>
+            SCHEMA,
+            showcaseId,
+            planContentHash,
+            retainedPopulationRunHash,
+            populationRunHash,
+            finalGenerationReportHash,
+            terminalOutcome,
+            SELECTION_POLICY,
+            canonical,
+            selectedHash,
+            selectedAlpha,
+            selectedPlan,
+            status,
+            hash);
+    }
+
+    public boolean eligibleCandidateAvailable() {
+<span class="fc" id="L209">        return ELIGIBLE.equals(status);</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L213">        return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
+    }
+
+    public static ProofCarryingShowcaseTrainSelectionEvidence fromCanonicalJson(
+        String json
+    ) {
+<span class="fc" id="L219">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            json,
+            ProofCarryingShowcaseTrainSelectionEvidence.class,
+            &quot;showcase TRAIN selection evidence&quot;);
+    }
+
+    private static void requireBindings(
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun protocolBoundRun,
+        RetainedEvolutionRewriteProgramPopulationRun retained,
+        EvolutionRewriteProgramStudyPlan study,
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds
+    ) {
+<span class="nc" id="L231">        if (!ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun.STATUS</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                .equals(protocolBoundRun.status())) {</span>
+<span class="nc" id="L233">            throw new IllegalArgumentException(</span>
+                &quot;TRAIN selection evidence requires protocol-bound authority&quot;);
+        }
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (!protocolBoundRun.evaluationProtocolHash().equals(</span>
+<span class="nc" id="L237">                study.trainEvaluationProtocolHash())</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                || !retained.populationRun().studyPlanHash().equals(</span>
+<span class="nc" id="L239">                    study.contentHash())) {</span>
+<span class="nc" id="L240">            throw new IllegalArgumentException(</span>
+                &quot;retained TRAIN population differs from study/protocol&quot;);
+        }
+<span class="nc" id="L243">        List&lt;String&gt; expectedSeeds = seeds.stream()</span>
+<span class="nc" id="L244">            .map(EvolutionRewriteProgramCandidate::contentHash)</span>
+<span class="nc" id="L245">            .distinct()</span>
+<span class="nc" id="L246">            .sorted()</span>
+<span class="nc" id="L247">            .toList();</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (expectedSeeds.size() != seeds.size()</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                || !expectedSeeds.equals(</span>
+<span class="nc" id="L250">                    retained.populationRun().seedCandidateHashes())) {</span>
+<span class="nc" id="L251">            throw new IllegalArgumentException(</span>
+                &quot;retained TRAIN population differs from seed candidates&quot;);
+        }
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(retained.validationStatus())</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(retained.finalTestStatus())) {</span>
+<span class="nc" id="L256">            throw new IllegalArgumentException(</span>
+                &quot;TRAIN selection evidence cannot consume later-stage outcomes&quot;);
+        }
+<span class="nc" id="L259">    }</span>
+
+    private static List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+            canonicalAlternatives(
+        List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt; values
+    ) {
+<span class="fc" id="L265">        Objects.requireNonNull(values, &quot;alternatives&quot;);</span>
+        List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+<span class="fc" id="L267">            result = values.stream()</span>
+<span class="fc" id="L268">                .map(value -&gt; Objects.requireNonNull(value, &quot;candidate alternative&quot;))</span>
+<span class="fc" id="L269">                .sorted(Comparator.comparing(</span>
+                    ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
+                        ::candidateHash))
+<span class="fc" id="L272">                .toList();</span>
+<span class="fc" id="L273">        if (new HashSet&lt;&gt;(result.stream().map(</span>
+                ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                    ::candidateHash).toList()).size() != result.size()) {</span>
+<span class="nc" id="L276">            throw new IllegalArgumentException(</span>
+                &quot;candidate alternatives require unique identities&quot;);
+        }
+<span class="fc" id="L279">        return List.copyOf(result);</span>
+    }
+
+    private static ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
+            select(
+        List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+            alternatives
+    ) {
+<span class="fc" id="L287">        return alternatives.stream()</span>
+<span class="fc" id="L288">            .filter(ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative</span>
+                ::eligibleForFreeze)
+<span class="fc" id="L290">            .sorted(ProofCarryingShowcaseCandidateFreezer.CandidateSelection.ranking())</span>
+<span class="fc" id="L291">            .findFirst()</span>
+<span class="fc" id="L292">            .orElse(null);</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String showcaseId,
+        String planContentHash,
+        String retainedPopulationRunHash,
+        String populationRunHash,
+        String finalGenerationReportHash,
+        TerminalOutcome terminalOutcome,
+        List&lt;ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative&gt;
+            alternatives,
+        String selectedCandidateHash,
+        String selectedCandidateAlphaStructuralHash,
+        String selectedPlanHash,
+        String status
+    ) {
+<span class="fc" id="L309">        return ProofCarryingShowcaseJsonSupport.payload(</span>
+            &quot;schema&quot;, SCHEMA,
+            &quot;showcaseId&quot;, showcaseId,
+            &quot;planContentHash&quot;, planContentHash,
+            &quot;retainedPopulationRunHash&quot;, retainedPopulationRunHash,
+            &quot;populationRunHash&quot;, populationRunHash,
+            &quot;finalGenerationReportHash&quot;, finalGenerationReportHash,
+            &quot;populationTerminalOutcome&quot;, terminalOutcome,
+            &quot;selectionPolicy&quot;, SELECTION_POLICY,
+            &quot;alternatives&quot;, alternatives,
+            &quot;selectedCandidateHash&quot;, selectedCandidateHash,
+            &quot;selectedCandidateAlphaStructuralHash&quot;,
+                selectedCandidateAlphaStructuralHash,
+            &quot;selectedPlanHash&quot;, selectedPlanHash,
+            &quot;status&quot;, status);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

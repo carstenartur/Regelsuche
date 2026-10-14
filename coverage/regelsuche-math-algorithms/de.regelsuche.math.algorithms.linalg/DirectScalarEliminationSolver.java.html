@@ -1,0 +1,1336 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DirectScalarEliminationSolver.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">DirectScalarEliminationSolver.java</span></div><h1>DirectScalarEliminationSolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import de.regelsuche.representation.RepresentationBridge.WorkLedger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Exact equation-level substitution/elimination baseline for matched-work
+ * comparison with the matrix-representation route.
+ *
+ * &lt;p&gt;The implementation deliberately does not construct an
+ * {@link ExactLinearSystem} or an {@link ExactRrefReduction}. It retains each
+ * scalar equation as a sparse named-coefficient map, chooses pivot variables in
+ * the declared order and substitutes solved equations into the remaining
+ * scalar equations. It nevertheless has the same terminal obligation: a
+ * canonical exact solution consequence or a normalized contradiction.&lt;/p&gt;
+ */
+<span class="fc" id="L41">public final class DirectScalarEliminationSolver {</span>
+    public static final String SOLVER_ID =
+        &quot;direct-scalar-substitution-elimination/v1&quot;;
+    public static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.direct-scalar-elimination-certificate/v1&quot;;
+    private static final int MAX_ABSOLUTE_CONSTANT_EXPONENT = 64;
+
+    public Result solve(Source source, Budget budget) {
+<span class="fc" id="L49">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L51">        WorkCounter work = new WorkCounter(budget.maxWorkUnits());</span>
+        try {
+<span class="fc" id="L53">            validateDeclaredVariables(source, work);</span>
+<span class="fc" id="L54">            List&lt;ScalarEquation&gt; original = extract(source, work);</span>
+<span class="fc" id="L55">            List&lt;ScalarEquation&gt; reduced = mutableCopy(original);</span>
+<span class="fc" id="L56">            List&lt;EquationOperation&gt; operations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L57">            List&lt;Pivot&gt; pivots = eliminate(</span>
+                reduced,
+<span class="fc" id="L59">                source.variables(),</span>
+                operations,
+                work);
+
+<span class="fc" id="L63">            int contradictionRow = firstContradiction(reduced, work);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            boolean inconsistent = contradictionRow &gt;= 0;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (inconsistent) {</span>
+<span class="fc" id="L66">                normalizeContradiction(</span>
+                    reduced,
+                    contradictionRow,
+                    operations,
+                    work);
+            }
+<span class="fc" id="L72">            List&lt;String&gt; freeVariables = freeVariables(</span>
+<span class="fc" id="L73">                source.variables(),</span>
+                pivots);
+<span class="fc" id="L75">            ExactLinearSolutionConsequence consequence = consequence(</span>
+<span class="fc" id="L76">                source.variables(),</span>
+                reduced,
+                pivots,
+                freeVariables,
+                inconsistent,
+                work);
+
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (!replayMatches(original, reduced, operations, work)</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                    || !consequenceMatchesOriginal(</span>
+                        original,
+<span class="fc" id="L86">                        source.variables(),</span>
+                        consequence,
+                        work)) {
+<span class="nc" id="L89">                return Result.withoutConsequence(</span>
+                    Status.INVALID_CERTIFICATE,
+<span class="nc" id="L91">                    work.profile(),</span>
+<span class="nc" id="L92">                    work.ledger(),</span>
+                    &quot;DIRECT_SCALAR_REPLAY_OR_CONSEQUENCE_MISMATCH&quot;);
+            }
+
+<span class="fc" id="L96">            Certificate certificate = certificate(</span>
+                source,
+                reduced,
+                operations,
+                consequence,
+<span class="fc" id="L101">                work.profile());</span>
+<span class="fc" id="L102">            return Result.solved(</span>
+                consequence,
+                certificate,
+<span class="fc" id="L105">                work.profile(),</span>
+<span class="fc" id="L106">                work.ledger());</span>
+<span class="fc" id="L107">        } catch (BudgetExceeded exception) {</span>
+<span class="fc" id="L108">            return Result.withoutConsequence(</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L110">                work.profile(),</span>
+<span class="fc" id="L111">                work.ledger(),</span>
+                &quot;DIRECT_SCALAR_WORK_BUDGET_EXHAUSTED&quot;);
+<span class="fc" id="L113">        } catch (NonlinearExpression exception) {</span>
+<span class="fc" id="L114">            return Result.withoutConsequence(</span>
+                Status.NONLINEAR,
+<span class="fc" id="L116">                work.profile(),</span>
+<span class="fc" id="L117">                work.ledger(),</span>
+<span class="fc" id="L118">                exception.detailCode());</span>
+<span class="fc" id="L119">        } catch (UnsupportedExpression exception) {</span>
+<span class="fc" id="L120">            return Result.withoutConsequence(</span>
+                Status.DOMAIN_UNSUPPORTED,
+<span class="fc" id="L122">                work.profile(),</span>
+<span class="fc" id="L123">                work.ledger(),</span>
+<span class="fc" id="L124">                exception.detailCode());</span>
+        }
+    }
+
+    public boolean verify(Source source, Result result) {
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">        if (source == null</span>
+                || result == null
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                || result.status() != Status.SOLVED) {</span>
+<span class="nc" id="L132">            return false;</span>
+        }
+        try {
+<span class="fc" id="L135">            return solve(</span>
+                source,
+<span class="fc" id="L137">                new Budget(result.work().configuredWorkUnits()))</span>
+<span class="fc" id="L138">                .equals(result);</span>
+<span class="nc" id="L139">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L140">            return false;</span>
+        }
+    }
+
+    private static void validateDeclaredVariables(
+        Source source,
+        WorkCounter work
+    ) {
+<span class="fc" id="L148">        Set&lt;String&gt; discovered = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (Equation equation : source.equations()) {</span>
+<span class="fc" id="L150">            collectVariables(equation.left(), discovered, work);</span>
+<span class="fc" id="L151">            collectVariables(equation.right(), discovered, work);</span>
+<span class="fc" id="L152">        }</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (!List.copyOf(discovered).equals(source.variables())) {</span>
+<span class="fc" id="L154">            throw new UnsupportedExpression(</span>
+                &quot;DECLARED_VARIABLE_ORDER_OR_SET_MISMATCH&quot;);
+        }
+<span class="fc" id="L157">    }</span>
+
+    private static void collectVariables(
+        Expr expression,
+        Set&lt;String&gt; target,
+        WorkCounter work
+    ) {
+<span class="fc" id="L164">        work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L166">            target.add(variable.name());</span>
+<span class="fc" id="L167">            return;</span>
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L170">            return;</span>
+        }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L173">            collectVariables(binary.left(), target, work);</span>
+<span class="fc" id="L174">            collectVariables(binary.right(), target, work);</span>
+<span class="fc" id="L175">            return;</span>
+        }
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L179">                collectVariables(argument, target, work);</span>
+<span class="fc" id="L180">            }</span>
+<span class="fc" id="L181">            return;</span>
+        }
+<span class="nc" id="L183">        throw new UnsupportedExpression(&quot;UNKNOWN_EXPRESSION_NODE&quot;);</span>
+    }
+
+    private static List&lt;ScalarEquation&gt; extract(
+        Source source,
+        WorkCounter work
+    ) {
+<span class="fc" id="L190">        Set&lt;String&gt; variables = Set.copyOf(source.variables());</span>
+<span class="fc" id="L191">        List&lt;ScalarEquation&gt; equations = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L192">            source.equations().size());</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (Equation equation : source.equations()) {</span>
+<span class="fc" id="L194">            AffineForm left = affine(</span>
+<span class="fc" id="L195">                equation.left(),</span>
+<span class="fc" id="L196">                source.variables(),</span>
+                variables,
+                work);
+<span class="fc" id="L199">            AffineForm right = affine(</span>
+<span class="fc" id="L200">                equation.right(),</span>
+<span class="fc" id="L201">                source.variables(),</span>
+                variables,
+                work);
+<span class="fc" id="L204">            AffineForm normalized = subtract(</span>
+                left,
+                right,
+<span class="fc" id="L207">                source.variables(),</span>
+                work);
+<span class="fc" id="L209">            work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L210">            equations.add(new ScalarEquation(</span>
+<span class="fc" id="L211">                normalized.coefficients(),</span>
+<span class="fc" id="L212">                normalized.constant().negate()));</span>
+<span class="fc" id="L213">        }</span>
+<span class="fc" id="L214">        return List.copyOf(equations);</span>
+    }
+
+    private static AffineForm affine(
+        Expr expression,
+        List&lt;String&gt; variableOrder,
+        Set&lt;String&gt; variables,
+        WorkCounter work
+    ) {
+<span class="fc" id="L223">        work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+
+<span class="fc" id="L226">            return AffineForm.constant(Rational.fromExact(number.value()));</span>
+        }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (!variables.contains(variable.name())) {</span>
+<span class="nc" id="L230">                throw new UnsupportedExpression(</span>
+                    &quot;UNDECLARED_SYMBOL_IN_DIRECT_NUMERIC_SYSTEM&quot;);
+            }
+<span class="fc" id="L233">            return AffineForm.variable(variable.name());</span>
+        }
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (expression instanceof FunctionExpr) {</span>
+<span class="fc" id="L236">            throw new UnsupportedExpression(</span>
+                &quot;FUNCTION_OUTSIDE_DIRECT_AFFINE_FRAGMENT&quot;);
+        }
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="nc" id="L240">            throw new UnsupportedExpression(&quot;UNKNOWN_EXPRESSION_NODE&quot;);</span>
+        }
+
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L244">            AffineForm base = affine(</span>
+<span class="fc" id="L245">                binary.left(),</span>
+                variableOrder,
+                variables,
+                work);
+<span class="fc" id="L249">            AffineForm exponent = affine(</span>
+<span class="fc" id="L250">                binary.right(),</span>
+                variableOrder,
+                variables,
+                work);
+<span class="fc" id="L254">            return power(base, exponent, work);</span>
+        }
+
+<span class="fc" id="L257">        AffineForm left = affine(</span>
+<span class="fc" id="L258">            binary.left(),</span>
+            variableOrder,
+            variables,
+            work);
+<span class="fc" id="L262">        AffineForm right = affine(</span>
+<span class="fc" id="L263">            binary.right(),</span>
+            variableOrder,
+            variables,
+            work);
+<span class="pc bpc" id="L267" title="1 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L268">            case ADD -&gt; add(left, right, variableOrder, work);</span>
+<span class="fc" id="L269">            case SUB -&gt; subtract(left, right, variableOrder, work);</span>
+<span class="fc" id="L270">            case MUL -&gt; multiply(left, right, variableOrder, work);</span>
+<span class="fc" id="L271">            case DIV -&gt; divide(left, right, variableOrder, work);</span>
+<span class="nc" id="L272">            case POW -&gt; throw new IllegalStateException(</span>
+                &quot;power handled before recursive binary switch&quot;);
+        };
+    }
+
+    private static AffineForm power(
+        AffineForm base,
+        AffineForm exponent,
+        WorkCounter work
+    ) {
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (!exponent.isConstant()</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                || !exponent.constant().denominator().equals(</span>
+                    java.math.BigInteger.ONE)) {
+<span class="nc" id="L285">            throw new NonlinearExpression(</span>
+                &quot;NON_CONSTANT_OR_NON_INTEGER_DIRECT_EXPONENT&quot;);
+        }
+<span class="fc" id="L288">        java.math.BigInteger exactExponent =</span>
+<span class="fc" id="L289">            exponent.constant().numerator();</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (exactExponent.abs().compareTo(java.math.BigInteger.valueOf(</span>
+                MAX_ABSOLUTE_CONSTANT_EXPONENT)) &gt; 0) {
+<span class="fc" id="L292">            throw new UnsupportedExpression(</span>
+                &quot;EXPONENT_OUTSIDE_DIRECT_AFFINE_FRAGMENT&quot;);
+        }
+<span class="fc" id="L295">        int exponentValue = exactExponent.intValueExact();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (exponentValue == 1) {</span>
+<span class="fc" id="L297">            return base;</span>
+        }
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (!base.isConstant()) {</span>
+<span class="fc" id="L300">            throw new NonlinearExpression(</span>
+                &quot;NONLINEAR_POWER_IN_DIRECT_SCALAR_SYSTEM&quot;);
+        }
+<span class="pc bpc" id="L303" title="1 of 4 branches missed.">        if (base.constant().isZero() &amp;&amp; exponentValue &lt;= 0) {</span>
+<span class="fc" id="L304">            throw new UnsupportedExpression(&quot;UNDEFINED_ZERO_POWER&quot;);</span>
+        }
+<span class="fc" id="L306">        return AffineForm.constant(pow(base.constant(), exponentValue, work));</span>
+    }
+
+    private static Rational pow(
+        Rational base,
+        int exponent,
+        WorkCounter work
+    ) {
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">        if (exponent == 0) {</span>
+<span class="nc" id="L315">            return Rational.ONE;</span>
+        }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        boolean reciprocal = exponent &lt; 0;</span>
+<span class="fc" id="L318">        int remaining = Math.abs(exponent);</span>
+<span class="fc" id="L319">        Rational result = Rational.ONE;</span>
+<span class="fc" id="L320">        Rational factor = base;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L323">                work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L324">                result = result.multiply(factor);</span>
+            }
+<span class="fc" id="L326">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L328">                work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L329">                factor = factor.multiply(factor);</span>
+            }
+        }
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (!reciprocal) {</span>
+<span class="fc" id="L333">            return result;</span>
+        }
+<span class="fc" id="L335">        work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L336">        return Rational.ONE.divide(result);</span>
+    }
+
+    private static AffineForm add(
+        AffineForm left,
+        AffineForm right,
+        List&lt;String&gt; variables,
+        WorkCounter work
+    ) {
+<span class="fc" id="L345">        Map&lt;String, Rational&gt; coefficients = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (String variable : variables) {</span>
+<span class="fc" id="L347">            work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L348">            Rational sum = left.coefficient(variable)</span>
+<span class="fc" id="L349">                .add(right.coefficient(variable));</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            if (!sum.isZero()) {</span>
+<span class="fc" id="L351">                coefficients.put(variable, sum);</span>
+            }
+<span class="fc" id="L353">        }</span>
+<span class="fc" id="L354">        work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L355">        return new AffineForm(</span>
+            coefficients,
+<span class="fc" id="L357">            left.constant().add(right.constant()));</span>
+    }
+
+    private static AffineForm subtract(
+        AffineForm left,
+        AffineForm right,
+        List&lt;String&gt; variables,
+        WorkCounter work
+    ) {
+<span class="fc" id="L366">        Map&lt;String, Rational&gt; coefficients = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        for (String variable : variables) {</span>
+<span class="fc" id="L368">            work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L369">            Rational difference = left.coefficient(variable)</span>
+<span class="fc" id="L370">                .subtract(right.coefficient(variable));</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            if (!difference.isZero()) {</span>
+<span class="fc" id="L372">                coefficients.put(variable, difference);</span>
+            }
+<span class="fc" id="L374">        }</span>
+<span class="fc" id="L375">        work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L376">        return new AffineForm(</span>
+            coefficients,
+<span class="fc" id="L378">            left.constant().subtract(right.constant()));</span>
+    }
+
+    private static AffineForm multiply(
+        AffineForm left,
+        AffineForm right,
+        List&lt;String&gt; variables,
+        WorkCounter work
+    ) {
+<span class="pc bpc" id="L387" title="1 of 4 branches missed.">        if (!left.isConstant() &amp;&amp; !right.isConstant()) {</span>
+<span class="fc" id="L388">            throw new NonlinearExpression(</span>
+                &quot;PRODUCT_OF_NON_CONSTANT_DIRECT_FORMS&quot;);
+        }
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (left.isConstant()) {</span>
+<span class="fc" id="L392">            return scale(right, left.constant(), variables, work);</span>
+        }
+<span class="nc" id="L394">        return scale(left, right.constant(), variables, work);</span>
+    }
+
+    private static AffineForm divide(
+        AffineForm numerator,
+        AffineForm denominator,
+        List&lt;String&gt; variables,
+        WorkCounter work
+    ) {
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (!denominator.isConstant()) {</span>
+<span class="nc" id="L404">            throw new UnsupportedExpression(</span>
+                &quot;VARIABLE_DENOMINATOR_IN_DIRECT_SCALAR_SYSTEM&quot;);
+        }
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">        if (denominator.constant().isZero()) {</span>
+<span class="nc" id="L408">            throw new UnsupportedExpression(&quot;EXPLICIT_DIVISION_BY_ZERO&quot;);</span>
+        }
+<span class="fc" id="L410">        work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L411">        return scale(</span>
+            numerator,
+<span class="fc" id="L413">            Rational.ONE.divide(denominator.constant()),</span>
+            variables,
+            work);
+    }
+
+    private static AffineForm scale(
+        AffineForm form,
+        Rational scalar,
+        List&lt;String&gt; variables,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (scalar.isZero()) {</span>
+<span class="fc" id="L425">            return AffineForm.constant(Rational.ZERO);</span>
+        }
+<span class="fc" id="L427">        Map&lt;String, Rational&gt; coefficients = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        for (String variable : variables) {</span>
+<span class="fc" id="L429">            Rational coefficient = form.coefficient(variable);</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">            if (coefficient.isZero()) {</span>
+<span class="fc" id="L431">                continue;</span>
+            }
+<span class="fc" id="L433">            work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L434">            Rational scaled = coefficient.multiply(scalar);</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">            if (!scaled.isZero()) {</span>
+<span class="fc" id="L436">                coefficients.put(variable, scaled);</span>
+            }
+<span class="fc" id="L438">        }</span>
+<span class="fc" id="L439">        work.consume(Stage.SOURCE_ANALYSIS);</span>
+<span class="fc" id="L440">        return new AffineForm(</span>
+            coefficients,
+<span class="fc" id="L442">            form.constant().multiply(scalar));</span>
+    }
+
+    private static List&lt;Pivot&gt; eliminate(
+        List&lt;ScalarEquation&gt; equations,
+        List&lt;String&gt; variables,
+        List&lt;EquationOperation&gt; operations,
+        WorkCounter work
+    ) {
+<span class="fc" id="L451">        List&lt;Pivot&gt; pivots = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L452">        int pivotRow = 0;</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">        for (String variable : variables) {</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">            if (pivotRow &gt;= equations.size()) {</span>
+<span class="fc" id="L455">                break;</span>
+            }
+<span class="fc" id="L457">            int candidate = findPivot(</span>
+                equations,
+                pivotRow,
+                variable,
+                work);
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            if (candidate &lt; 0) {</span>
+<span class="fc" id="L463">                continue;</span>
+            }
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            if (candidate != pivotRow) {</span>
+<span class="fc" id="L466">                work.consume(Stage.ELIMINATION, equations.size());</span>
+<span class="fc" id="L467">                Collections.swap(equations, candidate, pivotRow);</span>
+<span class="fc" id="L468">                operations.add(EquationOperation.swap(pivotRow, candidate));</span>
+            }
+
+<span class="fc" id="L471">            Rational pivot = coefficient(</span>
+<span class="fc" id="L472">                equations.get(pivotRow),</span>
+                variable,
+                Stage.ELIMINATION,
+                work);
+<span class="fc bfc" id="L476" title="All 2 branches covered.">            if (!pivot.isOne()) {</span>
+<span class="fc" id="L477">                work.consume(Stage.ELIMINATION);</span>
+<span class="fc" id="L478">                Rational multiplier = Rational.ONE.divide(pivot);</span>
+<span class="fc" id="L479">                equations.set(</span>
+                    pivotRow,
+<span class="fc" id="L481">                    scaleEquation(</span>
+<span class="fc" id="L482">                        equations.get(pivotRow),</span>
+                        multiplier,
+                        Stage.ELIMINATION,
+                        work));
+<span class="fc" id="L486">                operations.add(EquationOperation.scale(</span>
+                    pivotRow,
+                    multiplier));
+            }
+
+<span class="fc bfc" id="L491" title="All 2 branches covered.">            for (int row = 0; row &lt; equations.size(); row++) {</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">                if (row == pivotRow) {</span>
+<span class="fc" id="L493">                    continue;</span>
+                }
+<span class="fc" id="L495">                Rational factor = coefficient(</span>
+<span class="fc" id="L496">                    equations.get(row),</span>
+                    variable,
+                    Stage.ELIMINATION,
+                    work);
+<span class="fc bfc" id="L500" title="All 2 branches covered.">                if (factor.isZero()) {</span>
+<span class="fc" id="L501">                    continue;</span>
+                }
+<span class="fc" id="L503">                Rational multiplier = factor.negate();</span>
+<span class="fc" id="L504">                equations.set(</span>
+                    row,
+<span class="fc" id="L506">                    addEquationMultiple(</span>
+<span class="fc" id="L507">                        equations.get(row),</span>
+<span class="fc" id="L508">                        equations.get(pivotRow),</span>
+                        multiplier,
+                        Stage.ELIMINATION,
+                        work));
+<span class="fc" id="L512">                operations.add(EquationOperation.addMultiple(</span>
+                    row,
+                    pivotRow,
+                    multiplier));
+            }
+<span class="fc" id="L517">            pivots.add(new Pivot(pivotRow, variable));</span>
+<span class="fc" id="L518">            pivotRow++;</span>
+<span class="fc" id="L519">        }</span>
+<span class="fc" id="L520">        return List.copyOf(pivots);</span>
+    }
+
+    private static int findPivot(
+        List&lt;ScalarEquation&gt; equations,
+        int firstRow,
+        String variable,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        for (int row = firstRow; row &lt; equations.size(); row++) {</span>
+<span class="fc" id="L530">            if (!coefficient(</span>
+<span class="fc" id="L531">                    equations.get(row),</span>
+                    variable,
+                    Stage.ELIMINATION,
+<span class="fc bfc" id="L534" title="All 2 branches covered.">                    work).isZero()) {</span>
+<span class="fc" id="L535">                return row;</span>
+            }
+        }
+<span class="fc" id="L538">        return -1;</span>
+    }
+
+    private static Rational coefficient(
+        ScalarEquation equation,
+        String variable,
+        Stage stage,
+        WorkCounter work
+    ) {
+<span class="fc" id="L547">        work.consume(stage);</span>
+<span class="fc" id="L548">        return equation.coefficients().getOrDefault(</span>
+            variable,
+            Rational.ZERO);
+    }
+
+    private static ScalarEquation scaleEquation(
+        ScalarEquation equation,
+        Rational multiplier,
+        Stage stage,
+        WorkCounter work
+    ) {
+<span class="fc" id="L559">        Map&lt;String, Rational&gt; coefficients = new LinkedHashMap&lt;&gt;();</span>
+        for (Map.Entry&lt;String, Rational&gt; entry
+<span class="fc bfc" id="L561" title="All 2 branches covered.">                : equation.coefficients().entrySet()) {</span>
+<span class="fc" id="L562">            work.consume(stage);</span>
+<span class="fc" id="L563">            Rational scaled = entry.getValue().multiply(multiplier);</span>
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">            if (!scaled.isZero()) {</span>
+<span class="fc" id="L565">                coefficients.put(entry.getKey(), scaled);</span>
+            }
+<span class="fc" id="L567">        }</span>
+<span class="fc" id="L568">        work.consume(stage);</span>
+<span class="fc" id="L569">        return new ScalarEquation(</span>
+            coefficients,
+<span class="fc" id="L571">            equation.rightHandSide().multiply(multiplier));</span>
+    }
+
+    private static ScalarEquation addEquationMultiple(
+        ScalarEquation target,
+        ScalarEquation source,
+        Rational multiplier,
+        Stage stage,
+        WorkCounter work
+    ) {
+<span class="fc" id="L581">        Map&lt;String, Rational&gt; coefficients = new LinkedHashMap&lt;&gt;(</span>
+<span class="fc" id="L582">            target.coefficients());</span>
+        for (Map.Entry&lt;String, Rational&gt; entry
+<span class="fc bfc" id="L584" title="All 2 branches covered.">                : source.coefficients().entrySet()) {</span>
+<span class="fc" id="L585">            work.consume(stage);</span>
+<span class="fc" id="L586">            Rational replacement = coefficients</span>
+<span class="fc" id="L587">                .getOrDefault(entry.getKey(), Rational.ZERO)</span>
+<span class="fc" id="L588">                .add(entry.getValue().multiply(multiplier));</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">            if (replacement.isZero()) {</span>
+<span class="fc" id="L590">                coefficients.remove(entry.getKey());</span>
+            } else {
+<span class="fc" id="L592">                coefficients.put(entry.getKey(), replacement);</span>
+            }
+<span class="fc" id="L594">        }</span>
+<span class="fc" id="L595">        work.consume(stage);</span>
+<span class="fc" id="L596">        Rational rightHandSide = target.rightHandSide().add(</span>
+<span class="fc" id="L597">            source.rightHandSide().multiply(multiplier));</span>
+<span class="fc" id="L598">        return new ScalarEquation(coefficients, rightHandSide);</span>
+    }
+
+    private static int firstContradiction(
+        List&lt;ScalarEquation&gt; equations,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L605" title="All 2 branches covered.">        for (int row = 0; row &lt; equations.size(); row++) {</span>
+<span class="fc" id="L606">            work.consume(Stage.ELIMINATION);</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">            if (equations.get(row).coefficients().isEmpty()) {</span>
+<span class="fc" id="L608">                work.consume(Stage.ELIMINATION);</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">                if (!equations.get(row).rightHandSide().isZero()) {</span>
+<span class="fc" id="L610">                    return row;</span>
+                }
+            }
+        }
+<span class="fc" id="L614">        return -1;</span>
+    }
+
+    private static void normalizeContradiction(
+        List&lt;ScalarEquation&gt; equations,
+        int contradictionRow,
+        List&lt;EquationOperation&gt; operations,
+        WorkCounter work
+    ) {
+<span class="fc" id="L623">        ScalarEquation contradiction = equations.get(contradictionRow);</span>
+<span class="pc bpc" id="L624" title="1 of 2 branches missed.">        if (!contradiction.coefficients().isEmpty()</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">                || contradiction.rightHandSide().isZero()) {</span>
+<span class="nc" id="L626">            throw new IllegalArgumentException(</span>
+                &quot;contradiction row must have the form 0=c with c non-zero&quot;);
+        }
+<span class="fc bfc" id="L629" title="All 2 branches covered.">        if (contradiction.rightHandSide().isOne()) {</span>
+<span class="fc" id="L630">            return;</span>
+        }
+<span class="fc" id="L632">        work.consume(Stage.ELIMINATION);</span>
+<span class="fc" id="L633">        Rational multiplier = Rational.ONE.divide(</span>
+<span class="fc" id="L634">            contradiction.rightHandSide());</span>
+<span class="fc" id="L635">        ScalarEquation normalized = scaleEquation(</span>
+            contradiction,
+            multiplier,
+            Stage.ELIMINATION,
+            work);
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        if (!normalized.coefficients().isEmpty()</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">                || !normalized.rightHandSide().isOne()) {</span>
+<span class="nc" id="L642">            throw new IllegalStateException(</span>
+                &quot;contradiction normalization did not produce 0=1&quot;);
+        }
+<span class="fc" id="L645">        equations.set(contradictionRow, normalized);</span>
+<span class="fc" id="L646">        operations.add(EquationOperation.scale(</span>
+            contradictionRow,
+            multiplier));
+<span class="fc" id="L649">    }</span>
+
+    private static List&lt;String&gt; freeVariables(
+        List&lt;String&gt; variables,
+        List&lt;Pivot&gt; pivots
+    ) {
+<span class="fc" id="L655">        Set&lt;String&gt; pivotVariables = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L656">        pivots.forEach(pivot -&gt; pivotVariables.add(pivot.variable()));</span>
+<span class="fc" id="L657">        return variables.stream()</span>
+<span class="fc bfc" id="L658" title="All 2 branches covered.">            .filter(variable -&gt; !pivotVariables.contains(variable))</span>
+<span class="fc" id="L659">            .toList();</span>
+    }
+
+    private static ExactLinearSolutionConsequence consequence(
+        List&lt;String&gt; variables,
+        List&lt;ScalarEquation&gt; reduced,
+        List&lt;Pivot&gt; pivots,
+        List&lt;String&gt; freeVariables,
+        boolean inconsistent,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        if (inconsistent) {</span>
+<span class="fc" id="L671">            return new ExactLinearSolutionConsequence(</span>
+                variables,
+                SolutionClassification.INCONSISTENT,
+<span class="fc" id="L674">                Optional.empty(),</span>
+<span class="fc" id="L675">                List.of(),</span>
+<span class="fc" id="L676">                Optional.of(Rational.ONE));</span>
+        }
+
+<span class="fc" id="L679">        Map&lt;String, Integer&gt; indices = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L680" title="All 2 branches covered.">        for (int index = 0; index &lt; variables.size(); index++) {</span>
+<span class="fc" id="L681">            indices.put(variables.get(index), index);</span>
+        }
+<span class="fc" id="L683">        List&lt;Rational&gt; particular = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L684">            Collections.nCopies(variables.size(), Rational.ZERO));</span>
+<span class="fc bfc" id="L685" title="All 2 branches covered.">        for (Pivot pivot : pivots) {</span>
+<span class="fc" id="L686">            work.consume(Stage.EVIDENCE);</span>
+<span class="fc" id="L687">            particular.set(</span>
+<span class="fc" id="L688">                indices.get(pivot.variable()),</span>
+<span class="fc" id="L689">                reduced.get(pivot.row()).rightHandSide());</span>
+<span class="fc" id="L690">        }</span>
+
+<span class="fc" id="L692">        List&lt;ExactVector&gt; basis = new ArrayList&lt;&gt;(freeVariables.size());</span>
+<span class="fc bfc" id="L693" title="All 2 branches covered.">        for (String freeVariable : freeVariables) {</span>
+<span class="fc" id="L694">            List&lt;Rational&gt; vector = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L695">                Collections.nCopies(variables.size(), Rational.ZERO));</span>
+<span class="fc" id="L696">            vector.set(indices.get(freeVariable), Rational.ONE);</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">            for (Pivot pivot : pivots) {</span>
+<span class="fc" id="L698">                Rational freeCoefficient = coefficient(</span>
+<span class="fc" id="L699">                    reduced.get(pivot.row()),</span>
+                    freeVariable,
+                    Stage.EVIDENCE,
+                    work);
+<span class="fc" id="L703">                vector.set(</span>
+<span class="fc" id="L704">                    indices.get(pivot.variable()),</span>
+<span class="fc" id="L705">                    freeCoefficient.negate());</span>
+<span class="fc" id="L706">            }</span>
+<span class="fc" id="L707">            basis.add(new ExactVector(vector));</span>
+<span class="fc" id="L708">        }</span>
+
+<span class="fc bfc" id="L710" title="All 2 branches covered.">        SolutionClassification classification = freeVariables.isEmpty()</span>
+<span class="fc" id="L711">            ? SolutionClassification.UNIQUE</span>
+<span class="fc" id="L712">            : SolutionClassification.UNDERDETERMINED;</span>
+<span class="fc" id="L713">        return new ExactLinearSolutionConsequence(</span>
+            variables,
+            classification,
+<span class="fc" id="L716">            Optional.of(new ExactVector(particular)),</span>
+            basis,
+<span class="fc" id="L718">            Optional.empty());</span>
+    }
+
+    private static boolean replayMatches(
+        List&lt;ScalarEquation&gt; original,
+        List&lt;ScalarEquation&gt; expected,
+        List&lt;EquationOperation&gt; operations,
+        WorkCounter work
+    ) {
+<span class="fc" id="L727">        List&lt;ScalarEquation&gt; replay = mutableCopy(original);</span>
+<span class="fc bfc" id="L728" title="All 2 branches covered.">        for (EquationOperation operation : operations) {</span>
+<span class="pc bpc" id="L729" title="1 of 4 branches missed.">            switch (operation.kind()) {</span>
+                case SWAP_EQUATIONS -&gt; {
+<span class="fc" id="L731">                    work.consume(Stage.EVIDENCE, replay.size());</span>
+<span class="fc" id="L732">                    Collections.swap(</span>
+                        replay,
+<span class="fc" id="L734">                        operation.targetEquation(),</span>
+<span class="fc" id="L735">                        operation.sourceEquation());</span>
+<span class="fc" id="L736">                }</span>
+<span class="fc" id="L737">                case SCALE_EQUATION -&gt; replay.set(</span>
+<span class="fc" id="L738">                    operation.targetEquation(),</span>
+<span class="fc" id="L739">                    scaleEquation(</span>
+<span class="fc" id="L740">                        replay.get(operation.targetEquation()),</span>
+<span class="fc" id="L741">                        operation.multiplier(),</span>
+                        Stage.EVIDENCE,
+                        work));
+<span class="fc" id="L744">                case ADD_EQUATION_MULTIPLE -&gt; replay.set(</span>
+<span class="fc" id="L745">                    operation.targetEquation(),</span>
+<span class="fc" id="L746">                    addEquationMultiple(</span>
+<span class="fc" id="L747">                        replay.get(operation.targetEquation()),</span>
+<span class="fc" id="L748">                        replay.get(operation.sourceEquation()),</span>
+<span class="fc" id="L749">                        operation.multiplier(),</span>
+                        Stage.EVIDENCE,
+                        work));
+            }
+<span class="fc" id="L753">        }</span>
+<span class="pc bpc" id="L754" title="1 of 2 branches missed.">        if (replay.size() != expected.size()) {</span>
+<span class="nc" id="L755">            return false;</span>
+        }
+<span class="fc bfc" id="L757" title="All 2 branches covered.">        for (int row = 0; row &lt; replay.size(); row++) {</span>
+<span class="fc" id="L758">            work.consume(Stage.EVIDENCE);</span>
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">            if (!replay.get(row).equals(expected.get(row))) {</span>
+<span class="nc" id="L760">                return false;</span>
+            }
+        }
+<span class="fc" id="L763">        return true;</span>
+    }
+
+    private static boolean consequenceMatchesOriginal(
+        List&lt;ScalarEquation&gt; original,
+        List&lt;String&gt; variables,
+        ExactLinearSolutionConsequence consequence,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L772" title="All 2 branches covered.">        if (consequence.classification()</span>
+                == SolutionClassification.INCONSISTENT) {
+<span class="fc" id="L774">            return consequence.normalizedContradiction()</span>
+<span class="fc" id="L775">                .filter(Rational::isOne)</span>
+<span class="fc" id="L776">                .isPresent();</span>
+        }
+<span class="fc" id="L778">        ExactVector particular = consequence.particularSolution()</span>
+<span class="fc" id="L779">            .orElseThrow();</span>
+<span class="pc bpc" id="L780" title="1 of 2 branches missed.">        if (!satisfies(original, variables, particular, false, work)) {</span>
+<span class="nc" id="L781">            return false;</span>
+        }
+<span class="fc bfc" id="L783" title="All 2 branches covered.">        for (ExactVector basisVector : consequence.nullspaceBasis()) {</span>
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">            if (!satisfies(original, variables, basisVector, true, work)) {</span>
+<span class="nc" id="L785">                return false;</span>
+            }
+<span class="fc" id="L787">        }</span>
+<span class="fc" id="L788">        return true;</span>
+    }
+
+    private static boolean satisfies(
+        List&lt;ScalarEquation&gt; equations,
+        List&lt;String&gt; variables,
+        ExactVector vector,
+        boolean homogeneous,
+        WorkCounter work
+    ) {
+<span class="fc" id="L798">        Map&lt;String, Integer&gt; indices = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L799" title="All 2 branches covered.">        for (int index = 0; index &lt; variables.size(); index++) {</span>
+<span class="fc" id="L800">            indices.put(variables.get(index), index);</span>
+        }
+<span class="fc bfc" id="L802" title="All 2 branches covered.">        for (ScalarEquation equation : equations) {</span>
+<span class="fc" id="L803">            Rational sum = Rational.ZERO;</span>
+            for (Map.Entry&lt;String, Rational&gt; entry
+<span class="fc bfc" id="L805" title="All 2 branches covered.">                    : equation.coefficients().entrySet()) {</span>
+<span class="fc" id="L806">                work.consume(Stage.EVIDENCE);</span>
+<span class="fc" id="L807">                sum = sum.add(entry.getValue().multiply(</span>
+<span class="fc" id="L808">                    vector.get(indices.get(entry.getKey()))));</span>
+<span class="fc" id="L809">            }</span>
+<span class="fc" id="L810">            work.consume(Stage.EVIDENCE);</span>
+<span class="fc bfc" id="L811" title="All 2 branches covered.">            Rational expected = homogeneous</span>
+<span class="fc" id="L812">                ? Rational.ZERO</span>
+<span class="fc" id="L813">                : equation.rightHandSide();</span>
+<span class="pc bpc" id="L814" title="1 of 2 branches missed.">            if (!sum.equals(expected)) {</span>
+<span class="nc" id="L815">                return false;</span>
+            }
+<span class="fc" id="L817">        }</span>
+<span class="fc" id="L818">        return true;</span>
+    }
+
+    private static List&lt;ScalarEquation&gt; mutableCopy(
+        List&lt;ScalarEquation&gt; source
+    ) {
+<span class="fc" id="L824">        return new ArrayList&lt;&gt;(source.stream()</span>
+<span class="fc" id="L825">            .map(ScalarEquation::copy)</span>
+<span class="fc" id="L826">            .toList());</span>
+    }
+
+    private static Certificate certificate(
+        Source source,
+        List&lt;ScalarEquation&gt; reduced,
+        List&lt;EquationOperation&gt; operations,
+        ExactLinearSolutionConsequence consequence,
+        StageWorkProfile profile
+    ) {
+<span class="fc" id="L836">        List&lt;String&gt; sourceEquations = source.equations().stream()</span>
+<span class="fc" id="L837">            .map(ExpressionFormatter::format)</span>
+<span class="fc" id="L838">            .toList();</span>
+<span class="fc" id="L839">        List&lt;String&gt; reducedEquations = reduced.stream()</span>
+<span class="fc" id="L840">            .map(equation -&gt; equation.canonical(source.variables()))</span>
+<span class="fc" id="L841">            .toList();</span>
+<span class="fc" id="L842">        List&lt;String&gt; canonicalOperations = operations.stream()</span>
+<span class="fc" id="L843">            .map(EquationOperation::canonical)</span>
+<span class="fc" id="L844">            .toList();</span>
+<span class="fc" id="L845">        List&lt;String&gt; consequenceLines = consequence.canonicalLines();</span>
+<span class="fc" id="L846">        String sourceHash = sourceHash(sourceEquations, source.variables());</span>
+
+<span class="fc" id="L848">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L849">        append(payload, CERTIFICATE_SCHEMA);</span>
+<span class="fc" id="L850">        append(payload, SOLVER_ID);</span>
+<span class="fc" id="L851">        append(payload, sourceHash);</span>
+<span class="fc" id="L852">        sourceEquations.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L853">        source.variables().forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L854">        reducedEquations.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L855">        canonicalOperations.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L856">        consequenceLines.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L857">        append(payload, Integer.toString(profile.sourceAnalysisWork()));</span>
+<span class="fc" id="L858">        append(payload, Integer.toString(profile.eliminationWork()));</span>
+<span class="fc" id="L859">        append(payload, Integer.toString(profile.evidenceWork()));</span>
+
+<span class="fc" id="L861">        return new Certificate(</span>
+            CERTIFICATE_SCHEMA,
+            SOLVER_ID,
+            sourceHash,
+            sourceEquations,
+<span class="fc" id="L866">            source.variables(),</span>
+            reducedEquations,
+            canonicalOperations,
+            consequenceLines,
+            profile,
+<span class="fc" id="L871">            sha256(payload.toString()));</span>
+    }
+
+    private static String sourceHash(
+        List&lt;String&gt; equations,
+        List&lt;String&gt; variables
+    ) {
+<span class="fc" id="L878">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L879">        equations.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L880">        variables.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L881">        return sha256(payload.toString());</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L885">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L886">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L890">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L891">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L892">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L893">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L894">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L898">    public enum Status {</span>
+<span class="fc" id="L899">        SOLVED,</span>
+<span class="fc" id="L900">        NONLINEAR,</span>
+<span class="fc" id="L901">        DOMAIN_UNSUPPORTED,</span>
+<span class="fc" id="L902">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L903">        INVALID_CERTIFICATE</span>
+    }
+
+<span class="fc" id="L906">    public enum Stage {</span>
+<span class="fc" id="L907">        SOURCE_ANALYSIS,</span>
+<span class="fc" id="L908">        ELIMINATION,</span>
+<span class="fc" id="L909">        EVIDENCE</span>
+    }
+
+    public record StageWorkProfile(
+        int sourceAnalysisWork,
+        int eliminationWork,
+        int evidenceWork
+    ) {
+<span class="fc" id="L917">        public StageWorkProfile {</span>
+<span class="pc bpc" id="L918" title="3 of 6 branches missed.">            if (sourceAnalysisWork &lt; 0</span>
+                    || eliminationWork &lt; 0
+                    || evidenceWork &lt; 0) {
+<span class="nc" id="L921">                throw new IllegalArgumentException(</span>
+                    &quot;stage work must not be negative&quot;);
+            }
+<span class="fc" id="L924">        }</span>
+
+        public int totalWork() {
+<span class="fc" id="L927">            return Math.addExact(</span>
+                sourceAnalysisWork,
+<span class="fc" id="L929">                Math.addExact(eliminationWork, evidenceWork));</span>
+        }
+    }
+
+    public record Source(
+        List&lt;Equation&gt; equations,
+        List&lt;String&gt; variables
+    ) {
+<span class="fc" id="L937">        public Source {</span>
+<span class="fc" id="L938">            equations = List.copyOf(Objects.requireNonNull(</span>
+                equations,
+                &quot;equations&quot;));
+<span class="fc" id="L941">            variables = normalizedVariables(variables);</span>
+<span class="pc bpc" id="L942" title="1 of 2 branches missed.">            if (equations.isEmpty()) {</span>
+<span class="nc" id="L943">                throw new IllegalArgumentException(</span>
+                    &quot;direct scalar system requires at least one equation&quot;);
+            }
+<span class="fc" id="L946">        }</span>
+
+        private static List&lt;String&gt; normalizedVariables(List&lt;String&gt; values) {
+<span class="fc" id="L949">            Objects.requireNonNull(values, &quot;variables&quot;);</span>
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">            if (values.isEmpty()) {</span>
+<span class="nc" id="L951">                throw new IllegalArgumentException(</span>
+                    &quot;direct scalar system requires declared variables&quot;);
+            }
+<span class="fc" id="L954">            List&lt;String&gt; normalized = values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L955" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L956">                    throw new IllegalArgumentException(</span>
+                        &quot;variable names must not be blank&quot;);
+                }
+<span class="fc" id="L959">                return value.trim();</span>
+<span class="fc" id="L960">            }).toList();</span>
+<span class="pc bpc" id="L961" title="1 of 2 branches missed.">            if (new HashSet&lt;&gt;(normalized).size() != normalized.size()) {</span>
+<span class="nc" id="L962">                throw new IllegalArgumentException(</span>
+                    &quot;variable names must be unique&quot;);
+            }
+<span class="fc" id="L965">            return normalized;</span>
+        }
+    }
+
+    public record Certificate(
+        String schema,
+        String solverId,
+        String sourceHash,
+        List&lt;String&gt; sourceEquations,
+        List&lt;String&gt; variables,
+        List&lt;String&gt; reducedEquations,
+        List&lt;String&gt; canonicalOperations,
+        List&lt;String&gt; consequenceLines,
+        StageWorkProfile workProfile,
+        String contentHash
+    ) {
+<span class="fc" id="L981">        public Certificate {</span>
+<span class="fc bfc" id="L982" title="All 2 branches covered.">            if (!CERTIFICATE_SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L983" title="1 of 4 branches missed.">                    || !SOLVER_ID.equals(solverId)</span>
+                    || sourceHash == null
+<span class="pc bpc" id="L985" title="1 of 4 branches missed.">                    || !sourceHash.matches(&quot;[0-9a-f]{64}&quot;)</span>
+                    || contentHash == null
+<span class="fc bfc" id="L987" title="All 2 branches covered.">                    || !contentHash.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L988">                throw new IllegalArgumentException(</span>
+                    &quot;direct scalar certificate identities are invalid&quot;);
+            }
+<span class="fc" id="L991">            sourceEquations = nonEmptyTexts(</span>
+                sourceEquations,
+                &quot;sourceEquations&quot;);
+<span class="fc" id="L994">            variables = nonEmptyTexts(variables, &quot;variables&quot;);</span>
+<span class="fc" id="L995">            reducedEquations = nonEmptyTexts(</span>
+                reducedEquations,
+                &quot;reducedEquations&quot;);
+<span class="fc" id="L998">            canonicalOperations = textsAllowEmpty(</span>
+                canonicalOperations,
+                &quot;canonicalOperations&quot;);
+<span class="fc" id="L1001">            consequenceLines = nonEmptyTexts(</span>
+                consequenceLines,
+                &quot;consequenceLines&quot;);
+<span class="fc" id="L1004">            workProfile = Objects.requireNonNull(</span>
+                workProfile,
+                &quot;workProfile&quot;);
+<span class="fc" id="L1007">        }</span>
+
+        private static List&lt;String&gt; nonEmptyTexts(
+            List&lt;String&gt; values,
+            String field
+        ) {
+<span class="fc" id="L1013">            List&lt;String&gt; retained = textsAllowEmpty(values, field);</span>
+<span class="pc bpc" id="L1014" title="1 of 2 branches missed.">            if (retained.isEmpty()) {</span>
+<span class="nc" id="L1015">                throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+            }
+<span class="fc" id="L1017">            return retained;</span>
+        }
+
+        private static List&lt;String&gt; textsAllowEmpty(
+            List&lt;String&gt; values,
+            String field
+        ) {
+<span class="fc" id="L1024">            Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L1025">            return values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L1026" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L1027">                    throw new IllegalArgumentException(</span>
+                        field + &quot; entries must not be blank&quot;);
+                }
+<span class="fc" id="L1030">                return value.trim();</span>
+<span class="fc" id="L1031">            }).toList();</span>
+        }
+    }
+
+    public record Result(
+        Status status,
+        Optional&lt;ExactLinearSolutionConsequence&gt; consequence,
+        Optional&lt;Certificate&gt; certificate,
+        StageWorkProfile workProfile,
+        WorkLedger work,
+        String detailCode
+    ) {
+<span class="fc" id="L1043">        public Result {</span>
+<span class="fc" id="L1044">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L1045">            consequence = Objects.requireNonNull(consequence, &quot;consequence&quot;);</span>
+<span class="fc" id="L1046">            certificate = Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L1047">            workProfile = Objects.requireNonNull(</span>
+                workProfile,
+                &quot;workProfile&quot;);
+<span class="fc" id="L1050">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L1051" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L1052">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L1055">            detailCode = detailCode.trim();</span>
+<span class="pc bpc" id="L1056" title="1 of 2 branches missed.">            if (workProfile.totalWork() != work.consumedWorkUnits()) {</span>
+<span class="nc" id="L1057">                throw new IllegalArgumentException(</span>
+                    &quot;stage profile and total work disagree&quot;);
+            }
+<span class="pc bpc" id="L1060" title="1 of 4 branches missed.">            boolean payload = consequence.isPresent() &amp;&amp; certificate.isPresent();</span>
+<span class="pc bpc" id="L1061" title="1 of 4 branches missed.">            if ((status == Status.SOLVED) != payload</span>
+<span class="pc bpc" id="L1062" title="1 of 2 branches missed.">                    || consequence.isPresent() != certificate.isPresent()) {</span>
+<span class="nc" id="L1063">                throw new IllegalArgumentException(</span>
+                    &quot;only solved direct results retain complete evidence&quot;);
+            }
+<span class="fc" id="L1066">        }</span>
+
+        private static Result solved(
+            ExactLinearSolutionConsequence consequence,
+            Certificate certificate,
+            StageWorkProfile profile,
+            WorkLedger work
+        ) {
+<span class="fc" id="L1074">            return new Result(</span>
+                Status.SOLVED,
+<span class="fc" id="L1076">                Optional.of(consequence),</span>
+<span class="fc" id="L1077">                Optional.of(certificate),</span>
+                profile,
+                work,
+                &quot;DIRECT_SCALAR_CONSEQUENCE_COMPUTED&quot;);
+        }
+
+        private static Result withoutConsequence(
+            Status status,
+            StageWorkProfile profile,
+            WorkLedger work,
+            String detailCode
+        ) {
+<span class="pc bpc" id="L1089" title="1 of 2 branches missed.">            if (status == Status.SOLVED) {</span>
+<span class="nc" id="L1090">                throw new IllegalArgumentException(</span>
+                    &quot;solved result requires direct consequence evidence&quot;);
+            }
+<span class="fc" id="L1093">            return new Result(</span>
+                status,
+<span class="fc" id="L1095">                Optional.empty(),</span>
+<span class="fc" id="L1096">                Optional.empty(),</span>
+                profile,
+                work,
+                detailCode);
+        }
+    }
+
+    private record AffineForm(
+        Map&lt;String, Rational&gt; coefficients,
+        Rational constant
+    ) {
+<span class="fc" id="L1107">        private AffineForm {</span>
+<span class="fc" id="L1108">            Objects.requireNonNull(coefficients, &quot;coefficients&quot;);</span>
+<span class="fc" id="L1109">            LinkedHashMap&lt;String, Rational&gt; retained = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L1110">            coefficients.forEach((variable, coefficient) -&gt; {</span>
+<span class="pc bpc" id="L1111" title="2 of 4 branches missed.">                if (variable == null || variable.isBlank()) {</span>
+<span class="nc" id="L1112">                    throw new IllegalArgumentException(</span>
+                        &quot;coefficient variable must not be blank&quot;);
+                }
+<span class="fc" id="L1115">                Rational value = Objects.requireNonNull(</span>
+                    coefficient,
+                    &quot;coefficient&quot;);
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">                if (!value.isZero()) {</span>
+<span class="fc" id="L1119">                    retained.put(variable.trim(), value);</span>
+                }
+<span class="fc" id="L1121">            });</span>
+<span class="fc" id="L1122">            coefficients = Collections.unmodifiableMap(retained);</span>
+<span class="fc" id="L1123">            constant = Objects.requireNonNull(constant, &quot;constant&quot;);</span>
+<span class="fc" id="L1124">        }</span>
+
+        private static AffineForm constant(Rational value) {
+<span class="fc" id="L1127">            return new AffineForm(Map.of(), value);</span>
+        }
+
+        private static AffineForm variable(String variable) {
+<span class="fc" id="L1131">            return new AffineForm(Map.of(variable, Rational.ONE), Rational.ZERO);</span>
+        }
+
+        private Rational coefficient(String variable) {
+<span class="fc" id="L1135">            return coefficients.getOrDefault(variable, Rational.ZERO);</span>
+        }
+
+        private boolean isConstant() {
+<span class="fc" id="L1139">            return coefficients.isEmpty();</span>
+        }
+    }
+
+    private record ScalarEquation(
+        Map&lt;String, Rational&gt; coefficients,
+        Rational rightHandSide
+    ) {
+<span class="fc" id="L1147">        private ScalarEquation {</span>
+<span class="fc" id="L1148">            Objects.requireNonNull(coefficients, &quot;coefficients&quot;);</span>
+<span class="fc" id="L1149">            LinkedHashMap&lt;String, Rational&gt; retained = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L1150">            coefficients.forEach((variable, coefficient) -&gt; {</span>
+<span class="fc" id="L1151">                Rational value = Objects.requireNonNull(</span>
+                    coefficient,
+                    &quot;coefficient&quot;);
+<span class="pc bpc" id="L1154" title="1 of 2 branches missed.">                if (!value.isZero()) {</span>
+<span class="fc" id="L1155">                    retained.put(variable, value);</span>
+                }
+<span class="fc" id="L1157">            });</span>
+<span class="fc" id="L1158">            coefficients = Collections.unmodifiableMap(retained);</span>
+<span class="fc" id="L1159">            rightHandSide = Objects.requireNonNull(</span>
+                rightHandSide,
+                &quot;rightHandSide&quot;);
+<span class="fc" id="L1162">        }</span>
+
+        private ScalarEquation copy() {
+<span class="fc" id="L1165">            return new ScalarEquation(coefficients, rightHandSide);</span>
+        }
+
+        private String canonical(List&lt;String&gt; variableOrder) {
+<span class="fc" id="L1169">            List&lt;String&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L1170" title="All 2 branches covered.">            for (String variable : variableOrder) {</span>
+<span class="fc" id="L1171">                Rational coefficient = coefficients.get(variable);</span>
+<span class="fc bfc" id="L1172" title="All 2 branches covered.">                if (coefficient != null) {</span>
+<span class="fc" id="L1173">                    terms.add(coefficient + &quot;*&quot; + variable);</span>
+                }
+<span class="fc" id="L1175">            }</span>
+<span class="fc bfc" id="L1176" title="All 2 branches covered.">            return (terms.isEmpty() ? &quot;0&quot; : String.join(&quot;+&quot;, terms))</span>
+                + &quot;=&quot; + rightHandSide;
+        }
+    }
+
+    private record Pivot(int row, String variable) {
+<span class="fc" id="L1182">        private Pivot {</span>
+<span class="pc bpc" id="L1183" title="3 of 6 branches missed.">            if (row &lt; 0 || variable == null || variable.isBlank()) {</span>
+<span class="nc" id="L1184">                throw new IllegalArgumentException(&quot;pivot is invalid&quot;);</span>
+            }
+<span class="fc" id="L1186">            variable = variable.trim();</span>
+<span class="fc" id="L1187">        }</span>
+    }
+
+<span class="fc" id="L1190">    private enum OperationKind {</span>
+<span class="fc" id="L1191">        SWAP_EQUATIONS,</span>
+<span class="fc" id="L1192">        SCALE_EQUATION,</span>
+<span class="fc" id="L1193">        ADD_EQUATION_MULTIPLE</span>
+    }
+
+    private record EquationOperation(
+        OperationKind kind,
+        int targetEquation,
+        int sourceEquation,
+        Rational multiplier
+    ) {
+<span class="fc" id="L1202">        private EquationOperation {</span>
+<span class="fc" id="L1203">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L1204">            multiplier = Objects.requireNonNull(multiplier, &quot;multiplier&quot;);</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">            if (targetEquation &lt; 0) {</span>
+<span class="nc" id="L1206">                throw new IllegalArgumentException(</span>
+                    &quot;targetEquation must not be negative&quot;);
+            }
+<span class="fc" id="L1209">        }</span>
+
+        private static EquationOperation swap(int first, int second) {
+<span class="fc" id="L1212">            return new EquationOperation(</span>
+                OperationKind.SWAP_EQUATIONS,
+                first,
+                second,
+                Rational.ONE);
+        }
+
+        private static EquationOperation scale(int row, Rational multiplier) {
+<span class="fc" id="L1220">            return new EquationOperation(</span>
+                OperationKind.SCALE_EQUATION,
+                row,
+                -1,
+                multiplier);
+        }
+
+        private static EquationOperation addMultiple(
+            int target,
+            int source,
+            Rational multiplier
+        ) {
+<span class="fc" id="L1232">            return new EquationOperation(</span>
+                OperationKind.ADD_EQUATION_MULTIPLE,
+                target,
+                source,
+                multiplier);
+        }
+
+        private String canonical() {
+<span class="fc bfc" id="L1240" title="All 3 branches covered.">            return switch (kind) {</span>
+<span class="fc" id="L1241">                case SWAP_EQUATIONS -&gt; &quot;swap(&quot;</span>
+                    + targetEquation + &quot;,&quot; + sourceEquation + &quot;)&quot;;
+<span class="fc" id="L1243">                case SCALE_EQUATION -&gt; &quot;scale(&quot;</span>
+                    + targetEquation + &quot;,&quot; + multiplier + &quot;)&quot;;
+<span class="fc" id="L1245">                case ADD_EQUATION_MULTIPLE -&gt; &quot;add(&quot;</span>
+                    + targetEquation + &quot;,&quot; + sourceEquation
+                    + &quot;,&quot; + multiplier + &quot;)&quot;;
+            };
+        }
+    }
+
+    private static final class WorkCounter {
+        private final int configured;
+        private int sourceAnalysis;
+        private int elimination;
+        private int evidence;
+
+<span class="fc" id="L1258">        private WorkCounter(int configured) {</span>
+<span class="fc" id="L1259">            this.configured = configured;</span>
+<span class="fc" id="L1260">        }</span>
+
+        private void consume(Stage stage) {
+<span class="fc" id="L1263">            consume(stage, 1);</span>
+<span class="fc" id="L1264">        }</span>
+
+        private void consume(Stage stage, int units) {
+<span class="pc bpc" id="L1267" title="1 of 2 branches missed.">            if (units &lt; 0) {</span>
+<span class="nc" id="L1268">                throw new IllegalArgumentException(</span>
+                    &quot;work units must not be negative&quot;);
+            }
+<span class="fc" id="L1271">            int consumed = consumed();</span>
+<span class="fc bfc" id="L1272" title="All 2 branches covered.">            if (units &gt; configured - consumed) {</span>
+<span class="fc" id="L1273">                int remaining = configured - consumed;</span>
+<span class="fc" id="L1274">                add(stage, remaining);</span>
+<span class="fc" id="L1275">                throw new BudgetExceeded();</span>
+            }
+<span class="fc" id="L1277">            add(stage, units);</span>
+<span class="fc" id="L1278">        }</span>
+
+        private void add(Stage stage, int units) {
+<span class="pc bpc" id="L1281" title="1 of 4 branches missed.">            switch (stage) {</span>
+<span class="fc" id="L1282">                case SOURCE_ANALYSIS -&gt; sourceAnalysis += units;</span>
+<span class="fc" id="L1283">                case ELIMINATION -&gt; elimination += units;</span>
+<span class="fc" id="L1284">                case EVIDENCE -&gt; evidence += units;</span>
+            }
+<span class="fc" id="L1286">        }</span>
+
+        private int consumed() {
+<span class="fc" id="L1289">            return Math.addExact(</span>
+                sourceAnalysis,
+<span class="fc" id="L1291">                Math.addExact(elimination, evidence));</span>
+        }
+
+        private StageWorkProfile profile() {
+<span class="fc" id="L1295">            return new StageWorkProfile(</span>
+                sourceAnalysis,
+                elimination,
+                evidence);
+        }
+
+        private WorkLedger ledger() {
+<span class="fc" id="L1302">            return WorkLedger.of(configured, consumed());</span>
+        }
+    }
+
+    private static final class BudgetExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static final class NonlinearExpression extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="fc" id="L1314">        private NonlinearExpression(String detailCode) {</span>
+<span class="fc" id="L1315">            this.detailCode = detailCode;</span>
+<span class="fc" id="L1316">        }</span>
+
+        private String detailCode() {
+<span class="fc" id="L1319">            return detailCode;</span>
+        }
+    }
+
+    private static final class UnsupportedExpression extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="fc" id="L1327">        private UnsupportedExpression(String detailCode) {</span>
+<span class="fc" id="L1328">            this.detailCode = detailCode;</span>
+<span class="fc" id="L1329">        }</span>
+
+        private String detailCode() {
+<span class="fc" id="L1332">            return detailCode;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

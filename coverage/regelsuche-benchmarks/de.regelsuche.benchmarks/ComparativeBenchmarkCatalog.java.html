@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ComparativeBenchmarkCatalog.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ComparativeBenchmarkCatalog.java</span></div><h1>ComparativeBenchmarkCatalog.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.benchmarks.ComparativeBenchmark.Case;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Configuration;
+import de.regelsuche.benchmarks.ComparativeBenchmark.CoverageGap;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ExpectedVerdict;
+import de.regelsuche.benchmarks.ComparativeBenchmark.InformationParityManifest;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Role;
+import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import java.util.List;
+
+/** Pinned information regimes, cases, configurations and visible coverage gaps. */
+final class ComparativeBenchmarkCatalog {
+<span class="fc" id="L21">    static final SearchHeuristic SEARCH_BUDGET =</span>
+        new SearchHeuristic(4, 80, 1, 2, 40, 8);
+
+    private ComparativeBenchmarkCatalog() {
+    }
+
+    static List&lt;Case&gt; searchCases() {
+<span class="fc" id="L28">        return List.of(</span>
+<span class="fc" id="L29">            Case.create(</span>
+                &quot;target-add-zero&quot;,
+                Track.TARGET_DIRECTED_SEARCH,
+                &quot;identity&quot;,
+                &quot;x + 0&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L35">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L37">            Case.create(</span>
+                &quot;target-multiply-one&quot;,
+                Track.TARGET_DIRECTED_SEARCH,
+                &quot;identity&quot;,
+                &quot;x * 1&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L43">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L45">            Case.create(</span>
+                &quot;target-composed-identities&quot;,
+                Track.TARGET_DIRECTED_SEARCH,
+                &quot;identity-composition&quot;,
+                &quot;(x + 0) * 1&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L51">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED));
+    }
+
+    static List&lt;Case&gt; validationCases() {
+<span class="fc" id="L56">        return List.of(</span>
+<span class="fc" id="L57">            Case.create(</span>
+                &quot;polynomial-square-confirmed&quot;,
+                Track.EQUALITY_VALIDATION,
+                &quot;polynomial&quot;,
+                &quot;(x + 1)^2&quot;,
+                &quot;x^2 + 2*x + 1&quot;,
+<span class="fc" id="L63">                List.of(),</span>
+                ExpectedVerdict.CONFIRMED),
+<span class="fc" id="L65">            Case.create(</span>
+                &quot;polynomial-shift-refuted&quot;,
+                Track.EQUALITY_VALIDATION,
+                &quot;polynomial&quot;,
+                &quot;x + 1&quot;,
+                &quot;x + 2&quot;,
+<span class="fc" id="L71">                List.of(),</span>
+                ExpectedVerdict.REFUTED));
+    }
+
+    /**
+     * Target-free simplification corpus.
+     *
+     * &lt;p&gt;The stored target expression is a pinned reference form. It is the
+     * shared judge's answer key and is never handed to a competitor: the parity
+     * manifest for this track sets {@code targetVisible=false}.&lt;/p&gt;
+     *
+     * &lt;p&gt;The corpus deliberately contains a held-out capability gap. Exact
+     * polynomial long division exists only in an opt-in experimental pack and
+     * is not part of the measured default inventory.&lt;/p&gt;
+     */
+    static List&lt;Case&gt; simplificationCases() {
+<span class="fc" id="L87">        return List.of(</span>
+<span class="fc" id="L88">            Case.create(</span>
+                &quot;simplify-identity-collapse&quot;,
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;identity&quot;,
+                &quot;(x + 0) * 1&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L94">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L96">            Case.create(</span>
+                &quot;simplify-annihilator&quot;,
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;annihilator&quot;,
+                &quot;x * 0 + y&quot;,
+                &quot;y&quot;,
+<span class="fc" id="L102">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L104">            Case.create(</span>
+                &quot;simplify-square-folding&quot;,
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;power-folding&quot;,
+                &quot;(a + b) * (a + b)&quot;,
+                &quot;(a + b) ^ 2&quot;,
+<span class="fc" id="L110">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L112">            Case.create(</span>
+                &quot;simplify-like-terms&quot;,
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;linear-combination&quot;,
+                &quot;x + x&quot;,
+                &quot;2 * x&quot;,
+<span class="fc" id="L118">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L120">            Case.create(</span>
+                &quot;simplify-constant-fraction&quot;,
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;rational-reduction&quot;,
+                &quot;(2 * x + 4) / 2&quot;,
+                &quot;x + 2&quot;,
+<span class="fc" id="L126">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L128">            Case.create(</span>
+                &quot;simplify-factor-cancellation&quot;,
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;rational-cancellation&quot;,
+                &quot;(x^2 - 1) / (x - 1)&quot;,
+                &quot;x + 1&quot;,
+<span class="fc" id="L134">                List.of(&quot;x - 1 != 0&quot;),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L136">            Case.create(</span>
+                &quot;simplify-cubic-cancellation&quot;,
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;polynomial-division&quot;,
+                &quot;(x^3 - 1) / (x - 1)&quot;,
+                &quot;x ^ 2 + x + 1&quot;,
+<span class="fc" id="L142">                List.of(&quot;x - 1 != 0&quot;),</span>
+                ExpectedVerdict.TARGET_REACHED));
+    }
+
+    static InformationParityManifest searchParity(List&lt;Case&gt; cases) {
+<span class="fc" id="L147">        return InformationParityManifest.create(</span>
+            &quot;target-directed-shared-budget/v1&quot;,
+            Track.TARGET_DIRECTED_SEARCH,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+<span class="fc" id="L156">            corpusHash(cases),</span>
+<span class="fc" id="L157">            searchInventoryHash(),</span>
+<span class="fc" id="L158">            searchBudgetHash(),</span>
+<span class="fc" id="L159">            notApplicable(&quot;research-brief&quot;),</span>
+<span class="fc" id="L160">            notApplicable(&quot;qualification-split&quot;),</span>
+<span class="fc" id="L161">            List.of(&quot;TARGET_REACHABILITY&quot;));</span>
+    }
+
+    static InformationParityManifest validationParity(List&lt;Case&gt; cases) {
+<span class="fc" id="L165">        return InformationParityManifest.create(</span>
+            &quot;shared-polynomial-equality/v1&quot;,
+            Track.EQUALITY_VALIDATION,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+<span class="fc" id="L174">            corpusHash(cases),</span>
+<span class="fc" id="L175">            SolverIr.sha256(</span>
+                &quot;fragment=real-polynomial-equality/v1&quot;
+                    + &quot;\nassumptions=none&quot;
+                    + &quot;\nrequestedEvidence=SYMBOLIC_CERTIFICATE&quot;),
+<span class="fc" id="L179">            SolverIr.sha256(</span>
+                &quot;configuredWork=1&quot;
+                    + &quot;\nmandatoryEvaluations=1&quot;
+                    + &quot;\nprocessTimeoutMillis=20000&quot;),
+<span class="fc" id="L183">            notApplicable(&quot;research-brief&quot;),</span>
+<span class="fc" id="L184">            notApplicable(&quot;qualification-split&quot;),</span>
+<span class="fc" id="L185">            List.of(&quot;EQUALITY_DECISION&quot;));</span>
+    }
+
+    static InformationParityManifest simplificationParity(List&lt;Case&gt; cases) {
+<span class="fc" id="L189">        return InformationParityManifest.create(</span>
+            &quot;target-free-simplification/v2&quot;,
+            Track.SIMPLIFICATION_COMPETITION,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+<span class="fc" id="L198">            corpusHash(cases),</span>
+<span class="fc" id="L199">            SolverIr.sha256(</span>
+<span class="fc" id="L200">                &quot;regelsuche-inventory=&quot; + searchInventoryHash()</span>
+                    + &quot;\nexternal-inventory=SYMPY_NATIVE_OPERATIONS_&quot;
+                    + &quot;[simplify,factor,cancel,together,apart,trigsimp]&quot;),
+<span class="fc" id="L203">            SolverIr.sha256(</span>
+<span class="fc" id="L204">                &quot;regelsuche-budget=&quot; + searchBudgetHash()</span>
+                    + &quot;\nexternal-timeoutMillis=20000&quot;),
+<span class="fc" id="L206">            notApplicable(&quot;research-brief&quot;),</span>
+<span class="fc" id="L207">            notApplicable(&quot;qualification-split&quot;),</span>
+<span class="fc" id="L208">            List.of(&quot;PINNED_REFERENCE_FORM_REACHABILITY&quot;));</span>
+    }
+
+    static Configuration searchConfiguration(
+        SearchSystem system,
+        InformationParityManifest parity
+    ) {
+<span class="fc" id="L215">        return Configuration.create(</span>
+<span class="fc" id="L216">            &quot;search-&quot; + system.id(),</span>
+            Track.TARGET_DIRECTED_SEARCH,
+            SystemKind.REGELSUCHE,
+<span class="fc" id="L219">            List.of(Role.SEARCH),</span>
+<span class="fc" id="L220">            parity.contentHash(),</span>
+<span class="fc" id="L221">            system.id(),</span>
+<span class="fc" id="L222">            system.version(),</span>
+<span class="fc" id="L223">            SolverIr.sha256(</span>
+<span class="fc" id="L224">                &quot;search-strategy=&quot; + system.strategy().getClass().getName()),</span>
+<span class="fc" id="L225">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L226">            SolverIr.sha256(</span>
+                &quot;java=21\nsearch-kernel=regelsuche-search/v1&quot;),
+            true,
+<span class="fc" id="L229">            system.limitations());</span>
+    }
+
+    static Configuration validationConfiguration(
+        ValidationSystem system,
+        InformationParityManifest parity
+    ) {
+<span class="fc" id="L236">        return Configuration.create(</span>
+<span class="fc" id="L237">            &quot;validation-&quot; + system.backend().descriptor().backendId(),</span>
+            Track.EQUALITY_VALIDATION,
+<span class="fc" id="L239">            system.kind(),</span>
+<span class="fc" id="L240">            system.roles(),</span>
+<span class="fc" id="L241">            parity.contentHash(),</span>
+<span class="fc" id="L242">            system.backend().descriptor().backendId(),</span>
+<span class="fc" id="L243">            system.backend().descriptor().backendVersion(),</span>
+<span class="fc" id="L244">            SolverIr.sha256(&quot;direct-equality-validation/v1&quot;),</span>
+<span class="fc" id="L245">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L246">            SolverIr.sha256(system.environmentIdentity()),</span>
+<span class="fc" id="L247">            system.backend().descriptor().deterministic(),</span>
+<span class="fc" id="L248">            system.limitations());</span>
+    }
+
+    static Configuration simplificationConfiguration(
+        SimplificationSystem system,
+        InformationParityManifest parity
+    ) {
+<span class="fc" id="L255">        return Configuration.create(</span>
+<span class="fc" id="L256">            &quot;simplify-&quot; + system.id(),</span>
+            Track.SIMPLIFICATION_COMPETITION,
+<span class="fc" id="L258">            system.kind(),</span>
+<span class="fc" id="L259">            List.of(Role.EQUALITY_REWRITE),</span>
+<span class="fc" id="L260">            parity.contentHash(),</span>
+<span class="fc" id="L261">            system.id(),</span>
+<span class="fc" id="L262">            system.version(),</span>
+<span class="fc" id="L263">            SolverIr.sha256(</span>
+                &quot;target-free-simplification/v2\nimplementation=&quot;
+<span class="fc" id="L265">                    + system.implementationIdentity()),</span>
+<span class="fc" id="L266">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L267">            SolverIr.sha256(system.environmentIdentity()),</span>
+            true,
+<span class="fc" id="L269">            system.limitations());</span>
+    }
+
+    static List&lt;CoverageGap&gt; coverageGaps() {
+<span class="fc" id="L273">        return List.of(</span>
+<span class="fc" id="L274">            CoverageGap.create(</span>
+                Track.HIDDEN_RULE_REDISCOVERY,
+                &quot;The initial slice does not yet replay the leak-free #227 manifest.&quot;,
+<span class="fc" id="L277">                List.of(</span>
+                    &quot;PINNED_HIDDEN_RULE_MANIFEST&quot;,
+                    &quot;NEGATIVE_HOLDOUT_EXECUTIONS&quot;,
+                    &quot;POST_HOC_REFERENCE_RELATION&quot;)),
+<span class="fc" id="L281">            CoverageGap.create(</span>
+                Track.OPEN_TARGET_DISCOVERY,
+                &quot;No external target-free conjecture generator has yet been run under information parity.&quot;,
+<span class="fc" id="L284">                List.of(</span>
+                    &quot;TARGET_FREE_EXTERNAL_BASELINE&quot;,
+                    &quot;ZERO_TO_MANY_CANDIDATE_OUTPUTS&quot;,
+                    &quot;PROJECT_NOVELTY_AND_FALSIFICATION&quot;)),
+<span class="fc" id="L288">            CoverageGap.create(</span>
+                Track.SIMPLIFICATION_COMPETITION,
+                &quot;The target-free simplification corpus is small and single-domain; equality saturation and an independent assumption-aware output validator remain unmeasured. Separate native SymPy simplify/factor/cancel/together/apart/trigsimp configurations and a deterministic seeded randomized-valid rewrite control are retained.&quot;,
+<span class="fc" id="L291">                List.of(</span>
+                    &quot;EQUALITY_SATURATION_COMPETITOR_WITH_EXACT_SIDE_CONDITION_PROVENANCE&quot;,
+                    &quot;MULTI_DOMAIN_SIMPLIFICATION_CORPUS&quot;,
+                    &quot;INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION&quot;)),
+<span class="fc" id="L295">            CoverageGap.create(</span>
+                Track.CROSS_FAMILY_TRANSFER,
+                &quot;The fully held-out #222 transfer split is not part of the first executable slice.&quot;,
+<span class="fc" id="L298">                List.of(</span>
+                    &quot;FAMILY_BLIND_FORMATION&quot;,
+                    &quot;HELD_OUT_TRANSFER_RESULTS&quot;,
+                    &quot;PAIRED_UTILITY&quot;)),
+<span class="fc" id="L302">            CoverageGap.create(</span>
+                Track.AUTONOMOUS_CAMPAIGN,
+                &quot;Controller baselines have not yet consumed the pinned #355 research brief and budget ledger.&quot;,
+<span class="fc" id="L305">                List.of(</span>
+                    &quot;COMMON_RESEARCH_BRIEF&quot;,
+                    &quot;COMMON_RESOURCE_LEDGER&quot;,
+                    &quot;COMPLETE_RECEIPT_DAG&quot;)),
+<span class="fc" id="L309">            CoverageGap.create(</span>
+                Track.DISCOVERY_COMPONENT_ABLATION,
+                &quot;At least three production discovery-component ablations remain to be measured.&quot;,
+<span class="fc" id="L312">                List.of(</span>
+                    &quot;THREE_COMPONENT_ABLATIONS&quot;,
+                    &quot;IDENTICAL_INPUT_EVIDENCE&quot;,
+                    &quot;SEPARATE_CORRECTNESS_AND_UTILITY&quot;)),
+<span class="fc" id="L316">            CoverageGap.create(</span>
+                Track.CONTROLLER_ABLATION,
+                &quot;At least two autonomous-controller ablations remain to be measured.&quot;,
+<span class="fc" id="L319">                List.of(</span>
+                    &quot;TWO_CONTROLLER_ABLATIONS&quot;,
+                    &quot;BALANCED_RESOURCE_ACCOUNTING&quot;,
+                    &quot;DETERMINISTIC_NEXT_PLAN&quot;)));
+    }
+
+    private static String corpusHash(List&lt;Case&gt; cases) {
+<span class="fc" id="L326">        return SolverIr.sha256(</span>
+<span class="fc" id="L327">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
+    }
+
+    private static String searchInventoryHash() {
+<span class="fc" id="L331">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
+<span class="fc" id="L332">            .stream()</span>
+<span class="fc" id="L333">            .map(rule -&gt; rule.id())</span>
+<span class="fc" id="L334">            .sorted()</span>
+<span class="fc" id="L335">            .toList();</span>
+<span class="fc" id="L336">        return SolverIr.sha256(ruleIds.toString());</span>
+    }
+
+    private static String searchBudgetHash() {
+<span class="fc" id="L340">        return SolverIr.sha256(</span>
+<span class="fc" id="L341">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
+                + &quot;\nmaxVisitedExpressions=&quot;
+<span class="fc" id="L343">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
+                + &quot;\nmaxExpandingSteps=&quot;
+<span class="fc" id="L345">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
+                + &quot;\nmaxCandidatesPerState=&quot;
+<span class="fc" id="L347">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
+<span class="fc" id="L348">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
+    }
+
+    private static String notApplicable(String name) {
+<span class="fc" id="L352">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

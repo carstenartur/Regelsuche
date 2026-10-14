@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramTrainSuite.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramTrainSuite.java</span></div><h1>EvolutionRewriteProgramTrainSuite.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Frozen assumption-aware TRAIN cases for executable rewrite-program fitness. */
+public record EvolutionRewriteProgramTrainSuite(
+    String schema,
+    String suiteId,
+    EvaluatorProfile evaluatorProfile,
+    List&lt;TrainCase&gt; cases,
+    SearchHeuristic heuristic,
+    PrimitiveWorkBudget primitiveWorkBudget,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-train-suite/v1&quot;;
+<span class="fc" id="L27">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+
+<span class="fc" id="L29">    public EvolutionRewriteProgramTrainSuite {</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L31">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program TRAIN suite schema&quot;);
+        }
+<span class="fc" id="L34">        requireId(suiteId, &quot;suiteId&quot;);</span>
+<span class="fc" id="L35">        Objects.requireNonNull(evaluatorProfile, &quot;evaluatorProfile&quot;);</span>
+<span class="fc" id="L36">        cases = canonicalCases(cases);</span>
+<span class="fc" id="L37">        Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L38">        Objects.requireNonNull(primitiveWorkBudget, &quot;primitiveWorkBudget&quot;);</span>
+<span class="fc" id="L39">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L40">        String expected = EvolutionGenome.hash(render(</span>
+            suiteId,
+            evaluatorProfile,
+            cases,
+            heuristic,
+            primitiveWorkBudget,
+            null));
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program TRAIN suite contentHash mismatch&quot;);
+        }
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Compatibility factory. It freezes an explicit derived v1 work budget;
+     * callers preparing the flagship suite should use the overload that accepts
+     * a reviewed {@link PrimitiveWorkBudget}.
+     */
+    public static EvolutionRewriteProgramTrainSuite create(
+        String suiteId,
+        EvaluatorProfile evaluatorProfile,
+        List&lt;TrainCase&gt; cases,
+        SearchHeuristic heuristic
+    ) {
+<span class="fc" id="L64">        return create(</span>
+            suiteId,
+            evaluatorProfile,
+            cases,
+            heuristic,
+<span class="fc" id="L69">            PrimitiveWorkBudget.derivedFrom(heuristic));</span>
+    }
+
+    public static EvolutionRewriteProgramTrainSuite create(
+        String suiteId,
+        EvaluatorProfile evaluatorProfile,
+        List&lt;TrainCase&gt; cases,
+        SearchHeuristic heuristic,
+        PrimitiveWorkBudget primitiveWorkBudget
+    ) {
+<span class="fc" id="L79">        requireId(suiteId, &quot;suiteId&quot;);</span>
+<span class="fc" id="L80">        Objects.requireNonNull(evaluatorProfile, &quot;evaluatorProfile&quot;);</span>
+<span class="fc" id="L81">        List&lt;TrainCase&gt; canonicalCases = canonicalCases(cases);</span>
+<span class="fc" id="L82">        Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L83">        Objects.requireNonNull(primitiveWorkBudget, &quot;primitiveWorkBudget&quot;);</span>
+<span class="fc" id="L84">        String hash = EvolutionGenome.hash(render(</span>
+            suiteId,
+            evaluatorProfile,
+            canonicalCases,
+            heuristic,
+            primitiveWorkBudget,
+            null));
+<span class="fc" id="L91">        return new EvolutionRewriteProgramTrainSuite(</span>
+            SCHEMA,
+            suiteId,
+            evaluatorProfile,
+            canonicalCases,
+            heuristic,
+            primitiveWorkBudget,
+            hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="nc" id="L102">        return render(</span>
+            suiteId,
+            evaluatorProfile,
+            cases,
+            heuristic,
+            primitiveWorkBudget,
+            contentHash);
+    }
+
+    public WorkBudgetBestFirstSearchStrategy.Budget searchBudget() {
+<span class="nc" id="L112">        return primitiveWorkBudget.toSearchBudget();</span>
+    }
+
+    private static List&lt;TrainCase&gt; canonicalCases(List&lt;TrainCase&gt; values) {
+<span class="fc" id="L116">        Objects.requireNonNull(values, &quot;cases&quot;);</span>
+<span class="fc" id="L117">        List&lt;TrainCase&gt; result = values.stream()</span>
+<span class="fc" id="L118">            .map(item -&gt; Objects.requireNonNull(item, &quot;TRAIN case&quot;))</span>
+<span class="fc" id="L119">            .sorted(Comparator.comparing(TrainCase::caseId))</span>
+<span class="fc" id="L120">            .toList();</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L122">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program TRAIN suite must not be empty&quot;);
+        }
+<span class="fc" id="L125">        if (new HashSet&lt;&gt;(result.stream().map(TrainCase::caseId).toList()).size()</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program TRAIN case IDs must be unique&quot;);
+        }
+<span class="fc" id="L130">        return result;</span>
+    }
+
+    private static String render(
+        String suiteId,
+        EvaluatorProfile evaluatorProfile,
+        List&lt;TrainCase&gt; cases,
+        SearchHeuristic heuristic,
+        PrimitiveWorkBudget primitiveWorkBudget,
+        String contentHash
+    ) {
+<span class="fc" id="L141">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L142">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L143">            .property(&quot;suiteId&quot;, suiteId)</span>
+<span class="fc" id="L144">            .property(&quot;evaluationSplit&quot;, &quot;TRAIN&quot;)</span>
+<span class="fc" id="L145">            .property(&quot;evaluatorProfile&quot;, evaluatorProfile.name())</span>
+<span class="fc" id="L146">            .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L147">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L148">                    .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L149">                    .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L150">                    .property(&quot;inputExpression&quot;, item.inputExpression())</span>
+<span class="fc" id="L151">                    .property(&quot;targetExpression&quot;, item.targetExpression())</span>
+<span class="fc" id="L152">                    .stringArray(&quot;assumptions&quot;, item.assumptions()))))</span>
+<span class="fc" id="L153">            .object(&quot;heuristic&quot;, object -&gt; object</span>
+<span class="fc" id="L154">                .property(&quot;maxDepth&quot;, heuristic.maxDepth())</span>
+<span class="fc" id="L155">                .property(&quot;maxVisitedExpressions&quot;,</span>
+<span class="fc" id="L156">                    heuristic.maxVisitedExpressions())</span>
+<span class="fc" id="L157">                .property(&quot;significantImprovementThreshold&quot;,</span>
+<span class="fc" id="L158">                    heuristic.significantImprovementThreshold())</span>
+<span class="fc" id="L159">                .property(&quot;maxExpandingSteps&quot;, heuristic.maxExpandingSteps())</span>
+<span class="fc" id="L160">                .property(&quot;maxCandidatesPerState&quot;,</span>
+<span class="fc" id="L161">                    heuristic.maxCandidatesPerState())</span>
+<span class="fc" id="L162">                .property(&quot;beamWidth&quot;, heuristic.beamWidth()))</span>
+<span class="fc" id="L163">            .object(&quot;primitiveWorkBudget&quot;, object -&gt; object</span>
+<span class="fc" id="L164">                .property(&quot;maxPrimitiveSteps&quot;,</span>
+<span class="fc" id="L165">                    primitiveWorkBudget.maxPrimitiveSteps())</span>
+<span class="fc" id="L166">                .property(&quot;maxExploredStates&quot;,</span>
+<span class="fc" id="L167">                    primitiveWorkBudget.maxExploredStates())</span>
+<span class="fc" id="L168">                .property(&quot;maxCandidatesPerState&quot;,</span>
+<span class="fc" id="L169">                    primitiveWorkBudget.maxCandidatesPerState())</span>
+<span class="fc" id="L170">                .property(&quot;maxExpandingSteps&quot;,</span>
+<span class="fc" id="L171">                    primitiveWorkBudget.maxExpandingSteps())</span>
+<span class="fc" id="L172">                .property(&quot;maxWorkUnits&quot;,</span>
+<span class="fc" id="L173">                    primitiveWorkBudget.maxWorkUnits()));</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L175">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L177">        return json.endObject().toString();</span>
+    }
+
+<span class="fc" id="L180">    public enum EvaluatorProfile {</span>
+<span class="fc" id="L181">        EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS</span>
+    }
+
+    /**
+     * Total paired-evaluation work budget. One unit per permitted primitive step
+     * is reserved for exact retained-path auditing; the remainder is available
+     * to the mechanical search ledger.
+     */
+    public record PrimitiveWorkBudget(
+        int maxPrimitiveSteps,
+        int maxExploredStates,
+        int maxCandidatesPerState,
+        int maxExpandingSteps,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L196">        public PrimitiveWorkBudget {</span>
+<span class="fc" id="L197">            WorkBudgetBestFirstSearchStrategy.Budget.primitive(</span>
+                maxPrimitiveSteps,
+                maxExploredStates,
+                maxCandidatesPerState,
+                maxExpandingSteps,
+                maxWorkUnits);
+<span class="fc" id="L203">        }</span>
+
+        /** Maximum retained primitive path depth in documentation terminology. */
+        public int maximumDepth() {
+<span class="nc" id="L207">            return maxPrimitiveSteps;</span>
+        }
+
+        /** Maximum explored expressions/states in documentation terminology. */
+        public int maximumVisitedExpressions() {
+<span class="nc" id="L212">            return maxExploredStates;</span>
+        }
+
+        /** Maximum candidates emitted for one explored state. */
+        public int maximumCandidatesPerState() {
+<span class="nc" id="L217">            return maxCandidatesPerState;</span>
+        }
+
+        /** Maximum expanding steps retained by the matched-work policy. */
+        public int maximumExpandingSteps() {
+<span class="nc" id="L222">            return maxExpandingSteps;</span>
+        }
+
+        /** Complete primitive and internal work allowance. */
+        public long totalPrimitiveWorkUnits() {
+<span class="nc" id="L227">            return maxWorkUnits;</span>
+        }
+
+        static PrimitiveWorkBudget derivedFrom(SearchHeuristic heuristic) {
+<span class="fc" id="L231">            Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L232">            int primitiveSteps = Math.max(1, heuristic.maxDepth());</span>
+            long units;
+            try {
+<span class="fc" id="L235">                units = Math.multiplyExact(</span>
+<span class="fc" id="L236">                    (long) heuristic.maxVisitedExpressions(),</span>
+<span class="fc" id="L237">                    (long) heuristic.maxCandidatesPerState() + 4L);</span>
+<span class="nc" id="L238">            } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L239">                units = Long.MAX_VALUE;</span>
+<span class="fc" id="L240">            }</span>
+<span class="fc" id="L241">            units = Math.max(units, (long) primitiveSteps + 1L);</span>
+<span class="fc" id="L242">            return new PrimitiveWorkBudget(</span>
+                primitiveSteps,
+<span class="fc" id="L244">                heuristic.maxVisitedExpressions(),</span>
+<span class="fc" id="L245">                heuristic.maxCandidatesPerState(),</span>
+<span class="fc" id="L246">                heuristic.maxExpandingSteps(),</span>
+                units);
+        }
+
+        public long exactPathAuditReserve() {
+<span class="nc" id="L251">            return maxPrimitiveSteps;</span>
+        }
+
+        public long mechanicalSearchWorkBudget() {
+<span class="nc" id="L255">            return maxWorkUnits - exactPathAuditReserve();</span>
+        }
+
+        WorkBudgetBestFirstSearchStrategy.Budget toSearchBudget() {
+<span class="fc" id="L259">            return WorkBudgetBestFirstSearchStrategy.Budget.primitive(</span>
+                maxPrimitiveSteps,
+                maxExploredStates,
+                maxCandidatesPerState,
+                maxExpandingSteps,
+                maxWorkUnits);
+        }
+    }
+
+    public record TrainCase(
+        String caseId,
+        String familyId,
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L275">        public TrainCase {</span>
+<span class="fc" id="L276">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L277">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L278">            inputExpression = normalizeExpression(inputExpression);</span>
+<span class="fc" id="L279">            targetExpression = normalizeExpression(targetExpression);</span>
+<span class="fc" id="L280">            assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L281">                .normalizedAssumptions();</span>
+<span class="fc" id="L282">        }</span>
+    }
+
+    private static String normalizeExpression(String expression) {
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L287">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="fc" id="L289">        return ExpressionFormatter.format(</span>
+<span class="fc" id="L290">            new ExpressionParser().parseTerm(expression));</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L295">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L297">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

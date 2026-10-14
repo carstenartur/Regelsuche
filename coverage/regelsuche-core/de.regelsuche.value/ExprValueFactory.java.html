@@ -1,0 +1,610 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExprValueFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.value</a> &gt; <span class="el_source">ExprValueFactory.java</span></div><h1>ExprValueFactory.java</h1><pre class="source lang-java linenums">package de.regelsuche.value;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Bounded owner-scoped interning for immutable mathematical values.
+ *
+ * &lt;p&gt;All supporting value types are nested deliberately: the API separates value,
+ * syntax and occurrence identity without multiplying top-level concepts. Equal
+ * values are reference-identical inside one factory; {@link ValueKey} remains the
+ * stable identity across scopes and persistence.&lt;/p&gt;
+ */
+public final class ExprValueFactory implements AutoCloseable {
+    public static final int DEFAULT_MAXIMUM_ENTRIES = 100_000;
+
+    private final int maximumEntries;
+<span class="fc" id="L33">    private final Map&lt;ValueKey, ExprValue&gt; valuesByKey = new HashMap&lt;&gt;();</span>
+    private boolean closed;
+
+    public ExprValueFactory() {
+<span class="fc" id="L37">        this(DEFAULT_MAXIMUM_ENTRIES);</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    public ExprValueFactory(int maximumEntries) {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (maximumEntries &lt; 1) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;maximumEntries must be positive&quot;);</span>
+        }
+<span class="fc" id="L44">        this.maximumEntries = maximumEntries;</span>
+<span class="fc" id="L45">    }</span>
+
+    public synchronized VariableValue variable(String name) {
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (name != null &amp;&amp; name.startsWith(SymbolId.IDENTIFIER_PREFIX)) {</span>
+<span class="fc" id="L49">            return scopedVariable(SymbolId.fromIdentifier(name));</span>
+        }
+<span class="fc" id="L51">        return intern(new VariableValue(name), VariableValue.class);</span>
+    }
+
+    public synchronized VariableValue scopedVariable(SymbolId symbol) {
+<span class="fc" id="L55">        return intern(new VariableValue(symbol), VariableValue.class);</span>
+    }
+
+    public synchronized NumberValue number(ExactRational value) {
+<span class="fc" id="L59">        return intern(new NumberValue(value), NumberValue.class);</span>
+    }
+
+    public NumberValue number(long value) {
+<span class="fc" id="L63">        return number(ExactRational.integer(value));</span>
+    }
+
+    public ExprValue sum(List&lt;? extends ExprValue&gt; operands) {
+<span class="fc" id="L67">        return associativeCommutative(ValueOperator.ADD, operands);</span>
+    }
+
+    public ExprValue product(List&lt;? extends ExprValue&gt; operands) {
+<span class="fc" id="L71">        return associativeCommutative(ValueOperator.MUL, operands);</span>
+    }
+
+    public synchronized ExprValue ordered(
+            ValueOperator operator,
+            List&lt;? extends ExprValue&gt; operands) {
+<span class="fc" id="L77">        ensureOpen();</span>
+<span class="fc" id="L78">        Objects.requireNonNull(operator, &quot;operator&quot;);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (operator.laws().supportsUnorderedNaryValue()) {</span>
+<span class="nc" id="L80">            return associativeCommutative(operator, operands);</span>
+        }
+<span class="fc" id="L82">        return intern(new OrderedValue(operator, operands), OrderedValue.class);</span>
+    }
+
+    public ExprValue function(String name, List&lt;? extends ExprValue&gt; arguments) {
+<span class="fc" id="L86">        Objects.requireNonNull(arguments, &quot;arguments&quot;);</span>
+<span class="fc" id="L87">        return ordered(ValueOperator.function(name, arguments.size()), arguments);</span>
+    }
+
+    public ExprValue fromExpr(Expr expression) {
+<span class="fc" id="L91">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L92">        return fromExprRecursive(expression, null);</span>
+    }
+
+    /** Projects one syntax root and keeps links keyed by syntax-object identity. */
+    public Projection project(Expr syntaxRoot) {
+<span class="fc" id="L97">        Objects.requireNonNull(syntaxRoot, &quot;syntaxRoot&quot;);</span>
+<span class="fc" id="L98">        IdentityHashMap&lt;Expr, ExprValue&gt; valuesBySyntax = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L99">        ExprValue valueRoot = fromExprRecursive(syntaxRoot, valuesBySyntax);</span>
+<span class="fc" id="L100">        return new Projection(syntaxRoot, valueRoot, valuesBySyntax);</span>
+    }
+
+    public synchronized Optional&lt;ExprValue&gt; find(ValueKey key) {
+<span class="nc" id="L104">        ensureOpen();</span>
+<span class="nc" id="L105">        return Optional.ofNullable(valuesByKey.get(Objects.requireNonNull(key, &quot;key&quot;)));</span>
+    }
+
+    public synchronized int size() {
+<span class="nc" id="L109">        ensureOpen();</span>
+<span class="nc" id="L110">        return valuesByKey.size();</span>
+    }
+
+    public int maximumEntries() {
+<span class="nc" id="L114">        return maximumEntries;</span>
+    }
+
+    public synchronized void clear() {
+<span class="fc" id="L118">        ensureOpen();</span>
+<span class="fc" id="L119">        valuesByKey.clear();</span>
+<span class="fc" id="L120">    }</span>
+
+    @Override
+    public synchronized void close() {
+<span class="fc" id="L124">        valuesByKey.clear();</span>
+<span class="fc" id="L125">        closed = true;</span>
+<span class="fc" id="L126">    }</span>
+
+    private ExprValue fromExprRecursive(
+            Expr expression,
+            IdentityHashMap&lt;Expr, ExprValue&gt; valuesBySyntax) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (valuesBySyntax != null) {</span>
+<span class="fc" id="L132">            ExprValue existing = valuesBySyntax.get(expression);</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (existing != null) {</span>
+<span class="nc" id="L134">                return existing;</span>
+            }
+        }
+
+        ExprValue value;
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            value = variable.symbol().isPresent()</span>
+<span class="fc" id="L141">                ? scopedVariable(variable.symbol().orElseThrow()) : variable(variable.name());</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        } else if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L143">            value = number(number.value());</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L145">            List&lt;ExprValue&gt; arguments = new ArrayList&lt;&gt;(function.arguments().size());</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L147">                arguments.add(fromExprRecursive(argument, valuesBySyntax));</span>
+<span class="fc" id="L148">            }</span>
+<span class="fc" id="L149">            value = function(function.name(), arguments);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L151">            ExprValue left = fromExprRecursive(binary.left(), valuesBySyntax);</span>
+<span class="fc" id="L152">            ExprValue right = fromExprRecursive(binary.right(), valuesBySyntax);</span>
+<span class="fc bfc" id="L153" title="All 5 branches covered.">            value = switch (binary.operator()) {</span>
+<span class="fc" id="L154">                case ADD -&gt; sum(List.of(left, right));</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">                case SUB -&gt; left instanceof NumberValue a &amp;&amp; right instanceof NumberValue b</span>
+<span class="fc" id="L156">                    ? number(a.value().subtract(b.value()))</span>
+<span class="fc" id="L157">                    : ordered(ValueOperator.SUB, List.of(left, right));</span>
+<span class="fc" id="L158">                case MUL -&gt; product(List.of(left, right));</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                case DIV -&gt; left instanceof NumberValue a &amp;&amp; right instanceof NumberValue b</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">                        &amp;&amp; !b.value().isZero()</span>
+<span class="fc" id="L161">                    ? number(a.value().divide(b.value()))</span>
+<span class="fc" id="L162">                    : ordered(ValueOperator.DIV, List.of(left, right));</span>
+<span class="fc" id="L163">                case POW -&gt; ordered(ValueOperator.POW, List.of(left, right));</span>
+            };
+<span class="fc" id="L165">        } else {</span>
+<span class="nc" id="L166">            throw new IllegalArgumentException(&quot;unsupported Expr implementation: &quot; + expression.getClass());</span>
+        }
+
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (valuesBySyntax != null) {</span>
+<span class="fc" id="L170">            valuesBySyntax.put(expression, value);</span>
+        }
+<span class="fc" id="L172">        return value;</span>
+    }
+
+    private synchronized ExprValue associativeCommutative(
+            ValueOperator operator,
+            List&lt;? extends ExprValue&gt; operands) {
+<span class="fc" id="L178">        ensureOpen();</span>
+<span class="fc" id="L179">        Objects.requireNonNull(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L180">        Objects.requireNonNull(operands, &quot;operands&quot;);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (!operator.laws().supportsUnorderedNaryValue()) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(&quot;operator is not associative and commutative: &quot; + operator.id());</span>
+        }
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (operands.isEmpty()) {</span>
+<span class="nc" id="L185">            throw new IllegalArgumentException(&quot;AC operation needs at least one operand&quot;);</span>
+        }
+
+<span class="fc" id="L188">        Map&lt;ExprValue, Integer&gt; multiplicities = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (ExprValue operand : operands) {</span>
+<span class="fc" id="L190">            ExprValue value = Objects.requireNonNull(operand, &quot;operand&quot;);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (value instanceof AssociativeCommutativeValue nested</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                    &amp;&amp; nested.operator().equals(operator)) {</span>
+<span class="fc" id="L193">                nested.multiplicities().forEach(</span>
+<span class="fc" id="L194">                        (nestedValue, count) -&gt; multiplicities.merge(nestedValue, count, Math::addExact));</span>
+            } else {
+<span class="fc" id="L196">                multiplicities.merge(value, 1, Math::addExact);</span>
+            }
+<span class="fc" id="L198">        }</span>
+
+<span class="fc" id="L200">        int count = multiplicities.values().stream().mapToInt(Integer::intValue).sum();</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (count == 1) {</span>
+<span class="nc" id="L202">            return multiplicities.keySet().iterator().next();</span>
+        }
+<span class="fc" id="L204">        operator.requireArity(count);</span>
+<span class="fc" id="L205">        return intern(</span>
+                new AssociativeCommutativeValue(operator, multiplicities),
+                AssociativeCommutativeValue.class);
+    }
+
+    private &lt;T extends ExprValue&gt; T intern(T candidate, Class&lt;T&gt; expectedType) {
+<span class="fc" id="L211">        ensureOpen();</span>
+<span class="fc" id="L212">        ExprValue existing = valuesByKey.get(candidate.key());</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L214">            return expectedType.cast(existing);</span>
+        }
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (valuesByKey.size() &gt;= maximumEntries) {</span>
+<span class="nc" id="L217">            throw new IllegalStateException(</span>
+                    &quot;expression value factory capacity exceeded: &quot; + maximumEntries);
+        }
+<span class="fc" id="L220">        valuesByKey.put(candidate.key(), candidate);</span>
+<span class="fc" id="L221">        return candidate;</span>
+    }
+
+    private void ensureOpen() {
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L226">            throw new IllegalStateException(&quot;expression value factory is closed&quot;);</span>
+        }
+<span class="fc" id="L228">    }</span>
+
+    /** Mathematical value independent of source position and occurrence identity. */
+    public abstract static sealed class ExprValue
+            permits VariableValue, NumberValue, OrderedValue, AssociativeCommutativeValue {
+        private final ValueKey key;
+
+<span class="fc" id="L235">        private ExprValue(ValueKey key) {</span>
+<span class="fc" id="L236">            this.key = Objects.requireNonNull(key, &quot;key&quot;);</span>
+<span class="fc" id="L237">        }</span>
+
+        public final ValueKey key() {
+<span class="fc" id="L240">            return key;</span>
+        }
+
+        public final boolean sameValue(ExprValue other) {
+<span class="nc bnc" id="L244" title="All 4 branches missed.">            return other != null &amp;&amp; key.equals(other.key);</span>
+        }
+
+        @Override
+        public final boolean equals(Object other) {
+<span class="pc bpc" id="L249" title="1 of 6 branches missed.">            return this == other || other instanceof ExprValue value &amp;&amp; key.equals(value.key);</span>
+        }
+
+        @Override
+        public final int hashCode() {
+<span class="fc" id="L254">            return key.hashCode();</span>
+        }
+    }
+
+    public static final class VariableValue extends ExprValue {
+        private final String name;
+        private final SymbolId symbol;
+
+        private VariableValue(String name) {
+<span class="fc" id="L263">            super(ValueKey.variable(requireName(name)));</span>
+<span class="fc" id="L264">            this.name = requireName(name);</span>
+<span class="fc" id="L265">            this.symbol = null;</span>
+<span class="fc" id="L266">        }</span>
+
+        private VariableValue(SymbolId symbol) {
+<span class="fc" id="L269">            super(ValueKey.scopedVariable(Objects.requireNonNull(symbol, &quot;symbol&quot;)));</span>
+<span class="fc" id="L270">            this.name = symbol.identifier();</span>
+<span class="fc" id="L271">            this.symbol = symbol;</span>
+<span class="fc" id="L272">        }</span>
+
+        public Optional&lt;SymbolId&gt; symbol() {
+<span class="fc" id="L275">            return Optional.ofNullable(symbol);</span>
+        }
+
+        public String name() {
+<span class="nc" id="L279">            return name;</span>
+        }
+
+        private static String requireName(String name) {
+<span class="fc" id="L283">            Objects.requireNonNull(name, &quot;name&quot;);</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (name.isBlank()) {</span>
+<span class="nc" id="L285">                throw new IllegalArgumentException(&quot;variable name must not be blank&quot;);</span>
+            }
+<span class="fc" id="L287">            return name;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L292">            return name;</span>
+        }
+    }
+
+    public static final class NumberValue extends ExprValue {
+        private final ExactRational value;
+
+        private NumberValue(ExactRational value) {
+<span class="fc" id="L300">            super(ValueKey.number(Objects.requireNonNull(value, &quot;value&quot;)));</span>
+<span class="fc" id="L301">            this.value = value;</span>
+<span class="fc" id="L302">        }</span>
+
+        public ExactRational value() {
+<span class="fc" id="L305">            return value;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L310">            return value.canonicalText();</span>
+        }
+    }
+
+    public static final class OrderedValue extends ExprValue {
+        private final ValueOperator operator;
+        private final List&lt;ExprValue&gt; operands;
+
+        private OrderedValue(ValueOperator operator, List&lt;? extends ExprValue&gt; operands) {
+<span class="fc" id="L319">            this(prepareOrdered(operator, operands));</span>
+<span class="fc" id="L320">        }</span>
+
+        private OrderedValue(PreparedOrdered prepared) {
+<span class="fc" id="L323">            super(prepared.key());</span>
+<span class="fc" id="L324">            operator = prepared.operator();</span>
+<span class="fc" id="L325">            operands = prepared.operands();</span>
+<span class="fc" id="L326">        }</span>
+
+        public ValueOperator operator() {
+<span class="nc" id="L329">            return operator;</span>
+        }
+
+        public List&lt;ExprValue&gt; operands() {
+<span class="nc" id="L333">            return operands;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L338">            return operator.id() + operands;</span>
+        }
+    }
+
+    public static final class AssociativeCommutativeValue extends ExprValue {
+        private final ValueOperator operator;
+        private final Map&lt;ExprValue, Integer&gt; multiplicities;
+        private final int operandCount;
+
+        private AssociativeCommutativeValue(
+                ValueOperator operator,
+                Map&lt;? extends ExprValue, Integer&gt; multiplicities) {
+<span class="fc" id="L350">            this(prepareAssociativeCommutative(operator, multiplicities));</span>
+<span class="fc" id="L351">        }</span>
+
+        private AssociativeCommutativeValue(PreparedAssociativeCommutative prepared) {
+<span class="fc" id="L354">            super(prepared.key());</span>
+<span class="fc" id="L355">            operator = prepared.operator();</span>
+<span class="fc" id="L356">            multiplicities = prepared.multiplicities();</span>
+<span class="fc" id="L357">            operandCount = prepared.operandCount();</span>
+<span class="fc" id="L358">        }</span>
+
+        public ValueOperator operator() {
+<span class="fc" id="L361">            return operator;</span>
+        }
+
+        /** Unordered value-to-count mapping; iteration order is not semantic. */
+        public Map&lt;ExprValue, Integer&gt; multiplicities() {
+<span class="fc" id="L366">            return multiplicities;</span>
+        }
+
+        public int operandCount() {
+<span class="nc" id="L370">            return operandCount;</span>
+        }
+
+        public int multiplicityOf(ExprValue value) {
+<span class="nc" id="L374">            return multiplicities.getOrDefault(value, 0);</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L379">            return operator.id() + multiplicities;</span>
+        }
+    }
+
+<span class="fc" id="L383">    public record OperatorLaws(boolean associative, boolean commutative, boolean idempotent) {</span>
+<span class="fc" id="L384">        public static final OperatorLaws NONE = new OperatorLaws(false, false, false);</span>
+<span class="fc" id="L385">        public static final OperatorLaws ASSOCIATIVE_COMMUTATIVE =</span>
+                new OperatorLaws(true, true, false);
+
+        public boolean supportsUnorderedNaryValue() {
+<span class="pc bpc" id="L389" title="1 of 4 branches missed.">            return associative &amp;&amp; commutative;</span>
+        }
+    }
+
+    public record ValueOperator(
+            String id,
+            int minimumArity,
+            int maximumArity,
+            OperatorLaws laws) {
+<span class="fc" id="L398">        public static final ValueOperator ADD =</span>
+                new ValueOperator(&quot;add&quot;, 2, Integer.MAX_VALUE, OperatorLaws.ASSOCIATIVE_COMMUTATIVE);
+<span class="fc" id="L400">        public static final ValueOperator SUB =</span>
+                new ValueOperator(&quot;sub&quot;, 2, 2, OperatorLaws.NONE);
+<span class="fc" id="L402">        public static final ValueOperator MUL =</span>
+                new ValueOperator(&quot;mul&quot;, 2, Integer.MAX_VALUE, OperatorLaws.ASSOCIATIVE_COMMUTATIVE);
+<span class="fc" id="L404">        public static final ValueOperator DIV =</span>
+                new ValueOperator(&quot;div&quot;, 2, 2, OperatorLaws.NONE);
+<span class="fc" id="L406">        public static final ValueOperator POW =</span>
+                new ValueOperator(&quot;pow&quot;, 2, 2, OperatorLaws.NONE);
+
+<span class="fc" id="L409">        public ValueOperator {</span>
+<span class="fc" id="L410">            Objects.requireNonNull(id, &quot;id&quot;);</span>
+<span class="fc" id="L411">            Objects.requireNonNull(laws, &quot;laws&quot;);</span>
+<span class="fc" id="L412">            id = id.trim();</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            if (id.isEmpty()) {</span>
+<span class="nc" id="L414">                throw new IllegalArgumentException(&quot;operator id must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L416" title="2 of 4 branches missed.">            if (minimumArity &lt; 0 || maximumArity &lt; minimumArity) {</span>
+<span class="nc" id="L417">                throw new IllegalArgumentException(&quot;invalid operator arity range&quot;);</span>
+            }
+<span class="fc" id="L419">        }</span>
+
+        public static ValueOperator function(String name, int arity) {
+<span class="fc" id="L422">            Objects.requireNonNull(name, &quot;name&quot;);</span>
+<span class="fc" id="L423">            String normalized = name.trim();</span>
+<span class="pc bpc" id="L424" title="2 of 4 branches missed.">            if (normalized.isEmpty() || arity &lt; 0) {</span>
+<span class="nc" id="L425">                throw new IllegalArgumentException(&quot;invalid function name or arity&quot;);</span>
+            }
+<span class="fc" id="L427">            return new ValueOperator(&quot;fn:&quot; + normalized, arity, arity, OperatorLaws.NONE);</span>
+        }
+
+        private String identityToken() {
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            int lawBits = (laws.associative() ? 1 : 0)</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">                    | (laws.commutative() ? 2 : 0)</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">                    | (laws.idempotent() ? 4 : 0);</span>
+<span class="fc" id="L434">            return id + &quot;|&quot; + minimumArity + &quot;|&quot; + maximumArity + &quot;|&quot; + lawBits;</span>
+        }
+
+        private void requireArity(int actualArity) {
+<span class="pc bpc" id="L438" title="2 of 4 branches missed.">            if (actualArity &lt; minimumArity || actualArity &gt; maximumArity) {</span>
+<span class="nc" id="L439">                throw new IllegalArgumentException(</span>
+                        &quot;operator &quot; + id + &quot; does not accept arity &quot; + actualArity);
+            }
+<span class="fc" id="L442">        }</span>
+    }
+
+    /** Versioned structural key, authoritative outside one factory scope. */
+    public record ValueKey(String encoded) implements Comparable&lt;ValueKey&gt; {
+        public static final String FORMAT_VERSION = &quot;regelsuche.expr-value/v2&quot;;
+        public static final String SCOPED_FORMAT_VERSION = &quot;regelsuche.expr-value/v3&quot;;
+        private static final String PREFIX = FORMAT_VERSION + &quot;:&quot;;
+        private static final String SCOPED_PREFIX = SCOPED_FORMAT_VERSION + &quot;:&quot;;
+
+<span class="fc" id="L452">        public ValueKey {</span>
+<span class="fc" id="L453">            Objects.requireNonNull(encoded, &quot;encoded&quot;);</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            if (encoded.isEmpty()) {</span>
+<span class="nc" id="L455">                throw new IllegalArgumentException(&quot;encoded value key must not be empty&quot;);</span>
+            }
+<span class="fc" id="L457">        }</span>
+
+        private static ValueKey variable(String name) {
+<span class="fc" id="L460">            return new ValueKey(PREFIX + &quot;V&quot; + segment(name));</span>
+        }
+
+        private static ValueKey scopedVariable(SymbolId symbol) {
+<span class="fc" id="L464">            return new ValueKey(SCOPED_PREFIX + &quot;S&quot; + segment(symbol.canonicalText()));</span>
+        }
+
+        private static String prefix(Iterable&lt;ExprValue&gt; operands) {
+<span class="fc bfc" id="L468" title="All 2 branches covered.">            for (var operand : operands) {</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                if (operand.key().encoded().startsWith(SCOPED_PREFIX)) return SCOPED_PREFIX;</span>
+<span class="fc" id="L470">            }</span>
+<span class="fc" id="L471">            return PREFIX;</span>
+        }
+
+        private static ValueKey number(ExactRational value) {
+<span class="fc" id="L475">            return new ValueKey(</span>
+<span class="fc" id="L476">                    PREFIX + &quot;Q&quot; + segment(value.canonicalText()));</span>
+        }
+
+        private static ValueKey ordered(ValueOperator operator, List&lt;ExprValue&gt; operands) {
+<span class="fc" id="L480">            StringBuilder encoded = new StringBuilder(prefix(operands))</span>
+<span class="fc" id="L481">                    .append('O')</span>
+<span class="fc" id="L482">                    .append(segment(operator.identityToken()))</span>
+<span class="fc" id="L483">                    .append(operands.size())</span>
+<span class="fc" id="L484">                    .append(':');</span>
+<span class="fc" id="L485">            operands.forEach(operand -&gt; encoded.append(segment(operand.key().encoded())));</span>
+<span class="fc" id="L486">            return new ValueKey(encoded.toString());</span>
+        }
+
+        private static ValueKey associativeCommutative(
+                ValueOperator operator,
+                Map&lt;ExprValue, Integer&gt; multiplicities) {
+<span class="fc" id="L492">            List&lt;Map.Entry&lt;ExprValue, Integer&gt;&gt; entries = new ArrayList&lt;&gt;(multiplicities.entrySet());</span>
+<span class="fc" id="L493">            entries.sort(Comparator.comparing(entry -&gt; entry.getKey().key()));</span>
+<span class="fc" id="L494">            StringBuilder encoded = new StringBuilder(prefix(multiplicities.keySet()))</span>
+<span class="fc" id="L495">                    .append('A')</span>
+<span class="fc" id="L496">                    .append(segment(operator.identityToken()))</span>
+<span class="fc" id="L497">                    .append(entries.size())</span>
+<span class="fc" id="L498">                    .append(':');</span>
+<span class="fc" id="L499">            entries.forEach(entry -&gt; encoded.append(entry.getValue())</span>
+<span class="fc" id="L500">                    .append('*')</span>
+<span class="fc" id="L501">                    .append(segment(entry.getKey().key().encoded())));</span>
+<span class="fc" id="L502">            return new ValueKey(encoded.toString());</span>
+        }
+
+        private static String segment(String text) {
+<span class="fc" id="L506">            Objects.requireNonNull(text, &quot;text&quot;);</span>
+<span class="fc" id="L507">            return text.length() + &quot;:&quot; + text;</span>
+        }
+
+        @Override
+        public int compareTo(ValueKey other) {
+<span class="fc" id="L512">            return encoded.compareTo(other.encoded);</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L517">            return encoded;</span>
+        }
+    }
+
+    public static final class Projection {
+        private final Expr syntaxRoot;
+        private final ExprValue valueRoot;
+        private final Map&lt;Expr, ExprValue&gt; valuesBySyntaxIdentity;
+
+        private Projection(
+                Expr syntaxRoot,
+                ExprValue valueRoot,
+<span class="fc" id="L529">                IdentityHashMap&lt;Expr, ExprValue&gt; valuesBySyntaxIdentity) {</span>
+<span class="fc" id="L530">            this.syntaxRoot = Objects.requireNonNull(syntaxRoot, &quot;syntaxRoot&quot;);</span>
+<span class="fc" id="L531">            this.valueRoot = Objects.requireNonNull(valueRoot, &quot;valueRoot&quot;);</span>
+<span class="fc" id="L532">            this.valuesBySyntaxIdentity = Collections.unmodifiableMap(</span>
+                    new IdentityHashMap&lt;&gt;(valuesBySyntaxIdentity));
+<span class="fc" id="L534">        }</span>
+
+        public Expr syntaxRoot() {
+<span class="nc" id="L537">            return syntaxRoot;</span>
+        }
+
+        public ExprValue valueRoot() {
+<span class="nc" id="L541">            return valueRoot;</span>
+        }
+
+        public Optional&lt;ExprValue&gt; valueOf(Expr syntaxOccurrence) {
+<span class="fc" id="L545">            return Optional.ofNullable(valuesBySyntaxIdentity.get(syntaxOccurrence));</span>
+        }
+
+        public Map&lt;Expr, ExprValue&gt; valuesBySyntaxIdentity() {
+<span class="nc" id="L549">            return valuesBySyntaxIdentity;</span>
+        }
+    }
+
+    private static PreparedOrdered prepareOrdered(
+            ValueOperator operator,
+            List&lt;? extends ExprValue&gt; operands) {
+<span class="fc" id="L556">        Objects.requireNonNull(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L557">        List&lt;ExprValue&gt; copy = List.copyOf(Objects.requireNonNull(operands, &quot;operands&quot;));</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">        if (copy.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L559">            throw new IllegalArgumentException(&quot;operands must not contain null&quot;);</span>
+        }
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (operator.laws().supportsUnorderedNaryValue()) {</span>
+<span class="nc" id="L562">            throw new IllegalArgumentException(&quot;AC operator requires an unordered value&quot;);</span>
+        }
+<span class="fc" id="L564">        operator.requireArity(copy.size());</span>
+<span class="fc" id="L565">        return new PreparedOrdered(operator, copy, ValueKey.ordered(operator, copy));</span>
+    }
+
+    private static PreparedAssociativeCommutative prepareAssociativeCommutative(
+            ValueOperator operator,
+            Map&lt;? extends ExprValue, Integer&gt; multiplicities) {
+<span class="fc" id="L571">        Objects.requireNonNull(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L572">        Objects.requireNonNull(multiplicities, &quot;multiplicities&quot;);</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">        if (!operator.laws().supportsUnorderedNaryValue()) {</span>
+<span class="nc" id="L574">            throw new IllegalArgumentException(&quot;operator is not associative and commutative&quot;);</span>
+        }
+
+<span class="fc" id="L577">        Map&lt;ExprValue, Integer&gt; copy = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L578">        int count = 0;</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">        for (Map.Entry&lt;? extends ExprValue, Integer&gt; entry : multiplicities.entrySet()) {</span>
+<span class="fc" id="L580">            ExprValue value = Objects.requireNonNull(entry.getKey(), &quot;operand value&quot;);</span>
+<span class="fc" id="L581">            int multiplicity = Objects.requireNonNull(entry.getValue(), &quot;operand multiplicity&quot;);</span>
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">            if (multiplicity &lt; 1) {</span>
+<span class="nc" id="L583">                throw new IllegalArgumentException(&quot;operand multiplicity must be positive&quot;);</span>
+            }
+<span class="fc" id="L585">            copy.merge(value, multiplicity, Math::addExact);</span>
+<span class="fc" id="L586">            count = Math.addExact(count, multiplicity);</span>
+<span class="fc" id="L587">        }</span>
+<span class="fc" id="L588">        operator.requireArity(count);</span>
+<span class="fc" id="L589">        Map&lt;ExprValue, Integer&gt; immutable = Collections.unmodifiableMap(copy);</span>
+<span class="fc" id="L590">        return new PreparedAssociativeCommutative(</span>
+                operator,
+                immutable,
+                count,
+<span class="fc" id="L594">                ValueKey.associativeCommutative(operator, immutable));</span>
+    }
+
+<span class="fc" id="L597">    private record PreparedOrdered(</span>
+            ValueOperator operator,
+            List&lt;ExprValue&gt; operands,
+            ValueKey key) {
+    }
+
+<span class="fc" id="L603">    private record PreparedAssociativeCommutative(</span>
+            ValueOperator operator,
+            Map&lt;ExprValue, Integer&gt; multiplicities,
+            int operandCount,
+            ValueKey key) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

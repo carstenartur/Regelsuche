@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Neo4jExpressionGraphStore.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.graph</a> &gt; <span class="el_source">Neo4jExpressionGraphStore.java</span></div><h1>Neo4jExpressionGraphStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.graph;
+
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.mining.RuleCandidate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.neo4j.driver.AuthTokens;
+import org.neo4j.driver.Driver;
+import org.neo4j.driver.GraphDatabase;
+import org.neo4j.driver.Record;
+import org.neo4j.driver.Result;
+import org.neo4j.driver.Session;
+
+public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
+    private final Driver driver;
+
+<span class="nc" id="L20">    public Neo4jExpressionGraphStore(String uri, String username, String password) {</span>
+<span class="nc" id="L21">        this.driver = GraphDatabase.driver(uri, AuthTokens.basic(username, password));</span>
+<span class="nc" id="L22">    }</span>
+
+    @Override
+    public void saveNode(String expression, int complexity) {
+<span class="nc" id="L26">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L27">            session.run(</span>
+                &quot;MERGE (e:Expression {value: $value}) SET e.complexity = $complexity&quot;,
+<span class="nc" id="L29">                java.util.Map.of(&quot;value&quot;, expression, &quot;complexity&quot;, complexity)</span>
+            );
+        }
+<span class="nc" id="L32">    }</span>
+
+    @Override
+    public void saveEdge(GraphEdge edge) {
+        // Legacy observation-only relationships have neither property. Normalize only those
+        // before the identity-aware MERGE; matching on rule alone could erase a recorded execution.
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        String legacyObservation = edge.execution() == null</span>
+<span class="nc" id="L39">            ? &quot;WITH from, to &quot;</span>
+                + &quot;OPTIONAL MATCH (from)-[legacy:TRANSFORMATION {rule: $rule}]-&gt;(to) &quot;
+                + &quot;WHERE legacy.executionIdentity IS NULL AND legacy.execution IS NULL &quot;
+                + &quot;SET legacy.executionIdentity = '' &quot;
+                + &quot;WITH DISTINCT from, to &quot;
+<span class="nc" id="L44">            : &quot;&quot;;</span>
+<span class="nc" id="L45">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L46">            session.run(</span>
+                &quot;MERGE (from:Expression {value: $from}) &quot;
+                    + &quot;MERGE (to:Expression {value: $to}) &quot;
+                    + legacyObservation
+                    + &quot;MERGE (from)-[r:TRANSFORMATION {rule: $rule, executionIdentity: $executionIdentity}]-&gt;(to) &quot;
+                    + &quot;SET r.depth = $depth, r.improvement = $improvement, &quot;
+                    + &quot;r.pathId = $pathId, r.canonicalHash = $canonicalHash, &quot;
+                    + &quot;r.scoreBefore = $scoreBefore, r.scoreAfter = $scoreAfter, &quot;
+                    + &quot;r.rewriteKind = $rewriteKind, r.mayIncreaseComplexity = $mayIncreaseComplexity, &quot;
+                    + &quot;r.estimatedCostDelta = $estimatedCostDelta, &quot;
+                    + &quot;r.equivalencePreservingByConstruction = $equivalencePreservingByConstruction, &quot;
+                    + &quot;r.validationStatus = $validationStatus, r.execution = $execution&quot;,
+<span class="nc" id="L58">                GraphEdgePersistence.properties(edge)</span>
+<span class="nc" id="L59">            ).consume();</span>
+        }
+<span class="nc" id="L61">    }</span>
+
+    @Override
+    public GraphSnapshot snapshot() {
+<span class="nc" id="L65">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L66">            Result nodeResult = session.run(&quot;MATCH (e:Expression) RETURN e.value AS value&quot;);</span>
+<span class="nc" id="L67">            List&lt;String&gt; nodes = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            while (nodeResult.hasNext()) {</span>
+<span class="nc" id="L69">                Record record = nodeResult.next();</span>
+<span class="nc" id="L70">                nodes.add(record.get(&quot;value&quot;).asString());</span>
+<span class="nc" id="L71">            }</span>
+
+<span class="nc" id="L73">            Result edgeResult = session.run(</span>
+                &quot;MATCH (from:Expression)-[r:TRANSFORMATION]-&gt;(to:Expression) &quot;
+                    + &quot;RETURN from.value AS fromExpr, to.value AS toExpr, properties(r) AS properties&quot;
+            );
+<span class="nc" id="L77">            List&lt;GraphEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            while (edgeResult.hasNext()) {</span>
+<span class="nc" id="L79">                Record record = edgeResult.next();</span>
+<span class="nc" id="L80">                edges.add(GraphEdgePersistence.read(</span>
+<span class="nc" id="L81">                    record.get(&quot;fromExpr&quot;).asString(),</span>
+<span class="nc" id="L82">                    record.get(&quot;toExpr&quot;).asString(),</span>
+<span class="nc" id="L83">                    record.get(&quot;properties&quot;).asMap()</span>
+                ));
+<span class="nc" id="L85">            }</span>
+<span class="nc" id="L86">            return new GraphSnapshot(nodes, edges);</span>
+        }
+    }
+
+    @Override
+    public void saveDiscoveredTransformation(DiscoveredTransformation transformation) {
+<span class="nc" id="L92">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L93">            session.run(</span>
+                &quot;MERGE (start:Expression {value: $original}) &quot;
+                    + &quot;SET start.canonicalHash = $canonicalHash, start.score = $originalScore &quot;
+                    + &quot;MERGE (end:Expression {value: $improved}) &quot;
+                    + &quot;SET end.canonicalHash = $canonicalHash, end.score = $improvedScore &quot;
+                    + &quot;MERGE (path:TransformationPath {id: $id}) &quot;
+                    + &quot;SET path.discoveredAt = $discoveredAt, path.totalImprovement = $totalImprovement, &quot;
+                    + &quot;path.status = $status, path.canonicalHash = $canonicalHash &quot;
+                    + &quot;MERGE (path)-[:STARTS_WITH]-&gt;(start) &quot;
+                    + &quot;MERGE (path)-[:ENDS_WITH]-&gt;(end)&quot;,
+<span class="nc" id="L103">                Map.of(</span>
+<span class="nc" id="L104">                    &quot;id&quot;, transformation.id(),</span>
+<span class="nc" id="L105">                    &quot;original&quot;, transformation.originalExpression(),</span>
+<span class="nc" id="L106">                    &quot;improved&quot;, transformation.improvedExpression(),</span>
+<span class="nc" id="L107">                    &quot;originalScore&quot;, transformation.originalScore().weightedTotal(),</span>
+<span class="nc" id="L108">                    &quot;improvedScore&quot;, transformation.improvedScore().weightedTotal(),</span>
+<span class="nc" id="L109">                    &quot;discoveredAt&quot;, transformation.discoveredAt().toString(),</span>
+<span class="nc" id="L110">                    &quot;totalImprovement&quot;, transformation.totalImprovement(),</span>
+<span class="nc" id="L111">                    &quot;status&quot;, transformation.validationStatus().name(),</span>
+<span class="nc" id="L112">                    &quot;canonicalHash&quot;, transformation.canonicalHash()</span>
+                )
+            );
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            for (TransformationStep step : transformation.steps()) {</span>
+<span class="nc" id="L116">                session.run(</span>
+                    &quot;MATCH (path:TransformationPath {id: $pathId}) &quot;
+                        + &quot;MERGE (from:Expression {value: $before}) &quot;
+                        + &quot;MERGE (to:Expression {value: $after}) &quot;
+                        + &quot;MERGE (step:TransformationStep {pathId: $pathId, index: $index}) &quot;
+                        + &quot;SET step.ruleId = $ruleId, step.ruleKind = $ruleKind, step.explanation = $explanation, &quot;
+                        + &quot;step.scoreBefore = $scoreBefore, step.scoreAfter = $scoreAfter, &quot;
+                        + &quot;step.equivalencePreserving = $equivalencePreserving, step.execution = $execution, &quot;
+                        + &quot;step.assumptions = $assumptions &quot;
+                        + &quot;MERGE (path)-[:HAS_STEP]-&gt;(step) &quot;
+                        + &quot;MERGE (step)-[:FROM]-&gt;(from) &quot;
+                        + &quot;MERGE (step)-[:TO]-&gt;(to)&quot;,
+<span class="nc" id="L128">                    stepProperties(transformation.id(), step)</span>
+                );
+<span class="nc" id="L130">            }</span>
+        }
+<span class="nc" id="L132">    }</span>
+
+    private static Map&lt;String, Object&gt; stepProperties(String pathId, TransformationStep step) {
+<span class="nc" id="L135">        Map&lt;String, Object&gt; values = new java.util.LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L136">        values.put(&quot;pathId&quot;, pathId); values.put(&quot;index&quot;, step.index());</span>
+<span class="nc" id="L137">        values.put(&quot;before&quot;, step.beforeExpression()); values.put(&quot;after&quot;, step.afterExpression());</span>
+<span class="nc" id="L138">        values.put(&quot;ruleId&quot;, step.ruleId()); values.put(&quot;ruleKind&quot;, step.ruleKind().name());</span>
+<span class="nc" id="L139">        values.put(&quot;explanation&quot;, step.explanation()); values.put(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="nc" id="L140">        values.put(&quot;scoreAfter&quot;, step.scoreAfter()); values.put(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="nc" id="L141">        values.put(&quot;assumptions&quot;, step.assumptions());</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        values.put(&quot;execution&quot;, step.execution() == null ? null : step.execution().toCanonicalJson());</span>
+<span class="nc" id="L143">        return values;</span>
+    }
+
+    @Override
+    public void saveRuleCandidate(RuleCandidate candidate) {
+<span class="nc" id="L148">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L149">            session.run(</span>
+                &quot;MERGE (candidate:RuleCandidate {canonicalHash: $canonicalHash}) &quot;
+                    + &quot;SET candidate.leftPattern = $leftPattern, candidate.rightPattern = $rightPattern, &quot;
+                    + &quot;candidate.proofStatus = $proofStatus, candidate.status = $status&quot;,
+<span class="nc" id="L153">                Map.of(</span>
+<span class="nc" id="L154">                    &quot;canonicalHash&quot;, candidate.canonicalHash(),</span>
+<span class="nc" id="L155">                    &quot;leftPattern&quot;, candidate.leftPattern(),</span>
+<span class="nc" id="L156">                    &quot;rightPattern&quot;, candidate.rightPattern(),</span>
+<span class="nc" id="L157">                    &quot;proofStatus&quot;, candidate.proofStatus().name(),</span>
+<span class="nc" id="L158">                    &quot;status&quot;, candidate.status().name()</span>
+                )
+            );
+        }
+<span class="nc" id="L162">    }</span>
+
+    @Override
+    public void saveReusableRule(ReusableRule rule) {
+<span class="nc" id="L166">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L167">            session.run(</span>
+                &quot;MERGE (rule:ReusableRule {id: $id}) &quot;
+                    + &quot;SET rule.leftPattern = $leftPattern, rule.rightPattern = $rightPattern, &quot;
+                    + &quot;rule.status = $status, rule.proofStatus = $proofStatus, rule.createdAt = $createdAt&quot;,
+<span class="nc" id="L171">                Map.of(</span>
+<span class="nc" id="L172">                    &quot;id&quot;, rule.id(),</span>
+<span class="nc" id="L173">                    &quot;leftPattern&quot;, rule.leftPattern(),</span>
+<span class="nc" id="L174">                    &quot;rightPattern&quot;, rule.rightPattern(),</span>
+<span class="nc" id="L175">                    &quot;status&quot;, rule.knownRuleStatus().name(),</span>
+<span class="nc" id="L176">                    &quot;proofStatus&quot;, rule.proofStatus().name(),</span>
+<span class="nc" id="L177">                    &quot;createdAt&quot;, rule.createdAt().toString()</span>
+                )
+            );
+        }
+<span class="nc" id="L181">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L185">        driver.close();</span>
+<span class="nc" id="L186">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

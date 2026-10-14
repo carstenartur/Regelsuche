@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramPopulationExecutionProtocol.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramPopulationExecutionProtocol.java</span></div><h1>EvolutionRewriteProgramPopulationExecutionProtocol.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+
+/**
+ * Versioned identity for the mechanics that turn a frozen rewrite-program study
+ * into a bounded deterministic TRAIN population.
+ *
+ * &lt;p&gt;The study plan intentionally remains the historical v1 artifact. This
+ * protocol binds execution semantics that were previously implicit in Java
+ * implementation details, so future experiments can change scheduling without
+ * silently reinterpreting an older study identity.&lt;/p&gt;
+ */
+public record EvolutionRewriteProgramPopulationExecutionProtocol(
+    String schema,
+    String populationEngineImplementationClass,
+    PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
+    String mutatorImplementationClass,
+    MutatorSemanticsVersion mutatorSemanticsVersion,
+    ProposalOrderingPolicy proposalOrderingPolicy,
+    OffspringSchedulingPolicy offspringSchedulingPolicy,
+    int generatedPoolMultiplier,
+    MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
+    SurvivorSelectionPolicy survivorSelectionPolicy,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-population-execution-protocol/v1&quot;;
+    public static final String STATUS = &quot;FROZEN_NOT_RUN&quot;;
+
+<span class="fc" id="L33">    public enum PopulationEngineSemanticsVersion {</span>
+<span class="fc" id="L34">        LEGACY_POPULATION_ENGINE_V1,</span>
+<span class="fc" id="L35">        PROTOCOL_DRIVEN_POPULATION_ENGINE_V2</span>
+    }
+
+<span class="fc" id="L38">    public enum MutatorSemanticsVersion {</span>
+<span class="fc" id="L39">        ROTATED_PREFIX_MUTATOR_V1,</span>
+<span class="fc" id="L40">        STRATIFIED_MUTATION_KIND_MUTATOR_V2</span>
+    }
+
+<span class="fc" id="L43">    public enum ProposalOrderingPolicy {</span>
+<span class="fc" id="L44">        KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1</span>
+    }
+
+<span class="fc" id="L47">    public enum OffspringSchedulingPolicy {</span>
+<span class="fc" id="L48">        ROTATED_PREFIX_V1,</span>
+<span class="fc" id="L49">        STRATIFIED_MUTATION_KIND_V1</span>
+    }
+
+<span class="fc" id="L52">    public enum MutationSeedDerivationPolicy {</span>
+<span class="fc" id="L53">        STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1</span>
+    }
+
+<span class="fc" id="L56">    public enum SurvivorSelectionPolicy {</span>
+<span class="fc" id="L57">        FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1</span>
+    }
+
+<span class="fc" id="L60">    public EvolutionRewriteProgramPopulationExecutionProtocol {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program population execution protocol&quot;);
+        }
+<span class="fc" id="L65">        populationEngineImplementationClass = requireText(</span>
+            populationEngineImplementationClass,
+            &quot;populationEngineImplementationClass&quot;);
+<span class="fc" id="L68">        Objects.requireNonNull(</span>
+            populationEngineSemanticsVersion,
+            &quot;populationEngineSemanticsVersion&quot;);
+<span class="fc" id="L71">        mutatorImplementationClass = requireText(</span>
+            mutatorImplementationClass,
+            &quot;mutatorImplementationClass&quot;);
+<span class="fc" id="L74">        Objects.requireNonNull(</span>
+            mutatorSemanticsVersion,
+            &quot;mutatorSemanticsVersion&quot;);
+<span class="fc" id="L77">        requirePolicyInputs(</span>
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy);
+<span class="fc" id="L83">        requireSemanticVersions(</span>
+            populationEngineSemanticsVersion,
+            mutatorSemanticsVersion,
+            offspringSchedulingPolicy);
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!STATUS.equals(status)) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;execution protocol must remain frozen and unexecuted&quot;);
+        }
+<span class="fc" id="L91">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L92">        String expected = EvolutionGenome.hash(render(</span>
+            populationEngineImplementationClass,
+            populationEngineSemanticsVersion,
+            mutatorImplementationClass,
+            mutatorSemanticsVersion,
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy,
+            null));
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(</span>
+                &quot;population execution protocol contentHash mismatch&quot;);
+        }
+<span class="fc" id="L107">    }</span>
+
+    /** Exact identity of the population/mutator behavior used before #613. */
+    public static EvolutionRewriteProgramPopulationExecutionProtocol legacyV1() {
+<span class="fc" id="L111">        return create(</span>
+            EvolutionRewriteProgramPopulationEngine.class,
+            PopulationEngineSemanticsVersion.LEGACY_POPULATION_ENGINE_V1,
+            DeterministicRewriteProgramMutator.class,
+            MutatorSemanticsVersion.ROTATED_PREFIX_MUTATOR_V1,
+            ProposalOrderingPolicy.KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
+            OffspringSchedulingPolicy.ROTATED_PREFIX_V1,
+            2,
+            MutationSeedDerivationPolicy
+                .STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1,
+            SurvivorSelectionPolicy
+                .FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1);
+    }
+
+    /** Exact v2 identity for mutation-kind stratification under legacy budgets. */
+    public static EvolutionRewriteProgramPopulationExecutionProtocol
+            stratifiedMutationKindV1() {
+<span class="fc" id="L128">        return create(</span>
+            EvolutionRewriteProgramPopulationEngine.class,
+            PopulationEngineSemanticsVersion.PROTOCOL_DRIVEN_POPULATION_ENGINE_V2,
+            StratifiedMutationKindRewriteProgramMutator.class,
+            MutatorSemanticsVersion.STRATIFIED_MUTATION_KIND_MUTATOR_V2,
+            ProposalOrderingPolicy.KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
+            OffspringSchedulingPolicy.STRATIFIED_MUTATION_KIND_V1,
+            2,
+            MutationSeedDerivationPolicy
+                .STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1,
+            SurvivorSelectionPolicy
+                .FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1);
+    }
+
+    /**
+     * Convenience factory for one of the explicitly versioned scheduling
+     * families. The semantic version is derived from the scheduling policy so a
+     * future policy cannot accidentally reuse the legacy implementation version.
+     */
+    public static EvolutionRewriteProgramPopulationExecutionProtocol create(
+        Class&lt;?&gt; populationEngineClass,
+        Class&lt;?&gt; mutatorClass,
+        ProposalOrderingPolicy proposalOrderingPolicy,
+        OffspringSchedulingPolicy offspringSchedulingPolicy,
+        int generatedPoolMultiplier,
+        MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
+        SurvivorSelectionPolicy survivorSelectionPolicy
+    ) {
+<span class="fc" id="L156">        requirePolicyInputs(</span>
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy);
+        PopulationEngineSemanticsVersion engineVersion;
+        MutatorSemanticsVersion mutatorVersion;
+<span class="pc bpc" id="L164" title="1 of 3 branches missed.">        switch (offspringSchedulingPolicy) {</span>
+            case ROTATED_PREFIX_V1 -&gt; {
+<span class="fc" id="L166">                engineVersion = PopulationEngineSemanticsVersion</span>
+                    .LEGACY_POPULATION_ENGINE_V1;
+<span class="fc" id="L168">                mutatorVersion = MutatorSemanticsVersion</span>
+                    .ROTATED_PREFIX_MUTATOR_V1;
+<span class="fc" id="L170">            }</span>
+            case STRATIFIED_MUTATION_KIND_V1 -&gt; {
+<span class="fc" id="L172">                engineVersion = PopulationEngineSemanticsVersion</span>
+                    .PROTOCOL_DRIVEN_POPULATION_ENGINE_V2;
+<span class="fc" id="L174">                mutatorVersion = MutatorSemanticsVersion</span>
+                    .STRATIFIED_MUTATION_KIND_MUTATOR_V2;
+<span class="fc" id="L176">            }</span>
+<span class="nc" id="L177">            default -&gt; throw new IllegalArgumentException(</span>
+                &quot;unsupported offspring scheduling policy&quot;);
+        }
+<span class="fc" id="L180">        return create(</span>
+            populationEngineClass,
+            engineVersion,
+            mutatorClass,
+            mutatorVersion,
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy);
+    }
+
+    public static EvolutionRewriteProgramPopulationExecutionProtocol create(
+        Class&lt;?&gt; populationEngineClass,
+        PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
+        Class&lt;?&gt; mutatorClass,
+        MutatorSemanticsVersion mutatorSemanticsVersion,
+        ProposalOrderingPolicy proposalOrderingPolicy,
+        OffspringSchedulingPolicy offspringSchedulingPolicy,
+        int generatedPoolMultiplier,
+        MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
+        SurvivorSelectionPolicy survivorSelectionPolicy
+    ) {
+<span class="fc" id="L203">        Objects.requireNonNull(populationEngineClass, &quot;populationEngineClass&quot;);</span>
+<span class="fc" id="L204">        Objects.requireNonNull(</span>
+            populationEngineSemanticsVersion,
+            &quot;populationEngineSemanticsVersion&quot;);
+<span class="fc" id="L207">        Objects.requireNonNull(mutatorClass, &quot;mutatorClass&quot;);</span>
+<span class="fc" id="L208">        Objects.requireNonNull(mutatorSemanticsVersion, &quot;mutatorSemanticsVersion&quot;);</span>
+<span class="fc" id="L209">        requirePolicyInputs(</span>
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy);
+<span class="fc" id="L215">        requireSemanticVersions(</span>
+            populationEngineSemanticsVersion,
+            mutatorSemanticsVersion,
+            offspringSchedulingPolicy);
+<span class="fc" id="L219">        String hash = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L220">            populationEngineClass.getName(),</span>
+            populationEngineSemanticsVersion,
+<span class="fc" id="L222">            mutatorClass.getName(),</span>
+            mutatorSemanticsVersion,
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy,
+            null));
+<span class="fc" id="L230">        return new EvolutionRewriteProgramPopulationExecutionProtocol(</span>
+            SCHEMA,
+<span class="fc" id="L232">            populationEngineClass.getName(),</span>
+            populationEngineSemanticsVersion,
+<span class="fc" id="L234">            mutatorClass.getName(),</span>
+            mutatorSemanticsVersion,
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy,
+            STATUS,
+            hash);
+    }
+
+    public void requireImplementations(
+        Class&lt;?&gt; populationEngineClass,
+        Class&lt;?&gt; mutatorClass
+    ) {
+<span class="fc" id="L249">        Objects.requireNonNull(populationEngineClass, &quot;populationEngineClass&quot;);</span>
+<span class="fc" id="L250">        Objects.requireNonNull(mutatorClass, &quot;mutatorClass&quot;);</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (!populationEngineImplementationClass.equals(</span>
+<span class="fc" id="L252">                populationEngineClass.getName())) {</span>
+<span class="nc" id="L253">            throw new IllegalArgumentException(</span>
+                &quot;population engine implementation differs from execution protocol&quot;);
+        }
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (!mutatorImplementationClass.equals(mutatorClass.getName())) {</span>
+<span class="nc" id="L257">            throw new IllegalArgumentException(</span>
+                &quot;mutator implementation differs from execution protocol&quot;);
+        }
+<span class="fc" id="L260">    }</span>
+
+    public String toCanonicalJson() {
+<span class="nc" id="L263">        return render(</span>
+            populationEngineImplementationClass,
+            populationEngineSemanticsVersion,
+            mutatorImplementationClass,
+            mutatorSemanticsVersion,
+            proposalOrderingPolicy,
+            offspringSchedulingPolicy,
+            generatedPoolMultiplier,
+            mutationSeedDerivationPolicy,
+            survivorSelectionPolicy,
+            contentHash);
+    }
+
+    private static void requirePolicyInputs(
+        ProposalOrderingPolicy proposalOrderingPolicy,
+        OffspringSchedulingPolicy offspringSchedulingPolicy,
+        int generatedPoolMultiplier,
+        MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
+        SurvivorSelectionPolicy survivorSelectionPolicy
+    ) {
+<span class="fc" id="L283">        Objects.requireNonNull(proposalOrderingPolicy, &quot;proposalOrderingPolicy&quot;);</span>
+<span class="fc" id="L284">        Objects.requireNonNull(</span>
+            offspringSchedulingPolicy, &quot;offspringSchedulingPolicy&quot;);
+<span class="pc bpc" id="L286" title="1 of 4 branches missed.">        if (generatedPoolMultiplier &lt; 1 || generatedPoolMultiplier &gt; 64) {</span>
+<span class="fc" id="L287">            throw new IllegalArgumentException(</span>
+                &quot;generatedPoolMultiplier must be in [1,64]&quot;);
+        }
+<span class="fc" id="L290">        Objects.requireNonNull(</span>
+            mutationSeedDerivationPolicy,
+            &quot;mutationSeedDerivationPolicy&quot;);
+<span class="fc" id="L293">        Objects.requireNonNull(</span>
+            survivorSelectionPolicy,
+            &quot;survivorSelectionPolicy&quot;);
+<span class="fc" id="L296">    }</span>
+
+    private static void requireSemanticVersions(
+        PopulationEngineSemanticsVersion engineVersion,
+        MutatorSemanticsVersion mutatorVersion,
+        OffspringSchedulingPolicy schedulingPolicy
+    ) {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        boolean valid = switch (schedulingPolicy) {</span>
+            case ROTATED_PREFIX_V1 -&gt;
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">                engineVersion</span>
+                    == PopulationEngineSemanticsVersion.LEGACY_POPULATION_ENGINE_V1
+                &amp;&amp; mutatorVersion
+                    == MutatorSemanticsVersion.ROTATED_PREFIX_MUTATOR_V1;
+            case STRATIFIED_MUTATION_KIND_V1 -&gt;
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">                engineVersion</span>
+                    == PopulationEngineSemanticsVersion
+                        .PROTOCOL_DRIVEN_POPULATION_ENGINE_V2
+                &amp;&amp; mutatorVersion
+                    == MutatorSemanticsVersion
+                        .STRATIFIED_MUTATION_KIND_MUTATOR_V2;
+        };
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (!valid) {</span>
+<span class="fc" id="L318">            throw new IllegalArgumentException(</span>
+                &quot;execution semantic versions do not match scheduling policy&quot;);
+        }
+<span class="fc" id="L321">    }</span>
+
+    private static String render(
+        String populationEngineImplementationClass,
+        PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
+        String mutatorImplementationClass,
+        MutatorSemanticsVersion mutatorSemanticsVersion,
+        ProposalOrderingPolicy proposalOrderingPolicy,
+        OffspringSchedulingPolicy offspringSchedulingPolicy,
+        int generatedPoolMultiplier,
+        MutationSeedDerivationPolicy mutationSeedDerivationPolicy,
+        SurvivorSelectionPolicy survivorSelectionPolicy,
+        String contentHash
+    ) {
+<span class="fc" id="L335">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L336">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L337">            .property(</span>
+                &quot;populationEngineImplementationClass&quot;,
+                populationEngineImplementationClass)
+<span class="fc" id="L340">            .property(</span>
+                &quot;populationEngineSemanticsVersion&quot;,
+<span class="fc" id="L342">                populationEngineSemanticsVersion.name())</span>
+<span class="fc" id="L343">            .property(&quot;mutatorImplementationClass&quot;, mutatorImplementationClass)</span>
+<span class="fc" id="L344">            .property(</span>
+                &quot;mutatorSemanticsVersion&quot;,
+<span class="fc" id="L346">                mutatorSemanticsVersion.name())</span>
+<span class="fc" id="L347">            .property(&quot;proposalOrderingPolicy&quot;, proposalOrderingPolicy.name())</span>
+<span class="fc" id="L348">            .property(&quot;offspringSchedulingPolicy&quot;, offspringSchedulingPolicy.name())</span>
+<span class="fc" id="L349">            .property(&quot;generatedPoolMultiplier&quot;, generatedPoolMultiplier)</span>
+<span class="fc" id="L350">            .property(</span>
+                &quot;mutationSeedDerivationPolicy&quot;,
+<span class="fc" id="L352">                mutationSeedDerivationPolicy.name())</span>
+<span class="fc" id="L353">            .property(&quot;survivorSelectionPolicy&quot;, survivorSelectionPolicy.name())</span>
+<span class="fc" id="L354">            .property(&quot;status&quot;, STATUS);</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L356">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L358">        return json.endObject().toString();</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L362" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L363">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L365">        return value.trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

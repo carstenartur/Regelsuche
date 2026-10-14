@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SmtProofArtifacts.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">SmtProofArtifacts.java</span></div><h1>SmtProofArtifacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIrJsonCodec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
+/** Portable generated SMT artifact bound to the same native IR used by the portfolio. */
+public final class SmtProofArtifacts {
+    public static final String ENVELOPE = &quot;; regelsuche-obligation-base64: &quot;;
+    private SmtProofArtifacts() { }
+
+    public static String artifact(Obligation obligation) {
+<span class="fc" id="L15">        var material = new SmtLibRenderer().render(obligation);</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (!material.issues().isEmpty()</span>
+<span class="fc bfc" id="L17" title="All 4 branches covered.">                || obligation.theories().stream().anyMatch(t -&gt; t != Theory.REAL_ARITHMETIC))</span>
+<span class="fc" id="L18">            throw new IllegalArgumentException(&quot;unsupported SMT translation: &quot; + material.issues());</span>
+<span class="fc" id="L19">        return ENVELOPE + Base64.getEncoder().encodeToString(</span>
+<span class="fc" id="L20">            obligation.toCanonicalJson().getBytes(StandardCharsets.UTF_8)) + &quot;\n&quot;</span>
+<span class="fc" id="L21">            + &quot;(set-option :produce-proofs true)\n&quot; + material.scriptPrefix()</span>
+            + &quot;(check-sat)\n(get-proof)\n(exit)\n&quot;;
+    }
+
+    public static Obligation readArtifact(String artifact) {
+<span class="fc bfc" id="L26" title="All 6 branches covered.">        if (artifact == null || artifact.length() &gt; 2_000_000 || !artifact.startsWith(ENVELOPE))</span>
+<span class="fc" id="L27">            throw new IllegalArgumentException(&quot;expected generated typed SMT artifact&quot;);</span>
+<span class="fc" id="L28">        int end = artifact.indexOf('\n');</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (end &lt; 0) throw new IllegalArgumentException(&quot;incomplete SMT artifact&quot;);</span>
+<span class="fc" id="L30">        var request = new SolverIrJsonCodec().readObligation(new String(</span>
+<span class="fc" id="L31">            Base64.getDecoder().decode(artifact.substring(ENVELOPE.length(), end)), StandardCharsets.UTF_8));</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (!artifact.equals(artifact(request))) throw new IllegalArgumentException(&quot;edited SMT artifact&quot;);</span>
+<span class="fc" id="L33">        return request;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

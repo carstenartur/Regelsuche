@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Rational.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">Rational.java</span></div><h1>Rational.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Objects;
+
+/**
+ * Compatibility facade for the historical mathematical-algorithms API.
+ *
+ * &lt;p&gt;All exact normalization and arithmetic delegates to the authoritative
+ * {@link ExactRational} contract in {@code regelsuche-core}. New core code
+ * should use {@code ExactRational} directly. {@link #fromDouble(double)} is a
+ * legacy approximate-input adapter and must not be used to authorize an exact
+ * source-language claim.&lt;/p&gt;
+ */
+public record Rational(
+    BigInteger numerator,
+    BigInteger denominator
+) implements Comparable&lt;Rational&gt; {
+<span class="fc" id="L21">    public static final Rational ZERO =</span>
+<span class="fc" id="L22">        fromExact(ExactRational.ZERO);</span>
+<span class="fc" id="L23">    public static final Rational ONE =</span>
+<span class="fc" id="L24">        fromExact(ExactRational.ONE);</span>
+<span class="fc" id="L25">    public static final Rational NEGATIVE_ONE =</span>
+<span class="fc" id="L26">        fromExact(ExactRational.NEGATIVE_ONE);</span>
+
+<span class="fc" id="L28">    public Rational {</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (numerator == null) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(</span>
+                &quot;numerator must not be null&quot;);
+        }
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        if (denominator == null || denominator.signum() == 0) {</span>
+<span class="fc" id="L34">            throw new IllegalArgumentException(</span>
+                &quot;denominator must not be zero&quot;);
+        }
+<span class="fc" id="L37">        ExactRational normalized =</span>
+            new ExactRational(numerator, denominator);
+<span class="fc" id="L39">        numerator = normalized.numerator();</span>
+<span class="fc" id="L40">        denominator = normalized.denominator();</span>
+<span class="fc" id="L41">    }</span>
+
+    public static Rational of(long value) {
+<span class="fc" id="L44">        return fromExact(ExactRational.integer(value));</span>
+    }
+
+    /**
+     * Converts an already rounded binary floating-point value through its
+     * canonical decimal rendering. This preserves legacy behavior only.
+     */
+    public static Rational fromDouble(double value) {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;number must be finite&quot;);
+        }
+<span class="fc" id="L56">        BigDecimal decimal =</span>
+<span class="fc" id="L57">            BigDecimal.valueOf(value).stripTrailingZeros();</span>
+<span class="fc" id="L58">        BigInteger numerator = decimal.unscaledValue();</span>
+<span class="fc" id="L59">        BigInteger denominator = BigInteger.ONE;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (decimal.scale() &gt; 0) {</span>
+<span class="fc" id="L61">            denominator = BigInteger.TEN.pow(decimal.scale());</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        } else if (decimal.scale() &lt; 0) {</span>
+<span class="nc" id="L63">            numerator = numerator.multiply(</span>
+<span class="nc" id="L64">                BigInteger.TEN.pow(-decimal.scale()));</span>
+        }
+<span class="fc" id="L66">        return new Rational(numerator, denominator);</span>
+    }
+
+    public static Rational fromExact(ExactRational value) {
+<span class="fc" id="L70">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L71">        return new Rational(</span>
+<span class="fc" id="L72">            value.numerator(),</span>
+<span class="fc" id="L73">            value.denominator());</span>
+    }
+
+    public ExactRational exactValue() {
+<span class="fc" id="L77">        return new ExactRational(numerator, denominator);</span>
+    }
+
+    public Rational add(Rational other) {
+<span class="fc" id="L81">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L83">            return this;</span>
+        }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (isZero()) {</span>
+<span class="fc" id="L86">            return other;</span>
+        }
+<span class="fc" id="L88">        return canonical(exactValue().add(other.exactValue()));</span>
+    }
+
+    public Rational subtract(Rational other) {
+<span class="fc" id="L92">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L94">            return this;</span>
+        }
+<span class="fc" id="L96">        return canonical(exactValue().subtract(other.exactValue()));</span>
+    }
+
+    public Rational multiply(Rational other) {
+<span class="fc" id="L100">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        if (isZero() || other.isZero()) {</span>
+<span class="fc" id="L102">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L105">            return this;</span>
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L108">            return other;</span>
+        }
+<span class="fc" id="L110">        return canonical(exactValue().multiply(other.exactValue()));</span>
+    }
+
+    public Rational divide(Rational other) {
+<span class="fc" id="L114">        Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L116">            return this;</span>
+        }
+<span class="fc" id="L118">        return canonical(exactValue().divide(other.exactValue()));</span>
+    }
+
+    public Rational negate() {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (isZero()) {</span>
+<span class="fc" id="L123">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L126">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
+<span class="fc" id="L129">            return ONE;</span>
+        }
+<span class="fc" id="L131">        return canonical(exactValue().negate());</span>
+    }
+
+    public Rational abs() {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        return numerator.signum() &gt;= 0 ? this : negate();</span>
+    }
+
+    private static Rational canonical(ExactRational value) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (value.isZero()) {</span>
+<span class="fc" id="L140">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (value.isOne()) {</span>
+<span class="fc" id="L143">            return ONE;</span>
+        }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (value.isNegativeOne()) {</span>
+<span class="fc" id="L146">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc" id="L148">        return fromExact(value);</span>
+    }
+
+    public boolean isZero() {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
+    }
+
+    public boolean isOne() {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE)</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+    }
+
+    public boolean isNegativeOne() {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        return numerator.equals(BigInteger.ONE.negate())</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+    }
+
+    @Override
+    public int compareTo(Rational other) {
+<span class="fc" id="L167">        return exactValue().compareTo(</span>
+<span class="fc" id="L168">            Objects.requireNonNull(other, &quot;other&quot;).exactValue());</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L173">        return exactValue().canonicalText();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EquivalenceAwareAntiUnifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">EquivalenceAwareAntiUnifier.java</span></div><h1>EquivalenceAwareAntiUnifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Computes a bounded least-general generalization for equivalent AST examples.
+ * Inputs are first normalized for AC ordering and monomial power/product form.
+ */
+<span class="fc" id="L18">public final class EquivalenceAwareAntiUnifier {</span>
+    public PatternExpr generalize(List&lt;Expr&gt; examples, RecognitionProfile profile) {
+<span class="fc" id="L20">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">        if (examples == null || examples.size() &lt; 2) {</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;at least two examples are required&quot;);</span>
+        }
+        List&lt;Expr&gt; normalized;
+<span class="fc" id="L25">        try (RecognitionNormalizer.Session session = RecognitionNormalizer.session(profile)) {</span>
+<span class="fc" id="L26">            normalized = examples.stream().map(session::normalize).toList();</span>
+        }
+<span class="fc" id="L28">        Counter counter = new Counter();</span>
+<span class="fc" id="L29">        PatternExpr result = fromExpr(normalized.get(0));</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (int i = 1; i &lt; normalized.size(); i++) {</span>
+<span class="fc" id="L31">            result = generalize(result, normalized.get(i), new HashMap&lt;&gt;(), counter);</span>
+        }
+<span class="fc" id="L33">        return result;</span>
+    }
+
+    private PatternExpr generalize(
+        PatternExpr pattern,
+        Expr expression,
+        Map&lt;String, PatternExpr&gt; reused,
+        Counter counter
+    ) {
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber number</span>
+<span class="fc" id="L43">            &amp;&amp; expression instanceof NumberExpr other</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            &amp;&amp; number.value().equals(other.value())) {</span>
+<span class="fc" id="L45">            return pattern;</span>
+        }
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable</span>
+<span class="fc" id="L48">            &amp;&amp; expression instanceof VariableExpr other</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            &amp;&amp; variable.name().equals(other.name())) {</span>
+<span class="nc" id="L50">            return pattern;</span>
+        }
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.Operation operation</span>
+<span class="fc" id="L53">            &amp;&amp; expression instanceof BinaryExpr other</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            &amp;&amp; operation.operator() == other.operator()) {</span>
+<span class="fc" id="L55">            return PatternExpr.op(</span>
+<span class="fc" id="L56">                operation.operator(),</span>
+<span class="fc" id="L57">                generalize(operation.left(), other.left(), reused, counter),</span>
+<span class="fc" id="L58">                generalize(operation.right(), other.right(), reused, counter)</span>
+            );
+        }
+<span class="pc bpc" id="L61" title="3 of 4 branches missed.">        if (pattern instanceof PatternExpr.Function function</span>
+<span class="nc" id="L62">            &amp;&amp; expression instanceof FunctionExpr other</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            &amp;&amp; function.name().equals(other.name())</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            &amp;&amp; function.arguments().size() == other.arguments().size()) {</span>
+<span class="nc" id="L65">            List&lt;PatternExpr&gt; args = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            for (int i = 0; i &lt; function.arguments().size(); i++) {</span>
+<span class="nc" id="L67">                args.add(generalize(function.arguments().get(i), other.arguments().get(i), reused, counter));</span>
+            }
+<span class="nc" id="L69">            return new PatternExpr.Function(function.name(), args);</span>
+        }
+<span class="fc" id="L71">        String key = pattern + &quot; :: &quot; + expression;</span>
+<span class="fc" id="L72">        return reused.computeIfAbsent(key, ignored -&gt; PatternExpr.var(&quot;G&quot; + counter.next()));</span>
+    }
+
+    private static PatternExpr fromExpr(Expr expression) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L77">            return PatternExpr.num(number.value());</span>
+        }
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L80">            return PatternExpr.variable(variable.name());</span>
+        }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L83">            return PatternExpr.op(binary.operator(), fromExpr(binary.left()), fromExpr(binary.right()));</span>
+        }
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L86">            return new PatternExpr.Function(function.name(), function.arguments().stream()</span>
+<span class="nc" id="L87">                .map(EquivalenceAwareAntiUnifier::fromExpr).toList());</span>
+        }
+<span class="nc" id="L89">        throw new IllegalArgumentException(&quot;unsupported expression type: &quot; + expression.getClass().getName());</span>
+    }
+
+    private static final class Counter {
+        private int value;
+        int next() {
+<span class="fc" id="L95">            return ++value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

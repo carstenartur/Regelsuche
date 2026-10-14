@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LeanProofBridge.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.proof</a> &gt; <span class="el_source">LeanProofBridge.java</span></div><h1>LeanProofBridge.java</h1><pre class="source lang-java linenums">package de.regelsuche.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.portfolio.LeanSolverBackend;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.util.List;
+
+/** Generates actual bounded tactics and a closed theorem/axiom audit through the shared IR. */
+<span class="fc" id="L10">public final class LeanProofBridge implements ProofBridge {</span>
+    @Override
+    public ProofAttempt prove(String left, String right, List&lt;Assumption&gt; assumptions) {
+<span class="fc" id="L13">        try { return prove(ProofObligationAdapter.equality(left, right, assumptions)); }</span>
+<span class="fc" id="L14">        catch (IllegalArgumentException unsupported) { return unsupported(unsupported); }</span>
+    }
+
+    /** Typed goals include inequalities; no string-based alternate mathematics is used. */
+    public ProofAttempt prove(Obligation obligation) {
+        try {
+<span class="fc" id="L20">            return new ProofAttempt(CandidateProofStatus.FORMALLY_PROVABLE,</span>
+<span class="fc" id="L21">                LeanSolverBackend.artifact(obligation), &quot;lean4&quot;);</span>
+<span class="nc" id="L22">        } catch (IllegalArgumentException unsupported) { return unsupported(unsupported); }</span>
+    }
+
+    private static ProofAttempt unsupported(IllegalArgumentException exception) {
+<span class="fc" id="L26">        return new ProofAttempt(CandidateProofStatus.OBSERVED,</span>
+<span class="fc" id="L27">            &quot;Unsupported Lean obligation: &quot; + exception.getMessage(), &quot;lean4&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
