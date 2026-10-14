@@ -40,7 +40,8 @@ class MavenDependencyManagementContractTest {
           "org.neo4j.driver:neo4j-java-driver",
           "org.graalvm.polyglot:polyglot",
           "org.graalvm.polyglot:python",
-          "org.graalvm.python:python-embedding");
+          "org.graalvm.python:python-embedding",
+          "org.jacoco:org.jacoco.report");
 
   private static final Set<String> MANAGED_REACTOR_DEPENDENCIES =
       Set.of(

@@ -318,6 +318,8 @@ jobs:
           ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success')) }}
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with: { distribution: temurin, java-version: '25', verify-signature: true }
       - name: Download project-parallel Gradle coverage evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -339,6 +341,11 @@ jobs:
           --root "$PWD"
           --isolated-report
           build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
+      - name: Generate complete standard JaCoCo coverage report
+        run: >-
+          python3 -B scripts/generate-ci-pages.py --coverage-only
+          --sympy-inputs
+          build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/inputs
       - name: Collect complete checkout-owned quality acceptance evidence
         id: acceptance_evidence
         run: >-
@@ -361,6 +368,7 @@ jobs:
           path: |
             build/reports/quality/coverage-report.json
             build/reports/quality/coverage-report.md
+            public/coverage/**
           include-hidden-files: true
           if-no-files-found: error
       - name: Record complete verification authority
@@ -378,6 +386,8 @@ jobs:
         with: { name: repository-verification, path: . }
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: jmh-verification, path: . }
+      - name: Remove producer-local coverage before restoring the complete report
+        run: rm -rf public/coverage
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with: { name: coverage-verification, path: . }
       - name: Assemble the static site

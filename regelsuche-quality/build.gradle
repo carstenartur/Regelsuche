@@ -14,6 +14,7 @@ java {
 
 dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
+    implementation 'org.jacoco:org.jacoco.report:0.8.13'
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
@@ -106,4 +107,51 @@ tasks.named('check') {
 
 rootProject.tasks.named('check') {
     dependsOn tasks.named('verifySupplyChainVulnerabilities')
+}
+
+// Stage the standard JaCoCo renderer and its small module-assembly adapter in
+// the normal build. Convergence neither reruns tests nor resolves dependencies.
+def coverageReportRuntime = tasks.register('coverageReportRuntime', Sync) {
+    group = 'reporting'
+    description = 'Retains the JaCoCo report runtime with the verification evidence.'
+    from tasks.named('jar')
+    from configurations.runtimeClasspath
+    into rootProject.layout.buildDirectory.dir('reports/quality/coverage-report-runtime')
+}
+
+def coverageModules = new groovy.json.JsonSlurper().parse(
+    rootProject.file('config/quality/coverage-policy.json')).modules.keySet()
+rootProject.subprojects.findAll { it.name in coverageModules }.each { module ->
+    module.plugins.withId('jacoco') {
+        module.tasks.named('jacocoTestReport').configure { report ->
+            def retainedInputs = module.layout.buildDirectory.dir('reports/jacoco/test/inputs')
+            outputs.dir retainedInputs
+            doLast {
+                // Copy the actual report inputs, including its configured
+                // exclusions and additional test data, rather than guessing
+                // class paths or replacing one authority with another.
+                module.sync {
+                    into retainedInputs
+                    duplicatesStrategy = DuplicatesStrategy.FAIL
+                    from(report.executionData.filter { it.isFile() }) { into 'execution-data' }
+                    from(module.files(report.classDirectories, report.additionalClassDirs)) { into 'classes' }
+                    from(module.files(report.sourceDirectories, report.additionalSourceDirs)) { into 'sources' }
+                }
+            }
+        }
+    }
+}
+
+rootProject.tasks.named('generateCiPages').configure {
+    dependsOn coverageReportRuntime
+    inputs.file rootProject.file('config/quality/coverage-policy.json')
+    outputs.upToDateWhen { false }
+    def deferredSympy = providers.gradleProperty('separateSympyRuntimeAuthority').orNull == 'true' &&
+        System.getenv('REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY') == 'required-by-workflow'
+    if (deferredSympy) {
+        args '--tests-only'
+    } else {
+        dependsOn ':verifyCoverageRegression'
+        dependsOn coverageModules.collect { ":${it}:jacocoTestReport" }
+    }
 }
