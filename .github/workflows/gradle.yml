@@ -55,7 +55,7 @@ jobs:
           env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
       - name: Retain Gradle verification evidence
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id) || 'repository-verification' }}
           path: |
@@ -106,7 +106,7 @@ jobs:
         run: bash gradle/run-isolated-jmh-authority.sh
       - name: Retain isolated JMH evidence
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jmh-verification
           path: |
@@ -146,7 +146,7 @@ jobs:
         run: bash gradle/run-isolated-sympy-runtime-authority.sh
       - name: Retain isolated SymPy runtime evidence
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: sympy-runtime-verification
           path: |
@@ -190,7 +190,7 @@ jobs:
         run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: maven-product-verification
           path: |
@@ -223,7 +223,7 @@ jobs:
         run: bash gradle/run-external-polynomial-comparison.sh
       - name: Retain complete evidence including negative outcomes
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: external-polynomial-comparison-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
@@ -253,7 +253,7 @@ jobs:
         run: bash gradle/run-checked-schema-comparison.sh
       - name: Retain every outcome and test receipt
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: typed-external-polynomial-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
@@ -292,7 +292,7 @@ jobs:
           -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Retain all proof inputs, outputs and failed-attempt evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: checked-proof-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           include-hidden-files: true
@@ -321,17 +321,17 @@ jobs:
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with: { distribution: temurin, java-version: '25', verify-signature: true }
       - name: Download project-parallel Gradle coverage evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id) || 'repository-verification' }}
           path: .
       - name: Download isolated SymPy coverage evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: sympy-runtime-verification
           path: build/authority-evidence/sympy/regelsuche-math-sympy/build
       - name: Download isolated JMH acceptance evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: jmh-verification
           path: .
@@ -353,7 +353,7 @@ jobs:
           --root "$PWD" --require-complete
       - name: Retain quality acceptance index and bound source files
         if: ${{ always() && !cancelled() && steps.acceptance_evidence.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: quality-acceptance-evidence
           path: build/reports/quality/acceptance-evidence/**
@@ -362,7 +362,7 @@ jobs:
       - name: Retain converged coverage evidence
         if: >-
           ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && needs.sympy-runtime-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-verification
           path: |
@@ -382,13 +382,13 @@ jobs:
     permissions: { actions: read, contents: write }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with: { name: repository-verification, path: . }
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with: { name: jmh-verification, path: . }
       - name: Remove producer-local coverage before restoring the complete report
         run: rm -rf public/coverage
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with: { name: coverage-verification, path: . }
       - name: Assemble the static site
         run: |
@@ -453,7 +453,7 @@ jobs:
           --output "build/reports/jmh-precision-study-v1/replicate-$REGELSUCHE_STUDY_REPLICATE"
       - name: Retain every replica outcome and its original raw evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jmh-precision-study-v1-replicate-${{ matrix.replicate }}
           path: build/reports/jmh-precision-study-v1/replicate-${{ matrix.replicate }}
@@ -472,7 +472,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0, ref: '${{ github.sha }}' }
       - name: Download every available replica, including failed collections
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: jmh-precision-study-v1-replicate-*
           path: retained
@@ -487,7 +487,7 @@ jobs:
           --output build/reports/jmh-precision-study-v1/analysis
       - name: Retain canonical analysis including errors and null outcomes
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jmh-precision-study-v1-analysis
           path: build/reports/jmh-precision-study-v1/analysis
@@ -538,7 +538,7 @@ jobs:
           --output "build/reports/jmh-precision-study-v2/replicate-$REGELSUCHE_STUDY_REPLICATE"
       - name: Retain every replica outcome and its original raw evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jmh-precision-study-v2-replicate-${{ matrix.replicate }}
           path: build/reports/jmh-precision-study-v2/replicate-${{ matrix.replicate }}
@@ -557,7 +557,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0, ref: '${{ github.sha }}' }
       - name: Download every available replica, including failed collections
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: jmh-precision-study-v2-replicate-*
           path: retained
@@ -572,7 +572,7 @@ jobs:
           --output build/reports/jmh-precision-study-v2/analysis
       - name: Retain canonical analysis including errors and null outcomes
         if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: jmh-precision-study-v2-analysis
           path: build/reports/jmh-precision-study-v2/analysis
