@@ -235,6 +235,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             simplify("ast_multiply_zero_left", op(BinaryOperator.MUL, num(0), a), num(0)),
             simplify("ast_subtract_zero", op(BinaryOperator.SUB, a, num(0)), a),
             simplify("ast_divide_one", op(BinaryOperator.DIV, a, num(1)), a),
+            new SignedAdditiveRewriteRule(),
             new DoubleTermRule(),
             normalize("ast_product_to_power_two", op(BinaryOperator.MUL, a, a), op(BinaryOperator.POW, a, num(2))),
             expand("ast_power_two_to_product", op(BinaryOperator.POW, a, num(2)), op(BinaryOperator.MUL, a, a), 3),
