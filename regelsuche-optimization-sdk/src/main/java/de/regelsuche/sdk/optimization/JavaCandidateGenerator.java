@@ -7,8 +7,8 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    // Established core premises and structural modular operand transport share this revision.
-    static final String REVISION = "java-core-algebra-proposals/v5";
+    // Candidate replay includes generic signed-additive normalization.
+    static final String REVISION = "java-core-algebra-proposals/v6-signed-additive";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -32,13 +32,18 @@ final class JavaCandidateGenerator {
         var seen = new HashSet<List<Expr>>();
         var simplified = outputs.stream().map(expression -> simplify(expression, 0)).toList();
         addProposal(source, outputs, simplified, "typed-local-algebra", proposals, seen);
+        boolean complete = true;
+        if (proposals.size() < maximum) {
+            var signed = new JavaSignedAdditiveCandidates(work).generate(outputs);
+            complete &= signed.complete();
+            addProposal(source, outputs, signed.outputs(), "core-signed-additive-normal-form", proposals, seen);
+        } else complete = false;
 
         // Keep the fast combined candidate, but never make its admissibility a
         // prerequisite for independent changes. Only the checker admits a move.
         var nodes = new ArrayList<Expr>();
         Set<Expr> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Expr output : outputs) collect(output, nodes, visited, 0);
-        boolean complete = true;
         for (Expr node : nodes) {
             Expr local = simplifyHere(node);
             if (node.equals(local)) continue;
