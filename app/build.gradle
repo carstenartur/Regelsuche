@@ -60,7 +60,7 @@ tasks.named('test') {
 // Generates HTML + XML reports under `app/build/reports/jacoco/test/`.
 // XML feeds the shields.io endpoint badge built by the CI workflow.
 jacoco {
-    toolVersion = '0.8.13'
+    toolVersion = '0.8.15'
 }
 
 tasks.named('jacocoTestReport') {
