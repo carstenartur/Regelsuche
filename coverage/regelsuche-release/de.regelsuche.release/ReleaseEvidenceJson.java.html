@@ -17,53 +17,61 @@ import java.util.Properties;
 
 /** Strict JSON and offline Draft 2020-12 validation of checkout-owned schemas. */
 final class ReleaseEvidenceJson {
-    static final String VALIDATOR_VERSION = &quot;2.0.7&quot;;
+    static final String VALIDATOR_VERSION = &quot;3.0.8&quot;;
     private static final String DIALECT = &quot;https://json-schema.org/draft/2020-12/schema&quot;;
 <span class="fc" id="L22">    private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()</span>
 <span class="fc" id="L23">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())</span>
 <span class="fc" id="L24">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
 <span class="fc" id="L25">        .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);</span>
+    // Networknt 3 owns Jackson 3 nodes. Keep the public evidence tree on Jackson 2,
+    // with one exact numeric conversion at this independent validator boundary.
+<span class="fc" id="L28">    private static final tools.jackson.databind.json.JsonMapper VALIDATOR_JSON =</span>
+<span class="fc" id="L29">        tools.jackson.databind.json.JsonMapper.builder()</span>
+<span class="fc" id="L30">            .enable(tools.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)</span>
+<span class="fc" id="L31">            .build();</span>
     private final SchemaRegistry registry;
 
-<span class="fc" id="L28">    ReleaseEvidenceJson() throws IOException {</span>
-<span class="fc" id="L29">        var properties = new Properties();</span>
-<span class="fc" id="L30">        try (var resource = SchemaRegistry.class.getResourceAsStream(&quot;/META-INF/maven/com.networknt/json-schema-validator/pom.properties&quot;)) {</span>
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (resource == null) throw new IOException(&quot;schema validator version metadata is unavailable&quot;);</span>
-<span class="fc" id="L32">            properties.load(resource);</span>
+<span class="fc" id="L34">    ReleaseEvidenceJson() throws IOException {</span>
+<span class="fc" id="L35">        var properties = new Properties();</span>
+<span class="fc" id="L36">        try (var resource = SchemaRegistry.class.getResourceAsStream(&quot;/META-INF/maven/com.networknt/json-schema-validator/pom.properties&quot;)) {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (resource == null) throw new IOException(&quot;schema validator version metadata is unavailable&quot;);</span>
+<span class="fc" id="L38">            properties.load(resource);</span>
         }
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!VALIDATOR_VERSION.equals(properties.getProperty(&quot;version&quot;))) throw new IOException(&quot;schema validator version drift&quot;);</span>
-<span class="fc" id="L35">        registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12, builder -&gt; builder</span>
-<span class="fc" id="L36">            .schemaLoader(loader -&gt; loader.fetchRemoteResources(false))</span>
-<span class="fc" id="L37">            .schemaRegistryConfig(SchemaRegistryConfig.builder().typeLoose(false).formatAssertionsEnabled(false).build()));</span>
-<span class="fc" id="L38">    }</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (!VALIDATOR_VERSION.equals(properties.getProperty(&quot;version&quot;))) throw new IOException(&quot;schema validator version drift&quot;);</span>
+<span class="fc" id="L41">        registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12, builder -&gt; builder</span>
+<span class="fc" id="L42">            .schemaLoader(loader -&gt; loader.fetchRemoteResources(false))</span>
+<span class="fc" id="L43">            .schemaRegistryConfig(SchemaRegistryConfig.builder().typeLoose(false).formatAssertionsEnabled(false).build()));</span>
+<span class="fc" id="L44">    }</span>
 
     static JsonNode parse(byte[] bytes, String label) throws IOException {
-<span class="fc" id="L41">        String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)</span>
-<span class="fc" id="L42">            .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();</span>
-<span class="fc" id="L43">        JsonNode node = JSON.readTree(text);</span>
-<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IOException(&quot;JSON root must be an object: &quot; + label);</span>
-<span class="fc" id="L45">        return node;</span>
+<span class="fc" id="L47">        String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L48">            .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();</span>
+<span class="fc" id="L49">        JsonNode node = JSON.readTree(text);</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IOException(&quot;JSON root must be an object: &quot; + label);</span>
+<span class="fc" id="L51">        return node;</span>
     }
 
     void validate(JsonNode document, JsonNode schema, String label) {
-<span class="fc" id="L49">        ReleaseReadinessBindings.require(DIALECT.equals(schema.path(&quot;$schema&quot;).asText()), &quot;unsupported schema dialect: &quot; + label);</span>
-<span class="fc" id="L50">        requireLocalReferences(schema);</span>
-<span class="fc" id="L51">        var metaErrors = registry.getSchema(SchemaLocation.of(DIALECT)).validate(schema);</span>
-<span class="fc" id="L52">        ReleaseReadinessBindings.require(metaErrors.isEmpty(), &quot;invalid checkout schema &quot; + label + &quot;: &quot; + metaErrors);</span>
+<span class="fc" id="L55">        ReleaseReadinessBindings.require(DIALECT.equals(schema.path(&quot;$schema&quot;).asText()), &quot;unsupported schema dialect: &quot; + label);</span>
+<span class="fc" id="L56">        requireLocalReferences(schema);</span>
+<span class="fc" id="L57">        var validatorSchema = VALIDATOR_JSON.readTree(schema.toString());</span>
+<span class="fc" id="L58">        var validatorDocument = VALIDATOR_JSON.readTree(document.toString());</span>
+<span class="fc" id="L59">        var metaErrors = registry.getSchema(SchemaLocation.of(DIALECT)).validate(validatorSchema);</span>
+<span class="fc" id="L60">        ReleaseReadinessBindings.require(metaErrors.isEmpty(), &quot;invalid checkout schema &quot; + label + &quot;: &quot; + metaErrors);</span>
         // Existing checkout schemas use relative $id values. Supply a resolution context;
         // schema bytes stay unchanged and the loader cannot fetch this reserved-domain URI.
-<span class="fc" id="L55">        var errors = registry.getSchema(SchemaLocation.of(&quot;https://regelsuche.invalid/checkout-schemas/&quot;), schema).validate(document);</span>
-<span class="fc" id="L56">        ReleaseReadinessBindings.require(errors.isEmpty(), &quot;schema violation for &quot; + label + &quot;: &quot; + errors);</span>
-<span class="fc" id="L57">    }</span>
+<span class="fc" id="L63">        var errors = registry.getSchema(SchemaLocation.of(&quot;https://regelsuche.invalid/checkout-schemas/&quot;), validatorSchema).validate(validatorDocument);</span>
+<span class="fc" id="L64">        ReleaseReadinessBindings.require(errors.isEmpty(), &quot;schema violation for &quot; + label + &quot;: &quot; + errors);</span>
+<span class="fc" id="L65">    }</span>
 
     private static void requireLocalReferences(JsonNode node) {
-<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (node.isObject()) {</span>
-<span class="fc bfc" id="L61" title="All 2 branches covered.">            for (String keyword : java.util.List.of(&quot;$ref&quot;, &quot;$dynamicRef&quot;)) {</span>
-<span class="pc bpc" id="L62" title="1 of 4 branches missed.">                if (node.has(keyword)) ReleaseReadinessBindings.require(node.get(keyword).isTextual()</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">                    &amp;&amp; node.get(keyword).textValue().startsWith(&quot;#/&quot;), &quot;external schema references are not admitted&quot;);</span>
-<span class="fc" id="L64">            }</span>
-<span class="fc" id="L65">            node.elements().forEachRemaining(ReleaseEvidenceJson::requireLocalReferences);</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        } else if (node.isArray()) node.elements().forEachRemaining(ReleaseEvidenceJson::requireLocalReferences);</span>
-<span class="fc" id="L67">    }</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (node.isObject()) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (String keyword : java.util.List.of(&quot;$ref&quot;, &quot;$dynamicRef&quot;)) {</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">                if (node.has(keyword)) ReleaseReadinessBindings.require(node.get(keyword).isTextual()</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                    &amp;&amp; node.get(keyword).textValue().startsWith(&quot;#/&quot;), &quot;external schema references are not admitted&quot;);</span>
+<span class="fc" id="L72">            }</span>
+<span class="fc" id="L73">            node.elements().forEachRemaining(ReleaseEvidenceJson::requireLocalReferences);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        } else if (node.isArray()) node.elements().forEachRemaining(ReleaseEvidenceJson::requireLocalReferences);</span>
+<span class="fc" id="L75">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
