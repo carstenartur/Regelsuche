@@ -170,3 +170,38 @@ There is no P04-total, P05–P12 or measured learning-benefit completion claim.
 - The corrected #1095 checkout also runs the actual checksum-pinned Gradle9.8.1
   wrapper help task successfully and remains git-clean. This is a wrapper smoke
   check, not the complete required hosted authority or Windows execution.
+- Fresh hosted CI now passes for #1094(38986788230), #1097(38988084970), and
+  #1099(38988006942). All three current review-thread queries are empty. Their
+  integration branch combines these exact heads with current main and preserves
+  them as ancestors. Local combined reactor4260 tests passes with zero
+  failures/errors and one existing distribution-profile skip.
+- Integration PR #1101 has head7bbd5487d73a6743c9633b42f6b8465f8cf7fd4c,
+  tree142de41d2e45cd6c34333d15a936b4ce9fd66bd6, identical to local d7450c47.
+  Ruling: use one separately gated integration PR for the three green dependency
+  heads — strict up-to-date-main and their combined full CI remain required,
+  avoiding serial verification of each intermediate main — cost if wrong:
+  leave the integration open and retain the individual PRs; no bypass.
+- #1098's full hosted App run reaches1592 tests and fails only the packaged
+  Cytoscape test's old3.34.1 assertion. The Maven/Gradle artifact is already3.34.3;
+  update both assertion and diagnostic to3.34.3, not the vendored snapshot.
+- #1095's corrected full CI fails the frozen reproduction-v1 Gradle9.7.1 contract,
+  not dirty-tree or archive safety. It was briefly closed, then reopened because
+  the PR also references security corrections. Dependabot auto-deleted its branch;
+  restore it exactly at63027528 and reopen. No commit or local work was lost.
+  Ruling: retain the wrapper PR for a new versioned toolchain/reproduction contract
+  rather than rewrite frozen v1 — cost if wrong: the upgrade remains delayed and
+  requires explicit follow-up; no unqualified merge or security-pass claim.
+- #1100's required container comparison exposes stale versioned gallery-v2 bytes.
+  A standard JUnit reproduces candidate-lineage.svg mismatch outside Docker.
+  Two fresh JVMs generate54 byte-identical current files. Add shared-core-v3
+  figures/reference; preserve every v1/v2 historical byte, and retain the complete
+  container/local comparison. Current lineage, utility and representative figures
+  change; sequence.svg does not. No new economic/held-out success is inferred.
+- New gallery check GREEN: all85 release JUnit tests pass on the updated shared-core
+  gallery, zero failures/errors/skips. The earlier gallery mismatch remains RED
+  evidence. Docker is unavailable locally; exact-head hosted container/local
+  reproduction remains mandatory, not replaced by the new JUnit check.
+- #1098's corrected actual packaged-asset test and Maven/Gradle parity test both
+  pass. Published head5297148d683f2596edf66ec870ac2ffd748aa951 matches local
+  0d6e1b32 at tree22d18ec4072fd4edc9127dd3e36201c6fcefc5ea and includes current
+  main's already qualified workflow-action updates. No vendor bytes were changed.

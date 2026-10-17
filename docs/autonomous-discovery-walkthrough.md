@@ -98,23 +98,34 @@ retains their reports.
 
 ## Versioned gallery references
 
-The current [gallery reference](generated/autonomous-discovery-walkthrough-exact-v2-reference.json)
-is bound to source revision `3942c345edb1996dddfc32d4797d5ab9cdc1e4d6`,
-which introduced exact numeric AST identity. Its four SVGs live in
-`docs/generated/autonomous-discovery-walkthrough-exact-v2/`.
+The current [shared-core v3 gallery reference](generated/autonomous-discovery-walkthrough-shared-core-v3-reference.json)
+is bound to source revision `9d046a0a113c92a8f77a3e751d1c1007ab012db4`,
+which registers signed-additive normalization in the ordinary core inventory.
+Its four SVGs live in `docs/generated/autonomous-discovery-walkthrough-shared-core-v3/`.
+Two fresh JVMs produce54 byte-identical walkthrough files. Against exact-v2,
+lineage, paired utility and representative search change; the evidence-sequence
+SVG remains identical. These are public development cases under a changed shared
+basis, not new held-out evidence or a lifecycle learning advantage.
+
+The [exact-v2 reference](generated/autonomous-discovery-walkthrough-exact-v2-reference.json)
+and all four SVGs in `docs/generated/autonomous-discovery-walkthrough-exact-v2/`
+retain their original bytes. Their source revision
+`3942c345edb1996dddfc32d4797d5ab9cdc1e4d6` introduced exact numeric AST identity.
 
 The prior SVGs in `docs/generated/autonomous-discovery-walkthrough/` retain
 all their original bytes; revision `d7b477c51aa75834596c63e8dc9a503aa928c6fa`
 is the reproducible pre-migration reference. They are historical output,
 not a required hash identity for the new scalar representation.
 
-Two separate JVM executions of the new code produced 54 byte-identical output
+For that earlier exact-v2 migration, two separate JVM executions produced54 byte-identical output
 files. Compared with the historical figures, only the candidate-lineage root
 hash changes. The evidence sequence, paired utility and representative search
 figures are byte-identical. No retained historical qualification is rewritten,
 and these unchanged utility values establish no additional search advantage.
 The container/local byte comparison and full current-gallery comparison remain
-required CI checks against the new versioned reference.
+required CI checks against the current shared-core v3 reference. A standard JUnit
+test additionally checks current figures and their declared hashes without Docker;
+it does not replace container/local reproduction.
 
 ## Evidence sequence
 

@@ -72,6 +72,25 @@ class AutonomousDiscoveryWalkthroughTest {
     }
 
     @Test
+    void committedGalleryMatchesTheCurrentQualifiedRun(@TempDir Path temp) throws Exception {
+        new AutonomousDiscoveryWalkthroughRunner().generate(temp, REVISION, releaseRun);
+        Path root = Path.of("").toAbsolutePath();
+        while (root != null && !Files.isDirectory(root.resolve("docs/generated"))) root = root.getParent();
+        org.junit.jupiter.api.Assertions.assertNotNull(root, "checkout documentation directory");
+        assertTreesEqual(temp.resolve("figures"),
+                root.resolve("docs/generated/autonomous-discovery-walkthrough-shared-core-v3"));
+        var reference = new ObjectMapper().readTree(root.resolve(
+                "docs/generated/autonomous-discovery-walkthrough-shared-core-v3-reference.json").toFile());
+        try (var figures = Files.list(temp.resolve("figures"))) {
+            for (Path figure : figures.sorted().toList()) {
+                String digest = "sha256:" + java.util.HexFormat.of().formatHex(
+                        java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(figure)));
+                assertEquals(digest, reference.path("figures").required(figure.getFileName().toString()).asText());
+            }
+        }
+    }
+
+    @Test
     void rejectsUnboundRepositoryRevision(@TempDir Path temp) {
         assertThrows(IllegalArgumentException.class, () ->
             new AutonomousDiscoveryWalkthroughRunner().generate(
