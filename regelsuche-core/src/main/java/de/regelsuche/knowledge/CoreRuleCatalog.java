@@ -67,6 +67,7 @@ public final class CoreRuleCatalog {
                     true,
                     "Collection of equal or linear terms into compact form.",
                     List.of(
+                            "ast_signed_additive_normalize",
                             "ast_double_term",
                             "ast_linear_offset_simplify")),
             new CoreRulePack(
@@ -144,7 +145,7 @@ public final class CoreRuleCatalog {
     }
 
     public static RuleTier tierForRule(String ruleId) {
-        String packId = PACK_ID_BY_RULE_ID.get(ruleId);
+        String packId = packIdForRule(ruleId);
         return packId == null ? RuleTier.PLUGIN : pack(packId).tier();
     }
 

@@ -7,8 +7,8 @@ import java.util.*;
 
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
-    // Established core premises and structural modular operand transport share this revision.
-    static final String REVISION = "java-core-algebra-proposals/v5";
+    // Signed-additive proposals now come exclusively from the shared core rule inventory.
+    static final String REVISION = "java-core-algebra-proposals/v7-shared-rule-inventory";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;

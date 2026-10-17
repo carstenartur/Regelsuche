@@ -6,8 +6,8 @@
 - targetExpression: `(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * x * y + 2 * y ^ 2)`
 - oracleStatus: `UNAVAILABLE`
 - promotionEligible: `true`
-- nodeCount: 56
-- edgeCount: 113
+- nodeCount: 49
+- edgeCount: 94
 - bridgeRulesUsed: `hypothesis_difference_of_squares_preparation`, `ast_square_difference_factor`
 - learnedMacros: `macro_6bd0496b`
 - reusedMacros: `macro_6bd0496b`
