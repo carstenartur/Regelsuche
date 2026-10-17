@@ -205,3 +205,67 @@ There is no P04-total, P05–P12 or measured learning-benefit completion claim.
   pass. Published head5297148d683f2596edf66ec870ac2ffd748aa951 matches local
   0d6e1b32 at tree22d18ec4072fd4edc9127dd3e36201c6fcefc5ea and includes current
   main's already qualified workflow-action updates. No vendor bytes were changed.
+- A follow-up README audit found another stale public claim: shared-core v3's
+  baseline now reaches the representative target in26 states/3 steps, not an
+  80-state failure. The candidate still uses3 states/1 step. A real JUnit check
+  first fails the stale README link, then passes after binding the current image
+  and both table rows to the actual qualified utility case. The known instance
+  transfer is explicitly not an untouched final family test, runtime measurement
+  or lifecycle learning advantage. All four walkthrough tests pass.
+- The existing App README-showcase check initially still required the old-v2 image
+  link and fails RED. Point its current-showcase assertion to v3 while retaining
+  the historical-v2 file-existence check. All nine current README/gallery App tests
+  now pass, with no failure/error/skip. These are evidence-consistency fixes, not
+  a replacement for the mandatory exact-head full CI.
+
+## Additive transport depth and current evidence
+
+- Review thread PRRT_kwDOSiJVMM6tbuNb reproduces three valid-source failures:
+  balanced128 terms grow from depth9 to129; a deep opaque term grows64 to184;
+  a local rewrite under120 enclosing functions grows125 to129. All three abort
+  the existing transport before the fix. The fourth regression retains a useful
+  cancellation and independently replays it in the same deep context.
+- Ruling: decline signed-additive reconstructions that increase local depth,
+  including opaque term children, because the rule has no enclosing-path budget.
+  This preserves the enclosing transport's existing depth bound. Inspection and
+  failed proposals remain charged. Cost if wrong: this conservative rule can omit
+  some otherwise safe depth-increasing proposals; it does not remove the other
+  registered standard rules or assert complete-native qualification.
+- Actual RED: three failing transport regressions in
+  `pr1100-review-depth-red.log`. Actual focused GREEN: all13 signed-additive
+  tests pass in `pr1100-review-depth-green.log`. The source is committed at
+  c3e1e8374f988da33a0a493e4ab5e3707ebf6d63.
+- The first full local run stopped during Experiments without a completion
+  receipt; `pr1100-depth-full-modules.log` is incomplete, not a successful run.
+  The unchanged-source retry `pr1100-depth-complete-retry.log` completes with
+  exit0:6025 tests across20 tested modules, zero failures/errors and10 existing
+  skips. This includes Core1164, Search698, Learning1093, Release86 and App1592.
+  Command: `mvn -fae -Pproduct-reactor -pl app,regelsuche-release,maven-build-contract -am test`.
+- Exact-head hosted CI38992807320 on bb8ffa71 passes all authorities except the
+  stale generated capability matrix; the aggregate correctly refuses completion.
+  Two fresh sets of the existing Java release/domain producers reproduce the same
+  replacement matrix. Both release and domain verifiers pass. All14 capability
+  statuses and claim boundaries stay unchanged; only their current evidence roots
+  change. Historical galleries and research references are preserved.
+- Matrix check RED -> GREEN and the pinned jsonschema4.25.1 validator pass for
+  content hash5ec26434f828f0bb752dfce3f039003d451199077613562c119f7002dba6baac.
+  The README and discovery-status managed blocks already match the new matrix.
+  Raw regeneration attempts, including an initial harness native-access omission,
+  remain in the qualification directory; product verification was not weakened.
+
+## Hosted qualification and remaining platform gate
+
+- #1101 head7bbd5487d73a6743c9633b42f6b8465f8cf7fd4c passes full hosted
+  CI38992324023, all seven authorities, aggregate ciCheck and CodeQL. No inline
+  review threads are open. Its downloaded retained coverage artifact reports
+  PASSED,84.98% aggregate lines and65.91% branches, without lowering any floor.
+- #1098 head5297148d683f2596edf66ec870ac2ffd748aa951 passes full hosted
+  CI38992598249; no inline review threads are open.
+- Main remains fcce00ed96425b96a9f8f884356d5a21c761a881. Both PRs separately
+  report `mergeable=true`, `mergeable_state=blocked`. The connector's read-only
+  ruleset rule-suite request returns403, so the specific remaining platform gate
+  is not established. Green checkout checks do not imply that gate is satisfied.
+- The active ruleset advertises an always-bypass role, unlike the tracked ordinary
+  merge policy. No merge is attempted while blocked; no protection or threshold
+  is changed. Regular integration remains pending. P04 remains partial and
+  P05–P12 remain subsequent work, with no new economic-learning-success claim.
