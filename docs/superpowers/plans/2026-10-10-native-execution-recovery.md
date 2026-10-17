@@ -34,7 +34,7 @@ The published #1081 evidence remains historical and unchanged.
 3. [x] Bind the installed checked-schema checker to its model and actual private
    application factory. Tests: real learning/load, eager versus one lazy
    application, foreign-model and injected callback rejection, fresh child JVM.
-4. [ ] Run complete Core/Search/Learning suites, frozen public V7 differential,
+4. [x] Run complete Core/Search/Learning suites, frozen public V7 differential,
    AI quality gate and one independent whole-branch review. Publish exact source
    and evidence, inspect required head CI, then integrate only if qualified.
 
@@ -105,3 +105,7 @@ search completeness cannot manufacture the kernel's bounded relation.
 - Corrected source is durably published as df2b73a4f27badb7a615a2467583dd0f55dbfe0f;
   its tree aeee4597a445d9419ec5e53ce860df1ad4df66cc equals local d65456505b exactly.
   Required hosted head CI and regular PR review/integration remain open.
+- Integration receipt checked2026-10-17: #1085 merged2026-10-10 as
+  26989933a61326171f9e0ca9830882c46d9202e1. Final head e8154ce6 passed all six
+  authorities and aggregate ciCheck in CI38066541692; review threads are empty.
+  This completes this bounded recovery plan's integration step, not all of P04.

@@ -41,17 +41,17 @@
     "mediaType" : "text/markdown",
     "name" : "summary",
     "path" : "summary.md",
-    "sha256" : "sha256:131a6b37ba5bbbc9bcbb256f2a592fecccf7b1cb902ebbea57f6f8aaf6f09792"
+    "sha256" : "sha256:e1a8e619eaeaa2aaef68d548c234216136d5d990d7551dd9d293e54a18885ffe"
   }, {
     "mediaType" : "image/svg+xml",
     "name" : "search-space",
     "path" : "search-space.svg",
-    "sha256" : "sha256:d63fa380fb8ebb033a8547960b957092136cdcaa89bfdd7c74526ff78e555b5b"
+    "sha256" : "sha256:c48f3cd572b9000d8f59ebb3a28f6e63b28b52fe295c70a17c603042799c8bed"
   } ],
   "assumptions" : [ ],
   "bridgeRulesUsed" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
-  "canonicalEvidenceHash" : "sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31",
-  "canonicalEvidenceId" : "regelsuche.discovery-evidence/v1#sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31",
+  "canonicalEvidenceHash" : "sha256:2d55b4073625adf9dee6d6567be4ed18bc5d953c9da0d30cb79559f762ffd9a6",
+  "canonicalEvidenceId" : "regelsuche.discovery-evidence/v1#sha256:2d55b4073625adf9dee6d6567be4ed18bc5d953c9da0d30cb79559f762ffd9a6",
   "claims" : [ {
     "evidenceRefs" : [ "observation-search-trace", "oracle-equivalence", "ablation-macro-reuse" ],
     "extensions" : { },
@@ -69,7 +69,7 @@
   } ],
   "convergentStates" : [ "x^4+4*y^4" ],
   "counterexamples" : [ ],
-  "edgeCount" : 113,
+  "edgeCount" : 94,
   "edges" : [ {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -89,7 +89,7 @@
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
@@ -97,21 +97,21 @@
         "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
+      "ruleId" : "ast_signed_additive_normalize",
       "sourceExpression" : "(0 - 2 * x * y + x * x + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "targetExpression" : "(x * x - 2 * x * y + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_canonical_normalize",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+    "to" : "(x*x-2*x*y+2*y^2)*(2*x*y+x^2+2*y^2)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
-    "from" : "(0-2*x*y+x*x+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "from" : "(0-2*x*y+x*x+2*y^2)*(x^2+2*y^2+2*x*y)",
     "kind" : "rule",
     "maturity" : "CORE",
     "operatorId" : "",
@@ -122,30 +122,30 @@
       "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
+      "kind" : "NORMALIZE",
       "learnedFromPathId" : "",
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_product_to_power_two|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
         "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
+        "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_product_to_power_two",
-      "sourceExpression" : "(0 - 2 * x * y + x * x + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "(0 - 2 * x * y + x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(x * x - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_product_to_power_two",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+    "to" : "(x*x-2*x*y+2*y^2)*(x^2+2*y^2+2*x*y)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -165,7 +165,7 @@
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
@@ -173,17 +173,17 @@
         "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
+      "ruleId" : "ast_signed_additive_normalize",
       "sourceExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_canonical_normalize",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+    "to" : "(x^2-2*x*y+2*y*y)*(2*x*y+x^2+2*y^2)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -263,6 +263,44 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
+    "from" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "expandedMoves" : [ ],
+      "kind" : "NORMALIZE",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 303967,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 0
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_signed_additive_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2-2*x*y+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
     "from" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)",
     "kind" : "rule",
     "maturity" : "CORE",
@@ -312,30 +350,30 @@
       "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
+      "kind" : "NORMALIZE",
       "learnedFromPathId" : "",
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
         "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
+        "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
+      "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_power_two_to_product",
+    "ruleId" : "ast_canonical_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(0-2*x*y+x^2+2*y*y)*(x^2+2*y^2+2*x*y)"
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -355,7 +393,7 @@
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
@@ -363,17 +401,17 @@
         "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
+      "ruleId" : "ast_signed_additive_normalize",
       "sourceExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_canonical_normalize",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+    "to" : "(x^2-2*x*y+2*y^2)*(x^2+2*y^2+2*x*y)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -403,82 +441,6 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(2 * x * y + x * x + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(2*x*y+x*x+2*y^2)*(x^2-2*x*y+2*y^2)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_product_to_power_two|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 303967,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_product_to_power_two",
-      "sourceExpression" : "(2 * x * y + x * x + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_product_to_power_two",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(2*x*y+x^2+2*y*y)*(x^2-2*x*y+2*y^2)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 303967,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(2 * x * y + x ^ 2 + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "tags" : [ "alternative-branch" ],
       "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
@@ -540,68 +502,30 @@
       "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
+      "kind" : "NORMALIZE",
       "learnedFromPathId" : "",
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
         "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
+        "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
+      "ruleId" : "ast_signed_additive_normalize",
       "sourceExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(2 * x * y + x * x + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_power_two_to_product",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(2*x*y+x*x+2*y^2)*(0-2*x*y+x^2+2*y^2)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(2*x*y+x^2+2*y^2)*(0-2*x*y+x^2+2*y^2)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 303967,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
-      "sourceExpression" : "(2 * x * y + x ^ 2 + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(2 * x * y + x ^ 2 + 2 * y * y) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_power_two_to_product",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(2*x*y+x^2+2*y*y)*(0-2*x*y+x^2+2*y^2)"
+    "to" : "(2*x*y+x^2+2*y^2)*(x^2-2*x*y+2*y^2)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -773,7 +697,7 @@
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
@@ -781,55 +705,17 @@
         "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
+      "ruleId" : "ast_signed_additive_normalize",
       "sourceExpression" : "(x * x + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "targetExpression" : "(x * x + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_canonical_normalize",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_product_to_power_two|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 303967,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_product_to_power_two",
-      "sourceExpression" : "(x * x + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_product_to_power_two",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+    "to" : "(x*x+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -947,44 +833,6 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
-    "from" : "(x*x+2*y*y)^2-4*x^2*y^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_product_to_power_two|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_product_to_power_two",
-      "sourceExpression" : "(x * x + 2 * y * y) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_product_to_power_two",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y*y)^2-4*x^2*y^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
     "from" : "(x*x+2*y^2)*(x*x+2*y^2)-(2*x*y)^2",
     "kind" : "rule",
     "maturity" : "CORE",
@@ -1011,158 +859,6 @@
       "parameters" : [ ],
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x*x+2*y^2)*(x^2+2*y^2)-(2*x*y)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)*(x*x+2*y^2)-(2*x*y)^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_product_to_power_two|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_product_to_power_two",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_product_to_power_two",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x*x+2*y^2)*(x^2+2*y^2)-(2*x*y)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)*(x*x+2*y^2)-(2*x*y)^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)*(x*x+2*y^2)-4*x^2*y^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
       "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
@@ -1248,44 +944,6 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "(x*x+2*y^2)*(x*x+2*y^2)-(2*x*y)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)^2-(2*x*y)^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_power_two_to_product",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x*x+2*y^2)^2-2*x*y*2*x*y"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -1441,82 +1099,6 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)^2-2*x*y*2*x*y",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x*x+2*y^2)^2-4*x*y*x*y"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)^2-2*x*y*2*x*y",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x*x+2*y^2)^2-4*x^2*y*y"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
     "from" : "(x*x+2*y^2)^2-4*x^2*y^2",
     "kind" : "rule",
     "maturity" : "CORE",
@@ -1552,44 +1134,6 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "(x*x+2*y*y)^2-4*x^2*y^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2)^2-4*x^2*y^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
-      "sourceExpression" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_power_two_to_product",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x*x+2*y^2)*(x*x+2*y^2)-4*x^2*y^2"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -1783,7 +1327,7 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "from" : "(x*x+2*y^2-2*x*y)*(x*x+2*y^2+2*x*y)",
     "kind" : "rule",
     "maturity" : "CORE",
     "operatorId" : "",
@@ -1799,7 +1343,7 @@
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
@@ -1807,93 +1351,17 @@
         "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x * x + 2 * y ^ 2 + 2 * x * y)",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "targetExpression" : "(x * x - 2 * x * y + 2 * y ^ 2) * (x * x + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_canonical_normalize",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(x*x+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 303967,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x*x+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_product_to_power_two|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 303967,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_product_to_power_two",
-      "sourceExpression" : "(x * x + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_product_to_power_two",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+    "to" : "(x*x-2*x*y+2*y^2)*(x*x+2*y^2+2*x*y)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -1913,7 +1381,7 @@
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
@@ -1921,17 +1389,17 @@
         "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
+      "ruleId" : "ast_signed_additive_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y * y) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y * y) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_canonical_normalize",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)"
+    "to" : "(x^2+2*x*y+2*y*y)*(x^2-2*x*y+2*y^2)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -2084,6 +1552,44 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "(x^2+2*x*y+2*y*y)*(0-2*x*y+x^2+2*y^2)"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
+    "from" : "(x^2+2*x*y+2*y^2)*(0-2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "expandedMoves" : [ ],
+      "kind" : "NORMALIZE",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 303967,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 0
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(x ^ 2 + 2 * x * y + 2 * y ^ 2) * (x ^ 2 - 2 * x * y + 2 * y ^ 2)",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_signed_additive_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*x*y+2*y^2)*(x^2-2*x*y+2*y^2)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -2304,120 +1810,6 @@
       "ruleId" : "ast_canonical_normalize",
       "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - (2 * x * y) ^ 2",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y*y)*(x^2+2*y^2)-(2*x*y)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y)*(x^2+2*y*y)-(2*x*y)^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y)*(x^2+2*y*y)-4*x^2*y^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y)*(x^2+2*y^2)-(2*x*y)^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch" ],
       "targetExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
       "validationStatus" : ""
     },
@@ -2464,44 +1856,6 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "(x^2+2*y*y)*(x^2+2*y*y)-(2*x*y)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y)^2-(2*x*y)^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - (2 * x * y) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 2 * x * y * 2 * x * y",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_power_two_to_product",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y*y)^2-2*x*y*2*x*y"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -2619,120 +1973,6 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y)^2-2*x*y*2*x*y",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x * y * x * y",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y*y)^2-4*x*y*x*y"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y)^2-2*x*y*2*x*y",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 2 * x * y * 2 * x * y",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y * y",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y*y)^2-4*x^2*y*y"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y)^2-4*x^2*y^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - 4 * x ^ 2 * y ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_power_two_to_product",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y*y)*(x^2+2*y*y)-4*x^2*y^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
     "from" : "(x^2+2*y*y)^2-4*x^2*y^2",
     "kind" : "rule",
     "maturity" : "CORE",
@@ -2847,7 +2087,7 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y-2*x*y)*(x^2+2*y^2+2*x*y)",
+    "from" : "(x^2+2*y*y-2*x*y)*(x^2+2*y*y+2*x*y)",
     "kind" : "rule",
     "maturity" : "CORE",
     "operatorId" : "",
@@ -2863,7 +2103,7 @@
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
         "occurrenceOrdinal" : 303967,
@@ -2871,55 +2111,17 @@
         "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
       "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_canonical_normalize",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y*y-2*x*y)*(2*x*y+x^2+2*y^2)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y*y-2*x*y)*(x^2+2*y^2+2*x*y)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 303967,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y * y - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)"
+    "to" : "(x^2-2*x*y+2*y*y)*(x^2+2*y*y+2*x*y)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -3034,82 +2236,6 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-4*x^2*y^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "NORMALIZE",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "NORMALIZE|ast_canonical_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 0
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_canonical_normalize",
-      "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_canonical_normalize",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x^2+2*y^2)*(x^2+2*y^2)-4*x^2*y^2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_product_to_power_two|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 388159,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_product_to_power_two",
-      "sourceExpression" : "(x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_product_to_power_two",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -3987,6 +3113,44 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
+    "from" : "(x^2+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "expandedMoves" : [ ],
+      "kind" : "NORMALIZE",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 303967,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 0
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_signed_additive_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2-2*x*y+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
     "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
     "kind" : "rule",
     "maturity" : "CORE",
@@ -4101,7 +3265,7 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
-    "from" : "0-4*x*x*y^2+(x^2+2*y^2)^2",
+    "from" : "(x^2+2*y^2-2*x*y)*(x^2+2*y^2+2*x*y)",
     "kind" : "rule",
     "maturity" : "CORE",
     "operatorId" : "",
@@ -4109,33 +3273,109 @@
     "rewriteMove" : {
       "assumptions" : [ ],
       "atomic" : true,
-      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
+      "kind" : "NORMALIZE",
       "learnedFromPathId" : "",
       "macro" : false,
       "macroId" : "",
       "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_power_two_to_product|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
       "operatorId" : "",
       "ordinal" : {
-        "occurrenceOrdinal" : 388159,
+        "occurrenceOrdinal" : 303967,
         "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
+        "ruleOrdinal" : 0
       },
       "parameters" : [ ],
-      "ruleId" : "ast_power_two_to_product",
-      "sourceExpression" : "0 - 4 * x * x * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "0 - 4 * x * x * y ^ 2 + (x ^ 2 + 2 * y * y) ^ 2",
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
       "validationStatus" : ""
     },
-    "ruleId" : "ast_power_two_to_product",
+    "ruleId" : "ast_signed_additive_normalize",
     "searchEffect" : [ "NORMALIZING" ],
     "source" : "core",
     "tags" : [ "alternative-branch" ],
-    "to" : "0-4*x*x*y^2+(x^2+2*y*y)^2"
+    "to" : "(x^2-2*x*y+2*y^2)*(x^2+2*y^2+2*x*y)"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
+    "from" : "(x^2-2*x*y+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "expandedMoves" : [ ],
+      "kind" : "NORMALIZE",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 303967,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 0
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_canonical_normalize",
+      "sourceExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(2*x*y+x^2+2*y^2)"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
+    "from" : "(x^2-2*x*y+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "canonicalBefore" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "expandedMoves" : [ ],
+      "kind" : "NORMALIZE",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "NORMALIZE|ast_canonical_normalize|(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)=>(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 303967,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 0
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_canonical_normalize",
+      "sourceExpression" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(0 - 2 * x * y + x ^ 2 + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_canonical_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(0-2*x*y+x^2+2*y^2)*(x^2+2*y^2+2*x*y)"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -4212,6 +3452,44 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "0-4*x^2*y^2+(x^2+2*y^2)^2"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
+    "from" : "0-4*x^2*y^2+(x^2+2*y^2)^2",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+      "canonicalBefore" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+      "expandedMoves" : [ ],
+      "kind" : "NORMALIZE",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "NORMALIZE|ast_signed_additive_normalize|0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2=>0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 388159,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 0
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_signed_additive_normalize",
+      "sourceExpression" : "0 - 4 * x ^ 2 * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
+      "tags" : [ "alternative-branch" ],
+      "targetExpression" : "(x ^ 2 + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_signed_additive_normalize",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x^2+2*y^2)^2-4*x^2*y^2"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -4395,7 +3673,7 @@
   } ],
   "inputExpression" : "x ^ 4 + 4 * y ^ 4",
   "learnedMacros" : [ "macro_6bd0496b" ],
-  "nodeCount" : 56,
+  "nodeCount" : 49,
   "nodes" : [ {
     "depth" : 0,
     "id" : "x^4+4*y^4",
@@ -4548,12 +3826,6 @@
     "tags" : [ "alternative-branch" ]
   }, {
     "depth" : 3,
-    "id" : "(x*x+2*y^2)^2-2*x*y*2*x*y",
-    "kind" : "state",
-    "label" : "(x * x + 2 * y ^ 2) ^ 2 - 2 * x * y * 2 * x * y",
-    "tags" : [ "alternative-branch" ]
-  }, {
-    "depth" : 3,
     "id" : "(x*x+2*y^2)^2-4*x^2*y^2",
     "kind" : "state",
     "label" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y ^ 2",
@@ -4575,12 +3847,6 @@
     "id" : "(x^2+2*y*y)*(x^2+2*y*y)-(2*x*y)^2",
     "kind" : "state",
     "label" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - (2 * x * y) ^ 2",
-    "tags" : [ "alternative-branch" ]
-  }, {
-    "depth" : 3,
-    "id" : "(x^2+2*y*y)^2-2*x*y*2*x*y",
-    "kind" : "state",
-    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - 2 * x * y * 2 * x * y",
     "tags" : [ "alternative-branch" ]
   }, {
     "depth" : 3,
@@ -4614,6 +3880,18 @@
     "tags" : [ "alternative-branch" ]
   }, {
     "depth" : 3,
+    "id" : "(x^2-2*x*y+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "alternative-branch", "target" ]
+  }, {
+    "depth" : 3,
+    "id" : "(x^2-2*x*y+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "alternative-branch", "target" ]
+  }, {
+    "depth" : 3,
     "id" : "0-4*x*x*y^2+(x^2+2*y^2)^2",
     "kind" : "state",
     "label" : "0 - 4 * x * x * y ^ 2 + (x ^ 2 + 2 * y ^ 2) ^ 2",
@@ -4632,28 +3910,10 @@
     "tags" : [ "alternative-branch", "target" ]
   }, {
     "depth" : 4,
-    "id" : "(0-2*x*y+x^2+2*y*y)*(x^2+2*y^2+2*x*y)",
-    "kind" : "target",
-    "label" : "(0 - 2 * x * y + x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
-    "tags" : [ "alternative-branch", "target" ]
-  }, {
-    "depth" : 4,
-    "id" : "(2*x*y+x*x+2*y^2)*(0-2*x*y+x^2+2*y^2)",
-    "kind" : "target",
-    "label" : "(2 * x * y + x * x + 2 * y ^ 2) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-    "tags" : [ "alternative-branch", "target" ]
-  }, {
-    "depth" : 4,
-    "id" : "(2*x*y+x^2+2*y*y)*(0-2*x*y+x^2+2*y^2)",
-    "kind" : "target",
-    "label" : "(2 * x * y + x ^ 2 + 2 * y * y) * (0 - 2 * x * y + x ^ 2 + 2 * y ^ 2)",
-    "tags" : [ "alternative-branch", "target" ]
-  }, {
-    "depth" : 4,
     "id" : "(x*x+2*y*y)^2-4*x^2*y^2",
     "kind" : "state",
     "label" : "(x * x + 2 * y * y) ^ 2 - 4 * x ^ 2 * y ^ 2",
-    "tags" : [ "alternative-branch" ]
+    "tags" : [ "alternative-branch", "dead-end" ]
   }, {
     "depth" : 4,
     "id" : "(x*x+2*y^2-2*x*y)*(2*x*y+x^2+2*y^2)",
@@ -4668,28 +3928,16 @@
     "tags" : [ "alternative-branch", "target" ]
   }, {
     "depth" : 4,
-    "id" : "(x*x+2*y^2)*(x*x+2*y^2)-4*x^2*y^2",
-    "kind" : "state",
-    "label" : "(x * x + 2 * y ^ 2) * (x * x + 2 * y ^ 2) - 4 * x ^ 2 * y ^ 2",
-    "tags" : [ "alternative-branch" ]
+    "id" : "(x*x-2*x*y+2*y^2)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x * x - 2 * x * y + 2 * y ^ 2) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "alternative-branch", "target" ]
   }, {
     "depth" : 4,
-    "id" : "(x*x+2*y^2)*(x^2+2*y^2)-(2*x*y)^2",
-    "kind" : "state",
-    "label" : "(x * x + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-    "tags" : [ "alternative-branch" ]
-  }, {
-    "depth" : 4,
-    "id" : "(x*x+2*y^2)^2-4*x*y*x*y",
-    "kind" : "state",
-    "label" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x * y * x * y",
-    "tags" : [ "alternative-branch", "dead-end" ]
-  }, {
-    "depth" : 4,
-    "id" : "(x*x+2*y^2)^2-4*x^2*y*y",
-    "kind" : "state",
-    "label" : "(x * x + 2 * y ^ 2) ^ 2 - 4 * x ^ 2 * y * y",
-    "tags" : [ "alternative-branch", "dead-end" ]
+    "id" : "(x*x-2*x*y+2*y^2)*(x*x+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x * x - 2 * x * y + 2 * y ^ 2) * (x * x + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "alternative-branch", "target" ]
   }, {
     "depth" : 4,
     "id" : "(x^2+2*y*y-2*x*y)*(2*x*y+x^2+2*y^2)",
@@ -4704,34 +3952,22 @@
     "tags" : [ "alternative-branch", "target" ]
   }, {
     "depth" : 4,
-    "id" : "(x^2+2*y*y)*(x^2+2*y*y)-4*x^2*y^2",
-    "kind" : "state",
-    "label" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y * y) - 4 * x ^ 2 * y ^ 2",
-    "tags" : [ "alternative-branch" ]
+    "id" : "(x^2-2*x*y+2*y*y)*(2*x*y+x^2+2*y^2)",
+    "kind" : "target",
+    "label" : "(x ^ 2 - 2 * x * y + 2 * y * y) * (2 * x * y + x ^ 2 + 2 * y ^ 2)",
+    "tags" : [ "alternative-branch", "target" ]
   }, {
     "depth" : 4,
-    "id" : "(x^2+2*y*y)*(x^2+2*y^2)-(2*x*y)^2",
-    "kind" : "state",
-    "label" : "(x ^ 2 + 2 * y * y) * (x ^ 2 + 2 * y ^ 2) - (2 * x * y) ^ 2",
-    "tags" : [ "alternative-branch" ]
+    "id" : "(x^2-2*x*y+2*y*y)*(x^2+2*y*y+2*x*y)",
+    "kind" : "target",
+    "label" : "(x ^ 2 - 2 * x * y + 2 * y * y) * (x ^ 2 + 2 * y * y + 2 * x * y)",
+    "tags" : [ "alternative-branch", "target" ]
   }, {
-    "depth" : 4,
-    "id" : "(x^2+2*y*y)^2-4*x*y*x*y",
-    "kind" : "state",
-    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x * y * x * y",
-    "tags" : [ "alternative-branch", "dead-end" ]
-  }, {
-    "depth" : 4,
-    "id" : "(x^2+2*y*y)^2-4*x^2*y*y",
-    "kind" : "state",
-    "label" : "(x ^ 2 + 2 * y * y) ^ 2 - 4 * x ^ 2 * y * y",
-    "tags" : [ "alternative-branch", "dead-end" ]
-  }, {
-    "depth" : 4,
-    "id" : "0-4*x*x*y^2+(x^2+2*y*y)^2",
-    "kind" : "state",
-    "label" : "0 - 4 * x * x * y ^ 2 + (x ^ 2 + 2 * y * y) ^ 2",
-    "tags" : [ "alternative-branch", "dead-end" ]
+    "depth" : 5,
+    "id" : "(x*x-2*x*y+2*y^2)*(x^2+2*y^2+2*x*y)",
+    "kind" : "target",
+    "label" : "(x * x - 2 * x * y + 2 * y ^ 2) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+    "tags" : [ "alternative-branch", "target" ]
   } ],
   "novelty" : {
     "extensions" : { },
@@ -4741,12 +3977,12 @@
   },
   "observations" : [ {
     "bridgeRulesUsed" : [ "hypothesis_difference_of_squares_preparation", "ast_square_difference_factor" ],
-    "edgeCount" : 113,
+    "edgeCount" : 94,
     "extensions" : { },
     "id" : "observation-search-trace",
     "kind" : "SEARCH_TRACE",
     "learnedMacros" : [ "macro_6bd0496b" ],
-    "nodeCount" : 56,
+    "nodeCount" : 49,
     "outcome" : "OBSERVED",
     "pathCount" : 2,
     "reusedMacros" : [ "macro_6bd0496b" ],
