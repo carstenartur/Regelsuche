@@ -366,8 +366,8 @@ Makrowiederverwendung; sie sind keine Behauptung externer mathematischer Neuheit
 
 | Scenario | Bridge | Macro learned | Macro reused | Evidence |
 |---|---:|---:|---:|---|
-| Complete square | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:217d5ca4dff3dba588f16d8451195a883378956a795259936317d3d35e8ce273](docs/generated/discovery/complete-square/evidence.json) |
-| Sophie-Germain | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31](docs/generated/discovery/sophie-germain/evidence.json) |
+| Complete square | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:76d9396b1caec0d1510ff9d0c1f08dbe3441f8f526f11882456e1f7eb77fed17](docs/generated/discovery/complete-square/evidence.json) |
+| Sophie-Germain | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:2d55b4073625adf9dee6d6567be4ed18bc5d953c9da0d30cb79559f762ffd9a6](docs/generated/discovery/sophie-germain/evidence.json) |
 
 `Sophie-Germain` bezeichnet hier die eingefrorene historische Szenario- und
 Evidence-Identität. Neue allgemeine Discovery-Profile verwenden für den
