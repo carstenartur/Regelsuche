@@ -15,7 +15,7 @@ java {
 
 dependencies {
     api project(':regelsuche-solver-ir')
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.3'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -35,7 +35,7 @@ tasks.register('writeSolverPortfolioExample', JavaExec) {
 }
 
 jacoco {
-    toolVersion = '0.8.13'
+    toolVersion = '0.8.15'
 }
 
 tasks.named('jacocoTestReport') {
