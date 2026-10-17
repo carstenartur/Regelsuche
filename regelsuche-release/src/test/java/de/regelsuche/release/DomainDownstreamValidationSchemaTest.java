@@ -2,9 +2,9 @@ package de.regelsuche.release;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.networknt.schema.*;
 import de.regelsuche.discovery.domain.*;
 import de.regelsuche.discovery.domain.DiscoveryDomain.*;

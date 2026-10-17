@@ -17,12 +17,18 @@ import java.util.Properties;
 
 /** Strict JSON and offline Draft 2020-12 validation of checkout-owned schemas. */
 final class ReleaseEvidenceJson {
-    static final String VALIDATOR_VERSION = "2.0.7";
+    static final String VALIDATOR_VERSION = "3.0.8";
     private static final String DIALECT = "https://json-schema.org/draft/2020-12/schema";
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+    // Networknt 3 owns Jackson 3 nodes. Keep the public evidence tree on Jackson 2,
+    // with one exact numeric conversion at this independent validator boundary.
+    private static final tools.jackson.databind.json.JsonMapper VALIDATOR_JSON =
+        tools.jackson.databind.json.JsonMapper.builder()
+            .enable(tools.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+            .build();
     private final SchemaRegistry registry;
 
     ReleaseEvidenceJson() throws IOException {
@@ -48,11 +54,13 @@ final class ReleaseEvidenceJson {
     void validate(JsonNode document, JsonNode schema, String label) {
         ReleaseReadinessBindings.require(DIALECT.equals(schema.path("$schema").asText()), "unsupported schema dialect: " + label);
         requireLocalReferences(schema);
-        var metaErrors = registry.getSchema(SchemaLocation.of(DIALECT)).validate(schema);
+        var validatorSchema = VALIDATOR_JSON.readTree(schema.toString());
+        var validatorDocument = VALIDATOR_JSON.readTree(document.toString());
+        var metaErrors = registry.getSchema(SchemaLocation.of(DIALECT)).validate(validatorSchema);
         ReleaseReadinessBindings.require(metaErrors.isEmpty(), "invalid checkout schema " + label + ": " + metaErrors);
         // Existing checkout schemas use relative $id values. Supply a resolution context;
         // schema bytes stay unchanged and the loader cannot fetch this reserved-domain URI.
-        var errors = registry.getSchema(SchemaLocation.of("https://regelsuche.invalid/checkout-schemas/"), schema).validate(document);
+        var errors = registry.getSchema(SchemaLocation.of("https://regelsuche.invalid/checkout-schemas/"), validatorSchema).validate(validatorDocument);
         ReleaseReadinessBindings.require(errors.isEmpty(), "schema violation for " + label + ": " + errors);
     }
 
