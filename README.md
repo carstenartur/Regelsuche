@@ -93,18 +93,24 @@ kanonischen Evidence erzeugt, nicht für das README nachgezeichnet.
 
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
-misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im vom
-Evidence-Bundle ausgewählten Beispiel erreicht die Baseline das Ziel innerhalb
-von 80 untersuchten Zuständen nicht; mit dem Kandidaten wird es in einem Schritt
-bei drei untersuchten Zuständen erreicht.
+misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier
+gezeigten öffentlichen Entwicklungsfall erreichen inzwischen beide Varianten
+die verlangte Zieldarstellung:
 
-![Konkrete gelernte Regel, zurückgehaltene Aufgabe und Zieldarstellung: ohne Zusatzregel kein Zielpfad nach 80 Zuständen, mit Zusatzregel ein Schritt bei drei Zuständen](docs/generated/autonomous-discovery-walkthrough-exact-v2/representative-search.svg)
+| Variante | Ziel erreicht | Untersuchte Zustände | Umformungen |
+| --- | --- | ---: | ---: |
+| Verbesserte Basis | ja | 26 | 3 |
+| Mit gelernter Regel | ja | 3 | 1 |
+
+![Konkrete gelernte Regel und dieselbe zurückgehaltene Aufgabe: beide Varianten erreichen die Zieldarstellung; die versionierte Grafik zeigt ihre tatsächlichen Pfade und Zustandszahlen](docs/generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg)
 
 *Hier wird die gelernte Regel mit `A = 20` und `x = i*j + k` wiederverwendet.
 Gesucht ist eine bestimmte syntaktische Zieldarstellung, nicht irgendein
 äquivalenter Ausdruck. Die Zahlen vergleichen untersuchte Zustände, keine
-Laufzeiten; sie belegen keinen allgemeinen Geschwindigkeitsvorteil gegenüber
-anderen Algebra-Systemen.*
+Laufzeiten. Erwerb, Auswahl, Laden und Nachweisprüfung sind damit noch nicht
+wirtschaftlich bilanziert. Der bekannte Entwicklungsfall zeigt Instanztransfer,
+keinen unberührten Finaltest und keinen allgemeinen Geschwindigkeitsvorteil
+gegenüber anderen Algebra-Systemen.*
 
 Die vollständige Fallserie, Kandidaten-Lineage, Hashbindung und unabhängige
 Prüfung stehen im [Autonomous Discovery Walkthrough](docs/autonomous-discovery-walkthrough.md).

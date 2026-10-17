@@ -29,7 +29,7 @@ class ReadmeShowcaseDocumentationTest {
         assertAppearsBeforeQuickstart(
             readme,
             quickstart,
-            "docs/generated/autonomous-discovery-walkthrough-exact-v2/representative-search.svg"
+            "docs/generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg"
         );
         assertAppearsBeforeQuickstart(
             readme,
@@ -61,6 +61,7 @@ class ReadmeShowcaseDocumentationTest {
         for (String relative : List.of(
             "docs/assets/ast-rule-radar.svg",
             "docs/generated/discovery/sophie-germain/search-space.svg",
+            "docs/generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg",
             "docs/generated/autonomous-discovery-walkthrough-exact-v2/representative-search.svg",
             "docs/assets/screenshots/macro-learning-summary.png",
             "docs/assets/screenshots/rational-summary.png",

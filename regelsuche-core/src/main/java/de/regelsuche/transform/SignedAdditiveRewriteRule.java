@@ -44,37 +44,46 @@ public final class SignedAdditiveRewriteRule implements RewriteRule, RetainedGra
         if (!(subtree instanceof BinaryExpr binary)
                 || binary.operator() != BinaryOperator.ADD && binary.operator() != BinaryOperator.SUB)
             return null;
-        int inspected = countBounded(subtree, 0, MAX_INSPECTED_NODES);
-        if (inspected < 0) return null;
+        var shape = new BoundedShape();
+        RetainedOperation.work(1);
+        if (!shape.inspect(subtree, 0, SignedAdditiveForm.MAX_DEPTH)) return null;
         // Definedness is shared with other simplifiers, not reimplemented here.
-        RetainedOperation.work(inspected);
+        RetainedOperation.work(shape.nodes);
         if (!ExpressionDefinedness.isTotal(subtree)) return null;
         var result = SignedAdditiveForm.normalize(subtree, units -> {
             RetainedOperation.work(units);
             RetainedOperation.checkpoint();
         });
-        return result.complete() && !result.expression().equals(subtree) ? result.expression() : null;
+        if (!result.complete()) return null;
+        // The rule has no enclosing-path budget. Never increase local depth:
+        // this also preserves every enclosing transport's existing depth bound.
+        // Inspect opaque terms too, before structural equality or admission.
+        int sourceDepth = shape.maximumDepth;
+        shape.nodes = 0;
+        shape.maximumDepth = 0;
+        RetainedOperation.work(1);
+        if (!shape.inspect(result.expression(), 0, sourceDepth)) return null;
+        return !result.expression().equals(subtree) ? result.expression() : null;
     }
 
     /** Count expanded visits before any recursive domain inspection or term hashing. */
-    private static int countBounded(Expr expression, int depth, int remaining) {
-        RetainedOperation.work(1);
-        if (remaining <= 0 || depth > SignedAdditiveForm.MAX_DEPTH) return -1;
-        int count = 1;
-        if (expression instanceof BinaryExpr binary) {
-            int left = countBounded(binary.left(), depth + 1, remaining - count);
-            if (left < 0) return -1;
-            count += left;
-            int right = countBounded(binary.right(), depth + 1, remaining - count);
-            if (right < 0) return -1;
-            count += right;
-        } else if (expression instanceof FunctionExpr function) {
-            for (Expr argument : function.arguments()) {
-                int child = countBounded(argument, depth + 1, remaining - count);
-                if (child < 0) return -1;
-                count += child;
+    private static final class BoundedShape {
+        private int nodes;
+        private int maximumDepth;
+
+        private boolean inspect(Expr expression, int depth, int depthLimit) {
+            RetainedOperation.work(1);
+            if (++nodes > MAX_INSPECTED_NODES || depth > depthLimit) return false;
+            maximumDepth = Math.max(maximumDepth, depth);
+            if (expression instanceof BinaryExpr binary) {
+                return inspect(binary.left(), depth + 1, depthLimit)
+                        && inspect(binary.right(), depth + 1, depthLimit);
+            } else if (expression instanceof FunctionExpr function) {
+                for (Expr argument : function.arguments()) {
+                    if (!inspect(argument, depth + 1, depthLimit)) return false;
+                }
             }
+            return true;
         }
-        return count;
     }
 }
