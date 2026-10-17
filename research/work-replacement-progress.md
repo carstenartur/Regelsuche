@@ -102,6 +102,22 @@ the unchanged-source rerun completed. P03 is the accepted predecessor for P04.
 
 ## P04 — additive foundation, total qualification incomplete
 
+### 2026-10-17 integration receipt
+
+[PR #1085](https://github.com/carstenartur/Regelsuche/pull/1085) was integrated
+on 2026-10-10 at `26989933a61326171f9e0ca9830882c46d9202e1`. Its final head
+`e8154ce6c3d9b3361679a2dc71da489585020b13` passed all six required authorities
+and aggregate ciCheck in [CI38066541692](https://github.com/carstenartur/Regelsuche/actions/runs/38066541692).
+The current review-thread query has no unresolved thread. The recovery account
+below records the earlier, then-pending checkpoint; it is not the current PR state.
+
+Current main `fcce00ed96425b96a9f8f884356d5a21c761a881` also passed the complete
+authority in [CI38709731530](https://github.com/carstenartur/Regelsuche/actions/runs/38709731530).
+This integrates the opt-in declared execution slice, not total P04 acceptance:
+the bounded inventory and default V7/V3 qualification limits remain explicit.
+P05–P12 and an economic learning advantage remain unproved. Open PR maintenance
+is tracked in the [2026-10-17 qualification ledger](../superpowers/plans/2026-10-17-pr-qualification.md).
+
 ### 2026-10-10 recovery and declared-inventory follow-up
 
 #1081 was integrated at `c1815c00813659de26fddfe0dbfc1cd212421d29` after full

@@ -663,7 +663,7 @@ public final class AutonomousDiscoveryResultCard {
 <span class="fc" id="L663">            int candidateReached = (int) cases.stream()</span>
 <span class="fc" id="L664">                .filter(UtilityCase::candidateReached).count();</span>
 <span class="fc" id="L665">            int bothReached = (int) cases.stream()</span>
-<span class="pc bpc" id="L666" title="3 of 4 branches missed.">                .filter(item -&gt; item.baselineReached() &amp;&amp; item.candidateReached())</span>
+<span class="pc bpc" id="L666" title="2 of 4 branches missed.">                .filter(item -&gt; item.baselineReached() &amp;&amp; item.candidateReached())</span>
 <span class="fc" id="L667">                .count();</span>
 <span class="fc" id="L668">            int baselinePath = cases.stream()</span>
 <span class="fc" id="L669">                .filter(UtilityCase::baselineReached)</span>
@@ -672,9 +672,9 @@ public final class AutonomousDiscoveryResultCard {
 <span class="fc" id="L672">                .filter(UtilityCase::candidateReached)</span>
 <span class="fc" id="L673">                .mapToInt(UtilityCase::candidatePathLength).sum();</span>
 <span class="fc" id="L674">            int pairedDelta = cases.stream()</span>
-<span class="pc bpc" id="L675" title="3 of 4 branches missed.">                .filter(item -&gt; item.baselineReached() &amp;&amp; item.candidateReached())</span>
-<span class="pc" id="L676">                .mapToInt(item -&gt; item.candidatePathLength()</span>
-<span class="pc" id="L677">                    - item.baselinePathLength()).sum();</span>
+<span class="pc bpc" id="L675" title="2 of 4 branches missed.">                .filter(item -&gt; item.baselineReached() &amp;&amp; item.candidateReached())</span>
+<span class="fc" id="L676">                .mapToInt(item -&gt; item.candidatePathLength()</span>
+<span class="fc" id="L677">                    - item.baselinePathLength()).sum();</span>
 <span class="fc" id="L678">            long baselineStates = cases.stream()</span>
 <span class="fc" id="L679">                .mapToLong(UtilityCase::baselineExploredStates).sum();</span>
 <span class="fc" id="L680">            long candidateStates = cases.stream()</span>
@@ -717,4 +717,4 @@ public final class AutonomousDiscoveryResultCard {
         }
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -67,6 +67,7 @@ public final class CoreRuleCatalog {
                     true,
                     &quot;Collection of equal or linear terms into compact form.&quot;,
 <span class="fc" id="L69">                    List.of(</span>
+                            &quot;ast_signed_additive_normalize&quot;,
                             &quot;ast_double_term&quot;,
                             &quot;ast_linear_offset_simplify&quot;)),
             new CoreRulePack(
@@ -75,7 +76,7 @@ public final class CoreRuleCatalog {
                     RuleTier.FIRST_PARTY,
                     true,
                     &quot;Distributive expansion over sums and differences.&quot;,
-<span class="fc" id="L78">                    List.of(</span>
+<span class="fc" id="L79">                    List.of(</span>
                             &quot;ast_distribute_left_add&quot;,
                             &quot;ast_distribute_right_add&quot;,
                             &quot;ast_distribute_left_subtract&quot;,
@@ -87,7 +88,7 @@ public final class CoreRuleCatalog {
                     RuleTier.FIRST_PARTY,
                     true,
                     &quot;Common-factor extraction and difference-of-squares factoring shortcuts.&quot;,
-<span class="fc" id="L90">                    List.of(</span>
+<span class="fc" id="L91">                    List.of(</span>
                             &quot;ast_square_difference_factor&quot;,
                             &quot;ast_factor_common_left&quot;,
                             &quot;ast_factor_common_right&quot;)),
@@ -97,55 +98,55 @@ public final class CoreRuleCatalog {
                     RuleTier.FIRST_PARTY,
                     true,
                     &quot;Atomic cancellation of a numerator factor against the divisor.&quot;,
-<span class="fc" id="L100">                    List.of(&quot;ast_cancel_division_factor&quot;)),</span>
+<span class="fc" id="L101">                    List.of(&quot;ast_cancel_division_factor&quot;)),</span>
             new CoreRulePack(
                     EXACT_POLYNOMIAL_DIVISION,
                     &quot;Experimental Exact Polynomial Division&quot;,
                     RuleTier.FIRST_PARTY,
                     false,
                     &quot;Opt-in exact univariate polynomial long division. It is excluded from the default benchmark inventory so that a benchmark-discovered gap is not silently closed inside the measured configuration.&quot;,
-<span class="fc" id="L107">                    List.of(&quot;ast_polynomial_exact_division&quot;)));</span>
+<span class="fc" id="L108">                    List.of(&quot;ast_polynomial_exact_division&quot;)));</span>
 
-<span class="fc" id="L109">    private static final Map&lt;String, CoreRulePack&gt; BY_ID = indexById(PACKS);</span>
-<span class="fc" id="L110">    private static final Map&lt;String, String&gt; PACK_ID_BY_RULE_ID = indexByRuleId(PACKS);</span>
+<span class="fc" id="L110">    private static final Map&lt;String, CoreRulePack&gt; BY_ID = indexById(PACKS);</span>
+<span class="fc" id="L111">    private static final Map&lt;String, String&gt; PACK_ID_BY_RULE_ID = indexByRuleId(PACKS);</span>
 
     private CoreRuleCatalog() {
     }
 
     public static List&lt;CoreRulePack&gt; packs() {
-<span class="fc" id="L116">        return PACKS;</span>
+<span class="fc" id="L117">        return PACKS;</span>
     }
 
     public static CoreRulePack pack(String packId) {
-<span class="fc" id="L120">        CoreRulePack pack = BY_ID.get(packId);</span>
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (pack == null) {</span>
-<span class="nc" id="L122">            throw new IllegalArgumentException(&quot;Unknown core rule pack: &quot; + packId);</span>
+<span class="fc" id="L121">        CoreRulePack pack = BY_ID.get(packId);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (pack == null) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;Unknown core rule pack: &quot; + packId);</span>
         }
-<span class="fc" id="L124">        return pack;</span>
+<span class="fc" id="L125">        return pack;</span>
     }
 
     public static Set&lt;String&gt; packIds() {
-<span class="fc" id="L128">        return BY_ID.keySet();</span>
+<span class="fc" id="L129">        return BY_ID.keySet();</span>
     }
 
     public static Set&lt;String&gt; kernelPackIds() {
-<span class="fc" id="L132">        Set&lt;String&gt; kernel = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (CoreRulePack pack : PACKS) {</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (pack.tier() == RuleTier.KERNEL) {</span>
-<span class="fc" id="L135">                kernel.add(pack.packId());</span>
+<span class="fc" id="L133">        Set&lt;String&gt; kernel = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (CoreRulePack pack : PACKS) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (pack.tier() == RuleTier.KERNEL) {</span>
+<span class="fc" id="L136">                kernel.add(pack.packId());</span>
             }
-<span class="fc" id="L137">        }</span>
-<span class="fc" id="L138">        return Set.copyOf(kernel);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return Set.copyOf(kernel);</span>
     }
 
     /** Returns the pack owning {@code ruleId}, or {@code null} when the rule is not a core rule. */
     public static String packIdForRule(String ruleId) {
-<span class="fc" id="L143">        return PACK_ID_BY_RULE_ID.get(ruleId);</span>
+<span class="fc" id="L144">        return PACK_ID_BY_RULE_ID.get(ruleId);</span>
     }
 
     public static RuleTier tierForRule(String ruleId) {
-<span class="nc" id="L147">        String packId = PACK_ID_BY_RULE_ID.get(ruleId);</span>
-<span class="nc bnc" id="L148" title="All 2 branches missed.">        return packId == null ? RuleTier.PLUGIN : pack(packId).tier();</span>
+<span class="nc" id="L148">        String packId = packIdForRule(ruleId);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        return packId == null ? RuleTier.PLUGIN : pack(packId).tier();</span>
     }
 
     /**
@@ -157,57 +158,57 @@ public final class CoreRuleCatalog {
      * packs. User-facing validation belongs at the boundary that knows the complete catalog.&lt;/p&gt;
      */
     public static Set&lt;String&gt; enabledPackIds(KnowledgePackSelection selection) {
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        KnowledgePackSelection effective = selection == null ? KnowledgePackSelection.CORE : selection;</span>
-<span class="fc" id="L161">        rejectKernelDisable(effective.disabledPacks());</span>
-<span class="fc" id="L162">        Set&lt;String&gt; defaults = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L163" title="All 2 branches covered.">        for (CoreRulePack pack : PACKS) {</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">            if (!pack.enabledByDefault()) {</span>
-<span class="fc" id="L165">                continue;</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        KnowledgePackSelection effective = selection == null ? KnowledgePackSelection.CORE : selection;</span>
+<span class="fc" id="L162">        rejectKernelDisable(effective.disabledPacks());</span>
+<span class="fc" id="L163">        Set&lt;String&gt; defaults = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (CoreRulePack pack : PACKS) {</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if (!pack.enabledByDefault()) {</span>
+<span class="fc" id="L166">                continue;</span>
             }
-<span class="fc bfc" id="L167" title="All 4 branches covered.">            if (pack.tier() == RuleTier.KERNEL || effective.profile().includeFirstPartyDefaults()) {</span>
-<span class="fc" id="L168">                defaults.add(pack.packId());</span>
+<span class="fc bfc" id="L168" title="All 4 branches covered.">            if (pack.tier() == RuleTier.KERNEL || effective.profile().includeFirstPartyDefaults()) {</span>
+<span class="fc" id="L169">                defaults.add(pack.packId());</span>
             }
-<span class="fc" id="L170">        }</span>
-<span class="fc" id="L171">        Set&lt;String&gt; enabled = new LinkedHashSet&lt;&gt;(effective.effectiveEnabledPacks(packIds(), defaults));</span>
-<span class="fc" id="L172">        enabled.addAll(kernelPackIds());</span>
-<span class="fc" id="L173">        Set&lt;String&gt; ordered = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (CoreRulePack pack : PACKS) {</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (enabled.contains(pack.packId())) {</span>
-<span class="fc" id="L176">                ordered.add(pack.packId());</span>
+<span class="fc" id="L171">        }</span>
+<span class="fc" id="L172">        Set&lt;String&gt; enabled = new LinkedHashSet&lt;&gt;(effective.effectiveEnabledPacks(packIds(), defaults));</span>
+<span class="fc" id="L173">        enabled.addAll(kernelPackIds());</span>
+<span class="fc" id="L174">        Set&lt;String&gt; ordered = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (CoreRulePack pack : PACKS) {</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (enabled.contains(pack.packId())) {</span>
+<span class="fc" id="L177">                ordered.add(pack.packId());</span>
             }
-<span class="fc" id="L178">        }</span>
-<span class="fc" id="L179">        return Set.copyOf(ordered);</span>
+<span class="fc" id="L179">        }</span>
+<span class="fc" id="L180">        return Set.copyOf(ordered);</span>
     }
 
     private static void rejectKernelDisable(Set&lt;String&gt; disabledPacks) {
-<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (String packId : disabledPacks) {</span>
-<span class="fc" id="L184">            CoreRulePack pack = BY_ID.get(packId);</span>
-<span class="fc bfc" id="L185" title="All 4 branches covered.">            if (pack != null &amp;&amp; pack.tier() == RuleTier.KERNEL) {</span>
-<span class="fc" id="L186">                throw new IllegalArgumentException(&quot;Kernel rule pack cannot be disabled: &quot; + packId);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (String packId : disabledPacks) {</span>
+<span class="fc" id="L185">            CoreRulePack pack = BY_ID.get(packId);</span>
+<span class="fc bfc" id="L186" title="All 4 branches covered.">            if (pack != null &amp;&amp; pack.tier() == RuleTier.KERNEL) {</span>
+<span class="fc" id="L187">                throw new IllegalArgumentException(&quot;Kernel rule pack cannot be disabled: &quot; + packId);</span>
             }
-<span class="fc" id="L188">        }</span>
-<span class="fc" id="L189">    }</span>
+<span class="fc" id="L189">        }</span>
+<span class="fc" id="L190">    }</span>
 
     private static Map&lt;String, CoreRulePack&gt; indexById(List&lt;CoreRulePack&gt; packs) {
-<span class="fc" id="L192">        Map&lt;String, CoreRulePack&gt; index = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (CoreRulePack pack : packs) {</span>
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (index.put(pack.packId(), pack) != null) {</span>
-<span class="nc" id="L195">                throw new IllegalStateException(&quot;Duplicate core rule pack id: &quot; + pack.packId());</span>
+<span class="fc" id="L193">        Map&lt;String, CoreRulePack&gt; index = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (CoreRulePack pack : packs) {</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            if (index.put(pack.packId(), pack) != null) {</span>
+<span class="nc" id="L196">                throw new IllegalStateException(&quot;Duplicate core rule pack id: &quot; + pack.packId());</span>
             }
-<span class="fc" id="L197">        }</span>
-<span class="fc" id="L198">        return Map.copyOf(index);</span>
+<span class="fc" id="L198">        }</span>
+<span class="fc" id="L199">        return Map.copyOf(index);</span>
     }
 
     private static Map&lt;String, String&gt; indexByRuleId(List&lt;CoreRulePack&gt; packs) {
-<span class="fc" id="L202">        Map&lt;String, String&gt; index = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (CoreRulePack pack : packs) {</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (String ruleId : pack.ruleIds()) {</span>
-<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                if (index.put(ruleId, pack.packId()) != null) {</span>
-<span class="nc" id="L206">                    throw new IllegalStateException(&quot;Rule assigned to more than one core pack: &quot; + ruleId);</span>
+<span class="fc" id="L203">        Map&lt;String, String&gt; index = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (CoreRulePack pack : packs) {</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (String ruleId : pack.ruleIds()) {</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (index.put(ruleId, pack.packId()) != null) {</span>
+<span class="nc" id="L207">                    throw new IllegalStateException(&quot;Rule assigned to more than one core pack: &quot; + ruleId);</span>
                 }
-<span class="fc" id="L208">            }</span>
-<span class="fc" id="L209">        }</span>
-<span class="fc" id="L210">        return Map.copyOf(index);</span>
+<span class="fc" id="L209">            }</span>
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">        return Map.copyOf(index);</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

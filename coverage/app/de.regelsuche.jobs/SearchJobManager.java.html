@@ -616,8 +616,8 @@ public class SearchJobManager {
 <span class="fc" id="L616">                    roots.add(edge.fromExpression());</span>
                 }
 <span class="fc" id="L618">            }</span>
-<span class="fc bfc" id="L619" title="All 2 branches covered.">            if (roots.isEmpty()) {</span>
-<span class="fc" id="L620">                roots.add(snapshot.nodes().get(0));</span>
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">            if (roots.isEmpty()) {</span>
+<span class="nc" id="L620">                roots.add(snapshot.nodes().get(0));</span>
             }
 <span class="fc" id="L622">            perDepth.computeIfAbsent(0, ignored -&gt; new LinkedHashSet&lt;&gt;()).addAll(roots);</span>
 <span class="fc" id="L623">            List&lt;Long&gt; result = new ArrayList&lt;&gt;();</span>
@@ -650,4 +650,4 @@ public class SearchJobManager {
 <span class="nc" id="L650">        return diff;</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

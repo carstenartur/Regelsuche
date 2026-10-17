@@ -72,9 +72,9 @@ import java.util.Set;
 <span class="fc" id="L72">            boolean selected = hasTag(node.tags(), &quot;selected-path&quot;);</span>
 <span class="fc" id="L73">            boolean deadEnd = hasTag(node.tags(), &quot;dead-end&quot;);</span>
 <span class="fc bfc" id="L74" title="All 6 branches covered.">            String fill = isTarget ? &quot;#dcfce7&quot; : isInput ? &quot;#dbeafe&quot; : selected ? &quot;#ede9fe&quot; : &quot;#f8fafc&quot;;</span>
-<span class="fc bfc" id="L75" title="All 8 branches covered.">            String stroke = isTarget ? &quot;#16a34a&quot; : isInput ? &quot;#2563eb&quot; : selected ? &quot;#7c3aed&quot; : deadEnd ? &quot;#ef4444&quot; : &quot;#334155&quot;;</span>
+<span class="pc bpc" id="L75" title="1 of 8 branches missed.">            String stroke = isTarget ? &quot;#16a34a&quot; : isInput ? &quot;#2563eb&quot; : selected ? &quot;#7c3aed&quot; : deadEnd ? &quot;#ef4444&quot; : &quot;#334155&quot;;</span>
 <span class="fc bfc" id="L76" title="All 2 branches covered.">            nodes.append(&quot;&lt;g class=\&quot;node &quot;).append(escapeXml(node.kind())).append(selected ? &quot; selected&quot; : &quot; alternative&quot;)</span>
-<span class="fc bfc" id="L77" title="All 2 branches covered.">                    .append(deadEnd ? &quot; dead-end&quot; : &quot;&quot;).append(&quot;\&quot;&gt;&quot;);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                    .append(deadEnd ? &quot; dead-end&quot; : &quot;&quot;).append(&quot;\&quot;&gt;&quot;);</span>
 <span class="fc" id="L78">            nodes.append(&quot;&lt;rect id=\&quot;&quot;).append(escapeXml(node.id())).append(&quot;\&quot; x=\&quot;&quot;).append(point.x() - 60)</span>
 <span class="fc" id="L79">                    .append(&quot;\&quot; y=\&quot;&quot;).append(point.y() - 24)</span>
 <span class="fc" id="L80">                    .append(&quot;\&quot; width=\&quot;120\&quot; height=\&quot;48\&quot; rx=\&quot;12\&quot; fill=\&quot;&quot;).append(fill)</span>
@@ -216,8 +216,8 @@ import java.util.Set;
 <span class="fc bfc" id="L216" title="All 2 branches covered.">        if (hasTag(node.tags(), &quot;selected-path&quot;)) {</span>
 <span class="fc" id="L217">            labels.add(&quot;selected&quot;);</span>
         }
-<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (hasTag(node.tags(), &quot;dead-end&quot;)) {</span>
-<span class="fc" id="L220">            labels.add(&quot;dead-end&quot;);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (hasTag(node.tags(), &quot;dead-end&quot;)) {</span>
+<span class="nc" id="L220">            labels.add(&quot;dead-end&quot;);</span>
         }
 <span class="fc bfc" id="L222" title="All 2 branches covered.">        if (labels.isEmpty()) {</span>
 <span class="fc" id="L223">            labels.add(&quot;alternative&quot;);</span>
@@ -267,4 +267,4 @@ import java.util.Set;
 <span class="fc" id="L267">    private record Point(int x, int y) {</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

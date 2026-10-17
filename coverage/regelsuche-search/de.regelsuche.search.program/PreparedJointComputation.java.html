@@ -8,10 +8,10 @@ public final class PreparedJointComputation {
 <span class="fc" id="L8">    public record Cost(long operationWork, long peakLiveStorage, long retainedOutputStorage,</span>
             int outputBindings, int operationCount, long inspectionWork) {
         public long weighted(long workWeight, long liveWeight, long retainedWeight, long outputWeight) {
-<span class="nc bnc" id="L11" title="All 8 branches missed.">            if (workWeight &lt; 0 || liveWeight &lt; 0 || retainedWeight &lt; 0 || outputWeight &lt; 0)</span>
+<span class="pc bpc" id="L11" title="4 of 8 branches missed.">            if (workWeight &lt; 0 || liveWeight &lt; 0 || retainedWeight &lt; 0 || outputWeight &lt; 0)</span>
 <span class="nc" id="L12">                throw new IllegalArgumentException(&quot;cost weights must be nonnegative&quot;);</span>
-<span class="nc" id="L13">            return Math.addExact(Math.addExact(Math.multiplyExact(operationWork, workWeight), Math.multiplyExact(peakLiveStorage, liveWeight)),</span>
-<span class="nc" id="L14">                Math.addExact(Math.multiplyExact(retainedOutputStorage, retainedWeight), Math.multiplyExact(outputBindings, outputWeight)));</span>
+<span class="fc" id="L13">            return Math.addExact(Math.addExact(Math.multiplyExact(operationWork, workWeight), Math.multiplyExact(peakLiveStorage, liveWeight)),</span>
+<span class="fc" id="L14">                Math.addExact(Math.multiplyExact(retainedOutputStorage, retainedWeight), Math.multiplyExact(outputBindings, outputWeight)));</span>
         }
     }
     public record Node(Expr expression, ComputationBackend.Type type, ComputationBackend.Operation operation,
@@ -121,7 +121,7 @@ public final class PreparedJointComputation {
 <span class="fc" id="L121">            ComputationBackend.Operation operation = null;</span>
             long storage;
 <span class="fc bfc" id="L123" title="All 2 branches covered.">            if (expression instanceof VariableExpr variable) type = Objects.requireNonNull(inputs.get(variable.name()), &quot;unbound input&quot;);</span>
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            else if (expression instanceof NumberExpr number) type = backend.literalType(number);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            else if (expression instanceof NumberExpr number) type = backend.literalType(number);</span>
             else {
 <span class="fc" id="L126">                operation = Objects.requireNonNull(backend.operation(expression), &quot;operation&quot;);</span>
 <span class="pc bpc" id="L127" title="1 of 2 branches missed.">                if (arguments.size() != operation.arguments().size()) throw new IllegalArgumentException(&quot;operator arity differs&quot;);</span>
@@ -145,11 +145,11 @@ public final class PreparedJointComputation {
 <span class="fc" id="L145">            StructuralKey { arguments = List.copyOf(arguments); }</span>
             static StructuralKey of(Expr expression, List&lt;Integer&gt; arguments) {
 <span class="fc bfc" id="L147" title="All 2 branches covered.">                if (expression instanceof VariableExpr v) return new StructuralKey(&quot;variable&quot;, v.name(), arguments);</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (expression instanceof NumberExpr n) return new StructuralKey(&quot;number&quot;, n.value(), arguments);</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (expression instanceof BinaryExpr b) return new StructuralKey(&quot;binary&quot;, b.operator(), arguments);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                if (expression instanceof NumberExpr n) return new StructuralKey(&quot;number&quot;, n.value(), arguments);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                if (expression instanceof BinaryExpr b) return new StructuralKey(&quot;binary&quot;, b.operator(), arguments);</span>
 <span class="fc" id="L150">                return new StructuralKey(&quot;function&quot;, ((FunctionExpr) expression).name(), arguments);</span>
             }
         }
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

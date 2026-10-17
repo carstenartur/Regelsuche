@@ -79,10 +79,10 @@ import java.util.Objects;
 <span class="fc" id="L79">        long baselineStates = baseline.metrics().exploredStates();</span>
 <span class="fc" id="L80">        long candidateStates = candidate.metrics().exploredStates();</span>
 <span class="pc bpc" id="L81" title="1 of 2 branches missed.">        boolean regression = !candidate.reached()</span>
-<span class="pc bpc" id="L82" title="5 of 6 branches missed.">            || baseline.reached() &amp;&amp; (candidateDepth &gt; baselineDepth</span>
+<span class="pc bpc" id="L82" title="3 of 6 branches missed.">            || baseline.reached() &amp;&amp; (candidateDepth &gt; baselineDepth</span>
                 || candidateStates &gt; baselineStates);
 <span class="pc bpc" id="L84" title="2 of 4 branches missed.">        boolean materialGain = candidate.reached() &amp;&amp; !regression</span>
-<span class="pc bpc" id="L85" title="5 of 6 branches missed.">            &amp;&amp; (!baseline.reached()</span>
+<span class="pc bpc" id="L85" title="4 of 6 branches missed.">            &amp;&amp; (!baseline.reached()</span>
                 || candidateDepth &lt; baselineDepth
                 || candidateStates &lt; baselineStates);
 <span class="fc" id="L88">        return new UtilityCase(</span>
@@ -115,7 +115,7 @@ import java.util.Objects;
     }
 
     private static int depth(GoalSearchResult result) {
-<span class="fc bfc" id="L118" title="All 2 branches covered.">        return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
     }
 
     public record UtilityCase(
@@ -208,4 +208,4 @@ import java.util.Objects;
         }
 <span class="fc" id="L209">    }</span>
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

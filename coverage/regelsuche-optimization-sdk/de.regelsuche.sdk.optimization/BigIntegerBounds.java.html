@@ -37,8 +37,8 @@ final class BigIntegerBounds {
 <span class="fc" id="L37">            var args = JavaExpressions.operands(expression);</span>
 <span class="fc" id="L38">            var operation = JavaExpressions.operationOf(expression).orElseThrow();</span>
 <span class="fc" id="L39">            long left = bits(args.getFirst());</span>
-<span class="pc bpc" id="L40" title="4 of 12 branches missed.">            bound = switch (operation) {</span>
-<span class="nc" id="L41">                case NEGATE, ABS -&gt; left;</span>
+<span class="pc bpc" id="L40" title="3 of 12 branches missed.">            bound = switch (operation) {</span>
+<span class="fc" id="L41">                case NEGATE, ABS -&gt; left;</span>
 <span class="nc" id="L42">                case NOT -&gt; left + 1;</span>
 <span class="fc" id="L43">                case ADD, SUBTRACT, AND, OR, XOR -&gt; Math.max(left, bits(args.get(1))) + 1;</span>
 <span class="fc" id="L44">                case MULTIPLY -&gt; left + bits(args.get(1));</span>
@@ -90,4 +90,4 @@ final class BigIntegerBounds {
 <span class="pc bpc" id="L90" title="1 of 4 branches missed.">        if (bound &lt; 0 || bound &gt; maximum) throw new IllegalArgumentException(&quot;BIG_INTEGER_SUPPORTED_RANGE_NOT_PROVED&quot;);</span>
 <span class="fc" id="L91">    }</span>
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

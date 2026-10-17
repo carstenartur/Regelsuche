@@ -49,7 +49,7 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L49">            boolean otherFields = false;</span>
 <span class="fc bfc" id="L50" title="All 2 branches covered.">            while (object.nextField()) {</span>
 <span class="fc bfc" id="L51" title="All 4 branches covered.">                if (!object.fieldName().equals(&quot;runtimeRequest&quot;) &amp;&amp; !object.fieldName().equals(&quot;runtimeArtifact&quot;)) otherFields = true;</span>
-<span class="pc bpc" id="L52" title="9 of 26 branches missed.">                switch (object.fieldName()) {</span>
+<span class="pc bpc" id="L52" title="1 of 7 branches missed.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L53">                    case &quot;runtimeRequest&quot; -&gt; runtimeRequest = object.readNullableObject(StreamingJsonRequestBody.ObjectCursor::readRemainingObject);</span>
 <span class="fc" id="L54">                    case &quot;runtimeArtifact&quot; -&gt; runtimeArtifact = object.readNullableObject(StreamingJsonRequestBody.ObjectCursor::readRemainingObject);</span>
 <span class="fc" id="L55">                    case &quot;expression&quot; -&gt; expression = stringOr(</span>
@@ -73,7 +73,7 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L73">            int min = 1;</span>
 <span class="fc" id="L74">            int max = 3;</span>
 <span class="fc bfc" id="L75" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L76" title="2 of 10 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc bfc" id="L76" title="All 3 branches covered.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L77">                    case &quot;min&quot; -&gt; min = intOr(object.readNullableInt(), 1);</span>
 <span class="fc" id="L78">                    case &quot;max&quot; -&gt; max = intOr(object.readNullableInt(), 3);</span>
 <span class="fc" id="L79">                    default -&gt; object.skipValue();</span>
@@ -106,7 +106,7 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L106">            String matchId = &quot;&quot;;</span>
 <span class="fc" id="L107">            int matchIndex = -1;</span>
 <span class="fc bfc" id="L108" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L109" title="4 of 18 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc bfc" id="L109" title="All 5 branches covered.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L110">                    case &quot;expression&quot; -&gt; expression = stringOr(</span>
 <span class="fc" id="L111">                        object.readNullableString(), &quot;&quot;);</span>
 <span class="fc" id="L112">                    case &quot;pathKey&quot; -&gt; pathKey = stringOr(</span>
@@ -130,7 +130,7 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L130">            String studentStep = &quot;&quot;;</span>
 <span class="fc" id="L131">            String difficulty = &quot;MITTELSTUFE&quot;;</span>
 <span class="fc bfc" id="L132" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L133" title="3 of 14 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc bfc" id="L133" title="All 4 branches covered.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L134">                    case &quot;currentExpression&quot; -&gt; currentExpression = stringOr(</span>
 <span class="fc" id="L135">                        object.readNullableString(), &quot;&quot;);</span>
 <span class="fc" id="L136">                    case &quot;studentStep&quot; -&gt; studentStep = stringOr(</span>
@@ -151,7 +151,7 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L151">            String currentExpression = &quot;&quot;;</span>
 <span class="fc" id="L152">            String pedagogyProfile = &quot;SCHOOL&quot;;</span>
 <span class="fc bfc" id="L153" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L154" title="2 of 10 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc bfc" id="L154" title="All 3 branches covered.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L155">                    case &quot;currentExpression&quot; -&gt; currentExpression = stringOr(</span>
 <span class="fc" id="L156">                        object.readNullableString(), &quot;&quot;);</span>
 <span class="fc" id="L157">                    case &quot;pedagogyProfile&quot; -&gt; pedagogyProfile = stringOr(</span>
@@ -173,7 +173,7 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L173">            String backend = &quot;&quot;;</span>
 <span class="fc" id="L174">            List&lt;Assumption&gt; assumptions = List.of();</span>
 <span class="fc bfc" id="L175" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L176" title="8 of 22 branches missed.">                switch (object.fieldName()) {</span>
+<span class="pc bpc" id="L176" title="1 of 6 branches missed.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L177">                    case &quot;leftPattern&quot; -&gt; leftPattern = stringOr(</span>
 <span class="fc" id="L178">                        object.readNullableString(), &quot;&quot;);</span>
 <span class="fc" id="L179">                    case &quot;rightPattern&quot; -&gt; rightPattern = stringOr(</span>
@@ -204,7 +204,7 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L204">            String worker = &quot;&quot;;</span>
 <span class="fc" id="L205">            List&lt;Assumption&gt; assumptions = List.of();</span>
 <span class="fc bfc" id="L206" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L207" title="5 of 22 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc bfc" id="L207" title="All 6 branches covered.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L208">                    case &quot;leftPattern&quot; -&gt; leftPattern = stringOr(</span>
 <span class="fc" id="L209">                        object.readNullableString(), &quot;&quot;);</span>
 <span class="fc" id="L210">                    case &quot;rightPattern&quot; -&gt; rightPattern = stringOr(</span>
@@ -363,4 +363,4 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L363">        }</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

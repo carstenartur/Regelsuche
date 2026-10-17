@@ -186,9 +186,9 @@ import static de.regelsuche.search.moves.MoveSearch.*;
 
         /** False also covers a depth-bound leaf; only terminal outcomes stop the whole run. */
         private boolean open(Node node) {
-<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (ledger.explored &gt;= budget.maxStates()) {</span>
-<span class="nc" id="L190">                stop(Outcome.STATE_LIMIT);</span>
-<span class="nc" id="L191">                return false;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (ledger.explored &gt;= budget.maxStates()) {</span>
+<span class="fc" id="L190">                stop(Outcome.STATE_LIMIT);</span>
+<span class="fc" id="L191">                return false;</span>
             }
 <span class="fc" id="L193">            ledger.explored++;</span>
 <span class="fc" id="L194">            boolean firstOpening=reached.add(node.state);</span>
@@ -505,4 +505,4 @@ import static de.regelsuche.search.moves.MoveSearch.*;
 <span class="fc" id="L505">        return score;</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

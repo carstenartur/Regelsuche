@@ -99,7 +99,7 @@ final class JavaNumericBackend implements ComputationBackend {
         };
     }
     private static int integral32(NumericOperation op, int x, int y) {
-<span class="pc bpc" id="L102" title="7 of 19 branches missed.">        return switch (op) {</span>
+<span class="pc bpc" id="L102" title="6 of 19 branches missed.">        return switch (op) {</span>
 <span class="fc" id="L103">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
 <span class="pc" id="L104">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
 <span class="fc" id="L105">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
@@ -109,7 +109,7 @@ final class JavaNumericBackend implements ComputationBackend {
         };
     }
     private static long integral64(NumericOperation op, long x, long y) {
-<span class="pc bpc" id="L112" title="10 of 19 branches missed.">        return switch (op) {</span>
+<span class="pc bpc" id="L112" title="9 of 19 branches missed.">        return switch (op) {</span>
 <span class="pc" id="L113">            case ADD -&gt; x + y; case SUBTRACT -&gt; x - y; case MULTIPLY -&gt; x * y; case DIVIDE -&gt; x / y; case REMAINDER -&gt; x % y;</span>
 <span class="pc" id="L114">            case NEGATE -&gt; -x; case ABS -&gt; Math.abs(x); case AND -&gt; x &amp; y; case OR -&gt; x | y; case XOR -&gt; x ^ y;</span>
 <span class="pc" id="L115">            case NOT -&gt; ~x; case SHIFT_LEFT -&gt; x &lt;&lt; y; case SHIFT_RIGHT -&gt; x &gt;&gt; y; case UNSIGNED_SHIFT_RIGHT -&gt; x &gt;&gt;&gt; y;</span>
@@ -136,4 +136,4 @@ final class JavaNumericBackend implements ComputationBackend {
         };
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

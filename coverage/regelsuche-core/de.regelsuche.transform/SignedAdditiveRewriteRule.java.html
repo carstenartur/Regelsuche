@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SignedAdditiveRewriteRule.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">SignedAdditiveRewriteRule.java</span></div><h1>SignedAdditiveRewriteRule.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+
+/**
+ * Ordinary core rule for signed-term cancellation and reusable differences.
+ * The same registered rule is lifted by representation adapters; no consumer
+ * formula or Java numeric type participates in this implementation.
+ *
+ * &lt;p&gt;This conservative rule requires a bounded, total real-domain expression.
+ * In particular it must not turn {@code (a + 1/x) - 1/x} into {@code a} and
+ * silently lose the original domain. Typed consumers still independently
+ * verify their own overflow, narrowing, and exception semantics.&lt;/p&gt;
+ */
+<span class="fc" id="L21">public final class SignedAdditiveRewriteRule implements RewriteRule, RetainedGraph.View {</span>
+    public static final String ID = &quot;ast_signed_additive_normalize&quot;;
+    private static final int MAX_INSPECTED_NODES = 512;
+
+<span class="fc" id="L25">    @Override public String id() { return ID; }</span>
+<span class="fc" id="L26">    @Override public RewriteKind kind() { return RewriteKind.NORMALIZE; }</span>
+<span class="fc" id="L27">    @Override public boolean mayIncreaseComplexity() { return true; }</span>
+<span class="fc" id="L28">    @Override public int estimatedCostDelta() { return 0; }</span>
+<span class="fc" id="L29">    @Override public boolean isEquivalencePreservingByConstruction() { return true; }</span>
+<span class="nc" id="L30">    @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
+
+    @Override public boolean matches(Expr subtree) {
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        return normalized(subtree) != null;</span>
+    }
+
+    @Override public Expr apply(Expr subtree) {
+<span class="fc" id="L37">        Expr result = normalized(subtree);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (result == null) throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="fc" id="L39">        return result;</span>
+    }
+
+    private static Expr normalized(Expr subtree) {
+<span class="fc" id="L43">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!(subtree instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L45" title="All 4 branches covered.">                || binary.operator() != BinaryOperator.ADD &amp;&amp; binary.operator() != BinaryOperator.SUB)</span>
+<span class="fc" id="L46">            return null;</span>
+<span class="fc" id="L47">        var shape = new BoundedShape();</span>
+<span class="fc" id="L48">        RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!shape.inspect(subtree, 0, SignedAdditiveForm.MAX_DEPTH)) return null;</span>
+        // Definedness is shared with other simplifiers, not reimplemented here.
+<span class="fc" id="L51">        RetainedOperation.work(shape.nodes);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!ExpressionDefinedness.isTotal(subtree)) return null;</span>
+<span class="fc" id="L53">        var result = SignedAdditiveForm.normalize(subtree, units -&gt; {</span>
+<span class="fc" id="L54">            RetainedOperation.work(units);</span>
+<span class="fc" id="L55">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L56">        });</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (!result.complete()) return null;</span>
+        // The rule has no enclosing-path budget. Never increase local depth:
+        // this also preserves every enclosing transport's existing depth bound.
+        // Inspect opaque terms too, before structural equality or admission.
+<span class="fc" id="L61">        int sourceDepth = shape.maximumDepth;</span>
+<span class="fc" id="L62">        shape.nodes = 0;</span>
+<span class="fc" id="L63">        shape.maximumDepth = 0;</span>
+<span class="fc" id="L64">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (!shape.inspect(result.expression(), 0, sourceDepth)) return null;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        return !result.expression().equals(subtree) ? result.expression() : null;</span>
+    }
+
+    /** Count expanded visits before any recursive domain inspection or term hashing. */
+    private static final class BoundedShape {
+        private int nodes;
+        private int maximumDepth;
+
+        private boolean inspect(Expr expression, int depth, int depthLimit) {
+<span class="fc" id="L75">            RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">            if (++nodes &gt; MAX_INSPECTED_NODES || depth &gt; depthLimit) return false;</span>
+<span class="fc" id="L77">            maximumDepth = Math.max(maximumDepth, depth);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                return inspect(binary.left(), depth + 1, depthLimit)</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                        &amp;&amp; inspect(binary.right(), depth + 1, depthLimit);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                for (Expr argument : function.arguments()) {</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                    if (!inspect(argument, depth + 1, depthLimit)) return false;</span>
+<span class="fc" id="L84">                }</span>
+            }
+<span class="fc" id="L86">            return true;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
