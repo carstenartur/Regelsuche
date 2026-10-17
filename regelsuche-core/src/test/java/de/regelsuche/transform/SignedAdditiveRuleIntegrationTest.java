@@ -23,7 +23,11 @@ class SignedAdditiveRuleIntegrationTest {
                 .filter(candidate -> candidate.rule().equals(RULE) && candidate.target().equals(expected))
                 .findFirst().orElseThrow(() -> new AssertionError("Ordinary Regelsuche did not offer the signed-additive rewrite"));
         assertEquals(expected, engine.replay(source, List.of(step)));
-        assertEquals(CoreRuleCatalog.TERM_COLLECTION, step.packId());
+        // Transport records built-in provenance; selectable sub-packs belong to
+        // CoreRuleCatalog. Treating a built-in rule as an external pack would
+        // change its trust contract merely to satisfy an incorrect assertion.
+        assertEquals("core", step.packId());
+        assertEquals(CoreRuleCatalog.TERM_COLLECTION, CoreRuleCatalog.packIdForRule(step.rule()));
     }
 
     @Test void ordinaryInventoryExposesReusableDifferencesWithoutAPaethRule() {
