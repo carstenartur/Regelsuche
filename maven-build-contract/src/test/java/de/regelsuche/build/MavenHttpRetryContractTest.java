@@ -29,6 +29,9 @@ class MavenHttpRetryContractTest {
             .stream().map(String::strip)
             .filter(line -> !line.isEmpty() && !line.startsWith("#")).toList();
         assertEquals(List.of(
+            "-Daether.connector.http.retryHandler.count=5",
+            "-Daether.connector.http.retryHandler.interval=10000",
+            "-Daether.connector.http.retryHandler.intervalMax=60000",
             "-Daether.transport.http.retryHandler.count=5",
             "-Daether.transport.http.retryHandler.interval=10000",
             "-Daether.transport.http.retryHandler.intervalMax=60000"), options);
