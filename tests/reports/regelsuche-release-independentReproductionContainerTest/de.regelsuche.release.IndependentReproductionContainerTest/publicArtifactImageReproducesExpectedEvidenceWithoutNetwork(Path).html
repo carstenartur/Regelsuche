@@ -63,7 +63,7 @@
 </td>
 <td>
 <div class="infoBox duration">
-<div class="counter">2m36.82s</div>
+<div class="counter">3m33.82s</div>
 <p>duration</p>
 </div>
 </td>
@@ -91,72 +91,73 @@ Calculating task graph as no cached configuration is available for tasks: :regel
 &gt; Task :regelsuche-autopilot:processResources NO-SOURCE
 &gt; Task :regelsuche-egraph:processResources NO-SOURCE
 &gt; Task :regelsuche-experiments:processResources
-&gt; Task :regelsuche-discovery:processResources
 &gt; Task :regelsuche-core:processResources
+&gt; Task :regelsuche-discovery:processResources
 &gt; Task :regelsuche-math-algorithms:processResources NO-SOURCE
 &gt; Task :regelsuche-release:processResources NO-SOURCE
 &gt; Task :regelsuche-learning:processResources
+&gt; Task :regelsuche-search:processResources
 &gt; Task :regelsuche-solver-ir:processResources NO-SOURCE
 &gt; Task :regelsuche-validation:processResources NO-SOURCE
-&gt; Task :regelsuche-search:processResources
 &gt; Task :regelsuche-optimization-sdk:processResources
-
-&gt; Task :regelsuche-core:compileJava
 Note: /workspace/regelsuche-core/src/main/java/de/regelsuche/retention/RetainedJson.java uses or overrides a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
+
+&gt; Task :regelsuche-core:compileJava
 Note: /workspace/regelsuche-core/src/main/java/de/regelsuche/retention/RetainedJson.java uses unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 
 &gt; Task :regelsuche-core:classes
+warning: unknown enum constant Mode.PROPERTIES
 
 &gt; Task :regelsuche-egraph:compileJava
-warning: unknown enum constant Mode.PROPERTIES
+  reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
+warning: unknown enum constant Mode.DELEGATING
+2 warnings
 
 &gt; Task :regelsuche-egraph:classes
+&gt; Task :regelsuche-egraph:jar
+&gt; Task :regelsuche-core:jar
 
 &gt; Task :regelsuche-validation:compileJava
-
-&gt; Task :regelsuche-egraph:jar
-&gt; Task :regelsuche-validation:classes
-  reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
-warning: unknown enum constant Mode.DELEGATING
-2 warnings
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
 2 warnings
-&gt; Task :regelsuche-validation:jar
-&gt; Task :regelsuche-core:jar
 
-&gt; Task :regelsuche-search:compileJava
+&gt; Task :regelsuche-validation:classes
+&gt; Task :regelsuche-validation:jar
+warning: unknown enum constant Mode.PROPERTIES
+  reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
+warning: unknown enum constant Mode.DELEGATING
+
+&gt; Task :regelsuche-math-algorithms:compileJava
+Note: /workspace/regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/completion/KnuthBendixCompletionService.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+2 warnings
 /workspace/regelsuche-search/src/main/java/de/regelsuche/search/moves/NativeMoveProof.java:25: warning: non-varargs call of varargs method with inexact argument type for last parameter;
             try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {
                                                                           ^
   cast to Object for a varargs call
-  cast to Object[] for a non-varargs call and to suppress this warning
-
-warning: unknown enum constant Mode.PROPERTIES
-  reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
-warning: unknown enum constant Mode.DELEGATING
-Note: /workspace/regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/completion/KnuthBendixCompletionService.java uses or overrides a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-2 warnings
-&gt; Task :regelsuche-math-algorithms:compileJava
 
 &gt; Task :regelsuche-math-algorithms:classes
+
+&gt; Task :regelsuche-search:compileJava
+  cast to Object[] for a non-varargs call and to suppress this warning
+
 &gt; Task :regelsuche-math-algorithms:jar
 
 &gt; Task :regelsuche-search:compileJava
+1 warning
 
 &gt; Task :regelsuche-search:classes
-1 warning
 &gt; Task :regelsuche-search:jar
 
 &gt; Task :regelsuche-solver-ir:compileJava
-Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
 
 &gt; Task :regelsuche-solver-ir:classes
+Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
 &gt; Task :regelsuche-solver-ir:jar
 
 &gt; Task :regelsuche-optimization-sdk:compileJava
@@ -175,9 +176,9 @@ warning: unknown enum constant Mode.DELEGATING
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
+2 warnings
 
 &gt; Task :regelsuche-experiments:classes
-2 warnings
 &gt; Task :regelsuche-experiments:jar
 
 &gt; Task :regelsuche-learning:compileJava
@@ -191,17 +192,17 @@ Note: Recompile with -Xlint:deprecation for details.
 &gt; Task :regelsuche-autopilot:jar
 
 &gt; Task :regelsuche-release:compileJava
+
+&gt; Task :regelsuche-release:classes
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 
-&gt; Task :regelsuche-release:classes
-
 &gt; Task :regelsuche-release:runAutonomousDiscoveryWalkthrough
-sha256:9ec9f181336b89ba8a9f0eac62e25cf91290a90b6d627ec1f5fe96d6f058f1c8
+sha256:820bf3c889a9f7ec6fa19678ba7200b482060be911c4109b8612f90b62bbf7a4
 
 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 27s
+BUILD SUCCESSFUL in 59s
 30 actionable tasks: 30 executed
 Configuration cache entry stored.
 </pre>
@@ -218,7 +219,7 @@ Configuration cache entry stored.
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 9.7.1</a> at Oct 17, 2026, 10:36:37 AM</p>
+<a href="https://www.gradle.org">Gradle 9.7.1</a> at Oct 18, 2026, 7:59:33 AM</p>
 </div>
 </div>
 </body>
