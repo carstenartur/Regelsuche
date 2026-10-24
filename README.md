@@ -152,6 +152,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 ### Domänen und Solver
 
+- [Geprüfte gemeinsame Rechenpläne als externes SDK-Beispiel](checked-modular-profile-example.md) —
+  begrenzte Komposition und Ausführung; vollständige Studie und Daten in Primachsenraum.
 - [Generische Discovery-Domänen](generic-discovery-domains.md)
 - [Domänenneutraler Lifecycle-Handoff](domain-lifecycle-handoff.md)
 - [Generischer Domain-Discovery-Export](domain-discovery-export.md)
