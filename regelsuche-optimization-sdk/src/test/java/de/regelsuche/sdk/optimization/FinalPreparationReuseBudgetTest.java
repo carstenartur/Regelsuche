@@ -10,6 +10,19 @@ import org.junit.jupiter.api.Test;
 
 /** A completed proof must be able to reuse costs already obtained in the same request. */
 class FinalPreparationReuseBudgetTest {
+    @Test void noImprovementDoesNotChargeAnUnconstructedCandidate() {
+        var plan = new JointComputationPlan(Map.of("x", NumericKind.INT.type()), Map.of(),
+                List.of(new JointComputationPlan.Output("result", NumericKind.INT.type(), new VariableExpr("x"))));
+        var request = new OptimizationRequest(plan, new SourceEvaluationTrace(List.of()), Set.of(NumericKind.INT),
+                ComputationOptimizer.SEMANTICS_REVISION, Set.of(), SafetyProfile.PRESERVE_JAVA,
+                OptimizationGoal.LOWER_ESTIMATED_RUNTIME, new OptimizationBudget(100_000, 20_000, 64, 5000), CheckedPolicy.NONE);
+        var result = assertInstanceOf(OptimizationResult.NoImprovement.class,
+                new ComputationOptimizer().optimize(request, CancellationToken.NONE));
+        // This ceiling excludes the unused 15-unit Candidate-constructor
+        // reservation; the complete search must account only for executed work.
+        assertTrue(result.work() <= 330, result.toString());
+    }
+
     @Test void sharedEvaluationsFinishWithinTheAllowanceForOneTrustedFinalPreparation() {
         var optimizer = new ComputationOptimizer();
         var referenceRequest = request(2_000_000);
@@ -20,10 +33,10 @@ class FinalPreparationReuseBudgetTest {
         assertTrue(reference.derivation().isPresent());
         assertTrue(reference.derivation().orElseThrow().steps().isEmpty());
 
-        // Metered structural interning raises complete request work to 3,385.
-        // Leave less than one extra preparation (103 units), retaining the reuse
-        // regression instead of refunding the newly accounted resolver work.
-        long allowance = 3_400;
+        // Canonical resolution avoids repeated structural interning in preparation.
+        // Measured work is 3,084; leave less than one extra preparation (84 units)
+        // to retain the reuse regression without discounting actual traversal.
+        long allowance = 3_100;
         assertTrue(reference.work() + reference.cost().candidateCost().inspectionWork() > allowance);
 
         var constrainedRequest = request(allowance);
@@ -48,7 +61,7 @@ class FinalPreparationReuseBudgetTest {
         var exhausted = assertInstanceOf(OptimizationResult.BudgetExceeded.class,
                 new ComputationOptimizer().optimize(request(historicalAllowance), CancellationToken.NONE));
         assertTrue(exhausted.work() > historicalAllowance);
-        assertEquals("SEARCH_BUDGET_EXCEEDED", exhausted.diagnostic());
+        assertEquals("FINAL_PREPARATION_BUDGET_EXCEEDED", exhausted.diagnostic());
     }
 
     private static OptimizationRequest request(long maximumWork) {

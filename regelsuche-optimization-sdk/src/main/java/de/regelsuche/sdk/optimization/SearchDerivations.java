@@ -18,14 +18,19 @@ final class SearchDerivations {
         Expr cursor = envelope(request.plan(), work);
         for (var edge : witness) {
             work.charge(1);
-            Expr before = envelope(request.plan().withExpression(edge.source().expression()), work);
-            Expr after = envelope(request.plan().withExpression(edge.target().expression()), work);
+            // These producer states already passed the bounded frontier and
+            // independent move verifier. Retain their immutable expressions;
+            // rebuilding their plans would repeat resolution solely for capture.
+            Expr before = edge.source().expression();
+            Expr after = edge.target().expression();
             if (!edge.verification().accepted() || !cursor.equals(before))
                 throw new IllegalArgumentException("SELECTED_DERIVATION_DISCONTINUOUS");
             steps.add(new SearchDerivation.Step(edge.move().ruleId(), before, after));
             cursor = after;
         }
-        if (!cursor.equals(envelope(found.plan(), work)))
+        // found.plan was constructed from this incumbent and independently
+        // verified before capture. Untrusted replay below still rebuilds bounds.
+        if (!cursor.equals(found.search().incumbent().expression()))
             throw new IllegalArgumentException("SELECTED_DERIVATION_ENDPOINT_DIFFERS");
         return new SearchDerivation(evidence, request.budget().maximumCandidates(), request.budget().maximumWork(), steps);
     }

@@ -50,11 +50,6 @@ public final class ComputationOptimizer {
             if(finalOutcome.isPresent()) return finalOutcome.get();
             var obligations=obligations(request,found.plan());
             var cost=cost(request,sourceCost,found.prepared().cost(),obligations);
-            // Both costs came from preparations already charged in this request.
-            // Reserve the trusted Candidate constructor's independent preparation.
-            long preparationWork=cost.candidateCost().inspectionWork();
-            work.charge(preparationWork); total=Math.addExact(total,preparationWork);
-            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             boolean improved=cost.candidateScore()<cost.sourceScore();
             // Reaching the exploration limit says nothing about the validity of
             // an incumbent that has now passed the full original-source proof.
@@ -64,6 +59,11 @@ public final class ComputationOptimizer {
             if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
                 return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION",total);
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
+            // Only an actual Candidate executes its trusted constructor's fresh
+            // preparation. Non-improvement paths must not charge unused work.
+            long preparationWork=cost.candidateCost().inspectionWork();
+            work.charge(preparationWork); total=Math.addExact(total,preparationWork);
+            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             var receipt = evidence(request,found.plan(),proof,obligations);
             long beforeDerivation = work.used();
             var derivation = SearchDerivations.capture(request, receipt, found, work);

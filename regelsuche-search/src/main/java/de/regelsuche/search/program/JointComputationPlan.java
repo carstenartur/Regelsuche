@@ -75,7 +75,10 @@ public final class JointComputationPlan {
     }
     public record SearchExpression(Expr expression, long work) {}
     public SearchExpression searchExpression() {
-        var resolved = resolveOutputs();
+        return searchExpression(resolveOutputs());
+    }
+    /** Internal reuse of this plan's already resolved immutable outputs. */
+    SearchExpression searchExpression(Resolution resolved) {
         if ((long) resolved.expandedNodes() + 2L * outputs.size() + 1 > MAX_NODES || resolved.height() + 2 > MAX_DEPTH)
             throw new IllegalArgumentException("expanded frontier AST exceeds transport bound");
         var expressions = resolved.expressions();

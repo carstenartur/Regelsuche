@@ -92,3 +92,18 @@ keys and child IDs. Every decoded visit and key operation remains charged;
 no structural/depth limit is raised. A metered resolver callback replaces the
 affine API's former fixed precharge, and source-adapter failure reservations must
 include the resolver's documented work bound as well as preparation work.
+The schedule builder consumes those canonical identities rather than repeating
+structural interning. Failed late trace preparation may follow earlier request
+work: consumers must reserve that allowance in addition to the unreported bound.
+Only actually constructed candidates reserve the trusted constructor's final
+preparation; non-improvement outcomes do not perform that work.
+Initial search-envelope and schedule construction share their local resolution.
+Derivation capture retains the internally verified frontier states; source
+binding, continuity and endpoint checks remain, and external replay still
+rebuilds bounds, regenerates proposals and independently verifies each edge.
+
+The architecture follow-up also identified an existing separate accounting
+limit: the explanation API reports presentation work after its fresh verification,
+not that call's full consumed work. A later API/consumer change should report and
+debit complete explanation-call work on success and failure. The current file
+ledger must not be described as a bound on every actually executed SDK operation.

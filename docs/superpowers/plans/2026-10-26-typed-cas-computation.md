@@ -48,7 +48,7 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 
 - [x] Add a bounded task extraction entry point reusing the existing decoder; ordinary extraction stays unchanged.
 - [x] Retain all local value versions, every fresh read, low-word stores and later carries in an ordered source schedule.
-- [ ] Compare real pinned Nat256 add plans with manually assembled arithmetic, including alias/exception/local-commit observations.
+- [x] Compare real pinned Nat256 add plans with manually assembled arithmetic, including alias/exception/local-commit observations.
 - [ ] Prove cross-store task extraction grants no automatic edit permission and run the full headless mathematics suite.
 
 ## Task 4: Qualify and integrate
@@ -57,7 +57,7 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 - [x] Restore exact structural sharing in the common plan resolver, retaining visit/key work and all structural limits.
 - [x] Add metered resolver traversal to the affine analysis, preserving shared budget and cancellation.
 
-- [ ] Independent whole-change code review; fix substantive findings with regressions.
+- [x] Independent whole-change code review; fix substantive findings with regressions.
 - [ ] Publish main-based Regelsuche change; qualify its exact SDK source revision through the established staging workflow.
 - [ ] Integrate exact staged artifact/receipt into Sandbox after prerequisites are integrated; run native CI and review comments.
 - [ ] Document measured results and remaining conservative boundaries; no unsupported runtime claims.
@@ -74,3 +74,7 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 - Nat256.add comparison: the pinned source yields 25 ordinary edit regions versus one complete inspection task (26 outputs, 16 reads, eight stores); independent SDK-plan verification and alias/exception replay pass. Sandbox qualification and exact SDK staging remain separate follow-up gates.
 - Complete-plan search found a second concrete issue: cold codec transport inflated 87 prepared nodes to 1,753 separate tree occurrences and exceeded the preparation cap. A core regression failed before structural interning; transport, carry-search and affine budget/cancellation regressions then passed. The first qualified SDK revision is superseded by this follow-up and must not be presented as the final consumer artifact.
 - Final follow-up verification: all seven dependency/SDK modules pass, including 199 SDK tests. The fixed final-preparation regression allows 3,400 units after measured resolver accounting (3,385 consumed; one extra preparation costs 103), and the historical 1,092-unit request still exhausts its allowance. The CI complexity finding in bit projection was resolved by separating cast, Boolean and shift projection helpers, without a policy exception.
+- Consumer follow-up exposed duplicate interning: preparation now uses canonical resolver identities, retaining visits and explicit type/edge checks. It also exposed a charge for the final Candidate constructor on paths that never construct a Candidate. That charge now occurs only on the actual candidate path; independent final proof and constructor preparation remain fresh.
+- Intermediate budget follow-up: all seven modules passed with 201 SDK tests. A new non-improvement regression failed at 341 units before removing an unused 15-unit constructor reservation. No production request budget was raised.
+- The full pinned Nat256 JDT task and independent manual plan both reach search. The manual plan retains the actual int-to-long initializer conversion so the original evaluation trace remains complete. Both report an incomplete search relation, not an unsupported task or a proved runtime improvement. Source-task/late-preparation focused checks pass; final consumer-wide and corpus validation remain separate gates.
+- Final shared-work verification: all seven modules pass with 201 SDK tests. Initial envelope/schedule construction share one local resolution; capture retains the already bounded producer states, while external replay remains fresh. The tight regression consumes 3,084 units with an 84-unit extra preparation and a 3,100-unit allowance. Independent code and architecture reviews found no blocker. Targeted consumer diagnostics retain both established Hawk fragments without changing the production file budget or allocation; exact-artifact qualification remains mandatory.

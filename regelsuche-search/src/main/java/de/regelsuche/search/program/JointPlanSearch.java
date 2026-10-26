@@ -64,18 +64,27 @@ public final class JointPlanSearch {
         return prepare(source, candidate).plan();
     }
     private Preparation prepare(JointComputationPlan source, JointComputationPlan candidate) {
+        return prepare(source, candidate, null);
+    }
+    private Preparation prepare(JointComputationPlan source, JointComputationPlan candidate,
+            JointComputationPlan.Resolution resolved) {
         if (!source.inputs().equals(candidate.inputs()) || !source.outputs().stream().map(o -> List.of(o.name(), o.type())).toList()
                 .equals(candidate.outputs().stream().map(o -> List.of(o.name(), o.type())).toList()))
             throw new IllegalArgumentException("input/output bindings differ");
         var verified = domain.verify(source, candidate);
         if (!verified.accepted()) throw new IllegalArgumentException("domain did not prove joint outputs equivalent");
-        var prepared = candidate.prepare(backend);
+        var prepared = resolved == null ? candidate.prepare(backend) : PreparedJointComputation.prepare(candidate, backend, resolved);
         return new Preparation(prepared, Math.addExact(verified.work(), prepared.cost().inspectionWork()));
     }
     public Result optimize(JointComputationPlan source, MoveSearch.Budget budget) {
-        var sourceExpression = source.searchExpression();
-        var initialCheck = prepare(source, source);
-        var initial = new Preparation(initialCheck.plan(), Math.addExact(initialCheck.work(), sourceExpression.work()));
+        var sourceResolution = source.resolveOutputs();
+        var sourceExpression = source.searchExpression(sourceResolution);
+        var initialCheck = prepare(source, source, sourceResolution);
+        // The envelope and schedule share one immutable resolution. Its work is
+        // included in preparation; add only envelope construction here. Domain
+        // verification and the final incumbent check remain independent.
+        var initial = new Preparation(initialCheck.plan(),
+                Math.addExact(initialCheck.work(), sourceExpression.work() - sourceResolution.work()));
         long remaining = Math.max(1, budget.totalWork() - initial.work());
         var searchBudget = new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),
             budget.maxStates(), remaining, budget.maxComplexityDebt());

@@ -54,9 +54,14 @@ public final class PreparedJointComputation {
     }
     static PreparedJointComputation prepare(JointComputationPlan plan, ComputationBackend backend) {
         Objects.requireNonNull(backend, "backend");
+        return prepare(plan, backend, plan.resolveOutputs());
+    }
+    /** Internal reuse of the same plan resolution, retaining all schedule/type checks. */
+    static PreparedJointComputation prepare(JointComputationPlan plan, ComputationBackend backend,
+            JointComputationPlan.Resolution resolved) {
+        Objects.requireNonNull(backend, "backend");
         var builder = new Builder(plan.inputs(), backend);
         var outputs = new LinkedHashMap<String, Integer>();
-        var resolved = plan.resolveOutputs();
         var expressions = resolved.expressions();
         for (int i = 0; i < plan.outputs().size(); i++) {
             var output = plan.outputs().get(i);
@@ -97,7 +102,6 @@ public final class PreparedJointComputation {
         private final Map<String, ComputationBackend.Type> inputs;
         private final ComputationBackend backend;
         private final Map<Expr, Integer> byIdentity = new IdentityHashMap<>();
-        private final Map<ComputationStructuralKey, Integer> indices = new HashMap<>();
         private final List<Node> nodes = new ArrayList<>();
         private long inspections;
         Builder(Map<String, ComputationBackend.Type> inputs, ComputationBackend backend) { this.inputs = inputs; this.backend = backend; }
@@ -108,15 +112,10 @@ public final class PreparedJointComputation {
             if (existing != null) return existing;
             var arguments = new ArrayList<Integer>();
             for (var child : JointComputationPlan.children(expression)) arguments.add(intern(child, depth + 1));
-            // No recursive Expr.hashCode/equals is invoked: parents only refer to already interned integer IDs.
-            // Charge construction, lookup, and insertion key-field/edge work before any structural-key hashing.
-            charge(3L * (2 + arguments.size()));
-            var key = ComputationStructuralKey.of(expression, arguments);
-            existing = indices.get(key);
-            if (existing != null) {
-                byIdentity.put(expression, existing);
-                return existing;
-            }
+            // The resolver already canonicalizes every subtree. Reuse that identity;
+            // a second structural-key construction/hash pass would repeat paid work.
+            // Charge type lookup and argument-type inspection before validation.
+            charge(1L + arguments.size());
             ComputationBackend.Type type;
             ComputationBackend.Operation operation = null;
             long storage;
@@ -133,7 +132,6 @@ public final class PreparedJointComputation {
             if (storage < 0) throw new IllegalArgumentException("negative storage");
             int index = nodes.size();
             nodes.add(new Node(expression, type, operation, arguments, storage));
-            indices.put(key, index);
             byIdentity.put(expression, index);
             return index;
         }
