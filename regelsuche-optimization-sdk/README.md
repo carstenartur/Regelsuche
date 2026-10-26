@@ -59,7 +59,7 @@ External receiver guards must be charged by the source adapter before it
 claims runtime improvement. Unsupported effects, aliasing, control flow,
 dispatch, exceptions and observations are rejected at the source boundary.
 
-## Shared integral domains
+## Typed word relations and CAS boundary
 
 The Java bitvector checker also projects constant shifts and primitive integral
 casts to individual source bits. Its variables are `(typed word, bit position)`,
@@ -86,6 +86,17 @@ must reenter the existing independent Java verifier. Source-adapter memory
 events, local commits and exception ordering remain separate obligations.
 See [the architecture decision](../docs/superpowers/specs/2026-10-26-typed-cas-computation-design.md).
 
+Computation graphs also recover exact structural sharing after a cold codec
+roundtrip. The common plan resolver interns shallow node keys and child IDs;
+it never hashes a recursively expanded expression. All decoded occurrences and
+key work remain charged. The same eight-word carry plan keeps its 87 prepared
+nodes after transport instead of failing preparation on 1,753 duplicated tree
+occurrences. Node, depth and expanded-transport limits are unchanged. Consumers
+can use `resolveOutputs(LongConsumer)` for synchronous budget/cancellation and
+`MAX_RESOLUTION_WORK` for conservative reservations on legacy failure paths.
+
+## Shared integral domains
+
 `IntegralDomainAnalysis.analyze(plan, sourceTrace)` reports an exact local input
 interval and affine outputs for the supported one-input primitive integral
 fragment. `compare(source, sourceTrace, candidate)` independently checks equal
@@ -101,7 +112,7 @@ must explicitly authorize changed overflow behavior; these results do not add
 caller assumptions. Nonlinear products, bit operations, inexact division and
 multiple independent inputs return `Unsupported`, as do exhausted work bounds
 and cancellation. Overloads share a deterministic work limit across comparison.
-Each graph resolution reserves 20,000 work units before calling the core's
+Each graph resolution charges actual traversal/interning work through the core's
 structurally bounded resolver; the default allowance is 100,000. Declared and
 evaluated trace kinds both constrain the reported interval.
 The migrated affine calculation retains its original EPL-2.0 notice.

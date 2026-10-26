@@ -130,6 +130,12 @@ class IntegralDomainAnalysisTest {
         var cancelled = assertInstanceOf(IntegralDomainAnalysis.Unsupported.class,
                 IntegralDomainAnalysis.analyze(source, trace, 1000, () -> true));
         assertEquals("CANCELLED", cancelled.diagnostic());
+        assertInstanceOf(IntegralDomainAnalysis.Domain.class,
+                IntegralDomainAnalysis.analyze(source, trace, 500, CancellationToken.NONE), "Small DAGs pay actual resolver work");
+        var polls = new java.util.concurrent.atomic.AtomicInteger();
+        var duringResolution = assertInstanceOf(IntegralDomainAnalysis.Unsupported.class,
+                IntegralDomainAnalysis.analyze(source, trace, 500, () -> polls.incrementAndGet() > 3));
+        assertEquals("CANCELLED", duringResolution.diagnostic());
     }
 
     @Test void cachedDeadTraceRetainsTheStructuralDepthBound() {

@@ -20,10 +20,11 @@ class FinalPreparationReuseBudgetTest {
         assertTrue(reference.derivation().isPresent());
         assertTrue(reference.derivation().orElseThrow().steps().isEmpty());
 
-        // The shared v7 inventory pays for an additional core rule, even on a non-hit.
-        // Keep below the historical 1,200 no-reuse baseline; do not hide the old
-        // 1,092 overrun, which is retained separately below.
-        long allowance = 1_120;
+        // Metered structural interning raises complete request work to 3,385.
+        // Leave less than one extra preparation (103 units), retaining the reuse
+        // regression instead of refunding the newly accounted resolver work.
+        long allowance = 3_400;
+        assertTrue(reference.work() + reference.cost().candidateCost().inspectionWork() > allowance);
 
         var constrainedRequest = request(allowance);
         var constrained = optimizer.optimize(constrainedRequest, CancellationToken.NONE);
@@ -47,7 +48,7 @@ class FinalPreparationReuseBudgetTest {
         var exhausted = assertInstanceOf(OptimizationResult.BudgetExceeded.class,
                 new ComputationOptimizer().optimize(request(historicalAllowance), CancellationToken.NONE));
         assertTrue(exhausted.work() > historicalAllowance);
-        assertEquals("DERIVATION_CAPTURE_BUDGET_EXCEEDED", exhausted.diagnostic());
+        assertEquals("SEARCH_BUDGET_EXCEEDED", exhausted.diagnostic());
     }
 
     private static OptimizationRequest request(long maximumWork) {

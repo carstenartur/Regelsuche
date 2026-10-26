@@ -97,7 +97,7 @@ public final class PreparedJointComputation {
         private final Map<String, ComputationBackend.Type> inputs;
         private final ComputationBackend backend;
         private final Map<Expr, Integer> byIdentity = new IdentityHashMap<>();
-        private final Map<StructuralKey, Integer> indices = new HashMap<>();
+        private final Map<ComputationStructuralKey, Integer> indices = new HashMap<>();
         private final List<Node> nodes = new ArrayList<>();
         private long inspections;
         Builder(Map<String, ComputationBackend.Type> inputs, ComputationBackend backend) { this.inputs = inputs; this.backend = backend; }
@@ -111,7 +111,7 @@ public final class PreparedJointComputation {
             // No recursive Expr.hashCode/equals is invoked: parents only refer to already interned integer IDs.
             // Charge construction, lookup, and insertion key-field/edge work before any structural-key hashing.
             charge(3L * (2 + arguments.size()));
-            var key = StructuralKey.of(expression, arguments);
+            var key = ComputationStructuralKey.of(expression, arguments);
             existing = indices.get(key);
             if (existing != null) {
                 byIdentity.put(expression, existing);
@@ -140,15 +140,6 @@ public final class PreparedJointComputation {
         private void charge(long work) {
             inspections = Math.addExact(inspections, work);
             if (inspections > JointComputationPlan.MAX_NODES) throw new IllegalArgumentException("plan preparation work bound exceeded");
-        }
-        private record StructuralKey(String kind, Object value, List<Integer> arguments) {
-            StructuralKey { arguments = List.copyOf(arguments); }
-            static StructuralKey of(Expr expression, List<Integer> arguments) {
-                if (expression instanceof VariableExpr v) return new StructuralKey("variable", v.name(), arguments);
-                if (expression instanceof NumberExpr n) return new StructuralKey("number", n.value(), arguments);
-                if (expression instanceof BinaryExpr b) return new StructuralKey("binary", b.operator(), arguments);
-                return new StructuralKey("function", ((FunctionExpr) expression).name(), arguments);
-            }
         }
     }
 }

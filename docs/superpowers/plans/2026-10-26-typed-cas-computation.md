@@ -53,6 +53,10 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 
 ## Task 4: Qualify and integrate
 
+- [x] Diagnose complete-plan search separately from numeric verification; reproduce cold codec loss of DAG sharing.
+- [x] Restore exact structural sharing in the common plan resolver, retaining visit/key work and all structural limits.
+- [x] Add metered resolver traversal to the affine analysis, preserving shared budget and cancellation.
+
 - [ ] Independent whole-change code review; fix substantive findings with regressions.
 - [ ] Publish main-based Regelsuche change; qualify its exact SDK source revision through the established staging workflow.
 - [ ] Integrate exact staged artifact/receipt into Sandbox after prerequisites are integrated; run native CI and review comments.
@@ -68,3 +72,5 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 - SDK GREEN: eleven word-projection tests and 196 total SDK tests pass; the full seven-module Maven verification reactor passes.
 - Independent implementation review found no soundness blocker. Its budget/cancellation, shifted-bit bound, generator-variant and stale-revision test gaps were closed and re-reviewed.
 - Nat256.add comparison: the pinned source yields 25 ordinary edit regions versus one complete inspection task (26 outputs, 16 reads, eight stores); independent SDK-plan verification and alias/exception replay pass. Sandbox qualification and exact SDK staging remain separate follow-up gates.
+- Complete-plan search found a second concrete issue: cold codec transport inflated 87 prepared nodes to 1,753 separate tree occurrences and exceeded the preparation cap. A core regression failed before structural interning; transport, carry-search and affine budget/cancellation regressions then passed. The first qualified SDK revision is superseded by this follow-up and must not be presented as the final consumer artifact.
+- Final follow-up verification: all seven dependency/SDK modules pass, including 199 SDK tests. The fixed final-preparation regression allows 3,400 units after measured resolver accounting (3,385 consumed; one extra preparation costs 103), and the historical 1,092-unit request still exhausts its allowance. The CI complexity finding in bit projection was resolved by separating cast, Boolean and shift projection helpers, without a policy exception.

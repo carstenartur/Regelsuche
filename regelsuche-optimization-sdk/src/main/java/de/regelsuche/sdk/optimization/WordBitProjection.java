@@ -103,39 +103,47 @@ final class WordBitProjection {
             return SemanticChecker.integer(JavaExpressions.literalValue(expression)).testBit(bit) ? ONE : ZERO;
         var from = JavaExpressions.castSourceKind(expression);
         var args = JavaExpressions.operands(expression);
-        if (from.isPresent() && from.get().integral() && JavaExpressions.resultKind(expression).integral()) {
-            NumericKind input = from.get();
-            if (bit >= input.bits()) {
-                if (!input.signed()) return ZERO;
-                return project(args.getFirst(), input, input.bits() - 1, depth + 1);
-            }
-            return project(args.getFirst(), input, bit, depth + 1);
-        }
+        if (from.isPresent() && from.get().integral() && JavaExpressions.resultKind(expression).integral())
+            return castBit(args.getFirst(), from.get(), bit, depth);
         var op = JavaExpressions.operationOf(expression).orElse(null);
         if (op == NumericOperation.NOT)
             return new Operation(op, project(args.getFirst(), kind, bit, depth + 1), null);
-        if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR) {
-            Formula a = project(args.getFirst(), kind, bit, depth + 1);
-            Formula b = project(args.get(1), kind, bit, depth + 1);
-            if (a instanceof Constant constant) return constant(op, constant.bit(), b);
-            if (b instanceof Constant constant) return constant(op, constant.bit(), a);
-            return new Operation(op, a, b);
-        }
+        if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR)
+            return booleanBit(op, args, kind, bit, depth);
         if ((op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT)
-                && (kind == NumericKind.INT || kind == NumericKind.LONG) && JavaExpressions.isLiteral(args.get(1))) {
-            int distance = SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).intValue() & (kind.bits() - 1);
-            int sourceBit = op == NumericOperation.SHIFT_LEFT ? bit - distance : bit + distance;
-            if (sourceBit < 0) return ZERO;
-            if (sourceBit >= kind.bits()) {
-                if (op != NumericOperation.SHIFT_RIGHT) return ZERO;
-                sourceBit = kind.bits() - 1;
-            }
-            return project(args.getFirst(), kind, sourceBit, depth + 1);
-        }
+                && (kind == NumericKind.INT || kind == NumericKind.LONG) && JavaExpressions.isLiteral(args.get(1)))
+            return shiftedBit(op, args, kind, bit, depth);
         Word representative = representative(new Word(expression, kind));
         if (JavaExpressions.isLiteral(representative.expression()))
             return SemanticChecker.integer(JavaExpressions.literalValue(representative.expression())).testBit(bit) ? ONE : ZERO;
         return new Bit(representative, bit);
+    }
+
+    private Formula castBit(Expr value, NumericKind input, int bit, int depth) {
+        if (bit >= input.bits()) {
+            if (!input.signed()) return ZERO;
+            bit = input.bits() - 1;
+        }
+        return project(value, input, bit, depth + 1);
+    }
+
+    private Formula booleanBit(NumericOperation op, List<Expr> args, NumericKind kind, int bit, int depth) {
+        Formula a = project(args.getFirst(), kind, bit, depth + 1);
+        Formula b = project(args.get(1), kind, bit, depth + 1);
+        if (a instanceof Constant constant) return constant(op, constant.bit(), b);
+        if (b instanceof Constant constant) return constant(op, constant.bit(), a);
+        return new Operation(op, a, b);
+    }
+
+    private Formula shiftedBit(NumericOperation op, List<Expr> args, NumericKind kind, int bit, int depth) {
+        int distance = SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).intValue() & (kind.bits() - 1);
+        int sourceBit = op == NumericOperation.SHIFT_LEFT ? bit - distance : bit + distance;
+        if (sourceBit < 0) return ZERO;
+        if (sourceBit >= kind.bits()) {
+            if (op != NumericOperation.SHIFT_RIGHT) return ZERO;
+            sourceBit = kind.bits() - 1;
+        }
+        return project(args.getFirst(), kind, sourceBit, depth + 1);
     }
 
     private static Formula constant(NumericOperation operation, boolean value, Formula other) {

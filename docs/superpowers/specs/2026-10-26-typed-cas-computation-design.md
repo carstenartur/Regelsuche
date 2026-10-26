@@ -83,3 +83,12 @@ existing SolverIr/SymPy facilities, and rejected merely widening extraction
 boundaries. Its critical case is handler-visible local state across a throwing
 array store. It recommended typed bit projection as a reusable first mathematical
 extension, separate from the exact one-input affine-domain API.
+
+The complete-block experiment additionally exposed a transport bottleneck:
+the cold codec reconstructs trees, so an unchanged 87-node carry DAG arrived as
+1,753 distinct expression objects and exceeded the subsequent preparation cap.
+The shared plan resolver now restores structural sharing with shallow exact
+keys and child IDs. Every decoded visit and key operation remains charged;
+no structural/depth limit is raised. A metered resolver callback replaces the
+affine API's former fixed precharge, and source-adapter failure reservations must
+include the resolver's documented work bound as well as preparation work.
