@@ -61,6 +61,31 @@ dispatch, exceptions and observations are rejected at the source boundary.
 
 ## Shared integral domains
 
+The Java bitvector checker also projects constant shifts and primitive integral
+casts to individual source bits. Its variables are `(typed word, bit position)`,
+so shifting a word never identifies different bits. It preserves Java's masked
+shift distances, signed widening and `char` zero extension. Each output bit is
+checked universally over at most eight independent source bits; unsupported
+width or budget cases fail closed. The established opaque-word proof remains
+the first, cheaper path. All preparation and truth-table work shares the caller's
+budget, deadline and cancellation token.
+
+The ordinary candidate generator can reconstruct a word from complementary
+high/low projections, including narrowed low words, for example
+`((x >>> 32) << 32) | ((long)(int)x & 0xffffffffL) -> x`.
+This is a generic typed proposal, independently proved and costed. It is not a
+Nat256-specific rule or a claim that an existing carry chain becomes faster.
+
+`JointComputationPlan` / `OptimizationRequest` remain the typed computation
+contract for future configurable CAS providers. Existing `SolverIr` backends
+represent proof obligations, not Java computation graphs: a provider must use a
+lossless, capability-checked projection of supported mathematical subgraphs.
+SymPy already has limited adapters elsewhere in the repository; this change does
+not start a SymPy process or add a competing backend interface. CAS proposals
+must reenter the existing independent Java verifier. Source-adapter memory
+events, local commits and exception ordering remain separate obligations.
+See [the architecture decision](../docs/superpowers/specs/2026-10-26-typed-cas-computation-design.md).
+
 `IntegralDomainAnalysis.analyze(plan, sourceTrace)` reports an exact local input
 interval and affine outputs for the supported one-input primitive integral
 fragment. `compare(source, sourceTrace, candidate)` independently checks equal

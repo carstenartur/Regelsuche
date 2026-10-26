@@ -8,7 +8,7 @@ import java.util.*;
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
     // Signed-additive proposals now come exclusively from the shared core rule inventory.
-    static final String REVISION = "java-core-algebra-proposals/v7-shared-rule-inventory";
+    static final String REVISION = "java-core-algebra-proposals/v8-word-projection";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -149,7 +149,7 @@ final class JavaCandidateGenerator {
         if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
         if (op == NumericOperation.OR || op == NumericOperation.XOR) {
             work.charge(8);
-            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments);
+            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments, work);
             if (!bitwise.equals(result)) return bitwise;
         }
         return foldConstant(result, op, kind, arguments);

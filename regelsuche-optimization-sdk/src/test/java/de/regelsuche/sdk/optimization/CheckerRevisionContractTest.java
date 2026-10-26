@@ -2,11 +2,13 @@ package de.regelsuche.sdk.optimization;
 
 import static org.junit.jupiter.api.Assertions.*;
 import de.regelsuche.ast.VariableExpr;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class CheckerRevisionContractTest {
-    @Test
-    void rejectsEvidenceFromThePreviousCheckerRevision() {
+    @ParameterizedTest
+    @ValueSource(strings = {"java-numeric-independent/v7", "java-numeric-independent/v8"})
+    void rejectsEvidenceFromThePreviousCheckerRevision(String staleRevision) {
         var source = OptimizationContractTest.plan(NumericKind.INT,
                 JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD,
                         new VariableExpr("x"), JavaExpressions.literal(0)));
@@ -17,10 +19,9 @@ class CheckerRevisionContractTest {
         assertInstanceOf(VerificationResult.Verified.class,
                 optimizer.reverify(request, candidate, CancellationToken.NONE));
 
-        // Both pre-merge implementations used v7; the combined checker must not reuse it.
         var current = candidate.evidence();
         var stale = new VerificationEvidence(current.schemaRevision(), current.semanticsRevision(),
-                "java-numeric-independent/v7", current.generatorRevision(), current.sourceHash(),
+                staleRevision, current.generatorRevision(), current.sourceHash(),
                 current.candidateHash(), current.traceHash(), current.assumptionsHash(), current.safetyProfile(),
                 current.checkedPolicy(), current.obligations(), current.proofMethods(), current.verificationWork());
         var staleCandidate = new OptimizationResult.Candidate(candidate.plan(), candidate.prepared(), stale,
