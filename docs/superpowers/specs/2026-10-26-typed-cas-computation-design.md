@@ -1,5 +1,11 @@
 # Typed computation tasks and replaceable mathematical backends
 
+The word-relation proof and source-task increments are implemented. See the
+[implementation status and qualification](../plans/2026-10-26-typed-cas-computation.md#current-status-2026-10-27)
+for tested revisions and pending integration gates. The future-backend section
+below defines the extension requirements; it does not claim configurable CAS
+selection or automatic cross-store rewriting is available.
+
 ## Intent and ownership
 
 Connect real Java carry computations to reusable mathematical reasoning without

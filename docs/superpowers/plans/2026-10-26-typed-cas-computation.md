@@ -10,6 +10,23 @@
 
 **Spec:** ../specs/2026-10-26-typed-cas-computation-design.md
 
+## Current status (2026-10-27)
+
+Implementation and independent architecture/code review are complete. The qualified
+SDK source is `b4081ca59ccf2d8b6985bb628856f68d0c118945`, published in
+[main-based PR 1114](https://github.com/carstenartur/Regelsuche/pull/1114).
+All 210 SDK tests pass; the product-wide [CI run 40448548628](https://github.com/carstenartur/Regelsuche/actions/runs/40448548628)
+also completed successfully, including Maven/Docker, Gradle, JMH and `ciCheck`.
+
+The exact staged SDK is integrated on Sandbox's `codex/typed-computation-tasks`
+branch. Its [qualification report](https://github.com/carstenartur/sandbox/blob/9255952db0979c3bcb1ad66d844406a80619ed4f/docs/superpowers/plans/2026-10-27-typed-computation-qualification.md)
+records 560 consumer tests (zero failures/errors, one optional skip), strict BC
+114 -> 117 and mathematical BC 124 -> 126, with no lost original source spans.
+Both changes remain unmerged. Sandbox's direct-main PR and native Eclipse/UI gate
+await prerequisite PR 1767; headless validation does not replace that gate.
+Configurable CAS selection, automatic cross-store edits and full explanation-call
+work accounting remain future work, not implemented features of this increment.
+
 ## Global Constraints
 
 - Java 25; Maven/JUnit are the executable authority.
@@ -49,7 +66,7 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 - [x] Add a bounded task extraction entry point reusing the existing decoder; ordinary extraction stays unchanged.
 - [x] Retain all local value versions, every fresh read, low-word stores and later carries in an ordered source schedule.
 - [x] Compare real pinned Nat256 add plans with manually assembled arithmetic, including alias/exception/local-commit observations.
-- [ ] Prove cross-store task extraction grants no automatic edit permission and run the full headless mathematics suite.
+- [x] Prove cross-store task extraction grants no automatic edit permission and run the full headless mathematics suite.
 
 ## Task 4: Qualify and integrate
 
@@ -58,11 +75,16 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 - [x] Add metered resolver traversal to the affine analysis, preserving shared budget and cancellation.
 
 - [x] Independent whole-change code review; fix substantive findings with regressions.
-- [ ] Publish main-based Regelsuche change; qualify its exact SDK source revision through the established staging workflow.
-- [ ] Integrate exact staged artifact/receipt into Sandbox after prerequisites are integrated; run native CI and review comments.
-- [ ] Document measured results and remaining conservative boundaries; no unsupported runtime claims.
+- [x] Publish main-based Regelsuche PR; qualify its exact SDK source revision through the established staging workflow.
+- [x] Integrate exact staged artifact/receipt on the Sandbox feature branch and run complete headless/corpus validation.
+- [ ] Merge prerequisites, base the Sandbox PR directly on updated main, and complete its native CI/review gates.
+- [x] Document measured results and remaining conservative boundaries; no unsupported runtime claims.
 
-## Execution ledger
+## Execution ledger (intermediate checkpoints)
+
+The entries below preserve results and pending gates at each intermediate revision.
+The current status above and linked final qualification supersede their test counts
+and outstanding staging/consumer-validation notes.
 
 - Architecture review completed before implementation. Existing SolverIr is an obligation contract, not a substitute for typed computations.
 - Ruling: implement bit projection and source-task export now; reuse existing backend facilities and document the future provider bridge rather than introduce an unused competing CAS protocol.
@@ -82,3 +104,13 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 - Larger preparation-retry fixtures exposed an overly conservative consumer debit. Initial-validation preparation failures now report earlier trace work plus a safe failed-preparation bound; legacy/unrelated Unsupported outcomes retain unknown work (-1). Full reactor verification covered 205 SDK tests with one new fixture threshold correction; all seven focused accounting/capture tests then passed. The late-trace regression independently validates its completed trace prefix instead of assuming an absolute work total. Exact SDK qualification and complete consumer/corpus reruns remain required.
 - Complete consumer scans exposed the remaining NTRU Boolean proof regression: unnecessary projected subterm attempts preceded a cheap complete opaque-word identity. The existing opaque proof now runs first at Boolean roots; a folded-word selection regression previously exhausted 70,000 verification units and now passes. Checker revision v11 rejects v10 receipts; projection and independent replay remain available.
 - Completed search-limit outcomes may consume less than the outer request allowance. The SDK exposes this through `BudgetExceeded.hasCompleteWorkAccounting()`; partial checker stops and unknown/legacy counters remain conservative. The search/checker handoff unit is explicitly included in the aggregate. Architecture review confirmed this narrow contract; no generator memo or production budget increase was adopted.
+
+## Final qualification
+
+The exact-source SDK staging [run 40448545085](https://github.com/carstenartur/sandbox/actions/runs/40448545085)
+and its fresh external consumer passed. Sandbox pins the unchanged JAR/receipt
+from staging commit `92754e85ec870740f72ea6b07e2b7632fc2c4af4` in consumer commit
+`c4b0f63707a1fca398951a02dd8890819be33eb5`. Nat256's actual JDT and manual plans
+both reach search with `INCOMPLETE_SEARCH_RELATION`; no full-addition optimization
+or new runtime/constant-time measurement is claimed. The linked qualification
+records exact hashes, matched corpus settings and the JVM change between runs.
