@@ -13,17 +13,22 @@
 ## Current status (2026-10-27)
 
 Implementation and independent architecture/code review are complete. The qualified
-SDK source is `b4081ca59ccf2d8b6985bb628856f68d0c118945`, published in
-[main-based PR 1114](https://github.com/carstenartur/Regelsuche/pull/1114).
+SDK source is `b4081ca59ccf2d8b6985bb628856f68d0c118945`, merged via
+[main-based PR 1114](https://github.com/carstenartur/Regelsuche/pull/1114) as
+`ca67c0133898e10c21fec9ce5493bdc2b2a4a546`.
 All 210 SDK tests pass; the product-wide [CI run 40448548628](https://github.com/carstenartur/Regelsuche/actions/runs/40448548628)
 also completed successfully, including Maven/Docker, Gradle, JMH and `ciCheck`.
 
-The exact staged SDK is integrated on Sandbox's `codex/typed-computation-tasks`
-branch. Its [qualification report](https://github.com/carstenartur/sandbox/blob/9255952db0979c3bcb1ad66d844406a80619ed4f/docs/superpowers/plans/2026-10-27-typed-computation-qualification.md)
+The exact staged SDK is integrated in Sandbox's [PR 1769](https://github.com/carstenartur/sandbox/pull/1769),
+based directly on updated `main` after [prerequisite PR 1767](https://github.com/carstenartur/sandbox/pull/1767)
+was merged as `2c785aabf1a6ac1fa25554f2292cf851a8f46a48`.
+Its [qualification report](https://github.com/carstenartur/sandbox/blob/76bf188b253f79263c276efc2a8a11de9dbcbca9/docs/superpowers/plans/2026-10-27-typed-computation-qualification.md)
 records 560 consumer tests (zero failures/errors, one optional skip), strict BC
 114 -> 117 and mathematical BC 124 -> 126, with no lost original source spans.
-Both changes remain unmerged. Sandbox's direct-main PR and native Eclipse/UI gate
-await prerequisite PR 1767; headless validation does not replace that gate.
+Regelsuche's [post-merge CI](https://github.com/carstenartur/Regelsuche/actions/runs/40457105696)
+also passed. Sandbox's current native Eclipse/UI, distribution, benchmark and
+review results are recorded in [PR 1769's checks](https://github.com/carstenartur/sandbox/pull/1769/checks);
+its PR records the merge status. Headless validation does not replace those gates.
 Configurable CAS selection, automatic cross-store edits and full explanation-call
 work accounting remain future work, not implemented features of this increment.
 
@@ -77,7 +82,8 @@ Files in Sandbox: `JavaComputationExtractor.java`, new `JavaComputationTask.java
 - [x] Independent whole-change code review; fix substantive findings with regressions.
 - [x] Publish main-based Regelsuche PR; qualify its exact SDK source revision through the established staging workflow.
 - [x] Integrate exact staged artifact/receipt on the Sandbox feature branch and run complete headless/corpus validation.
-- [ ] Merge prerequisites, base the Sandbox PR directly on updated main, and complete its native CI/review gates.
+- [x] Merge prerequisites and base Sandbox PR 1769 directly on updated main.
+- Consumer native CI/review and merge completion: [PR 1769](https://github.com/carstenartur/sandbox/pull/1769) is the live status authority.
 - [x] Document measured results and remaining conservative boundaries; no unsupported runtime claims.
 
 ## Execution ledger (intermediate checkpoints)
