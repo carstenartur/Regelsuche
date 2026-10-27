@@ -13,6 +13,10 @@ final class BitwiseProof {
     private final Set<Expr> constants=new LinkedHashSet<>();
     BitwiseProof(VerificationWork work) { this.work=work; }
     boolean equivalent(Expr left,Expr right,NumericKind kind) {
+        if (opaqueEquivalent(left,right,kind)) return true;
+        return new WordBitProjection(work).equivalent(left,right,kind);
+    }
+    boolean opaqueEquivalent(Expr left,Expr right,NumericKind kind) {
         var atoms=new LinkedHashSet<Expr>(); collect(left,atoms); collect(right,atoms);
         if (atoms.size()>8) return false;
         constants.add(kind==NumericKind.LONG?JavaExpressions.literal(0L):JavaExpressions.literal(0));

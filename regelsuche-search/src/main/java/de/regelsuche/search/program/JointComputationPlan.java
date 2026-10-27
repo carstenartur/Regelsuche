@@ -12,6 +12,8 @@ public final class JointComputationPlan {
     public static final String OUTPUT = "jointoutput";
     public static final int MAX_NODES = 10_000;
     public static final int MAX_DEPTH = 128;
+    /** Visits + outputs + three shallow-key field passes, bounded by node/edge visits. */
+    public static final long MAX_RESOLUTION_WORK = 11L * MAX_NODES;
 
     public record Output(String name, ComputationBackend.Type type, Expr expression) {
         public Output {
@@ -50,17 +52,22 @@ public final class JointComputationPlan {
         public Resolution { expressions = List.copyOf(expressions); }
     }
     public Resolution resolveOutputs() {
-        var resolver = new Resolver();
+        return resolveOutputs(ignored -> { });
+    }
+    /** Charges before each bounded traversal/key step; caller cancellation/exhaustion propagates unchanged. */
+    public Resolution resolveOutputs(java.util.function.LongConsumer charge) {
+        var resolver = new Resolver(Objects.requireNonNull(charge));
         for (var name : definitions.keySet()) resolver.resolve(new VariableExpr(name), 0);
         var expressions = new ArrayList<Expr>();
         int expandedNodes = 0, height = 0;
         for (var output : outputs) {
+            resolver.charge(1);
             var resolved = resolver.resolve(output.expression(), 0);
             expressions.add(resolved.expression());
             expandedNodes = saturatedAdd(expandedNodes, resolved.expandedNodes());
             height = Math.max(height, resolved.height());
         }
-        return new Resolution(expressions, resolver.visits + outputs.size(), expandedNodes, height);
+        return new Resolution(expressions, resolver.work, expandedNodes, height);
     }
     /** Canonical envelope for TypedMoveSearch. Names are data; only output values are computations. */
     public Expr expression() {
@@ -68,7 +75,10 @@ public final class JointComputationPlan {
     }
     public record SearchExpression(Expr expression, long work) {}
     public SearchExpression searchExpression() {
-        var resolved = resolveOutputs();
+        return searchExpression(resolveOutputs());
+    }
+    /** Internal reuse of this plan's already resolved immutable outputs. */
+    SearchExpression searchExpression(Resolution resolved) {
         if ((long) resolved.expandedNodes() + 2L * outputs.size() + 1 > MAX_NODES || resolved.height() + 2 > MAX_DEPTH)
             throw new IllegalArgumentException("expanded frontier AST exceeds transport bound");
         var expressions = resolved.expressions();
@@ -104,20 +114,26 @@ public final class JointComputationPlan {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("binding name required");
     }
     private static int saturatedAdd(int left, int right) { return Math.min(MAX_NODES + 1, left + right); }
-    private record Resolved(Expr expression, int height, int expandedNodes) {}
+    private record Resolved(Expr expression, int height, int expandedNodes, int id) {}
     private final class Resolver {
         private final Map<String, Resolved> resolved = new HashMap<>();
         private final Map<Expr, Resolved> byIdentity = new IdentityHashMap<>();
+        private final Map<ComputationStructuralKey, Resolved> structural = new HashMap<>();
         private final Set<String> visiting = new HashSet<>();
+        private final java.util.function.LongConsumer charge;
         private int visits;
+        private long work;
+        Resolver(java.util.function.LongConsumer charge) { this.charge = charge; }
+        private void charge(long amount) { charge.accept(amount); work = Math.addExact(work, amount); }
         Resolved resolve(Expr expression, int depth) {
+            charge(1);
             if (++visits > MAX_NODES || depth > MAX_DEPTH) throw new IllegalArgumentException("plan structural limit exceeded");
             var cached = byIdentity.get(expression);
             if (cached != null) return bounded(cached, depth);
             Resolved result;
             if (expression instanceof VariableExpr variable) {
                 String name = variable.name();
-                if (inputs.containsKey(name)) result = new Resolved(variable, 0, 1);
+                if (inputs.containsKey(name)) result = intern(variable, 0, 1, List.of());
                 else if (resolved.containsKey(name)) result = resolved.get(name);
                 else {
                     if (!definitions.containsKey(name)) throw new IllegalArgumentException("unbound reference: " + name);
@@ -129,23 +145,36 @@ public final class JointComputationPlan {
             } else if (expression instanceof BinaryExpr binary) {
                 var left = resolve(binary.left(), depth + 1);
                 var right = resolve(binary.right(), depth + 1);
-                result = new Resolved(new BinaryExpr(left.expression(), binary.operator(), right.expression()),
-                    1 + Math.max(left.height(), right.height()), saturatedAdd(1, saturatedAdd(left.expandedNodes(), right.expandedNodes())));
+                result = intern(new BinaryExpr(left.expression(), binary.operator(), right.expression()),
+                    1 + Math.max(left.height(), right.height()), saturatedAdd(1, saturatedAdd(left.expandedNodes(), right.expandedNodes())),
+                    List.of(left.id(), right.id()));
             } else if (expression instanceof FunctionExpr function) {
                 var arguments = new ArrayList<Expr>();
+                var ids = new ArrayList<Integer>();
                 int height = 0, expandedNodes = 1;
                 for (Expr argument : function.arguments()) {
                     var child = resolve(argument, depth + 1);
                     arguments.add(child.expression());
+                    ids.add(child.id());
                     height = Math.max(height, child.height() + 1);
                     expandedNodes = saturatedAdd(expandedNodes, child.expandedNodes());
                 }
-                result = new Resolved(new FunctionExpr(function.name(), arguments), height, expandedNodes);
+                result = intern(new FunctionExpr(function.name(), arguments), height, expandedNodes, ids);
             } else {
-                result = new Resolved(expression, 0, 1);
+                result = intern(expression, 0, 1, List.of());
             }
             bounded(result, depth);
             byIdentity.put(expression, result);
+            return result;
+        }
+        private Resolved intern(Expr expression, int height, int expandedNodes, List<Integer> children) {
+            // Every decoded occurrence pays key work, even when its structure already exists.
+            charge(3L * (2 + children.size()));
+            var key = ComputationStructuralKey.of(expression, children);
+            var known = structural.get(key);
+            if (known != null) return known;
+            var result = new Resolved(expression, height, expandedNodes, structural.size());
+            structural.put(key, result);
             return result;
         }
         private Resolved bounded(Resolved result, int depth) {

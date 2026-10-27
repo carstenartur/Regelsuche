@@ -54,9 +54,14 @@ public final class PreparedJointComputation {
     }
     static PreparedJointComputation prepare(JointComputationPlan plan, ComputationBackend backend) {
         Objects.requireNonNull(backend, "backend");
+        return prepare(plan, backend, plan.resolveOutputs());
+    }
+    /** Internal reuse of the same plan resolution, retaining all schedule/type checks. */
+    static PreparedJointComputation prepare(JointComputationPlan plan, ComputationBackend backend,
+            JointComputationPlan.Resolution resolved) {
+        Objects.requireNonNull(backend, "backend");
         var builder = new Builder(plan.inputs(), backend);
         var outputs = new LinkedHashMap<String, Integer>();
-        var resolved = plan.resolveOutputs();
         var expressions = resolved.expressions();
         for (int i = 0; i < plan.outputs().size(); i++) {
             var output = plan.outputs().get(i);
@@ -97,7 +102,6 @@ public final class PreparedJointComputation {
         private final Map<String, ComputationBackend.Type> inputs;
         private final ComputationBackend backend;
         private final Map<Expr, Integer> byIdentity = new IdentityHashMap<>();
-        private final Map<StructuralKey, Integer> indices = new HashMap<>();
         private final List<Node> nodes = new ArrayList<>();
         private long inspections;
         Builder(Map<String, ComputationBackend.Type> inputs, ComputationBackend backend) { this.inputs = inputs; this.backend = backend; }
@@ -108,15 +112,10 @@ public final class PreparedJointComputation {
             if (existing != null) return existing;
             var arguments = new ArrayList<Integer>();
             for (var child : JointComputationPlan.children(expression)) arguments.add(intern(child, depth + 1));
-            // No recursive Expr.hashCode/equals is invoked: parents only refer to already interned integer IDs.
-            // Charge construction, lookup, and insertion key-field/edge work before any structural-key hashing.
-            charge(3L * (2 + arguments.size()));
-            var key = StructuralKey.of(expression, arguments);
-            existing = indices.get(key);
-            if (existing != null) {
-                byIdentity.put(expression, existing);
-                return existing;
-            }
+            // The resolver already canonicalizes every subtree. Reuse that identity;
+            // a second structural-key construction/hash pass would repeat paid work.
+            // Charge type lookup and argument-type inspection before validation.
+            charge(1L + arguments.size());
             ComputationBackend.Type type;
             ComputationBackend.Operation operation = null;
             long storage;
@@ -133,22 +132,12 @@ public final class PreparedJointComputation {
             if (storage < 0) throw new IllegalArgumentException("negative storage");
             int index = nodes.size();
             nodes.add(new Node(expression, type, operation, arguments, storage));
-            indices.put(key, index);
             byIdentity.put(expression, index);
             return index;
         }
         private void charge(long work) {
             inspections = Math.addExact(inspections, work);
             if (inspections > JointComputationPlan.MAX_NODES) throw new IllegalArgumentException("plan preparation work bound exceeded");
-        }
-        private record StructuralKey(String kind, Object value, List<Integer> arguments) {
-            StructuralKey { arguments = List.copyOf(arguments); }
-            static StructuralKey of(Expr expression, List<Integer> arguments) {
-                if (expression instanceof VariableExpr v) return new StructuralKey("variable", v.name(), arguments);
-                if (expression instanceof NumberExpr n) return new StructuralKey("number", n.value(), arguments);
-                if (expression instanceof BinaryExpr b) return new StructuralKey("binary", b.operator(), arguments);
-                return new StructuralKey("function", ((FunctionExpr) expression).name(), arguments);
-            }
         }
     }
 }

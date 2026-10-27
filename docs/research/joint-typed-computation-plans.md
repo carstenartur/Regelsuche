@@ -7,10 +7,12 @@ references, cyclic definitions, shadowed inputs, duplicate output names, operato
 arity/type mismatches, and output type mismatches are rejected. Structural depth
 and visit limits apply. The search envelope preserves output names and order.
 
-`PreparedJointComputation` interns equal structural expressions across all
-outputs into one DAG, validates operator signatures, and retains a topological
-schedule. Interning uses identity memoization plus nonrecursive keys containing
-the operator/leaf and integer child IDs. It never hashes an `Expr` recursively.
+`JointComputationPlan` resolution interns equal structural expressions across all
+outputs into one DAG, including trees reconstructed by cold transport. Interning
+uses identity memoization plus nonrecursive keys containing the operator/leaf and
+integer child IDs. It never hashes an `Expr` recursively.
+`PreparedJointComputation` reuses these canonical identities, validates operator
+signatures, and retains a topological schedule without a second structural-key pass.
 Each node is evaluated once per execution. Values are local to that
 execution, and intermediate slots are released after their last use; output
 nodes remain live through return. Alias outputs reference the same computed
@@ -30,6 +32,9 @@ field/edge work, and schedule/liveness scans. Resolution also memoizes identitie
 and tracks height and a saturated expanded-tree size. A compact DAG can be
 prepared directly; `searchExpression()` rejects it before serialization if its
 tree expansion exceeds the existing frontier transport's node/depth limits.
+`resolveOutputs(LongConsumer)` charges traversal and key work to the caller and
+supports synchronous cancellation; `MAX_RESOLUTION_WORK` bounds a failed
+resolution for conservative accounting. Structural limits remain unchanged.
 
 `JointPlanSearch` supplies this cost as a charged `StateValue.Assessment` to
 `TypedMoveSearch`, which delegates to the existing `MoveSearch` frontier. It also
@@ -40,6 +45,13 @@ depth, work, and candidate budgets bound the search. Candidate generation,
 semantic checking, initial/final preparation, incumbent inspection, and selected
 path replay have logical work receipts. Atomic overruns remain visible through
 `Result.withinBudget()`. These counters are mechanical units, not total CPU time.
+
+Initial source-envelope and schedule preparation share one local resolution.
+`Result.sourceExpression()` retains that bounded immutable envelope for derivation
+capture alongside already verified producer states. Capture retains source-binding,
+continuity and endpoint checks; external replay still rebuilds bounds, regenerates
+proposals and independently verifies every edge. This local reuse does not turn
+an imported witness into proof.
 
 The domain callback proposes expressions and independently proves equivalence.
 Each admitted candidate must preserve input/output bindings, pass domain

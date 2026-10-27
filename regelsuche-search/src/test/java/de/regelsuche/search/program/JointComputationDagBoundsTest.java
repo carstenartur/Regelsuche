@@ -12,6 +12,37 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class JointComputationDagBoundsTest {
+    @Test void resolutionReportsAndChargesTheSameWorkAndPropagatesInterruption() {
+        Expr expression = new VariableExpr("x");
+        for (int i = 0; i < 8; i++) expression = new FunctionExpr("add", List.of(expression, expression));
+        var plan = JointComputationDagProbe.plan(Map.of(), expression, expression);
+        var charged = new java.util.concurrent.atomic.AtomicLong();
+        var resolution = plan.resolveOutputs(charged::addAndGet);
+        assertEquals(resolution.work(), charged.get());
+        assertTrue(resolution.work() <= JointComputationPlan.MAX_RESOLUTION_WORK);
+        var stopped = new IllegalStateException("caller cancellation");
+        charged.set(0);
+        assertSame(stopped, assertThrows(IllegalStateException.class, () -> plan.resolveOutputs(amount -> {
+            if (charged.addAndGet(amount) > resolution.work() / 2) throw stopped;
+        })));
+    }
+
+    @Test void coldCodecRoundTripRestoresStructuralSharingAndCountsDecodedWork() {
+        Expr expression = new VariableExpr("x");
+        for (int i = 0; i < 10; i++) expression = new FunctionExpr("add", List.of(expression, expression));
+        var source = JointComputationDagProbe.plan(Map.of(), expression, expression);
+        String encoded = new CompiledAstReplayCodec().encodeExpression(source.expression());
+        var decoded = source.withExpression(new CompiledAstReplayCodec().decodeExpression(encoded));
+        var before = source.prepare(JointComputationDagProbe.BACKEND);
+        var after = assertDoesNotThrow(() -> decoded.prepare(JointComputationDagProbe.BACKEND));
+        assertEquals(before.nodes(), after.nodes());
+        assertEquals(before.outputBindings(), after.outputBindings());
+        assertEquals(before.execute(Map.of("x", BigInteger.valueOf(17))), after.execute(Map.of("x", BigInteger.valueOf(17))));
+        assertTrue(after.cost().inspectionWork() > before.cost().inspectionWork(), "Decoded duplicate visits are still charged");
+        var children = JointComputationPlan.children(decoded.outputExpressions().getFirst());
+        assertSame(children.get(0), children.get(1), "Resolver restores shared children before scheduling/search");
+    }
+
     @Test void namedSharedDagsCannotTriggerRecursiveRecordHashing() throws Exception {
         String classpath = List.of(JointComputationDagProbe.class, JointComputationPlan.class, Expr.class).stream()
             .map(type -> {

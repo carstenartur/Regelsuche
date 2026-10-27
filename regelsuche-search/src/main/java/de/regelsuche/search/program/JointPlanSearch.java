@@ -42,7 +42,13 @@ public final class JointPlanSearch {
         long score(PreparedJointComputation.Cost cost) { return cost.weighted(operation, liveStorage, retainedStorage, outputBindings); }
     }
     public record Result(JointComputationPlan plan, PreparedJointComputation prepared,
-            TypedSourceOnlySearch.Result search, long setupWork, long workBudget) {
+            TypedSourceOnlySearch.Result search, long setupWork, long workBudget, Expr sourceExpression) {
+        /** Retains the original bounded envelope for producer-side witness capture. */
+        public Result { Objects.requireNonNull(sourceExpression); }
+        public Result(JointComputationPlan plan, PreparedJointComputation prepared,
+                TypedSourceOnlySearch.Result search, long setupWork, long workBudget) {
+            this(plan, prepared, search, setupWork, workBudget, search.search().initialState().expression());
+        }
         public long totalWork() { return Math.addExact(search.totalWork(), setupWork); }
         public boolean withinBudget() { return totalWork() <= workBudget; }
     }
@@ -64,18 +70,27 @@ public final class JointPlanSearch {
         return prepare(source, candidate).plan();
     }
     private Preparation prepare(JointComputationPlan source, JointComputationPlan candidate) {
+        return prepare(source, candidate, null);
+    }
+    private Preparation prepare(JointComputationPlan source, JointComputationPlan candidate,
+            JointComputationPlan.Resolution resolved) {
         if (!source.inputs().equals(candidate.inputs()) || !source.outputs().stream().map(o -> List.of(o.name(), o.type())).toList()
                 .equals(candidate.outputs().stream().map(o -> List.of(o.name(), o.type())).toList()))
             throw new IllegalArgumentException("input/output bindings differ");
         var verified = domain.verify(source, candidate);
         if (!verified.accepted()) throw new IllegalArgumentException("domain did not prove joint outputs equivalent");
-        var prepared = candidate.prepare(backend);
+        var prepared = resolved == null ? candidate.prepare(backend) : PreparedJointComputation.prepare(candidate, backend, resolved);
         return new Preparation(prepared, Math.addExact(verified.work(), prepared.cost().inspectionWork()));
     }
     public Result optimize(JointComputationPlan source, MoveSearch.Budget budget) {
-        var sourceExpression = source.searchExpression();
-        var initialCheck = prepare(source, source);
-        var initial = new Preparation(initialCheck.plan(), Math.addExact(initialCheck.work(), sourceExpression.work()));
+        var sourceResolution = source.resolveOutputs();
+        var sourceExpression = source.searchExpression(sourceResolution);
+        var initialCheck = prepare(source, source, sourceResolution);
+        // The envelope and schedule share one immutable resolution. Its work is
+        // included in preparation; add only envelope construction here. Domain
+        // verification and the final incumbent check remain independent.
+        var initial = new Preparation(initialCheck.plan(),
+                Math.addExact(initialCheck.work(), sourceExpression.work() - sourceResolution.work()));
         long remaining = Math.max(1, budget.totalWork() - initial.work());
         var searchBudget = new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),
             budget.maxStates(), remaining, budget.maxComplexityDebt());
@@ -126,7 +141,8 @@ public final class JointPlanSearch {
         });
         var candidate = source.withExpression(search.incumbent().expression());
         var checked = prepare(source, candidate);
-        return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()), budget.totalWork());
+        return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()),
+                budget.totalWork(), sourceExpression.expression());
     }
     private static String key(String source, String target, String rule) {
         try {

@@ -45,6 +45,23 @@ generation and final preparation.
 Final cost assessment reuses immutable costs from source validation and the
 selected prepared search result within the same request. The independent final
 proof and the trusted Candidate constructor's preparation remain fully charged.
+Preparation-limit `Unsupported` outcomes during initial source validation report
+a conservative `work` upper bound, including earlier trace checks. Unused
+request allowance can fund smaller requests. Other or legacy unsupported outcomes
+use `-1`; consumers must still reserve their allocation and any unreported bound.
+Witness capture retains the search's original immutable source envelope instead
+of rebuilding it. External replay still reconstructs and verifies the source.
+For `BudgetExceeded`, `hasCompleteWorkAccounting()` certifies when the reported
+counter can replace the request reservation. A completed bounded search may use
+less than the outer allowance; partial checker stops still require the allocation
+or reported overshoot, whichever is greater. Consumers must not infer completeness
+from a small counter alone.
+
+`OptimizationResult.Unsupported` now includes `work`, and `JointPlanSearch.Result`
+retains `sourceExpression` for producer-side capture. Their previous constructors
+and accessors remain available; source callers using record deconstruction must
+adapt to the additional components. Checker revision `java-numeric-independent/v11`
+rejects v10 evidence; regenerate and independently verify receipts on upgrade.
 
 `verify` checks a proposed plan independently; `reverify` additionally binds
 all versioned evidence and runtime obligations to the current request.
@@ -58,6 +75,42 @@ return a candidate that is explicitly not an estimated runtime improvement.
 External receiver guards must be charged by the source adapter before it
 claims runtime improvement. Unsupported effects, aliasing, control flow,
 dispatch, exceptions and observations are rejected at the source boundary.
+
+## Typed word relations and CAS boundary
+
+The Java bitvector checker also projects constant shifts and primitive integral
+casts to individual source bits. Its variables are `(typed word, bit position)`,
+so shifting a word never identifies different bits. It preserves Java's masked
+shift distances, signed widening and `char` zero extension. Each output bit is
+checked universally over at most eight independent source bits; unsupported
+width or budget cases fail closed. The established opaque-word proof remains
+the first, cheaper path. All preparation and truth-table work shares the caller's
+budget, deadline and cancellation token.
+
+The ordinary candidate generator can reconstruct a word from complementary
+high/low projections, including narrowed low words, for example
+`((x >>> 32) << 32) | ((long)(int)x & 0xffffffffL) -> x`.
+This is a generic typed proposal, independently proved and costed. It is not a
+Nat256-specific rule or a claim that an existing carry chain becomes faster.
+
+`JointComputationPlan` / `OptimizationRequest` remain the typed computation
+contract for future configurable CAS providers. Existing `SolverIr` backends
+represent proof obligations, not Java computation graphs: a provider must use a
+lossless, capability-checked projection of supported mathematical subgraphs.
+SymPy already has limited adapters elsewhere in the repository; this change does
+not start a SymPy process or add a competing backend interface. CAS proposals
+must reenter the existing independent Java verifier. Source-adapter memory
+events, local commits and exception ordering remain separate obligations.
+See [the architecture decision](../docs/superpowers/specs/2026-10-26-typed-cas-computation-design.md).
+
+Computation graphs also recover exact structural sharing after a cold codec
+roundtrip. The common plan resolver interns shallow node keys and child IDs;
+it never hashes a recursively expanded expression. All decoded occurrences and
+key work remain charged. The same eight-word carry plan keeps its 87 prepared
+nodes after transport instead of failing preparation on 1,753 duplicated tree
+occurrences. Node, depth and expanded-transport limits are unchanged. Consumers
+can use `resolveOutputs(LongConsumer)` for synchronous budget/cancellation and
+`MAX_RESOLUTION_WORK` for conservative reservations on legacy failure paths.
 
 ## Shared integral domains
 
@@ -76,7 +129,7 @@ must explicitly authorize changed overflow behavior; these results do not add
 caller assumptions. Nonlinear products, bit operations, inexact division and
 multiple independent inputs return `Unsupported`, as do exhausted work bounds
 and cancellation. Overloads share a deterministic work limit across comparison.
-Each graph resolution reserves 20,000 work units before calling the core's
+Each graph resolution charges actual traversal/interning work through the core's
 structurally bounded resolver; the default allowance is 100,000. Declared and
 evaluated trace kinds both constrain the reported interval.
 The migrated affine calculation retains its original EPL-2.0 notice.
@@ -84,10 +137,10 @@ The migrated affine calculation retains its original EPL-2.0 notice.
 ## Reproducible local distribution
 
 The normal Maven/Gradle module coordinate is
-`de.regelsuche:regelsuche-optimization-sdk:0.5.0-SNAPSHOT`, aligned by the BOM.
+`de.regelsuche:regelsuche-optimization-sdk:0.5.1-SNAPSHOT`, aligned by the BOM.
 This is a build coordinate, not a claim that a public repository serves it.
 The pinned standalone distribution uses
-`0.5.0-issue1657-<commit12>` with classifier `all`, includes the dependency
+`0.5.1-issue1657-<commit12>` with classifier `all`, includes the dependency
 closure, licenses, sources, Javadoc, consumer and SHA-256 provenance.
 
 From a clean committed checkout, build with Java 25:
@@ -112,8 +165,9 @@ application dependencies. It merges service entries and keeps dependency
 notices. Repeat the same build and packaging command, then compare every
 artifact hash. JUnit owns packaging regressions; Python is only the production
 build adapter. The normal API, publication, coverage and `ciCheck` authorities
-include this module. See `docs/java-optimization-sdk-qualification.md` for the
-fresh reconstruction evidence and any unresolved environment gates.
+include this module. See the [current qualification and integration status](../docs/superpowers/plans/2026-10-26-typed-cas-computation.md#current-status-2026-10-27).
+The [October 4 reconstruction report](../docs/java-optimization-sdk-qualification.md)
+is historical evidence for its recorded revision, not the current distribution.
 
 
 ## Proof-bound explanations and contextual residues
@@ -125,6 +179,12 @@ counts. No explanation is returned for an unverified candidate, a stale receipt,
 a canceled request, or an exhausted explanation budget. The presentation is not
 itself a proof. Consumers should render actual local names, retain necessary
 runtime guards, and keep operation-count claims separate from measurements.
+
+The explanation result currently reports presentation work separately from the
+fresh verification/replay performed by this call. It is not a complete consumed-work
+receipt; summing it with `Candidate.work()` does not account for every executed SDK
+operation. Complete explanation-call accounting remains a separate API/consumer
+follow-up. The call's proof, cancellation and admission checks still apply.
 
 The modular domain can eliminate `modPow(a, 1, m)` at a use inside a matching
 reducing modular product, even when `a` is negative or unreduced. This is not a

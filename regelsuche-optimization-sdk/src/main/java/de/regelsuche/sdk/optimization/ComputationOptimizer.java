@@ -15,7 +15,18 @@ public final class ComputationOptimizer {
     public OptimizationResult optimize(OptimizationRequest request, CancellationToken token) {
         Objects.requireNonNull(request); var work=new VerificationWork(request,token);
         try {
-            var checker=new SemanticChecker(request,work); var sourceCost=checker.validate();
+            var checker=new SemanticChecker(request,work);
+            PreparedJointComputation.Cost sourceCost;
+            try {
+                sourceCost=checker.validate();
+            } catch (IllegalArgumentException invalid) {
+                if (!diagnostic(invalid).contains("plan preparation work bound exceeded")) throw invalid;
+                // Before search starts, every completed source/trace check is in
+                // this ledger. Reserve the failed bounded preparation as well;
+                // the unused request allowance is not work already performed.
+                long failedPreparation = JointComputationPlan.MAX_RESOLUTION_WORK + JointComputationPlan.MAX_NODES;
+                return new OptimizationResult.Unsupported(diagnostic(invalid), Math.addExact(work.used(), failedPreparation));
+            }
             long setup=work.used();
             var generator=new JavaCandidateGenerator(request,work);
             var domain=new JointPlanSearch.Domain() {
@@ -34,7 +45,7 @@ public final class ComputationOptimizer {
             long explorationAllowance=Math.max(1,(budget.maximumWork()-setup)/2);
             var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,explorationAllowance,budget.maximumStates(),explorationAllowance,64));
             work.charge(1);
-            long searchWork=Math.addExact(setup,found.totalWork());
+            long searchWork=Math.addExact(Math.addExact(setup,found.totalWork()),1);
             var outcome=found.search().search().outcome();
             boolean explorationLimited=!found.withinBudget() || !found.search().withinBudget()
                     || outcome==MoveSearch.Outcome.WORK_EXHAUSTED || outcome==MoveSearch.Outcome.STATE_LIMIT;
@@ -50,11 +61,6 @@ public final class ComputationOptimizer {
             if(finalOutcome.isPresent()) return finalOutcome.get();
             var obligations=obligations(request,found.plan());
             var cost=cost(request,sourceCost,found.prepared().cost(),obligations);
-            // Both costs came from preparations already charged in this request.
-            // Reserve the trusted Candidate constructor's independent preparation.
-            long preparationWork=cost.candidateCost().inspectionWork();
-            work.charge(preparationWork); total=Math.addExact(total,preparationWork);
-            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             boolean improved=cost.candidateScore()<cost.sourceScore();
             // Reaching the exploration limit says nothing about the validity of
             // an incumbent that has now passed the full original-source proof.
@@ -64,6 +70,11 @@ public final class ComputationOptimizer {
             if(!improved && outcome==MoveSearch.Outcome.INCONCLUSIVE)
                 return new OptimizationResult.Inconclusive("INCOMPLETE_SEARCH_RELATION",total);
             if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?"CONSTANT_FOLD_BUDGET_LIMIT":"NO_IMPROVEMENT_WITH_FULL_POLICY_COST",OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);
+            // Only an actual Candidate executes its trusted constructor's fresh
+            // preparation. Non-improvement paths must not charge unused work.
+            long preparationWork=cost.candidateCost().inspectionWork();
+            work.charge(preparationWork); total=Math.addExact(total,preparationWork);
+            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
             var receipt = evidence(request,found.plan(),proof,obligations);
             long beforeDerivation = work.used();
             var derivation = SearchDerivations.capture(request, receipt, found, work);

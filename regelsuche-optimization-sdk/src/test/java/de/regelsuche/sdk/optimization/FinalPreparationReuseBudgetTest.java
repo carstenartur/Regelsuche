@@ -10,6 +10,39 @@ import org.junit.jupiter.api.Test;
 
 /** A completed proof must be able to reuse costs already obtained in the same request. */
 class FinalPreparationReuseBudgetTest {
+    @Test void sharedShiftKeepsItsCandidateWithoutRebuildingTheCapturedSource() {
+        var shift = JavaExpressions.operation(NumericKind.INT, NumericOperation.SHIFT_LEFT,
+                new VariableExpr("u"), new VariableExpr("distance"));
+        var left = JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD, new VariableExpr("first"), shift);
+        var right = JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD, new VariableExpr("second"), shift);
+        var plan = new JointComputationPlan(Map.of("u", NumericKind.INT.type(), "distance", NumericKind.INT.type(),
+                "first", NumericKind.INT.type(), "second", NumericKind.INT.type()), Map.of(),
+                List.of(new JointComputationPlan.Output("left", NumericKind.INT.type(), left),
+                        new JointComputationPlan.Output("right", NumericKind.INT.type(), right)));
+        var request = new OptimizationRequest(plan, SourceEvaluationTrace.fromPlan(plan), Set.of(NumericKind.INT),
+                ComputationOptimizer.SEMANTICS_REVISION, Set.of(), SafetyProfile.PRESERVE_JAVA,
+                OptimizationGoal.LOWER_ESTIMATED_RUNTIME, new OptimizationBudget(2200, 20_000, 64, 5000), CheckedPolicy.NONE);
+        var optimizer = new ComputationOptimizer();
+        var result = optimizer.optimize(request, CancellationToken.NONE);
+        var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result.toString());
+        assertTrue(candidate.work() <= 2200, "Capture work: " + candidate.work());
+        assertTrue(candidate.cost().estimatedRuntimeImprovement());
+        assertInstanceOf(VerificationResult.Verified.class, optimizer.reverify(request, candidate, CancellationToken.NONE));
+    }
+
+    @Test void noImprovementDoesNotChargeAnUnconstructedCandidate() {
+        var plan = new JointComputationPlan(Map.of("x", NumericKind.INT.type()), Map.of(),
+                List.of(new JointComputationPlan.Output("result", NumericKind.INT.type(), new VariableExpr("x"))));
+        var request = new OptimizationRequest(plan, new SourceEvaluationTrace(List.of()), Set.of(NumericKind.INT),
+                ComputationOptimizer.SEMANTICS_REVISION, Set.of(), SafetyProfile.PRESERVE_JAVA,
+                OptimizationGoal.LOWER_ESTIMATED_RUNTIME, new OptimizationBudget(100_000, 20_000, 64, 5000), CheckedPolicy.NONE);
+        var result = assertInstanceOf(OptimizationResult.NoImprovement.class,
+                new ComputationOptimizer().optimize(request, CancellationToken.NONE));
+        // This ceiling excludes the unused 15-unit Candidate-constructor
+        // reservation; the complete search must account only for executed work.
+        assertTrue(result.work() <= 330, result.toString());
+    }
+
     @Test void sharedEvaluationsFinishWithinTheAllowanceForOneTrustedFinalPreparation() {
         var optimizer = new ComputationOptimizer();
         var referenceRequest = request(2_000_000);
@@ -20,10 +53,11 @@ class FinalPreparationReuseBudgetTest {
         assertTrue(reference.derivation().isPresent());
         assertTrue(reference.derivation().orElseThrow().steps().isEmpty());
 
-        // The shared v7 inventory pays for an additional core rule, even on a non-hit.
-        // Keep below the historical 1,200 no-reuse baseline; do not hide the old
-        // 1,092 overrun, which is retained separately below.
-        long allowance = 1_120;
+        // Canonical resolution avoids repeated structural interning in preparation.
+        // Leave less than one extra preparation (84 units)
+        // to retain the reuse regression without discounting actual traversal.
+        long allowance = 3_100;
+        assertTrue(reference.work() + reference.cost().candidateCost().inspectionWork() > allowance);
 
         var constrainedRequest = request(allowance);
         var constrained = optimizer.optimize(constrainedRequest, CancellationToken.NONE);
@@ -47,7 +81,7 @@ class FinalPreparationReuseBudgetTest {
         var exhausted = assertInstanceOf(OptimizationResult.BudgetExceeded.class,
                 new ComputationOptimizer().optimize(request(historicalAllowance), CancellationToken.NONE));
         assertTrue(exhausted.work() > historicalAllowance);
-        assertEquals("DERIVATION_CAPTURE_BUDGET_EXCEEDED", exhausted.diagnostic());
+        assertEquals("FINAL_PREPARATION_BUDGET_EXCEEDED", exhausted.diagnostic());
     }
 
     private static OptimizationRequest request(long maximumWork) {

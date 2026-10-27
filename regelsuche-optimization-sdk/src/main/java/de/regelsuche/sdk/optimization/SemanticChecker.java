@@ -7,8 +7,8 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    // Exact quotient proofs and metered structural modular verification share this evidence revision.
-    static final String REVISION = "java-numeric-independent/v8";
+    // Opaque Boolean proofs precede context normalization and typed bit projection.
+    static final String REVISION = "java-numeric-independent/v11";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -152,6 +152,13 @@ final class SemanticChecker {
     private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set<String> methods) {
         boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
         if (kind == NumericKind.INT || kind == NumericKind.LONG) {
+            // A complete Boolean identity can treat arithmetic/shift words as
+            // opaque atoms. Try that existing proof before projecting many
+            // unsuccessful subterm alternatives during context normalization.
+            if ((booleanRoot(a) || booleanRoot(b)) && new BitwiseProof(work).opaqueEquivalent(a, b, kind)) {
+                methods.add("BITVECTOR_TRUTH_TABLE");
+                return true;
+            }
             Expr normalizedA = normalizeBitwiseContexts(a, new IdentityHashMap<>());
             Expr normalizedB = normalizeBitwiseContexts(b, new IdentityHashMap<>());
             if (!normalizedA.equals(a) || !normalizedB.equals(b)) methods.add("BITVECTOR_TRUTH_TABLE");
@@ -183,6 +190,11 @@ final class SemanticChecker {
         }
         if (kind.integral() && new BitwiseProof(work).equivalent(a,b,kind)) { methods.add("BITVECTOR_TRUTH_TABLE"); return true; }
         return false;
+    }
+    private static boolean booleanRoot(Expr expression) {
+        var operation = JavaExpressions.operationOf(expression).orElse(null);
+        return operation == NumericOperation.AND || operation == NumericOperation.OR
+                || operation == NumericOperation.XOR || operation == NumericOperation.NOT;
     }
     /** Independent proof-view normalization, never a generator call. Universal word
      * proofs can replace a subterm inside an arithmetic context by congruence.

@@ -67,8 +67,7 @@ public final class IntegralDomainAnalysis {
     }
 
     /** Deterministic work and structural/coefficient bounds apply even without a cancellation token.
-     * Each graph resolution conservatively reserves twice {@link JointComputationPlan#MAX_NODES}
-     * units before entering the structurally bounded resolver.
+     * Graph resolution charges the same allowance before each traversal and interning step.
      */
     public static Result analyze(JointComputationPlan plan, SourceEvaluationTrace trace,
             long maximumWork, CancellationToken cancellation) {
@@ -138,10 +137,7 @@ public final class IntegralDomainAnalysis {
             inputKind = NumericKind.fromType(plan.inputs().get(input));
             range = limits(inputKind);
             backend = new JavaNumericBackend(plan.inputs());
-            // The core resolver bounds visits at MAX_NODES and returns visits +
-            // output count. Reserve that upper bound before any unmetered work.
-            work.charge(2L * JointComputationPlan.MAX_NODES);
-            var resolved = plan.resolveOutputs();
+            var resolved = plan.resolveOutputs(work::charge);
             if (resolved.expandedNodes() > JointComputationPlan.MAX_NODES) throw unsupported("DOMAIN_GRAPH_BOUND");
             for (var occurrence : trace.occurrences()) {
                 work.charge(1);

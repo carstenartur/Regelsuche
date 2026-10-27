@@ -8,7 +8,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 class GeneratorRevisionContractTest {
     @ParameterizedTest
     @ValueSource(strings = {"java-core-algebra-proposals/v1", "java-core-algebra-proposals/v2",
-            "java-core-algebra-proposals/v3", "java-core-algebra-proposals/v4"})
+            "java-core-algebra-proposals/v3", "java-core-algebra-proposals/v4", "java-core-algebra-proposals/v7-shared-rule-inventory",
+            "java-core-algebra-proposals/v8-word-projection", "java-core-algebra-proposals/v9-shared-dag-word-projection"})
     void rejectsEvidenceFromEarlierGeneratorRevisions(String staleGeneratorRevision) {
         var source = OptimizationContractTest.plan(NumericKind.INT,
                 JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD,
