@@ -98,12 +98,18 @@ work: known initial-validation failures report earlier charged work plus the
 failed preparation's conservative bound. Consumers debit this reported upper
 bound, even above the allocation, and can reuse only the actual remainder.
 Unknown/legacy failures still reserve the allowance and unreported bound.
+Completed bounded searches expose a complete-work accessor, allowing their actual
+reported counter to replace the allocation. Partial checker stops remain
+conservative; the source adapter does not parse stage strings for this decision.
 Only actually constructed candidates reserve the trusted constructor's final
 preparation; non-improvement outcomes do not perform that work.
 Initial search-envelope and schedule construction share their local resolution.
 Derivation capture retains the original source envelope and internally verified frontier states; source
 binding, continuity and endpoint checks remain, and external replay still
 rebuilds bounds, regenerates proposals and independently verifies each edge.
+For Boolean roots, the existing opaque-word proof runs before expensive context
+normalization. The bit-projection fallback remains available; changing proof
+order avoids spending the budget on unnecessary subterm attempts.
 
 The architecture follow-up also identified an existing separate accounting
 limit: the explanation API reports presentation work after its fresh verification,

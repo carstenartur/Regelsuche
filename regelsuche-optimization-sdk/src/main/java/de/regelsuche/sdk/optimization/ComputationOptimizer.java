@@ -45,7 +45,7 @@ public final class ComputationOptimizer {
             long explorationAllowance=Math.max(1,(budget.maximumWork()-setup)/2);
             var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,explorationAllowance,budget.maximumStates(),explorationAllowance,64));
             work.charge(1);
-            long searchWork=Math.addExact(setup,found.totalWork());
+            long searchWork=Math.addExact(Math.addExact(setup,found.totalWork()),1);
             var outcome=found.search().search().outcome();
             boolean explorationLimited=!found.withinBudget() || !found.search().withinBudget()
                     || outcome==MoveSearch.Outcome.WORK_EXHAUSTED || outcome==MoveSearch.Outcome.STATE_LIMIT;

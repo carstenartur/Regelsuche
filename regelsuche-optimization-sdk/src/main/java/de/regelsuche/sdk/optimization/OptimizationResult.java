@@ -36,7 +36,14 @@ public sealed interface OptimizationResult {
         public Unsupported(String diagnostic) { this(diagnostic, -1); }
         public Unsupported { if (work < -1) throw new IllegalArgumentException("NEGATIVE_OPTIMIZATION_WORK"); }
     }
-    record BudgetExceeded(String diagnostic, long work) implements OptimizationResult {}
+    record BudgetExceeded(String diagnostic, long work) implements OptimizationResult {
+        /** Only a completed search currently certifies a debit counter that can
+         * replace the request reservation. Partial checker stops still require
+         * conservative allocation/overshoot handling by a source adapter. */
+        public boolean hasCompleteWorkAccounting() {
+            return work >= 0 && "SEARCH_BUDGET_EXCEEDED".equals(diagnostic);
+        }
+    }
     record Cancelled(String diagnostic) implements OptimizationResult {}
     record Refuted(String diagnostic, Map<String, Object> counterexample) implements OptimizationResult {
         public Refuted { counterexample = Map.copyOf(counterexample); }

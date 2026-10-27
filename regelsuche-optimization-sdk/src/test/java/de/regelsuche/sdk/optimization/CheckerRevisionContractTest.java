@@ -7,7 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class CheckerRevisionContractTest {
     @ParameterizedTest
-    @ValueSource(strings = {"java-numeric-independent/v7", "java-numeric-independent/v8", "java-numeric-independent/v9"})
+    @ValueSource(strings = {"java-numeric-independent/v7", "java-numeric-independent/v8", "java-numeric-independent/v9", "java-numeric-independent/v10"})
     void rejectsEvidenceFromThePreviousCheckerRevision(String staleRevision) {
         var source = OptimizationContractTest.plan(NumericKind.INT,
                 JavaExpressions.operation(NumericKind.INT, NumericOperation.ADD,
