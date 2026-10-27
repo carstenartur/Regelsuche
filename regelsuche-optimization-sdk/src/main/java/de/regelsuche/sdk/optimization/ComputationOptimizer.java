@@ -15,7 +15,18 @@ public final class ComputationOptimizer {
     public OptimizationResult optimize(OptimizationRequest request, CancellationToken token) {
         Objects.requireNonNull(request); var work=new VerificationWork(request,token);
         try {
-            var checker=new SemanticChecker(request,work); var sourceCost=checker.validate();
+            var checker=new SemanticChecker(request,work);
+            PreparedJointComputation.Cost sourceCost;
+            try {
+                sourceCost=checker.validate();
+            } catch (IllegalArgumentException invalid) {
+                if (!diagnostic(invalid).contains("plan preparation work bound exceeded")) throw invalid;
+                // Before search starts, every completed source/trace check is in
+                // this ledger. Reserve the failed bounded preparation as well;
+                // the unused request allowance is not work already performed.
+                long failedPreparation = JointComputationPlan.MAX_RESOLUTION_WORK + JointComputationPlan.MAX_NODES;
+                return new OptimizationResult.Unsupported(diagnostic(invalid), Math.addExact(work.used(), failedPreparation));
+            }
             long setup=work.used();
             var generator=new JavaCandidateGenerator(request,work);
             var domain=new JointPlanSearch.Domain() {

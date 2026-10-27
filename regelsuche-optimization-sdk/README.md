@@ -45,6 +45,12 @@ generation and final preparation.
 Final cost assessment reuses immutable costs from source validation and the
 selected prepared search result within the same request. The independent final
 proof and the trusted Candidate constructor's preparation remain fully charged.
+Preparation-limit `Unsupported` outcomes during initial source validation report
+a safely debit-able `work` upper bound, including earlier trace checks. Unused
+request allowance can fund smaller requests. Other or legacy unsupported outcomes
+use `-1`; consumers must still reserve their allocation and any unreported bound.
+Witness capture retains the search's original immutable source envelope instead
+of rebuilding it. External replay still reconstructs and verifies the source.
 
 `verify` checks a proposed plan independently; `reverify` additionally binds
 all versioned evidence and runtime obligations to the current request.

@@ -31,7 +31,11 @@ public sealed interface OptimizationResult {
         }
     }
     record NoImprovement(String diagnostic, SearchCompletion searchCompletion, long work) implements OptimizationResult {}
-    record Unsupported(String diagnostic) implements OptimizationResult {}
+    /** Work is a safe debit upper bound, or -1 when this failure cannot report it. */
+    record Unsupported(String diagnostic, long work) implements OptimizationResult {
+        public Unsupported(String diagnostic) { this(diagnostic, -1); }
+        public Unsupported { if (work < -1) throw new IllegalArgumentException("NEGATIVE_OPTIMIZATION_WORK"); }
+    }
     record BudgetExceeded(String diagnostic, long work) implements OptimizationResult {}
     record Cancelled(String diagnostic) implements OptimizationResult {}
     record Refuted(String diagnostic, Map<String, Object> counterexample) implements OptimizationResult {

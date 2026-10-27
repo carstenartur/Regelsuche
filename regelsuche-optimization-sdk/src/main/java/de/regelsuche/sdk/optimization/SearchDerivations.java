@@ -15,7 +15,10 @@ final class SearchDerivations {
         if (witness.size() > SearchDerivation.MAX_STEPS)
             throw new IllegalArgumentException("DERIVATION_STRUCTURAL_BOUND");
         var steps = new ArrayList<SearchDerivation.Step>();
-        Expr cursor = envelope(request.plan(), work);
+        // The search retains the bounded envelope built from this request.
+        // Capture reuses its immutable root; untrusted replay below rebuilds it.
+        work.charge(1);
+        Expr cursor = found.sourceExpression();
         for (var edge : witness) {
             work.charge(1);
             // These producer states already passed the bounded frontier and

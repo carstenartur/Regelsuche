@@ -42,7 +42,13 @@ public final class JointPlanSearch {
         long score(PreparedJointComputation.Cost cost) { return cost.weighted(operation, liveStorage, retainedStorage, outputBindings); }
     }
     public record Result(JointComputationPlan plan, PreparedJointComputation prepared,
-            TypedSourceOnlySearch.Result search, long setupWork, long workBudget) {
+            TypedSourceOnlySearch.Result search, long setupWork, long workBudget, Expr sourceExpression) {
+        /** Retains the original bounded envelope for producer-side witness capture. */
+        public Result { Objects.requireNonNull(sourceExpression); }
+        public Result(JointComputationPlan plan, PreparedJointComputation prepared,
+                TypedSourceOnlySearch.Result search, long setupWork, long workBudget) {
+            this(plan, prepared, search, setupWork, workBudget, search.search().initialState().expression());
+        }
         public long totalWork() { return Math.addExact(search.totalWork(), setupWork); }
         public boolean withinBudget() { return totalWork() <= workBudget; }
     }
@@ -135,7 +141,8 @@ public final class JointPlanSearch {
         });
         var candidate = source.withExpression(search.incumbent().expression());
         var checked = prepare(source, candidate);
-        return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()), budget.totalWork());
+        return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()),
+                budget.totalWork(), sourceExpression.expression());
     }
     private static String key(String source, String target, String rule) {
         try {
