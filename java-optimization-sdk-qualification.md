@@ -1,5 +1,10 @@
 # Issue 1657: frische SDK-Rekonstruktion und Qualifikation
 
+**Historischer Bericht (Oktober 2026):** Die folgenden Ergebnisse und damals
+offenen Gates gelten ausschließlich für die genannten Rekonstruktionsrevisionen.
+Der [aktuelle SDK- und Consumer-Qualifikationsstand](superpowers/plans/2026-10-26-typed-cas-computation.md#current-status-2026-10-27)
+ist separat dokumentiert; dieser Bericht wird nicht auf neue Artefakte übertragen.
+
 Diese Arbeit basiert auf `da1f33195339efe08380b47c36e83455c1e3815f` und dem
 Branch `codex/1657-optimization-sdk`. Ein Wartungsereignis entfernte den ersten
 Arbeitsbaum einschließlich lokaler Git-Objekte. Der rekonstruierte Stand

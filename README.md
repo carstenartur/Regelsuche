@@ -20,6 +20,7 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
 | einen Release durchführen | [Release-Betrieb](release-operations.md) |
 | Regeln oder Plugins entwickeln | [Erweiterungssystem](extension-system.md) |
+| Java-Berechnungen optimieren oder einen CAS anbinden | [Java-Optimierungs-SDK](../regelsuche-optimization-sdk/README.md) und [JDT/CAS-Architektur](superpowers/specs/2026-10-26-typed-cas-computation-design.md) |
 | einen Lauf reproduzieren | [Scientific Reproducibility](scientific-reproducibility.md) und [Independent Reproduction](independent-reproduction.md) |
 | einen JSON-Vertrag nachschlagen | [Schema-Katalog](schema-catalog.md) |
 
@@ -218,6 +219,8 @@ Verträge und Gates.
 
 ## Betrieb und Integration
 
+- [Java-Optimierungs-SDK](../regelsuche-optimization-sdk/README.md) — typisierte
+  Berechnungen, Java-Semantik, unabhängige Prüfung und [aktueller Qualifikationsstand](superpowers/plans/2026-10-26-typed-cas-computation.md#current-status-2026-10-27).
 - [Release-Betrieb](release-operations.md) — verpflichtender Trockenlauf,
   Versionierung, Veröffentlichung, Wiederholung und Nachkontrolle.
 - [Persistenz](persistence.md) — unterstützte Betriebsmodi und Konfiguration.

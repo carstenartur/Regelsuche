@@ -7,8 +7,8 @@ import java.util.*;
 
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
-    // Exact quotient proofs and metered structural modular verification share this evidence revision.
-    static final String REVISION = &quot;java-numeric-independent/v8&quot;;
+    // Opaque Boolean proofs precede context normalization and typed bit projection.
+    static final String REVISION = &quot;java-numeric-independent/v11&quot;;
 <span class="fc" id="L12">    record Proof(boolean accepted, List&lt;String&gt; methods, long work) { Proof { methods = List.copyOf(methods); } }</span>
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -152,143 +152,155 @@ final class SemanticChecker {
     private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set&lt;String&gt; methods) {
 <span class="fc bfc" id="L153" title="All 4 branches covered.">        boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;</span>
 <span class="fc bfc" id="L154" title="All 4 branches covered.">        if (kind == NumericKind.INT || kind == NumericKind.LONG) {</span>
-<span class="fc" id="L155">            Expr normalizedA = normalizeBitwiseContexts(a, new IdentityHashMap&lt;&gt;());</span>
-<span class="fc" id="L156">            Expr normalizedB = normalizeBitwiseContexts(b, new IdentityHashMap&lt;&gt;());</span>
-<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            if (!normalizedA.equals(a) || !normalizedB.equals(b)) methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;);</span>
-<span class="fc" id="L158">            a = normalizedA;</span>
-<span class="fc" id="L159">            b = normalizedB;</span>
+            // A complete Boolean identity can treat arithmetic/shift words as
+            // opaque atoms. Try that existing proof before projecting many
+            // unsuccessful subterm alternatives during context normalization.
+<span class="fc bfc" id="L158" title="All 6 branches covered.">            if ((booleanRoot(a) || booleanRoot(b)) &amp;&amp; new BitwiseProof(work).opaqueEquivalent(a, b, kind)) {</span>
+<span class="fc" id="L159">                methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;);</span>
+<span class="fc" id="L160">                return true;</span>
+            }
+<span class="fc" id="L162">            Expr normalizedA = normalizeBitwiseContexts(a, new IdentityHashMap&lt;&gt;());</span>
+<span class="fc" id="L163">            Expr normalizedB = normalizeBitwiseContexts(b, new IdentityHashMap&lt;&gt;());</span>
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">            if (!normalizedA.equals(a) || !normalizedB.equals(b)) methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;);</span>
+<span class="fc" id="L165">            a = normalizedA;</span>
+<span class="fc" id="L166">            b = normalizedB;</span>
         }
         try {
-<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {</span>
-<span class="fc bfc" id="L163" title="All 4 branches covered.">                methods.add(kind==NumericKind.BIG_INTEGER ? &quot;INTEGER_POLYNOMIAL_NORMAL_FORM&quot; : exact ? &quot;INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE&quot; : &quot;BITVECTOR_POLYNOMIAL_MOD_2_&quot;+kind.bits());</span>
-<span class="fc" id="L164">                return true;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {</span>
+<span class="fc bfc" id="L170" title="All 4 branches covered.">                methods.add(kind==NumericKind.BIG_INTEGER ? &quot;INTEGER_POLYNOMIAL_NORMAL_FORM&quot; : exact ? &quot;INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE&quot; : &quot;BITVECTOR_POLYNOMIAL_MOD_2_&quot;+kind.bits());</span>
+<span class="fc" id="L171">                return true;</span>
             }
-<span class="pc" id="L166">        } catch (PolynomialProof.OutsideFragment bounded) { /* A larger polynomial is unknown, never proved. */ }</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (exact) try {</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (new IntegerQuotientProof(facts, work).equivalent(a, b, kind)) {</span>
-<span class="fc" id="L169">                methods.add(&quot;EXACT_INTEGER_QUOTIENT_IDENTITY&quot;);</span>
-<span class="fc" id="L170">                return true;</span>
+<span class="pc" id="L173">        } catch (PolynomialProof.OutsideFragment bounded) { /* A larger polynomial is unknown, never proved. */ }</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (exact) try {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (new IntegerQuotientProof(facts, work).equivalent(a, b, kind)) {</span>
+<span class="fc" id="L176">                methods.add(&quot;EXACT_INTEGER_QUOTIENT_IDENTITY&quot;);</span>
+<span class="fc" id="L177">                return true;</span>
             }
-<span class="pc" id="L172">        } catch (PolynomialProof.OutsideFragment bounded) { /* Divisibility was not established within the proof bounds. */ }</span>
-<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (kind==NumericKind.BIG_INTEGER) {</span>
+<span class="pc" id="L179">        } catch (PolynomialProof.OutsideFragment bounded) { /* Divisibility was not established within the proof bounds. */ }</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (kind==NumericKind.BIG_INTEGER) {</span>
             // This is an exact typed expansion, not equality modulo an unspecified modulus.
             // Both traces and every intermediate range have already been checked by the caller.
-<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (expandModularProduct(a).equals(expandModularProduct(b))) {</span>
-<span class="fc" id="L177">                methods.add(&quot;TYPED_MODULAR_PRODUCT_EXPANSION&quot;); return true;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (expandModularProduct(a).equals(expandModularProduct(b))) {</span>
+<span class="fc" id="L184">                methods.add(&quot;TYPED_MODULAR_PRODUCT_EXPANSION&quot;); return true;</span>
             }
             try {
-<span class="fc" id="L180">                var proof = new ModularBridge(request.assumptions()).verify(a,b); work.charge(proof.work());</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">                if (proof.accepted()) { methods.add(&quot;AFFINE_MODULAR_NORMAL_FORM&quot;); return true; }</span>
-<span class="fc" id="L182">            } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }</span>
+<span class="fc" id="L187">                var proof = new ModularBridge(request.assumptions()).verify(a,b); work.charge(proof.work());</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                if (proof.accepted()) { methods.add(&quot;AFFINE_MODULAR_NORMAL_FORM&quot;); return true; }</span>
+<span class="fc" id="L189">            } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }</span>
         }
-<span class="fc bfc" id="L184" title="All 4 branches covered.">        if (kind.integral() &amp;&amp; new BitwiseProof(work).equivalent(a,b,kind)) { methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;); return true; }</span>
-<span class="fc" id="L185">        return false;</span>
+<span class="fc bfc" id="L191" title="All 4 branches covered.">        if (kind.integral() &amp;&amp; new BitwiseProof(work).equivalent(a,b,kind)) { methods.add(&quot;BITVECTOR_TRUTH_TABLE&quot;); return true; }</span>
+<span class="fc" id="L192">        return false;</span>
+    }
+    private static boolean booleanRoot(Expr expression) {
+<span class="fc" id="L195">        var operation = JavaExpressions.operationOf(expression).orElse(null);</span>
+<span class="pc bpc" id="L196" title="1 of 8 branches missed.">        return operation == NumericOperation.AND || operation == NumericOperation.OR</span>
+                || operation == NumericOperation.XOR || operation == NumericOperation.NOT;
     }
     /** Independent proof-view normalization, never a generator call. Universal word
      * proofs can replace a subterm inside an arithmetic context by congruence.
      * Original/candidate traces and their range/exception obligations are untouched.
      */
     private Expr normalizeBitwiseContexts(Expr expression, Map&lt;Expr, Expr&gt; memo) {
-<span class="fc" id="L192">        work.charge(1);</span>
-<span class="fc" id="L193">        Expr cached = memo.get(expression);</span>
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (cached != null) return cached;</span>
-<span class="fc bfc" id="L195" title="All 4 branches covered.">        if (expression instanceof VariableExpr || JavaExpressions.isLiteral(expression)) return expression;</span>
-<span class="fc" id="L196">        var arguments = JavaExpressions.operands(expression).stream()</span>
-<span class="fc" id="L197">            .map(child -&gt; normalizeBitwiseContexts(child, memo)).toList();</span>
-<span class="fc" id="L198">        Expr result = new FunctionExpr(((FunctionExpr) expression).name(), arguments);</span>
-<span class="fc" id="L199">        var kind = JavaExpressions.resultKind(result);</span>
-<span class="fc" id="L200">        var operation = JavaExpressions.operationOf(result).orElse(null);</span>
-<span class="pc bpc" id="L201" title="1 of 12 branches missed.">        if ((kind == NumericKind.INT || kind == NumericKind.LONG)</span>
+<span class="fc" id="L204">        work.charge(1);</span>
+<span class="fc" id="L205">        Expr cached = memo.get(expression);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (cached != null) return cached;</span>
+<span class="fc bfc" id="L207" title="All 4 branches covered.">        if (expression instanceof VariableExpr || JavaExpressions.isLiteral(expression)) return expression;</span>
+<span class="fc" id="L208">        var arguments = JavaExpressions.operands(expression).stream()</span>
+<span class="fc" id="L209">            .map(child -&gt; normalizeBitwiseContexts(child, memo)).toList();</span>
+<span class="fc" id="L210">        Expr result = new FunctionExpr(((FunctionExpr) expression).name(), arguments);</span>
+<span class="fc" id="L211">        var kind = JavaExpressions.resultKind(result);</span>
+<span class="fc" id="L212">        var operation = JavaExpressions.operationOf(result).orElse(null);</span>
+<span class="fc bfc" id="L213" title="All 12 branches covered.">        if ((kind == NumericKind.INT || kind == NumericKind.LONG)</span>
                 &amp;&amp; (operation == NumericOperation.XOR || operation == NumericOperation.AND
                     || operation == NumericOperation.OR || operation == NumericOperation.NOT)) {
-<span class="fc" id="L204">            var representatives = new ArrayList&lt;Expr&gt;();</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(0L) : JavaExpressions.literal(0));</span>
-<span class="fc bfc" id="L206" title="All 2 branches covered.">            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(-1L) : JavaExpressions.literal(-1));</span>
-<span class="fc" id="L207">            representatives.addAll(arguments);</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">            for (Expr representative : representatives) {</span>
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                if (JavaExpressions.kindOf(representative, request.plan().inputs()) == kind</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">                        &amp;&amp; new BitwiseProof(work).equivalent(result, representative, kind)) {</span>
-<span class="fc" id="L211">                    result = representative;</span>
-<span class="fc" id="L212">                    break;</span>
+<span class="fc" id="L216">            var representatives = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(0L) : JavaExpressions.literal(0));</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            representatives.add(kind == NumericKind.LONG ? JavaExpressions.literal(-1L) : JavaExpressions.literal(-1));</span>
+<span class="fc" id="L219">            representatives.addAll(arguments);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            for (Expr representative : representatives) {</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                if (JavaExpressions.kindOf(representative, request.plan().inputs()) == kind</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                        &amp;&amp; new BitwiseProof(work).equivalent(result, representative, kind)) {</span>
+<span class="fc" id="L223">                    result = representative;</span>
+<span class="fc" id="L224">                    break;</span>
                 }
-<span class="fc" id="L214">            }</span>
+<span class="fc" id="L226">            }</span>
         }
-<span class="fc" id="L216">        memo.put(expression, result);</span>
-<span class="fc" id="L217">        return result;</span>
+<span class="fc" id="L228">        memo.put(expression, result);</span>
+<span class="fc" id="L229">        return result;</span>
     }
     private Expr expandModularProduct(Expr expression) {
-<span class="fc" id="L220">        work.charge(1);</span>
-<span class="fc bfc" id="L221" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
-<span class="fc" id="L222">        var args=JavaExpressions.operands(expression).stream().map(this::expandModularProduct).toList();</span>
-<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (JavaExpressions.operationOf(expression).orElse(null)==NumericOperation.MOD_MULTIPLY)</span>
-<span class="fc" id="L224">            return JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MOD,</span>
-<span class="fc" id="L225">                JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,args.getFirst(),args.get(1)),args.get(2));</span>
-<span class="fc" id="L226">        return new FunctionExpr(((FunctionExpr)expression).name(),args);</span>
+<span class="fc" id="L232">        work.charge(1);</span>
+<span class="fc bfc" id="L233" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
+<span class="fc" id="L234">        var args=JavaExpressions.operands(expression).stream().map(this::expandModularProduct).toList();</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (JavaExpressions.operationOf(expression).orElse(null)==NumericOperation.MOD_MULTIPLY)</span>
+<span class="fc" id="L236">            return JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MOD,</span>
+<span class="fc" id="L237">                JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,args.getFirst(),args.get(1)),args.get(2));</span>
+<span class="fc" id="L238">        return new FunctionExpr(((FunctionExpr)expression).name(),args);</span>
     }
     /** Closed primitive literal casts have one exact Java value; this evaluates no input or arithmetic.
      * Only the proof view is normalized. Original and candidate execution traces remain unchanged.
      */
     private Expr normalizePrimitiveLiteralCasts(Expr expression) {
-<span class="fc" id="L232">        work.charge(1);</span>
-<span class="fc bfc" id="L233" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
-<span class="fc" id="L234">        var args=JavaExpressions.operands(expression).stream().map(this::normalizePrimitiveLiteralCasts).toList();</span>
-<span class="fc" id="L235">        var result=new FunctionExpr(((FunctionExpr)expression).name(),args);</span>
-<span class="fc bfc" id="L236" title="All 4 branches covered.">        if (JavaExpressions.castSourceKind(result).isEmpty() || !JavaExpressions.isLiteral(args.getFirst())) return result;</span>
-<span class="fc" id="L237">        var backend=new JavaNumericBackend(request.plan().inputs());</span>
-<span class="fc" id="L238">        var value=backend.apply(backend.operation(result),List.of(JavaExpressions.literalValue(args.getFirst())));</span>
-<span class="pc bpc" id="L239" title="3 of 8 branches missed.">        return switch(JavaExpressions.resultKind(result)) {</span>
-<span class="fc" id="L240">            case BYTE -&gt; JavaExpressions.literal((Byte)value);</span>
-<span class="fc" id="L241">            case SHORT -&gt; JavaExpressions.literal((Short)value);</span>
-<span class="fc" id="L242">            case CHAR -&gt; JavaExpressions.literal((Character)value);</span>
-<span class="fc" id="L243">            case INT -&gt; JavaExpressions.literal((Integer)value);</span>
-<span class="fc" id="L244">            case LONG -&gt; JavaExpressions.literal((Long)value);</span>
-<span class="nc" id="L245">            case FLOAT -&gt; JavaExpressions.literal((Float)value);</span>
-<span class="nc" id="L246">            case DOUBLE -&gt; JavaExpressions.literal((Double)value);</span>
-<span class="nc" id="L247">            case BIG_INTEGER -&gt; throw new IllegalArgumentException(&quot;NO_IMPLICIT_BIG_INTEGER_CONVERSION&quot;);</span>
+<span class="fc" id="L244">        work.charge(1);</span>
+<span class="fc bfc" id="L245" title="All 4 branches covered.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
+<span class="fc" id="L246">        var args=JavaExpressions.operands(expression).stream().map(this::normalizePrimitiveLiteralCasts).toList();</span>
+<span class="fc" id="L247">        var result=new FunctionExpr(((FunctionExpr)expression).name(),args);</span>
+<span class="fc bfc" id="L248" title="All 4 branches covered.">        if (JavaExpressions.castSourceKind(result).isEmpty() || !JavaExpressions.isLiteral(args.getFirst())) return result;</span>
+<span class="fc" id="L249">        var backend=new JavaNumericBackend(request.plan().inputs());</span>
+<span class="fc" id="L250">        var value=backend.apply(backend.operation(result),List.of(JavaExpressions.literalValue(args.getFirst())));</span>
+<span class="pc bpc" id="L251" title="3 of 8 branches missed.">        return switch(JavaExpressions.resultKind(result)) {</span>
+<span class="fc" id="L252">            case BYTE -&gt; JavaExpressions.literal((Byte)value);</span>
+<span class="fc" id="L253">            case SHORT -&gt; JavaExpressions.literal((Short)value);</span>
+<span class="fc" id="L254">            case CHAR -&gt; JavaExpressions.literal((Character)value);</span>
+<span class="fc" id="L255">            case INT -&gt; JavaExpressions.literal((Integer)value);</span>
+<span class="fc" id="L256">            case LONG -&gt; JavaExpressions.literal((Long)value);</span>
+<span class="nc" id="L257">            case FLOAT -&gt; JavaExpressions.literal((Float)value);</span>
+<span class="nc" id="L258">            case DOUBLE -&gt; JavaExpressions.literal((Double)value);</span>
+<span class="nc" id="L259">            case BIG_INTEGER -&gt; throw new IllegalArgumentException(&quot;NO_IMPLICIT_BIG_INTEGER_CONVERSION&quot;);</span>
         };
     }
     private static List&lt;List&lt;Object&gt;&gt; bindings(JointComputationPlan plan) {
-<span class="fc" id="L251">        return plan.outputs().stream().map(output -&gt; List.&lt;Object&gt;of(output.name(),output.type())).toList();</span>
+<span class="fc" id="L263">        return plan.outputs().stream().map(output -&gt; List.&lt;Object&gt;of(output.name(),output.type())).toList();</span>
     }
-<span class="fc" id="L253">    private boolean has(SemanticAssumption.Kind kind,String name) { return request.assumptions().stream().anyMatch(a -&gt;</span>
-<span class="fc bfc" id="L254" title="All 6 branches covered.">        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE &amp;&amp; a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">            &amp;&amp; a.subject().equals(name)); }</span>
+<span class="fc" id="L265">    private boolean has(SemanticAssumption.Kind kind,String name) { return request.assumptions().stream().anyMatch(a -&gt;</span>
+<span class="pc bpc" id="L266" title="1 of 6 branches missed.">        (a.kind()==kind || kind==SemanticAssumption.Kind.NON_NEGATIVE &amp;&amp; a.kind()==SemanticAssumption.Kind.NON_NEGATIVE_UPPER_BOUND)</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            &amp;&amp; a.subject().equals(name)); }</span>
     private boolean positive(Expr expression) {
-<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) return has(SemanticAssumption.Kind.POSITIVE,v.name());</span>
-<span class="pc bpc" id="L258" title="2 of 4 branches missed.">        return JavaExpressions.isLiteral(expression) &amp;&amp; integer(JavaExpressions.literalValue(expression)).signum()&gt;0;</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) return has(SemanticAssumption.Kind.POSITIVE,v.name());</span>
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        return JavaExpressions.isLiteral(expression) &amp;&amp; integer(JavaExpressions.literalValue(expression)).signum()&gt;0;</span>
     }
     private void requireTotal(Expr expression) {
-<span class="fc" id="L261">        var op=JavaExpressions.operationOf(expression);</span>
-<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (op.isEmpty()) return;</span>
-<span class="fc" id="L263">        var kind=JavaExpressions.resultKind(expression); var args=JavaExpressions.operands(expression);</span>
-<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (op.get().name().endsWith(&quot;EXACT&quot;)) throw new IllegalArgumentException(&quot;EXISTING_EXACT_CHECK_MUST_REMAIN&quot;);</span>
-<span class="pc bpc" id="L265" title="2 of 6 branches missed.">        if ((op.get()==NumericOperation.DIVIDE || op.get()==NumericOperation.REMAINDER) &amp;&amp; !kind.floatingPoint()) {</span>
-<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (!facts.nonzero(args.get(1)))</span>
-<span class="fc" id="L267">                throw new IllegalArgumentException(&quot;POSSIBLE_DIVISION_EXCEPTION&quot;);</span>
+<span class="fc" id="L273">        var op=JavaExpressions.operationOf(expression);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (op.isEmpty()) return;</span>
+<span class="fc" id="L275">        var kind=JavaExpressions.resultKind(expression); var args=JavaExpressions.operands(expression);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (op.get().name().endsWith(&quot;EXACT&quot;)) throw new IllegalArgumentException(&quot;EXISTING_EXACT_CHECK_MUST_REMAIN&quot;);</span>
+<span class="pc bpc" id="L277" title="2 of 6 branches missed.">        if ((op.get()==NumericOperation.DIVIDE || op.get()==NumericOperation.REMAINDER) &amp;&amp; !kind.floatingPoint()) {</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (!facts.nonzero(args.get(1)))</span>
+<span class="fc" id="L279">                throw new IllegalArgumentException(&quot;POSSIBLE_DIVISION_EXCEPTION&quot;);</span>
         }
-<span class="fc bfc" id="L269" title="All 7 branches covered.">        if (kind==NumericKind.BIG_INTEGER) switch(op.get()) {</span>
-<span class="fc bfc" id="L270" title="All 2 branches covered.">            case MOD -&gt; { if (!positive(args.get(1))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
+<span class="fc bfc" id="L281" title="All 7 branches covered.">        if (kind==NumericKind.BIG_INTEGER) switch(op.get()) {</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            case MOD -&gt; { if (!positive(args.get(1))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
             case MOD_POW -&gt; {
                 try {
-<span class="fc" id="L273">                    var proof = new ModularBridge(request.assumptions()).verify(expression,expression); work.charge(proof.work());</span>
-<span class="fc bfc" id="L274" title="All 2 branches covered.">                    if (!proof.accepted()) throw new IllegalArgumentException(&quot;NONNEGATIVE_AFFINE_EXPONENT_AND_POSITIVE_MODULUS_REQUIRED&quot;);</span>
-<span class="pc" id="L275">                } catch (NoSuchElementException malformed) { throw new IllegalArgumentException(&quot;MODULAR_FRAGMENT_REQUIRED&quot;,malformed); }</span>
+<span class="fc" id="L285">                    var proof = new ModularBridge(request.assumptions()).verify(expression,expression); work.charge(proof.work());</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                    if (!proof.accepted()) throw new IllegalArgumentException(&quot;NONNEGATIVE_AFFINE_EXPONENT_AND_POSITIVE_MODULUS_REQUIRED&quot;);</span>
+<span class="pc" id="L287">                } catch (NoSuchElementException malformed) { throw new IllegalArgumentException(&quot;MODULAR_FRAGMENT_REQUIRED&quot;,malformed); }</span>
             }
-<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            case MOD_MULTIPLY -&gt; { if (!positive(args.get(2))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            case MOD_MULTIPLY -&gt; { if (!positive(args.get(2))) throw new IllegalArgumentException(&quot;POSITIVE_MODULUS_REQUIRED&quot;); }</span>
             case POW -&gt; {
-<span class="pc bpc" id="L279" title="1 of 4 branches missed.">                if (!(JavaExpressions.isLiteral(args.get(1)) &amp;&amp; integer(JavaExpressions.literalValue(args.get(1))).signum()&gt;=0)</span>
-<span class="pc bpc" id="L280" title="4 of 6 branches missed.">                        &amp;&amp; !(args.get(1) instanceof VariableExpr v &amp;&amp; (has(SemanticAssumption.Kind.NON_NEGATIVE,v.name()) || has(SemanticAssumption.Kind.POSITIVE,v.name()))))</span>
-<span class="nc" id="L281">                    throw new IllegalArgumentException(&quot;NONNEGATIVE_EXPONENT_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L291" title="1 of 4 branches missed.">                if (!(JavaExpressions.isLiteral(args.get(1)) &amp;&amp; integer(JavaExpressions.literalValue(args.get(1))).signum()&gt;=0)</span>
+<span class="pc bpc" id="L292" title="4 of 6 branches missed.">                        &amp;&amp; !(args.get(1) instanceof VariableExpr v &amp;&amp; (has(SemanticAssumption.Kind.NON_NEGATIVE,v.name()) || has(SemanticAssumption.Kind.POSITIVE,v.name()))))</span>
+<span class="nc" id="L293">                    throw new IllegalArgumentException(&quot;NONNEGATIVE_EXPONENT_REQUIRED&quot;);</span>
             }
             default -&gt; { }
         }
-<span class="fc" id="L285">    }</span>
+<span class="fc" id="L297">    }</span>
     static BigInteger integer(Object value) {
-<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (value instanceof BigInteger b) return b;</span>
-<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (value instanceof Character c) return BigInteger.valueOf(c);</span>
-<span class="pc bpc" id="L289" title="3 of 8 branches missed.">        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long)</span>
-<span class="fc" id="L290">            return BigInteger.valueOf(((Number)value).longValue());</span>
-<span class="nc" id="L291">        throw new IllegalArgumentException(&quot;INTEGRAL_VALUE_REQUIRED&quot;);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (value instanceof BigInteger b) return b;</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (value instanceof Character c) return BigInteger.valueOf(c);</span>
+<span class="pc bpc" id="L301" title="3 of 8 branches missed.">        if (value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long)</span>
+<span class="fc" id="L302">            return BigInteger.valueOf(((Number)value).longValue());</span>
+<span class="nc" id="L303">        throw new IllegalArgumentException(&quot;INTEGRAL_VALUE_REQUIRED&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

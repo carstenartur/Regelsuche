@@ -67,7 +67,7 @@ public final class JavaExpressions {
         };
     }
     public static Optional&lt;NumericKind&gt; castSourceKind(Expr expression) {
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (!(expression instanceof FunctionExpr function)) return Optional.empty();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!(expression instanceof FunctionExpr function)) return Optional.empty();</span>
 <span class="fc" id="L71">        String action = decode(function).action();</span>
 <span class="fc bfc" id="L72" title="All 2 branches covered.">        return action.startsWith(&quot;cast_&quot;) ? Optional.of(NumericKind.valueOf(action.substring(5).toUpperCase(Locale.ROOT))) : Optional.empty();</span>
     }

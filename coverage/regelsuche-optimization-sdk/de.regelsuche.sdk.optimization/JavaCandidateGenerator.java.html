@@ -8,7 +8,7 @@ import java.util.*;
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
     // Signed-additive proposals now come exclusively from the shared core rule inventory.
-    static final String REVISION = &quot;java-core-algebra-proposals/v7-shared-rule-inventory&quot;;
+    static final String REVISION = &quot;java-core-algebra-proposals/v10-canonical-preparation&quot;;
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -149,7 +149,7 @@ final class JavaCandidateGenerator {
 <span class="pc bpc" id="L149" title="1 of 6 branches missed.">        if ((op == NumericOperation.OR || op == NumericOperation.AND) &amp;&amp; left.equals(right)) return left;</span>
 <span class="fc bfc" id="L150" title="All 4 branches covered.">        if (op == NumericOperation.OR || op == NumericOperation.XOR) {</span>
 <span class="fc" id="L151">            work.charge(8);</span>
-<span class="fc" id="L152">            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments);</span>
+<span class="fc" id="L152">            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments, work);</span>
 <span class="fc bfc" id="L153" title="All 2 branches covered.">            if (!bitwise.equals(result)) return bitwise;</span>
         }
 <span class="fc" id="L155">        return foldConstant(result, op, kind, arguments);</span>

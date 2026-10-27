@@ -7,48 +7,88 @@ import java.util.List;
 final class JavaBitwiseCandidates {
     private JavaBitwiseCandidates() {}
 
-    static Expr simplify(Expr source, NumericOperation join, NumericKind kind, List&lt;Expr&gt; operands) {
+    static Expr simplify(Expr source, NumericOperation join, NumericKind kind, List&lt;Expr&gt; operands, VerificationWork work) {
 <span class="pc bpc" id="L11" title="2 of 8 branches missed.">        if ((kind != NumericKind.INT &amp;&amp; kind != NumericKind.LONG)</span>
                 || (join != NumericOperation.OR &amp;&amp; join != NumericOperation.XOR)
 <span class="pc bpc" id="L13" title="1 of 2 branches missed.">                || operands.size() != 2) return source;</span>
 <span class="fc" id="L14">        Expr left = operands.getFirst(), right = operands.get(1);</span>
-<span class="fc bfc" id="L15" title="All 4 branches covered.">        if (!operation(left, NumericOperation.AND, kind) || !operation(right, NumericOperation.AND, kind))</span>
-<span class="fc" id="L16">            return source;</span>
-<span class="fc" id="L17">        var a = JavaExpressions.operands(left);</span>
-<span class="fc" id="L18">        var b = JavaExpressions.operands(right);</span>
-<span class="fc bfc" id="L19" title="All 4 branches covered.">        for (int i = 0; i &lt; 2; i++) for (int j = 0; j &lt; 2; j++) {</span>
-<span class="fc" id="L20">            Expr mask = a.get(i), otherMask = b.get(j);</span>
-<span class="fc" id="L21">            Expr positive = a.get(1 - i), negative = b.get(1 - j);</span>
-<span class="fc bfc" id="L22" title="All 2 branches covered.">            if (mask.equals(otherMask)) {</span>
+<span class="fc" id="L15">        Expr reconstructed = reconstruct(kind, left, right, work);</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (reconstructed == null) reconstructed = reconstruct(kind, right, left, work);</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (reconstructed != null) return reconstructed;</span>
+<span class="fc bfc" id="L18" title="All 4 branches covered.">        if (!operation(left, NumericOperation.AND, kind) || !operation(right, NumericOperation.AND, kind))</span>
+<span class="fc" id="L19">            return source;</span>
+<span class="fc" id="L20">        var a = JavaExpressions.operands(left);</span>
+<span class="fc" id="L21">        var b = JavaExpressions.operands(right);</span>
+<span class="fc bfc" id="L22" title="All 4 branches covered.">        for (int i = 0; i &lt; 2; i++) for (int j = 0; j &lt; 2; j++) {</span>
+<span class="fc" id="L23">            Expr mask = a.get(i), otherMask = b.get(j);</span>
+<span class="fc" id="L24">            Expr positive = a.get(1 - i), negative = b.get(1 - j);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            if (mask.equals(otherMask)) {</span>
                 // (a &amp; m) JOIN (b &amp; m) = (a JOIN b) &amp; m. Applying this
                 // locally also reduces the three-term majority function.
-<span class="fc" id="L25">                return op(kind, NumericOperation.AND, op(kind, join, positive, negative), mask);</span>
+<span class="fc" id="L28">                return op(kind, NumericOperation.AND, op(kind, join, positive, negative), mask);</span>
             }
-<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (complementOf(otherMask, mask, kind)) return choose(kind, mask, positive, negative);</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (complementOf(mask, otherMask, kind)) return choose(kind, otherMask, negative, positive);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            if (complementOf(otherMask, mask, kind)) return choose(kind, mask, positive, negative);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (complementOf(mask, otherMask, kind)) return choose(kind, otherMask, negative, positive);</span>
         }
-<span class="fc" id="L30">        return source;</span>
+<span class="fc" id="L33">        return source;</span>
+    }
+
+    /** High/low projections at any Java-masked word boundary; proof is separate. */
+    private static Expr reconstruct(NumericKind kind, Expr high, Expr low, VerificationWork work) {
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        if (!operation(high, NumericOperation.SHIFT_LEFT, kind) || !operation(low, NumericOperation.AND, kind)) return null;</span>
+<span class="fc" id="L39">        var outer = JavaExpressions.operands(high);</span>
+<span class="fc" id="L40">        Integer distance = distance(outer.get(1), kind);</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        if (distance == null || !(operation(outer.getFirst(), NumericOperation.UNSIGNED_SHIFT_RIGHT, kind)</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                || operation(outer.getFirst(), NumericOperation.SHIFT_RIGHT, kind))) return null;</span>
+<span class="fc" id="L43">        var inner = JavaExpressions.operands(outer.getFirst());</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (!distance.equals(distance(inner.get(1), kind))) return null;</span>
+<span class="fc" id="L45">        Expr value = inner.getFirst();</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        long mask = distance == 0 ? 0 : -1L &gt;&gt;&gt; (64 - distance);</span>
+<span class="fc" id="L47">        var lower = JavaExpressions.operands(low);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (int side = 0; side &lt; 2; side++) {</span>
+<span class="fc" id="L49">            Expr literal = lower.get(side);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (!JavaExpressions.isLiteral(literal)) continue;</span>
+<span class="fc" id="L51">            Object number = JavaExpressions.literalValue(literal);</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">            if (!(number instanceof Number n) || n.longValue() != mask) continue;</span>
+<span class="fc" id="L53">            Expr projected = lower.get(1 - side);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            for (int depth = 0; depth &lt;= 128; depth++) {</span>
+<span class="fc" id="L55">                work.charge(1);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                if (projected.equals(value)) return value;</span>
+<span class="fc" id="L57">                var from = JavaExpressions.castSourceKind(projected);</span>
+<span class="pc bpc" id="L58" title="3 of 6 branches missed.">                if (from.isEmpty() || !from.get().integral() || !JavaExpressions.resultKind(projected).integral()</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                        || Math.min(from.get().bits(), JavaExpressions.resultKind(projected).bits()) &lt; distance) break;</span>
+<span class="fc" id="L60">                projected = JavaExpressions.operands(projected).getFirst();</span>
+            }
+        }
+<span class="fc" id="L63">        return null;</span>
+    }
+
+    private static Integer distance(Expr expression, NumericKind kind) {
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!JavaExpressions.isLiteral(expression)) return null;</span>
+<span class="fc" id="L68">        Object value = JavaExpressions.literalValue(expression);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        return value instanceof Number number ? number.intValue() &amp; (kind.bits() - 1)</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                : value instanceof Character character ? character &amp; (kind.bits() - 1) : null;</span>
     }
 
     private static Expr choose(NumericKind kind, Expr mask, Expr positive, Expr negative) {
         // Complementary masks are disjoint, so this holds for OR and XOR.
         // No data-dependent branch, lookup, narrowing or arithmetic is introduced.
-<span class="fc" id="L36">        return op(kind, NumericOperation.XOR, negative,</span>
-<span class="fc" id="L37">                op(kind, NumericOperation.AND, mask, op(kind, NumericOperation.XOR, positive, negative)));</span>
+<span class="fc" id="L76">        return op(kind, NumericOperation.XOR, negative,</span>
+<span class="fc" id="L77">                op(kind, NumericOperation.AND, mask, op(kind, NumericOperation.XOR, positive, negative)));</span>
     }
 
     private static boolean complementOf(Expr expression, Expr other, NumericKind kind) {
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        return operation(expression, NumericOperation.NOT, kind)</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">                &amp;&amp; JavaExpressions.operands(expression).getFirst().equals(other);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        return operation(expression, NumericOperation.NOT, kind)</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                &amp;&amp; JavaExpressions.operands(expression).getFirst().equals(other);</span>
     }
 
     private static boolean operation(Expr expression, NumericOperation expected, NumericKind kind) {
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        return JavaExpressions.operationOf(expression).orElse(null) == expected</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                &amp;&amp; JavaExpressions.resultKind(expression) == kind;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        return JavaExpressions.operationOf(expression).orElse(null) == expected</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                &amp;&amp; JavaExpressions.resultKind(expression) == kind;</span>
     }
 
     private static Expr op(NumericKind kind, NumericOperation operation, Expr... operands) {
-<span class="fc" id="L51">        return JavaExpressions.operation(kind, operation, operands);</span>
+<span class="fc" id="L91">        return JavaExpressions.operation(kind, operation, operands);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

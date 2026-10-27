@@ -41,98 +41,114 @@ public final class JointPlanSearch {
 <span class="fc" id="L41">        }</span>
 <span class="fc" id="L42">        long score(PreparedJointComputation.Cost cost) { return cost.weighted(operation, liveStorage, retainedStorage, outputBindings); }</span>
     }
-<span class="fc" id="L44">    public record Result(JointComputationPlan plan, PreparedJointComputation prepared,</span>
-            TypedSourceOnlySearch.Result search, long setupWork, long workBudget) {
-<span class="fc" id="L46">        public long totalWork() { return Math.addExact(search.totalWork(), setupWork); }</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        public boolean withinBudget() { return totalWork() &lt;= workBudget; }</span>
+    public record Result(JointComputationPlan plan, PreparedJointComputation prepared,
+            TypedSourceOnlySearch.Result search, long setupWork, long workBudget, Expr sourceExpression) {
+        /** Retains the original bounded envelope for producer-side witness capture. */
+<span class="fc" id="L47">        public Result { Objects.requireNonNull(sourceExpression); }</span>
+        public Result(JointComputationPlan plan, PreparedJointComputation prepared,
+                TypedSourceOnlySearch.Result search, long setupWork, long workBudget) {
+<span class="nc" id="L50">            this(plan, prepared, search, setupWork, workBudget, search.search().initialState().expression());</span>
+<span class="nc" id="L51">        }</span>
+<span class="fc" id="L52">        public long totalWork() { return Math.addExact(search.totalWork(), setupWork); }</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        public boolean withinBudget() { return totalWork() &lt;= workBudget; }</span>
     }
-<span class="fc" id="L49">    private record Preparation(PreparedJointComputation plan, long work) {}</span>
-<span class="fc" id="L50">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L55">    private record Preparation(PreparedJointComputation plan, long work) {}</span>
+<span class="fc" id="L56">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
     private final ComputationBackend backend;
     private final Domain domain;
     private final Weights weights;
     private final int maximumCandidates;
 
-<span class="fc" id="L56">    public JointPlanSearch(ComputationBackend backend, Domain domain, Weights weights, int maximumCandidates) {</span>
-<span class="fc" id="L57">        this.backend = Objects.requireNonNull(backend, &quot;backend&quot;);</span>
-<span class="fc" id="L58">        this.domain = Objects.requireNonNull(domain, &quot;domain&quot;);</span>
-<span class="fc" id="L59">        this.weights = Objects.requireNonNull(weights, &quot;weights&quot;);</span>
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;positive candidate cap required&quot;);</span>
-<span class="fc" id="L61">        this.maximumCandidates = maximumCandidates;</span>
-<span class="fc" id="L62">    }</span>
+<span class="fc" id="L62">    public JointPlanSearch(ComputationBackend backend, Domain domain, Weights weights, int maximumCandidates) {</span>
+<span class="fc" id="L63">        this.backend = Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="fc" id="L64">        this.domain = Objects.requireNonNull(domain, &quot;domain&quot;);</span>
+<span class="fc" id="L65">        this.weights = Objects.requireNonNull(weights, &quot;weights&quot;);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;positive candidate cap required&quot;);</span>
+<span class="fc" id="L67">        this.maximumCandidates = maximumCandidates;</span>
+<span class="fc" id="L68">    }</span>
     public PreparedJointComputation prepareVerified(JointComputationPlan source, JointComputationPlan candidate) {
-<span class="nc" id="L64">        return prepare(source, candidate).plan();</span>
+<span class="nc" id="L70">        return prepare(source, candidate).plan();</span>
     }
     private Preparation prepare(JointComputationPlan source, JointComputationPlan candidate) {
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!source.inputs().equals(candidate.inputs()) || !source.outputs().stream().map(o -&gt; List.of(o.name(), o.type())).toList()</span>
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                .equals(candidate.outputs().stream().map(o -&gt; List.of(o.name(), o.type())).toList()))</span>
-<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;input/output bindings differ&quot;);</span>
-<span class="fc" id="L70">        var verified = domain.verify(source, candidate);</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (!verified.accepted()) throw new IllegalArgumentException(&quot;domain did not prove joint outputs equivalent&quot;);</span>
-<span class="fc" id="L72">        var prepared = candidate.prepare(backend);</span>
-<span class="fc" id="L73">        return new Preparation(prepared, Math.addExact(verified.work(), prepared.cost().inspectionWork()));</span>
+<span class="fc" id="L73">        return prepare(source, candidate, null);</span>
+    }
+    private Preparation prepare(JointComputationPlan source, JointComputationPlan candidate,
+            JointComputationPlan.Resolution resolved) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (!source.inputs().equals(candidate.inputs()) || !source.outputs().stream().map(o -&gt; List.of(o.name(), o.type())).toList()</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                .equals(candidate.outputs().stream().map(o -&gt; List.of(o.name(), o.type())).toList()))</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(&quot;input/output bindings differ&quot;);</span>
+<span class="fc" id="L80">        var verified = domain.verify(source, candidate);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!verified.accepted()) throw new IllegalArgumentException(&quot;domain did not prove joint outputs equivalent&quot;);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        var prepared = resolved == null ? candidate.prepare(backend) : PreparedJointComputation.prepare(candidate, backend, resolved);</span>
+<span class="fc" id="L83">        return new Preparation(prepared, Math.addExact(verified.work(), prepared.cost().inspectionWork()));</span>
     }
     public Result optimize(JointComputationPlan source, MoveSearch.Budget budget) {
-<span class="fc" id="L76">        var sourceExpression = source.searchExpression();</span>
-<span class="fc" id="L77">        var initialCheck = prepare(source, source);</span>
-<span class="fc" id="L78">        var initial = new Preparation(initialCheck.plan(), Math.addExact(initialCheck.work(), sourceExpression.work()));</span>
-<span class="fc" id="L79">        long remaining = Math.max(1, budget.totalWork() - initial.work());</span>
-<span class="fc" id="L80">        var searchBudget = new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),</span>
-<span class="fc" id="L81">            budget.maxStates(), remaining, budget.maxComplexityDebt());</span>
-<span class="fc" id="L82">        var descriptor = new MoveProvider.Descriptor(&quot;joint-plan-domain&quot;, &quot;joint-plan-domain&quot;, SearchMove.SourceKind.PRIMITIVE,</span>
-<span class="fc" id="L83">            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, domain.revision());</span>
-<span class="fc" id="L84">        TypedMoveSearch.TypedProvider provider = new TypedMoveSearch.TypedProvider() {</span>
-<span class="fc" id="L85">            @Override public Descriptor descriptor() { return descriptor; }</span>
+<span class="fc" id="L86">        var sourceResolution = source.resolveOutputs();</span>
+<span class="fc" id="L87">        var sourceExpression = source.searchExpression(sourceResolution);</span>
+<span class="fc" id="L88">        var initialCheck = prepare(source, source, sourceResolution);</span>
+        // The envelope and schedule share one immutable resolution. Its work is
+        // included in preparation; add only envelope construction here. Domain
+        // verification and the final incumbent check remain independent.
+<span class="fc" id="L92">        var initial = new Preparation(initialCheck.plan(),</span>
+<span class="fc" id="L93">                Math.addExact(initialCheck.work(), sourceExpression.work() - sourceResolution.work()));</span>
+<span class="fc" id="L94">        long remaining = Math.max(1, budget.totalWork() - initial.work());</span>
+<span class="fc" id="L95">        var searchBudget = new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),</span>
+<span class="fc" id="L96">            budget.maxStates(), remaining, budget.maxComplexityDebt());</span>
+<span class="fc" id="L97">        var descriptor = new MoveProvider.Descriptor(&quot;joint-plan-domain&quot;, &quot;joint-plan-domain&quot;, SearchMove.SourceKind.PRIMITIVE,</span>
+<span class="fc" id="L98">            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, domain.revision());</span>
+<span class="fc" id="L99">        TypedMoveSearch.TypedProvider provider = new TypedMoveSearch.TypedProvider() {</span>
+<span class="fc" id="L100">            @Override public Descriptor descriptor() { return descriptor; }</span>
             @Override public Batch candidates(MoveState state, MoveContext context) {
-<span class="fc" id="L87">                var current = source.withExpression(CODEC.decodeExpression(state.expression()));</span>
-<span class="fc" id="L88">                var generated = domain.generate(current, maximumCandidates);</span>
-<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                if (generated.proposals().size() &gt; maximumCandidates) throw new IllegalArgumentException(&quot;domain exceeded candidate cap&quot;);</span>
-<span class="fc" id="L90">                var moves = new ArrayList&lt;SearchMove&gt;();</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">                for (var proposal : generated.proposals()) {</span>
-<span class="fc" id="L92">                    String target = CODEC.encodeExpression(proposal.expression());</span>
-<span class="fc" id="L93">                    var transformation = new Transformation(proposal.rule(), target, RewriteKind.SIMPLIFY, true, 0, false,</span>
-<span class="fc" id="L94">                        key(state.expression(), target, proposal.rule()), List.of(), domain.revision(), &quot;Apache-2.0&quot;);</span>
-<span class="fc" id="L95">                    moves.add(SearchMove.from(transformation, descriptor, generated.work()));</span>
-<span class="fc" id="L96">                }</span>
-<span class="fc" id="L97">                return new Batch(moves, TransformationWorkMetrics.flatEngine(moves.size()).withDelegatedMechanicalWork(generated.work()), generated.complete());</span>
+<span class="fc" id="L102">                var current = source.withExpression(CODEC.decodeExpression(state.expression()));</span>
+<span class="fc" id="L103">                var generated = domain.generate(current, maximumCandidates);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                if (generated.proposals().size() &gt; maximumCandidates) throw new IllegalArgumentException(&quot;domain exceeded candidate cap&quot;);</span>
+<span class="fc" id="L105">                var moves = new ArrayList&lt;SearchMove&gt;();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                for (var proposal : generated.proposals()) {</span>
+<span class="fc" id="L107">                    String target = CODEC.encodeExpression(proposal.expression());</span>
+<span class="fc" id="L108">                    var transformation = new Transformation(proposal.rule(), target, RewriteKind.SIMPLIFY, true, 0, false,</span>
+<span class="fc" id="L109">                        key(state.expression(), target, proposal.rule()), List.of(), domain.revision(), &quot;Apache-2.0&quot;);</span>
+<span class="fc" id="L110">                    moves.add(SearchMove.from(transformation, descriptor, generated.work()));</span>
+<span class="fc" id="L111">                }</span>
+<span class="fc" id="L112">                return new Batch(moves, TransformationWorkMetrics.flatEngine(moves.size()).withDelegatedMechanicalWork(generated.work()), generated.complete());</span>
             }
         };
-<span class="fc" id="L100">        TypedMoveSearch.Verifier verifier = (state, move, context) -&gt; {</span>
-<span class="fc" id="L101">            long work = 1;</span>
+<span class="fc" id="L115">        TypedMoveSearch.Verifier verifier = (state, move, context) -&gt; {</span>
+<span class="fc" id="L116">            long work = 1;</span>
             try {
-<span class="fc" id="L103">                var current = source.withExpression(state.expression());</span>
-<span class="fc" id="L104">                var candidate = source.withExpression(CODEC.decodeExpression(move.transformation().transformedExpression()));</span>
-<span class="fc" id="L105">                var proof = domain.verify(current, candidate);</span>
-<span class="fc" id="L106">                work = proof.work();</span>
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                if (proof.accepted()) work = Math.addExact(work, candidate.prepare(backend).cost().inspectionWork());</span>
-<span class="fc" id="L108">                return new MoveVerifier.Verification(proof.accepted(), work,</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                    proof.accepted() ? List.of(domain.revision() + &quot;:&quot; + key(CODEC.encodeExpression(state.expression()),</span>
-<span class="pc" id="L110">                        move.transformation().transformedExpression(), move.ruleId())) : List.of(),</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                    proof.accepted() ? &quot;JOINT_OUTPUTS_PROVED&quot; : &quot;JOINT_OUTPUTS_REJECTED&quot;);</span>
-<span class="nc" id="L112">            } catch (IllegalArgumentException malformed) {</span>
-<span class="nc" id="L113">                return new MoveVerifier.Verification(false, work, List.of(), &quot;JOINT_PLAN_REJECTED&quot;);</span>
+<span class="fc" id="L118">                var current = source.withExpression(state.expression());</span>
+<span class="fc" id="L119">                var candidate = source.withExpression(CODEC.decodeExpression(move.transformation().transformedExpression()));</span>
+<span class="fc" id="L120">                var proof = domain.verify(current, candidate);</span>
+<span class="fc" id="L121">                work = proof.work();</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                if (proof.accepted()) work = Math.addExact(work, candidate.prepare(backend).cost().inspectionWork());</span>
+<span class="fc" id="L123">                return new MoveVerifier.Verification(proof.accepted(), work,</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                    proof.accepted() ? List.of(domain.revision() + &quot;:&quot; + key(CODEC.encodeExpression(state.expression()),</span>
+<span class="pc" id="L125">                        move.transformation().transformedExpression(), move.ruleId())) : List.of(),</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                    proof.accepted() ? &quot;JOINT_OUTPUTS_PROVED&quot; : &quot;JOINT_OUTPUTS_REJECTED&quot;);</span>
+<span class="nc" id="L127">            } catch (IllegalArgumentException malformed) {</span>
+<span class="nc" id="L128">                return new MoveVerifier.Verification(false, work, List.of(), &quot;JOINT_PLAN_REJECTED&quot;);</span>
             }
         };
-<span class="fc" id="L116">        var problem = new TypedMoveSearch.Problem(sourceExpression.expression(),</span>
-<span class="fc" id="L117">            TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION), List.of(provider),</span>
-<span class="fc" id="L118">            MovePriorityPolicy.INVENTORY_ORDER, verifier, state -&gt; 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,</span>
+<span class="fc" id="L131">        var problem = new TypedMoveSearch.Problem(sourceExpression.expression(),</span>
+<span class="fc" id="L132">            TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION), List.of(provider),</span>
+<span class="fc" id="L133">            MovePriorityPolicy.INVENTORY_ORDER, verifier, state -&gt; 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,</span>
             searchBudget, (state, context) -&gt; {
-<span class="fc" id="L120">                var cost = source.withExpression(state.expression()).prepare(backend).cost();</span>
-<span class="fc" id="L121">                return new StateValue.Assessment(cost.operationCount(), -weights.score(cost), cost.inspectionWork(), 0, Map.of());</span>
+<span class="fc" id="L135">                var cost = source.withExpression(state.expression()).prepare(backend).cost();</span>
+<span class="fc" id="L136">                return new StateValue.Assessment(cost.operationCount(), -weights.score(cost), cost.inspectionWork(), 0, Map.of());</span>
             });
-<span class="fc" id="L123">        var search = new TypedSourceOnlySearch().search(problem, state -&gt; {</span>
-<span class="fc" id="L124">            var cost = source.withExpression(state.expression()).prepare(backend).cost();</span>
-<span class="fc" id="L125">            return new TypedSourceOnlySearch.Score(weights.score(cost), cost.inspectionWork());</span>
+<span class="fc" id="L138">        var search = new TypedSourceOnlySearch().search(problem, state -&gt; {</span>
+<span class="fc" id="L139">            var cost = source.withExpression(state.expression()).prepare(backend).cost();</span>
+<span class="fc" id="L140">            return new TypedSourceOnlySearch.Score(weights.score(cost), cost.inspectionWork());</span>
         });
-<span class="fc" id="L127">        var candidate = source.withExpression(search.incumbent().expression());</span>
-<span class="fc" id="L128">        var checked = prepare(source, candidate);</span>
-<span class="fc" id="L129">        return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()), budget.totalWork());</span>
+<span class="fc" id="L142">        var candidate = source.withExpression(search.incumbent().expression());</span>
+<span class="fc" id="L143">        var checked = prepare(source, candidate);</span>
+<span class="fc" id="L144">        return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()),</span>
+<span class="fc" id="L145">                budget.totalWork(), sourceExpression.expression());</span>
     }
     private static String key(String source, String target, String rule) {
         try {
-<span class="fc" id="L133">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L134">                .digest((source + &quot;\n&quot; + target + &quot;\n&quot; + rule).getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L135">        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+<span class="fc" id="L149">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L150">                .digest((source + &quot;\n&quot; + target + &quot;\n&quot; + rule).getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L151">        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -13,47 +13,51 @@ final class BitwiseProof {
 <span class="fc" id="L13">    private final Set&lt;Expr&gt; constants=new LinkedHashSet&lt;&gt;();</span>
 <span class="fc" id="L14">    BitwiseProof(VerificationWork work) { this.work=work; }</span>
     boolean equivalent(Expr left,Expr right,NumericKind kind) {
-<span class="fc" id="L16">        var atoms=new LinkedHashSet&lt;Expr&gt;(); collect(left,atoms); collect(right,atoms);</span>
-<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if (atoms.size()&gt;8) return false;</span>
-<span class="fc bfc" id="L18" title="All 2 branches covered.">        constants.add(kind==NumericKind.LONG?JavaExpressions.literal(0L):JavaExpressions.literal(0));</span>
-<span class="fc bfc" id="L19" title="All 2 branches covered.">        constants.add(kind==NumericKind.LONG?JavaExpressions.literal(-1L):JavaExpressions.literal(-1));</span>
-<span class="fc" id="L20">        var distinct=new ArrayList&lt;Expr&gt;();</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        for(var atom:atoms) {</span>
-<span class="fc" id="L22">            Expr representative=atom;</span>
-<span class="fc" id="L23">            var options=new ArrayList&lt;&gt;(constants); options.addAll(distinct);</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">            for(var option:options) {</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (opaqueEquivalent(left,right,kind)) return true;</span>
+<span class="fc" id="L17">        return new WordBitProjection(work).equivalent(left,right,kind);</span>
+    }
+    boolean opaqueEquivalent(Expr left,Expr right,NumericKind kind) {
+<span class="fc" id="L20">        var atoms=new LinkedHashSet&lt;Expr&gt;(); collect(left,atoms); collect(right,atoms);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (atoms.size()&gt;8) return false;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        constants.add(kind==NumericKind.LONG?JavaExpressions.literal(0L):JavaExpressions.literal(0));</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        constants.add(kind==NumericKind.LONG?JavaExpressions.literal(-1L):JavaExpressions.literal(-1));</span>
+<span class="fc" id="L24">        var distinct=new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for(var atom:atoms) {</span>
+<span class="fc" id="L26">            Expr representative=atom;</span>
+<span class="fc" id="L27">            var options=new ArrayList&lt;&gt;(constants); options.addAll(distinct);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for(var option:options) {</span>
                 try {
-<span class="fc bfc" id="L26" title="All 2 branches covered.">                    if(new PolynomialProof(kind,false,false,work).equivalent(atom,option)) { representative=option; break; }</span>
-<span class="pc" id="L27">                } catch(PolynomialProof.OutsideFragment unknown) { /* Unproved atoms remain independent. */ }</span>
-<span class="fc" id="L28">            }</span>
-<span class="fc" id="L29">            representatives.put(atom,representative);</span>
-<span class="fc bfc" id="L30" title="All 2 branches covered.">            if(representative.equals(atom)) distinct.add(atom);</span>
-<span class="fc" id="L31">        }</span>
-<span class="fc" id="L32">        var list=List.copyOf(distinct);</span>
-<span class="fc bfc" id="L33" title="All 4 branches covered.">        for(int bit=0;bit&lt;kind.bits();bit++) for(int assignment=0;assignment&lt;(1&lt;&lt;list.size());assignment++) {</span>
-<span class="fc" id="L34">            work.charge(1);</span>
-<span class="fc bfc" id="L35" title="All 2 branches covered.">            if(value(left,bit,assignment,list)!=value(right,bit,assignment,list)) return false;</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                    if(new PolynomialProof(kind,false,false,work).equivalent(atom,option)) { representative=option; break; }</span>
+<span class="pc" id="L31">                } catch(PolynomialProof.OutsideFragment unknown) { /* Unproved atoms remain independent. */ }</span>
+<span class="fc" id="L32">            }</span>
+<span class="fc" id="L33">            representatives.put(atom,representative);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if(representative.equals(atom)) distinct.add(atom);</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        var list=List.copyOf(distinct);</span>
+<span class="fc bfc" id="L37" title="All 4 branches covered.">        for(int bit=0;bit&lt;kind.bits();bit++) for(int assignment=0;assignment&lt;(1&lt;&lt;list.size());assignment++) {</span>
+<span class="fc" id="L38">            work.charge(1);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if(value(left,bit,assignment,list)!=value(right,bit,assignment,list)) return false;</span>
         }
-<span class="fc" id="L37">        return true;</span>
+<span class="fc" id="L41">        return true;</span>
     }
     private void collect(Expr e,Set&lt;Expr&gt; atoms) {
-<span class="fc" id="L40">        work.charge(1);</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) { constants.add(e); return; }</span>
-<span class="fc" id="L42">        var op=JavaExpressions.operationOf(e).orElse(null);</span>
-<span class="fc bfc" id="L43" title="All 8 branches covered.">        if(op==NumericOperation.AND || op==NumericOperation.OR || op==NumericOperation.XOR || op==NumericOperation.NOT)</span>
-<span class="fc" id="L44">            JavaExpressions.operands(e).forEach(child -&gt; collect(child,atoms));</span>
-<span class="fc" id="L45">        else atoms.add(e);</span>
-<span class="fc" id="L46">    }</span>
+<span class="fc" id="L44">        work.charge(1);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) { constants.add(e); return; }</span>
+<span class="fc" id="L46">        var op=JavaExpressions.operationOf(e).orElse(null);</span>
+<span class="fc bfc" id="L47" title="All 8 branches covered.">        if(op==NumericOperation.AND || op==NumericOperation.OR || op==NumericOperation.XOR || op==NumericOperation.NOT)</span>
+<span class="fc" id="L48">            JavaExpressions.operands(e).forEach(child -&gt; collect(child,atoms));</span>
+<span class="fc" id="L49">        else atoms.add(e);</span>
+<span class="fc" id="L50">    }</span>
     private boolean value(Expr e,int bit,int assignment,List&lt;Expr&gt; atoms) {
-<span class="fc bfc" id="L48" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) return SemanticChecker.integer(JavaExpressions.literalValue(e)).testBit(bit);</span>
-<span class="fc" id="L49">        var op=JavaExpressions.operationOf(e).orElse(null); var args=JavaExpressions.operands(e);</span>
-<span class="fc bfc" id="L50" title="All 4 branches covered.">        if(op==NumericOperation.NOT) return !value(args.getFirst(),bit,assignment,atoms);</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        if(op==NumericOperation.AND) return value(args.getFirst(),bit,assignment,atoms)&amp;value(args.get(1),bit,assignment,atoms);</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        if(op==NumericOperation.OR) return value(args.getFirst(),bit,assignment,atoms)|value(args.get(1),bit,assignment,atoms);</span>
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        if(op==NumericOperation.XOR) return value(args.getFirst(),bit,assignment,atoms)^value(args.get(1),bit,assignment,atoms);</span>
-<span class="fc" id="L54">        var representative=representatives.getOrDefault(e,e);</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(representative)) return SemanticChecker.integer(JavaExpressions.literalValue(representative)).testBit(bit);</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        return (assignment&amp;(1&lt;&lt;atoms.indexOf(representative)))!=0;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(e)) return SemanticChecker.integer(JavaExpressions.literalValue(e)).testBit(bit);</span>
+<span class="fc" id="L53">        var op=JavaExpressions.operationOf(e).orElse(null); var args=JavaExpressions.operands(e);</span>
+<span class="fc bfc" id="L54" title="All 4 branches covered.">        if(op==NumericOperation.NOT) return !value(args.getFirst(),bit,assignment,atoms);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if(op==NumericOperation.AND) return value(args.getFirst(),bit,assignment,atoms)&amp;value(args.get(1),bit,assignment,atoms);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if(op==NumericOperation.OR) return value(args.getFirst(),bit,assignment,atoms)|value(args.get(1),bit,assignment,atoms);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if(op==NumericOperation.XOR) return value(args.getFirst(),bit,assignment,atoms)^value(args.get(1),bit,assignment,atoms);</span>
+<span class="fc" id="L58">        var representative=representatives.getOrDefault(e,e);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if(JavaExpressions.isLiteral(representative)) return SemanticChecker.integer(JavaExpressions.literalValue(representative)).testBit(bit);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        return (assignment&amp;(1&lt;&lt;atoms.indexOf(representative)))!=0;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
