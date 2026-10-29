@@ -22,6 +22,7 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | Regeln oder Plugins entwickeln | [Erweiterungssystem](extension-system.md) |
 | Java-Berechnungen optimieren oder einen CAS anbinden | [Java-Optimierungs-SDK](../regelsuche-optimization-sdk/README.md) und [JDT/CAS-Architektur](superpowers/specs/2026-10-26-typed-cas-computation-design.md) |
 | einen Lauf reproduzieren | [Scientific Reproducibility](scientific-reproducibility.md) und [Independent Reproduction](independent-reproduction.md) |
+| inkrementelle Zählerzustände ableiten | [Geprüfte Zustandssynthese](derived-incremental-counter-states.md) |
 | einen JSON-Vertrag nachschlagen | [Schema-Katalog](schema-catalog.md) |
 
 ## Verbindliche Quellen
