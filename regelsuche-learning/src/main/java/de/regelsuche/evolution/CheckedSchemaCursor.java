@@ -40,6 +40,7 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
     private Occurrence occurrence;
     private CheckedSchemaMatcherPlan.Range relevant;
     private int schemaIndex, attempted, produced;
+    private long remainingSchemas;
     private CheckedSchemaMatcherPlan.Entry matchedEntry;
     private Map<String, Expr> bindings;
     private CheckedSchemaMatcherPlan.ApplicationSteps application;
@@ -134,7 +135,7 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
                 try {
                     if(loadSource()) {
                         domain(source,plan.bounds(),initializationWork);
-                        pending.push(new Occurrence(source,List.of()));
+                        pending.push(new Occurrence(source,plan.indexedDispatch() ? SharedOccurrencePath.root() : List.of()));
                     } else {complete=false;status=Status.INCONCLUSIVE;}
                 } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {
                     complete=false;status=Status.INCONCLUSIVE;
@@ -174,6 +175,11 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         occurrence = pending.pop();
         relevant = plan.relevant(occurrence.expression());
         schemaIndex = 0;
+        if (plan.indexedDispatch()) {
+            meter.charge(Operation.MATCH, plan.dispatchWork(relevant));
+            remainingSchemas = plan.selectionMask(relevant, occurrence.expression());
+            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);
+        }
         if (relevant.size() > plan.maximumSchemasPerOccurrence()) complete = false;
     }
     private void match() {
@@ -184,6 +190,10 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         }
         attempted++;
         var entry = relevant.get(schemaIndex++);
+        if (plan.indexedDispatch()) {
+            remainingSchemas &= remainingSchemas - 1;
+            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);
+        }
         // Existing exact matcher is bounded but atomic. A completed match is retained across pulls.
         var outcome = entry.matcher().match(occurrence.expression(), new ExprMatcher.MatchOptions(
             null, 1, plan.bounds().maximumExpressionNodes() * 4, plan.bounds().maximumExpressionNodes() * 4));
@@ -198,7 +208,8 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         if (application == null) {
             applicationWork = new Work();
             payment = meter.beginPrepaidApplication();
-            application = plan.startApplication(matchedEntry, source, encodedSource, occurrence.path(), bindings, applicationWork);
+            if (occurrence.path() instanceof SharedOccurrencePath shared) startSharedApplication(shared);
+            else application = plan.startApplication(matchedEntry, source, encodedSource, occurrence.path(), bindings, applicationWork);
         }
         long before = applicationWork.units;
         var phase = application.phase();
@@ -228,6 +239,36 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         de.regelsuche.retention.RetainedOperation.checkpoint();
         clearApplication();
     }
+    private static final class PathProjection implements RetainedGraph.View {
+        private final SharedOccurrencePath source;
+        private Integer[] buffer;
+        private List<Integer> path;
+        PathProjection(SharedOccurrencePath source) { this.source = source; }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(source); visitor.reference(buffer); visitor.reference(path);
+        }
+    }
+    private void startSharedApplication(SharedOccurrencePath path) {
+        var projection = new PathProjection(path);
+        var held = RetainedOperation.retainCompleted(1, this, projection);
+        Throwable primary = null;
+        try {
+            projection.buffer = new Integer[path.size()];
+            meter.charge(Operation.MATCH, path.size() + 1L);
+            RetainedOperation.checkpoint();
+            path.copyInto(projection.buffer);
+            meter.charge(Operation.MATCH, path.size() + 1L);
+            RetainedOperation.checkpoint();
+            projection.path = List.of(projection.buffer);
+            meter.charge(Operation.MATCH, path.size() + 1L);
+            RetainedOperation.checkpoint();
+            application = plan.startApplication(matchedEntry, source, encodedSource, projection.path, bindings, applicationWork);
+            RetainedOperation.work(1);
+            RetainedOperation.checkpoint();
+        } catch (RuntimeException | Error failure) {
+            primary = failure; observeFailure(failure); throw failure;
+        } finally { closeFrame(held, primary); }
+    }
     private void clearApplication() {
         application = null; applicationWork = null; payment = null;
         matchedEntry = null; bindings = null;
@@ -243,11 +284,12 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         if (occurrence.expression() instanceof BinaryExpr binary) {
             pending.push(new Occurrence(binary.right(), child(occurrence.path(), 1)));
             pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));
-            meter.charge(Operation.MATCH, 2L * (occurrence.path().size() + 1));
+            meter.charge(Operation.MATCH, occurrence.path() instanceof SharedOccurrencePath ? 2L : 2L * (occurrence.path().size() + 1));
         }
         occurrence = null; relevant = null;
     }
     private static List<Integer> child(List<Integer> path, int index) {
+        if (path instanceof SharedOccurrencePath shared) return shared.child(index);
         var result = new ArrayList<>(path);
         result.add(index);
         return List.copyOf(result);
