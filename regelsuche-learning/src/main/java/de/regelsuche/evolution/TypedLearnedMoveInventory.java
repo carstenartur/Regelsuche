@@ -83,6 +83,24 @@ public final class TypedLearnedMoveInventory {
 
     public List<MoveProvider> primitiveProviders() { return primitives; }
 
+    /** A task-completion control with the same frontier, stopping criterion and replay as learned solving. */
+    public CheckedSchemaTaskSolver newTaskSolver() {
+        return new CheckedSchemaTaskSolver(newSearchSession(false, 0, 0), null);
+    }
+
+    /**
+     * Prepare all independently proved schemata once. Each solve opens fresh lazy cursors and
+     * keeps the primitive fallback; this does not change the historical exploration sessions.
+     */
+    public CheckedSchemaTaskSolver newTaskSolver(CheckedLearnedSchemaModel model) {
+        java.util.Objects.requireNonNull(model, "model");
+        if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException("schema inventory mismatch");
+        var included = model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        var plan = CheckedSchemaMatcherPlan.prepare(model, model.bounds().maximumSchemas(), Map.of(), included);
+        return new CheckedSchemaTaskSolver(newSchemaSearchSession(model, List.of(plan.provider())), plan.compilationReceipt());
+    }
+
     /** Generalizes actual successful observations, then proves each symbolic statement. */
     public CheckedLearnedSchemaModel checkedSchemas() {
         if (formation == null) throw new IllegalStateException("training observations required");
