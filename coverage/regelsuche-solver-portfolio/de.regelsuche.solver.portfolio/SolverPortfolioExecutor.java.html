@@ -91,12 +91,12 @@ public final class SolverPortfolioExecutor {
                 continue;
             }
 
-<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (cancellationToken.isCancelled()) {</span>
-<span class="fc" id="L95">                attempts.add(PortfolioAttempt.create(</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (cancellationToken.isCancelled()) {</span>
+<span class="nc" id="L95">                attempts.add(PortfolioAttempt.create(</span>
                     sequence++, profile, AttemptDisposition.CANCELLED, &quot;NOT_RUN&quot;, &quot;&quot;,
-<span class="fc" id="L97">                    List.of(&quot;CANCELLED_BEFORE_INVOCATION&quot;), 0L, configurationHash));</span>
-<span class="fc" id="L98">                cancelled = true;</span>
-<span class="fc" id="L99">                break;</span>
+<span class="nc" id="L97">                    List.of(&quot;CANCELLED_BEFORE_INVOCATION&quot;), 0L, configurationHash));</span>
+<span class="nc" id="L98">                cancelled = true;</span>
+<span class="nc" id="L99">                break;</span>
             }
 <span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (profile.availability() != BackendAvailability.AVAILABLE) {</span>
 <span class="nc" id="L102">                attempts.add(PortfolioAttempt.create(</span>
@@ -129,9 +129,9 @@ public final class SolverPortfolioExecutor {
 <span class="fc" id="L129">                    ? &quot;&quot; : invocation.execution().contentHash(),</span>
 <span class="fc" id="L130">                invocation.issues(), cost, configurationHash));</span>
 
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (invocation.disposition() == AttemptDisposition.CANCELLED) {</span>
-<span class="nc" id="L133">                cancelled = true;</span>
-<span class="nc" id="L134">                break;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (invocation.disposition() == AttemptDisposition.CANCELLED) {</span>
+<span class="fc" id="L133">                cancelled = true;</span>
+<span class="fc" id="L134">                break;</span>
             }
 <span class="fc bfc" id="L136" title="All 2 branches covered.">            if (invocation.disposition() == AttemptDisposition.TIMED_OUT) {</span>
 <span class="fc" id="L137">                timedOut = true;</span>
@@ -190,11 +190,11 @@ public final class SolverPortfolioExecutor {
 <span class="fc" id="L190">            + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);</span>
         try {
             while (true) {
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                if (cancellationToken.isCancelled()) {</span>
-<span class="nc" id="L194">                    future.cancel(true);</span>
-<span class="nc" id="L195">                    return new Invocation(</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                if (cancellationToken.isCancelled()) {</span>
+<span class="fc" id="L194">                    future.cancel(true);</span>
+<span class="fc" id="L195">                    return new Invocation(</span>
                         AttemptDisposition.CANCELLED, null,
-<span class="nc" id="L197">                        List.of(&quot;CANCELLED_DURING_INVOCATION&quot;));</span>
+<span class="fc" id="L197">                        List.of(&quot;CANCELLED_DURING_INVOCATION&quot;));</span>
                 }
 <span class="fc" id="L199">                long remainingNanos = deadline - System.nanoTime();</span>
 <span class="fc bfc" id="L200" title="All 2 branches covered.">                if (remainingNanos &lt;= 0L) {</span>
