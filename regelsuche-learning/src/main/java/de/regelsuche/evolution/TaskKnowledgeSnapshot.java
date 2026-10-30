@@ -26,13 +26,15 @@ final class TaskKnowledgeSnapshot {
     private TaskKnowledgeSnapshot() { }
     record Decoded(int generation, String parentId, String model,
             Map<String, CumulativeTaskKnowledge.Strategy> routes, CumulativeTaskKnowledge.Costs costs,
-            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts) { }
+            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts, TaskConstructionProfile profile) { }
 
     static String encode(int generation, String parentId, CheckedLearnedSchemaModel model,
             Map<String, CumulativeTaskKnowledge.Strategy> routes, CumulativeTaskKnowledge.Costs costs,
-            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts) {
-        var root = JSON.createObjectNode().put("revision", CumulativeTaskKnowledge.REVISION)
+            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts, TaskConstructionProfile profile) {
+        var root = JSON.createObjectNode().put("revision", profile == TaskConstructionProfile.NONE
+                ? CumulativeTaskKnowledge.REVISION : CumulativeTaskKnowledge.CONSTRUCTION_REVISION)
             .put("generation", generation).put("parentId", parentId).put("model", model.toCanonicalJson());
+        if (profile != TaskConstructionProfile.NONE) root.put("constructionProfile", profile.name());
         var policy = root.putObject("routes");
         new TreeMap<>(routes).forEach((key, value) -> policy.put(key, value.name()));
         var work = root.putObject("costs");
@@ -54,8 +56,7 @@ final class TaskKnowledgeSnapshot {
             throw new IllegalArgumentException("knowledge snapshot too large");
         try {
             JsonNode root = JSON.readTree(json);
-            fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts"));
-            if (!CumulativeTaskKnowledge.REVISION.equals(text(root, "revision"))) throw new IllegalArgumentException("unknown knowledge revision");
+            TaskConstructionProfile profile = profile(root);
             int generation = Math.toIntExact(number(root, "generation"));
             var routes = new TreeMap<String, CumulativeTaskKnowledge.Strategy>();
             var policy = root.get("routes");
@@ -83,10 +84,24 @@ final class TaskKnowledgeSnapshot {
                 new CumulativeTaskKnowledge.Costs(number(costs, "lessons"), number(costs, "formation"),
                     number(costs, "preparation"), number(costs, "validation"), number(costs, "selection"),
                     number(costs, "restoration"), number(costs, "splitChecking")),
-                CumulativeTaskKnowledge.Decision.valueOf(text(root, "decision")), List.copyOf(attempts));
+                CumulativeTaskKnowledge.Decision.valueOf(text(root, "decision")), List.copyOf(attempts), profile);
         } catch (IOException | ArithmeticException failure) {
             throw new IllegalArgumentException("invalid knowledge snapshot", failure);
         }
+    }
+    private static TaskConstructionProfile profile(JsonNode root) {
+        if (root == null || !root.isObject() || !root.hasNonNull("revision"))
+            throw new IllegalArgumentException("snapshot revision required");
+        String revision = text(root, "revision");
+        if (revision.equals(CumulativeTaskKnowledge.REVISION)) {
+            fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts"));
+            return TaskConstructionProfile.NONE;
+        }
+        if (!revision.equals(CumulativeTaskKnowledge.CONSTRUCTION_REVISION)) throw new IllegalArgumentException("unknown knowledge revision");
+        fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts", "constructionProfile"));
+        var profile = TaskConstructionProfile.valueOf(text(root, "constructionProfile"));
+        if (profile == TaskConstructionProfile.NONE) throw new IllegalArgumentException("construction snapshot requires a profile");
+        return profile;
     }
     private static void fields(JsonNode node, Set<String> expected) {
         if (node == null || !node.isObject()) throw new IllegalArgumentException("object required");

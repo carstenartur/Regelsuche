@@ -3,7 +3,6 @@ package de.regelsuche.evolution;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.search.moves.MoveSearch;
-import de.regelsuche.search.moves.NativeNodeCountObjective;
 import java.util.Set;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -22,6 +21,7 @@ import java.util.TreeMap;
  */
 public final class CumulativeTaskKnowledge {
     public static final String REVISION = "regelsuche.cumulative-task-knowledge/v1";
+    static final String CONSTRUCTION_REVISION = "regelsuche.cumulative-task-knowledge/v2";
     public enum Strategy { BASELINE, KNOWLEDGE_FIRST, AUTOMATIC }
     public enum Decision { INITIAL, PROMOTED, NO_NEW_SCHEMA, NO_VALIDATED_BENEFIT, ACQUISITION_LIMIT }
     public static final long DEFAULT_LEARNING_WORK = 1_000_000;
@@ -105,7 +105,8 @@ public final class CumulativeTaskKnowledge {
     private final int generation;
     private final String parentId;
     private final Map<String, Strategy> routes;
-    private final Set<Long> knowledgeGoals;
+    private final Set<String> knowledgeGoals;
+    private final TaskConstructionProfile constructionProfile;
     private final Costs acquisition;
     private final Costs sessionSetup;
     private final Decision lastDecision;
@@ -116,14 +117,15 @@ public final class CumulativeTaskKnowledge {
     private CumulativeTaskKnowledge(EvolutionGenome inventory, CheckedLearnedSchemaModel model,
             CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned, int generation,
             String parentId, Map<String, Strategy> routes, Costs acquisition, Costs sessionSetup,
-            Decision lastDecision, List<CheckedLearnedSchemaModel.Attempt> lastAttempts) {
+            Decision lastDecision, List<CheckedLearnedSchemaModel.Attempt> lastAttempts, TaskConstructionProfile constructionProfile) {
         this.inventory = Objects.requireNonNull(inventory); this.model = Objects.requireNonNull(model);
+        this.constructionProfile = Objects.requireNonNull(constructionProfile);
         if (!inventory.contentHash().equals(model.inventoryHash())) throw new IllegalArgumentException("foreign inventory");
         if (!model.requiredAssumptions().isEmpty()) throw new IllegalArgumentException("conditional knowledge unsupported");
         if (generation < 0 || generation > 100_000 || (generation == 0) != parentId.isEmpty()
                 || generation > 0 && !parentId.matches("sha256:[0-9a-f]{64}")) throw new IllegalArgumentException("invalid generation parent");
         if (routes.size() > MAX_ROUTES || routes.entrySet().stream().anyMatch(e -> e.getKey().length() > 512
-                || !e.getKey().matches("nodes:-?[0-9]{1,19}:[A-Z(),]+") || e.getValue() == null || e.getValue() == Strategy.AUTOMATIC))
+                || !e.getKey().matches("(?:nodes|factor-v1|two-squares-v1):-?[0-9]{1,19}:[A-Z(),]+") || e.getValue() == null || e.getValue() == Strategy.AUTOMATIC))
             throw new IllegalArgumentException("invalid routing policy");
         this.baseline = baseline; this.learned = learned; this.generation = generation; this.parentId = parentId;
         this.routes = java.util.Collections.unmodifiableMap(new TreeMap<>(routes));
@@ -134,16 +136,20 @@ public final class CumulativeTaskKnowledge {
                 || generation == 0 && (!model.schemas().isEmpty() || !routes.isEmpty() || acquisition.total() != 0))
             throw new IllegalArgumentException("invalid initial generation");
         canonicalJson = TaskKnowledgeSnapshot.encode(generation, parentId, model, this.routes, acquisition,
-            lastDecision, this.lastAttempts);
+            lastDecision, this.lastAttempts, constructionProfile);
         id = SchematicProofPlan.hash(canonicalJson);
     }
 
     public static CumulativeTaskKnowledge empty(EvolutionGenome inventory) {
-        Objects.requireNonNull(inventory, "inventory");
-        var baseline = TypedLearnedMoveInventory.primitives(inventory).newTaskSolver();
-        return new CumulativeTaskKnowledge(inventory, CheckedLearnedSchemaModel.empty(inventory.contentHash()),
-            baseline, baseline, 0, "", Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of());
+        return empty(inventory, TaskConstructionProfile.NONE);
     }
+    public static CumulativeTaskKnowledge empty(EvolutionGenome inventory, TaskConstructionProfile profile) {
+        Objects.requireNonNull(inventory, "inventory"); Objects.requireNonNull(profile, "profile");
+        var baseline = profile.attach(TypedLearnedMoveInventory.primitives(inventory).newTaskSolver());
+        return new CumulativeTaskKnowledge(inventory, CheckedLearnedSchemaModel.empty(inventory.contentHash()),
+            baseline, baseline, 0, "", Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of(), profile);
+    }
+    public TaskConstructionProfile constructionProfile() { return constructionProfile; }
     public String id() { return id; }
     public int generation() { return generation; }
     public String parentId() { return parentId; }
@@ -163,19 +169,21 @@ public final class CumulativeTaskKnowledge {
         return automatic(id, task, routes, knowledgeGoals, baseline, learned);
     }
 
-    private static Set<Long> knowledgeGoals(Map<String, Strategy> routes) {
-        var goals = new HashSet<Long>();
+    private static Set<String> knowledgeGoals(Map<String, Strategy> routes) {
+        var goals = new HashSet<String>();
         routes.forEach((key, strategy) -> {
-            if (strategy == Strategy.KNOWLEDGE_FIRST) goals.add(Long.parseLong(key.split(":", 3)[1]));
+            if (strategy == Strategy.KNOWLEDGE_FIRST) {
+                String[] parts = key.split(":", 3);
+                goals.add(parts[0] + ":" + Long.parseLong(parts[1]));
+            }
         });
         return Set.copyOf(goals);
     }
     private static Execution automatic(String id, CheckedSchemaTaskSolver.Task task, Map<String, Strategy> routes,
-            Set<Long> goals, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned) {
+            Set<String> goals, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned) {
         // A constant baseline policy does not inspect the source at all.
         if (goals.isEmpty()) return run(id, task, Strategy.BASELINE, 0, baseline, learned);
-        if (task.goal().objective() != NativeNodeCountObjective.INSTANCE
-                || !goals.contains(task.goal().maximumOutputScore()))
+        if (!goals.contains(TaskKnowledgeProfile.goalKey(task)))
             return run(id, task, Strategy.BASELINE, 2, baseline, learned);
         var profile = TaskKnowledgeProfile.inspect(task);
         return run(id, task, routes.getOrDefault(profile.key(), Strategy.BASELINE), profile.work() + 2, baseline, learned);
@@ -213,12 +221,13 @@ public final class CumulativeTaskKnowledge {
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             if (!learnLessons(lessons, progress, maximumAcquisitionWork)) return limited(progress);
             var candidate = CheckedLearnedSchemaModel.extendFromSolutions(model,
-                progress.training.stream().flatMap(e -> e.solution().stream()).toList());
+                progress.training.stream().flatMap(e -> e.solution().stream()).toList(),
+                constructionProfile != TaskConstructionProfile.NONE);
             progress.formation = candidate.formationWork(); progress.attempts = candidate.attempts();
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             boolean newSchemas = !candidate.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(java.util.stream.Collectors.toSet())
                 .equals(model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(java.util.stream.Collectors.toSet()));
-            var prepared = newSchemas ? TypedLearnedMoveInventory.primitives(inventory).newTaskSolver(candidate) : learned;
+            var prepared = newSchemas ? constructionProfile.attach(TypedLearnedMoveInventory.primitives(inventory).newTaskSolver(candidate)) : learned;
             progress.preparation = newSchemas ? prepared.preparationWork() : 0;
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             var proposedRoutes = new TreeMap<>(routes);
@@ -328,7 +337,7 @@ public final class CumulativeTaskKnowledge {
         var work = progress.costs();
         var successor = new CumulativeTaskKnowledge(inventory, chosen, baseline, solver,
             Math.addExact(generation, 1), id, policy, acquisition.plus(sessionSetup).plus(work), Costs.zero(),
-            decision, progress.attempts);
+            decision, progress.attempts, constructionProfile);
         return new Update(successor, decision, progress.training, progress.trials, work, progress.attempts);
     }
 
@@ -372,11 +381,11 @@ public final class CumulativeTaskKnowledge {
         // A recomputed digest cannot authorize false mathematics: load re-proves every schema.
         var model = CheckedLearnedSchemaModel.load(snapshot.model(), inventory.contentHash());
         var base = TypedLearnedMoveInventory.primitives(inventory);
-        var baseline = base.newTaskSolver();
-        var learned = model.schemas().isEmpty() ? baseline : base.newTaskSolver(model);
+        var baseline = snapshot.profile().attach(base.newTaskSolver());
+        var learned = model.schemas().isEmpty() ? baseline : snapshot.profile().attach(base.newTaskSolver(model));
         var setup = new Costs(0, 0, learned.preparationWork(), 0, 0, model.loadWork(), 0);
         var restored = new CumulativeTaskKnowledge(inventory, model, baseline, learned,
-            snapshot.generation(), snapshot.parentId(), snapshot.routes(), snapshot.costs(), setup, snapshot.decision(), snapshot.attempts());
+            snapshot.generation(), snapshot.parentId(), snapshot.routes(), snapshot.costs(), setup, snapshot.decision(), snapshot.attempts(), snapshot.profile());
         if (!restored.toCanonicalJson().equals(json)) throw new IllegalArgumentException("noncanonical knowledge snapshot");
         return restored;
     }

@@ -12,10 +12,20 @@ final class TaskKnowledgeProfile {
     record Profile(String key, long work) { }
 
     static Profile inspect(CheckedSchemaTaskSolver.Task task) {
-        if (task.goal().objective() != NativeNodeCountObjective.INSTANCE) return new Profile("custom", 1);
-        var text = new StringBuilder("nodes:").append(task.goal().maximumOutputScore()).append(':');
-        long work = append(task.source(), 2, text) + 2;
+        String objective = objectiveKey(task);
+        if (objective == null) return new Profile("custom", 1);
+        var text = new StringBuilder(objective).append(':').append(task.goal().maximumOutputScore()).append(':');
+        int depth = task.goal().objective() instanceof StructuralTaskObjective ? 1 : 2;
+        long work = append(task.source(), depth, text) + 2;
         return new Profile(text.toString(), work);
+    }
+    static String objectiveKey(CheckedSchemaTaskSolver.Task task) {
+        if (task.goal().objective() == NativeNodeCountObjective.INSTANCE) return "nodes";
+        return task.goal().objective() instanceof StructuralTaskObjective structure ? structure.key() : null;
+    }
+    static String goalKey(CheckedSchemaTaskSolver.Task task) {
+        String objective = objectiveKey(task);
+        return objective == null ? "custom" : objective + ":" + task.goal().maximumOutputScore();
     }
     private static long append(Expr expression, int depth, StringBuilder text) {
         if (expression instanceof BinaryExpr binary) {

@@ -38,8 +38,18 @@ public final class ExactPolynomialResidualComposer {
     private static final int MAX_RESULTS = 1_024;
     private static final long MAX_COMBINATION_ATTEMPTS = 1_000_000L;
 
-    private final ExactResidualPolynomialArithmetic arithmetic =
-        new ExactResidualPolynomialArithmetic();
+    private final ExactResidualPolynomialArithmetic arithmetic;
+    private final java.util.function.LongConsumer workObserver;
+
+    public ExactPolynomialResidualComposer() { this(null); }
+
+    /** Optional logical node/term and combination accounting; the mathematical contract is unchanged. */
+    public ExactPolynomialResidualComposer(java.util.function.LongConsumer workObserver) {
+        this.workObserver = workObserver;
+        arithmetic = new ExactResidualPolynomialArithmetic(workObserver);
+    }
+
+    private void work(long count) { if (workObserver != null) workObserver.accept(count); }
 
     /**
      * Extracts the exact top-level additive occurrence partition used by v1.
@@ -230,6 +240,7 @@ public final class ExactPolynomialResidualComposer {
         List<Composition> results,
         Set<String> retainedCandidates
     ) {
+        work(1);
         if (results.size() >= maxResults) {
             return;
         }
@@ -253,6 +264,7 @@ public final class ExactPolynomialResidualComposer {
         for (int index = start;
                 index <= effects.size() - missing;
                 index++) {
+            work(1);
             Effect effect = effects.get(index);
             if (effect.componentIds().stream()
                     .anyMatch(coveredIds::contains)) {

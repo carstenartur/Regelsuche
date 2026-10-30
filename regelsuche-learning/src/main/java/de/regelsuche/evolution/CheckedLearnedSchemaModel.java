@@ -62,6 +62,18 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     private static final String APPLICATION_REVISION = "regelsuche.checked-schema-application/v1";
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
 
+    private static boolean eligibleTaskExample(CheckedSchemaTaskSolver.Solution solution, boolean progress) {
+        var evidence = solution.evidence();
+        if (!solution.task().assumptions().isEmpty()
+                || evidence.witness().stream().anyMatch(step -> !step.move().assumptions().isEmpty())) return false;
+        boolean useful = solution.solved() || progress && evidence.withinBudget() && evidence.improved();
+        if (!useful || !evidence.withinBudget()) return false;
+        if (evidence.witness().size() >= 2) return true;
+        return progress && evidence.witness().size() == 1
+            && evidence.witness().getFirst().move().sourceKind() == SearchMove.SourceKind.PREPARATION
+            && evidence.witness().getFirst().move().executionWork().exactTheorySteps() > 0;
+    }
+
     /** Hard limits can be tightened, never expanded by a loaded artifact. */
     public record Bounds(int maximumExpressionNodes, int maximumPatternNodes, int maximumDepth,
             int maximumCoefficientBits, int maximumExponent, int maximumExamples, int maximumPairAttempts,
@@ -179,6 +191,12 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
      */
     static CheckedLearnedSchemaModel extendFromSolutions(CheckedLearnedSchemaModel parent,
             List<CheckedSchemaTaskSolver.Solution> solutions) {
+        return extendFromSolutions(parent, solutions, false);
+    }
+
+    /** Opt-in useful independently replayed prefixes and single non-learned construction capabilities. */
+    static CheckedLearnedSchemaModel extendFromSolutions(CheckedLearnedSchemaModel parent,
+            List<CheckedSchemaTaskSolver.Solution> solutions, boolean includeVerifiedProgress) {
         Objects.requireNonNull(parent, "parent");
         solutions = List.copyOf(solutions);
         if (solutions.size() > parent.bounds.maximumExamples()) throw new IllegalArgumentException("too many lessons");
@@ -192,9 +210,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             var solution = solutions.get(i);
             String observationId = "task-" + i;
             work.add(1);
-            if (!solution.solved() || !solution.task().assumptions().isEmpty()
-                    || solution.evidence().witness().stream().anyMatch(step -> !step.move().assumptions().isEmpty())
-                    || solution.evidence().witness().size() < 2) {
+            if (!eligibleTaskExample(solution, includeVerifiedProgress)) {
                 attempts.add(new Attempt(List.of(observationId), "TRACE_ONLY", "NO_UNCONDITIONAL_COMPLETED_COMPOSITION"));
                 continue;
             }

@@ -11,6 +11,8 @@ import java.util.Optional;
 public final class CheckedSchemaTheoryEvidenceProvider implements ExactTheoryEvidenceProvider,RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){}
     @Override public Optional<ExactTheoryEvidence.Binding> bind(Object value) {
+        if (value instanceof StructuralConstructionProvider.VerifiedConstruction construction)
+            return Optional.of(construction.binding());
         if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();
         Object[] pending = new Object[1];
         var retained = RetainedOperation.retainCompleted(1, application, pending);
