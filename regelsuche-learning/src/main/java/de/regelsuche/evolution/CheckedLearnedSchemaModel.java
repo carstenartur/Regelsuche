@@ -162,8 +162,69 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         var work = new Work();
         var attempts = new ArrayList<Attempt>();
         var examples = collectObservedPairs(formation, bounds, work, attempts);
-        String inventoryBinding = inventorySemanticsHash(formation.inventory().contentHash());
+        return form(formation.inventory().contentHash(), formation.contentHash(), bounds, examples,
+            List.of(), work, attempts);
+    }
+
+    /** Empty, fixed-inventory starting point for generation-separated task learning. */
+    static CheckedLearnedSchemaModel empty(String inventoryHash) {
+        return new CheckedLearnedSchemaModel(inventoryHash, SchematicProofPlan.hash("empty-task-knowledge"),
+            Bounds.defaults(), List.of(), List.of(), List.of(), 0, 0);
+    }
+
+    /**
+     * The same generalizer/prover as trace learning, fed only by solver-issued completed paths.
+     * Earlier schemata remain immutable. One previously learned application alone is not a new
+     * composition. formationWork() reports this attempt's work, not the parent's sunk costs.
+     */
+    static CheckedLearnedSchemaModel extendFromSolutions(CheckedLearnedSchemaModel parent,
+            List<CheckedSchemaTaskSolver.Solution> solutions) {
+        Objects.requireNonNull(parent, "parent");
+        solutions = List.copyOf(solutions);
+        if (solutions.size() > parent.bounds.maximumExamples()) throw new IllegalArgumentException("too many lessons");
+        if (!parent.requiredAssumptions.isEmpty()) throw new IllegalArgumentException("conditional library cannot be generalized");
+        var work = new Work();
+        var attempts = new ArrayList<Attempt>();
+        var examples = new ArrayList<ObservedPair>();
+        var seen = new HashSet<String>();
+        var provenance = new StringBuilder(parent.modelHash);
+        for (int i = 0; i < solutions.size(); i++) {
+            var solution = solutions.get(i);
+            String observationId = "task-" + i;
+            work.add(1);
+            if (!solution.solved() || !solution.task().assumptions().isEmpty()
+                    || solution.evidence().witness().stream().anyMatch(step -> !step.move().assumptions().isEmpty())
+                    || solution.evidence().witness().size() < 2) {
+                attempts.add(new Attempt(List.of(observationId), "TRACE_ONLY", "NO_UNCONDITIONAL_COMPLETED_COMPOSITION"));
+                continue;
+            }
+            try {
+                var source = solution.task().source();
+                var target = solution.evidence().incumbent().expression();
+                domain(source, parent.bounds, work);
+                domain(target, parent.bounds, work);
+                // The path records which old learned providers actually contributed to this lesson.
+                String lineage = solution.evidence().witness().stream().map(step -> step.move().ruleId())
+                    .collect(java.util.stream.Collectors.joining("\n"));
+                work.add(solution.evidence().witness().size());
+                observationId += "@" + SchematicProofPlan.hash(lineage);
+                addPair(examples, seen, observationId, 0, solution.evidence().witness().size(), source, target, work);
+                provenance.append('\n').append(CODEC.encodeExpression(source)).append('\n')
+                    .append(CODEC.encodeExpression(target)).append('\n').append(lineage);
+            } catch (IllegalArgumentException unsupported) {
+                attempts.add(new Attempt(List.of(observationId), "TRACE_ONLY", unsupported.getMessage()));
+            }
+        }
+        return form(parent.inventoryHash, SchematicProofPlan.hash(provenance.toString()), parent.bounds,
+            examples, parent.schemas, work, attempts);
+    }
+
+    private static CheckedLearnedSchemaModel form(String inventoryHash, String origin, Bounds bounds,
+            List<ObservedPair> examples, List<Schema> previous, Work work, List<Attempt> attempts) {
+        String inventoryBinding = inventorySemanticsHash(inventoryHash);
         var admitted = new TreeMap<String, Schema>();
+        previous.forEach(schema -> admitted.put(schema.id(), schema));
+        work.add(previous.size());
         var generalizer = new TypedPatternGeneralizer();
         int paired = 0;
         outer: for (int left = 0; left < examples.size(); left++) {
@@ -201,7 +262,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             }
         }
         work.add(admitted.size());
-        return new CheckedLearnedSchemaModel(formation.inventory().contentHash(), formation.contentHash(), bounds,
+        return new CheckedLearnedSchemaModel(inventoryHash, origin, bounds,
             List.of(), List.copyOf(admitted.values()), attempts, work.units, 0);
     }
 
