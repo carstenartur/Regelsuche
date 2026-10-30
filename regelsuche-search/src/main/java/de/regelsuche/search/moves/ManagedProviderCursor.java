@@ -25,7 +25,7 @@ final class ManagedProviderCursor<T> implements ObjectCursor<T>,RetainedGraph.Vi
     private final Meter meter;
     private ObjectSource<T> source;
     private Status status = Status.OPEN;
-    private boolean admitted, closed, accountingComplete = true;
+    private boolean admitted, pullPaid, closed, accountingComplete = true;
     private long emitted;
     private ExecutionWork emittedWork = ExecutionWork.ZERO;
     private String detail = "";
@@ -45,8 +45,14 @@ final class ManagedProviderCursor<T> implements ObjectCursor<T>,RetainedGraph.Vi
             if (terminal() || !available(before, allowance)) return Optional.empty();
             if (source == null) open();
             if (!available(before, allowance)) return Optional.empty();
-            meter.charge(Operation.PULL, 1);
+            // A unit allowance may pay dispatch without reaching the source. Resume that
+            // same paid phase instead of repeatedly charging PULL and starving delegation.
+            if (!pullPaid) {
+                meter.charge(Operation.PULL, 1);
+                pullPaid = true;
+            }
             if (!available(before, allowance)) return Optional.empty();
+            pullPaid = false;
             var candidate = Objects.requireNonNull(source.next(remaining(before, allowance)));
             status = Objects.requireNonNull(source.status());
             if (status == Status.OPEN || status == Status.CLOSED || status == Status.FAILED)
