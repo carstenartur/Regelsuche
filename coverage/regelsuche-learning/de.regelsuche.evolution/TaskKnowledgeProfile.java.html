@@ -12,24 +12,34 @@ final class TaskKnowledgeProfile {
 <span class="fc" id="L12">    record Profile(String key, long work) { }</span>
 
     static Profile inspect(CheckedSchemaTaskSolver.Task task) {
-<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (task.goal().objective() != NativeNodeCountObjective.INSTANCE) return new Profile(&quot;custom&quot;, 1);</span>
-<span class="fc" id="L16">        var text = new StringBuilder(&quot;nodes:&quot;).append(task.goal().maximumOutputScore()).append(':');</span>
-<span class="fc" id="L17">        long work = append(task.source(), 2, text) + 2;</span>
-<span class="fc" id="L18">        return new Profile(text.toString(), work);</span>
+<span class="fc" id="L15">        String objective = objectiveKey(task);</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        if (objective == null) return new Profile(&quot;custom&quot;, 1);</span>
+<span class="fc" id="L17">        var text = new StringBuilder(objective).append(':').append(task.goal().maximumOutputScore()).append(':');</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        int depth = task.goal().objective() instanceof StructuralTaskObjective ? 1 : 2;</span>
+<span class="fc" id="L19">        long work = append(task.source(), depth, text) + 2;</span>
+<span class="fc" id="L20">        return new Profile(text.toString(), work);</span>
+    }
+    static String objectiveKey(CheckedSchemaTaskSolver.Task task) {
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (task.goal().objective() == NativeNodeCountObjective.INSTANCE) return &quot;nodes&quot;;</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        return task.goal().objective() instanceof StructuralTaskObjective structure ? structure.key() : null;</span>
+    }
+    static String goalKey(CheckedSchemaTaskSolver.Task task) {
+<span class="fc" id="L27">        String objective = objectiveKey(task);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        return objective == null ? &quot;custom&quot; : objective + &quot;:&quot; + task.goal().maximumOutputScore();</span>
     }
     private static long append(Expr expression, int depth, StringBuilder text) {
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L22">            text.append(binary.operator().name());</span>
-<span class="fc bfc" id="L23" title="All 2 branches covered.">            if (depth &gt; 0) {</span>
-<span class="fc" id="L24">                text.append('(');</span>
-<span class="fc" id="L25">                long work = append(binary.left(), depth - 1, text);</span>
-<span class="fc" id="L26">                text.append(',');</span>
-<span class="fc" id="L27">                work += append(binary.right(), depth - 1, text);</span>
-<span class="fc" id="L28">                text.append(')');</span>
-<span class="fc" id="L29">                return work + 1;</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L32">            text.append(binary.operator().name());</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (depth &gt; 0) {</span>
+<span class="fc" id="L34">                text.append('(');</span>
+<span class="fc" id="L35">                long work = append(binary.left(), depth - 1, text);</span>
+<span class="fc" id="L36">                text.append(',');</span>
+<span class="fc" id="L37">                work += append(binary.right(), depth - 1, text);</span>
+<span class="fc" id="L38">                text.append(')');</span>
+<span class="fc" id="L39">                return work + 1;</span>
             }
-<span class="pc bpc" id="L31" title="1 of 4 branches missed.">        } else text.append(expression instanceof NumberExpr ? 'N' : expression instanceof FunctionExpr ? 'F' : 'V');</span>
-<span class="fc" id="L32">        return 1;</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        } else text.append(expression instanceof NumberExpr ? 'N' : expression instanceof FunctionExpr ? 'F' : 'V');</span>
+<span class="fc" id="L42">        return 1;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

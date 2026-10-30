@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StructuralConstructionProvider.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">StructuralConstructionProvider.java</span></div><h1>StructuralConstructionProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.MoveVerifier;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.ExactTheoryEvidence;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeMap;
+
+/** Typed adapter for bounded existing construction procedures, with independent source-bound replay. */
+final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvider {
+    private static final String REVISION = &quot;regelsuche.structural-construction/v1&quot;;
+<span class="fc" id="L24">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    private final StructuralConstructionPrograms.Operation operation;
+    private final Descriptor descriptor;
+
+<span class="fc" id="L28">    StructuralConstructionProvider(StructuralConstructionPrograms.Operation operation) {</span>
+<span class="fc" id="L29">        this.operation = java.util.Objects.requireNonNull(operation);</span>
+<span class="fc" id="L30">        descriptor = new Descriptor(REVISION + &quot;:&quot; + operation.name(), &quot;structural-construction&quot;,</span>
+<span class="fc" id="L31">            SearchMove.SourceKind.PREPARATION, SearchMove.ProofStrength.VERIFIED, List.of(),</span>
+<span class="fc" id="L32">            SearchMove.ValueEvidence.UNKNOWN, SchematicProofPlan.hash(REVISION + &quot;:&quot; + operation.name()));</span>
+<span class="fc" id="L33">    }</span>
+<span class="fc" id="L34">    @Override public Descriptor descriptor() { return descriptor; }</span>
+
+    @Override public Batch candidates(MoveState state, MoveContext context) {
+<span class="fc" id="L37">        var source = CODEC.decodeExpression(state.expression());</span>
+<span class="fc" id="L38">        var generated = StructuralConstructionPrograms.generate(operation, source);</span>
+<span class="fc" id="L39">        long[] work = {generated.work()};</span>
+<span class="fc" id="L40">        var exact = new ExactPolynomialAnalysis(units -&gt; work[0] = Math.addExact(work[0], units));</span>
+<span class="fc" id="L41">        String input = ExpressionFormatter.format(source); work[0] = Math.addExact(work[0], input.length());</span>
+<span class="fc" id="L42">        var proofs = new ArrayList&lt;Transformation&gt;();</span>
+<span class="fc" id="L43">        var seen = new java.util.HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (String output : generated.candidates()) {</span>
+<span class="fc" id="L45">            long before = work[0];</span>
+            try {
+<span class="fc" id="L47">                var target = new ExpressionParser().parseExactTerm(output).expression();</span>
+<span class="fc" id="L48">                String encoded = CODEC.encodeExpression(target);</span>
+<span class="fc" id="L49">                work[0] = Math.addExact(work[0], output.length() + (long) encoded.length() + 1);</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">                if (target.equals(source) || !seen.add(encoded)) continue;</span>
+<span class="fc" id="L51">                exact.requireEquivalent(input, output);</span>
+<span class="fc" id="L52">                var verified = new VerifiedConstruction(state.expression(), encoded, descriptor.id(), work[0] - before);</span>
+<span class="fc" id="L53">                proofs.add(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified)));</span>
+<span class="nc" id="L54">            } catch (IllegalArgumentException unsupported) {</span>
+                // Failed mathematical checks remain charged and cannot issue an edge.
+<span class="fc" id="L56">            }</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        var math = proofs.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
+<span class="fc" id="L59">        long mechanics = Math.subtractExact(work[0], math.canonicalWorkUnits());</span>
+<span class="fc" id="L60">        var metrics = TransformationWorkMetrics.flatEngine(proofs.size()).withCandidateWork(math)</span>
+<span class="fc" id="L61">            .withDelegatedMechanicalWork(mechanics);</span>
+<span class="fc" id="L62">        return new Batch(proofs.stream().map(proof -&gt; SearchMove.from(proof, descriptor, metrics.totalWorkUnits())).toList(), metrics, false);</span>
+    }
+
+    MoveProvider incremental() {
+<span class="fc" id="L66">        var definition = new de.regelsuche.search.moves.IncrementalProviderContract.Definition(</span>
+<span class="fc" id="L67">            de.regelsuche.search.moves.IncrementalProviderContract.REVISION, descriptor.id(),</span>
+            de.regelsuche.search.moves.IncrementalProviderContract.Kind.REGISTERED_SCHEMA,
+<span class="fc" id="L69">            descriptor.provenanceId(), REVISION,</span>
+            de.regelsuche.search.moves.IncrementalProviderContract.Transport.TYPED_AST_JSON,
+            de.regelsuche.search.moves.IncrementalProviderContract.Mathematics.EXACT, null);
+<span class="fc" id="L72">        var registration = new de.regelsuche.search.moves.IncrementalProviderContract.Registration(definition,</span>
+<span class="fc" id="L73">            (state, context, meter) -&gt; new ConstructionCursor(this, state, context, meter));</span>
+<span class="fc" id="L74">        return new de.regelsuche.search.moves.RegisteredIncrementalMoveProvider(descriptor, definition,</span>
+<span class="fc" id="L75">            new de.regelsuche.search.moves.IncrementalProviderContract.Registry(List.of(registration)));</span>
+    }
+
+    /** A batch is one bounded atomic load. Every candidate, including unconsumed ones, stays paid. */
+    private static final class ConstructionCursor implements de.regelsuche.search.moves.IncrementalProviderContract.Source {
+        private final StructuralConstructionProvider provider;
+        private final MoveState state;
+        private final MoveContext context;
+        private final de.regelsuche.search.moves.IncrementalProviderContract.Meter meter;
+        private Batch batch;
+        private int index;
+        ConstructionCursor(StructuralConstructionProvider provider, MoveState state, MoveContext context,
+<span class="fc" id="L87">                de.regelsuche.search.moves.IncrementalProviderContract.Meter meter) {</span>
+<span class="fc" id="L88">            this.provider = provider; this.state = state; this.context = context; this.meter = meter;</span>
+<span class="fc" id="L89">        }</span>
+        @Override public java.util.Optional&lt;Transformation&gt; next(long allowance) {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative construction allowance&quot;);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (allowance == 0) return java.util.Optional.empty();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (batch == null) {</span>
+<span class="fc" id="L94">                batch = provider.candidates(state, context);</span>
+<span class="fc" id="L95">                meter.charge(de.regelsuche.search.moves.IncrementalProviderContract.Operation.LOAD, batch.work().totalWorkUnits());</span>
+<span class="fc" id="L96">                meter.charge(batch.work().candidateWork());</span>
+            }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            return index &lt; batch.moves().size() ? java.util.Optional.of(batch.moves().get(index++).transformation()) : java.util.Optional.empty();</span>
+        }
+        @Override public de.regelsuche.search.moves.IncrementalProviderContract.Status status() {
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">            return batch == null || index &lt; batch.moves().size()</span>
+<span class="fc" id="L102">                ? de.regelsuche.search.moves.IncrementalProviderContract.Status.READY</span>
+<span class="fc" id="L103">                : de.regelsuche.search.moves.IncrementalProviderContract.Status.INCONCLUSIVE;</span>
+        }
+    }
+
+    TypedMoveSearch.Verifier verifier() {
+<span class="fc" id="L108">        return (source, move, context) -&gt; {</span>
+<span class="fc" id="L109">            var encoded = new MoveState(CODEC.encodeExpression(source.expression()), source.searchDepth(), source.primitiveDepth(),</span>
+<span class="fc" id="L110">                source.previousRule(), source.assumptions(), source.capabilities(), source.complexityDebt());</span>
+<span class="fc" id="L111">            var batch = candidates(encoded, new MoveContext(&quot;&quot;, context.initialAssumptions(), context.phase()));</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            boolean accepted = move.sourceKind() == descriptor.sourceKind() &amp;&amp; batch.moves().stream()</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                .anyMatch(expected -&gt; SearchMove.from(expected.transformation(), descriptor, move.generationCost()).equals(move));</span>
+<span class="fc" id="L114">            return new MoveVerifier.Verification(accepted, batch.work().totalWorkUnitsV2(),</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                accepted ? List.of(&quot;construction-replayed:&quot; + move.provenance().contentHash()) : List.of(),</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                accepted ? &quot;EXACT_CONSTRUCTION_REPLAYED&quot; : &quot;CONSTRUCTION_REPLAY_REJECTED&quot;);</span>
+        };
+    }
+
+    static final class VerifiedConstruction {
+        private final ExactTheoryEvidence.Binding binding;
+<span class="fc" id="L122">        private VerifiedConstruction(String source, String target, String procedure, long work) {</span>
+<span class="fc" id="L123">            var content = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L124">            content.put(&quot;revision&quot;, REVISION); content.put(&quot;source&quot;, source); content.put(&quot;target&quot;, target);</span>
+<span class="fc" id="L125">            content.put(&quot;procedure&quot;, procedure); content.put(&quot;work&quot;, work);</span>
+<span class="fc" id="L126">            String json = CheckedSchemaSupport.JSON.valueToTree(content).toString();</span>
+<span class="fc" id="L127">            String hash = SchematicProofPlan.hash(json);</span>
+<span class="fc" id="L128">            binding = new ExactTheoryEvidence.Binding(source, target, procedure, hash, hash,</span>
+<span class="fc" id="L129">                SchematicProofPlan.hash(REVISION + source), work, json);</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">        ExactTheoryEvidence.Binding binding() { return binding; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

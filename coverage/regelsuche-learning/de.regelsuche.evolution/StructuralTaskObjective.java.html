@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StructuralTaskObjective.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">StructuralTaskObjective.java</span></div><h1>StructuralTaskObjective.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.moves.TypedSourceOnlySearch;
+
+/** Stable, source-independent scalar structure goals. Equivalence remains the independent verifier's job. */
+<span class="fc" id="L13">public enum StructuralTaskObjective implements TypedSourceOnlySearch.Objective {</span>
+<span class="fc" id="L14">    FACTORIZATION(&quot;factor-v1&quot;), SUM_OF_TWO_SQUARES(&quot;two-squares-v1&quot;);</span>
+
+    private final String key;
+<span class="fc" id="L17">    StructuralTaskObjective(String key) { this.key = key; }</span>
+<span class="fc" id="L18">    public String key() { return key; }</span>
+<span class="fc" id="L19">    public CheckedSchemaTaskSolver.Goal goal() { return new CheckedSchemaTaskSolver.Goal(this, 0); }</span>
+
+    @Override public TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state) {
+<span class="fc" id="L22">        var work = new CheckedSchemaSupport.Work();</span>
+        try {
+<span class="fc" id="L24">            CheckedSchemaSupport.domain(state.expression(), CheckedLearnedSchemaModel.Bounds.defaults(), work);</span>
+<span class="fc" id="L25">            var exact = new ExactPolynomialAnalysis(work::add);</span>
+<span class="fc" id="L26">            long score = score(state.expression(), exact, work);</span>
+<span class="fc" id="L27">            return new TypedSourceOnlySearch.Score(score, Math.addExact(work.units, 1));</span>
+<span class="nc" id="L28">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L29">            return new TypedSourceOnlySearch.Score(8, Math.addExact(work.units, 1));</span>
+        }
+    }
+
+    private long score(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr root)) return 6;</span>
+<span class="fc bfc" id="L35" title="All 4 branches covered.">        if (this == FACTORIZATION &amp;&amp; root.operator() == BinaryOperator.MUL</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">                &amp;&amp; nonconstant(root.left(), exact, work) &amp;&amp; nonconstant(root.right(), exact, work)) return 0;</span>
+<span class="fc bfc" id="L37" title="All 4 branches covered.">        if (this == SUM_OF_TWO_SQUARES &amp;&amp; root.operator() == BinaryOperator.ADD</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">                &amp;&amp; nonconstantSquare(root.left(), exact, work) &amp;&amp; nonconstantSquare(root.right(), exact, work)) return 0;</span>
+        // Generic preparation landmarks, not comparison with a stored historical answer.
+<span class="pc bpc" id="L40" title="1 of 6 branches missed.">        if (root.operator() == BinaryOperator.SUB &amp;&amp; isSquare(root.left())) return isSquare(root.right()) ? 1 : 2;</span>
+<span class="fc bfc" id="L41" title="All 6 branches covered.">        if (root.operator() == BinaryOperator.ADD) return 5 - (isSquare(root.left()) ? 1 : 0) - (isSquare(root.right()) ? 1 : 0);</span>
+<span class="fc" id="L42">        return 6;</span>
+    }
+
+    private static boolean nonconstantSquare(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        return isSquare(expression) &amp;&amp; nonconstant(((BinaryExpr) expression).left(), exact, work);</span>
+    }
+    private static boolean nonconstant(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L49">        String text = ExpressionFormatter.format(expression); work.add(text.length());</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        return exact.normalForm(text).totalDegree() &gt; 0;</span>
+    }
+    static boolean isSquare(Expr expression) {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        return expression instanceof BinaryExpr power &amp;&amp; power.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L54" title="1 of 6 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent &amp;&amp; exponent.value().equalsInteger(2);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

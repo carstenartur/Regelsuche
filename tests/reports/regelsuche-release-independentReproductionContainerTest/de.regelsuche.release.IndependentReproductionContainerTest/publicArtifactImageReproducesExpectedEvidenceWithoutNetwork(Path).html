@@ -63,7 +63,7 @@
 </td>
 <td>
 <div class="infoBox duration">
-<div class="counter">4m14.98s</div>
+<div class="counter">2m48.38s</div>
 <p>duration</p>
 </div>
 </td>
@@ -90,15 +90,15 @@ Daemon will be stopped at the end of the build
 Calculating task graph as no cached configuration is available for tasks: :regelsuche-release:runAutonomousDiscoveryWalkthrough
 &gt; Task :regelsuche-autopilot:processResources NO-SOURCE
 &gt; Task :regelsuche-egraph:processResources NO-SOURCE
-&gt; Task :regelsuche-core:processResources
 &gt; Task :regelsuche-discovery:processResources
+&gt; Task :regelsuche-core:processResources
 &gt; Task :regelsuche-math-algorithms:processResources NO-SOURCE
 &gt; Task :regelsuche-learning:processResources
 &gt; Task :regelsuche-release:processResources NO-SOURCE
 &gt; Task :regelsuche-search:processResources
 &gt; Task :regelsuche-solver-ir:processResources NO-SOURCE
-&gt; Task :regelsuche-validation:processResources NO-SOURCE
 &gt; Task :regelsuche-experiments:processResources
+&gt; Task :regelsuche-validation:processResources NO-SOURCE
 &gt; Task :regelsuche-optimization-sdk:processResources
 
 &gt; Task :regelsuche-core:compileJava
@@ -116,27 +116,17 @@ warning: unknown enum constant Mode.DELEGATING
 2 warnings
 
 &gt; Task :regelsuche-egraph:classes
-&gt; Task :regelsuche-egraph:jar
 
+&gt; Task :regelsuche-validation:compileJava
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
-&gt; Task :regelsuche-validation:compileJava
-
-&gt; Task :regelsuche-validation:classes
 warning: unknown enum constant Mode.DELEGATING
 2 warnings
+
+&gt; Task :regelsuche-egraph:jar
+&gt; Task :regelsuche-validation:classes
 &gt; Task :regelsuche-validation:jar
 &gt; Task :regelsuche-core:jar
-warning: unknown enum constant Mode.PROPERTIES
-  reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
-warning: unknown enum constant Mode.DELEGATING
-
-&gt; Task :regelsuche-math-algorithms:compileJava
-Note: /workspace/regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/completion/KnuthBendixCompletionService.java uses or overrides a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-2 warnings
-
-&gt; Task :regelsuche-math-algorithms:classes
 
 &gt; Task :regelsuche-search:compileJava
 /workspace/regelsuche-search/src/main/java/de/regelsuche/search/moves/NativeMoveProof.java:25: warning: non-varargs call of varargs method with inexact argument type for last parameter;
@@ -145,39 +135,46 @@ Note: Recompile with -Xlint:deprecation for details.
   cast to Object for a varargs call
   cast to Object[] for a non-varargs call and to suppress this warning
 
+&gt; Task :regelsuche-math-algorithms:compileJava
+warning: unknown enum constant Mode.PROPERTIES
+  reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
+warning: unknown enum constant Mode.DELEGATING
+Note: /workspace/regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/completion/KnuthBendixCompletionService.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+2 warnings
+
+&gt; Task :regelsuche-math-algorithms:classes
 &gt; Task :regelsuche-math-algorithms:jar
 
-&gt; Task :regelsuche-search:compileJava
 1 warning
+&gt; Task :regelsuche-search:compileJava
 
 &gt; Task :regelsuche-search:classes
 &gt; Task :regelsuche-search:jar
 
+&gt; Task :regelsuche-solver-ir:compileJava
+Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+&gt; Task :regelsuche-solver-ir:classes
+&gt; Task :regelsuche-solver-ir:jar
+
+&gt; Task :regelsuche-optimization-sdk:compileJava
+
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
-&gt; Task :regelsuche-optimization-sdk:compileJava
-
-&gt; Task :regelsuche-solver-ir:compileJava
-
-&gt; Task :regelsuche-solver-ir:classes
-Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-&gt; Task :regelsuche-solver-ir:jar
-
 2 warnings
-&gt; Task :regelsuche-optimization-sdk:compileJava
-
 &gt; Task :regelsuche-optimization-sdk:classes
 &gt; Task :regelsuche-optimization-sdk:jar
 &gt; Task :regelsuche-discovery:compileJava
 &gt; Task :regelsuche-discovery:classes
 &gt; Task :regelsuche-discovery:jar
+
+&gt; Task :regelsuche-experiments:compileJava
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
-
-&gt; Task :regelsuche-experiments:compileJava
 2 warnings
 
 &gt; Task :regelsuche-experiments:classes
@@ -194,17 +191,17 @@ Note: Recompile with -Xlint:deprecation for details.
 &gt; Task :regelsuche-autopilot:jar
 
 &gt; Task :regelsuche-release:compileJava
-Note: Some input files use or override a deprecated API.
 
-&gt; Task :regelsuche-release:classes
+Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
+&gt; Task :regelsuche-release:classes
 
 &gt; Task :regelsuche-release:runAutonomousDiscoveryWalkthrough
-sha256:21dd094147c451769716992a23fe600c23a2b5a1b5d0a51623e0a84834f56b65
+sha256:f43cf7eb4952ca06974f567fa0f073d8a927a4d410f8bf71c242861a3d20a429
 
 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 1m 12s
+BUILD SUCCESSFUL in 38s
 30 actionable tasks: 30 executed
 Configuration cache entry stored.
 </pre>
@@ -221,7 +218,7 @@ Configuration cache entry stored.
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 9.7.1</a> at Oct 30, 2026, 6:43:21 PM</p>
+<a href="https://www.gradle.org">Gradle 9.7.1</a> at Oct 30, 2026, 10:20:40 PM</p>
 </div>
 </div>
 </body>

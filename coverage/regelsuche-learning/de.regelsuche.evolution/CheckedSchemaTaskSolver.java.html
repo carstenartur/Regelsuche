@@ -79,41 +79,54 @@ public final class CheckedSchemaTaskSolver {
 <span class="fc" id="L79">        this.preparation = preparation;</span>
 <span class="fc" id="L80">    }</span>
 
+    CheckedSchemaTaskSolver withConstructions() {
+<span class="fc" id="L83">        var providers = new java.util.ArrayList&lt;&gt;(session.providers());</span>
+<span class="fc" id="L84">        var verifiers = new java.util.HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (var operation : StructuralConstructionPrograms.Operation.values()) {</span>
+<span class="fc" id="L86">            var provider = new StructuralConstructionProvider(operation);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            providers.add(preparation == null ? provider : provider.incremental());</span>
+<span class="fc" id="L88">            verifiers.put(provider.descriptor().id(), provider.verifier());</span>
+        }
+<span class="fc" id="L90">        var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),</span>
+<span class="fc" id="L91">            (source, move, context) -&gt; verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));</span>
+<span class="fc" id="L92">        return new CheckedSchemaTaskSolver(augmented, preparation);</span>
+    }
+
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
-<span class="fc bfc" id="L83" title="All 2 branches covered.">    public long preparationWork() { return preparation == null ? 0 : preparation.workUnits(); }</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">    public long preparationWork() { return preparation == null ? 0 : preparation.workUnits(); }</span>
     public Optional&lt;CheckedSchemaMatcherPlan.Compilation&gt; preparationReceipt() {
-<span class="nc" id="L85">        return Optional.ofNullable(preparation);</span>
+<span class="nc" id="L98">        return Optional.ofNullable(preparation);</span>
     }
 
     /** Fresh cursors, scoped codec reuse, one budget, and final replay for every invocation. */
     public Solution solve(Task task) {
-<span class="fc" id="L90">        Objects.requireNonNull(task, &quot;task&quot;);</span>
-<span class="fc" id="L91">        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
-<span class="fc" id="L92">            () -&gt; new TypedSourceOnlySearch().searchUntil(problem(task), task.goal().objective(),</span>
-<span class="fc" id="L93">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));</span>
-<span class="fc" id="L94">        return new Solution(task, result);</span>
+<span class="fc" id="L103">        Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L104">        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
+<span class="fc" id="L105">            () -&gt; new TypedSourceOnlySearch().searchUntil(problem(task), task.goal().objective(),</span>
+<span class="fc" id="L106">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));</span>
+<span class="fc" id="L107">        return new Solution(task, result);</span>
     }
 
     // The primitive control uses its cheaper batch scheduler; it is not handicapped by unused cursor machinery.
     TypedMoveSearch.Problem problem(Task task) {
-<span class="fc" id="L99">        return new TypedMoveSearch.Problem(task.source(),</span>
-<span class="fc" id="L100">            TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),</span>
-<span class="fc" id="L101">            session.providers(), KnowledgeFirst.INSTANCE, session.verifier(), state -&gt; 0,</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">            MoveSearch.Mode.FAST, preparation == null ? MoveSearch.Scheduling.STAGED</span>
-<span class="fc" id="L103">                : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),</span>
+<span class="fc" id="L112">        return new TypedMoveSearch.Problem(task.source(),</span>
+<span class="fc" id="L113">            TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),</span>
+<span class="fc" id="L114">            session.providers(), KnowledgeFirst.INSTANCE, session.verifier(), state -&gt; 0,</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            MoveSearch.Mode.FAST, preparation == null ? MoveSearch.Scheduling.STAGED</span>
+<span class="fc" id="L116">                : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),</span>
             (state, context) -&gt; {
-<span class="fc" id="L105">                var size = NativeNodeCountObjective.INSTANCE.evaluate(state);</span>
-<span class="fc" id="L106">                return new StateValue.Assessment(Math.toIntExact(size.value()), -size.value(), size.work(), 0, Map.of());</span>
+<span class="fc" id="L118">                var size = NativeNodeCountObjective.INSTANCE.evaluate(state);</span>
+<span class="fc" id="L119">                return new StateValue.Assessment(Math.toIntExact(size.value()), -size.value(), size.work(), 0, Map.of());</span>
             });
     }
 
     /** Ordering alone grants no mathematical authority; the normal verifier still admits each edge. */
-<span class="fc" id="L111">    private enum KnowledgeFirst implements TypedMoveSearch.TypedPolicy {</span>
-<span class="fc" id="L112">        INSTANCE;</span>
-<span class="fc" id="L113">        @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }</span>
+<span class="fc" id="L124">    private enum KnowledgeFirst implements TypedMoveSearch.TypedPolicy {</span>
+<span class="fc" id="L125">        INSTANCE;</span>
+<span class="fc" id="L126">        @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }</span>
         @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED</span>
-<span class="fc" id="L116">                : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED</span>
+<span class="fc" id="L129">                : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);</span>
         }
     }
 }

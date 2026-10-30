@@ -26,109 +26,124 @@ final class TaskKnowledgeSnapshot {
     private TaskKnowledgeSnapshot() { }
 <span class="fc" id="L27">    record Decoded(int generation, String parentId, String model,</span>
             Map&lt;String, CumulativeTaskKnowledge.Strategy&gt; routes, CumulativeTaskKnowledge.Costs costs,
-            CumulativeTaskKnowledge.Decision decision, List&lt;CheckedLearnedSchemaModel.Attempt&gt; attempts) { }
+            CumulativeTaskKnowledge.Decision decision, List&lt;CheckedLearnedSchemaModel.Attempt&gt; attempts, TaskConstructionProfile profile) { }
 
     static String encode(int generation, String parentId, CheckedLearnedSchemaModel model,
             Map&lt;String, CumulativeTaskKnowledge.Strategy&gt; routes, CumulativeTaskKnowledge.Costs costs,
-            CumulativeTaskKnowledge.Decision decision, List&lt;CheckedLearnedSchemaModel.Attempt&gt; attempts) {
-<span class="fc" id="L34">        var root = JSON.createObjectNode().put(&quot;revision&quot;, CumulativeTaskKnowledge.REVISION)</span>
-<span class="fc" id="L35">            .put(&quot;generation&quot;, generation).put(&quot;parentId&quot;, parentId).put(&quot;model&quot;, model.toCanonicalJson());</span>
-<span class="fc" id="L36">        var policy = root.putObject(&quot;routes&quot;);</span>
-<span class="fc" id="L37">        new TreeMap&lt;&gt;(routes).forEach((key, value) -&gt; policy.put(key, value.name()));</span>
-<span class="fc" id="L38">        var work = root.putObject(&quot;costs&quot;);</span>
-<span class="fc" id="L39">        long[] values = {costs.lessons(), costs.formation(), costs.preparation(), costs.validation(), costs.selection(),</span>
-<span class="fc" id="L40">            costs.restoration(), costs.splitChecking()};</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (int i = 0; i &lt; COSTS.length; i++) work.put(COSTS[i], values[i]);</span>
-<span class="fc" id="L42">        root.put(&quot;decision&quot;, decision.name());</span>
-<span class="fc" id="L43">        var records = root.putArray(&quot;attempts&quot;);</span>
-<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (var attempt : attempts) {</span>
-<span class="fc" id="L45">            var value = records.addObject().put(&quot;status&quot;, attempt.status()).put(&quot;detail&quot;, attempt.detail());</span>
-<span class="fc" id="L46">            var origins = value.putArray(&quot;observationIds&quot;); attempt.observationIds().forEach(origins::add);</span>
-<span class="fc" id="L47">        }</span>
-<span class="fc" id="L48">        String json = root.toString();</span>
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (json.getBytes(StandardCharsets.UTF_8).length &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;knowledge snapshot too large&quot;);</span>
-<span class="fc" id="L50">        return json;</span>
+            CumulativeTaskKnowledge.Decision decision, List&lt;CheckedLearnedSchemaModel.Attempt&gt; attempts, TaskConstructionProfile profile) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        var root = JSON.createObjectNode().put(&quot;revision&quot;, profile == TaskConstructionProfile.NONE</span>
+<span class="fc" id="L35">                ? CumulativeTaskKnowledge.REVISION : CumulativeTaskKnowledge.CONSTRUCTION_REVISION)</span>
+<span class="fc" id="L36">            .put(&quot;generation&quot;, generation).put(&quot;parentId&quot;, parentId).put(&quot;model&quot;, model.toCanonicalJson());</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (profile != TaskConstructionProfile.NONE) root.put(&quot;constructionProfile&quot;, profile.name());</span>
+<span class="fc" id="L38">        var policy = root.putObject(&quot;routes&quot;);</span>
+<span class="fc" id="L39">        new TreeMap&lt;&gt;(routes).forEach((key, value) -&gt; policy.put(key, value.name()));</span>
+<span class="fc" id="L40">        var work = root.putObject(&quot;costs&quot;);</span>
+<span class="fc" id="L41">        long[] values = {costs.lessons(), costs.formation(), costs.preparation(), costs.validation(), costs.selection(),</span>
+<span class="fc" id="L42">            costs.restoration(), costs.splitChecking()};</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (int i = 0; i &lt; COSTS.length; i++) work.put(COSTS[i], values[i]);</span>
+<span class="fc" id="L44">        root.put(&quot;decision&quot;, decision.name());</span>
+<span class="fc" id="L45">        var records = root.putArray(&quot;attempts&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (var attempt : attempts) {</span>
+<span class="fc" id="L47">            var value = records.addObject().put(&quot;status&quot;, attempt.status()).put(&quot;detail&quot;, attempt.detail());</span>
+<span class="fc" id="L48">            var origins = value.putArray(&quot;observationIds&quot;); attempt.observationIds().forEach(origins::add);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        String json = root.toString();</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (json.getBytes(StandardCharsets.UTF_8).length &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;knowledge snapshot too large&quot;);</span>
+<span class="fc" id="L52">        return json;</span>
     }
     static Decoded decode(String json) {
-<span class="pc bpc" id="L53" title="3 of 6 branches missed.">        if (json == null || json.length() &gt; MAX_BYTES || json.getBytes(StandardCharsets.UTF_8).length &gt; MAX_BYTES)</span>
-<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;knowledge snapshot too large&quot;);</span>
+<span class="pc bpc" id="L55" title="3 of 6 branches missed.">        if (json == null || json.length() &gt; MAX_BYTES || json.getBytes(StandardCharsets.UTF_8).length &gt; MAX_BYTES)</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;knowledge snapshot too large&quot;);</span>
         try {
-<span class="fc" id="L56">            JsonNode root = JSON.readTree(json);</span>
-<span class="fc" id="L57">            fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;));</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (!CumulativeTaskKnowledge.REVISION.equals(text(root, &quot;revision&quot;))) throw new IllegalArgumentException(&quot;unknown knowledge revision&quot;);</span>
-<span class="fc" id="L59">            int generation = Math.toIntExact(number(root, &quot;generation&quot;));</span>
-<span class="fc" id="L60">            var routes = new TreeMap&lt;String, CumulativeTaskKnowledge.Strategy&gt;();</span>
-<span class="fc" id="L61">            var policy = root.get(&quot;routes&quot;);</span>
-<span class="pc bpc" id="L62" title="2 of 4 branches missed.">            if (!policy.isObject() || policy.size() &gt; 256) throw new IllegalArgumentException(&quot;invalid routing policy&quot;);</span>
-<span class="fc" id="L63">            policy.properties().forEach(entry -&gt; {</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                if (!entry.getValue().isTextual()) throw new IllegalArgumentException(&quot;invalid strategy&quot;);</span>
-<span class="fc" id="L65">                routes.put(entry.getKey(), CumulativeTaskKnowledge.Strategy.valueOf(entry.getValue().textValue()));</span>
-<span class="fc" id="L66">            });</span>
-<span class="fc" id="L67">            var costs = root.get(&quot;costs&quot;); fields(costs, Set.of(COSTS));</span>
-<span class="fc" id="L68">            var attempts = new ArrayList&lt;CheckedLearnedSchemaModel.Attempt&gt;();</span>
-<span class="fc" id="L69">            var records = root.get(&quot;attempts&quot;);</span>
-<span class="pc bpc" id="L70" title="2 of 4 branches missed.">            if (!records.isArray() || records.size() &gt; 1024) throw new IllegalArgumentException(&quot;invalid attempt history&quot;);</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">            for (var attempt : records) {</span>
-<span class="fc" id="L72">                fields(attempt, Set.of(&quot;observationIds&quot;, &quot;status&quot;, &quot;detail&quot;));</span>
-<span class="fc" id="L73">                var origins = attempt.get(&quot;observationIds&quot;);</span>
-<span class="pc bpc" id="L74" title="2 of 4 branches missed.">                if (!origins.isArray() || origins.size() &gt; 128) throw new IllegalArgumentException(&quot;invalid observation history&quot;);</span>
-<span class="fc" id="L75">                var ids = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">                for (var origin : origins) {</span>
-<span class="pc bpc" id="L77" title="2 of 4 branches missed.">                    if (!origin.isTextual() || origin.textValue().length() &gt; 1024) throw new IllegalArgumentException(&quot;invalid observation id&quot;);</span>
-<span class="fc" id="L78">                    ids.add(origin.textValue());</span>
-<span class="fc" id="L79">                }</span>
-<span class="fc" id="L80">                attempts.add(new CheckedLearnedSchemaModel.Attempt(ids, text(attempt, &quot;status&quot;), text(attempt, &quot;detail&quot;)));</span>
-<span class="fc" id="L81">            }</span>
-<span class="fc" id="L82">            return new Decoded(generation, text(root, &quot;parentId&quot;), text(root, &quot;model&quot;), routes,</span>
-<span class="fc" id="L83">                new CumulativeTaskKnowledge.Costs(number(costs, &quot;lessons&quot;), number(costs, &quot;formation&quot;),</span>
-<span class="fc" id="L84">                    number(costs, &quot;preparation&quot;), number(costs, &quot;validation&quot;), number(costs, &quot;selection&quot;),</span>
-<span class="fc" id="L85">                    number(costs, &quot;restoration&quot;), number(costs, &quot;splitChecking&quot;)),</span>
-<span class="fc" id="L86">                CumulativeTaskKnowledge.Decision.valueOf(text(root, &quot;decision&quot;)), List.copyOf(attempts));</span>
-<span class="fc" id="L87">        } catch (IOException | ArithmeticException failure) {</span>
-<span class="fc" id="L88">            throw new IllegalArgumentException(&quot;invalid knowledge snapshot&quot;, failure);</span>
+<span class="fc" id="L58">            JsonNode root = JSON.readTree(json);</span>
+<span class="fc" id="L59">            TaskConstructionProfile profile = profile(root);</span>
+<span class="fc" id="L60">            int generation = Math.toIntExact(number(root, &quot;generation&quot;));</span>
+<span class="fc" id="L61">            var routes = new TreeMap&lt;String, CumulativeTaskKnowledge.Strategy&gt;();</span>
+<span class="fc" id="L62">            var policy = root.get(&quot;routes&quot;);</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">            if (!policy.isObject() || policy.size() &gt; 256) throw new IllegalArgumentException(&quot;invalid routing policy&quot;);</span>
+<span class="fc" id="L64">            policy.properties().forEach(entry -&gt; {</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                if (!entry.getValue().isTextual()) throw new IllegalArgumentException(&quot;invalid strategy&quot;);</span>
+<span class="fc" id="L66">                routes.put(entry.getKey(), CumulativeTaskKnowledge.Strategy.valueOf(entry.getValue().textValue()));</span>
+<span class="fc" id="L67">            });</span>
+<span class="fc" id="L68">            var costs = root.get(&quot;costs&quot;); fields(costs, Set.of(COSTS));</span>
+<span class="fc" id="L69">            var attempts = new ArrayList&lt;CheckedLearnedSchemaModel.Attempt&gt;();</span>
+<span class="fc" id="L70">            var records = root.get(&quot;attempts&quot;);</span>
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">            if (!records.isArray() || records.size() &gt; 1024) throw new IllegalArgumentException(&quot;invalid attempt history&quot;);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (var attempt : records) {</span>
+<span class="fc" id="L73">                fields(attempt, Set.of(&quot;observationIds&quot;, &quot;status&quot;, &quot;detail&quot;));</span>
+<span class="fc" id="L74">                var origins = attempt.get(&quot;observationIds&quot;);</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">                if (!origins.isArray() || origins.size() &gt; 128) throw new IllegalArgumentException(&quot;invalid observation history&quot;);</span>
+<span class="fc" id="L76">                var ids = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                for (var origin : origins) {</span>
+<span class="pc bpc" id="L78" title="2 of 4 branches missed.">                    if (!origin.isTextual() || origin.textValue().length() &gt; 1024) throw new IllegalArgumentException(&quot;invalid observation id&quot;);</span>
+<span class="fc" id="L79">                    ids.add(origin.textValue());</span>
+<span class="fc" id="L80">                }</span>
+<span class="fc" id="L81">                attempts.add(new CheckedLearnedSchemaModel.Attempt(ids, text(attempt, &quot;status&quot;), text(attempt, &quot;detail&quot;)));</span>
+<span class="fc" id="L82">            }</span>
+<span class="fc" id="L83">            return new Decoded(generation, text(root, &quot;parentId&quot;), text(root, &quot;model&quot;), routes,</span>
+<span class="fc" id="L84">                new CumulativeTaskKnowledge.Costs(number(costs, &quot;lessons&quot;), number(costs, &quot;formation&quot;),</span>
+<span class="fc" id="L85">                    number(costs, &quot;preparation&quot;), number(costs, &quot;validation&quot;), number(costs, &quot;selection&quot;),</span>
+<span class="fc" id="L86">                    number(costs, &quot;restoration&quot;), number(costs, &quot;splitChecking&quot;)),</span>
+<span class="fc" id="L87">                CumulativeTaskKnowledge.Decision.valueOf(text(root, &quot;decision&quot;)), List.copyOf(attempts), profile);</span>
+<span class="fc" id="L88">        } catch (IOException | ArithmeticException failure) {</span>
+<span class="fc" id="L89">            throw new IllegalArgumentException(&quot;invalid knowledge snapshot&quot;, failure);</span>
         }
     }
+    private static TaskConstructionProfile profile(JsonNode root) {
+<span class="pc bpc" id="L93" title="3 of 6 branches missed.">        if (root == null || !root.isObject() || !root.hasNonNull(&quot;revision&quot;))</span>
+<span class="nc" id="L94">            throw new IllegalArgumentException(&quot;snapshot revision required&quot;);</span>
+<span class="fc" id="L95">        String revision = text(root, &quot;revision&quot;);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (revision.equals(CumulativeTaskKnowledge.REVISION)) {</span>
+<span class="fc" id="L97">            fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;));</span>
+<span class="fc" id="L98">            return TaskConstructionProfile.NONE;</span>
+        }
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (!revision.equals(CumulativeTaskKnowledge.CONSTRUCTION_REVISION)) throw new IllegalArgumentException(&quot;unknown knowledge revision&quot;);</span>
+<span class="fc" id="L101">        fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;, &quot;constructionProfile&quot;));</span>
+<span class="fc" id="L102">        var profile = TaskConstructionProfile.valueOf(text(root, &quot;constructionProfile&quot;));</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (profile == TaskConstructionProfile.NONE) throw new IllegalArgumentException(&quot;construction snapshot requires a profile&quot;);</span>
+<span class="fc" id="L104">        return profile;</span>
+    }
     private static void fields(JsonNode node, Set&lt;String&gt; expected) {
-<span class="pc bpc" id="L92" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IllegalArgumentException(&quot;object required&quot;);</span>
-<span class="fc" id="L93">        var names = new HashSet&lt;String&gt;(); node.fieldNames().forEachRemaining(names::add);</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (!names.equals(expected)) throw new IllegalArgumentException(&quot;unexpected snapshot fields&quot;);</span>
-<span class="fc" id="L95">    }</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IllegalArgumentException(&quot;object required&quot;);</span>
+<span class="fc" id="L108">        var names = new HashSet&lt;String&gt;(); node.fieldNames().forEachRemaining(names::add);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (!names.equals(expected)) throw new IllegalArgumentException(&quot;unexpected snapshot fields&quot;);</span>
+<span class="fc" id="L110">    }</span>
     private static String text(JsonNode node, String key) {
-<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (!node.get(key).isTextual()) throw new IllegalArgumentException(&quot;text required: &quot; + key);</span>
-<span class="fc" id="L98">        return node.get(key).textValue();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (!node.get(key).isTextual()) throw new IllegalArgumentException(&quot;text required: &quot; + key);</span>
+<span class="fc" id="L113">        return node.get(key).textValue();</span>
     }
     private static long number(JsonNode node, String key) {
-<span class="fc" id="L101">        var value = node.get(key);</span>
-<span class="pc bpc" id="L102" title="3 of 6 branches missed.">        if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() &lt; 0)</span>
-<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;nonnegative integer required: &quot; + key);</span>
-<span class="fc" id="L104">        return value.longValue();</span>
+<span class="fc" id="L116">        var value = node.get(key);</span>
+<span class="pc bpc" id="L117" title="3 of 6 branches missed.">        if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() &lt; 0)</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;nonnegative integer required: &quot; + key);</span>
+<span class="fc" id="L119">        return value.longValue();</span>
     }
     static Path save(Path directory, String id, String json) throws IOException {
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(directory)) throw new IOException(&quot;snapshot directory is a symbolic link&quot;);</span>
-<span class="fc" id="L108">        Files.createDirectories(directory);</span>
-<span class="fc" id="L109">        var path = directory.resolve(id.substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;);</span>
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) { requireSame(path, json); return path; }</span>
-<span class="fc" id="L111">        Path temporary = Files.createTempFile(directory, &quot;.knowledge-&quot;, &quot;.tmp&quot;);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(directory)) throw new IOException(&quot;snapshot directory is a symbolic link&quot;);</span>
+<span class="fc" id="L123">        Files.createDirectories(directory);</span>
+<span class="fc" id="L124">        var path = directory.resolve(id.substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) { requireSame(path, json); return path; }</span>
+<span class="fc" id="L126">        Path temporary = Files.createTempFile(directory, &quot;.knowledge-&quot;, &quot;.tmp&quot;);</span>
         try {
-<span class="fc" id="L113">            Files.writeString(temporary, json, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L128">            Files.writeString(temporary, json, StandardCharsets.UTF_8);</span>
             // Same-filesystem hard link publishes complete bytes atomically, without replacing a rival file.
-<span class="fc" id="L115">            try { Files.createLink(path, temporary); }</span>
-<span class="pc" id="L116">            catch (FileAlreadyExistsException race) { requireSame(path, json); }</span>
-<span class="fc" id="L117">        } finally { Files.deleteIfExists(temporary); }</span>
-<span class="fc" id="L118">        return path;</span>
+<span class="fc" id="L130">            try { Files.createLink(path, temporary); }</span>
+<span class="pc" id="L131">            catch (FileAlreadyExistsException race) { requireSame(path, json); }</span>
+<span class="fc" id="L132">        } finally { Files.deleteIfExists(temporary); }</span>
+<span class="fc" id="L133">        return path;</span>
     }
     private static void requireSame(Path path, String json) throws IOException {
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (!read(path).equals(json)) throw new IOException(&quot;existing knowledge snapshot differs&quot;);</span>
-<span class="fc" id="L122">    }</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (!read(path).equals(json)) throw new IOException(&quot;existing knowledge snapshot differs&quot;);</span>
+<span class="fc" id="L137">    }</span>
     static String read(Path path) throws IOException {
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;regular snapshot file required&quot;);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;regular snapshot file required&quot;);</span>
         byte[] bytes;
-<span class="fc" id="L126">        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { bytes = input.readNBytes(MAX_BYTES + 1); }</span>
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_BYTES) throw new IOException(&quot;knowledge snapshot too large&quot;);</span>
-<span class="fc" id="L128">        var json = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();</span>
-<span class="fc" id="L129">        String expected = SchematicProofPlan.hash(json).substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;;</span>
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (!path.getFileName().toString().equals(expected)) throw new IOException(&quot;snapshot content address differs&quot;);</span>
-<span class="fc" id="L131">        return json;</span>
+<span class="fc" id="L141">        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { bytes = input.readNBytes(MAX_BYTES + 1); }</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_BYTES) throw new IOException(&quot;knowledge snapshot too large&quot;);</span>
+<span class="fc" id="L143">        var json = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();</span>
+<span class="fc" id="L144">        String expected = SchematicProofPlan.hash(json).substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (!path.getFileName().toString().equals(expected)) throw new IOException(&quot;snapshot content address differs&quot;);</span>
+<span class="fc" id="L146">        return json;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

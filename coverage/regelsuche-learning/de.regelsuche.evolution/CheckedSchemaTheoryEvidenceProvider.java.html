@@ -11,60 +11,62 @@ import java.util.Optional;
 <span class="fc" id="L11">public final class CheckedSchemaTheoryEvidenceProvider implements ExactTheoryEvidenceProvider,RetainedGraph.View {</span>
 <span class="fc" id="L12">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
     @Override public Optional&lt;ExactTheoryEvidence.Binding&gt; bind(Object value) {
-<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
-<span class="fc" id="L15">        Object[] pending = new Object[1];</span>
-<span class="fc" id="L16">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
-<span class="fc" id="L17">        Throwable primary = null;</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (value instanceof StructuralConstructionProvider.VerifiedConstruction construction)</span>
+<span class="fc" id="L15">            return Optional.of(construction.binding());</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
+<span class="fc" id="L17">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L18">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
+<span class="fc" id="L19">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L19">            var binding = application.binding();</span>
-<span class="fc" id="L20">            pending[0] = binding;</span>
-<span class="fc" id="L21">            RetainedOperation.work(1);</span>
-<span class="fc" id="L22">            return RetainedOperation.produced(Optional.of(binding));</span>
-<span class="fc" id="L23">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L24">            primary = failure;</span>
-<span class="fc" id="L25">            observeFailure(failure);</span>
-<span class="fc" id="L26">            throw failure;</span>
+<span class="fc" id="L21">            var binding = application.binding();</span>
+<span class="fc" id="L22">            pending[0] = binding;</span>
+<span class="fc" id="L23">            RetainedOperation.work(1);</span>
+<span class="fc" id="L24">            return RetainedOperation.produced(Optional.of(binding));</span>
+<span class="fc" id="L25">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L26">            primary = failure;</span>
+<span class="fc" id="L27">            observeFailure(failure);</span>
+<span class="fc" id="L28">            throw failure;</span>
         } finally {
-<span class="fc" id="L28">            closeFrame(retained, primary);</span>
+<span class="fc" id="L30">            closeFrame(retained, primary);</span>
         }
     }
     @Override public Optional&lt;NativeExactTheoryEvidence.Binding&gt; bindNative(Object value) {
-<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
-<span class="fc" id="L33">        Object[] pending = new Object[1];</span>
-<span class="fc" id="L34">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
-<span class="fc" id="L35">        Throwable primary = null;</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
+<span class="fc" id="L35">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L36">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
+<span class="fc" id="L37">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L37">            var binding = application.nativeBinding();</span>
-<span class="fc" id="L38">            pending[0] = binding;</span>
-<span class="fc" id="L39">            RetainedOperation.work(1);</span>
-<span class="fc" id="L40">            return RetainedOperation.produced(Optional.of(binding));</span>
-<span class="fc" id="L41">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L42">            primary = failure;</span>
-<span class="fc" id="L43">            observeFailure(failure);</span>
-<span class="fc" id="L44">            throw failure;</span>
+<span class="fc" id="L39">            var binding = application.nativeBinding();</span>
+<span class="fc" id="L40">            pending[0] = binding;</span>
+<span class="fc" id="L41">            RetainedOperation.work(1);</span>
+<span class="fc" id="L42">            return RetainedOperation.produced(Optional.of(binding));</span>
+<span class="fc" id="L43">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L44">            primary = failure;</span>
+<span class="fc" id="L45">            observeFailure(failure);</span>
+<span class="fc" id="L46">            throw failure;</span>
         } finally {
-<span class="fc" id="L46">            closeFrame(retained, primary);</span>
+<span class="fc" id="L48">            closeFrame(retained, primary);</span>
         }
     }
 
     private static void observeFailure(Throwable failure) {
-<span class="fc" id="L51">        try { RetainedOperation.checkpoint(); }</span>
-<span class="nc" id="L52">        catch (RuntimeException | Error observation) {</span>
-<span class="nc bnc" id="L53" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
-<span class="fc" id="L54">        }</span>
-<span class="fc" id="L55">    }</span>
+<span class="fc" id="L53">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L54">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">    }</span>
 
     private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (frame == null) return;</span>
-<span class="fc" id="L59">        try { frame.close(); }</span>
-<span class="fc" id="L60">        catch (RuntimeException | Error cleanup) {</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
-<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L63">        }</span>
-<span class="fc" id="L64">    }</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (frame == null) return;</span>
+<span class="fc" id="L61">        try { frame.close(); }</span>
+<span class="fc" id="L62">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">    }</span>
     @Override public Object exportNative(Object value) {
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if(!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication))throw new IllegalArgumentException(&quot;private checked application required&quot;);</span>
-<span class="fc" id="L67">        return value;</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if(!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication))throw new IllegalArgumentException(&quot;private checked application required&quot;);</span>
+<span class="fc" id="L69">        return value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
