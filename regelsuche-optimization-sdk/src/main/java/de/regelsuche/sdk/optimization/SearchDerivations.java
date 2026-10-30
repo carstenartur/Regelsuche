@@ -70,7 +70,7 @@ final class SearchDerivations {
         // Generation already charges this same work object. There is no new frontier or deadline.
         var generated = generator.generate(current, candidateLimit);
         var resolution = next.resolveOutputs();
-        work.charge(resolution.work());
+        work.chargeCompleted(resolution.work());
         long comparisonWork = Math.max(1, resolution.expandedNodes());
         for (var proposal : generated.proposals()) {
             work.charge(1);
@@ -85,7 +85,7 @@ final class SearchDerivations {
     private static Expr envelope(JointComputationPlan plan, VerificationWork work) {
         work.charge(1);
         var expression = plan.searchExpression();
-        work.charge(expression.work());
+        work.chargeCompleted(expression.work());
         return expression.expression();
     }
 }

@@ -13,6 +13,10 @@ public final class ComputationOptimizer {
     public static final String SEMANTICS_REVISION = "java25-numeric/v1";
     public static PreparedJointComputation prepare(JointComputationPlan plan) { return plan.prepare(new JavaNumericBackend(plan.inputs())); }
     public OptimizationResult optimize(OptimizationRequest request, CancellationToken token) {
+        return optimize(request, token, null);
+    }
+    /** Optional consumer ranking uses the same verified frontier and shared search work allowance. */
+    public OptimizationResult optimize(OptimizationRequest request, CancellationToken token, CandidateRanking ranking) {
         Objects.requireNonNull(request); var work=new VerificationWork(request,token);
         try {
             var checker=new SemanticChecker(request,work);
@@ -27,6 +31,16 @@ public final class ComputationOptimizer {
                 long failedPreparation = JointComputationPlan.MAX_RESOLUTION_WORK + JointComputationPlan.MAX_NODES;
                 return new OptimizationResult.Unsupported(diagnostic(invalid), Math.addExact(work.used(), failedPreparation));
             }
+            boolean projectedWords = false;
+            for (var occurrence : request.sourceTrace().occurrences()) {
+                work.charge(1);
+                if (JavaExpressions.operationOf(occurrence.expression()).orElse(null) == NumericOperation.AND) {
+                    work.charge(2);
+                    if (JavaExpressions.operands(occurrence.expression()).stream().anyMatch(JavaExpressions::isLiteral)) {
+                        projectedWords = true; break;
+                    }
+                }
+            }
             long setup=work.used();
             var generator=new JavaCandidateGenerator(request,work);
             var domain=new JointPlanSearch.Domain() {
@@ -38,11 +52,17 @@ public final class ComputationOptimizer {
                 }
             };
             var budget=request.budget();
-            var search=new JointPlanSearch(new JavaNumericBackend(request.plan().inputs()),domain,weights(request.goal()),budget.maximumCandidates());
-            // Search is an anytime producer, not the final proof. Reserve half
-            // the remaining request allowance for independently checking and
-            // preparing the incumbent after bounded exploration stops.
-            long explorationAllowance=Math.max(1,(budget.maximumWork()-setup)/2);
+            var search=new JointPlanSearch(new JavaNumericBackend(request.plan().inputs()),domain,weights(request.goal()),budget.maximumCandidates(),
+                    ranking == null ? null : (plan, prepared) -> {
+                        var assessment = ranking.assess(plan, prepared);
+                        return new JointPlanSearch.Rank(assessment.score(), assessment.work());
+                    });
+            // Literal word projections need more final proof work than structural
+            // arithmetic. Reserve two thirds for these requests, otherwise half.
+            // The trusted Candidate constructor also prepares the final graph.
+            // Reserve the known initial incumbent's preparation before splitting
+            // the rest between exploration and the independent final proof.
+            long explorationAllowance=Math.max(1,(budget.maximumWork()-setup-sourceCost.inspectionWork())/(projectedWords ? 3 : 2));
             var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,explorationAllowance,budget.maximumStates(),explorationAllowance,64));
             work.charge(1);
             long searchWork=Math.addExact(Math.addExact(setup,found.totalWork()),1);
@@ -61,6 +81,20 @@ public final class ComputationOptimizer {
             if(finalOutcome.isPresent()) return finalOutcome.get();
             var obligations=obligations(request,found.plan());
             var cost=cost(request,sourceCost,found.prepared().cost(),obligations);
+            if (ranking != null) {
+                long beforeRanking = work.used();
+                var original = prepare(request.plan()); work.chargeCompleted(original.cost().inspectionWork());
+                var sourceRank = ranking.assessSource(request.plan(), original); work.chargeCompleted(sourceRank.work());
+                var candidateRank = ranking.assess(found.plan(), found.prepared()); work.chargeCompleted(candidateRank.work());
+                long targetScore = Math.addExact(candidateRank.score(),
+                        request.goal() == OptimizationGoal.READABILITY ? 0 : obligations.estimatedCheckWork() + obligations.fallbackOperationCount());
+                boolean runtime = sourceRank.runtimeWork() < 0 || candidateRank.runtimeWork() < 0 ? cost.estimatedRuntimeImprovement()
+                        : candidateRank.runtimeWork() + obligations.estimatedCheckWork() + obligations.fallbackOperationCount() < sourceRank.runtimeWork();
+                cost = new OptimizationResult.CostAssessment(sourceRank.score(), targetScore, cost.checkWork(), cost.fallbackOperations(),
+                        cost.sourceCost(), cost.candidateCost(), runtime);
+                total = Math.addExact(total, work.used() - beforeRanking);
+                if (total > budget.maximumWork()) return new OptimizationResult.BudgetExceeded("RANKING_BUDGET_EXCEEDED", total);
+            }
             boolean improved=cost.candidateScore()<cost.sourceScore();
             // Reaching the exploration limit says nothing about the validity of
             // an incumbent that has now passed the full original-source proof.
@@ -200,6 +234,7 @@ public final class ComputationOptimizer {
         if(!request.plan().inputs().equals(candidate.inputs())) return Map.of();
         if(!safeToSample(request,candidate,work)) return null;
         var source=prepare(request.plan()); var target=prepare(candidate);
+        work.chargeCompleted(source.cost().inspectionWork() + target.cost().inspectionWork());
         var names=request.plan().inputs().keySet().stream().sorted().toList();
         var baseline=new LinkedHashMap<String,Object>();
         for(var name:names) baseline.put(name,samples(NumericKind.fromType(request.plan().inputs().get(name))).getFirst());
@@ -213,6 +248,7 @@ public final class ComputationOptimizer {
             try { RuntimeChecks.validateAssumptions(request,probe); }
             catch(IllegalArgumentException assumptionViolated) { continue; }
             try {
+                work.charge(source.nodes().size() + target.nodes().size() + 2L * names.size());
                 var left=source.execute(probe); var right=target.execute(probe);
                 if(!left.keySet().equals(right.keySet()) || left.keySet().stream().anyMatch(name -> !RuntimeChecks.same(left.get(name),right.get(name)))) return probe;
             } catch(ArithmeticException existingException) { /* Throwing fragments are validated separately; samples never prove them. */ }

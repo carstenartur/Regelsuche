@@ -27,25 +27,35 @@ public final class ComputationExplanations {
         }
         public Explanation { assumptions = Set.copyOf(assumptions); Objects.requireNonNull(derivation); }
     }
-    public record Result(VerificationResult verification, Optional<Explanation> explanation) {
+    /** Total call work includes independent verification/replay and presentation; -1 denotes legacy unknown work. */
+    public record Result(VerificationResult verification, Optional<Explanation> explanation, long work) {
+        public Result(VerificationResult verification, Optional<Explanation> explanation) {
+            this(verification, explanation, -1);
+        }
         public Result {
             Objects.requireNonNull(verification); Objects.requireNonNull(explanation);
+            if (work < -1) throw new IllegalArgumentException("NEGATIVE_EXPLANATION_WORK");
             if (explanation.isPresent() && !(verification instanceof VerificationResult.Verified))
                 throw new IllegalArgumentException("EXPLANATION_REQUIRES_VERIFIED_RESULT");
         }
     }
     public static Result describe(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
+        return describe(request, candidate, request.budget().maximumWork(), token);
+    }
+    /** Bounds this call without changing the request used to replay the producer's derivation. */
+    public static Result describe(OptimizationRequest request, OptimizationResult.Candidate candidate,
+            long remainingWork, CancellationToken token) {
         Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(token);
-        var work = new VerificationWork(request, token);
+        var work = new VerificationWork(request, token, remainingWork);
         var verified = new ComputationOptimizer().reverifyWithin(request, candidate, work);
-        if (!(verified instanceof VerificationResult.Verified proof)) return new Result(verified, Optional.empty());
+        if (!(verified instanceof VerificationResult.Verified proof)) return new Result(verified, Optional.empty(), work.used());
         long verificationWork = work.used();
         try {
             work.charge(1);
             // Value views are reconstructed; the selected search path is retained and independently replayed.
             var original = ComputationOptimizer.prepare(request.plan());
             var replacement = ComputationOptimizer.prepare(candidate.plan());
-            work.charge(original.cost().inspectionWork() + replacement.cost().inspectionWork());
+            work.chargeCompleted(original.cost().inspectionWork() + replacement.cost().inspectionWork());
             var before = view(original, work);
             var after = view(replacement, work);
             long originalPowers = 0;
@@ -55,15 +65,15 @@ public final class ComputationExplanations {
             }
             long replacementPowers = after.steps().stream().filter(s ->
                 JavaExpressions.operationOf(s.expression()).orElse(null) == NumericOperation.MOD_POW).count();
-            work.charge(after.steps().size());
+            work.chargeCompleted(after.steps().size());
             return new Result(verified, Optional.of(new Explanation(proof.evidence(), request.assumptions(),
                 proof.obligations(), before, after, originalPowers, replacementPowers, work.used() - verificationWork,
-                candidate.derivation())));
+                candidate.derivation())), work.used());
         } catch (VerificationWork.Stopped stopped) {
             return new Result(stopped.cancelled ? new VerificationResult.Cancelled("CANCELLED")
-                : new VerificationResult.BudgetExceeded("EXPLANATION_BUDGET_EXCEEDED", work.used()), Optional.empty());
+                : new VerificationResult.BudgetExceeded("EXPLANATION_BUDGET_EXCEEDED", work.used()), Optional.empty(), work.used());
         } catch (IllegalArgumentException outsideBound) {
-            return new Result(new VerificationResult.Unsupported("EXPLANATION_OUTSIDE_STRUCTURAL_BOUND"), Optional.empty());
+            return new Result(new VerificationResult.Unsupported("EXPLANATION_OUTSIDE_STRUCTURAL_BOUND"), Optional.empty(), work.used());
         }
     }
     private static PlanView view(PreparedJointComputation prepared, VerificationWork work) {

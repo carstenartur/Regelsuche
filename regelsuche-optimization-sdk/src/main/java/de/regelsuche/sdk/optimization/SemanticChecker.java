@@ -8,7 +8,7 @@ import java.util.*;
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
     // Opaque Boolean proofs precede context normalization and typed bit projection.
-    static final String REVISION = "java-numeric-independent/v11";
+    static final String REVISION = "java-numeric-independent/v12";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -28,7 +28,7 @@ final class SemanticChecker {
         if (plan.outputs().stream().anyMatch(output -> !request.selectedKinds().contains(NumericKind.fromType(output.type()))))
             throw new IllegalArgumentException("EXCLUDED_NUMERIC_KIND");
         var prepared = plan.prepare(new JavaNumericBackend(plan.inputs()));
-        work.charge(prepared.cost().inspectionWork());
+        work.chargeCompleted(prepared.cost().inspectionWork());
         validateSourceTrace(plan, prepared, bounds);
         for (var input : plan.inputs().entrySet()) {
             var kind = NumericKind.fromType(input.getValue());
@@ -61,7 +61,7 @@ final class SemanticChecker {
             // A trace entry need not have an output's type (e.g. an int exponent in BigInteger.pow).
             var tracePlan = new JointComputationPlan(plan.inputs(), Map.of(), List.of(
                 new JointComputationPlan.Output("trace", occurrence.evaluatedKind().type(), expression)));
-            work.charge(tracePlan.prepare(new JavaNumericBackend(plan.inputs())).cost().inspectionWork());
+            work.chargeCompleted(tracePlan.prepare(new JavaNumericBackend(plan.inputs())).cost().inspectionWork());
             requireTotal(expression);
             bounds.require(expression);
             seen.add(expression);
@@ -101,11 +101,17 @@ final class SemanticChecker {
         }
     }
     Proof check(JointComputationPlan source, JointComputationPlan target) {
+        return check(source, target, new HashMap<>(), new HashMap<>());
+    }
+    private record Congruence(Expr source, Expr target, NumericKind kind) { }
+    /** Reuse only independently established child proofs within this one check. */
+    private Proof check(JointComputationPlan source, JointComputationPlan target, Map<Congruence, List<String>> proven,
+            Map<Expr, Expr> normalized) {
         var bounds = new BigIntegerBounds(request, work);
         long initial = work.used(); work.charge(1);
         if (!source.inputs().equals(target.inputs()) || !bindings(source).equals(bindings(target))) return new Proof(false, List.of("BINDINGS_DIFFER"), work.used()-initial);
         var targetPrepared = target.prepare(new JavaNumericBackend(target.inputs()));
-        work.charge(targetPrepared.cost().inspectionWork());
+        work.chargeCompleted(targetPrepared.cost().inspectionWork());
         for (var node : targetPrepared.nodes()) if (node.operation()!=null && !JavaExpressions.isLiteral(node.expression())) {
             if (!request.selectedKinds().contains(NumericKind.fromType(node.type()))) throw new IllegalArgumentException("EXCLUDED_NUMERIC_KIND");
             requireTotal(node.expression());
@@ -115,11 +121,17 @@ final class SemanticChecker {
         var methods = new LinkedHashSet<String>();
         for (int i=0;i<left.size();i++) {
             work.charge(1);
-            Expr a=normalizePrimitiveLiteralCasts(left.get(i)), b=normalizePrimitiveLiteralCasts(right.get(i));
+            Expr a=normalizePrimitiveLiteralCasts(left.get(i), normalized), b=normalizePrimitiveLiteralCasts(right.get(i), normalized);
             if (!a.equals(left.get(i)) || !b.equals(right.get(i))) methods.add("EXACT_PRIMITIVE_LITERAL_CAST");
             var kind=NumericKind.fromType(source.outputs().get(i).type());
             if (a.equals(b)) { methods.add("TYPED_STRUCTURAL_IDENTITY"); continue; }
-            if (operationCongruent(a, b, source, methods)) { methods.add("TYPED_OPERATION_CONGRUENCE"); continue; }
+            // An outer Boolean identity need not compare unrelated arithmetic
+            // children pairwise (for example, the operands of a choice rewrite).
+            if ((kind == NumericKind.INT || kind == NumericKind.LONG) && (booleanRoot(a) || booleanRoot(b))
+                    && new BitwiseProof(work).opaqueEquivalent(a, b, kind)) {
+                methods.add("BITVECTOR_TRUTH_TABLE"); continue;
+            }
+            if (operationCongruent(a, b, source, methods, proven, normalized)) { methods.add("TYPED_OPERATION_CONGRUENCE"); continue; }
             if (kind.floatingPoint()) {
                 if (new StrictFloatingProof(work).equivalent(a,b)) { methods.add("STRICT_IEEE_IDENTITY"); continue; }
                 if (request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA) {
@@ -132,17 +144,26 @@ final class SemanticChecker {
         }
         return new Proof(true,List.copyOf(methods),Math.max(1,work.used()-initial));
     }
-    private boolean operationCongruent(Expr a, Expr b, JointComputationPlan source, Set<String> methods) {
+    private boolean operationCongruent(Expr a, Expr b, JointComputationPlan source, Set<String> methods,
+            Map<Congruence, List<String>> proven, Map<Expr, Expr> normalized) {
         if (a instanceof FunctionExpr af && b instanceof FunctionExpr bf && af.name().equals(bf.name())
                 && af.arguments().size()==bf.arguments().size() && !JavaExpressions.isLiteral(a)) {
             boolean congruent=true;
             for (int argument=0;argument<af.arguments().size();argument++) {
                 Expr child=af.arguments().get(argument), replacement=bf.arguments().get(argument);
+                // The enclosing target has already been typed and checked for totality.
+                // Identical children need no fresh recursive plan preparation.
+                work.charge(1);
+                if (child.equals(replacement)) { methods.add("TYPED_STRUCTURAL_IDENTITY"); continue; }
                 var childKind=JavaExpressions.kindOf(child,source.inputs());
+                var key = new Congruence(child, replacement, childKind);
+                var previous = proven.get(key);
+                if (previous != null) { methods.addAll(previous); continue; }
                 var childSource=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output("congruence",childKind.type(),child)));
                 var childTarget=new JointComputationPlan(source.inputs(),Map.of(),List.of(new JointComputationPlan.Output("congruence",childKind.type(),replacement)));
-                var childProof=check(childSource,childTarget);
+                var childProof=check(childSource,childTarget,proven,normalized);
                 if(!childProof.accepted()) { congruent=false; break; }
+                if (proven.size() < JointComputationPlan.MAX_NODES) proven.put(key, childProof.methods());
                 methods.addAll(childProof.methods());
             }
             return congruent;
@@ -152,12 +173,8 @@ final class SemanticChecker {
     private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set<String> methods) {
         boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
         if (kind == NumericKind.INT || kind == NumericKind.LONG) {
-            // A complete Boolean identity can treat arithmetic/shift words as
-            // opaque atoms. Try that existing proof before projecting many
-            // unsuccessful subterm alternatives during context normalization.
-            if ((booleanRoot(a) || booleanRoot(b)) && new BitwiseProof(work).opaqueEquivalent(a, b, kind)) {
-                methods.add("BITVECTOR_TRUTH_TABLE");
-                return true;
+            if (new LowWordProof(work).equivalent(a, b, kind)) {
+                methods.add("LOW_WORD_POLYNOMIAL_CONGRUENCE"); return true;
             }
             Expr normalizedA = normalizeBitwiseContexts(a, new IdentityHashMap<>());
             Expr normalizedB = normalizeBitwiseContexts(b, new IdentityHashMap<>());
@@ -184,7 +201,7 @@ final class SemanticChecker {
                 methods.add("TYPED_MODULAR_PRODUCT_EXPANSION"); return true;
             }
             try {
-                var proof = new ModularBridge(request.assumptions()).verify(a,b); work.charge(proof.work());
+                var proof = new ModularBridge(request.assumptions()).verify(a,b); work.chargeCompleted(proof.work());
                 if (proof.accepted()) { methods.add("AFFINE_MODULAR_NORMAL_FORM"); return true; }
             } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }
         }
@@ -240,15 +257,18 @@ final class SemanticChecker {
     /** Closed primitive literal casts have one exact Java value; this evaluates no input or arithmetic.
      * Only the proof view is normalized. Original and candidate execution traces remain unchanged.
      */
-    private Expr normalizePrimitiveLiteralCasts(Expr expression) {
+    private Expr normalizePrimitiveLiteralCasts(Expr expression, Map<Expr, Expr> memo) {
         work.charge(1);
         if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;
-        var args=JavaExpressions.operands(expression).stream().map(this::normalizePrimitiveLiteralCasts).toList();
+        Expr previous = memo.get(expression); if (previous != null) return previous;
+        var args=JavaExpressions.operands(expression).stream().map(e -> normalizePrimitiveLiteralCasts(e, memo)).toList();
         var result=new FunctionExpr(((FunctionExpr)expression).name(),args);
-        if (JavaExpressions.castSourceKind(result).isEmpty() || !JavaExpressions.isLiteral(args.getFirst())) return result;
+        if (JavaExpressions.castSourceKind(result).isEmpty() || !JavaExpressions.isLiteral(args.getFirst())) {
+            memo.put(expression, result); return result;
+        }
         var backend=new JavaNumericBackend(request.plan().inputs());
         var value=backend.apply(backend.operation(result),List.of(JavaExpressions.literalValue(args.getFirst())));
-        return switch(JavaExpressions.resultKind(result)) {
+        Expr literal = switch(JavaExpressions.resultKind(result)) {
             case BYTE -> JavaExpressions.literal((Byte)value);
             case SHORT -> JavaExpressions.literal((Short)value);
             case CHAR -> JavaExpressions.literal((Character)value);
@@ -258,6 +278,7 @@ final class SemanticChecker {
             case DOUBLE -> JavaExpressions.literal((Double)value);
             case BIG_INTEGER -> throw new IllegalArgumentException("NO_IMPLICIT_BIG_INTEGER_CONVERSION");
         };
+        memo.put(expression, literal); return literal;
     }
     private static List<List<Object>> bindings(JointComputationPlan plan) {
         return plan.outputs().stream().map(output -> List.<Object>of(output.name(),output.type())).toList();
@@ -282,7 +303,7 @@ final class SemanticChecker {
             case MOD -> { if (!positive(args.get(1))) throw new IllegalArgumentException("POSITIVE_MODULUS_REQUIRED"); }
             case MOD_POW -> {
                 try {
-                    var proof = new ModularBridge(request.assumptions()).verify(expression,expression); work.charge(proof.work());
+                    var proof = new ModularBridge(request.assumptions()).verify(expression,expression); work.chargeCompleted(proof.work());
                     if (!proof.accepted()) throw new IllegalArgumentException("NONNEGATIVE_AFFINE_EXPONENT_AND_POSITIVE_MODULUS_REQUIRED");
                 } catch (NoSuchElementException malformed) { throw new IllegalArgumentException("MODULAR_FRAGMENT_REQUIRED",malformed); }
             }

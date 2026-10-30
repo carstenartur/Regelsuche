@@ -21,7 +21,7 @@ class ComputationExplanationBudgetTest {
         var result = ComputationExplanations.describe(request, fixture.candidate(), CancellationToken.NONE);
         var exceeded = assertInstanceOf(VerificationResult.BudgetExceeded.class, result.verification(),
                 "Proof and rendering separately fit, but together exceed maximumWork");
-        assertTrue(exceeded.work() <= limit);
+        assertEquals(full.work(), exceeded.work(), "Already-completed presentation work remains debited on exhaustion");
         assertTrue(result.explanation().isEmpty(), "Budget failure must not publish a partial explanation");
     }
 

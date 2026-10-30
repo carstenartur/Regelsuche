@@ -8,13 +8,14 @@ final class JavaBitwiseCandidates {
     private JavaBitwiseCandidates() {}
 
     static Expr simplify(Expr source, NumericOperation join, NumericKind kind, List<Expr> operands, VerificationWork work) {
-        if ((kind != NumericKind.INT && kind != NumericKind.LONG)
-                || (join != NumericOperation.OR && join != NumericOperation.XOR)
-                || operands.size() != 2) return source;
+        if ((kind != NumericKind.INT && kind != NumericKind.LONG) || operands.size() != 2) return source;
+        if (join == NumericOperation.AND) return removeInnerMasks(source, kind, operands, work);
+        if (join != NumericOperation.OR && join != NumericOperation.XOR && join != NumericOperation.ADD) return source;
         Expr left = operands.getFirst(), right = operands.get(1);
         Expr reconstructed = reconstruct(kind, left, right, work);
         if (reconstructed == null) reconstructed = reconstruct(kind, right, left, work);
         if (reconstructed != null) return reconstructed;
+        if (join == NumericOperation.ADD) return source;
         if (!operation(left, NumericOperation.AND, kind) || !operation(right, NumericOperation.AND, kind))
             return source;
         var a = JavaExpressions.operands(left);
@@ -31,6 +32,30 @@ final class JavaBitwiseCandidates {
             if (complementOf(mask, otherMask, kind)) return choose(kind, otherMask, negative, positive);
         }
         return source;
+    }
+    private static Expr removeInnerMasks(Expr source, NumericKind kind, List<Expr> operands, VerificationWork work) {
+        for (int i = 0; i < 2; i++) {
+            Expr mask = operands.get(i), body = operands.get(1 - i);
+            if (!JavaExpressions.isLiteral(mask)) continue;
+            long value = SemanticChecker.integer(JavaExpressions.literalValue(mask)).longValue();
+            if (value <= 0 || (value & (value + 1)) != 0) continue;
+            Expr replaced = unmask(body, mask, kind, work, 0);
+            if (!replaced.equals(body)) return op(kind, NumericOperation.AND, replaced, mask);
+        }
+        return source;
+    }
+    private static Expr unmask(Expr expression, Expr mask, NumericKind kind, VerificationWork work, int depth) {
+        work.charge(1);
+        if (depth > 64) return expression;
+        var operation = JavaExpressions.operationOf(expression).orElse(null);
+        var args = JavaExpressions.operands(expression);
+        if (operation == null || JavaExpressions.resultKind(expression) != kind) return expression;
+        if (operation == NumericOperation.AND) {
+            for (int i = 0; i < 2; i++) if (args.get(i).equals(mask)) return unmask(args.get(1 - i), mask, kind, work, depth + 1);
+        }
+        if (operation == NumericOperation.ADD || operation == NumericOperation.SUBTRACT || operation == NumericOperation.MULTIPLY || operation == NumericOperation.NEGATE)
+            return JavaExpressions.operation(kind, operation, args.stream().map(e -> unmask(e, mask, kind, work, depth + 1)).toArray(Expr[]::new));
+        return expression;
     }
 
     /** High/low projections at any Java-masked word boundary; proof is separate. */
