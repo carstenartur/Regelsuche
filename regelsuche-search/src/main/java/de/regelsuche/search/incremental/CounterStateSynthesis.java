@@ -6,9 +6,9 @@ import java.util.*;
 
 /**
  * Bounded synthesis of sufficient counter states, using the existing expression
- * AST. An observation f(count) and the allowed changes determine the partition;
- * no support/parity update templates are consulted. Refinement is conservative:
- * the result is sufficient, not promised to be a globally minimal automaton.
+ * AST. Period analysis of the observation word determines a sufficient state;
+ * no support/parity update templates are consulted. The shortest global period
+ * is minimal for reversible changes; insert-only changes admit a prefix/cycle.
  */
 public final class CounterStateSynthesis {
     private CounterStateSynthesis() { }
@@ -64,63 +64,72 @@ public final class CounterStateSynthesis {
     public static Derivation derive(Specification source, long workBudget) {
         Objects.requireNonNull(source);
         Meter meter = new Meter(workBudget);
-        int n = source.maximumCount + 1;
-        BigInteger[] observations = new BigInteger[n];
-        int[] classes = new int[n];
-        var byOutput = new LinkedHashMap<BigInteger, Integer>();
-        for (int count = 0; count < n; count++) {
-            observations[count] = evaluate(source.observation, count, meter);
-            classes[count] = byOutput.computeIfAbsent(observations[count], _ -> byOutput.size());
-        }
-        int classCount = byOutput.size();
-        while (true) {
-            var groups = new ArrayList<List<Integer>>(classCount);
-            for (int i = 0; i < classCount; i++) groups.add(new ArrayList<>());
-            for (int count = 0; count < n; count++) { meter.charge(); groups.get(classes[count]).add(count); }
-            int[] refined = new int[n];
-            int nextClass = 0;
-            for (var group : groups) {
-                // Undefined transitions at the count bounds are wildcards. They
-                // are never executable: the accumulator enforces legal counts.
-                var signatures = new ArrayList<int[]>();
-                for (int count : group) {
-                    int up = count + 1 < n ? classes[count + 1] : -1;
-                    int down = source.allowDeletes && count > 0 ? classes[count - 1] : -1;
-                    int[] match = null;
-                    for (int[] signature : signatures) {
-                        meter.charge();
-                        if (compatible(up, signature[0]) && compatible(down, signature[1])) { match = signature; break; }
-                    }
-                    if (match == null) {
-                        match = new int[] {up, down, nextClass++}; signatures.add(match);
-                    } else {
-                        if (match[0] == -1) match[0] = up;
-                        if (match[1] == -1) match[1] = down;
-                    }
-                    refined[count] = match[2];
-                }
-            }
-            classes = refined;
-            if (nextClass == classCount) break;
-            classCount = nextClass;
-        }
-        BigInteger[] outputs = new BigInteger[classCount];
-        int[] plus = new int[classCount], minus = new int[classCount];
-        Arrays.fill(plus, -1); Arrays.fill(minus, -1);
-        for (int count = 0; count < n; count++) {
-            meter.charge();
-            int state = classes[count]; outputs[state] = observations[count];
-            if (count + 1 < n) plus[state] = classes[count + 1];
-            if (source.allowDeletes && count > 0) minus[state] = classes[count - 1];
-        }
-        Plan plan = new Plan(classes, outputs, plus, minus);
+        BigInteger[] observations = observationWord(source, meter);
+        Shape shape = minimalShape(observations, source.allowDeletes, meter);
+        Plan plan = buildPlan(observations, shape, source.allowDeletes, meter);
         long synthesisWork = meter.work;
         Verification verification = verify(source, plan, meter);
         if (!verification.accepted) throw new AssertionError("derived counter plan failed its checker: " + verification.detail);
         return new Derivation(plan, synthesisWork, verification);
     }
 
-    private static boolean compatible(int left, int right) { return left == -1 || right == -1 || left == right; }
+    private record Shape(int prefix, int period) {
+        int size() { return prefix + period; }
+        int state(int count) { return count < prefix ? count : prefix + (count - prefix) % period; }
+    }
+
+    private static BigInteger[] observationWord(Specification source, Meter meter) {
+        BigInteger[] word = new BigInteger[source.maximumCount + 1];
+        for (int count = 0; count < word.length; count++) word[count] = evaluate(source.observation, count, meter);
+        return word;
+    }
+
+    /** Reversal preserves periods. A prefix function on the reversed word
+     * yields the shortest period of EVERY suffix in linear work. Reversible
+     * changes require a global period; insertions alone allow a finite prefix. */
+    private static Shape minimalShape(BigInteger[] word, boolean deletes, Meter meter) {
+        int[] prefixFunction = reversedPrefixFunction(word, meter);
+        Shape best = new Shape(0, word.length - prefixFunction[word.length - 1]);
+        if (deletes) return best;
+        for (int start = 1; start < word.length; start++) {
+            meter.charge();
+            int length = word.length - start;
+            Shape candidate = new Shape(start, length - prefixFunction[length - 1]);
+            if (candidate.size() < best.size()) best = candidate;
+        }
+        return best;
+    }
+
+    private static int[] reversedPrefixFunction(BigInteger[] word, Meter meter) {
+        int[] prefix = new int[word.length];
+        for (int i = 1; i < word.length; i++) {
+            int matched = prefix[i - 1];
+            BigInteger current = word[word.length - i - 1];
+            while (matched > 0 && !same(current, word[word.length - matched - 1], meter)) matched = prefix[matched - 1];
+            if (same(current, word[word.length - matched - 1], meter)) matched++;
+            prefix[i] = matched;
+        }
+        return prefix;
+    }
+
+    private static boolean same(BigInteger left, BigInteger right, Meter meter) {
+        meter.charge();
+        return left.equals(right);
+    }
+
+    private static Plan buildPlan(BigInteger[] word, Shape shape, boolean deletes, Meter meter) {
+        int[] states = new int[word.length];
+        for (int count = 0; count < word.length; count++) { meter.charge(); states[count] = shape.state(count); }
+        BigInteger[] outputs = Arrays.copyOf(word, shape.size());
+        int[] plus = new int[shape.size()], minus = new int[shape.size()];
+        Arrays.fill(plus, -1); Arrays.fill(minus, -1);
+        for (int count = 0; count < word.length; count++) {
+            meter.charge();
+            if (count + 1 < word.length) plus[states[count]] = states[count + 1];
+            if (deletes && count > 0) minus[states[count]] = states[count - 1];
+        }
+        return new Plan(states, outputs, plus, minus);
+    }
 
     /** Checks the witness by enumeration of ALL legal counts and transitions;
      * does not call the partition refiner or trust the producer's state count. */

@@ -25,6 +25,52 @@ class CounterStateSynthesisTest {
         assertTrue(reversible.refinementWork() > 0);
     }
 
+    @Test void derivesLargestReversibleSupportWithinLinearWorkBudget() {
+        int bound = CounterStateSynthesis.MAXIMUM_COUNT;
+        var result = CounterStateSynthesis.derive(spec(SUPPORT, bound, true), 20L * (bound + 1));
+        assertEquals(bound + 1, result.plan().outputs().length);
+        assertTrue(result.totalWork() <= 20L * (bound + 1));
+        assertTrue(result.verification().accepted());
+    }
+
+    @Test void producesMinimalStatesForEverySmallBinaryObservationWord() {
+        for (int length = 2; length <= 7; length++) {
+            for (int bits = 0; bits < 1 << length; bits++) {
+                int[] word = new int[length];
+                Expr expression = new NumberExpr(0);
+                for (int i = 0; i < length; i++) {
+                    word[i] = bits >>> i & 1;
+                    if (word[i] == 0) continue;
+                    // Indicator for count == i, expressed in the public AST.
+                    Expr first = new FunctionExpr("positive", new BinaryExpr(COUNT, BinaryOperator.SUB, new NumberExpr(i - 1)));
+                    Expr second = new FunctionExpr("positive", new BinaryExpr(COUNT, BinaryOperator.SUB, new NumberExpr(i)));
+                    expression = new BinaryExpr(expression, BinaryOperator.ADD, new BinaryExpr(first, BinaryOperator.SUB, second));
+                }
+                for (boolean deletes : new boolean[] {false, true}) {
+                    var source = spec(expression, length - 1, deletes);
+                    var result = CounterStateSynthesis.derive(source);
+                    assertTrue(result.verification().accepted());
+                    assertEquals(minimumLassoSize(word, deletes), result.plan().outputs().length,
+                        "word=" + java.util.Arrays.toString(word) + ", deletes=" + deletes);
+                }
+            }
+        }
+    }
+
+    private int minimumLassoSize(int[] word, boolean deletes) {
+        int best = word.length;
+        for (int prefix = 0; prefix < (deletes ? 1 : word.length); prefix++) {
+            for (int period = 1; prefix + period <= word.length; period++) {
+                boolean valid = true;
+                for (int i = prefix; i < word.length; i++) {
+                    if (word[i] != word[prefix + (i - prefix) % period]) { valid = false; break; }
+                }
+                if (valid) best = Math.min(best, prefix + period);
+            }
+        }
+        return best;
+    }
+
     @Test void discoversParityWithoutAParityTransitionTemplate() {
         var source = spec(PARITY, 13, true);
         var result = CounterStateSynthesis.derive(source);
