@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CounterStateSynthesis.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.incremental</a> &gt; <span class="el_source">CounterStateSynthesis.java</span></div><h1>CounterStateSynthesis.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.incremental;
+
+import de.regelsuche.ast.*;
+import java.math.BigInteger;
+import java.util.*;
+
+/**
+ * Bounded synthesis of sufficient counter states, using the existing expression
+ * AST. Period analysis of the observation word determines a sufficient state;
+ * no support/parity update templates are consulted. The shortest global period
+ * is minimal for reversible changes; insert-only changes admit a prefix/cycle.
+ */
+public final class CounterStateSynthesis {
+    private CounterStateSynthesis() { }
+    public static final int MAXIMUM_COUNT = 8192;
+    public static final long DEFAULT_WORK_BUDGET = 100_000_000L;
+    private static final int MAXIMUM_VALUE_BITS = 4096;
+
+    /** Count bounds are part of the proof, not estimates inferred from samples. */
+    public record Specification(Expr observation, int maximumCount, boolean allowDeletes) {
+<span class="fc" id="L21">        public Specification {</span>
+<span class="fc" id="L22">            Objects.requireNonNull(observation, &quot;observation&quot;);</span>
+<span class="pc bpc" id="L23" title="1 of 4 branches missed.">            if (maximumCount &lt; 1 || maximumCount &gt; MAXIMUM_COUNT)</span>
+<span class="fc" id="L24">                throw new IllegalArgumentException(&quot;count bound must be 1..&quot; + MAXIMUM_COUNT);</span>
+<span class="fc" id="L25">            validateExpression(observation, 0, new int[1]);</span>
+<span class="fc" id="L26">        }</span>
+    }
+
+    /** Data-only witness. Arrays are copied both on input and on access. */
+    public record Plan(int[] statesByCount, BigInteger[] outputs, int[] onInsert, int[] onDelete) {
+<span class="fc" id="L31">        public Plan {</span>
+<span class="fc" id="L32">            Objects.requireNonNull(statesByCount); Objects.requireNonNull(outputs);</span>
+<span class="fc" id="L33">            Objects.requireNonNull(onInsert); Objects.requireNonNull(onDelete);</span>
+<span class="pc bpc" id="L34" title="4 of 8 branches missed.">            if (statesByCount.length &gt; MAXIMUM_COUNT + 1 || outputs.length &gt; MAXIMUM_COUNT + 1</span>
+                    || onInsert.length &gt; MAXIMUM_COUNT + 1 || onDelete.length &gt; MAXIMUM_COUNT + 1)
+<span class="nc" id="L36">                throw new IllegalArgumentException(&quot;oversized counter plan&quot;);</span>
+<span class="fc" id="L37">            statesByCount = statesByCount.clone(); outputs = outputs.clone();</span>
+<span class="fc" id="L38">            onInsert = onInsert.clone(); onDelete = onDelete.clone();</span>
+<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">        @Override public int[] statesByCount() { return statesByCount.clone(); }</span>
+<span class="fc" id="L41">        @Override public BigInteger[] outputs() { return outputs.clone(); }</span>
+<span class="fc" id="L42">        @Override public int[] onInsert() { return onInsert.clone(); }</span>
+<span class="fc" id="L43">        @Override public int[] onDelete() { return onDelete.clone(); }</span>
+    }
+<span class="fc" id="L45">    public record Verification(boolean accepted, long work, String detail) { }</span>
+<span class="fc" id="L46">    public record Derivation(Plan plan, long refinementWork, Verification verification) {</span>
+<span class="fc" id="L47">        public long totalWork() { return Math.addExact(refinementWork, verification.work()); }</span>
+    }
+    public static final class BudgetExceededException extends IllegalArgumentException {
+<span class="fc" id="L50">        public BudgetExceededException() { super(&quot;counter-state derivation/checking budget exhausted&quot;); }</span>
+    }
+    private static final class Meter {
+        final long limit;
+        long work;
+<span class="fc" id="L55">        Meter(long limit) {</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">            if (limit &lt; 1 || limit &gt; DEFAULT_WORK_BUDGET) throw new IllegalArgumentException(&quot;invalid work budget&quot;);</span>
+<span class="fc" id="L57">            this.limit = limit;</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        void charge() { if (work == limit) throw new BudgetExceededException(); work++; }</span>
+    }
+
+<span class="fc" id="L62">    public static Derivation derive(Specification source) { return derive(source, DEFAULT_WORK_BUDGET); }</span>
+
+    public static Derivation derive(Specification source, long workBudget) {
+<span class="fc" id="L65">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L66">        Meter meter = new Meter(workBudget);</span>
+<span class="fc" id="L67">        BigInteger[] observations = observationWord(source, meter);</span>
+<span class="fc" id="L68">        Shape shape = minimalShape(observations, source.allowDeletes, meter);</span>
+<span class="fc" id="L69">        Plan plan = buildPlan(observations, shape, source.allowDeletes, meter);</span>
+<span class="fc" id="L70">        long synthesisWork = meter.work;</span>
+<span class="fc" id="L71">        Verification verification = verify(source, plan, meter);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!verification.accepted) throw new AssertionError(&quot;derived counter plan failed its checker: &quot; + verification.detail);</span>
+<span class="fc" id="L73">        return new Derivation(plan, synthesisWork, verification);</span>
+    }
+
+<span class="fc" id="L76">    private record Shape(int prefix, int period) {</span>
+<span class="fc" id="L77">        int size() { return prefix + period; }</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        int state(int count) { return count &lt; prefix ? count : prefix + (count - prefix) % period; }</span>
+    }
+
+    private static BigInteger[] observationWord(Specification source, Meter meter) {
+<span class="fc" id="L82">        BigInteger[] word = new BigInteger[source.maximumCount + 1];</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (int count = 0; count &lt; word.length; count++) word[count] = evaluate(source.observation, count, meter);</span>
+<span class="fc" id="L84">        return word;</span>
+    }
+
+    /** Reversal preserves periods. A prefix function on the reversed word
+     * yields the shortest period of EVERY suffix in linear work. Reversible
+     * changes require a global period; insertions alone allow a finite prefix. */
+    private static Shape minimalShape(BigInteger[] word, boolean deletes, Meter meter) {
+<span class="fc" id="L91">        int[] prefixFunction = reversedPrefixFunction(word, meter);</span>
+<span class="fc" id="L92">        Shape best = new Shape(0, word.length - prefixFunction[word.length - 1]);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (deletes) return best;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int start = 1; start &lt; word.length; start++) {</span>
+<span class="fc" id="L95">            meter.charge();</span>
+<span class="fc" id="L96">            int length = word.length - start;</span>
+<span class="fc" id="L97">            Shape candidate = new Shape(start, length - prefixFunction[length - 1]);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (candidate.size() &lt; best.size()) best = candidate;</span>
+        }
+<span class="fc" id="L100">        return best;</span>
+    }
+
+    private static int[] reversedPrefixFunction(BigInteger[] word, Meter meter) {
+<span class="fc" id="L104">        int[] prefix = new int[word.length];</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (int i = 1; i &lt; word.length; i++) {</span>
+<span class="fc" id="L106">            int matched = prefix[i - 1];</span>
+<span class="fc" id="L107">            BigInteger current = word[word.length - i - 1];</span>
+<span class="fc bfc" id="L108" title="All 4 branches covered.">            while (matched &gt; 0 &amp;&amp; !same(current, word[word.length - matched - 1], meter)) matched = prefix[matched - 1];</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (same(current, word[word.length - matched - 1], meter)) matched++;</span>
+<span class="fc" id="L110">            prefix[i] = matched;</span>
+        }
+<span class="fc" id="L112">        return prefix;</span>
+    }
+
+    private static boolean same(BigInteger left, BigInteger right, Meter meter) {
+<span class="fc" id="L116">        meter.charge();</span>
+<span class="fc" id="L117">        return left.equals(right);</span>
+    }
+
+    private static Plan buildPlan(BigInteger[] word, Shape shape, boolean deletes, Meter meter) {
+<span class="fc" id="L121">        int[] states = new int[word.length];</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (int count = 0; count &lt; word.length; count++) { meter.charge(); states[count] = shape.state(count); }</span>
+<span class="fc" id="L123">        BigInteger[] outputs = Arrays.copyOf(word, shape.size());</span>
+<span class="fc" id="L124">        int[] plus = new int[shape.size()], minus = new int[shape.size()];</span>
+<span class="fc" id="L125">        Arrays.fill(plus, -1); Arrays.fill(minus, -1);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (int count = 0; count &lt; word.length; count++) {</span>
+<span class="fc" id="L127">            meter.charge();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (count + 1 &lt; word.length) plus[states[count]] = states[count + 1];</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">            if (deletes &amp;&amp; count &gt; 0) minus[states[count]] = states[count - 1];</span>
+        }
+<span class="fc" id="L131">        return new Plan(states, outputs, plus, minus);</span>
+    }
+
+    /** Checks the witness by enumeration of ALL legal counts and transitions;
+     * does not call the partition refiner or trust the producer's state count. */
+    public static Verification verify(Specification source, Plan plan) {
+<span class="fc" id="L137">        return verify(Objects.requireNonNull(source), Objects.requireNonNull(plan), new Meter(DEFAULT_WORK_BUDGET));</span>
+    }
+    private static Verification verify(Specification source, Plan plan, Meter meter) {
+<span class="fc" id="L140">        long start = meter.work;</span>
+<span class="fc" id="L141">        int n = source.maximumCount + 1, states = plan.outputs.length;</span>
+<span class="pc bpc" id="L142" title="4 of 10 branches missed.">        if (plan.statesByCount.length != n || states &lt; 1 || states &gt; n</span>
+                || plan.onInsert.length != states || plan.onDelete.length != states)
+<span class="fc" id="L144">            return new Verification(false, meter.work - start, &quot;table shape&quot;);</span>
+<span class="fc" id="L145">        boolean[] reached = new boolean[states];</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int state = 0; state &lt; states; state++) {</span>
+<span class="fc" id="L147">            meter.charge();</span>
+<span class="pc bpc" id="L148" title="7 of 16 branches missed.">            if (plan.outputs[state] == null || plan.outputs[state].bitLength() &gt; MAXIMUM_VALUE_BITS</span>
+                    || plan.onInsert[state] &lt; -1 || plan.onInsert[state] &gt;= states
+                    || plan.onDelete[state] &lt; -1 || plan.onDelete[state] &gt;= states
+                    || !source.allowDeletes &amp;&amp; plan.onDelete[state] != -1)
+<span class="nc" id="L152">                return new Verification(false, meter.work - start, &quot;invalid state&quot;);</span>
+        }
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (int count = 0; count &lt; n; count++) {</span>
+<span class="fc" id="L155">            meter.charge();</span>
+<span class="fc" id="L156">            int state = plan.statesByCount[count];</span>
+<span class="pc bpc" id="L157" title="2 of 6 branches missed.">            if (state &lt; 0 || state &gt;= states || !evaluate(source.observation, count, meter).equals(plan.outputs[state]))</span>
+<span class="fc" id="L158">                return new Verification(false, meter.work - start, &quot;observation at &quot; + count);</span>
+<span class="fc" id="L159">            reached[state] = true;</span>
+<span class="pc bpc" id="L160" title="1 of 10 branches missed.">            if (count + 1 &lt; n &amp;&amp; plan.onInsert[state] != plan.statesByCount[count + 1]</span>
+                    || source.allowDeletes &amp;&amp; count &gt; 0 &amp;&amp; plan.onDelete[state] != plan.statesByCount[count - 1])
+<span class="fc" id="L162">                return new Verification(false, meter.work - start, &quot;transition at &quot; + count);</span>
+        }
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">        for (boolean used : reached) if (!used) return new Verification(false, meter.work - start, &quot;unreachable state&quot;);</span>
+<span class="fc" id="L165">        return new Verification(true, meter.work - start, &quot;all bounded observations/transitions checked&quot;);</span>
+    }
+
+    public static Prepared prepareVerified(Specification source, Plan plan) {
+<span class="fc" id="L169">        Verification checked = verify(source, plan);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (!checked.accepted) throw new IllegalArgumentException(&quot;counter plan rejected: &quot; + checked.detail);</span>
+<span class="fc" id="L171">        return new Prepared(source, plan);</span>
+    }
+    public static final class Prepared {
+        private final Specification source;
+        private final Plan plan;
+<span class="fc" id="L176">        private Prepared(Specification source, Plan plan) { this.source = source; this.plan = plan; }</span>
+        public &lt;K&gt; Accumulator&lt;K&gt; newAccumulator() {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (plan.outputs[plan.statesByCount[0]].signum() != 0)</span>
+<span class="fc" id="L179">                throw new IllegalArgumentException(&quot;grouped sums require f(0)=0&quot;);</span>
+<span class="fc" id="L180">            return new Accumulator&lt;&gt;(source, plan);</span>
+        }
+    }
+    /** Sum of per-key observations. Sessions are independent and not thread-safe.
+     * Key equality/hash codes must remain stable while a key is present. */
+    public static final class Accumulator&lt;K&gt; {
+<span class="fc" id="L186">        private record Bucket(int count, int state) { }</span>
+        private final Specification source;
+        private final Plan plan;
+<span class="fc" id="L189">        private final Map&lt;K, Bucket&gt; buckets = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L190">        private BigInteger value = BigInteger.ZERO;</span>
+<span class="fc" id="L191">        private Accumulator(Specification source, Plan plan) { this.source = source; this.plan = plan; }</span>
+<span class="fc" id="L192">        public BigInteger value() { return value; }</span>
+<span class="fc" id="L193">        public void insert(K key) { change(key, 1); }</span>
+<span class="fc" id="L194">        public void delete(K key) { change(key, -1); }</span>
+        private void change(K key, int delta) {
+<span class="fc" id="L196">            Objects.requireNonNull(key, &quot;key&quot;);</span>
+<span class="fc" id="L197">            Bucket old = buckets.get(key);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            int count = old == null ? 0 : old.count;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            int state = old == null ? plan.statesByCount[0] : old.state;</span>
+<span class="fc bfc" id="L200" title="All 10 branches covered.">            if (delta &lt; 0 &amp;&amp; (!source.allowDeletes || count == 0) || delta &gt; 0 &amp;&amp; count == source.maximumCount)</span>
+<span class="fc" id="L201">                throw new IllegalStateException(&quot;change outside the proven count/update bounds&quot;);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            int next = delta &gt; 0 ? plan.onInsert[state] : plan.onDelete[state];</span>
+<span class="fc" id="L203">            BigInteger updated = value.subtract(plan.outputs[state]).add(plan.outputs[next]);</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (count + delta == 0) buckets.remove(key);</span>
+<span class="fc" id="L205">            else buckets.put(key, new Bucket(count + delta, next));</span>
+<span class="fc" id="L206">            value = updated;</span>
+<span class="fc" id="L207">        }</span>
+    }
+
+    private static void validateExpression(Expr expression, int depth, int[] nodes) {
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        if (depth &gt; 32 || ++nodes[0] &gt; 128) throw new IllegalArgumentException(&quot;observer AST too large&quot;);</span>
+<span class="fc bfc" id="L212" title="All 4 branches covered.">        switch (expression) {</span>
+<span class="fc" id="L213">            case NumberExpr number -&gt; {</span>
+<span class="pc bpc" id="L214" title="2 of 4 branches missed.">                if (!number.value().denominator().equals(BigInteger.ONE) || number.value().numerator().bitLength() &gt; 256)</span>
+<span class="nc" id="L215">                    throw new IllegalArgumentException(&quot;observer requires bounded integer constants&quot;);</span>
+            }
+<span class="fc" id="L217">            case VariableExpr variable -&gt; {</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                if (!variable.name().equals(&quot;count&quot;)) throw new IllegalArgumentException(&quot;only count is bound&quot;);</span>
+            }
+<span class="fc" id="L220">            case BinaryExpr binary -&gt; {</span>
+<span class="pc bpc" id="L221" title="1 of 6 branches missed.">                if (binary.operator() != BinaryOperator.ADD &amp;&amp; binary.operator() != BinaryOperator.SUB &amp;&amp; binary.operator() != BinaryOperator.MUL)</span>
+<span class="nc" id="L222">                    throw new IllegalArgumentException(&quot;observer supports +, -, *&quot;);</span>
+<span class="fc" id="L223">                validateExpression(binary.left(), depth + 1, nodes); validateExpression(binary.right(), depth + 1, nodes);</span>
+<span class="fc" id="L224">            }</span>
+<span class="fc" id="L225">            case FunctionExpr function -&gt; {</span>
+<span class="fc bfc" id="L226" title="All 3 branches covered.">                int arity = switch (function.name()) { case &quot;positive&quot; -&gt; 1; case &quot;mod&quot; -&gt; 2; default -&gt; 0; };</span>
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">                if (arity == 0 || function.arguments().size() != arity) throw new IllegalArgumentException(&quot;unknown observer function/arity&quot;);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                for (Expr argument : function.arguments()) validateExpression(argument, depth + 1, nodes);</span>
+            }
+        }
+<span class="fc" id="L231">    }</span>
+    private static BigInteger evaluate(Expr expression, int count, Meter meter) {
+<span class="fc" id="L233">        meter.charge();</span>
+<span class="fc bfc" id="L234" title="All 4 branches covered.">        BigInteger value = switch (expression) {</span>
+<span class="fc" id="L235">            case NumberExpr number -&gt; number.value().numerator();</span>
+<span class="fc" id="L236">            case VariableExpr _ -&gt; BigInteger.valueOf(count);</span>
+<span class="fc" id="L237">            case BinaryExpr binary -&gt; {</span>
+<span class="fc" id="L238">                BigInteger left = evaluate(binary.left(), count, meter), right = evaluate(binary.right(), count, meter);</span>
+<span class="pc bpc" id="L239" title="1 of 4 branches missed.">                yield switch (binary.operator()) {</span>
+<span class="fc" id="L240">                    case ADD -&gt; left.add(right); case SUB -&gt; left.subtract(right); case MUL -&gt; left.multiply(right);</span>
+<span class="nc" id="L241">                    default -&gt; throw new IllegalArgumentException(&quot;unsupported observer operation&quot;);</span>
+                };
+            }
+<span class="fc" id="L244">            case FunctionExpr function -&gt; {</span>
+<span class="fc" id="L245">                BigInteger first = evaluate(function.argument(), count, meter);</span>
+<span class="fc bfc" id="L246" title="All 4 branches covered.">                if (function.name().equals(&quot;positive&quot;)) yield first.signum() &gt; 0 ? BigInteger.ONE : BigInteger.ZERO;</span>
+<span class="fc" id="L247">                BigInteger modulus = evaluate(function.arguments().get(1), count, meter);</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                if (modulus.signum() &lt;= 0) throw new IllegalArgumentException(&quot;mod requires a positive modulus&quot;);</span>
+<span class="fc" id="L249">                yield first.mod(modulus);</span>
+            }
+<span class="fc" id="L251">        };</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (value.bitLength() &gt; MAXIMUM_VALUE_BITS) throw new IllegalArgumentException(&quot;observer value too large&quot;);</span>
+<span class="fc" id="L253">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
