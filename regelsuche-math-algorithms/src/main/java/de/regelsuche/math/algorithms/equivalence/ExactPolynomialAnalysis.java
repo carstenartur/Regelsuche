@@ -23,6 +23,9 @@ public final class ExactPolynomialAnalysis {
         arithmetic = new ExactResidualPolynomialArithmetic(workObserver);
     }
 
+    /** Source-exact bounded projection for construction and structural objectives. */
+    public Polynomial normalForm(String expression) { return arithmetic.parse(expression); }
+
     public void requireEquivalent(String source, String candidate) {
         if (!arithmetic.parse(source).equals(arithmetic.parse(candidate))) {
             throw new IllegalArgumentException("polynomial normal forms differ");

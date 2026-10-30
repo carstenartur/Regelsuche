@@ -1,0 +1,68 @@
+{
+  "purpose": "Accepted predecessor refresh; no metric is taken from failing PR #1126",
+  "acceptedSource": {
+    "revision": "ea5e7da3e199c2e052133317f089ab5c2da8e5be",
+    "tree": "bef455f1d116e26c421c6cab41c1930aafb08ce8",
+    "workflowRun": 41135715687,
+    "conclusion": "success",
+    "artifactId": 13018675678,
+    "artifactName": "quality-acceptance-evidence",
+    "artifactSha256": "5a2c8cdb8daa07cb632d1ab93b2a85d601af83ae189fadeeca5f1c474776550a",
+    "artifactBytes": 29176399
+  },
+  "files": {
+    "files/build/ai-knowledge/check.json": {
+      "sha256": "f37d8ccf23fd37ce365d783aa185d87010e72d7a5465c66b6a1babd4dc30f167",
+      "bytes": 10182
+    },
+    "files/build/ai-knowledge/complexity.json": {
+      "sha256": "46ac47f45f5a489b86133ce116bae4f19c8f6103668a51a3cd6588e946f11d75",
+      "bytes": 20764
+    },
+    "files/ai-knowledge/complexity-baseline.json": {
+      "sha256": "d2146a9f97686f724e49d5e710f46470674b39038b8595eae71dd2983c35c12b",
+      "bytes": 315
+    },
+    "index-projection.json": {
+      "sha256": "9ceac721b3a6e7bee5d82926067f7b93663461a9f4f130dbc566ca5b3faa28fc",
+      "bytes": 1133
+    },
+    "rejected-pr1126-trend.json": {
+      "sha256": "9f4c32ea7350a0bef43acdadcc3cc150d115c380cdb5dd1bacf826386f652a15",
+      "bytes": 2111
+    }
+  },
+  "previousBaselineSha256": "d2146a9f97686f724e49d5e710f46470674b39038b8595eae71dd2983c35c12b",
+  "projectedBaselineSha256": "74d61a502ebdcc344d1c60ad397a0b8013eae56669b79472aa2865aad2686f97",
+  "derivation": "Numeric baseline fields are copied from the accepted complexity.json report. schemaVersion=1 retains the baseline format; contextDebtModelVersion=context-footprint-v3 is bound to its measured contextFootprint.schemaVersion=3. This is a deterministic projection, NOT a downloaded metrics-snapshot.json.",
+  "limits": {
+    "maxContextTokenIncrease": 15000,
+    "acceptedPredecessorIncrease": 14885,
+    "rejectedFeatureIncrease": 16705,
+    "featureIncreaseFromAcceptedPredecessor": 1820
+  },
+  "verification": {
+    "qualityArtifactDigestVerified": true,
+    "allIndexedFilesVerified": 284,
+    "acceptedGatePassed": true,
+    "sameOldBaselineVerified": true,
+    "rejectedFeatureNotUsedAsBaseline": true,
+    "freshLocalJava25ExtractorRun": false,
+    "independentHumanReview": "pending",
+    "featureFinalHeadCi": "required"
+  },
+  "scope": "Only accepted-main measurement metadata and baseline; no thresholds, selectors, claims, exclusions, runtime code or tests are changed. The full 669812470-byte repository artifact exceeds the download tool limit; the smaller hash-verified quality artifact supplies the original reports.",
+  "originalIndex": {
+    "sha256": "8ddb8b8edff6b348fb340a23d5cdd926cdc0d63b9b1095c3390ec0c82ad91e53",
+    "bytes": 523122,
+    "sourceArtifact": 13018675678,
+    "retention": "Original index remains in the referenced GitHub artifact and downloadable verification bundle; no original index bytes are claimed for this metadata file."
+  },
+  "evidenceRetention": {
+    "originalArtifact": "https://github.com/carstenartur/Regelsuche/actions/runs/41135715687/artifacts/13018675678",
+    "portableVerificationBundle": "Regelsuche_Vier_PR_Diagnose_und_Korrekturen.zip",
+    "compactRawReportsSha256": "b166fff970bd0216a8170d96af8d6f455a7811de5dd9094c518aa8db71fbab8a",
+    "compactRawReportsBytes": 8909,
+    "note": "Original native reports and full original index are retained in the downloadable verification bundle, not duplicated as source files in this repository. Their exact artifact and file identities are recorded here."
+  }
+}
