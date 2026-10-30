@@ -10,6 +10,10 @@ import de.regelsuche.search.moves.IncrementalProviderContract.Registry;
 import de.regelsuche.search.moves.IncrementalProviderContract.Transport;
 
 import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.search.moves.IncrementalProviderContract;
 import de.regelsuche.search.moves.MoveProvider;
@@ -19,6 +23,7 @@ import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
+import java.util.AbstractList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -29,21 +34,26 @@ import java.util.TreeMap;
 
 /** Immutable preparation shared by cursor sessions, not an eagerly generated candidate list. */
 public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
-<span class="fc" id="L32">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(bounds);v.reference(descriptor);v.reference(index);v.reference(application);v.reference(definition);v.reference(compilation);v.reference(model);}</span>
+<span class="fc" id="L37">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(bounds);v.reference(descriptor);v.reference(index);v.reference(application);v.reference(definition);v.reference(compilation);v.reference(model);}</span>
     public static final String REVISION = &quot;regelsuche.checked-schema-matcher-plan/v1&quot;;
     public static final String WORK_REVISION = &quot;regelsuche.checked-schema-cursor-work/v2-prepaid-phases&quot;;
+    public static final String INDEXED_REVISION = &quot;regelsuche.checked-schema-matcher-plan/v2-indexed&quot;;
+    public static final String INDEXED_WORK_REVISION = &quot;regelsuche.checked-schema-cursor-work/v3-indexed-shared-paths&quot;;
+    private static final int OTHER_SHAPE = 3;
+    private static final int BINARY_SHAPE_BASE = 4;
+<span class="fc" id="L44">    private static final int SHAPE_COUNT = BINARY_SHAPE_BASE + BinaryOperator.values().length;</span>
     /** Preparation is a separate lifecycle charge; opening a cursor never rebuilds this index. */
-<span class="fc" id="L36">    public record Compilation(String revision, String configurationHash, long workUnits,</span>
+<span class="fc" id="L46">    public record Compilation(String revision, String configurationHash, long workUnits,</span>
             int includedSchemas, long patternNodeVisits, long orderingComparisons)  implements RetainedGraph.View {
-<span class="fc" id="L38">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(configurationHash);}</span>
+<span class="fc" id="L48">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(configurationHash);}</span>
     }
-<span class="fc" id="L40">    record Entry(CheckedLearnedSchemaModel.Schema schema, ExprMatcher matcher, int reduction)  implements RetainedGraph.View {</span>
-<span class="fc" id="L41">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(schema);v.reference(matcher);}</span>
+<span class="fc" id="L50">    record Entry(CheckedLearnedSchemaModel.Schema schema, ExprMatcher matcher, int reduction)  implements RetainedGraph.View {</span>
+<span class="fc" id="L51">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(schema);v.reference(matcher);}</span>
     }
-<span class="fc" id="L43">    record Range(List&lt;Entry&gt; shaped, List&lt;Entry&gt; wildcard) implements RetainedGraph.View {</span>
-<span class="fc" id="L44">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(shaped);v.reference(wildcard);}</span>
-<span class="fc" id="L45">        int size() { return shaped.size() + wildcard.size(); }</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        Entry get(int index) { return index &lt; shaped.size() ? shaped.get(index) : wildcard.get(index - shaped.size()); }</span>
+<span class="fc" id="L53">    record Range(List&lt;Entry&gt; shaped, List&lt;Entry&gt; wildcard) implements RetainedGraph.View {</span>
+<span class="fc" id="L54">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(shaped);v.reference(wildcard);}</span>
+<span class="fc" id="L55">        int size() { return shaped.size() + wildcard.size(); }</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        Entry get(int index) { return index &lt; shaped.size() ? shaped.get(index) : wildcard.get(index - shaped.size()); }</span>
     }
     @FunctionalInterface interface Application {
         ApplicationSteps start(CheckedLearnedSchemaModel.Schema schema, Expr source, String encodedSource,
@@ -68,132 +78,240 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
     private final CheckedLearnedSchemaModel model;
 
     CheckedSchemaMatcherPlan(CheckedLearnedSchemaModel model, MoveProvider.Descriptor descriptor, int maximum,
-<span class="fc" id="L71">            Map&lt;String, Double&gt; utilities, Set&lt;String&gt; included, Application application) {</span>
-<span class="fc" id="L72">        this.model=Objects.requireNonNull(model);</span>
-<span class="fc" id="L73">        this.descriptor = Objects.requireNonNull(descriptor);</span>
-<span class="fc" id="L74">        this.application = Objects.requireNonNull(application);</span>
-<span class="fc" id="L75">        bounds = model.bounds();</span>
-<span class="fc" id="L76">        maximumSchemasPerOccurrence = maximum;</span>
-<span class="fc" id="L77">        var work = new Work();</span>
-<span class="fc" id="L78">        var utility = Map.copyOf(utilities);</span>
-<span class="fc" id="L79">        var selected = Set.copyOf(included);</span>
-<span class="fc" id="L80">        validate(model, maximum, utility, selected, work);</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">        allSchemasIncluded = selected.size() == model.schemas().size();</span>
-<span class="fc" id="L82">        var entries = new ArrayList&lt;Entry&gt;();</span>
-<span class="fc" id="L83">        long patternVisits = prepareEntries(model, selected, entries, work);</span>
-<span class="fc" id="L84">        var comparisons = new Work();</span>
-<span class="fc" id="L85">        index = orderedIndex(entries, utility, comparisons);</span>
-<span class="fc" id="L86">        work.add(comparisons.units + entries.size());</span>
-<span class="fc" id="L87">        String configuration = configuration(descriptor.id(), maximum, utility, selected);</span>
-<span class="fc" id="L88">        work.add(configuration.length());</span>
-<span class="fc" id="L89">        String configurationHash = SchematicProofPlan.hash(configuration);</span>
-<span class="fc" id="L90">        definition = new Definition(IncrementalProviderContract.PREPAID_REVISION, descriptor.id(), Kind.REGISTERED_SCHEMA,</span>
-<span class="fc" id="L91">            configurationHash, model.inventorySemanticsHash() + &quot;;&quot; + CheckedLearnedSchemaModel.CHECKER_REVISION</span>
+<span class="fc" id="L81">            Map&lt;String, Double&gt; utilities, Set&lt;String&gt; included, Application application) {</span>
+<span class="fc" id="L82">        this.model=Objects.requireNonNull(model);</span>
+<span class="fc" id="L83">        this.descriptor = Objects.requireNonNull(descriptor);</span>
+<span class="fc" id="L84">        this.application = Objects.requireNonNull(application);</span>
+<span class="fc" id="L85">        bounds = model.bounds();</span>
+<span class="fc" id="L86">        maximumSchemasPerOccurrence = maximum;</span>
+<span class="fc" id="L87">        var work = new Work();</span>
+<span class="fc" id="L88">        var utility = Map.copyOf(utilities);</span>
+<span class="fc" id="L89">        var selected = Set.copyOf(included);</span>
+<span class="fc" id="L90">        validate(model, maximum, utility, selected, work);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        allSchemasIncluded = selected.size() == model.schemas().size();</span>
+<span class="fc" id="L92">        var entries = new ArrayList&lt;Entry&gt;();</span>
+<span class="fc" id="L93">        long patternVisits = prepareEntries(model, selected, entries, work);</span>
+<span class="fc" id="L94">        var comparisons = new Work();</span>
+<span class="fc" id="L95">        index = orderedIndex(entries, utility, comparisons);</span>
+<span class="fc" id="L96">        work.add(comparisons.units + entries.size());</span>
+<span class="fc" id="L97">        String configuration = configuration(descriptor.id(), maximum, utility, selected);</span>
+<span class="fc" id="L98">        work.add(configuration.length());</span>
+<span class="fc" id="L99">        String configurationHash = SchematicProofPlan.hash(configuration);</span>
+<span class="fc" id="L100">        definition = new Definition(IncrementalProviderContract.PREPAID_REVISION, descriptor.id(), Kind.REGISTERED_SCHEMA,</span>
+<span class="fc" id="L101">            configurationHash, model.inventorySemanticsHash() + &quot;;&quot; + CheckedLearnedSchemaModel.CHECKER_REVISION</span>
                 + &quot;;&quot; + REVISION + &quot;;&quot; + WORK_REVISION,
             Transport.TYPED_AST_JSON, Mathematics.EXACT, null);
-<span class="fc" id="L94">        compilation = new Compilation(WORK_REVISION, configurationHash, work.units, entries.size(),</span>
+<span class="fc" id="L104">        compilation = new Compilation(WORK_REVISION, configurationHash, work.units, entries.size(),</span>
             patternVisits, comparisons.units);
-<span class="fc" id="L96">    }</span>
+<span class="fc" id="L106">    }</span>
 
     public static CheckedSchemaMatcherPlan prepare(CheckedLearnedSchemaModel model, int maximum,
             Map&lt;String, Double&gt; utilities, Set&lt;String&gt; included) {
-<span class="fc" id="L100">        return Objects.requireNonNull(model).prepareCursorPlan(maximum, utilities, included);</span>
+<span class="fc" id="L110">        return Objects.requireNonNull(model).prepareCursorPlan(maximum, utilities, included);</span>
     }
-<span class="fc" id="L102">    public Compilation compilationReceipt() { return compilation; }</span>
-<span class="fc" id="L103">    public long compilationWork() { return compilation.workUnits(); }</span>
+    /** Opt-in acceleration. The original plan and its historical work revision stay unchanged. */
+    public static CheckedSchemaMatcherPlan prepareIndexed(CheckedLearnedSchemaModel model, int maximum,
+            Map&lt;String, Double&gt; utilities, Set&lt;String&gt; included) {
+<span class="fc" id="L115">        return prepare(model, maximum, utilities, included).withIndexedDispatch();</span>
+    }
+
+    /** Compile once, then share the immutable result across independent cursor sessions. */
+    public CheckedSchemaMatcherPlan withIndexedDispatch() {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        return indexedDispatch() ? this : new CheckedSchemaMatcherPlan(this);</span>
+    }
+
+<span class="fc" id="L123">    private CheckedSchemaMatcherPlan(CheckedSchemaMatcherPlan original) {</span>
+<span class="fc" id="L124">        model = original.model;</span>
+<span class="fc" id="L125">        descriptor = original.descriptor;</span>
+<span class="fc" id="L126">        application = original.application;</span>
+<span class="fc" id="L127">        bounds = original.bounds;</span>
+<span class="fc" id="L128">        maximumSchemasPerOccurrence = original.maximumSchemasPerOccurrence;</span>
+<span class="fc" id="L129">        allSchemasIncluded = original.allSchemasIncluded;</span>
+<span class="fc" id="L130">        var prepared = new TreeMap&lt;String, List&lt;Entry&gt;&gt;();</span>
+<span class="fc" id="L131">        long extraWork = 1;</span>
+<span class="fc" id="L132">        long patternVisits = 0;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (var bucket : original.index.entrySet()) {</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (bucket.getKey().equals(&quot;P&quot;)) prepared.put(bucket.getKey(), bucket.getValue());</span>
+            else {
+<span class="fc" id="L136">                var entries = new IndexedEntries(bucket.getValue());</span>
+<span class="fc" id="L137">                prepared.put(bucket.getKey(), entries);</span>
+<span class="fc" id="L138">                extraWork = Math.addExact(extraWork, entries.shapes.compilationWork());</span>
+                // Each requirement array has three slots; root and at most two children are inspected.
+<span class="fc" id="L140">                extraWork = Math.addExact(extraWork, 7L * entries.size() + 1);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                for (var entry : bucket.getValue()) {</span>
+<span class="fc" id="L142">                    patternVisits = Math.addExact(patternVisits,</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                        entry.schema().source() instanceof PatternExpr.Operation ? 3 : 1);</span>
+<span class="fc" id="L144">                }</span>
+            }
+<span class="fc" id="L146">            extraWork = Math.addExact(extraWork, 2);</span>
+<span class="fc" id="L147">        }</span>
+<span class="fc" id="L148">        index = Map.copyOf(prepared);</span>
+<span class="fc" id="L149">        String configuration = original.compilation.configurationHash() + &quot;;&quot; + INDEXED_REVISION + &quot;;&quot; + INDEXED_WORK_REVISION;</span>
+<span class="fc" id="L150">        String configurationHash = SchematicProofPlan.hash(configuration);</span>
+<span class="fc" id="L151">        extraWork = Math.addExact(extraWork, configuration.length() + prepared.size() + 1L);</span>
+<span class="fc" id="L152">        definition = new Definition(IncrementalProviderContract.PREPAID_REVISION, descriptor.id(), Kind.REGISTERED_SCHEMA,</span>
+<span class="fc" id="L153">            configurationHash, original.definition.semanticsRevision() + &quot;;&quot; + INDEXED_REVISION + &quot;;&quot; + INDEXED_WORK_REVISION,</span>
+            Transport.TYPED_AST_JSON, Mathematics.EXACT, null);
+<span class="fc" id="L155">        compilation = new Compilation(INDEXED_WORK_REVISION, configurationHash,</span>
+<span class="fc" id="L156">            Math.addExact(original.compilationWork(), extraWork), original.compilation.includedSchemas(),</span>
+<span class="fc" id="L157">            Math.addExact(original.compilation.patternNodeVisits(), patternVisits), original.compilation.orderingComparisons());</span>
+<span class="fc" id="L158">    }</span>
+
+<span class="fc" id="L160">    boolean indexedDispatch() { return compilation.revision().equals(INDEXED_WORK_REVISION); }</span>
+
+    long dispatchWork(Range range) {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        return range.shaped() instanceof IndexedEntries ? CheckedSchemaShapeIndex.QUERY_WORK : 1;</span>
+    }
+
+    long selectionMask(Range range, Expr expression) {
+<span class="fc" id="L167">        int limit = Math.min(range.size(), maximumSchemasPerOccurrence);</span>
+<span class="fc" id="L168">        long shaped = CheckedSchemaShapeIndex.prefix(Math.min(range.shaped().size(), limit));</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (range.shaped() instanceof IndexedEntries entries) {</span>
+<span class="fc" id="L170">            int left = OTHER_SHAPE, right = OTHER_SHAPE;</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L172">                left = shape(binary.left()); right = shape(binary.right());</span>
+            }
+<span class="fc" id="L174">            shaped = entries.shapes.candidates(shape(expression), left, right, Math.min(entries.size(), limit));</span>
+        }
+<span class="fc" id="L176">        int wildcardCount = Math.max(0, limit - range.shaped().size());</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        long wildcard = wildcardCount == 0 ? 0 : CheckedSchemaShapeIndex.prefix(wildcardCount) &lt;&lt; range.shaped().size();</span>
+<span class="fc" id="L178">        return shaped | wildcard;</span>
+    }
+
+    private static int shape(Expr expression) {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) return BINARY_SHAPE_BASE + binary.operator().ordinal();</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr) return 0;</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (expression instanceof VariableExpr) return 1;</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (expression instanceof FunctionExpr) return 2;</span>
+<span class="nc" id="L186">        return OTHER_SHAPE;</span>
+    }
+
+    private static int shape(PatternExpr expression) {
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.Operation operation) return BINARY_SHAPE_BASE + operation.operator().ordinal();</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (expression instanceof PatternExpr.LiteralNumber) return 0;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (expression instanceof PatternExpr.LiteralVariable) return 1;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (expression instanceof PatternExpr.Function) return 2;</span>
+<span class="nc" id="L194">        return CheckedSchemaShapeIndex.ANY;</span>
+    }
+
+    private static final class IndexedEntries extends AbstractList&lt;Entry&gt; implements RetainedGraph.View {
+        private final List&lt;Entry&gt; entries;
+        private final CheckedSchemaShapeIndex shapes;
+<span class="fc" id="L200">        IndexedEntries(List&lt;Entry&gt; entries) {</span>
+<span class="fc" id="L201">            this.entries = entries;</span>
+<span class="fc" id="L202">            int[][] requirements = new int[entries.size()][3];</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            for (int i = 0; i &lt; entries.size(); i++) {</span>
+<span class="fc" id="L204">                var pattern = entries.get(i).schema().source();</span>
+<span class="fc" id="L205">                requirements[i][0] = shape(pattern);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                requirements[i][1] = pattern instanceof PatternExpr.Operation operation ? shape(operation.left()) : CheckedSchemaShapeIndex.ANY;</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                requirements[i][2] = pattern instanceof PatternExpr.Operation operation ? shape(operation.right()) : CheckedSchemaShapeIndex.ANY;</span>
+            }
+<span class="fc" id="L209">            shapes = new CheckedSchemaShapeIndex(SHAPE_COUNT, requirements);</span>
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">        @Override public Entry get(int index) { return entries.get(index); }</span>
+<span class="fc" id="L212">        @Override public int size() { return entries.size(); }</span>
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L214">            visitor.reference(entries); visitor.reference(shapes);</span>
+<span class="fc" id="L215">        }</span>
+    }
+
+<span class="fc" id="L218">    public Compilation compilationReceipt() { return compilation; }</span>
+<span class="fc" id="L219">    public long compilationWork() { return compilation.workUnits(); }</span>
     public de.regelsuche.search.moves.ExprIncrementalProvider nativeProvider() {
-<span class="fc" id="L105">        return new NativeProvider();</span>
+<span class="fc" id="L221">        return new NativeProvider();</span>
     }
     public RegisteredIncrementalMoveProvider provider() {
-<span class="fc" id="L108">        var registration = new Registration(definition,</span>
-<span class="fc" id="L109">            (state, context, meter) -&gt; CheckedSchemaCursor.legacy(this, state.expression(), meter));</span>
-<span class="fc" id="L110">        return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));</span>
+<span class="fc" id="L224">        var registration = new Registration(definition,</span>
+<span class="fc" id="L225">            (state, context, meter) -&gt; CheckedSchemaCursor.legacy(this, state.expression(), meter));</span>
+<span class="fc" id="L226">        return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));</span>
     }
     final class NativeProvider implements ExprIncrementalProvider,RetainedGraph.View {
         boolean ownedBy(CheckedLearnedSchemaModel expected){
-<span class="fc" id="L114">            de.regelsuche.retention.RetainedOperation.work(1);</span>
-<span class="pc bpc" id="L115" title="1 of 4 branches missed.">            return model==expected &amp;&amp; expected.ownsApplication(application);</span>
+<span class="fc" id="L230">            de.regelsuche.retention.RetainedOperation.work(1);</span>
+            // This predicate is the installed checker's execution-inventory boundary.
+            // New dispatch/path accounting is not silently promoted under the old revision.
+<span class="pc bpc" id="L233" title="1 of 6 branches missed.">            return model==expected &amp;&amp; expected.ownsApplication(application) &amp;&amp; !indexedDispatch();</span>
         }
-<span class="fc" id="L117">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}</span>
-<span class="fc" id="L118">        private NativeProvider() {}</span>
-<span class="fc" id="L119">        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}</span>
+<span class="fc" id="L235">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}</span>
+<span class="fc" id="L236">        private NativeProvider() {}</span>
+<span class="fc" id="L237">        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}</span>
         @Override public Definition contractDefinition(){
-<span class="fc" id="L121">            return new Definition(IncrementalProviderContract.NATIVE_PREPAID_REVISION,definition.providerId(),definition.kind(),definition.modelRevision(),</span>
-<span class="fc" id="L122">                definition.semanticsRevision()+&quot;;&quot;+NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,definition.mathematics(),null);</span>
+<span class="fc" id="L239">            return new Definition(IncrementalProviderContract.NATIVE_PREPAID_REVISION,definition.providerId(),definition.kind(),definition.modelRevision(),</span>
+<span class="fc" id="L240">                definition.semanticsRevision()+&quot;;&quot;+NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,definition.mathematics(),null);</span>
         }
         @Override public IncrementalProviderContract.ObjectSource&lt;NativeMoveProof&gt; openSource(TypedMoveSearch.State state,
                 TypedMoveSearch.Context context,IncrementalProviderContract.Meter meter){
-<span class="fc" id="L126">            return CheckedSchemaCursor.nativeSource(CheckedSchemaMatcherPlan.this,state.expression(),meter);</span>
+<span class="fc" id="L244">            return CheckedSchemaCursor.nativeSource(CheckedSchemaMatcherPlan.this,state.expression(),meter);</span>
         }
-<span class="fc" id="L128">        NativeVerifier independentVerifier(){return model.nativeVerifier();}</span>
+<span class="fc" id="L246">        NativeVerifier independentVerifier(){return model.nativeVerifier();}</span>
     }
-<span class="fc" id="L130">    CheckedLearnedSchemaModel.Bounds bounds() { return bounds; }</span>
-<span class="fc" id="L131">    int maximumSchemasPerOccurrence() { return maximumSchemasPerOccurrence; }</span>
-<span class="fc" id="L132">    boolean allSchemasIncluded() { return allSchemasIncluded; }</span>
+<span class="fc" id="L248">    CheckedLearnedSchemaModel.Bounds bounds() { return bounds; }</span>
+<span class="fc" id="L249">    int maximumSchemasPerOccurrence() { return maximumSchemasPerOccurrence; }</span>
+<span class="fc" id="L250">    boolean allSchemasIncluded() { return allSchemasIncluded; }</span>
     Range relevant(Expr expression) {
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        String shape = expression instanceof BinaryExpr binary ? binary.operator().name() : &quot;LEAF&quot;;</span>
-<span class="fc" id="L135">        return new Range(index.getOrDefault(shape, List.of()), index.getOrDefault(&quot;P&quot;, List.of()));</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        String shape = expression instanceof BinaryExpr binary ? binary.operator().name() : &quot;LEAF&quot;;</span>
+<span class="fc" id="L253">        return new Range(index.getOrDefault(shape, List.of()), index.getOrDefault(&quot;P&quot;, List.of()));</span>
     }
     ApplicationSteps startApplication(Entry entry, Expr source, String encoded, List&lt;Integer&gt; path,
             Map&lt;String, Expr&gt; bindings, Work work) {
-<span class="fc" id="L139">        return application.start(entry.schema(), source, encoded, path, bindings, work);</span>
+<span class="fc" id="L257">        return application.start(entry.schema(), source, encoded, path, bindings, work);</span>
     }
 
     private static void validate(CheckedLearnedSchemaModel model, int maximum, Map&lt;String, Double&gt; utility,
             Set&lt;String&gt; included, Work work) {
-<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if (maximum &lt; 1 || maximum &gt; model.bounds().maximumSchemas())</span>
-<span class="nc" id="L145">            throw new IllegalArgumentException(&quot;schema selection bound outside model limits&quot;);</span>
-<span class="fc" id="L146">        var known = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (var schema : model.schemas()) { work.add(1); known.add(schema.id()); }</span>
-<span class="fc" id="L148">        work.add(included.size() + utility.size() + 1L);</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!known.containsAll(included)) throw new IllegalArgumentException(&quot;unregistered included schema&quot;);</span>
-<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (var entry : utility.entrySet()) {</span>
-<span class="pc bpc" id="L151" title="2 of 4 branches missed.">            if (!known.contains(entry.getKey()) || !Double.isFinite(entry.getValue()))</span>
-<span class="nc" id="L152">                throw new IllegalArgumentException(&quot;unknown schema or nonfinite selection utility&quot;);</span>
-<span class="fc" id="L153">        }</span>
-<span class="fc" id="L154">    }</span>
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">        if (maximum &lt; 1 || maximum &gt; model.bounds().maximumSchemas())</span>
+<span class="nc" id="L263">            throw new IllegalArgumentException(&quot;schema selection bound outside model limits&quot;);</span>
+<span class="fc" id="L264">        var known = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (var schema : model.schemas()) { work.add(1); known.add(schema.id()); }</span>
+<span class="fc" id="L266">        work.add(included.size() + utility.size() + 1L);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (!known.containsAll(included)) throw new IllegalArgumentException(&quot;unregistered included schema&quot;);</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        for (var entry : utility.entrySet()) {</span>
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">            if (!known.contains(entry.getKey()) || !Double.isFinite(entry.getValue()))</span>
+<span class="nc" id="L270">                throw new IllegalArgumentException(&quot;unknown schema or nonfinite selection utility&quot;);</span>
+<span class="fc" id="L271">        }</span>
+<span class="fc" id="L272">    }</span>
     private static long prepareEntries(CheckedLearnedSchemaModel model, Set&lt;String&gt; selected,
             List&lt;Entry&gt; entries, Work work) {
-<span class="fc" id="L157">        long visits = 0;</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (var schema : model.schemas()) {</span>
-<span class="fc" id="L159">            work.add(1);</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (!selected.contains(schema.id())) continue;</span>
-<span class="fc" id="L161">            int sourceNodes = nodes(schema.source()), targetNodes = nodes(schema.target());</span>
-<span class="fc" id="L162">            visits = Math.addExact(visits, sourceNodes + targetNodes);</span>
-<span class="fc" id="L163">            work.add(sourceNodes + targetNodes + 1L);</span>
-<span class="fc" id="L164">            entries.add(new Entry(schema, ExprMatcher.pattern(schema.source()), sourceNodes - targetNodes));</span>
-<span class="fc" id="L165">        }</span>
-<span class="fc" id="L166">        return visits;</span>
+<span class="fc" id="L275">        long visits = 0;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (var schema : model.schemas()) {</span>
+<span class="fc" id="L277">            work.add(1);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (!selected.contains(schema.id())) continue;</span>
+<span class="fc" id="L279">            int sourceNodes = nodes(schema.source()), targetNodes = nodes(schema.target());</span>
+<span class="fc" id="L280">            visits = Math.addExact(visits, sourceNodes + targetNodes);</span>
+<span class="fc" id="L281">            work.add(sourceNodes + targetNodes + 1L);</span>
+<span class="fc" id="L282">            entries.add(new Entry(schema, ExprMatcher.pattern(schema.source()), sourceNodes - targetNodes));</span>
+<span class="fc" id="L283">        }</span>
+<span class="fc" id="L284">        return visits;</span>
     }
     private static Map&lt;String, List&lt;Entry&gt;&gt; orderedIndex(List&lt;Entry&gt; entries, Map&lt;String, Double&gt; utility, Work comparisons) {
-<span class="fc" id="L169">        var comparator = Comparator.&lt;Entry&gt;comparingDouble(entry -&gt; utility.getOrDefault(entry.schema().id(), 0.0))</span>
-<span class="fc" id="L170">            .reversed().thenComparing(Comparator.comparingInt(Entry::reduction).reversed())</span>
-<span class="pc" id="L171">            .thenComparing(entry -&gt; entry.schema().id());</span>
-<span class="fc" id="L172">        entries.sort((left, right) -&gt; { comparisons.add(1); return comparator.compare(left, right); });</span>
-<span class="fc" id="L173">        var grouped = new TreeMap&lt;String, List&lt;Entry&gt;&gt;();</span>
-<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (var entry : entries) {</span>
-<span class="fc" id="L175">            PatternExpr pattern = entry.schema().source();</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">            String shape = pattern instanceof PatternExpr.Operation operation ? operation.operator().name()</span>
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                : pattern instanceof PatternExpr.Placeholder ? &quot;P&quot; : &quot;LEAF&quot;;</span>
-<span class="fc" id="L178">            grouped.computeIfAbsent(shape, ignored -&gt; new ArrayList&lt;&gt;()).add(entry);</span>
-<span class="fc" id="L179">        }</span>
-<span class="fc" id="L180">        grouped.replaceAll((key, value) -&gt; List.copyOf(value));</span>
-<span class="fc" id="L181">        return Map.copyOf(grouped);</span>
+<span class="fc" id="L287">        var comparator = Comparator.&lt;Entry&gt;comparingDouble(entry -&gt; utility.getOrDefault(entry.schema().id(), 0.0))</span>
+<span class="fc" id="L288">            .reversed().thenComparing(Comparator.comparingInt(Entry::reduction).reversed())</span>
+<span class="pc" id="L289">            .thenComparing(entry -&gt; entry.schema().id());</span>
+<span class="fc" id="L290">        entries.sort((left, right) -&gt; { comparisons.add(1); return comparator.compare(left, right); });</span>
+<span class="fc" id="L291">        var grouped = new TreeMap&lt;String, List&lt;Entry&gt;&gt;();</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        for (var entry : entries) {</span>
+<span class="fc" id="L293">            PatternExpr pattern = entry.schema().source();</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            String shape = pattern instanceof PatternExpr.Operation operation ? operation.operator().name()</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                : pattern instanceof PatternExpr.Placeholder ? &quot;P&quot; : &quot;LEAF&quot;;</span>
+<span class="fc" id="L296">            grouped.computeIfAbsent(shape, ignored -&gt; new ArrayList&lt;&gt;()).add(entry);</span>
+<span class="fc" id="L297">        }</span>
+<span class="fc" id="L298">        grouped.replaceAll((key, value) -&gt; List.copyOf(value));</span>
+<span class="fc" id="L299">        return Map.copyOf(grouped);</span>
     }
     private static String configuration(String modelId, int maximum,
             Map&lt;String, Double&gt; utility, Set&lt;String&gt; selected) {
-<span class="fc" id="L185">        var root = JSON.createObjectNode().put(&quot;revision&quot;, REVISION).put(&quot;workRevision&quot;, WORK_REVISION)</span>
-<span class="fc" id="L186">            .put(&quot;modelId&quot;, modelId)</span>
-<span class="fc" id="L187">            .put(&quot;maximumSchemasPerOccurrence&quot;, maximum).put(&quot;order&quot;, &quot;preorder;shaped-before-wildcard;utility-reduction-id&quot;);</span>
-<span class="fc" id="L188">        var ids = root.putArray(&quot;included&quot;);</span>
-<span class="fc" id="L189">        selected.stream().sorted().forEach(ids::add);</span>
-<span class="fc" id="L190">        var values = root.putObject(&quot;utilities&quot;);</span>
-<span class="fc" id="L191">        new TreeMap&lt;&gt;(utility).forEach((id, value) -&gt; values.put(id, Double.toHexString(value)));</span>
-<span class="fc" id="L192">        return write(root);</span>
+<span class="fc" id="L303">        var root = JSON.createObjectNode().put(&quot;revision&quot;, REVISION).put(&quot;workRevision&quot;, WORK_REVISION)</span>
+<span class="fc" id="L304">            .put(&quot;modelId&quot;, modelId)</span>
+<span class="fc" id="L305">            .put(&quot;maximumSchemasPerOccurrence&quot;, maximum).put(&quot;order&quot;, &quot;preorder;shaped-before-wildcard;utility-reduction-id&quot;);</span>
+<span class="fc" id="L306">        var ids = root.putArray(&quot;included&quot;);</span>
+<span class="fc" id="L307">        selected.stream().sorted().forEach(ids::add);</span>
+<span class="fc" id="L308">        var values = root.putObject(&quot;utilities&quot;);</span>
+<span class="fc" id="L309">        new TreeMap&lt;&gt;(utility).forEach((id, value) -&gt; values.put(id, Double.toHexString(value)));</span>
+<span class="fc" id="L310">        return write(root);</span>
     }
     private static int nodes(PatternExpr expression) {
-<span class="fc bfc" id="L195" title="All 2 branches covered.">        return expression instanceof PatternExpr.Operation operation</span>
-<span class="fc" id="L196">            ? 1 + nodes(operation.left()) + nodes(operation.right()) : 1;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        return expression instanceof PatternExpr.Operation operation</span>
+<span class="fc" id="L314">            ? 1 + nodes(operation.left()) + nodes(operation.right()) : 1;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

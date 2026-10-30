@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CheckedSchemaShapeIndex.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CheckedSchemaShapeIndex.java</span></div><h1>CheckedSchemaShapeIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.retention.RetainedGraph;
+import java.util.Objects;
+
+/**
+ * Conservative root/left/right discrimination for an already ordered schema bucket.
+ * Bits retain the original positions; filtering never refills a capped prefix.
+ * A set bit is only a possible match, never mathematical or binding evidence.
+ */
+final class CheckedSchemaShapeIndex implements RetainedGraph.View {
+    static final int ANY = -1;
+    static final long QUERY_WORK = 18;
+    private static final int AXES = 3;
+    private final int shapeCount;
+    private final int size;
+    private final long[] masks;
+    private final long compilationWork;
+
+<span class="fc" id="L20">    CheckedSchemaShapeIndex(int shapeCount, int[][] requirements) {</span>
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (shapeCount &lt; 1 || shapeCount &gt; 256) {</span>
+<span class="fc" id="L22">            throw new IllegalArgumentException(&quot;unsupported shape alphabet&quot;);</span>
+        }
+<span class="fc" id="L24">        Objects.requireNonNull(requirements, &quot;requirements&quot;);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (requirements.length &gt; Long.SIZE) {</span>
+<span class="fc" id="L26">            throw new IllegalArgumentException(&quot;more than 64 indexed schemas&quot;);</span>
+        }
+<span class="fc" id="L28">        this.shapeCount = shapeCount;</span>
+<span class="fc" id="L29">        size = requirements.length;</span>
+<span class="fc" id="L30">        masks = new long[AXES * (shapeCount + 1)];</span>
+<span class="fc" id="L31">        long work = masks.length + 1L;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (int row = 0; row &lt; size; row++) {</span>
+<span class="fc" id="L33">            int[] requirement = Objects.requireNonNull(requirements[row], &quot;requirement&quot;);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if (requirement.length != AXES) {</span>
+<span class="fc" id="L35">                throw new IllegalArgumentException(&quot;expected root/left/right shapes&quot;);</span>
+            }
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            for (int axis = 0; axis &lt; AXES; axis++) {</span>
+<span class="fc" id="L38">                int shape = requirement[axis];</span>
+<span class="fc bfc" id="L39" title="All 4 branches covered.">                if (shape &lt; ANY || shape &gt;= shapeCount) {</span>
+<span class="fc" id="L40">                    throw new IllegalArgumentException(&quot;shape outside index alphabet&quot;);</span>
+                }
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                int slot = axis * (shapeCount + 1) + (shape == ANY ? shapeCount : shape);</span>
+<span class="fc" id="L43">                masks[slot] |= 1L &lt;&lt; row;</span>
+<span class="fc" id="L44">                work = Math.addExact(work, 4);</span>
+            }
+<span class="fc" id="L46">            work = Math.addExact(work, 1);</span>
+        }
+<span class="fc" id="L48">        compilationWork = work;</span>
+<span class="fc" id="L49">    }</span>
+
+<span class="fc" id="L51">    long compilationWork() { return compilationWork; }</span>
+
+    long candidates(int root, int left, int right, int prefixLength) {
+<span class="fc bfc" id="L54" title="All 4 branches covered.">        if (prefixLength &lt; 0 || prefixLength &gt; size) {</span>
+<span class="fc" id="L55">            throw new IllegalArgumentException(&quot;prefix outside schema bucket&quot;);</span>
+        }
+<span class="fc" id="L57">        return allowed(0, root) &amp; allowed(1, left) &amp; allowed(2, right) &amp; prefix(prefixLength);</span>
+    }
+
+    static long prefix(int size) {
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (size &lt; 0 || size &gt; Long.SIZE) throw new IllegalArgumentException(&quot;invalid mask size&quot;);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        return size == Long.SIZE ? -1L : (1L &lt;&lt; size) - 1;</span>
+    }
+
+    private long allowed(int axis, int shape) {
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (shape &lt; 0 || shape &gt;= shapeCount) {</span>
+<span class="fc" id="L67">            throw new IllegalArgumentException(&quot;query shape outside index alphabet&quot;);</span>
+        }
+<span class="fc" id="L69">        int offset = axis * (shapeCount + 1);</span>
+<span class="fc" id="L70">        return masks[offset + shape] | masks[offset + shapeCount];</span>
+    }
+
+    @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L74">        visitor.reference(masks);</span>
+<span class="fc" id="L75">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

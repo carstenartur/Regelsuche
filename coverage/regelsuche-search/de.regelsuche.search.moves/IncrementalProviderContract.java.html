@@ -35,15 +35,15 @@ public final class IncrementalProviderContract {
 <span class="fc" id="L35">    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(providerId);v.reference(kind);v.reference(modelRevision);v.reference(semanticsRevision);v.reference(transport);v.reference(mathematics);v.reference(nativeDefinition);}</span>
 
 <span class="fc" id="L37">        public Definition {</span>
-<span class="pc bpc" id="L38" title="1 of 8 branches missed.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision) &amp;&amp; !NATIVE_REVISION.equals(revision) &amp;&amp; !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported provider revision&quot;);</span>
+<span class="fc bfc" id="L38" title="All 8 branches covered.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision) &amp;&amp; !NATIVE_REVISION.equals(revision) &amp;&amp; !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported provider revision&quot;);</span>
 <span class="fc bfc" id="L39" title="All 2 branches covered.">            for (var text : List.of(providerId, modelRevision, semanticsRevision))</span>
 <span class="pc bpc" id="L40" title="1 of 2 branches missed.">                if (text.isBlank()) throw new IllegalArgumentException(&quot;blank provider binding&quot;);</span>
 <span class="fc" id="L41">            Objects.requireNonNull(kind); Objects.requireNonNull(transport); Objects.requireNonNull(mathematics);</span>
-<span class="pc bpc" id="L42" title="2 of 8 branches missed.">            if ((NATIVE_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) != (transport==Transport.NATIVE_EXPR_V1))</span>
+<span class="pc bpc" id="L42" title="1 of 8 branches missed.">            if ((NATIVE_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) != (transport==Transport.NATIVE_EXPR_V1))</span>
 <span class="nc" id="L43">                throw new IllegalArgumentException(&quot;native transport requires its explicit revision&quot;);</span>
 <span class="fc bfc" id="L44" title="All 6 branches covered.">            if ((kind == Kind.NATIVE_RULES) != (nativeDefinition != null))</span>
 <span class="fc" id="L45">                throw new IllegalArgumentException(&quot;only native providers carry native rule definitions&quot;);</span>
-<span class="pc bpc" id="L46" title="3 of 8 branches missed.">            if ((PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) &amp;&amp; (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))</span>
+<span class="pc bpc" id="L46" title="2 of 8 branches missed.">            if ((PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) &amp;&amp; (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))</span>
 <span class="nc" id="L47">                throw new IllegalArgumentException(&quot;prepaid applications require registered exact mathematics&quot;);</span>
 <span class="fc" id="L48">        }</span>
     }
@@ -143,8 +143,8 @@ public final class IncrementalProviderContract {
 <span class="fc" id="L143">        private ExecutionWork prepaidCompleted = ExecutionWork.ZERO;</span>
 <span class="fc" id="L144">        public Meter() { this(REVISION); }</span>
 <span class="fc" id="L145">        public Meter(String revision) {</span>
-<span class="pc bpc" id="L146" title="3 of 8 branches missed.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision) &amp;&amp; !NATIVE_REVISION.equals(revision) &amp;&amp; !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported meter revision&quot;);</span>
-<span class="pc bpc" id="L147" title="1 of 4 branches missed.">            prepaidSupported = PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision);</span>
+<span class="pc bpc" id="L146" title="1 of 8 branches missed.">            if (!REVISION.equals(revision) &amp;&amp; !PREPAID_REVISION.equals(revision) &amp;&amp; !NATIVE_REVISION.equals(revision) &amp;&amp; !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported meter revision&quot;);</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">            prepaidSupported = PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision);</span>
 <span class="fc" id="L148">        }</span>
         public PrepaidApplication beginPrepaidApplication() {
 <span class="fc bfc" id="L150" title="All 2 branches covered.">            if (!prepaidSupported) throw new IllegalStateException(&quot;prepaid applications require provider v3&quot;);</span>
