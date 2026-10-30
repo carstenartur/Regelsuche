@@ -211,11 +211,7 @@ public final class CumulativeTaskKnowledge {
         progress.split = disjoint(lessons, validationTasks);
         try {
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
-            for (var task : lessons) {
-                var execution = solve(task, Strategy.KNOWLEDGE_FIRST);
-                progress.training.add(execution); progress.lessons = sum(progress.lessons, execution.totalWork());
-                if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
-            }
+            if (!learnLessons(lessons, progress, maximumAcquisitionWork)) return limited(progress);
             var candidate = CheckedLearnedSchemaModel.extendFromSolutions(model,
                 progress.training.stream().flatMap(e -> e.solution().stream()).toList());
             progress.formation = candidate.formationWork(); progress.attempts = candidate.attempts();
@@ -227,58 +223,97 @@ public final class CumulativeTaskKnowledge {
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             var proposedRoutes = new TreeMap<>(routes);
             if (newSchemas) {
-                String candidateId = "candidate:" + SchematicProofPlan.hash(candidate.toCanonicalJson());
-                for (var task : validationTasks) {
-                    var profile = TaskKnowledgeProfile.inspect(task); progress.selection = sum(progress.selection, profile.work());
-                    var b = profiledRun(id, task, Strategy.BASELINE, baseline, learned);
-                    progress.validation = sum(progress.validation, b.totalWork());
-                    if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
-                    var p = solve(task, Strategy.AUTOMATIC);
-                    progress.validation = sum(progress.validation, p.totalWork());
-                    if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
-                    var c = profiledRun(candidateId, task, Strategy.KNOWLEDGE_FIRST, baseline, prepared);
-                    progress.validation = sum(progress.validation, c.totalWork());
-                    progress.trials.add(new Validation(task, profile.key(), b, p, c, Optional.empty()));
-                    if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
-                }
-                var groups = new TreeMap<String, List<Validation>>();
-                for (var trial : progress.trials) groups.computeIfAbsent(trial.profile(), key -> new ArrayList<>()).add(trial);
-                for (var group : groups.entrySet()) {
-                    progress.selection = sum(progress.selection, group.getValue().size());
-                    if (group.getKey().equals("custom")) continue;
-                    boolean safe = group.getValue().stream().allMatch(row -> noWorse(row.candidate(), row.baseline()));
-                    long baseWork = group.getValue().stream().map(Validation::baseline).mapToLong(Execution::totalWork).reduce(0, Math::addExact);
-                    long candidateWork = group.getValue().stream().map(Validation::candidate).mapToLong(Execution::totalWork).reduce(0, Math::addExact);
-                    boolean moreSolved = group.getValue().stream().anyMatch(row -> row.candidate().solved() && !row.baseline().solved());
-                    proposedRoutes.put(group.getKey(), safe && (moreSolved || candidateWork < baseWork)
-                        ? Strategy.KNOWLEDGE_FIRST : Strategy.BASELINE);
-                }
+                if (!validateCandidate(validationTasks, candidate, prepared, progress, maximumAcquisitionWork))
+                    return limited(progress);
+                fitRoutes(progress, proposedRoutes);
             }
-            boolean safe = true, benefit = false;
-            long previousWork = 0, nextWork = 0;
-            var proposedGoals = knowledgeGoals(proposedRoutes);
-            progress.selection = sum(progress.selection, proposedRoutes.size());
-            for (int i = 0; i < progress.trials.size(); i++) {
-                var row = progress.trials.get(i);
-                // Execute the fitted policy itself, including its real cheap-baseline paths and budget.
-                // Reusing a counterfactual arm's receipt would misstate routing work and tight-budget outcomes.
-                var next = automatic("candidate:" + SchematicProofPlan.hash(candidate.toCanonicalJson()), row.task(),
-                    proposedRoutes, proposedGoals, baseline, prepared);
-                progress.validation = sum(progress.validation, next.totalWork());
-                progress.trials.set(i, new Validation(row.task(), row.profile(), row.baseline(), row.previous(), row.candidate(), Optional.of(next)));
-                safe &= noWorse(next, row.previous());
-                benefit |= next.solved() && !row.previous().solved();
-                previousWork = sum(previousWork, row.previous().totalWork()); nextWork = sum(nextWork, next.totalWork());
-                progress.selection = sum(progress.selection, 1);
-                if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
-            }
+            boolean improved = validatePolicy(candidate, prepared, proposedRoutes, progress, maximumAcquisitionWork);
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
-            boolean promoted = newSchemas && safe && (benefit || nextWork < previousWork) && proposedRoutes.size() <= MAX_ROUTES;
-            return finish(progress, promoted ? Decision.PROMOTED : newSchemas ? Decision.NO_VALIDATED_BENEFIT : Decision.NO_NEW_SCHEMA,
-                promoted ? candidate : model, promoted ? prepared : learned, promoted ? proposedRoutes : routes);
+            return selectSuccessor(progress, candidate, prepared, proposedRoutes, newSchemas, improved);
         } catch (RuntimeException failure) {
             throw new BatchFailure(id, progress.costs(), progress.training, failure);
         }
+    }
+
+    /** Every lesson uses this frozen parent; completed work survives an acquisition cutoff. */
+    private boolean learnLessons(List<CheckedSchemaTaskSolver.Task> lessons, Progress progress, long maximumAcquisitionWork) {
+        for (var task : lessons) {
+            var execution = solve(task, Strategy.KNOWLEDGE_FIRST);
+            progress.training.add(execution);
+            progress.lessons = sum(progress.lessons, execution.totalWork());
+            if (progress.costs().total() > maximumAcquisitionWork) return false;
+        }
+        return true;
+    }
+
+    /** Preserve the paid prefix between the baseline, previous-policy and candidate arms. */
+    private boolean validateCandidate(List<CheckedSchemaTaskSolver.Task> validationTasks,
+            CheckedLearnedSchemaModel candidate, CheckedSchemaTaskSolver prepared,
+            Progress progress, long maximumAcquisitionWork) {
+        String candidateId = "candidate:" + SchematicProofPlan.hash(candidate.toCanonicalJson());
+        for (var task : validationTasks) {
+            var profile = TaskKnowledgeProfile.inspect(task);
+            progress.selection = sum(progress.selection, profile.work());
+            var b = profiledRun(id, task, Strategy.BASELINE, baseline, learned);
+            progress.validation = sum(progress.validation, b.totalWork());
+            if (progress.costs().total() > maximumAcquisitionWork) return false;
+            var p = solve(task, Strategy.AUTOMATIC);
+            progress.validation = sum(progress.validation, p.totalWork());
+            if (progress.costs().total() > maximumAcquisitionWork) return false;
+            var c = profiledRun(candidateId, task, Strategy.KNOWLEDGE_FIRST, baseline, prepared);
+            progress.validation = sum(progress.validation, c.totalWork());
+            progress.trials.add(new Validation(task, profile.key(), b, p, c, Optional.empty()));
+            if (progress.costs().total() > maximumAcquisitionWork) return false;
+        }
+        return true;
+    }
+
+    private static void fitRoutes(Progress progress, Map<String, Strategy> proposedRoutes) {
+        var groups = new TreeMap<String, List<Validation>>();
+        for (var trial : progress.trials) groups.computeIfAbsent(trial.profile(), key -> new ArrayList<>()).add(trial);
+        for (var group : groups.entrySet()) {
+            progress.selection = sum(progress.selection, group.getValue().size());
+            if (group.getKey().equals("custom")) continue;
+            boolean safe = group.getValue().stream().allMatch(row -> noWorse(row.candidate(), row.baseline()));
+            long baseWork = group.getValue().stream().map(Validation::baseline).mapToLong(Execution::totalWork).reduce(0, Math::addExact);
+            long candidateWork = group.getValue().stream().map(Validation::candidate).mapToLong(Execution::totalWork).reduce(0, Math::addExact);
+            boolean moreSolved = group.getValue().stream().anyMatch(row -> row.candidate().solved() && !row.baseline().solved());
+            proposedRoutes.put(group.getKey(), safe && (moreSolved || candidateWork < baseWork)
+                ? Strategy.KNOWLEDGE_FIRST : Strategy.BASELINE);
+        }
+    }
+
+    /** Re-execute the actual fitted policy; counterfactual receipts cannot justify activation. */
+    private boolean validatePolicy(CheckedLearnedSchemaModel candidate, CheckedSchemaTaskSolver prepared,
+            Map<String, Strategy> proposedRoutes, Progress progress, long maximumAcquisitionWork) {
+        boolean safe = true, benefit = false;
+        long previousWork = 0, nextWork = 0;
+        var proposedGoals = knowledgeGoals(proposedRoutes);
+        progress.selection = sum(progress.selection, proposedRoutes.size());
+        for (int i = 0; i < progress.trials.size(); i++) {
+            var row = progress.trials.get(i);
+            // Execute the fitted policy itself, including its real cheap-baseline paths and budget.
+            // Reusing a counterfactual arm's receipt would misstate routing work and tight-budget outcomes.
+            var next = automatic("candidate:" + SchematicProofPlan.hash(candidate.toCanonicalJson()), row.task(),
+                proposedRoutes, proposedGoals, baseline, prepared);
+            progress.validation = sum(progress.validation, next.totalWork());
+            progress.trials.set(i, new Validation(row.task(), row.profile(), row.baseline(), row.previous(), row.candidate(), Optional.of(next)));
+            safe &= noWorse(next, row.previous());
+            benefit |= next.solved() && !row.previous().solved();
+            previousWork = sum(previousWork, row.previous().totalWork()); nextWork = sum(nextWork, next.totalWork());
+            progress.selection = sum(progress.selection, 1);
+            if (progress.costs().total() > maximumAcquisitionWork) return false;
+        }
+        return safe && (benefit || nextWork < previousWork);
+    }
+
+    private Update selectSuccessor(Progress progress, CheckedLearnedSchemaModel candidate,
+            CheckedSchemaTaskSolver prepared, Map<String, Strategy> proposedRoutes,
+            boolean newSchemas, boolean improved) {
+        if (newSchemas && improved && proposedRoutes.size() <= MAX_ROUTES)
+            return finish(progress, Decision.PROMOTED, candidate, prepared, proposedRoutes);
+        return finish(progress, newSchemas ? Decision.NO_VALIDATED_BENEFIT : Decision.NO_NEW_SCHEMA,
+            model, learned, routes);
     }
 
     private static Execution profiledRun(String id, CheckedSchemaTaskSolver.Task task, Strategy strategy,

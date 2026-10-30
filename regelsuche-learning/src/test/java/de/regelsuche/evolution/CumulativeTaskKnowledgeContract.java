@@ -134,6 +134,32 @@ final class CumulativeTaskKnowledgeContract {
         require(unhelpful.next().schemaCount() == 0 && unhelpful.work().formation() > 0 && unhelpful.work().validation() > 0,
             "unsuccessful acquisition and validation remain paid");
     }
+    static void acquisitionCheckpointsPreservePaidPrefixes() {
+        var state = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory());
+        String parent = state.id();
+        // Characterized on the original implementation: split, lessons, formation,
+        // preparation, each validation arm, and each actual fitted-policy execution.
+        long[] budgets = {1, 406, 583, 760, 962, 1424, 1625, 1806, 1982, 2175, 2352,
+            2517, 2528, 2531, 2539, 2671, 2783, 3128, 3313, 3479, 3485, 3600};
+        long[] paid = {406, 583, 760, 962, 1424, 1625, 1806, 1982, 2175, 2352, 2517,
+            2528, 2531, 2539, 2671, 2783, 3128, 3313, 3479, 3485, 3600, 3600};
+        int[] trials = {0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4};
+        int[] automatic = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 4};
+        for (int i = 0; i < budgets.length; i++) {
+            var update = state.learnBatch(lessons(1), validation(1), budgets[i]);
+            boolean complete = i == budgets.length - 1;
+            require(update.reason() == (complete ? CumulativeTaskKnowledge.Decision.PROMOTED
+                : CumulativeTaskKnowledge.Decision.ACQUISITION_LIMIT), "checkpoint decision at " + budgets[i]);
+            require(update.work().total() == paid[i], "atomic work must remain paid at " + budgets[i]);
+            require(update.training().size() == Math.min(i, 2), "completed lesson prefix at " + budgets[i]);
+            require(update.validation().size() == trials[i], "completed validation prefix at " + budgets[i]);
+            require(update.validation().stream().filter(row -> row.automatic().isPresent()).count() == automatic[i],
+                "actual-policy prefix at " + budgets[i]);
+            require(update.next().schemaCount() == (complete ? 1 : 0), "no premature activation at " + budgets[i]);
+            require(update.next().acquisitionWork() == paid[i], "successor retains all costs at " + budgets[i]);
+            require(state.id().equals(parent), "no parent mutation at " + budgets[i]);
+        }
+    }
     static void snapshotFilesAreNeverSilentlyReplaced(CumulativeTaskKnowledge state) throws Exception {
         var directory = Files.createTempDirectory("knowledge-conflict-");
         try {
@@ -188,7 +214,8 @@ final class CumulativeTaskKnowledgeContract {
         var directory = args.length == 1 ? Path.of(args[0]) : Files.createTempDirectory("cumulative-knowledge-");
         persistenceAndStrategies(state, directory); failedLearningAndSplitIsolation(state);
         failuresRetainPaidPrefixes(state); corruptedModelsNeverGainAuthority(state);
-        acquisitionBudgetAndUnhelpfulCandidatesRemainPaid(); snapshotFilesAreNeverSilentlyReplaced(state);
+        acquisitionBudgetAndUnhelpfulCandidatesRemainPaid(); acquisitionCheckpointsPreservePaidPrefixes();
+        snapshotFilesAreNeverSilentlyReplaced(state);
         measuredLifecycle(state, directory);
         System.out.println("SNAPSHOT=" + state.save(directory));
         System.out.println("PASS cumulative task knowledge contracts");

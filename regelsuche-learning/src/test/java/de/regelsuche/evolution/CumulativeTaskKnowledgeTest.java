@@ -23,6 +23,9 @@ class CumulativeTaskKnowledgeTest {
     @Test void acquisitionBudgetAndNoBenefitKeepOldMathematics() {
         CumulativeTaskKnowledgeContract.acquisitionBudgetAndUnhelpfulCandidatesRemainPaid();
     }
+    @Test void acquisitionPhaseBoundariesPreserveCompletedWork() {
+        CumulativeTaskKnowledgeContract.acquisitionCheckpointsPreservePaidPrefixes();
+    }
     @Test void immutableSnapshotsCannotOverwriteConflicts() throws Exception {
         CumulativeTaskKnowledgeContract.snapshotFilesAreNeverSilentlyReplaced(knowledge);
     }
