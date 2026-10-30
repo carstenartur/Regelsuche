@@ -14,25 +14,65 @@ und den nachvollziehbaren Weg zum Ergebnis. Erfolgreiche, qualifizierte Pfade
 können als neue Strategien wiederverwendet werden.
 
 [Demo starten](#schnellstart) ·
-[Workbench](docs/web-workbench.md) ·
-[Discovery Gallery](docs/demo-gallery.md) ·
-[Java Discovery SDK](docs/java-discovery-sdk.md) ·
-[Primachsenraum-Signalplugin](docs/periodic-signal-discovery.md) ·
-[Python-Client](docs/python-client.md) ·
-[Darstellungen und Transferdemo](docs/representation-transfer-demo.md) ·
-[Strategien lernen und vergleichen](docs/trace-strategy-transfer.md) ·
-[Regeln bewerten und Suche steuern](docs/learned-rule-scheduling.md) ·
-[Aktueller Forschungsstand](docs/discovery-status.md) ·
-[Architektur](docs/architecture.md) ·
-[Unabhängig reproduzieren](docs/independent-reproduction.md)
+[Ersten Rechenweg untersuchen](#erster-ablauf-einen-rechenweg-verstehen) ·
+[Forschung und Grenzen](#lernen-muss-sich-auf-unbekannten-fällen-auszahlen) ·
+[Erweitern und integrieren](#in-wenigen-zeilen-erweitern)
 
-![Schema des AST-Regelradars: eine lokale Regelanwendung erzeugt einen neuen vollständigen Ausdruckszustand](docs/assets/ast-rule-radar.svg)
+## Für wen und wofür?
 
-*Schematische Erklärung, kein Suchprotokoll: Ein Ausdruck ist eine Spielposition.
-Die Punkte an den AST-Knoten stehen für konkrete Regelanwendungen. Der gewählte
-Zug entfernt die Addition von null; eine andere Regel am Potenzknoten erzeugt
-einen anderen vollständigen Ausdruck. Position, Bindungen und Ergebnis bleiben
-nachvollziehbar.*
+| Zielgruppe | Unterstützter Einstieg | Ergebnis |
+| --- | --- | --- |
+| Lernende und Lehrende | Ausdruck eingeben, Herleitungen vergleichen, einen Weg im Replay prüfen | nachvollziehbare Zwischenschritte mit Annahmen; Markdown- oder LaTeX-Export |
+| Forschende zu symbolischer Suche und Regelwiederverwendung | Suchverfahren und gelernte Strategien auf getrennten Aufgaben unter vergleichbaren Budgets untersuchen | prüfbare Suchpfade, Arbeitsbilanzen und auch negative Ergebnisse |
+| Java-Entwicklerinnen und -Entwickler | Regeln, Suchprogramme oder eigene Discovery-Domänen über das SDK einbinden | headless ausführbare Erweiterungen mit expliziten Budgets und Evidence |
+
+Die zentrale Forschungsfrage lautet: **Wann spart die Wiederverwendung gelernter
+Regeln auf neuen Aufgaben insgesamt Arbeit, wenn Erwerb, Auswahl, Laden und
+Verifikation mitgezählt werden?** Die unten verlinkten Versuche untersuchen
+begrenzte Aufgabenfamilien; ein allgemeiner Effizienzvorteil ist damit nicht belegt.
+
+## Schnellstart
+
+Die **Standarddemo läuft ohne externe Infrastruktur**. Sie benötigt weder eine
+Datenbank noch einen externen Solver. Im Repository-Verzeichnis mit Docker:
+
+```bash
+docker build -t regelsuche .
+docker run --rm -p 127.0.0.1:8080:8080 regelsuche
+```
+
+Danach `http://127.0.0.1:8080/` öffnen. Die Bindung an `127.0.0.1` hält die
+Demo lokal; sie verwendet HTTP ohne Anmeldung.
+
+Ohne Docker genügt mit JDK 25:
+
+```bash
+./gradlew run
+```
+
+Der vollständige Einstieg einschließlich Sicherheitshinweisen und
+Fehlerdiagnose steht in [Getting Started](docs/getting-started.md).
+
+## Erster Ablauf: einen Rechenweg verstehen
+
+Ein Einstieg für Lernen und Lehren ist die binomische Formel:
+
+1. Im Tab **Workbench** `(x+3)^2` in **Ausdruck** eingeben, als **Ziel**
+   **Schulweg** wählen und **Suche starten**. Alternativ die vorbereitete Demo
+   **Binomische Formel** starten.
+2. Unter **Pfade** die gefundenen Herleitungen vergleichen. **Schulbuch** oder
+   **Schritte** zeigt die Umformungen in einer lesbaren Darstellung.
+3. Einen Pfad öffnen und unter **Replay** schrittweise abspielen. Dabei die
+   hervorgehobenen Änderungen, Regelhinweise und Annahmen prüfen.
+4. Unter **Exporte** Markdown für Arbeitsmaterialien oder LaTeX für
+   mathematische Texte herunterladen.
+
+Die Demo führt zu `x^2 + 6*x + 9`; der Rechenweg zeigt, wie dieses Ergebnis
+entsteht. Weiterführende Tabs erscheinen nach dem ersten Suchlauf oder dem
+Start einer Demo. Weitere Abläufe, etwa zum Vergleichen von Ergebnisformen und
+zum Prüfen von Regelkandidaten, stehen in [User Workflows](docs/user-workflows.md).
+Ein Replay ist eine nachvollziehbare Ableitung, aber nicht automatisch ein
+formaler Beweis; dafür gelten die getrennten [Proof-Workflows](docs/proof-workbench.md).
 
 ## Was Regelsuche sichtbar macht
 
@@ -48,6 +88,72 @@ Best-First, Beam, `A*`, Monte Carlo und Equality Saturation können auf denselbe
 expliziten Zuständen und Kanten arbeiten. Die grafische Workbench verbindet
 Suchgraph, Pfade, Replay, AST-Regelradar, Kandidaten, Proof-Jobs und Exporte in
 einem Ablauf.
+
+![Schema des AST-Regelradars: eine lokale Regelanwendung erzeugt einen neuen vollständigen Ausdruckszustand](docs/assets/ast-rule-radar.svg)
+
+*Schematische Erklärung, kein Suchprotokoll: Ein Ausdruck ist eine Spielposition.
+Die Punkte an den AST-Knoten stehen für konkrete Regelanwendungen. Der gewählte
+Zug entfernt die Addition von null; eine andere Regel am Potenzknoten erzeugt
+einen anderen vollständigen Ausdruck. Position, Bindungen und Ergebnis bleiben
+nachvollziehbar.*
+
+## Workbench statt Konsolenausgabe
+
+Browser-E2E-Tests prüfen die sichtbaren Abläufe und erzeugen dieselben
+Dokumentationsaufnahmen. Der folgende kompakte Ausschnitt zeigt einen Lauf, in
+dem ein mehrstufiger Pfad als Makro gelernt und erneut verwendet wird.
+
+![Testgenerierte Workbench-Zusammenfassung eines gelernten und wiederverwendeten Makros](docs/assets/screenshots/macro-learning-summary.png)
+
+Weitere Aufnahmen in voller Größe: [rationale Umformung mit Ergebnis und Suchdaten](docs/assets/screenshots/rational-summary.png)
+und [Vorschau einer Matrixdarstellung](docs/assets/screenshots/math-matrix-preview.png).
+
+Weitere sichtbare Abläufe: [Pfade, Graph und Replay](docs/web-ui-user-guide.md),
+[AST-Regelradar](docs/ast-rule-radar.md),
+[Proof Workbench](docs/proof-workbench.md) und
+[User Workflows](docs/user-workflows.md).
+
+## Lernen muss sich auf unbekannten Fällen auszahlen
+
+Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
+einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
+misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier
+gezeigten öffentlichen Entwicklungsfall erreichen inzwischen beide Varianten
+die verlangte Zieldarstellung:
+
+| Variante | Ziel erreicht | Untersuchte Zustände | Umformungen |
+| --- | --- | ---: | ---: |
+| Verbesserte Basis | ja | 26 | 3 |
+| Mit gelernter Regel | ja | 3 | 1 |
+
+![Konkrete gelernte Regel und dieselbe zurückgehaltene Aufgabe: beide Varianten erreichen die Zieldarstellung; die versionierte Grafik zeigt ihre tatsächlichen Pfade und Zustandszahlen](docs/generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg)
+
+*Hier wird die gelernte Regel mit `A = 20` und `x = i*j + k` wiederverwendet.
+Gesucht ist eine bestimmte syntaktische Zieldarstellung, nicht irgendein
+äquivalenter Ausdruck. Die Zahlen vergleichen untersuchte Zustände, keine
+Laufzeiten. Erwerb, Auswahl, Laden und Nachweisprüfung sind damit noch nicht
+wirtschaftlich bilanziert. Der bekannte Entwicklungsfall zeigt Instanztransfer,
+keinen unberührten Finaltest und keinen allgemeinen Geschwindigkeitsvorteil
+gegenüber anderen Algebra-Systemen.*
+
+Die vollständige Fallserie, Kandidaten-Lineage, Hashbindung und unabhängige
+Prüfung stehen im [Autonomous Discovery Walkthrough](docs/autonomous-discovery-walkthrough.md).
+Das ist projektinterne, symbolisch geprüfte Wiederverwendung — **keine
+Behauptung externer mathematischer Neuheit**.
+
+Weitere Lernpfade werden getrennt bilanziert; die verlinkten Berichte enthalten
+Versuchsaufbau, Herkunft, Vergleichszeilen und Reproduktionswege:
+
+| Lernpfad | Beobachtung und Grenze |
+| --- | --- |
+| [Vorlagen aus verifizierten Polynomspuren](docs/trace-derived-polynomial-plans.md) mit [Auswahl auf getrennten Trainingsaufgaben](docs/finite-polynomial-strategy-selection.md) | Jede Anwendung löst ihre Koeffizienten neu und prüft ihre Schritte erneut. Herkunft, Anwendbarkeit und Trainingsausschlüsse bleiben erhalten. Beispiele derselben quadratischen Familie belegen noch keinen Transfer auf andere Familien oder allgemeinen Effizienzgewinn. |
+| [Verzweigende Regelfolgen](docs/trace-strategy-transfer.md) aus zielausdrucksfreien Suchwegen | Der Vergleich auf neuen Zusammensetzungen mit denselben Einzelregeln und veränderter Regelreihenfolge liefert gleiche Ergebnisse bei **mehr Sucharbeit** mit dem gelernten Programm. Die HTML-Demo zeigt jeden primitiven Schritt und alle Vergleichszeilen. |
+| [Gezielte Fortsetzung gelernter Strategien](docs/conditional-strategy-dispatch.md) | Auf getrenntem TRAIN wird gelernt, wann einmal kompilierte Fortsetzungen bereits erzeugter erster Schritte nützlich sind. Auf 288 neuen Entwicklungsaufgaben fallen bei gleicher Ergebnisqualität **1,4 % weniger gezählte Anwendungsarbeit als bei der starken Greedy-Kontrolle** an. Die einmaligen Lernkosten sind noch nicht eingespielt; irreführende Hinweise und teurere Einzelfälle bleiben sichtbar. |
+
+Die [Regelbildung prüft kürzere primitive Wege](docs/primitive-trace-minimality.md),
+bevor sie eine Umformungsfolge übernimmt. Ein beobachteter 20-Schritt-Umweg darf
+dadurch keinen Wert von 20 erhalten, wenn zwei Schritte genügen. Ungeklärte
+Minimalität führt zur Ablehnung; Nachweise und Prüfkosten werden gespeichert.
 
 ## Darstellungen wählen, übertragen und unabhängig prüfen
 
@@ -89,77 +195,33 @@ kanonischen Evidence erzeugt, nicht für das README nachgezeichnet.
 [visuelle Discovery Gallery](docs/demo-gallery.md) ·
 [domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md)
 
-## Lernen muss sich auf unbekannten Fällen auszahlen
+## Repräsentationsbrücken öffnen neue Mathematikbereiche
 
-Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
-einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
-misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier
-gezeigten öffentlichen Entwicklungsfall erreichen inzwischen beide Varianten
-die verlangte Zieldarstellung:
+Regelsuche behandelt geeignete Gleichungssysteme nicht nur als Listen skalarer
+Zeilen. Mit explizit deklarierten Rollen kann beispielsweise
 
-| Variante | Ziel erreicht | Untersuchte Zustände | Umformungen |
-| --- | --- | ---: | ---: |
-| Verbesserte Basis | ja | 26 | 3 |
-| Mit gelernter Regel | ja | 3 | 1 |
+```text
+a*x + b*y = lambda*x
+c*x + d*y = lambda*y
+```
 
-![Konkrete gelernte Regel und dieselbe zurückgehaltene Aufgabe: beide Varianten erreichen die Zieldarstellung; die versionierte Grafik zeigt ihre tatsächlichen Pfade und Zustandszahlen](docs/generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg)
+als Eigenproblem `A*v = lambda*v` erkannt, in die exakte Koeffizientenmatrix
 
-*Hier wird die gelernte Regel mit `A = 20` und `x = i*j + k` wiederverwendet.
-Gesucht ist eine bestimmte syntaktische Zieldarstellung, nicht irgendein
-äquivalenter Ausdruck. Die Zahlen vergleichen untersuchte Zustände, keine
-Laufzeiten. Erwerb, Auswahl, Laden und Nachweisprüfung sind damit noch nicht
-wirtschaftlich bilanziert. Der bekannte Entwicklungsfall zeigt Instanztransfer,
-keinen unberührten Finaltest und keinen allgemeinen Geschwindigkeitsvorteil
-gegenüber anderen Algebra-Systemen.*
+```text
+[[a-lambda, b],
+ [c, d-lambda]]
+```
 
-Die vollständige Fallserie, Kandidaten-Lineage, Hashbindung und unabhängige
-Prüfung stehen im [Autonomous Discovery Walkthrough](docs/autonomous-discovery-walkthrough.md).
-Das ist projektinterne, symbolisch geprüfte Wiederverwendung — **keine
-Behauptung externer mathematischer Neuheit**.
+überführt und bis `det(A - lambda*I) = 0` weitergeführt werden. Variablennamen
+allein erzeugen keine physikalische Interpretation. Siehe
+[Symbolische Gleichungssysteme und Eigenprobleme](docs/symbolic-eigenproblem-representation.md).
 
-Ein weiterer begrenzter Lernpfad verbindet inzwischen
-[aus verifizierten Polynomspuren abgeleitete Vorlagen](docs/trace-derived-polynomial-plans.md)
-mit einer [Auswahl auf getrennten Trainingsaufgaben](docs/finite-polynomial-strategy-selection.md).
-Jede spätere Anwendung löst ihre Koeffizienten neu und prüft die erzeugten
-Schritte erneut. Die gemeinsamen Vorlagen bewahren Herkunft, Anwendbarkeit und
-Trainingsausschlüsse. Die Beispiele derselben quadratischen Familie belegen
-noch keine Übertragung auf andere Familien oder einen allgemeinen Effizienzgewinn.
-
-Der [ausführbare Strategievergleich](docs/trace-strategy-transfer.md) lernt
-auch verzweigende Regelfolgen aus zielausdrucksfreien Suchwegen. Er vergleicht
-deren Anwendung auf neue Zusammensetzungen mit denselben Einzelregeln und
-einer veränderten Regelreihenfolge. Die HTML-Demo zeigt jeden primitiven Schritt.
-Der aktuelle Entwicklungsbestand liefert gleiche Ergebnisse bei **mehr
-Sucharbeit** mit dem gelernten Programm; alle Vergleichszeilen bleiben sichtbar.
-
-Die [gezielte Fortsetzung gelernter Strategien](docs/conditional-strategy-dispatch.md)
-behebt einen Teil dieser Mehrarbeit: Sie nutzt bereits erzeugte erste Schritte,
-kompiliert lineare Fortsetzungen einmal und lernt auf getrenntem TRAIN, wann
-diese nützlich sind. Auf 288 neuen Entwicklungsaufgaben benötigt sie bei gleicher
-Ergebnisqualität insgesamt **1,4 % weniger gezählte Arbeit als die starke
-Greedy-Kontrolle**. Die einmaligen Lernkosten sind auf diesem Bestand noch nicht
-eingespielt. Die neue Demo zeigt auch irreführende Hinweise und teurere Einzelfälle.
-
-Die [Regelbildung prüft kürzere primitive Wege](docs/primitive-trace-minimality.md),
-bevor sie eine Umformungsfolge übernimmt. Ein beobachteter 20-Schritt-Umweg darf
-dadurch keinen Wert von 20 erhalten, wenn zwei Schritte genügen. Ungeklärte
-Minimalität führt zur Ablehnung; Nachweise und Prüfkosten werden gespeichert.
-
-## Workbench statt Konsolenausgabe
-
-Browser-E2E-Tests prüfen die sichtbaren Abläufe und erzeugen dieselben
-Dokumentationsaufnahmen. Der folgende kompakte Ausschnitt zeigt einen Lauf, in
-dem ein mehrstufiger Pfad als Makro gelernt und erneut verwendet wird.
-
-![Testgenerierte Workbench-Zusammenfassung eines gelernten und wiederverwendeten Makros](docs/assets/screenshots/macro-learning-summary.png)
-
-Weitere Aufnahmen in voller Größe: [rationale Umformung mit Ergebnis und Suchdaten](docs/assets/screenshots/rational-summary.png)
-und [Vorschau einer Matrixdarstellung](docs/assets/screenshots/math-matrix-preview.png).
-
-Weitere sichtbare Abläufe: [Pfade, Graph und Replay](docs/web-ui-user-guide.md),
-[AST-Regelradar](docs/ast-rule-radar.md),
-[Proof Workbench](docs/proof-workbench.md) und
-[User Workflows](docs/user-workflows.md).
+Die Workbench bietet außerdem **Alternative Darstellungen** mit aus der Quelle
+gewonnenen Matrixprodukten, unabhängigen Blöcken und expliziten Operatorregeln.
+Jede bestätigte Alternative behält die Variablenreihenfolge und einen exakten
+Replay aller Quellzeilen. Nachweise lassen sich exportieren und nach einem
+Neustart erneut prüfen. Siehe [Matrix- und Operatorvorbereitung](docs/matrix-operator-preparation.md)
+für Profile, CLI, Grenzen und reproduzierbare Vergleichsnachweise.
 
 ## In wenigen Zeilen erweitern
 
@@ -215,7 +277,10 @@ stehen unter [Java-internal Rewrite Programs](docs/java-rewrite-programs.md),
 
 ### Eigene Discovery-Domänen mit dem Java-SDK
 
-Neu: [Java-Quickstart](docs/java-sdk-quickstart.md), [Domain-Tutorial](docs/java-sdk-domain-tutorial.md) und [API-Vertrag](docs/java-sdk-api-policy.md). Regel-Plugins verwenden jetzt das eigenständige `regelsuche-plugin-api`; Provider-Evidence bindet die beobachteten Artefaktbytes.
+[Java-Quickstart](docs/java-sdk-quickstart.md), [Domain-Tutorial](docs/java-sdk-domain-tutorial.md)
+und [API-Vertrag](docs/java-sdk-api-policy.md) führen vom ersten Consumer zur eigenen
+Domäne. Regel-Plugins verwenden das eigenständige `regelsuche-plugin-api`;
+Provider-Evidence bindet die beobachteten Artefaktbytes.
 
 Das headless nutzbare Java-25-SDK lässt eigene Zustände, Übergänge,
 Gegenbeispielsuchen und Zertifikate in normalem Java definieren, ohne Webserver
@@ -260,79 +325,21 @@ Assertions und Provider-SPI. Die SDK-Artefakte werden derzeit aus dem Checkout
 lokal veröffentlicht; eine dauerhaft öffentliche Maven-Veröffentlichung und
 eine stabile API über Releases werden noch nicht zugesagt.
 
-## Repräsentationsbrücken öffnen neue Mathematikbereiche
+### Zusammenspiel mit Sandbox
 
-Regelsuche behandelt geeignete Gleichungssysteme nicht nur als Listen skalarer
-Zeilen. Mit explizit deklarierten Rollen kann beispielsweise
+[Sandbox](https://github.com/carstenartur/sandbox) verbindet die mathematische
+Suche mit Java-Quellcode. Regelsuche verantwortet die Suche nach Kandidaten und
+deren unabhängige mathematische Prüfung im unterstützten numerischen Bereich.
+Der Sandbox-Adapter verantwortet Java-AST und Extraktion, die Behandlung von
+Effekten und Quellkontext sowie Quelltextänderungen mit Vorschau, Anwenden und
+Rücknahme. Vor dem Anwenden muss er die Aktualität von Quelle und Umgebung prüfen.
 
-```text
-a*x + b*y = lambda*x
-c*x + d*y = lambda*y
-```
-
-als Eigenproblem `A*v = lambda*v` erkannt, in die exakte Koeffizientenmatrix
-
-```text
-[[a-lambda, b],
- [c, d-lambda]]
-```
-
-überführt und bis `det(A - lambda*I) = 0` weitergeführt werden. Variablennamen
-allein erzeugen keine physikalische Interpretation. Siehe
-[Symbolische Gleichungssysteme und Eigenprobleme](docs/symbolic-eigenproblem-representation.md).
-
-Die Workbench bietet außerdem **Alternative Darstellungen** mit aus der Quelle
-gewonnenen Matrixprodukten, unabhängigen Blöcken und expliziten Operatorregeln.
-Jede bestätigte Alternative behält die Variablenreihenfolge und einen exakten
-Replay aller Quellzeilen. Nachweise lassen sich exportieren und nach einem
-Neustart erneut prüfen. Siehe [Matrix- und Operatorvorbereitung](docs/matrix-operator-preparation.md)
-für Profile, CLI, Grenzen und reproduzierbare Vergleichsnachweise.
-
-## Schnellstart
-
-Die **Standarddemo läuft ohne externe Infrastruktur**. Sie benötigt weder eine
-Datenbank noch einen externen Solver und wird ausschließlich lokal veröffentlicht:
-
-```bash
-docker build -t regelsuche .
-docker run --rm -p 127.0.0.1:8080:8080 regelsuche
-```
-
-Danach `http://127.0.0.1:8080/` öffnen und eine der geführten Demos starten.
-Suchgraph, gefundene Pfade, Replay, AST-Regelradar, Proof-Jobs und Exporte sind
-in derselben Workbench erreichbar.
-
-Die ungebundene Variante `docker run --rm -p 8080:8080 regelsuche`
-veröffentlicht die Demo auf allen Host-Interfaces. Sie ist für die lokale
-Standarddemo nicht empfohlen und nur in bewusst isolierten Umgebungen sinnvoll.
-
-Ohne Docker genügt mit JDK 25:
-
-```bash
-./gradlew run
-```
-
-Der vollständige Einstieg einschließlich Sicherheitshinweisen und
-Fehlerdiagnose steht in [Getting Started](docs/getting-started.md).
-
-## Optional: Full Mode
-
-Docker Compose ist **nur optional** und **keine Voraussetzung** für die
-Standarddemo. Der Full Mode ergänzt PostgreSQL, Hibernate ORM/Search,
-persistente Volumes und optional Neo4j-Provenienz:
-
-```bash
-docker compose up --build
-```
-
-Das optionale Neo4j-Profil startet mit:
-
-```bash
-docker compose --profile neo4j up --build
-```
-
-Details und Produktionsgrenzen stehen in
-[Persistenz und Full Mode](docs/persistence.md).
+Die Schnittstelle und ihre Grenzen stehen im
+[Integrationsvertrag für Quelladapter](docs/java-optimization-sdk-integration.md)
+und im [Java-Optimierungs-SDK](regelsuche-optimization-sdk/README.md).
+Nicht unterstützte Effekte oder ungeprüfte Kandidaten autorisieren keine
+Quelltextänderung; die Qualifikation einer SDK-Version allein belegt noch nicht
+die Abnahme ihrer konkreten Kombination mit dem Sandbox-Adapter.
 
 ## Implementierte Bausteine
 
@@ -428,6 +435,25 @@ Die exakten Modulgrenzen und erlaubten Abhängigkeitsrichtungen sind in
 [Architektur](docs/architecture.md), [Modulstruktur](docs/module-structure.md)
 und [Dependency-Regeln](docs/dependency-rules.md) dokumentiert.
 
+## Optional: Full Mode
+
+Docker Compose ist **nur optional** und **keine Voraussetzung** für die
+Standarddemo. Der Full Mode ergänzt PostgreSQL, Hibernate ORM/Search,
+persistente Volumes und optional Neo4j-Provenienz:
+
+```bash
+docker compose up --build
+```
+
+Das optionale Neo4j-Profil startet mit:
+
+```bash
+docker compose --profile neo4j up --build
+```
+
+Details und Produktionsgrenzen stehen in
+[Persistenz und Full Mode](docs/persistence.md).
+
 ## Betriebsmodi
 
 | Modus | Zweck | Start |
@@ -440,6 +466,10 @@ und [Dependency-Regeln](docs/dependency-rules.md) dokumentiert.
 Die lokale Demo verwendet HTTP ohne Anmeldung. Für externe Erreichbarkeit sind
 authentifiziertes TLS, eigene Zugangsdaten und eine geeignete Betriebsumgebung
 erforderlich.
+
+Die ungebundene Variante `docker run --rm -p 8080:8080 regelsuche`
+veröffentlicht die Demo auf allen Host-Interfaces. Sie ist für die lokale
+Standarddemo nicht empfohlen und nur in bewusst isolierten Umgebungen sinnvoll.
 
 ## Verifikation aus einem Checkout
 
@@ -468,13 +498,17 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [Generational Rule Mining](docs/generational-rule-mining.md),
   [Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md),
   [Benchmarks](docs/discovery-benchmarks.md),
-  [Scientific Reproducibility](docs/scientific-reproducibility.md)
+  [Scientific Reproducibility](docs/scientific-reproducibility.md),
+  [unabhängige Reproduktion](docs/independent-reproduction.md),
+  [Regelbewertung und Suchsteuerung](docs/learned-rule-scheduling.md)
 - **Entwicklung:** [Architektur](docs/architecture.md),
   [Developer Guide](docs/developer-guide.md), [Testing](docs/testing.md)
 - **Erweiterungen:** [Erweiterungssystem](docs/extension-system.md),
   [Plugin-API](docs/plugin-api.md), [Regeldateien](docs/rule-files.md),
   [Java Rewrite Programs](docs/java-rewrite-programs.md),
-  [Java Discovery SDK](docs/java-discovery-sdk.md)
+  [Java Discovery SDK](docs/java-discovery-sdk.md),
+  [Primachsenraum-Signalplugin](docs/periodic-signal-discovery.md),
+  [Python-Client](docs/python-client.md)
 - **Referenz:** [Dokumentationsindex](docs/README.md),
   [Glossar](docs/glossary.md), [Schema-Katalog](docs/schema-catalog.md),
   lokale Swagger UI unter `/static/openapi/index.html`

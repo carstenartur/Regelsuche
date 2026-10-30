@@ -10,42 +10,52 @@ import java.nio.file.Paths;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** Protects the attention-first, evidence-backed README entry path. */
+/** Protects the workflow-first, evidence-backed README entry path. */
 class ReadmeShowcaseDocumentationTest {
     private static final Path REPO_ROOT = locateRepoRoot();
 
     @Test
-    void readmeLeadsWithVisualEvidenceAndExecutableExtensionExamples() throws IOException {
+    void readmeLeadsWithWorkflowAndKeepsEvidenceBackedExtensionExamples() throws IOException {
         String readme = Files.readString(REPO_ROOT.resolve("README.md"), StandardCharsets.UTF_8);
         int quickstart = readme.indexOf("## Schnellstart");
         assertTrue(quickstart > 0, "README must contain the supported quickstart");
+        int workflow = readme.indexOf("## Erster Ablauf: einen Rechenweg verstehen");
+        int research = readme.indexOf("## Lernen muss sich auf unbekannten Fällen auszahlen");
+        int extensions = readme.indexOf("## In wenigen Zeilen erweitern");
+        assertTrue(workflow > quickstart,
+            "README must lead from installation into the first user workflow");
+        assertTrue(research > workflow && extensions > workflow,
+            "README must present the first workflow before research and extension details");
 
-        assertAppearsBeforeQuickstart(readme, quickstart, "docs/assets/ast-rule-radar.svg");
-        assertAppearsBeforeQuickstart(
+        String firstWorkflow = readme.substring(workflow, readme.indexOf("\n## ", workflow + 1));
+        for (String step : List.of("(x+3)^2", "**Pfade**", "**Replay**", "**Exporte**", "Markdown", "LaTeX")) {
+            assertTrue(firstWorkflow.contains(step),
+                "README first workflow must include: " + step);
+        }
+
+        assertContains(readme, "docs/assets/ast-rule-radar.svg");
+        assertContains(
             readme,
-            quickstart,
             "docs/generated/discovery/sophie-germain/search-space.svg"
         );
-        assertAppearsBeforeQuickstart(
+        assertContains(
             readme,
-            quickstart,
             "docs/generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg"
         );
-        assertAppearsBeforeQuickstart(
+        assertContains(
             readme,
-            quickstart,
             "docs/assets/screenshots/macro-learning-summary.png"
         );
-        assertAppearsBeforeQuickstart(readme, quickstart, "rule difference_of_squares:");
-        assertAppearsBeforeQuickstart(readme, quickstart, "firstApplicable(");
-        assertAppearsBeforeQuickstart(readme, quickstart, "docs/java-discovery-sdk.md");
-        assertAppearsBeforeQuickstart(
-            readme, quickstart, "GeometricSequenceDomainProvider.typedDomain()"
+        assertContains(readme, "rule difference_of_squares:");
+        assertContains(readme, "firstApplicable(");
+        assertContains(readme, "docs/java-discovery-sdk.md");
+        assertContains(
+            readme, "GeometricSequenceDomainProvider.typedDomain()"
         );
-        assertAppearsBeforeQuickstart(readme, quickstart, "var input = new Input(");
-        assertAppearsBeforeQuickstart(readme, quickstart, ".seed(\"powers-of-two\", input,");
-        assertAppearsBeforeQuickstart(
-            readme, quickstart, "assertThat(run).isConfirmed().hasContentAddressedEvidence()"
+        assertContains(readme, "var input = new Input(");
+        assertContains(readme, ".seed(\"powers-of-two\", input,");
+        assertContains(
+            readme, "assertThat(run).isConfirmed().hasContentAddressedEvidence()"
         );
 
         String normalized = readme.replaceAll("\\s+", " ");
@@ -76,10 +86,8 @@ class ReadmeShowcaseDocumentationTest {
         }
     }
 
-    private static void assertAppearsBeforeQuickstart(String readme, int quickstart, String needle) {
-        int index = readme.indexOf(needle);
-        assertTrue(index >= 0, "README showcase must contain: " + needle);
-        assertTrue(index < quickstart, "README must show " + needle + " before installation details");
+    private static void assertContains(String readme, String needle) {
+        assertTrue(readme.contains(needle), "README showcase must contain: " + needle);
     }
 
     private static Path locateRepoRoot() {
