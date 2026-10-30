@@ -162,220 +162,281 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
 <span class="fc" id="L162">        var work = new Work();</span>
 <span class="fc" id="L163">        var attempts = new ArrayList&lt;Attempt&gt;();</span>
 <span class="fc" id="L164">        var examples = collectObservedPairs(formation, bounds, work, attempts);</span>
-<span class="fc" id="L165">        String inventoryBinding = inventorySemanticsHash(formation.inventory().contentHash());</span>
-<span class="fc" id="L166">        var admitted = new TreeMap&lt;String, Schema&gt;();</span>
-<span class="fc" id="L167">        var generalizer = new TypedPatternGeneralizer();</span>
-<span class="fc" id="L168">        int paired = 0;</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">        outer: for (int left = 0; left &lt; examples.size(); left++) {</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (int right = left + 1; right &lt; examples.size(); right++) {</span>
-<span class="fc" id="L171">                var first = examples.get(left);</span>
-<span class="fc" id="L172">                var second = examples.get(right);</span>
-<span class="fc" id="L173">                work.add(1);</span>
-<span class="pc bpc" id="L174" title="1 of 4 branches missed.">                if (first.inputId().equals(second.inputId()) || !shape(first.example().source()).equals(shape(second.example().source()))) continue;</span>
-<span class="pc bpc" id="L175" title="2 of 4 branches missed.">                if (paired++ &gt;= bounds.maximumPairAttempts() || admitted.size() &gt;= bounds.maximumSchemas()) {</span>
-<span class="nc" id="L176">                    attempts.add(new Attempt(List.of(), &quot;FORMATION_LIMIT&quot;, &quot;UNEXAMINED_PAIRS_REMAIN&quot;));</span>
-<span class="nc" id="L177">                    break outer;</span>
+<span class="fc" id="L165">        return form(formation.inventory().contentHash(), formation.contentHash(), bounds, examples,</span>
+<span class="fc" id="L166">            List.of(), work, attempts);</span>
+    }
+
+    /** Empty, fixed-inventory starting point for generation-separated task learning. */
+    static CheckedLearnedSchemaModel empty(String inventoryHash) {
+<span class="fc" id="L171">        return new CheckedLearnedSchemaModel(inventoryHash, SchematicProofPlan.hash(&quot;empty-task-knowledge&quot;),</span>
+<span class="fc" id="L172">            Bounds.defaults(), List.of(), List.of(), List.of(), 0, 0);</span>
+    }
+
+    /**
+     * The same generalizer/prover as trace learning, fed only by solver-issued completed paths.
+     * Earlier schemata remain immutable. One previously learned application alone is not a new
+     * composition. formationWork() reports this attempt's work, not the parent's sunk costs.
+     */
+    static CheckedLearnedSchemaModel extendFromSolutions(CheckedLearnedSchemaModel parent,
+            List&lt;CheckedSchemaTaskSolver.Solution&gt; solutions) {
+<span class="fc" id="L182">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc" id="L183">        solutions = List.copyOf(solutions);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (solutions.size() &gt; parent.bounds.maximumExamples()) throw new IllegalArgumentException(&quot;too many lessons&quot;);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (!parent.requiredAssumptions.isEmpty()) throw new IllegalArgumentException(&quot;conditional library cannot be generalized&quot;);</span>
+<span class="fc" id="L186">        var work = new Work();</span>
+<span class="fc" id="L187">        var attempts = new ArrayList&lt;Attempt&gt;();</span>
+<span class="fc" id="L188">        var examples = new ArrayList&lt;ObservedPair&gt;();</span>
+<span class="fc" id="L189">        var seen = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L190">        var provenance = new StringBuilder(parent.modelHash);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (int i = 0; i &lt; solutions.size(); i++) {</span>
+<span class="fc" id="L192">            var solution = solutions.get(i);</span>
+<span class="fc" id="L193">            String observationId = &quot;task-&quot; + i;</span>
+<span class="fc" id="L194">            work.add(1);</span>
+<span class="pc bpc" id="L195" title="1 of 4 branches missed.">            if (!solution.solved() || !solution.task().assumptions().isEmpty()</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">                    || solution.evidence().witness().stream().anyMatch(step -&gt; !step.move().assumptions().isEmpty())</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                    || solution.evidence().witness().size() &lt; 2) {</span>
+<span class="fc" id="L198">                attempts.add(new Attempt(List.of(observationId), &quot;TRACE_ONLY&quot;, &quot;NO_UNCONDITIONAL_COMPLETED_COMPOSITION&quot;));</span>
+<span class="fc" id="L199">                continue;</span>
+            }
+            try {
+<span class="fc" id="L202">                var source = solution.task().source();</span>
+<span class="fc" id="L203">                var target = solution.evidence().incumbent().expression();</span>
+<span class="fc" id="L204">                domain(source, parent.bounds, work);</span>
+<span class="fc" id="L205">                domain(target, parent.bounds, work);</span>
+                // The path records which old learned providers actually contributed to this lesson.
+<span class="fc" id="L207">                String lineage = solution.evidence().witness().stream().map(step -&gt; step.move().ruleId())</span>
+<span class="fc" id="L208">                    .collect(java.util.stream.Collectors.joining(&quot;\n&quot;));</span>
+<span class="fc" id="L209">                work.add(solution.evidence().witness().size());</span>
+<span class="fc" id="L210">                observationId += &quot;@&quot; + SchematicProofPlan.hash(lineage);</span>
+<span class="fc" id="L211">                addPair(examples, seen, observationId, 0, solution.evidence().witness().size(), source, target, work);</span>
+<span class="fc" id="L212">                provenance.append('\n').append(CODEC.encodeExpression(source)).append('\n')</span>
+<span class="fc" id="L213">                    .append(CODEC.encodeExpression(target)).append('\n').append(lineage);</span>
+<span class="nc" id="L214">            } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L215">                attempts.add(new Attempt(List.of(observationId), &quot;TRACE_ONLY&quot;, unsupported.getMessage()));</span>
+<span class="fc" id="L216">            }</span>
+        }
+<span class="fc" id="L218">        return form(parent.inventoryHash, SchematicProofPlan.hash(provenance.toString()), parent.bounds,</span>
+            examples, parent.schemas, work, attempts);
+    }
+
+    private static CheckedLearnedSchemaModel form(String inventoryHash, String origin, Bounds bounds,
+            List&lt;ObservedPair&gt; examples, List&lt;Schema&gt; previous, Work work, List&lt;Attempt&gt; attempts) {
+<span class="fc" id="L224">        String inventoryBinding = inventorySemanticsHash(inventoryHash);</span>
+<span class="fc" id="L225">        var admitted = new TreeMap&lt;String, Schema&gt;();</span>
+<span class="fc" id="L226">        previous.forEach(schema -&gt; admitted.put(schema.id(), schema));</span>
+<span class="fc" id="L227">        work.add(previous.size());</span>
+<span class="fc" id="L228">        var generalizer = new TypedPatternGeneralizer();</span>
+<span class="fc" id="L229">        int paired = 0;</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        outer: for (int left = 0; left &lt; examples.size(); left++) {</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            for (int right = left + 1; right &lt; examples.size(); right++) {</span>
+<span class="fc" id="L232">                var first = examples.get(left);</span>
+<span class="fc" id="L233">                var second = examples.get(right);</span>
+<span class="fc" id="L234">                work.add(1);</span>
+<span class="fc bfc" id="L235" title="All 4 branches covered.">                if (first.inputId().equals(second.inputId()) || !shape(first.example().source()).equals(shape(second.example().source()))) continue;</span>
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">                if (paired++ &gt;= bounds.maximumPairAttempts() || admitted.size() &gt;= bounds.maximumSchemas()) {</span>
+<span class="nc" id="L237">                    attempts.add(new Attempt(List.of(), &quot;FORMATION_LIMIT&quot;, &quot;UNEXAMINED_PAIRS_REMAIN&quot;));</span>
+<span class="nc" id="L238">                    break outer;</span>
                 }
-<span class="fc" id="L179">                List&lt;String&gt; origins = List.of(first.windowId(), second.windowId());</span>
+<span class="fc" id="L240">                List&lt;String&gt; origins = List.of(first.windowId(), second.windowId());</span>
                 try {
-<span class="fc" id="L181">                    work.add(1);</span>
-<span class="fc" id="L182">                    var hypothesis = generalizer.generalize(List.of(first.example(), second.example()));</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">                    if (hypothesis.isEmpty()) {</span>
-<span class="fc" id="L184">                        attempts.add(new Attempt(origins, &quot;TRACE_ONLY&quot;, &quot;NO_COMMON_SOURCE_BOUND_HYPOTHESIS&quot;));</span>
-<span class="fc" id="L185">                        continue;</span>
+<span class="fc" id="L242">                    work.add(1);</span>
+<span class="fc" id="L243">                    var hypothesis = generalizer.generalize(List.of(first.example(), second.example()));</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                    if (hypothesis.isEmpty()) {</span>
+<span class="fc" id="L245">                        attempts.add(new Attempt(origins, &quot;TRACE_ONLY&quot;, &quot;NO_COMMON_SOURCE_BOUND_HYPOTHESIS&quot;));</span>
+<span class="fc" id="L246">                        continue;</span>
                     }
-<span class="fc" id="L187">                    var candidate = hypothesis.orElseThrow();</span>
-<span class="fc" id="L188">                    String proof = prove(candidate.source(), candidate.target(), bounds, work);</span>
-<span class="fc" id="L189">                    var schema = new Schema(candidate.source(), candidate.target(), proof, inventoryBinding, origins);</span>
-<span class="fc" id="L190">                    var old = admitted.get(schema.id());</span>
-<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                    if (old != null) {</span>
-<span class="nc" id="L192">                        var combined = new ArrayList&lt;&gt;(old.supportingObservationIds());</span>
-<span class="nc" id="L193">                        combined.addAll(origins);</span>
-<span class="nc" id="L194">                        schema = new Schema(candidate.source(), candidate.target(), proof, inventoryBinding, combined);</span>
+<span class="fc" id="L248">                    var candidate = hypothesis.orElseThrow();</span>
+<span class="fc" id="L249">                    String proof = prove(candidate.source(), candidate.target(), bounds, work);</span>
+<span class="fc" id="L250">                    var schema = new Schema(candidate.source(), candidate.target(), proof, inventoryBinding, origins);</span>
+<span class="fc" id="L251">                    var old = admitted.get(schema.id());</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">                    if (old != null) {</span>
+<span class="fc" id="L253">                        var combined = new ArrayList&lt;&gt;(old.supportingObservationIds());</span>
+<span class="fc" id="L254">                        combined.addAll(origins);</span>
+<span class="fc" id="L255">                        schema = new Schema(candidate.source(), candidate.target(), proof, inventoryBinding, combined);</span>
                     }
-<span class="fc" id="L196">                    admitted.put(schema.id(), schema);</span>
-<span class="fc" id="L197">                    attempts.add(new Attempt(origins, &quot;PROVED&quot;, schema.id()));</span>
-<span class="nc" id="L198">                } catch (IllegalArgumentException unsupported) {</span>
-<span class="nc" id="L199">                    attempts.add(new Attempt(origins, &quot;TRACE_ONLY&quot;, unsupported.getMessage()));</span>
-<span class="fc" id="L200">                }</span>
+<span class="fc" id="L257">                    admitted.put(schema.id(), schema);</span>
+<span class="fc" id="L258">                    attempts.add(new Attempt(origins, &quot;PROVED&quot;, schema.id()));</span>
+<span class="fc" id="L259">                } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L260">                    attempts.add(new Attempt(origins, &quot;TRACE_ONLY&quot;, unsupported.getMessage()));</span>
+<span class="fc" id="L261">                }</span>
             }
         }
-<span class="fc" id="L203">        work.add(admitted.size());</span>
-<span class="fc" id="L204">        return new CheckedLearnedSchemaModel(formation.inventory().contentHash(), formation.contentHash(), bounds,</span>
-<span class="fc" id="L205">            List.of(), List.copyOf(admitted.values()), attempts, work.units, 0);</span>
+<span class="fc" id="L264">        work.add(admitted.size());</span>
+<span class="fc" id="L265">        return new CheckedLearnedSchemaModel(inventoryHash, origin, bounds,</span>
+<span class="fc" id="L266">            List.of(), List.copyOf(admitted.values()), attempts, work.units, 0);</span>
     }
 
     private static List&lt;ObservedPair&gt; collectObservedPairs(TraceRewriteStrategyLearner.FrozenStrategy formation,
             Bounds bounds, Work work, List&lt;Attempt&gt; attempts) {
-<span class="fc" id="L210">        var examples = new ArrayList&lt;ObservedPair&gt;();</span>
-<span class="fc" id="L211">        var deferred = new ArrayList&lt;ObservedPair&gt;();</span>
-<span class="fc" id="L212">        var seen = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (var observation : formation.observations()) {</span>
-<span class="fc" id="L214">            work.add(1);</span>
-<span class="pc bpc" id="L215" title="1 of 4 branches missed.">            if (observation.geneSequence().size() &lt; 2 || observation.minimality().isEmpty()</span>
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                    || !observation.minimality().orElseThrow().observedReplayVerified()) {</span>
-<span class="fc" id="L217">                attempts.add(new Attempt(List.of(observation.input().id()), &quot;TRACE_ONLY&quot;, &quot;NO_ADMITTED_MULTISTEP_SELECTED_PATH&quot;));</span>
-<span class="fc" id="L218">                continue;</span>
+<span class="fc" id="L271">        var examples = new ArrayList&lt;ObservedPair&gt;();</span>
+<span class="fc" id="L272">        var deferred = new ArrayList&lt;ObservedPair&gt;();</span>
+<span class="fc" id="L273">        var seen = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        for (var observation : formation.observations()) {</span>
+<span class="fc" id="L275">            work.add(1);</span>
+<span class="pc bpc" id="L276" title="1 of 4 branches missed.">            if (observation.geneSequence().size() &lt; 2 || observation.minimality().isEmpty()</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">                    || !observation.minimality().orElseThrow().observedReplayVerified()) {</span>
+<span class="fc" id="L278">                attempts.add(new Attempt(List.of(observation.input().id()), &quot;TRACE_ONLY&quot;, &quot;NO_ADMITTED_MULTISTEP_SELECTED_PATH&quot;));</span>
+<span class="fc" id="L279">                continue;</span>
             }
-<span class="fc" id="L220">            var path = observation.search().bestState().path();</span>
-<span class="fc" id="L221">            var assumptions = observation.search().bestState().transformations().stream()</span>
-<span class="fc" id="L222">                .flatMap(step -&gt; step.assumptions().stream()).distinct().toList();</span>
-<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (!assumptions.isEmpty()) {</span>
-<span class="nc" id="L224">                attempts.add(new Attempt(List.of(observation.input().id()), &quot;TRACE_ONLY&quot;, &quot;CONDITIONAL_SCHEMAS_UNSUPPORTED&quot;));</span>
-<span class="nc" id="L225">                continue;</span>
+<span class="fc" id="L281">            var path = observation.search().bestState().path();</span>
+<span class="fc" id="L282">            var assumptions = observation.search().bestState().transformations().stream()</span>
+<span class="fc" id="L283">                .flatMap(step -&gt; step.assumptions().stream()).distinct().toList();</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (!assumptions.isEmpty()) {</span>
+<span class="nc" id="L285">                attempts.add(new Attempt(List.of(observation.input().id()), &quot;TRACE_ONLY&quot;, &quot;CONDITIONAL_SCHEMAS_UNSUPPORTED&quot;));</span>
+<span class="nc" id="L286">                continue;</span>
             }
-<span class="fc" id="L227">            var asts = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L288">            var asts = new ArrayList&lt;Expr&gt;();</span>
             try {
-<span class="fc bfc" id="L229" title="All 2 branches covered.">                for (String expression : path) {</span>
-<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                    if (expression.length() &gt; 16_384) throw new IllegalArgumentException(&quot;training source size limit&quot;);</span>
-<span class="fc" id="L231">                    work.add(1);</span>
-<span class="fc" id="L232">                    Expr ast = new ExpressionParser().parseExactTerm(expression).expression();</span>
-<span class="fc" id="L233">                    domain(ast, bounds, work);</span>
-<span class="fc" id="L234">                    asts.add(ast);</span>
-<span class="fc" id="L235">                }</span>
-<span class="fc" id="L236">                addPair(examples, seen, observation.input().id(), 0, asts.size() - 1,</span>
-<span class="fc" id="L237">                    asts.getFirst(), asts.getLast(), work);</span>
-<span class="fc bfc" id="L238" title="All 2 branches covered.">                for (int length = asts.size() - 2; length &gt;= 2; length--) {</span>
-<span class="fc bfc" id="L239" title="All 2 branches covered.">                    for (int start = 0; start + length &lt; asts.size(); start++) {</span>
-<span class="fc" id="L240">                        addPair(deferred, seen, observation.input().id(), start, start + length,</span>
-<span class="fc" id="L241">                            asts.get(start), asts.get(start + length), work);</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">                for (String expression : path) {</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                    if (expression.length() &gt; 16_384) throw new IllegalArgumentException(&quot;training source size limit&quot;);</span>
+<span class="fc" id="L292">                    work.add(1);</span>
+<span class="fc" id="L293">                    Expr ast = new ExpressionParser().parseExactTerm(expression).expression();</span>
+<span class="fc" id="L294">                    domain(ast, bounds, work);</span>
+<span class="fc" id="L295">                    asts.add(ast);</span>
+<span class="fc" id="L296">                }</span>
+<span class="fc" id="L297">                addPair(examples, seen, observation.input().id(), 0, asts.size() - 1,</span>
+<span class="fc" id="L298">                    asts.getFirst(), asts.getLast(), work);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">                for (int length = asts.size() - 2; length &gt;= 2; length--) {</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">                    for (int start = 0; start + length &lt; asts.size(); start++) {</span>
+<span class="fc" id="L301">                        addPair(deferred, seen, observation.input().id(), start, start + length,</span>
+<span class="fc" id="L302">                            asts.get(start), asts.get(start + length), work);</span>
                     }
                 }
-<span class="nc" id="L244">            } catch (IllegalArgumentException unsupported) {</span>
-<span class="nc" id="L245">                attempts.add(new Attempt(List.of(observation.input().id()), &quot;TRACE_ONLY&quot;, unsupported.getMessage()));</span>
-<span class="fc" id="L246">            }</span>
-<span class="fc" id="L247">        }</span>
-<span class="fc" id="L248">        examples.addAll(deferred);</span>
-<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (examples.size() &gt; bounds.maximumExamples()) {</span>
-<span class="nc" id="L250">            attempts.add(new Attempt(List.of(), &quot;EXTRACTION_LIMIT&quot;, &quot;UNEXAMINED_WINDOWS=&quot; + (examples.size() - bounds.maximumExamples())));</span>
-<span class="nc" id="L251">            examples.subList(bounds.maximumExamples(), examples.size()).clear();</span>
+<span class="nc" id="L305">            } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L306">                attempts.add(new Attempt(List.of(observation.input().id()), &quot;TRACE_ONLY&quot;, unsupported.getMessage()));</span>
+<span class="fc" id="L307">            }</span>
+<span class="fc" id="L308">        }</span>
+<span class="fc" id="L309">        examples.addAll(deferred);</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (examples.size() &gt; bounds.maximumExamples()) {</span>
+<span class="nc" id="L311">            attempts.add(new Attempt(List.of(), &quot;EXTRACTION_LIMIT&quot;, &quot;UNEXAMINED_WINDOWS=&quot; + (examples.size() - bounds.maximumExamples())));</span>
+<span class="nc" id="L312">            examples.subList(bounds.maximumExamples(), examples.size()).clear();</span>
         }
-<span class="fc" id="L253">        return examples;</span>
+<span class="fc" id="L314">        return examples;</span>
     }
 
-<span class="fc" id="L256">    private record ObservedPair(String inputId, String windowId, TypedPatternGeneralizer.Example example) {}</span>
+<span class="fc" id="L317">    private record ObservedPair(String inputId, String windowId, TypedPatternGeneralizer.Example example) {}</span>
     /** Strip only identical enclosing operations with an unchanged sibling; no algebraic normalization. */
     private static void addPair(List&lt;ObservedPair&gt; output, Set&lt;String&gt; seen, String inputId, int start, int end,
             Expr source, Expr target, Work work) {
-<span class="pc bpc" id="L260" title="2 of 6 branches missed.">        while (source instanceof BinaryExpr left &amp;&amp; target instanceof BinaryExpr right &amp;&amp; left.operator() == right.operator()) {</span>
-<span class="fc" id="L261">            work.add(1);</span>
-<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (left.left().equals(right.left())) { source = left.right(); target = right.right(); }</span>
-<span class="fc bfc" id="L263" title="All 2 branches covered.">            else if (left.right().equals(right.right())) { source = left.left(); target = right.left(); }</span>
+<span class="pc bpc" id="L321" title="2 of 6 branches missed.">        while (source instanceof BinaryExpr left &amp;&amp; target instanceof BinaryExpr right &amp;&amp; left.operator() == right.operator()) {</span>
+<span class="fc" id="L322">            work.add(1);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            if (left.left().equals(right.left())) { source = left.right(); target = right.right(); }</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            else if (left.right().equals(right.right())) { source = left.left(); target = right.left(); }</span>
             else break;
         }
-<span class="fc" id="L266">        work.add(1);</span>
-<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (source.equals(target)) return;</span>
-<span class="fc" id="L268">        String key = inputId + &quot;:&quot; + CODEC.encodeExpression(source) + &quot;:&quot; + CODEC.encodeExpression(target);</span>
-<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (seen.add(key)) output.add(new ObservedPair(inputId, inputId + &quot;:&quot; + start + &quot;-&quot; + end,</span>
+<span class="fc" id="L327">        work.add(1);</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (source.equals(target)) return;</span>
+<span class="fc" id="L329">        String key = inputId + &quot;:&quot; + CODEC.encodeExpression(source) + &quot;:&quot; + CODEC.encodeExpression(target);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (seen.add(key)) output.add(new ObservedPair(inputId, inputId + &quot;:&quot; + start + &quot;-&quot; + end,</span>
             new TypedPatternGeneralizer.Example(source, target)));
-<span class="fc" id="L271">    }</span>
+<span class="fc" id="L332">    }</span>
 
-<span class="fc" id="L273">    public List&lt;Schema&gt; schemas() { return schemas; }</span>
-<span class="nc" id="L274">    public List&lt;Attempt&gt; attempts() { return attempts; }</span>
-<span class="fc" id="L275">    public Bounds bounds() { return bounds; }</span>
-<span class="fc" id="L276">    public String inventoryHash() { return inventoryHash; }</span>
-<span class="fc" id="L277">    public String inventorySemanticsHash() { return inventorySemanticsHash; }</span>
-<span class="nc" id="L278">    public List&lt;String&gt; requiredAssumptions() { return requiredAssumptions; }</span>
+<span class="fc" id="L334">    public List&lt;Schema&gt; schemas() { return schemas; }</span>
+<span class="fc" id="L335">    public List&lt;Attempt&gt; attempts() { return attempts; }</span>
+<span class="fc" id="L336">    public Bounds bounds() { return bounds; }</span>
+<span class="fc" id="L337">    public String inventoryHash() { return inventoryHash; }</span>
+<span class="fc" id="L338">    public String inventorySemanticsHash() { return inventorySemanticsHash; }</span>
+<span class="fc" id="L339">    public List&lt;String&gt; requiredAssumptions() { return requiredAssumptions; }</span>
     /** Additional formation only; the preexisting learner's work must also be paid by callers. */
-<span class="fc" id="L280">    public long formationWork() { return formationWork; }</span>
+<span class="fc" id="L341">    public long formationWork() { return formationWork; }</span>
     /** Fresh semantic recheck and decoding work, never serialized as proof authority. */
-<span class="fc" id="L282">    public long loadWork() { return loadWork; }</span>
-<span class="fc" id="L283">    public String toCanonicalJson() { return canonicalJson; }</span>
+<span class="fc" id="L343">    public long loadWork() { return loadWork; }</span>
+<span class="fc" id="L344">    public String toCanonicalJson() { return canonicalJson; }</span>
     /** Caller prerequisites gate the model; the admitted mathematical theorems remain unconditional. */
     public CheckedLearnedSchemaModel requiring(List&lt;String&gt; prerequisites) {
-<span class="fc" id="L286">        var combined = new ArrayList&lt;&gt;(requiredAssumptions);</span>
-<span class="fc" id="L287">        combined.addAll(prerequisites);</span>
-<span class="fc" id="L288">        return new CheckedLearnedSchemaModel(inventoryHash, originStrategyHash, bounds, combined, schemas, attempts, formationWork, loadWork);</span>
+<span class="fc" id="L347">        var combined = new ArrayList&lt;&gt;(requiredAssumptions);</span>
+<span class="fc" id="L348">        combined.addAll(prerequisites);</span>
+<span class="fc" id="L349">        return new CheckedLearnedSchemaModel(inventoryHash, originStrategyHash, bounds, combined, schemas, attempts, formationWork, loadWork);</span>
     }
 
     public List&lt;NativeMoveProvider&gt; nativeProviders() {
-<span class="fc" id="L292">        return nativeProviders(bounds.maximumSchemas(),Map.of(),byId.keySet());</span>
+<span class="fc" id="L353">        return nativeProviders(bounds.maximumSchemas(),Map.of(),byId.keySet());</span>
     }
     public List&lt;NativeMoveProvider&gt; nativeProviders(int maximum,Map&lt;String,Double&gt; utilities,Set&lt;String&gt; included) {
-<span class="fc" id="L295">        return providers(maximum,utilities,included).stream().&lt;NativeMoveProvider&gt;map(provider-&gt;new NativeProvider((IndexedProvider)provider)).toList();</span>
+<span class="fc" id="L356">        return providers(maximum,utilities,included).stream().&lt;NativeMoveProvider&gt;map(provider-&gt;new NativeProvider((IndexedProvider)provider)).toList();</span>
     }
-<span class="fc" id="L297">    public List&lt;MoveProvider&gt; providers() { return providers(bounds.maximumSchemas()); }</span>
-<span class="fc" id="L298">    public List&lt;MoveProvider&gt; providers(int maximumSchemasPerOccurrence) { return providers(maximumSchemasPerOccurrence, Map.of()); }</span>
+<span class="fc" id="L358">    public List&lt;MoveProvider&gt; providers() { return providers(bounds.maximumSchemas()); }</span>
+<span class="fc" id="L359">    public List&lt;MoveProvider&gt; providers(int maximumSchemasPerOccurrence) { return providers(maximumSchemasPerOccurrence, Map.of()); }</span>
     public List&lt;MoveProvider&gt; providers(int maximumSchemasPerOccurrence, Map&lt;String, Double&gt; utilityBySchemaId,
             Set&lt;String&gt; includedSchemaIds) {
-<span class="pc bpc" id="L301" title="2 of 4 branches missed.">        if (maximumSchemasPerOccurrence &lt; 1 || maximumSchemasPerOccurrence &gt; bounds.maximumSchemas()) {</span>
-<span class="nc" id="L302">            throw new IllegalArgumentException(&quot;schema selection bound outside model limits&quot;);</span>
+<span class="pc bpc" id="L362" title="2 of 4 branches missed.">        if (maximumSchemasPerOccurrence &lt; 1 || maximumSchemasPerOccurrence &gt; bounds.maximumSchemas()) {</span>
+<span class="nc" id="L363">            throw new IllegalArgumentException(&quot;schema selection bound outside model limits&quot;);</span>
         }
-<span class="fc" id="L304">        Objects.requireNonNull(includedSchemaIds, &quot;includedSchemaIds&quot;);</span>
-<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (!byId.keySet().containsAll(includedSchemaIds)) throw new IllegalArgumentException(&quot;unregistered included schema&quot;);</span>
-<span class="fc" id="L306">        Objects.requireNonNull(utilityBySchemaId, &quot;utilityBySchemaId&quot;);</span>
-<span class="pc bpc" id="L307" title="1 of 4 branches missed.">        for (var entry : utilityBySchemaId.entrySet()) if (!byId.containsKey(entry.getKey())</span>
-<span class="pc bpc" id="L308" title="2 of 4 branches missed.">                || entry.getValue() == null || !Double.isFinite(entry.getValue())) {</span>
-<span class="nc" id="L309">            throw new IllegalArgumentException(&quot;unknown schema or nonfinite selection utility&quot;);</span>
+<span class="fc" id="L365">        Objects.requireNonNull(includedSchemaIds, &quot;includedSchemaIds&quot;);</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        if (!byId.keySet().containsAll(includedSchemaIds)) throw new IllegalArgumentException(&quot;unregistered included schema&quot;);</span>
+<span class="fc" id="L367">        Objects.requireNonNull(utilityBySchemaId, &quot;utilityBySchemaId&quot;);</span>
+<span class="pc bpc" id="L368" title="1 of 4 branches missed.">        for (var entry : utilityBySchemaId.entrySet()) if (!byId.containsKey(entry.getKey())</span>
+<span class="pc bpc" id="L369" title="2 of 4 branches missed.">                || entry.getValue() == null || !Double.isFinite(entry.getValue())) {</span>
+<span class="nc" id="L370">            throw new IllegalArgumentException(&quot;unknown schema or nonfinite selection utility&quot;);</span>
         }
-<span class="fc bfc" id="L311" title="All 2 branches covered.">        return includedSchemaIds.isEmpty() ? List.of() : List.of(new IndexedProvider(maximumSchemasPerOccurrence,</span>
-<span class="fc" id="L312">            Map.copyOf(utilityBySchemaId), Set.copyOf(includedSchemaIds)));</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        return includedSchemaIds.isEmpty() ? List.of() : List.of(new IndexedProvider(maximumSchemasPerOccurrence,</span>
+<span class="fc" id="L373">            Map.copyOf(utilityBySchemaId), Set.copyOf(includedSchemaIds)));</span>
     }
     public List&lt;MoveProvider&gt; providers(int maximumSchemasPerOccurrence, Map&lt;String, Double&gt; utilityBySchemaId) {
-<span class="fc" id="L315">        return providers(maximumSchemasPerOccurrence, utilityBySchemaId, byId.keySet());</span>
+<span class="fc" id="L376">        return providers(maximumSchemasPerOccurrence, utilityBySchemaId, byId.keySet());</span>
     }
 
     /** Internal bridge to the same private application capability used by the eager provider. */
     CheckedSchemaMatcherPlan prepareCursorPlan(int maximumSchemasPerOccurrence,
             Map&lt;String, Double&gt; utilities, Set&lt;String&gt; included) {
-<span class="fc" id="L321">        return new CheckedSchemaMatcherPlan(this, descriptor, maximumSchemasPerOccurrence, utilities, included,</span>
+<span class="fc" id="L382">        return new CheckedSchemaMatcherPlan(this, descriptor, maximumSchemasPerOccurrence, utilities, included,</span>
             new ApplicationFactory());
     }
 
     boolean ownsApplication(CheckedSchemaMatcherPlan.Application candidate) {
-<span class="fc" id="L326">        RetainedOperation.work(1);</span>
-<span class="pc bpc" id="L327" title="1 of 4 branches missed.">        return candidate instanceof ApplicationFactory factory &amp;&amp; factory.owner()==this;</span>
+<span class="fc" id="L387">        RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L388" title="1 of 4 branches missed.">        return candidate instanceof ApplicationFactory factory &amp;&amp; factory.owner()==this;</span>
     }
 
-<span class="fc" id="L330">    private final class ApplicationFactory implements CheckedSchemaMatcherPlan.Application,RetainedGraph.View {</span>
-<span class="fc" id="L331">        private CheckedLearnedSchemaModel owner(){return CheckedLearnedSchemaModel.this;}</span>
+<span class="fc" id="L391">    private final class ApplicationFactory implements CheckedSchemaMatcherPlan.Application,RetainedGraph.View {</span>
+<span class="fc" id="L392">        private CheckedLearnedSchemaModel owner(){return CheckedLearnedSchemaModel.this;}</span>
         @Override public CheckedSchemaMatcherPlan.ApplicationSteps start(Schema schema,Expr source,String encoded,List&lt;Integer&gt; path,Map&lt;String,Expr&gt; bindings,Work work){
-<span class="fc" id="L333">            return new CheckedApplication(schema,source,encoded,path,bindings,work);</span>
+<span class="fc" id="L394">            return new CheckedApplication(schema,source,encoded,path,bindings,work);</span>
         }
-<span class="fc" id="L335">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}</span>
+<span class="fc" id="L396">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}</span>
     }
     private final class IndexedProvider implements TypedMoveSearch.TypedProvider,RetainedGraph.View {
-<span class="fc" id="L338">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(index);}</span>
+<span class="fc" id="L399">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(index);}</span>
         private final Map&lt;String, List&lt;Schema&gt;&gt; index;
         private final int maximumSchemasPerOccurrence;
         private final boolean allSchemasIncluded;
-<span class="fc" id="L342">        IndexedProvider(int maximumSchemasPerOccurrence, Map&lt;String, Double&gt; utility, Set&lt;String&gt; included) {</span>
-<span class="fc" id="L343">            this.maximumSchemasPerOccurrence = maximumSchemasPerOccurrence;</span>
-<span class="fc bfc" id="L344" title="All 2 branches covered.">            allSchemasIncluded = included.size() == schemas.size();</span>
-<span class="fc" id="L345">            var mutable = new TreeMap&lt;String, List&lt;Schema&gt;&gt;();</span>
-<span class="fc" id="L346">            var ordered = new ArrayList&lt;&gt;(schemas.stream().filter(schema -&gt; included.contains(schema.id())).toList());</span>
-<span class="fc" id="L347">            ordered.sort(Comparator.&lt;Schema&gt;comparingDouble(schema -&gt; utility.getOrDefault(schema.id(), 0.0)).reversed()</span>
-<span class="fc" id="L348">                .thenComparing(Comparator.comparingInt((Schema schema) -&gt; schema.structuralReduction).reversed()).thenComparing(Schema::id));</span>
-<span class="fc" id="L349">            ordered.forEach(schema -&gt; mutable.computeIfAbsent(shape(schema.source()), ignored -&gt; new ArrayList&lt;&gt;()).add(schema));</span>
-<span class="fc" id="L350">            var frozen = new TreeMap&lt;String, List&lt;Schema&gt;&gt;();</span>
-<span class="fc" id="L351">            mutable.forEach((key, value) -&gt; frozen.put(key, List.copyOf(value)));</span>
-<span class="fc" id="L352">            index = Map.copyOf(frozen);</span>
-<span class="fc" id="L353">        }</span>
-<span class="fc" id="L354">        @Override public Descriptor descriptor() { return descriptor; }</span>
+<span class="fc" id="L403">        IndexedProvider(int maximumSchemasPerOccurrence, Map&lt;String, Double&gt; utility, Set&lt;String&gt; included) {</span>
+<span class="fc" id="L404">            this.maximumSchemasPerOccurrence = maximumSchemasPerOccurrence;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">            allSchemasIncluded = included.size() == schemas.size();</span>
+<span class="fc" id="L406">            var mutable = new TreeMap&lt;String, List&lt;Schema&gt;&gt;();</span>
+<span class="fc" id="L407">            var ordered = new ArrayList&lt;&gt;(schemas.stream().filter(schema -&gt; included.contains(schema.id())).toList());</span>
+<span class="fc" id="L408">            ordered.sort(Comparator.&lt;Schema&gt;comparingDouble(schema -&gt; utility.getOrDefault(schema.id(), 0.0)).reversed()</span>
+<span class="fc" id="L409">                .thenComparing(Comparator.comparingInt((Schema schema) -&gt; schema.structuralReduction).reversed()).thenComparing(Schema::id));</span>
+<span class="fc" id="L410">            ordered.forEach(schema -&gt; mutable.computeIfAbsent(shape(schema.source()), ignored -&gt; new ArrayList&lt;&gt;()).add(schema));</span>
+<span class="fc" id="L411">            var frozen = new TreeMap&lt;String, List&lt;Schema&gt;&gt;();</span>
+<span class="fc" id="L412">            mutable.forEach((key, value) -&gt; frozen.put(key, List.copyOf(value)));</span>
+<span class="fc" id="L413">            index = Map.copyOf(frozen);</span>
+<span class="fc" id="L414">        }</span>
+<span class="fc" id="L415">        @Override public Descriptor descriptor() { return descriptor; }</span>
         @Override public Batch candidates(MoveState state, MoveContext context) {
-<span class="fc" id="L356">            var work = new Work();</span>
-<span class="fc" id="L357">            work.add(3);</span>
-<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (!context.carries(requiredAssumptions, state)) return batch(List.of(), work, true);</span>
+<span class="fc" id="L417">            var work = new Work();</span>
+<span class="fc" id="L418">            work.add(3);</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            if (!context.carries(requiredAssumptions, state)) return batch(List.of(), work, true);</span>
             Expr source;
             try {
-<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                if (state.expression().length() &gt; 262_144) throw new IllegalArgumentException(&quot;schema source transport size limit&quot;);</span>
-<span class="fc" id="L362">                source = CODEC.decodeExpression(state.expression());</span>
-<span class="fc" id="L363">                work.add(1);</span>
-<span class="fc" id="L364">                domain(source, bounds, work);</span>
-<span class="fc" id="L365">            } catch (IllegalArgumentException unsupported) { return batch(List.of(), work, false); }</span>
-<span class="fc" id="L366">            var generated=generate(source,state.expression(),work);</span>
-<span class="fc" id="L367">            return batch(generated.applications().stream().map(application-&gt;Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application))).toList(),work,generated.complete());</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                if (state.expression().length() &gt; 262_144) throw new IllegalArgumentException(&quot;schema source transport size limit&quot;);</span>
+<span class="fc" id="L423">                source = CODEC.decodeExpression(state.expression());</span>
+<span class="fc" id="L424">                work.add(1);</span>
+<span class="fc" id="L425">                domain(source, bounds, work);</span>
+<span class="fc" id="L426">            } catch (IllegalArgumentException unsupported) { return batch(List.of(), work, false); }</span>
+<span class="fc" id="L427">            var generated=generate(source,state.expression(),work);</span>
+<span class="fc" id="L428">            return batch(generated.applications().stream().map(application-&gt;Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application))).toList(),work,generated.complete());</span>
         }
         private ApplicationBatch generate(Expr source,String encodedSource,Work work) {
-<span class="fc" id="L370">            return new Generation(source,encodedSource,work).run();</span>
+<span class="fc" id="L431">            return new Generation(source,encodedSource,work).run();</span>
         }
         /** Actual shared eager traversal, including unfinished and already completed applications. */
         private final class Generation implements RetainedGraph.View {
             private final Expr source;
             private final String encodedSource;
             private final Work work;
-<span class="fc" id="L377">            private final ArrayDeque&lt;Occurrence&gt; pending=new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L378">            private final ArrayList&lt;VerifiedApplication&gt; candidates=new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L438">            private final ArrayDeque&lt;Occurrence&gt; pending=new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L439">            private final ArrayList&lt;VerifiedApplication&gt; candidates=new ArrayList&lt;&gt;();</span>
             private Occurrence occurrence;
             private List&lt;Schema&gt; relevant;
             private ExprMatcher.MatchOutcome outcome;
@@ -383,130 +444,130 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             private VerifiedApplication application;
             private ApplicationBatch result;
             private int matched;
-<span class="fc" id="L386">            private boolean complete=allSchemasIncluded;</span>
-<span class="fc" id="L387">            Generation(Expr source,String encodedSource,Work work){this.source=source;this.encodedSource=encodedSource;this.work=work;}</span>
+<span class="fc" id="L447">            private boolean complete=allSchemasIncluded;</span>
+<span class="fc" id="L448">            Generation(Expr source,String encodedSource,Work work){this.source=source;this.encodedSource=encodedSource;this.work=work;}</span>
             @Override public void retainedReferences(RetainedGraph.Visitor v) {
-<span class="fc" id="L389">                v.reference(IndexedProvider.this);v.reference(source);v.reference(encodedSource);v.reference(work);</span>
-<span class="fc" id="L390">                v.reference(pending);v.reference(candidates);v.reference(occurrence);v.reference(relevant);</span>
-<span class="fc" id="L391">                v.reference(outcome);v.reference(applicationWork);v.reference(application);v.reference(result);</span>
-<span class="fc" id="L392">            }</span>
+<span class="fc" id="L450">                v.reference(IndexedProvider.this);v.reference(source);v.reference(encodedSource);v.reference(work);</span>
+<span class="fc" id="L451">                v.reference(pending);v.reference(candidates);v.reference(occurrence);v.reference(relevant);</span>
+<span class="fc" id="L452">                v.reference(outcome);v.reference(applicationWork);v.reference(application);v.reference(result);</span>
+<span class="fc" id="L453">            }</span>
             ApplicationBatch run() {
-<span class="fc" id="L394">                var retained=RetainedOperation.retainCompleted(5,this);</span>
-<span class="fc" id="L395">                Throwable primary=null;</span>
+<span class="fc" id="L455">                var retained=RetainedOperation.retainCompleted(5,this);</span>
+<span class="fc" id="L456">                Throwable primary=null;</span>
                 try {
-<span class="fc" id="L397">                    pending.push(new Occurrence(source,List.of()));RetainedOperation.work(2);</span>
-<span class="fc" id="L398">                    traverse();</span>
-<span class="fc" id="L399">                    result=new ApplicationBatch(List.copyOf(candidates),complete);</span>
-<span class="fc" id="L400">                    RetainedOperation.work(candidates.size()+2L);RetainedOperation.checkpoint();</span>
-<span class="fc" id="L401">                    return result;</span>
-<span class="fc" id="L402">                } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L403">                    primary=failure;observeImportFailure(failure);throw failure;</span>
-<span class="fc" id="L404">                } finally {closeReplayFrame(retained,primary);}</span>
+<span class="fc" id="L458">                    pending.push(new Occurrence(source,List.of()));RetainedOperation.work(2);</span>
+<span class="fc" id="L459">                    traverse();</span>
+<span class="fc" id="L460">                    result=new ApplicationBatch(List.copyOf(candidates),complete);</span>
+<span class="fc" id="L461">                    RetainedOperation.work(candidates.size()+2L);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L462">                    return result;</span>
+<span class="fc" id="L463">                } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L464">                    primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L465">                } finally {closeReplayFrame(retained,primary);}</span>
             }
             private void traverse() {
-<span class="fc bfc" id="L407" title="All 2 branches covered.">                outer: while(!pending.isEmpty()) {</span>
-<span class="fc" id="L408">                    occurrence=pending.pop();work.add(1);RetainedOperation.work(2);</span>
-<span class="fc" id="L409">                    relevant=index.getOrDefault(shape(occurrence.expression()),List.of());</span>
-<span class="fc" id="L410">                    RetainedOperation.work(1);</span>
-<span class="fc" id="L411">                    var wildcard=index.getOrDefault(&quot;P&quot;,List.of());</span>
-<span class="fc bfc" id="L412" title="All 2 branches covered.">                    if(!wildcard.isEmpty()) {</span>
-<span class="fc" id="L413">                        var combined=new ArrayList&lt;&gt;(relevant);relevant=combined;</span>
-<span class="fc" id="L414">                        RetainedOperation.work(combined.size()+2L);</span>
-<span class="fc" id="L415">                        combined.addAll(wildcard);RetainedOperation.work(wildcard.size());</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">                outer: while(!pending.isEmpty()) {</span>
+<span class="fc" id="L469">                    occurrence=pending.pop();work.add(1);RetainedOperation.work(2);</span>
+<span class="fc" id="L470">                    relevant=index.getOrDefault(shape(occurrence.expression()),List.of());</span>
+<span class="fc" id="L471">                    RetainedOperation.work(1);</span>
+<span class="fc" id="L472">                    var wildcard=index.getOrDefault(&quot;P&quot;,List.of());</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">                    if(!wildcard.isEmpty()) {</span>
+<span class="fc" id="L474">                        var combined=new ArrayList&lt;&gt;(relevant);relevant=combined;</span>
+<span class="fc" id="L475">                        RetainedOperation.work(combined.size()+2L);</span>
+<span class="fc" id="L476">                        combined.addAll(wildcard);RetainedOperation.work(wildcard.size());</span>
                     }
-<span class="fc bfc" id="L417" title="All 2 branches covered.">                    if(relevant.size()&gt;maximumSchemasPerOccurrence)complete=false;</span>
-<span class="fc bfc" id="L418" title="All 2 branches covered.">                    for(int i=0;i&lt;Math.min(relevant.size(),maximumSchemasPerOccurrence);i++) {</span>
-<span class="fc bfc" id="L419" title="All 4 branches covered.">                        if(matched++&gt;=bounds.maximumMatchAttempts() || candidates.size()&gt;=bounds.maximumCandidates()) {</span>
-<span class="fc" id="L420">                            complete=false;break outer;</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">                    if(relevant.size()&gt;maximumSchemasPerOccurrence)complete=false;</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">                    for(int i=0;i&lt;Math.min(relevant.size(),maximumSchemasPerOccurrence);i++) {</span>
+<span class="fc bfc" id="L480" title="All 4 branches covered.">                        if(matched++&gt;=bounds.maximumMatchAttempts() || candidates.size()&gt;=bounds.maximumCandidates()) {</span>
+<span class="fc" id="L481">                            complete=false;break outer;</span>
                         }
-<span class="fc" id="L422">                        Schema schema=relevant.get(i);</span>
-<span class="fc" id="L423">                        outcome=match(schema,occurrence.expression());</span>
-<span class="fc" id="L424">                        work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());</span>
-<span class="fc" id="L425">                        RetainedOperation.work(1);</span>
-<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                        if(!outcome.complete())complete=false;</span>
-<span class="fc bfc" id="L427" title="All 2 branches covered.">                        if(outcome.matched())applyAt(schema);</span>
+<span class="fc" id="L483">                        Schema schema=relevant.get(i);</span>
+<span class="fc" id="L484">                        outcome=match(schema,occurrence.expression());</span>
+<span class="fc" id="L485">                        work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());</span>
+<span class="fc" id="L486">                        RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">                        if(!outcome.complete())complete=false;</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">                        if(outcome.matched())applyAt(schema);</span>
                     }
-<span class="fc bfc" id="L429" title="All 2 branches covered.">                    if(occurrence.expression() instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L430">                        pending.push(new Occurrence(binary.right(),child(occurrence.path(),1)));RetainedOperation.work(2);</span>
-<span class="fc" id="L431">                        pending.push(new Occurrence(binary.left(),child(occurrence.path(),0)));RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">                    if(occurrence.expression() instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L491">                        pending.push(new Occurrence(binary.right(),child(occurrence.path(),1)));RetainedOperation.work(2);</span>
+<span class="fc" id="L492">                        pending.push(new Occurrence(binary.left(),child(occurrence.path(),0)));RetainedOperation.work(2);</span>
                     }
-<span class="fc" id="L433">                    RetainedOperation.checkpoint();</span>
-<span class="fc" id="L434">                }</span>
-<span class="fc" id="L435">            }</span>
+<span class="fc" id="L494">                    RetainedOperation.checkpoint();</span>
+<span class="fc" id="L495">                }</span>
+<span class="fc" id="L496">            }</span>
             private void applyAt(Schema schema) {
-<span class="fc" id="L437">                applicationWork=new Work();application=null;RetainedOperation.work(2);</span>
+<span class="fc" id="L498">                applicationWork=new Work();application=null;RetainedOperation.work(2);</span>
                 try {
-<span class="fc" id="L439">                    application=apply(schema,source,encodedSource,occurrence.path(),outcome.matches().getFirst().bindings(),applicationWork);</span>
-<span class="fc" id="L440">                } catch(DomainRejected unsupported) {</span>
-<span class="fc" id="L441">                    work.add(1);complete=false;</span>
+<span class="fc" id="L500">                    application=apply(schema,source,encodedSource,occurrence.path(),outcome.matches().getFirst().bindings(),applicationWork);</span>
+<span class="fc" id="L501">                } catch(DomainRejected unsupported) {</span>
+<span class="fc" id="L502">                    work.add(1);complete=false;</span>
                 } finally {
                     // Every actual attempt is caller-owned, including successful work whose batch may never return.
-<span class="fc" id="L444">                    work.add(applicationWork.units);</span>
+<span class="fc" id="L505">                    work.add(applicationWork.units);</span>
                 }
-<span class="fc bfc" id="L446" title="All 2 branches covered.">                if(application!=null) {</span>
-<span class="fc" id="L447">                    candidates.add(application);work.add(1); // Existing sourceCandidates event, not an additional normal charge.</span>
-<span class="fc" id="L448">                    RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">                if(application!=null) {</span>
+<span class="fc" id="L508">                    candidates.add(application);work.add(1); // Existing sourceCandidates event, not an additional normal charge.</span>
+<span class="fc" id="L509">                    RetainedOperation.work(2);</span>
                 }
-<span class="fc" id="L450">            }</span>
+<span class="fc" id="L511">            }</span>
         }
         private Batch batch(List&lt;Transformation&gt; transformations, Work work, boolean complete) {
-<span class="fc" id="L453">            var candidateWork = transformations.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
-<span class="fc" id="L454">            var metrics = batchMetrics(work,transformations.size(),candidateWork);</span>
-<span class="fc" id="L455">            return new Batch(transformations.stream().map(transformation -&gt; SearchMove.from(transformation,</span>
-<span class="fc" id="L456">                descriptor, metrics.totalWorkUnits())).toList(), metrics, complete);</span>
+<span class="fc" id="L514">            var candidateWork = transformations.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
+<span class="fc" id="L515">            var metrics = batchMetrics(work,transformations.size(),candidateWork);</span>
+<span class="fc" id="L516">            return new Batch(transformations.stream().map(transformation -&gt; SearchMove.from(transformation,</span>
+<span class="fc" id="L517">                descriptor, metrics.totalWorkUnits())).toList(), metrics, complete);</span>
         }
     }
 
-<span class="fc" id="L460">    private record ApplicationBatch(List&lt;VerifiedApplication&gt; applications,boolean complete)  implements RetainedGraph.View {</span>
-<span class="fc" id="L461">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(applications);}</span>
+<span class="fc" id="L521">    private record ApplicationBatch(List&lt;VerifiedApplication&gt; applications,boolean complete)  implements RetainedGraph.View {</span>
+<span class="fc" id="L522">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(applications);}</span>
     }
     /** Only this final model-owned provider is recognized by the installed native checker. */
     final class NativeProvider implements NativeMoveProvider,RetainedGraph.View {
         boolean ownedBy(CheckedLearnedSchemaModel expected){
-<span class="fc bfc" id="L466" title="All 2 branches covered.">            RetainedOperation.work(1);return CheckedLearnedSchemaModel.this==expected;</span>
+<span class="fc bfc" id="L527" title="All 2 branches covered.">            RetainedOperation.work(1);return CheckedLearnedSchemaModel.this==expected;</span>
         }
-<span class="fc" id="L468">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(index);}</span>
+<span class="fc" id="L529">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(index);}</span>
         private final IndexedProvider index;
-<span class="fc" id="L470">        private NativeProvider(IndexedProvider index){this.index=index;}</span>
-<span class="nc" id="L471">        @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.EXACT;}</span>
-<span class="fc" id="L472">        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}</span>
+<span class="fc" id="L531">        private NativeProvider(IndexedProvider index){this.index=index;}</span>
+<span class="nc" id="L532">        @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.EXACT;}</span>
+<span class="fc" id="L533">        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}</span>
         @Override public Batch candidates(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
-<span class="fc" id="L474">            var work=new Work();work.add(3); // Original unit plus the existing engine/source events.</span>
+<span class="fc" id="L535">            var work=new Work();work.add(3); // Original unit plus the existing engine/source events.</span>
             try {
-<span class="fc" id="L476">                var pending=new Object[2];</span>
-<span class="fc" id="L477">                var retained=RetainedOperation.retainCompleted(3,this,state,context,work,pending);</span>
-<span class="fc" id="L478">                Throwable primary=null;</span>
+<span class="fc" id="L537">                var pending=new Object[2];</span>
+<span class="fc" id="L538">                var retained=RetainedOperation.retainCompleted(3,this,state,context,work,pending);</span>
+<span class="fc" id="L539">                Throwable primary=null;</span>
                 try {
                     ApplicationBatch generated;
-<span class="fc bfc" id="L481" title="All 2 branches covered.">                    if(!NativeMoveProvider.carries(requiredAssumptions,state,context))generated=new ApplicationBatch(List.of(),true);</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">                    if(!NativeMoveProvider.carries(requiredAssumptions,state,context))generated=new ApplicationBatch(List.of(),true);</span>
                     else {
                         try {
-<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                            if(AstExpressionValidation.inspect(state.expression()).canonicalCharacters()&gt;262144)</span>
-<span class="nc" id="L485">                                throw new AstExpressionValidation.InvalidExpression(&quot;schema source transport size limit&quot;);</span>
-<span class="fc" id="L486">                            work.add(1);domain(state.expression(),bounds,work);</span>
-<span class="fc" id="L487">                            generated=index.generate(state.expression(),null,work);</span>
-<span class="fc" id="L488">                        } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {</span>
-<span class="fc" id="L489">                            generated=new ApplicationBatch(List.of(),false);</span>
-<span class="fc" id="L490">                        }</span>
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">                            if(AstExpressionValidation.inspect(state.expression()).canonicalCharacters()&gt;262144)</span>
+<span class="nc" id="L546">                                throw new AstExpressionValidation.InvalidExpression(&quot;schema source transport size limit&quot;);</span>
+<span class="fc" id="L547">                            work.add(1);domain(state.expression(),bounds,work);</span>
+<span class="fc" id="L548">                            generated=index.generate(state.expression(),null,work);</span>
+<span class="fc" id="L549">                        } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {</span>
+<span class="fc" id="L550">                            generated=new ApplicationBatch(List.of(),false);</span>
+<span class="fc" id="L551">                        }</span>
                     }
-<span class="fc" id="L492">                    var build=new NativeBatchBuild(generated,work);pending[0]=build;RetainedOperation.work(1);</span>
-<span class="fc" id="L493">                    pending[1]=build.finish();RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
-<span class="fc" id="L494">                } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L495">                    primary=failure;observeImportFailure(failure);throw failure;</span>
-<span class="fc" id="L496">                } finally {closeReplayFrame(retained,primary);}</span>
-<span class="fc" id="L497">                return (Batch)pending[1];</span>
-<span class="fc" id="L498">            } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L553">                    var build=new NativeBatchBuild(generated,work);pending[0]=build;RetainedOperation.work(1);</span>
+<span class="fc" id="L554">                    pending[1]=build.finish();RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L555">                } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L556">                    primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L557">                } finally {closeReplayFrame(retained,primary);}</span>
+<span class="fc" id="L558">                return (Batch)pending[1];</span>
+<span class="fc" id="L559">            } catch(RuntimeException | Error failure) {</span>
                 // A receipt lost during publication or close delegated nothing to its caller.
-<span class="fc" id="L500">                try {RetainedOperation.work(work.units);}</span>
-<span class="pc bnc" id="L501" title="All 2 branches missed.">                catch(RuntimeException | Error accounting){if(accounting!=failure)failure.addSuppressed(accounting);}</span>
-<span class="fc" id="L502">                throw failure;</span>
+<span class="fc" id="L561">                try {RetainedOperation.work(work.units);}</span>
+<span class="pc bnc" id="L562" title="All 2 branches missed.">                catch(RuntimeException | Error accounting){if(accounting!=failure)failure.addSuppressed(accounting);}</span>
+<span class="fc" id="L563">                throw failure;</span>
             }
         }
-<span class="fc" id="L505">        NativeVerifier independentVerifier(){return CheckedLearnedSchemaModel.this.nativeVerifier();}</span>
+<span class="fc" id="L566">        NativeVerifier independentVerifier(){return CheckedLearnedSchemaModel.this.nativeVerifier();}</span>
     }
     private static TransformationWorkMetrics batchMetrics(Work work,int count,ExecutionWork mathematical) {
-<span class="fc" id="L508">        long delegated=Math.subtractExact(Math.subtractExact(work.units,mathematical.canonicalWorkUnits()),Math.addExact(2L,count));</span>
-<span class="fc" id="L509">        return new TransformationWorkMetrics(1,0,1,count,0,0,0,0,0,0,0,0,0,0,mathematical).withDelegatedMechanicalWork(delegated);</span>
+<span class="fc" id="L569">        long delegated=Math.subtractExact(Math.subtractExact(work.units,mathematical.canonicalWorkUnits()),Math.addExact(2L,count));</span>
+<span class="fc" id="L570">        return new TransformationWorkMetrics(1,0,1,count,0,0,0,0,0,0,0,0,0,0,mathematical).withDelegatedMechanicalWork(delegated);</span>
     }
     /** The root provider owner keeps these actual lists while the same native batch is assembled. */
     private final class NativeBatchBuild implements RetainedGraph.View {
@@ -516,93 +577,93 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         private ExecutionWork mathematical;
         private TransformationWorkMetrics metrics;
         private List&lt;NativeSearchMove&gt; moves;
-<span class="fc" id="L519">        NativeBatchBuild(ApplicationBatch applications,Work work){this.applications=applications;this.work=work;}</span>
+<span class="fc" id="L580">        NativeBatchBuild(ApplicationBatch applications,Work work){this.applications=applications;this.work=work;}</span>
         @Override public void retainedReferences(RetainedGraph.Visitor v) {
-<span class="fc" id="L521">            v.reference(CheckedLearnedSchemaModel.this);v.reference(applications);v.reference(work);</span>
-<span class="fc" id="L522">            v.reference(proofs);v.reference(mathematical);v.reference(metrics);v.reference(moves);</span>
-<span class="fc" id="L523">        }</span>
+<span class="fc" id="L582">            v.reference(CheckedLearnedSchemaModel.this);v.reference(applications);v.reference(work);</span>
+<span class="fc" id="L583">            v.reference(proofs);v.reference(mathematical);v.reference(metrics);v.reference(moves);</span>
+<span class="fc" id="L584">        }</span>
         NativeMoveProvider.Batch finish() {
-<span class="fc" id="L525">            proofs=applications.applications().stream().map(application-&gt;new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(application))).toList();</span>
-<span class="fc" id="L526">            RetainedOperation.work(proofs.size()+1L);</span>
-<span class="fc" id="L527">            mathematical=proofs.stream().map(NativeMoveProof::work).reduce(ExecutionWork.ZERO,ExecutionWork::plus);</span>
-<span class="fc" id="L528">            RetainedOperation.work(proofs.size()+1L);</span>
-<span class="fc" id="L529">            metrics=batchMetrics(work,proofs.size(),mathematical);RetainedOperation.work(1);</span>
-<span class="fc" id="L530">            moves=proofs.stream().map(proof-&gt;new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList();</span>
-<span class="fc" id="L531">            RetainedOperation.work(proofs.size()+1L);</span>
-<span class="fc" id="L532">            return new NativeMoveProvider.Batch(moves,metrics,applications.complete());</span>
+<span class="fc" id="L586">            proofs=applications.applications().stream().map(application-&gt;new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(application))).toList();</span>
+<span class="fc" id="L587">            RetainedOperation.work(proofs.size()+1L);</span>
+<span class="fc" id="L588">            mathematical=proofs.stream().map(NativeMoveProof::work).reduce(ExecutionWork.ZERO,ExecutionWork::plus);</span>
+<span class="fc" id="L589">            RetainedOperation.work(proofs.size()+1L);</span>
+<span class="fc" id="L590">            metrics=batchMetrics(work,proofs.size(),mathematical);RetainedOperation.work(1);</span>
+<span class="fc" id="L591">            moves=proofs.stream().map(proof-&gt;new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList();</span>
+<span class="fc" id="L592">            RetainedOperation.work(proofs.size()+1L);</span>
+<span class="fc" id="L593">            return new NativeMoveProvider.Batch(moves,metrics,applications.complete());</span>
         }
     }
 
-<span class="fc" id="L536">    private record Occurrence(Expr expression, List&lt;Integer&gt; path)  implements RetainedGraph.View {</span>
-<span class="fc" id="L537">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(expression);v.reference(path);}</span>
+<span class="fc" id="L597">    private record Occurrence(Expr expression, List&lt;Integer&gt; path)  implements RetainedGraph.View {</span>
+<span class="fc" id="L598">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(expression);v.reference(path);}</span>
     }
     private static List&lt;Integer&gt; child(List&lt;Integer&gt; path, int index) {
-<span class="fc" id="L540">        var copy = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L541">        copy.add(index);</span>
-<span class="fc" id="L542">        return List.copyOf(copy);</span>
+<span class="fc" id="L601">        var copy = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L602">        copy.add(index);</span>
+<span class="fc" id="L603">        return List.copyOf(copy);</span>
     }
     private ExprMatcher.MatchOutcome match(Schema schema, Expr occurrence) {
-<span class="fc" id="L545">        return ExprMatcher.pattern(schema.source()).match(occurrence, new ExprMatcher.MatchOptions(</span>
-<span class="fc" id="L546">            null, 1, bounds.maximumExpressionNodes() * 4, bounds.maximumExpressionNodes() * 4));</span>
+<span class="fc" id="L606">        return ExprMatcher.pattern(schema.source()).match(occurrence, new ExprMatcher.MatchOptions(</span>
+<span class="fc" id="L607">            null, 1, bounds.maximumExpressionNodes() * 4, bounds.maximumExpressionNodes() * 4));</span>
     }
 
     /** Privately issued capability recognized by the installed SPI; public records/JSON are not accepted. */
     public record ApplicationData(String revision,String checkerRevision,String inventorySemanticsHash,String modelId,
             String schemaId,String proofHash,String domain,Expr source,Expr target,List&lt;Integer&gt; path,Map&lt;String,Expr&gt; substitutions,
             long applicationWork,String modelHash) implements RetainedGraph.View {
-<span class="fc" id="L553">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(checkerRevision);v.reference(inventorySemanticsHash);v.reference(modelId);v.reference(schemaId);v.reference(proofHash);v.reference(domain);v.reference(source);v.reference(target);v.reference(path);v.reference(substitutions);v.reference(modelHash);}</span>
-<span class="fc" id="L554">        public ApplicationData {</span>
-<span class="fc" id="L555">            Object[] copies=new Object[2];</span>
-<span class="fc" id="L556">            var retained=RetainedOperation.retainCompleted(1,revision,checkerRevision,inventorySemanticsHash,modelId,</span>
+<span class="fc" id="L614">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(checkerRevision);v.reference(inventorySemanticsHash);v.reference(modelId);v.reference(schemaId);v.reference(proofHash);v.reference(domain);v.reference(source);v.reference(target);v.reference(path);v.reference(substitutions);v.reference(modelHash);}</span>
+<span class="fc" id="L615">        public ApplicationData {</span>
+<span class="fc" id="L616">            Object[] copies=new Object[2];</span>
+<span class="fc" id="L617">            var retained=RetainedOperation.retainCompleted(1,revision,checkerRevision,inventorySemanticsHash,modelId,</span>
                 schemaId,proofHash,domain,source,target,path,substitutions,modelHash,copies);
-<span class="fc" id="L558">            Throwable primary=null;</span>
+<span class="fc" id="L619">            Throwable primary=null;</span>
             try {
-<span class="fc" id="L560">                var originalPath=path;</span>
-<span class="fc" id="L561">                path=List.copyOf(path);copies[0]=path;</span>
-<span class="fc bfc" id="L562" title="All 2 branches covered.">                completedEvidenceWork(path==originalPath?1:path.size()+1L);</span>
-<span class="fc" id="L563">                substitutions=de.regelsuche.retention.RetainedSortedMap.copyOf(substitutions);copies[1]=substitutions;</span>
-<span class="fc" id="L564">                completedEvidenceWork(substitutions.size()+2L);</span>
-<span class="fc" id="L565">            } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L566">                primary=failure;observeImportFailure(failure);throw failure;</span>
-<span class="fc" id="L567">            } finally {closeReplayFrame(retained,primary);}</span>
-<span class="fc" id="L568">        }</span>
+<span class="fc" id="L621">                var originalPath=path;</span>
+<span class="fc" id="L622">                path=List.copyOf(path);copies[0]=path;</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">                completedEvidenceWork(path==originalPath?1:path.size()+1L);</span>
+<span class="fc" id="L624">                substitutions=de.regelsuche.retention.RetainedSortedMap.copyOf(substitutions);copies[1]=substitutions;</span>
+<span class="fc" id="L625">                completedEvidenceWork(substitutions.size()+2L);</span>
+<span class="fc" id="L626">            } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L627">                primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L628">            } finally {closeReplayFrame(retained,primary);}</span>
+<span class="fc" id="L629">        }</span>
     }
     static final class VerifiedApplication implements RetainedGraph.View {
-<span class="fc" id="L571">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(data);v.reference(binding);}</span>
+<span class="fc" id="L632">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(data);v.reference(binding);}</span>
         private final ApplicationData data;
         private final ExactTheoryEvidence.Binding binding;
-<span class="fc bfc" id="L574" title="All 2 branches covered.">        private VerifiedApplication(ApplicationData data,String encodedSource){this.data=data;binding=encodedSource==null?null:renderEvidence(data,encodedSource);}</span>
-<span class="fc bfc" id="L575" title="All 2 branches covered.">        ExactTheoryEvidence.Binding binding(){return binding==null?renderEvidence(data,CODEC.encodeExpression(data.source())):binding;}</span>
+<span class="fc bfc" id="L635" title="All 2 branches covered.">        private VerifiedApplication(ApplicationData data,String encodedSource){this.data=data;binding=encodedSource==null?null:renderEvidence(data,encodedSource);}</span>
+<span class="fc bfc" id="L636" title="All 2 branches covered.">        ExactTheoryEvidence.Binding binding(){return binding==null?renderEvidence(data,CODEC.encodeExpression(data.source())):binding;}</span>
         NativeExactTheoryEvidence.Binding nativeBinding(){
-<span class="fc" id="L577">            var result=new NativeExactTheoryEvidence.Binding(data.source(),data.target(),data.schemaId(),data.applicationWork(),data);</span>
-<span class="fc" id="L578">            try(var retained=RetainedOperation.retainCompleted(1,this,result)){return result;}</span>
+<span class="fc" id="L638">            var result=new NativeExactTheoryEvidence.Binding(data.source(),data.target(),data.schemaId(),data.applicationWork(),data);</span>
+<span class="fc" id="L639">            try(var retained=RetainedOperation.retainCompleted(1,this,result)){return result;}</span>
         }
     }
     private VerifiedApplication apply(Schema schema, Expr source, String encodedSource,
             List&lt;Integer&gt; path, Map&lt;String, Expr&gt; substitutions, Work work) {
-<span class="fc" id="L583">        var pending=new Object[3];</span>
-<span class="fc" id="L584">        var retained=RetainedOperation.retainCompleted(4,this,schema,source,encodedSource,path,substitutions,work,pending);</span>
-<span class="fc" id="L585">        Throwable primary=null;</span>
+<span class="fc" id="L644">        var pending=new Object[3];</span>
+<span class="fc" id="L645">        var retained=RetainedOperation.retainCompleted(4,this,schema,source,encodedSource,path,substitutions,work,pending);</span>
+<span class="fc" id="L646">        Throwable primary=null;</span>
         try {
             try {
-<span class="fc" id="L588">                var application=new CheckedApplication(schema,source,encodedSource,path,substitutions,work);</span>
-<span class="fc" id="L589">                pending[0]=application;RetainedOperation.work(1);</span>
-<span class="fc bfc" id="L590" title="All 2 branches covered.">                while(!application.done())application.advance();</span>
-<span class="fc" id="L591">                pending[1]=application.verified;RetainedOperation.work(1);</span>
-<span class="fc" id="L592">            } catch(DomainRejected rejected) {</span>
-<span class="fc" id="L593">                pending[2]=rejected.getMessage();RetainedOperation.work(1);</span>
-<span class="fc" id="L594">            }</span>
-<span class="fc" id="L595">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L596">        } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L597">            primary=failure;observeImportFailure(failure);throw failure;</span>
-<span class="fc" id="L598">        } finally {closeReplayFrame(retained,primary);}</span>
-<span class="fc bfc" id="L599" title="All 2 branches covered.">        if(pending[2]!=null)throw new DomainRejected((String)pending[2]);</span>
-<span class="fc" id="L600">        return (VerifiedApplication)pending[1];</span>
+<span class="fc" id="L649">                var application=new CheckedApplication(schema,source,encodedSource,path,substitutions,work);</span>
+<span class="fc" id="L650">                pending[0]=application;RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">                while(!application.done())application.advance();</span>
+<span class="fc" id="L652">                pending[1]=application.verified;RetainedOperation.work(1);</span>
+<span class="fc" id="L653">            } catch(DomainRejected rejected) {</span>
+<span class="fc" id="L654">                pending[2]=rejected.getMessage();RetainedOperation.work(1);</span>
+<span class="fc" id="L655">            }</span>
+<span class="fc" id="L656">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L657">        } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L658">            primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L659">        } finally {closeReplayFrame(retained,primary);}</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        if(pending[2]!=null)throw new DomainRejected((String)pending[2]);</span>
+<span class="fc" id="L661">        return (VerifiedApplication)pending[1];</span>
     }
 
     /** The eager provider, lazy cursor and independent concrete verifier all execute these same checks. */
     private final class CheckedApplication implements CheckedSchemaMatcherPlan.ApplicationSteps,RetainedGraph.View {
-<span class="fc" id="L605">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(schema);v.reference(source);v.reference(encodedSource);v.reference(path);v.reference(substitutions);v.reference(substitutionDomains);v.reference(work);v.reference(phase);v.reference(target);v.reference(verified);}</span>
+<span class="fc" id="L666">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(schema);v.reference(source);v.reference(encodedSource);v.reference(path);v.reference(substitutions);v.reference(substitutionDomains);v.reference(work);v.reference(phase);v.reference(target);v.reference(verified);}</span>
         private final Schema schema;
         private final Expr source;
         private final String encodedSource;
@@ -617,131 +678,131 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         private boolean done;
 
         CheckedApplication(Schema schema, Expr source, String encodedSource, List&lt;Integer&gt; path,
-<span class="fc" id="L620">                Map&lt;String, Expr&gt; substitutions, Work work) {</span>
-<span class="fc" id="L621">            this.schema = schema; this.source = source; this.encodedSource = encodedSource;</span>
-<span class="fc" id="L622">            this.path = path; this.substitutions = substitutions; this.work = work;</span>
-<span class="fc" id="L623">            substitutionDomains = List.copyOf(substitutions.values());</span>
+<span class="fc" id="L681">                Map&lt;String, Expr&gt; substitutions, Work work) {</span>
+<span class="fc" id="L682">            this.schema = schema; this.source = source; this.encodedSource = encodedSource;</span>
+<span class="fc" id="L683">            this.path = path; this.substitutions = substitutions; this.work = work;</span>
+<span class="fc" id="L684">            substitutionDomains = List.copyOf(substitutions.values());</span>
             // Publish this actual partially constructed owner before charging the already copied list.
-<span class="fc" id="L625">            var retained=RetainedOperation.retainCompleted(substitutionDomains.size()+1L,this);</span>
-<span class="fc" id="L626">            Throwable primary=null;</span>
+<span class="fc" id="L686">            var retained=RetainedOperation.retainCompleted(substitutionDomains.size()+1L,this);</span>
+<span class="fc" id="L687">            Throwable primary=null;</span>
             try {
-<span class="pc bpc" id="L628" title="1 of 2 branches missed.">                phase = substitutionIndex&lt;substitutionDomains.size() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;</span>
-<span class="fc" id="L629">                RetainedOperation.work(1);</span>
-<span class="nc" id="L630">            } catch(RuntimeException | Error failure) {</span>
-<span class="nc" id="L631">                primary=failure;observeImportFailure(failure);throw failure;</span>
-<span class="fc" id="L632">            } finally {closeReplayFrame(retained,primary);}</span>
-<span class="fc" id="L633">        }</span>
-<span class="fc" id="L634">        @Override public ApplicationPhase phase() { return phase; }</span>
-<span class="fc" id="L635">        @Override public boolean done() { return done; }</span>
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">                phase = substitutionIndex&lt;substitutionDomains.size() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;</span>
+<span class="fc" id="L690">                RetainedOperation.work(1);</span>
+<span class="nc" id="L691">            } catch(RuntimeException | Error failure) {</span>
+<span class="nc" id="L692">                primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L693">            } finally {closeReplayFrame(retained,primary);}</span>
+<span class="fc" id="L694">        }</span>
+<span class="fc" id="L695">        @Override public ApplicationPhase phase() { return phase; }</span>
+<span class="fc" id="L696">        @Override public boolean done() { return done; }</span>
         @Override public void advance() {
-<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            if (done) throw new IllegalStateException(&quot;checked application already complete&quot;);</span>
-<span class="pc bpc" id="L638" title="1 of 5 branches missed.">            switch (phase) {</span>
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">            if (done) throw new IllegalStateException(&quot;checked application already complete&quot;);</span>
+<span class="pc bpc" id="L699" title="1 of 5 branches missed.">            switch (phase) {</span>
                 case SUBSTITUTION_DOMAIN -&gt; {
-<span class="fc" id="L640">                    domain(substitutionDomains.get(substitutionIndex++), bounds, work);</span>
-<span class="fc bfc" id="L641" title="All 2 branches covered.">                    if (substitutionIndex&gt;=substitutionDomains.size()) phase = ApplicationPhase.INSTANTIATION;</span>
+<span class="fc" id="L701">                    domain(substitutionDomains.get(substitutionIndex++), bounds, work);</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">                    if (substitutionIndex&gt;=substitutionDomains.size()) phase = ApplicationPhase.INSTANTIATION;</span>
                 }
                 case INSTANTIATION -&gt; {
-<span class="fc" id="L644">                    Expr replacement = schema.target().instantiate(substitutions);</span>
-<span class="fc" id="L645">                    work.add(patternNodes(schema.target()) + path.size() + 1L);</span>
-<span class="fc" id="L646">                    target = new TreePosition(path, &quot;checked-typed-occurrence&quot;).replaceAt(source, replacement).rewrittenRoot().orElseThrow();</span>
-<span class="fc" id="L647">                    phase = ApplicationPhase.TARGET_DOMAIN;</span>
-<span class="fc" id="L648">                }</span>
+<span class="fc" id="L705">                    Expr replacement = schema.target().instantiate(substitutions);</span>
+<span class="fc" id="L706">                    work.add(patternNodes(schema.target()) + path.size() + 1L);</span>
+<span class="fc" id="L707">                    target = new TreePosition(path, &quot;checked-typed-occurrence&quot;).replaceAt(source, replacement).rewrittenRoot().orElseThrow();</span>
+<span class="fc" id="L708">                    phase = ApplicationPhase.TARGET_DOMAIN;</span>
+<span class="fc" id="L709">                }</span>
                 case TARGET_DOMAIN -&gt; {
-<span class="fc" id="L650">                    domain(target, bounds, work);</span>
-<span class="fc bfc" id="L651" title="All 2 branches covered.">                    if (source.equals(target)) done = true;</span>
-<span class="fc" id="L652">                    else phase = ApplicationPhase.EVIDENCE;</span>
-<span class="fc" id="L653">                }</span>
+<span class="fc" id="L711">                    domain(target, bounds, work);</span>
+<span class="fc bfc" id="L712" title="All 2 branches covered.">                    if (source.equals(target)) done = true;</span>
+<span class="fc" id="L713">                    else phase = ApplicationPhase.EVIDENCE;</span>
+<span class="fc" id="L714">                }</span>
                 case EVIDENCE -&gt; {
-<span class="fc" id="L655">                    verified = evidence(schema, source, encodedSource, target, path, substitutions, work);</span>
-<span class="fc" id="L656">                    done = true;</span>
+<span class="fc" id="L716">                    verified = evidence(schema, source, encodedSource, target, path, substitutions, work);</span>
+<span class="fc" id="L717">                    done = true;</span>
                 }
             }
-<span class="fc" id="L659">        }</span>
+<span class="fc" id="L720">        }</span>
         @Override public Transformation result() {
-<span class="pc bpc" id="L661" title="1 of 2 branches missed.">            if (!done) throw new IllegalStateException(&quot;partial application has no mathematical authority&quot;);</span>
-<span class="fc bfc" id="L662" title="All 2 branches covered.">            return verified == null ? null : Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified));</span>
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">            if (!done) throw new IllegalStateException(&quot;partial application has no mathematical authority&quot;);</span>
+<span class="fc bfc" id="L723" title="All 2 branches covered.">            return verified == null ? null : Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified));</span>
         }
         @Override public NativeMoveProof nativeResult() {
-<span class="fc bfc" id="L665" title="All 2 branches covered.">            if(!done)throw new IllegalStateException(&quot;partial application has no mathematical authority&quot;);</span>
-<span class="pc bpc" id="L666" title="1 of 2 branches missed.">            return verified==null?null:new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(verified));</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            if(!done)throw new IllegalStateException(&quot;partial application has no mathematical authority&quot;);</span>
+<span class="pc bpc" id="L727" title="1 of 2 branches missed.">            return verified==null?null:new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(verified));</span>
         }
     }
 
     private VerifiedApplication evidence(Schema schema,Expr source,String encodedSource,Expr target,
             List&lt;Integer&gt; path,Map&lt;String,Expr&gt; substitutions,Work work) {
-<span class="fc" id="L672">        Object[] products=new Object[2];</span>
-<span class="fc" id="L673">        var retained=RetainedOperation.retainCompleted(1,this,schema,source,encodedSource,target,path,substitutions,work,products);</span>
-<span class="fc" id="L674">        Throwable primary=null;</span>
+<span class="fc" id="L733">        Object[] products=new Object[2];</span>
+<span class="fc" id="L734">        var retained=RetainedOperation.retainCompleted(1,this,schema,source,encodedSource,target,path,substitutions,work,products);</span>
+<span class="fc" id="L735">        Throwable primary=null;</span>
         try {
-<span class="fc" id="L676">            var data=new ApplicationData(APPLICATION_REVISION,CHECKER_REVISION,inventorySemanticsHash,descriptor.id(),</span>
-<span class="fc" id="L677">                schema.id(),schema.proofHash(),DOMAIN,source,target,path,substitutions,work.units,modelHash);</span>
-<span class="fc" id="L678">            products[0]=data;completedEvidenceWork(1);</span>
-<span class="fc" id="L679">            var verified=new VerifiedApplication(data,encodedSource);</span>
-<span class="fc" id="L680">            products[1]=verified;completedEvidenceWork(1);</span>
-<span class="fc" id="L681">            return verified;</span>
-<span class="nc" id="L682">        } catch(RuntimeException | Error failure) {</span>
-<span class="nc" id="L683">            primary=failure;observeImportFailure(failure);throw failure;</span>
-<span class="fc" id="L684">        } finally {closeReplayFrame(retained,primary);}</span>
+<span class="fc" id="L737">            var data=new ApplicationData(APPLICATION_REVISION,CHECKER_REVISION,inventorySemanticsHash,descriptor.id(),</span>
+<span class="fc" id="L738">                schema.id(),schema.proofHash(),DOMAIN,source,target,path,substitutions,work.units,modelHash);</span>
+<span class="fc" id="L739">            products[0]=data;completedEvidenceWork(1);</span>
+<span class="fc" id="L740">            var verified=new VerifiedApplication(data,encodedSource);</span>
+<span class="fc" id="L741">            products[1]=verified;completedEvidenceWork(1);</span>
+<span class="fc" id="L742">            return verified;</span>
+<span class="nc" id="L743">        } catch(RuntimeException | Error failure) {</span>
+<span class="nc" id="L744">            primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L745">        } finally {closeReplayFrame(retained,primary);}</span>
     }
     private static ExactTheoryEvidence.Binding renderEvidence(ApplicationData data,String encodedSource) {
-<span class="fc" id="L687">        de.regelsuche.search.program.AstTransportObservation.record(de.regelsuche.search.program.AstTransportObservation.Operation.EVIDENCE_JSON_WRITE);</span>
-<span class="fc" id="L688">        Object[] products=new Object[5];</span>
-<span class="fc" id="L689">        var retained=RetainedOperation.retainCompleted(1,data,encodedSource,products);</span>
-<span class="fc" id="L690">        Throwable primary=null;</span>
+<span class="fc" id="L748">        de.regelsuche.search.program.AstTransportObservation.record(de.regelsuche.search.program.AstTransportObservation.Operation.EVIDENCE_JSON_WRITE);</span>
+<span class="fc" id="L749">        Object[] products=new Object[5];</span>
+<span class="fc" id="L750">        var retained=RetainedOperation.retainCompleted(1,data,encodedSource,products);</span>
+<span class="fc" id="L751">        Throwable primary=null;</span>
         try {
-<span class="fc" id="L692">            String encodedTarget=CODEC.encodeExpression(data.target());</span>
-<span class="fc" id="L693">            products[0]=encodedTarget;completedEvidenceWork(1);</span>
-<span class="fc" id="L694">            var evidence=de.regelsuche.retention.RetainedJson.object(JSON).put(&quot;schema&quot;,data.revision()).put(&quot;checkerRevision&quot;,data.checkerRevision())</span>
-<span class="fc" id="L695">                .put(&quot;inventorySemanticsHash&quot;,data.inventorySemanticsHash()).put(&quot;modelId&quot;,data.modelId())</span>
-<span class="fc" id="L696">                .put(&quot;schemaId&quot;,data.schemaId()).put(&quot;proofHash&quot;,data.proofHash()).put(&quot;domain&quot;,data.domain())</span>
-<span class="fc" id="L697">                .put(&quot;source&quot;,encodedSource).put(&quot;target&quot;,encodedTarget);</span>
-<span class="fc" id="L698">            products[1]=evidence;completedEvidenceWork(1);</span>
-<span class="fc" id="L699">            var positions=evidence.putArray(&quot;path&quot;);data.path().forEach(positions::add);</span>
-<span class="fc" id="L700">            var bindings=evidence.putArray(&quot;bindings&quot;);data.substitutions().forEach((name,value)-&gt;bindings.addObject()</span>
-<span class="fc" id="L701">                .put(&quot;name&quot;,name).put(&quot;expression&quot;,CODEC.encodeExpression(value)));</span>
-<span class="fc" id="L702">            evidence.put(&quot;applicationWork&quot;,data.applicationWork());String canonical=write(evidence);</span>
-<span class="fc" id="L703">            products[2]=canonical;completedEvidenceWork(1);</span>
-<span class="fc" id="L704">            String hash=SchematicProofPlan.hash(canonical);</span>
-<span class="fc" id="L705">            products[3]=hash;completedEvidenceWork(1);</span>
-<span class="fc" id="L706">            var binding=new ExactTheoryEvidence.Binding(encodedSource,encodedTarget,data.schemaId(),hash,</span>
-<span class="fc" id="L707">                data.proofHash(),data.modelHash(),data.applicationWork(),canonical);</span>
-<span class="fc" id="L708">            products[4]=binding;completedEvidenceWork(1);</span>
-<span class="fc" id="L709">            return binding;</span>
-<span class="fc" id="L710">        } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L711">            primary=failure;observeImportFailure(failure);throw failure;</span>
-<span class="fc" id="L712">        } finally {closeReplayFrame(retained,primary);}</span>
+<span class="fc" id="L753">            String encodedTarget=CODEC.encodeExpression(data.target());</span>
+<span class="fc" id="L754">            products[0]=encodedTarget;completedEvidenceWork(1);</span>
+<span class="fc" id="L755">            var evidence=de.regelsuche.retention.RetainedJson.object(JSON).put(&quot;schema&quot;,data.revision()).put(&quot;checkerRevision&quot;,data.checkerRevision())</span>
+<span class="fc" id="L756">                .put(&quot;inventorySemanticsHash&quot;,data.inventorySemanticsHash()).put(&quot;modelId&quot;,data.modelId())</span>
+<span class="fc" id="L757">                .put(&quot;schemaId&quot;,data.schemaId()).put(&quot;proofHash&quot;,data.proofHash()).put(&quot;domain&quot;,data.domain())</span>
+<span class="fc" id="L758">                .put(&quot;source&quot;,encodedSource).put(&quot;target&quot;,encodedTarget);</span>
+<span class="fc" id="L759">            products[1]=evidence;completedEvidenceWork(1);</span>
+<span class="fc" id="L760">            var positions=evidence.putArray(&quot;path&quot;);data.path().forEach(positions::add);</span>
+<span class="fc" id="L761">            var bindings=evidence.putArray(&quot;bindings&quot;);data.substitutions().forEach((name,value)-&gt;bindings.addObject()</span>
+<span class="fc" id="L762">                .put(&quot;name&quot;,name).put(&quot;expression&quot;,CODEC.encodeExpression(value)));</span>
+<span class="fc" id="L763">            evidence.put(&quot;applicationWork&quot;,data.applicationWork());String canonical=write(evidence);</span>
+<span class="fc" id="L764">            products[2]=canonical;completedEvidenceWork(1);</span>
+<span class="fc" id="L765">            String hash=SchematicProofPlan.hash(canonical);</span>
+<span class="fc" id="L766">            products[3]=hash;completedEvidenceWork(1);</span>
+<span class="fc" id="L767">            var binding=new ExactTheoryEvidence.Binding(encodedSource,encodedTarget,data.schemaId(),hash,</span>
+<span class="fc" id="L768">                data.proofHash(),data.modelHash(),data.applicationWork(),canonical);</span>
+<span class="fc" id="L769">            products[4]=binding;completedEvidenceWork(1);</span>
+<span class="fc" id="L770">            return binding;</span>
+<span class="fc" id="L771">        } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L772">            primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L773">        } finally {closeReplayFrame(retained,primary);}</span>
     }
 
     /** Added mechanical ownership work; the recorded mathematical application work is unchanged. */
     private static void completedEvidenceWork(long units) {
-<span class="fc" id="L717">        RetainedOperation.work(units);</span>
-<span class="fc" id="L718">        RetainedOperation.checkpoint();</span>
-<span class="fc" id="L719">    }</span>
+<span class="fc" id="L778">        RetainedOperation.work(units);</span>
+<span class="fc" id="L779">        RetainedOperation.checkpoint();</span>
+<span class="fc" id="L780">    }</span>
 
     /** Checks one supplied occurrence and substitution; never enumerates primitive paths or other sites. */
     public TypedMoveSearch.Verifier verifier() {
-<span class="fc" id="L723">        return (source, move, context) -&gt; {</span>
-<span class="fc" id="L724">            var work = new Work();</span>
-<span class="fc" id="L725">            work.add(1);</span>
+<span class="fc" id="L784">        return (source, move, context) -&gt; {</span>
+<span class="fc" id="L785">            var work = new Work();</span>
+<span class="fc" id="L786">            work.add(1);</span>
             try {
-<span class="fc" id="L727">                var available = new HashSet&lt;&gt;(context.initialAssumptions());</span>
-<span class="fc" id="L728">                available.addAll(AssumptionSignature.ofExpressions(source.assumptions()).normalizedAssumptions());</span>
-<span class="pc bpc" id="L729" title="1 of 4 branches missed.">                if (!available.containsAll(requiredAssumptions) || !available.containsAll(move.assumptions())) {</span>
-<span class="fc" id="L730">                    return rejected(work, &quot;CHECKED_SCHEMA_PREREQUISITES_MISSING&quot;);</span>
+<span class="fc" id="L788">                var available = new HashSet&lt;&gt;(context.initialAssumptions());</span>
+<span class="fc" id="L789">                available.addAll(AssumptionSignature.ofExpressions(source.assumptions()).normalizedAssumptions());</span>
+<span class="pc bpc" id="L790" title="1 of 4 branches missed.">                if (!available.containsAll(requiredAssumptions) || !available.containsAll(move.assumptions())) {</span>
+<span class="fc" id="L791">                    return rejected(work, &quot;CHECKED_SCHEMA_PREREQUISITES_MISSING&quot;);</span>
                 }
-<span class="pc bpc" id="L732" title="1 of 2 branches missed.">                if (!(move.provenance() instanceof TransformationProvenance.ExactTheoryStep step)</span>
-<span class="pc bpc" id="L733" title="1 of 2 branches missed.">                        || !move.ruleId().equals(descriptor.id())) return rejected(work, &quot;CHECKED_SCHEMA_PROVENANCE_REQUIRED&quot;);</span>
-<span class="fc" id="L734">                var checked = replayBinding(source, step.evidence().binding(), work);</span>
-<span class="fc" id="L735">                var expected = SearchMove.from(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(checked)), descriptor, move.generationCost());</span>
+<span class="pc bpc" id="L793" title="1 of 2 branches missed.">                if (!(move.provenance() instanceof TransformationProvenance.ExactTheoryStep step)</span>
+<span class="pc bpc" id="L794" title="1 of 2 branches missed.">                        || !move.ruleId().equals(descriptor.id())) return rejected(work, &quot;CHECKED_SCHEMA_PROVENANCE_REQUIRED&quot;);</span>
+<span class="fc" id="L795">                var checked = replayBinding(source, step.evidence().binding(), work);</span>
+<span class="fc" id="L796">                var expected = SearchMove.from(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(checked)), descriptor, move.generationCost());</span>
                 // StateValue assesses capabilities after mathematical admission. MoveSearch overwrites
                 // provider-supplied deltas with that assessment before retaining the witness. These
                 // search annotations are not part of this source/occurrence/substitution theorem.
-<span class="fc" id="L739">                boolean accepted = expected.equals(move.withCapabilityDelta(Set.of()));</span>
-<span class="fc" id="L740">                return new MoveVerifier.Verification(accepted, work.units,</span>
-<span class="fc bfc" id="L741" title="All 2 branches covered.">                    accepted ? List.of(&quot;checked-schema-application:&quot; + checked.binding().evidenceHash()) : List.of(),</span>
-<span class="fc bfc" id="L742" title="All 2 branches covered.">                    accepted ? &quot;CHECKED_SCHEMA_OCCURRENCE_VERIFIED&quot; : &quot;CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH&quot;);</span>
-<span class="fc" id="L743">            } catch(ReplayRejected rejected){return rejected(work,rejected.getMessage());}</span>
-<span class="nc" id="L744">            catch (IllegalArgumentException unsupported) { return rejected(work, &quot;CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED&quot;); }</span>
+<span class="fc" id="L800">                boolean accepted = expected.equals(move.withCapabilityDelta(Set.of()));</span>
+<span class="fc" id="L801">                return new MoveVerifier.Verification(accepted, work.units,</span>
+<span class="fc bfc" id="L802" title="All 2 branches covered.">                    accepted ? List.of(&quot;checked-schema-application:&quot; + checked.binding().evidenceHash()) : List.of(),</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">                    accepted ? &quot;CHECKED_SCHEMA_OCCURRENCE_VERIFIED&quot; : &quot;CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH&quot;);</span>
+<span class="fc" id="L804">            } catch(ReplayRejected rejected){return rejected(work,rejected.getMessage());}</span>
+<span class="nc" id="L805">            catch (IllegalArgumentException unsupported) { return rejected(work, &quot;CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED&quot;); }</span>
         };
     }
     /**
@@ -754,82 +815,82 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
      */
     public NativeVerification replayApplication(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
             TypedMoveSearch.Context context) {
-<span class="fc" id="L757">        var work = new Work();</span>
-<span class="fc" id="L758">        work.add(1);</span>
+<span class="fc" id="L818">        var work = new Work();</span>
+<span class="fc" id="L819">        work.add(1);</span>
         try {
-<span class="fc" id="L760">            var results = new Object[2];</span>
-<span class="fc" id="L761">            var retained = RetainedOperation.retainCompleted(4,this,source,binding,context,work,results);</span>
-<span class="fc" id="L762">            Throwable primary=null;</span>
+<span class="fc" id="L821">            var results = new Object[2];</span>
+<span class="fc" id="L822">            var retained = RetainedOperation.retainCompleted(4,this,source,binding,context,work,results);</span>
+<span class="fc" id="L823">            Throwable primary=null;</span>
             try {
                 try {
-<span class="fc bfc" id="L765" title="All 2 branches covered.">                    if (!NativeMoveProvider.carries(requiredAssumptions,source,context))</span>
-<span class="fc" id="L766">                        throw new ReplayRejected(&quot;CHECKED_SCHEMA_PREREQUISITES_MISSING&quot;);</span>
-<span class="fc" id="L767">                    var checked = replayBinding(source,binding,work);</span>
-<span class="fc" id="L768">                    results[0] = checked;</span>
-<span class="fc bfc" id="L769" title="All 2 branches covered.">                    if (!checked.binding().equals(binding))</span>
-<span class="fc" id="L770">                        throw new ReplayRejected(&quot;CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH&quot;);</span>
-<span class="fc" id="L771">                    var proof = new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));</span>
-<span class="fc" id="L772">                    results[1] = new NativeVerification(true,work.units,proof,descriptor.id(),</span>
+<span class="fc bfc" id="L826" title="All 2 branches covered.">                    if (!NativeMoveProvider.carries(requiredAssumptions,source,context))</span>
+<span class="fc" id="L827">                        throw new ReplayRejected(&quot;CHECKED_SCHEMA_PREREQUISITES_MISSING&quot;);</span>
+<span class="fc" id="L828">                    var checked = replayBinding(source,binding,work);</span>
+<span class="fc" id="L829">                    results[0] = checked;</span>
+<span class="fc bfc" id="L830" title="All 2 branches covered.">                    if (!checked.binding().equals(binding))</span>
+<span class="fc" id="L831">                        throw new ReplayRejected(&quot;CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH&quot;);</span>
+<span class="fc" id="L832">                    var proof = new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));</span>
+<span class="fc" id="L833">                    results[1] = new NativeVerification(true,work.units,proof,descriptor.id(),</span>
                         &quot;CHECKED_SCHEMA_OCCURRENCE_VERIFIED&quot;);
-<span class="fc" id="L774">                } catch (ReplayRejected rejected) {</span>
-<span class="fc" id="L775">                    results[1] = nativeRejected(work,rejected.getMessage());</span>
-<span class="fc" id="L776">                }</span>
-<span class="fc" id="L777">                RetainedOperation.work(2);</span>
-<span class="fc" id="L778">                RetainedOperation.checkpoint();</span>
-<span class="fc" id="L779">            } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L780">                primary=failure;</span>
-<span class="fc" id="L781">                observeImportFailure(failure);</span>
-<span class="fc" id="L782">                throw failure;</span>
+<span class="fc" id="L835">                } catch (ReplayRejected rejected) {</span>
+<span class="fc" id="L836">                    results[1] = nativeRejected(work,rejected.getMessage());</span>
+<span class="fc" id="L837">                }</span>
+<span class="fc" id="L838">                RetainedOperation.work(2);</span>
+<span class="fc" id="L839">                RetainedOperation.checkpoint();</span>
+<span class="fc" id="L840">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L841">                primary=failure;</span>
+<span class="fc" id="L842">                observeImportFailure(failure);</span>
+<span class="fc" id="L843">                throw failure;</span>
             } finally {
-<span class="fc" id="L784">                closeReplayFrame(retained,primary);</span>
+<span class="fc" id="L845">                closeReplayFrame(retained,primary);</span>
             }
-<span class="fc" id="L786">            return (NativeVerification) results[1];</span>
-<span class="fc" id="L787">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L847">            return (NativeVerification) results[1];</span>
+<span class="fc" id="L848">        } catch (RuntimeException | Error failure) {</span>
             // A result lost at frame close was not delegated, even if mathematically accepted.
-<span class="fc" id="L789">            try { RetainedOperation.work(work.units); }</span>
-<span class="nc" id="L790">            catch (RuntimeException | Error accounting) {</span>
-<span class="nc bnc" id="L791" title="All 2 branches missed.">                if (accounting != failure) failure.addSuppressed(accounting);</span>
-<span class="fc" id="L792">            }</span>
-<span class="fc" id="L793">            throw failure;</span>
+<span class="fc" id="L850">            try { RetainedOperation.work(work.units); }</span>
+<span class="nc" id="L851">            catch (RuntimeException | Error accounting) {</span>
+<span class="nc bnc" id="L852" title="All 2 branches missed.">                if (accounting != failure) failure.addSuppressed(accounting);</span>
+<span class="fc" id="L853">            }</span>
+<span class="fc" id="L854">            throw failure;</span>
         }
     }
 
     private VerifiedApplication replayBinding(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
-<span class="fc" id="L798">        var replay = new BindingReplay(source,binding,work);</span>
-<span class="fc" id="L799">        RetainedOperation.Frame retained=null,jsonOwner=null;</span>
-<span class="fc" id="L800">        Throwable failure=null;</span>
+<span class="fc" id="L859">        var replay = new BindingReplay(source,binding,work);</span>
+<span class="fc" id="L860">        RetainedOperation.Frame retained=null,jsonOwner=null;</span>
+<span class="fc" id="L861">        Throwable failure=null;</span>
         try {
-<span class="fc" id="L802">            retained=RetainedOperation.retainCompleted(1,replay);</span>
-<span class="fc" id="L803">            replay.json=RetainedJson.open();</span>
-<span class="fc" id="L804">            RetainedOperation.work(1);</span>
-<span class="fc" id="L805">            jsonOwner=RetainedOperation.retain(replay.json);</span>
-<span class="fc" id="L806">            try { replay.run(); }</span>
-<span class="fc" id="L807">            catch (ReplayRejected | DomainRejected rejected) {</span>
-<span class="fc" id="L808">                replay.rejection=rejected.getMessage();replay.domainRejected=rejected instanceof DomainRejected;</span>
-<span class="fc" id="L809">                RetainedOperation.work(2);</span>
-<span class="fc" id="L810">            }</span>
+<span class="fc" id="L863">            retained=RetainedOperation.retainCompleted(1,replay);</span>
+<span class="fc" id="L864">            replay.json=RetainedJson.open();</span>
+<span class="fc" id="L865">            RetainedOperation.work(1);</span>
+<span class="fc" id="L866">            jsonOwner=RetainedOperation.retain(replay.json);</span>
+<span class="fc" id="L867">            try { replay.run(); }</span>
+<span class="fc" id="L868">            catch (ReplayRejected | DomainRejected rejected) {</span>
+<span class="fc" id="L869">                replay.rejection=rejected.getMessage();replay.domainRejected=rejected instanceof DomainRejected;</span>
+<span class="fc" id="L870">                RetainedOperation.work(2);</span>
+<span class="fc" id="L871">            }</span>
             // No semantic exception can own a technical error that an outer caller discards.
-<span class="fc" id="L812">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L813">        } catch (RuntimeException | Error primary) {</span>
-<span class="fc" id="L814">            failure=primary;</span>
-<span class="fc" id="L815">            observeImportFailure(primary);</span>
+<span class="fc" id="L873">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L874">        } catch (RuntimeException | Error primary) {</span>
+<span class="fc" id="L875">            failure=primary;</span>
+<span class="fc" id="L876">            observeImportFailure(primary);</span>
         } finally {
             // Continue releasing every successful acquisition after a failed close.
             // The JSON scope stays an actual replay field even if acquiring its frame fails.
-<span class="fc bfc" id="L819" title="All 2 branches covered.">            try { if(jsonOwner!=null)jsonOwner.close(); }</span>
-<span class="fc" id="L820">            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }</span>
-<span class="pc bpc" id="L821" title="1 of 2 branches missed.">            try { if(replay.json!=null)replay.json.close(); }</span>
-<span class="fc" id="L822">            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }</span>
-<span class="fc bfc" id="L823" title="All 2 branches covered.">            try { if(retained!=null)retained.close(); }</span>
-<span class="fc" id="L824">            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }</span>
+<span class="fc bfc" id="L880" title="All 2 branches covered.">            try { if(jsonOwner!=null)jsonOwner.close(); }</span>
+<span class="fc" id="L881">            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }</span>
+<span class="pc bpc" id="L882" title="1 of 2 branches missed.">            try { if(replay.json!=null)replay.json.close(); }</span>
+<span class="fc" id="L883">            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }</span>
+<span class="fc bfc" id="L884" title="All 2 branches covered.">            try { if(retained!=null)retained.close(); }</span>
+<span class="fc" id="L885">            catch (RuntimeException | Error cleanup) { failure=appendReplayFailure(failure,cleanup); }</span>
         }
-<span class="fc bfc" id="L826" title="All 2 branches covered.">        if(failure instanceof RuntimeException runtime)throw runtime;</span>
-<span class="pc bpc" id="L827" title="1 of 2 branches missed.">        if(failure instanceof Error error)throw error;</span>
-<span class="fc bfc" id="L828" title="All 2 branches covered.">        if(replay.rejection!=null) {</span>
-<span class="fc bfc" id="L829" title="All 2 branches covered.">            if(replay.domainRejected)throw new DomainRejected(replay.rejection);</span>
-<span class="fc" id="L830">            throw new ReplayRejected(replay.rejection);</span>
+<span class="fc bfc" id="L887" title="All 2 branches covered.">        if(failure instanceof RuntimeException runtime)throw runtime;</span>
+<span class="pc bpc" id="L888" title="1 of 2 branches missed.">        if(failure instanceof Error error)throw error;</span>
+<span class="fc bfc" id="L889" title="All 2 branches covered.">        if(replay.rejection!=null) {</span>
+<span class="fc bfc" id="L890" title="All 2 branches covered.">            if(replay.domainRejected)throw new DomainRejected(replay.rejection);</span>
+<span class="fc" id="L891">            throw new ReplayRejected(replay.rejection);</span>
         }
-<span class="fc" id="L832">        return replay.checked;</span>
+<span class="fc" id="L893">        return replay.checked;</span>
     }
 
     /** Actual decoded/intermediate owners shared by legacy verification and explicit import. */
@@ -846,314 +907,314 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         private RetainedJson.Scope json;
         private String rejection;
         private boolean domainRejected;
-<span class="fc" id="L849">        BindingReplay(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {</span>
-<span class="fc" id="L850">            this.source=source;this.binding=binding;this.work=work;</span>
-<span class="fc" id="L851">        }</span>
+<span class="fc" id="L910">        BindingReplay(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {</span>
+<span class="fc" id="L911">            this.source=source;this.binding=binding;this.work=work;</span>
+<span class="fc" id="L912">        }</span>
         @Override public void retainedReferences(RetainedGraph.Visitor v) {
-<span class="fc" id="L853">            v.reference(CheckedLearnedSchemaModel.this);v.reference(source);v.reference(binding);v.reference(work);</span>
-<span class="fc" id="L854">            v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);</span>
-<span class="fc" id="L855">            v.reference(decoded);v.reference(checked);v.reference(rejection);v.reference(json);</span>
-<span class="fc" id="L856">        }</span>
+<span class="fc" id="L914">            v.reference(CheckedLearnedSchemaModel.this);v.reference(source);v.reference(binding);v.reference(work);</span>
+<span class="fc" id="L915">            v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);</span>
+<span class="fc" id="L916">            v.reference(decoded);v.reference(checked);v.reference(rejection);v.reference(json);</span>
+<span class="fc" id="L917">        }</span>
         void run() {
-<span class="fc" id="L858">            data = read(binding.canonicalEvidenceJson());</span>
-<span class="fc" id="L859">            RetainedOperation.work(1);</span>
-<span class="fc" id="L860">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L861">            fields(data, &quot;schema&quot;, &quot;checkerRevision&quot;, &quot;inventorySemanticsHash&quot;, &quot;modelId&quot;, &quot;schemaId&quot;, &quot;proofHash&quot;,</span>
+<span class="fc" id="L919">            data = read(binding.canonicalEvidenceJson());</span>
+<span class="fc" id="L920">            RetainedOperation.work(1);</span>
+<span class="fc" id="L921">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L922">            fields(data, &quot;schema&quot;, &quot;checkerRevision&quot;, &quot;inventorySemanticsHash&quot;, &quot;modelId&quot;, &quot;schemaId&quot;, &quot;proofHash&quot;,</span>
                 &quot;domain&quot;, &quot;source&quot;, &quot;target&quot;, &quot;path&quot;, &quot;bindings&quot;, &quot;applicationWork&quot;);
-<span class="fc bfc" id="L863" title="All 4 branches covered.">            if (!APPLICATION_REVISION.equals(text(data, &quot;schema&quot;)) || !CHECKER_REVISION.equals(text(data, &quot;checkerRevision&quot;))</span>
-<span class="fc bfc" id="L864" title="All 2 branches covered.">                    || !inventorySemanticsHash.equals(text(data, &quot;inventorySemanticsHash&quot;))</span>
-<span class="fc bfc" id="L865" title="All 4 branches covered.">                    || !descriptor.id().equals(text(data, &quot;modelId&quot;)) || !DOMAIN.equals(text(data, &quot;domain&quot;)))</span>
-<span class="fc" id="L866">                throw new ReplayRejected(&quot;CHECKED_SCHEMA_STALE_SEMANTICS&quot;);</span>
-<span class="fc" id="L867">            Schema schema = byId.get(text(data, &quot;schemaId&quot;));</span>
-<span class="fc bfc" id="L868" title="All 2 branches covered.">            if (schema == null) throw new ReplayRejected(&quot;CHECKED_SCHEMA_UNREGISTERED&quot;);</span>
-<span class="fc" id="L869">            domain(source.expression(), bounds, work);</span>
-<span class="fc" id="L870">            encodedSource = CODEC.encodeExpression(source.expression());</span>
-<span class="fc bfc" id="L871" title="All 4 branches covered.">            if (!encodedSource.equals(text(data, &quot;source&quot;)) || !encodedSource.equals(binding.sourceExpression()))</span>
-<span class="fc" id="L872">                throw new ReplayRejected(&quot;CHECKED_SCHEMA_WRONG_SOURCE&quot;);</span>
-<span class="fc" id="L873">            array(data.get(&quot;path&quot;), bounds.maximumDepth());</span>
-<span class="fc" id="L874">            path = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L875">            RetainedOperation.work(2);</span>
-<span class="fc bfc" id="L876" title="All 2 branches covered.">            for (var part : data.get(&quot;path&quot;)) {</span>
-<span class="pc bpc" id="L877" title="2 of 6 branches missed.">                if (!part.isInt() || part.intValue() &lt; 0 || part.intValue() &gt; 1)</span>
-<span class="fc" id="L878">                    throw new ReplayRejected(&quot;CHECKED_SCHEMA_INVALID_PATH&quot;);</span>
-<span class="fc" id="L879">                path.add(part.intValue());</span>
-<span class="fc" id="L880">                RetainedOperation.work(1);</span>
-<span class="fc" id="L881">            }</span>
-<span class="fc" id="L882">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L883">            checked = replayOccurrence(schema,source.expression(),encodedSource,path,()-&gt;{</span>
-<span class="fc" id="L884">                substitutions = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L885">                RetainedOperation.work(1);</span>
-<span class="fc" id="L886">                array(data.get(&quot;bindings&quot;), 16);</span>
-<span class="fc bfc" id="L887" title="All 2 branches covered.">                for (var value : data.get(&quot;bindings&quot;)) {</span>
-<span class="fc" id="L888">                    fields(value, &quot;name&quot;, &quot;expression&quot;);</span>
-<span class="fc" id="L889">                    decoded = CODEC.decodeExpression(text(value, &quot;expression&quot;));</span>
-<span class="fc" id="L890">                    domain(decoded, bounds, work);</span>
-<span class="fc" id="L891">                    var previous = substitutions.put(text(value, &quot;name&quot;), decoded);</span>
-<span class="fc" id="L892">                    RetainedOperation.work(2);</span>
-<span class="fc bfc" id="L893" title="All 2 branches covered.">                    if (previous != null) throw new ReplayRejected(&quot;CHECKED_SCHEMA_DUPLICATE_BINDING&quot;);</span>
-<span class="fc" id="L894">                    RetainedOperation.checkpoint();</span>
-<span class="fc" id="L895">                }</span>
-<span class="fc" id="L896">                return substitutions;</span>
+<span class="fc bfc" id="L924" title="All 4 branches covered.">            if (!APPLICATION_REVISION.equals(text(data, &quot;schema&quot;)) || !CHECKER_REVISION.equals(text(data, &quot;checkerRevision&quot;))</span>
+<span class="fc bfc" id="L925" title="All 2 branches covered.">                    || !inventorySemanticsHash.equals(text(data, &quot;inventorySemanticsHash&quot;))</span>
+<span class="fc bfc" id="L926" title="All 4 branches covered.">                    || !descriptor.id().equals(text(data, &quot;modelId&quot;)) || !DOMAIN.equals(text(data, &quot;domain&quot;)))</span>
+<span class="fc" id="L927">                throw new ReplayRejected(&quot;CHECKED_SCHEMA_STALE_SEMANTICS&quot;);</span>
+<span class="fc" id="L928">            Schema schema = byId.get(text(data, &quot;schemaId&quot;));</span>
+<span class="fc bfc" id="L929" title="All 2 branches covered.">            if (schema == null) throw new ReplayRejected(&quot;CHECKED_SCHEMA_UNREGISTERED&quot;);</span>
+<span class="fc" id="L930">            domain(source.expression(), bounds, work);</span>
+<span class="fc" id="L931">            encodedSource = CODEC.encodeExpression(source.expression());</span>
+<span class="fc bfc" id="L932" title="All 4 branches covered.">            if (!encodedSource.equals(text(data, &quot;source&quot;)) || !encodedSource.equals(binding.sourceExpression()))</span>
+<span class="fc" id="L933">                throw new ReplayRejected(&quot;CHECKED_SCHEMA_WRONG_SOURCE&quot;);</span>
+<span class="fc" id="L934">            array(data.get(&quot;path&quot;), bounds.maximumDepth());</span>
+<span class="fc" id="L935">            path = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L936">            RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L937" title="All 2 branches covered.">            for (var part : data.get(&quot;path&quot;)) {</span>
+<span class="pc bpc" id="L938" title="2 of 6 branches missed.">                if (!part.isInt() || part.intValue() &lt; 0 || part.intValue() &gt; 1)</span>
+<span class="fc" id="L939">                    throw new ReplayRejected(&quot;CHECKED_SCHEMA_INVALID_PATH&quot;);</span>
+<span class="fc" id="L940">                path.add(part.intValue());</span>
+<span class="fc" id="L941">                RetainedOperation.work(1);</span>
+<span class="fc" id="L942">            }</span>
+<span class="fc" id="L943">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L944">            checked = replayOccurrence(schema,source.expression(),encodedSource,path,()-&gt;{</span>
+<span class="fc" id="L945">                substitutions = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L946">                RetainedOperation.work(1);</span>
+<span class="fc" id="L947">                array(data.get(&quot;bindings&quot;), 16);</span>
+<span class="fc bfc" id="L948" title="All 2 branches covered.">                for (var value : data.get(&quot;bindings&quot;)) {</span>
+<span class="fc" id="L949">                    fields(value, &quot;name&quot;, &quot;expression&quot;);</span>
+<span class="fc" id="L950">                    decoded = CODEC.decodeExpression(text(value, &quot;expression&quot;));</span>
+<span class="fc" id="L951">                    domain(decoded, bounds, work);</span>
+<span class="fc" id="L952">                    var previous = substitutions.put(text(value, &quot;name&quot;), decoded);</span>
+<span class="fc" id="L953">                    RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L954" title="All 2 branches covered.">                    if (previous != null) throw new ReplayRejected(&quot;CHECKED_SCHEMA_DUPLICATE_BINDING&quot;);</span>
+<span class="fc" id="L955">                    RetainedOperation.checkpoint();</span>
+<span class="fc" id="L956">                }</span>
+<span class="fc" id="L957">                return substitutions;</span>
             },work);
-<span class="pc bpc" id="L898" title="1 of 2 branches missed.">            if (checked == null) throw new ReplayRejected(&quot;CHECKED_SCHEMA_UNCHANGED&quot;);</span>
-<span class="fc" id="L899">        }</span>
+<span class="pc bpc" id="L959" title="1 of 2 branches missed.">            if (checked == null) throw new ReplayRejected(&quot;CHECKED_SCHEMA_UNCHANGED&quot;);</span>
+<span class="fc" id="L960">        }</span>
     }
     private static void observeImportFailure(Throwable failure) {
-<span class="fc" id="L902">        try { RetainedOperation.checkpoint(); }</span>
-<span class="nc" id="L903">        catch (RuntimeException | Error observation) {</span>
-<span class="nc bnc" id="L904" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
-<span class="fc" id="L905">        }</span>
-<span class="fc" id="L906">    }</span>
+<span class="fc" id="L963">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L964">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L966">        }</span>
+<span class="fc" id="L967">    }</span>
     private static Throwable appendReplayFailure(Throwable primary,Throwable cleanup) {
-<span class="fc bfc" id="L908" title="All 2 branches covered.">        if(primary==null)return cleanup;</span>
-<span class="fc bfc" id="L909" title="All 2 branches covered.">        if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L910">        return primary;</span>
+<span class="fc bfc" id="L969" title="All 2 branches covered.">        if(primary==null)return cleanup;</span>
+<span class="fc bfc" id="L970" title="All 2 branches covered.">        if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L971">        return primary;</span>
     }
     private static void closeReplayFrame(RetainedOperation.Frame frame,Throwable primary) {
-<span class="fc bfc" id="L913" title="All 2 branches covered.">        try { if(frame!=null)frame.close(); }</span>
-<span class="fc" id="L914">        catch (RuntimeException | Error cleanup) {</span>
-<span class="fc bfc" id="L915" title="All 2 branches covered.">            if(primary==null)throw cleanup;</span>
-<span class="fc bfc" id="L916" title="All 2 branches covered.">            if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L917">        }</span>
-<span class="fc" id="L918">    }</span>
+<span class="fc bfc" id="L974" title="All 2 branches covered.">        try { if(frame!=null)frame.close(); }</span>
+<span class="fc" id="L975">        catch (RuntimeException | Error cleanup) {</span>
+<span class="fc bfc" id="L976" title="All 2 branches covered.">            if(primary==null)throw cleanup;</span>
+<span class="fc bfc" id="L977" title="All 2 branches covered.">            if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L978">        }</span>
+<span class="fc" id="L979">    }</span>
 
     private static final class ReplayRejected extends IllegalArgumentException {
-<span class="fc" id="L921">        ReplayRejected(String reason){super(reason);}</span>
+<span class="fc" id="L982">        ReplayRejected(String reason){super(reason);}</span>
     }
     /** Same concrete occurrence/match/substitution and phase replay for both representations. */
     private VerifiedApplication replayOccurrence(Schema schema,Expr source,String encodedSource,List&lt;Integer&gt; path,
             java.util.function.Supplier&lt;Map&lt;String,Expr&gt;&gt; bindings,Work work) {
-<span class="pc bpc" id="L926" title="5 of 10 branches missed.">        if(path.size()&gt;bounds.maximumDepth() || path.stream().anyMatch(part-&gt;part==null || part&lt;0 || part&gt;1))</span>
-<span class="nc" id="L927">            throw new ReplayRejected(&quot;CHECKED_SCHEMA_INVALID_PATH&quot;);</span>
-<span class="fc" id="L928">        work.add(path.size()+1L);</span>
-<span class="fc" id="L929">        var occurrence=new TreePosition(path,&quot;checked-verification&quot;).subtreeAt(source);</span>
-<span class="fc bfc" id="L930" title="All 2 branches covered.">        if(occurrence.isEmpty())throw new ReplayRejected(&quot;CHECKED_SCHEMA_ABSENT_OCCURRENCE&quot;);</span>
-<span class="fc" id="L931">        var outcome=match(schema,occurrence.orElseThrow());work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());</span>
-<span class="pc bpc" id="L932" title="2 of 4 branches missed.">        if(!outcome.complete() || !outcome.matched())throw new ReplayRejected(&quot;CHECKED_SCHEMA_BINDING_MISMATCH&quot;);</span>
+<span class="pc bpc" id="L987" title="5 of 10 branches missed.">        if(path.size()&gt;bounds.maximumDepth() || path.stream().anyMatch(part-&gt;part==null || part&lt;0 || part&gt;1))</span>
+<span class="nc" id="L988">            throw new ReplayRejected(&quot;CHECKED_SCHEMA_INVALID_PATH&quot;);</span>
+<span class="fc" id="L989">        work.add(path.size()+1L);</span>
+<span class="fc" id="L990">        var occurrence=new TreePosition(path,&quot;checked-verification&quot;).subtreeAt(source);</span>
+<span class="fc bfc" id="L991" title="All 2 branches covered.">        if(occurrence.isEmpty())throw new ReplayRejected(&quot;CHECKED_SCHEMA_ABSENT_OCCURRENCE&quot;);</span>
+<span class="fc" id="L992">        var outcome=match(schema,occurrence.orElseThrow());work.add((long)outcome.evaluatedSteps()+outcome.patternBranches());</span>
+<span class="pc bpc" id="L993" title="2 of 4 branches missed.">        if(!outcome.complete() || !outcome.matched())throw new ReplayRejected(&quot;CHECKED_SCHEMA_BINDING_MISMATCH&quot;);</span>
         // The returned matcher outcome is still needed after decoding the supplied bindings.
         // Keep both graphs, inner work and the completed application through their handoff.
-<span class="fc" id="L935">        var pending = new Object[5];</span>
-<span class="fc" id="L936">        var retained=RetainedOperation.retainCompleted(6,outcome,schema,source,encodedSource,path,work,pending);</span>
-<span class="fc" id="L937">        Throwable primary=null;</span>
+<span class="fc" id="L996">        var pending = new Object[5];</span>
+<span class="fc" id="L997">        var retained=RetainedOperation.retainCompleted(6,outcome,schema,source,encodedSource,path,work,pending);</span>
+<span class="fc" id="L998">        Throwable primary=null;</span>
         try {
             try {
-<span class="fc" id="L940">                var substitutions=bindings.get();pending[0]=substitutions;</span>
-<span class="fc bfc" id="L941" title="All 2 branches covered.">                if(!substitutions.equals(outcome.matches().getFirst().bindings()))</span>
-<span class="fc" id="L942">                    throw new ReplayRejected(&quot;CHECKED_SCHEMA_BINDING_MISMATCH&quot;);</span>
-<span class="fc" id="L943">                var applicationWork=new Work();pending[1]=applicationWork;</span>
-<span class="fc" id="L944">                try { pending[2]=apply(schema,source,encodedSource,path,substitutions,applicationWork); }</span>
-<span class="fc" id="L945">                finally { work.add(applicationWork.units); }</span>
-<span class="fc" id="L946">            } catch (ReplayRejected | DomainRejected rejected) {</span>
-<span class="fc" id="L947">                pending[3]=rejected.getMessage();pending[4]=rejected instanceof DomainRejected;</span>
-<span class="fc" id="L948">                RetainedOperation.work(2);</span>
-<span class="fc" id="L949">            }</span>
-<span class="fc" id="L950">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L951">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L952">            primary=failure;</span>
-<span class="fc" id="L953">            observeImportFailure(failure);</span>
-<span class="fc" id="L954">            throw failure;</span>
+<span class="fc" id="L1001">                var substitutions=bindings.get();pending[0]=substitutions;</span>
+<span class="fc bfc" id="L1002" title="All 2 branches covered.">                if(!substitutions.equals(outcome.matches().getFirst().bindings()))</span>
+<span class="fc" id="L1003">                    throw new ReplayRejected(&quot;CHECKED_SCHEMA_BINDING_MISMATCH&quot;);</span>
+<span class="fc" id="L1004">                var applicationWork=new Work();pending[1]=applicationWork;</span>
+<span class="fc" id="L1005">                try { pending[2]=apply(schema,source,encodedSource,path,substitutions,applicationWork); }</span>
+<span class="fc" id="L1006">                finally { work.add(applicationWork.units); }</span>
+<span class="fc" id="L1007">            } catch (ReplayRejected | DomainRejected rejected) {</span>
+<span class="fc" id="L1008">                pending[3]=rejected.getMessage();pending[4]=rejected instanceof DomainRejected;</span>
+<span class="fc" id="L1009">                RetainedOperation.work(2);</span>
+<span class="fc" id="L1010">            }</span>
+<span class="fc" id="L1011">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L1012">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L1013">            primary=failure;</span>
+<span class="fc" id="L1014">            observeImportFailure(failure);</span>
+<span class="fc" id="L1015">            throw failure;</span>
         } finally {
-<span class="fc" id="L956">            closeReplayFrame(retained,primary);</span>
+<span class="fc" id="L1017">            closeReplayFrame(retained,primary);</span>
         }
-<span class="fc bfc" id="L958" title="All 2 branches covered.">        if (pending[3]!=null) {</span>
-<span class="fc bfc" id="L959" title="All 2 branches covered.">            if(Boolean.TRUE.equals(pending[4]))throw new DomainRejected((String)pending[3]);</span>
-<span class="fc" id="L960">            throw new ReplayRejected((String)pending[3]);</span>
+<span class="fc bfc" id="L1019" title="All 2 branches covered.">        if (pending[3]!=null) {</span>
+<span class="fc bfc" id="L1020" title="All 2 branches covered.">            if(Boolean.TRUE.equals(pending[4]))throw new DomainRejected((String)pending[3]);</span>
+<span class="fc" id="L1021">            throw new ReplayRejected((String)pending[3]);</span>
         }
-<span class="fc" id="L962">        return (VerifiedApplication) pending[2];</span>
+<span class="fc" id="L1023">        return (VerifiedApplication) pending[2];</span>
     }
-<span class="fc" id="L964">    public NativeVerifier nativeVerifier() {return new IndependentNativeVerifier();}</span>
-<span class="fc" id="L965">    private final class IndependentNativeVerifier implements NativeVerifier,NativeVerifierProvider.ExecutionInventory,RetainedGraph.View {</span>
+<span class="fc" id="L1025">    public NativeVerifier nativeVerifier() {return new IndependentNativeVerifier();}</span>
+<span class="fc" id="L1026">    private final class IndependentNativeVerifier implements NativeVerifier,NativeVerifierProvider.ExecutionInventory,RetainedGraph.View {</span>
         @Override public String executionRevision(NativeMoveProvider candidate) {
-<span class="fc" id="L967">            RetainedOperation.work(1);</span>
-<span class="fc bfc" id="L968" title="All 4 branches covered.">            boolean covered=candidate instanceof NativeProvider eager &amp;&amp; eager.ownedBy(CheckedLearnedSchemaModel.this)</span>
-<span class="fc bfc" id="L969" title="All 4 branches covered.">                || candidate instanceof CheckedSchemaMatcherPlan.NativeProvider lazy &amp;&amp; lazy.ownedBy(CheckedLearnedSchemaModel.this);</span>
-<span class="fc bfc" id="L970" title="All 2 branches covered.">            return covered?CheckedSchemaNativeVerifierProvider.EXECUTION_REVISION:null;</span>
+<span class="fc" id="L1028">            RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L1029" title="All 4 branches covered.">            boolean covered=candidate instanceof NativeProvider eager &amp;&amp; eager.ownedBy(CheckedLearnedSchemaModel.this)</span>
+<span class="fc bfc" id="L1030" title="All 4 branches covered.">                || candidate instanceof CheckedSchemaMatcherPlan.NativeProvider lazy &amp;&amp; lazy.ownedBy(CheckedLearnedSchemaModel.this);</span>
+<span class="fc bfc" id="L1031" title="All 2 branches covered.">            return covered?CheckedSchemaNativeVerifierProvider.EXECUTION_REVISION:null;</span>
         }
-<span class="fc" id="L972">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}</span>
+<span class="fc" id="L1033">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}</span>
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
-<span class="fc" id="L974">            var work=new Work();work.add(1);</span>
+<span class="fc" id="L1035">            var work=new Work();work.add(1);</span>
             try {
-<span class="fc" id="L976">                var pending=new Object[5];</span>
-<span class="fc" id="L977">                var retained=RetainedOperation.retainCompleted(7,CheckedLearnedSchemaModel.this,source,move,context,work,pending);</span>
-<span class="fc" id="L978">                Throwable primary=null;</span>
+<span class="fc" id="L1037">                var pending=new Object[5];</span>
+<span class="fc" id="L1038">                var retained=RetainedOperation.retainCompleted(7,CheckedLearnedSchemaModel.this,source,move,context,work,pending);</span>
+<span class="fc" id="L1039">                Throwable primary=null;</span>
                 try {
-<span class="fc" id="L980">                    try { pending[4]=check(source,move,context,work,pending); }</span>
-<span class="nc" id="L981">                    catch(ReplayRejected rejected){pending[4]=nativeRejected(work,rejected.getMessage());}</span>
-<span class="pc" id="L982">                    catch(DomainRejected unsupported){pending[4]=nativeRejected(work,&quot;CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED&quot;);}</span>
+<span class="fc" id="L1041">                    try { pending[4]=check(source,move,context,work,pending); }</span>
+<span class="nc" id="L1042">                    catch(ReplayRejected rejected){pending[4]=nativeRejected(work,rejected.getMessage());}</span>
+<span class="pc" id="L1043">                    catch(DomainRejected unsupported){pending[4]=nativeRejected(work,&quot;CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED&quot;);}</span>
                     // Publish before paying: a receipt lost on either this debit or final close
                     // has not delegated any Work to the caller.
-<span class="fc" id="L985">                    RetainedOperation.work(2);</span>
-<span class="fc" id="L986">                    RetainedOperation.checkpoint();</span>
-<span class="fc" id="L987">                } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L988">                    primary=failure;observeImportFailure(failure);throw failure;</span>
+<span class="fc" id="L1046">                    RetainedOperation.work(2);</span>
+<span class="fc" id="L1047">                    RetainedOperation.checkpoint();</span>
+<span class="fc" id="L1048">                } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L1049">                    primary=failure;observeImportFailure(failure);throw failure;</span>
                 } finally {
-<span class="fc" id="L990">                    closeReplayFrame(retained,primary);</span>
+<span class="fc" id="L1051">                    closeReplayFrame(retained,primary);</span>
                 }
-<span class="fc" id="L992">                return (NativeVerification)pending[4];</span>
-<span class="fc" id="L993">            } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L994">                try { RetainedOperation.work(work.units); }</span>
-<span class="nc" id="L995">                catch(RuntimeException | Error accounting) {</span>
-<span class="nc bnc" id="L996" title="All 2 branches missed.">                    if(accounting!=failure)failure.addSuppressed(accounting);</span>
-<span class="fc" id="L997">                }</span>
-<span class="fc" id="L998">                throw failure;</span>
+<span class="fc" id="L1053">                return (NativeVerification)pending[4];</span>
+<span class="fc" id="L1054">            } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L1055">                try { RetainedOperation.work(work.units); }</span>
+<span class="nc" id="L1056">                catch(RuntimeException | Error accounting) {</span>
+<span class="nc bnc" id="L1057" title="All 2 branches missed.">                    if(accounting!=failure)failure.addSuppressed(accounting);</span>
+<span class="fc" id="L1058">                }</span>
+<span class="fc" id="L1059">                throw failure;</span>
             }
         }
         private NativeVerification check(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context,
                 Work work,Object[] pending) {
-<span class="pc bpc" id="L1003" title="2 of 4 branches missed.">            if(!NativeMoveProvider.carries(requiredAssumptions,source,context) || !NativeMoveProvider.carries(move.assumptions(),source,context))</span>
-<span class="nc" id="L1004">                return nativeRejected(work,&quot;CHECKED_SCHEMA_PREREQUISITES_MISSING&quot;);</span>
-<span class="pc bpc" id="L1005" title="2 of 4 branches missed.">            if(!(move.proof() instanceof NativeMoveProof.Exact exact) || !move.ruleId().equals(descriptor.id())</span>
-<span class="pc bpc" id="L1006" title="1 of 2 branches missed.">                || !(exact.evidence().binding().observation() instanceof ApplicationData data))return nativeRejected(work,&quot;CHECKED_SCHEMA_PROVENANCE_REQUIRED&quot;);</span>
-<span class="pc bpc" id="L1007" title="2 of 4 branches missed.">            if(!APPLICATION_REVISION.equals(data.revision()) || !CHECKER_REVISION.equals(data.checkerRevision())</span>
-<span class="pc bpc" id="L1008" title="3 of 6 branches missed.">                || !inventorySemanticsHash.equals(data.inventorySemanticsHash()) || !descriptor.id().equals(data.modelId()) || !DOMAIN.equals(data.domain()))</span>
-<span class="nc" id="L1009">                return nativeRejected(work,&quot;CHECKED_SCHEMA_STALE_SEMANTICS&quot;);</span>
-<span class="pc bpc" id="L1010" title="1 of 2 branches missed.">            var schema=byId.get(data.schemaId());if(schema==null)return nativeRejected(work,&quot;CHECKED_SCHEMA_UNREGISTERED&quot;);</span>
-<span class="fc" id="L1011">            domain(source.expression(),bounds,work);</span>
-<span class="pc bpc" id="L1012" title="1 of 4 branches missed.">            if(!source.expression().equals(data.source()) || !source.expression().equals(exact.source()))return nativeRejected(work,&quot;CHECKED_SCHEMA_WRONG_SOURCE&quot;);</span>
-<span class="fc" id="L1013">            var checked=replayOccurrence(schema,source.expression(),null,data.path(),()-&gt;{</span>
-<span class="pc bpc" id="L1014" title="1 of 2 branches missed.">                if(data.substitutions().size()&gt;16)throw new ReplayRejected(&quot;CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED&quot;);</span>
-<span class="fc" id="L1015">                data.substitutions().values().forEach(value-&gt;domain(value,bounds,work));return data.substitutions();</span>
+<span class="pc bpc" id="L1064" title="2 of 4 branches missed.">            if(!NativeMoveProvider.carries(requiredAssumptions,source,context) || !NativeMoveProvider.carries(move.assumptions(),source,context))</span>
+<span class="nc" id="L1065">                return nativeRejected(work,&quot;CHECKED_SCHEMA_PREREQUISITES_MISSING&quot;);</span>
+<span class="pc bpc" id="L1066" title="2 of 4 branches missed.">            if(!(move.proof() instanceof NativeMoveProof.Exact exact) || !move.ruleId().equals(descriptor.id())</span>
+<span class="pc bpc" id="L1067" title="1 of 2 branches missed.">                || !(exact.evidence().binding().observation() instanceof ApplicationData data))return nativeRejected(work,&quot;CHECKED_SCHEMA_PROVENANCE_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L1068" title="2 of 4 branches missed.">            if(!APPLICATION_REVISION.equals(data.revision()) || !CHECKER_REVISION.equals(data.checkerRevision())</span>
+<span class="pc bpc" id="L1069" title="3 of 6 branches missed.">                || !inventorySemanticsHash.equals(data.inventorySemanticsHash()) || !descriptor.id().equals(data.modelId()) || !DOMAIN.equals(data.domain()))</span>
+<span class="nc" id="L1070">                return nativeRejected(work,&quot;CHECKED_SCHEMA_STALE_SEMANTICS&quot;);</span>
+<span class="pc bpc" id="L1071" title="1 of 2 branches missed.">            var schema=byId.get(data.schemaId());if(schema==null)return nativeRejected(work,&quot;CHECKED_SCHEMA_UNREGISTERED&quot;);</span>
+<span class="fc" id="L1072">            domain(source.expression(),bounds,work);</span>
+<span class="pc bpc" id="L1073" title="1 of 4 branches missed.">            if(!source.expression().equals(data.source()) || !source.expression().equals(exact.source()))return nativeRejected(work,&quot;CHECKED_SCHEMA_WRONG_SOURCE&quot;);</span>
+<span class="fc" id="L1074">            var checked=replayOccurrence(schema,source.expression(),null,data.path(),()-&gt;{</span>
+<span class="pc bpc" id="L1075" title="1 of 2 branches missed.">                if(data.substitutions().size()&gt;16)throw new ReplayRejected(&quot;CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED&quot;);</span>
+<span class="fc" id="L1076">                data.substitutions().values().forEach(value-&gt;domain(value,bounds,work));return data.substitutions();</span>
             },work);
-<span class="fc" id="L1017">            pending[0]=checked;RetainedOperation.work(1);</span>
-<span class="pc bpc" id="L1018" title="1 of 2 branches missed.">            if(checked==null)return nativeRejected(work,&quot;CHECKED_SCHEMA_UNCHANGED&quot;);</span>
-<span class="fc" id="L1019">            var proof=new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));</span>
-<span class="fc" id="L1020">            pending[1]=proof;RetainedOperation.work(2);</span>
-<span class="fc" id="L1021">            var expected=new NativeSearchMove(proof,descriptor,move.generationCost(),Set.of());</span>
-<span class="fc" id="L1022">            pending[2]=expected;RetainedOperation.work(2);</span>
-<span class="fc" id="L1023">            pending[3]=move.withCapabilityDelta(Set.of());RetainedOperation.work(2);</span>
-<span class="fc" id="L1024">            boolean accepted=expected.equals(pending[3]);</span>
-<span class="pc bpc" id="L1025" title="2 of 4 branches missed.">            return new NativeVerification(accepted,work.units,accepted?proof:null,accepted?move.ruleId():null,</span>
-<span class="pc bpc" id="L1026" title="1 of 2 branches missed.">                accepted?&quot;CHECKED_SCHEMA_OCCURRENCE_VERIFIED&quot;:&quot;CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH&quot;);</span>
+<span class="fc" id="L1078">            pending[0]=checked;RetainedOperation.work(1);</span>
+<span class="pc bpc" id="L1079" title="1 of 2 branches missed.">            if(checked==null)return nativeRejected(work,&quot;CHECKED_SCHEMA_UNCHANGED&quot;);</span>
+<span class="fc" id="L1080">            var proof=new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(checked));</span>
+<span class="fc" id="L1081">            pending[1]=proof;RetainedOperation.work(2);</span>
+<span class="fc" id="L1082">            var expected=new NativeSearchMove(proof,descriptor,move.generationCost(),Set.of());</span>
+<span class="fc" id="L1083">            pending[2]=expected;RetainedOperation.work(2);</span>
+<span class="fc" id="L1084">            pending[3]=move.withCapabilityDelta(Set.of());RetainedOperation.work(2);</span>
+<span class="fc" id="L1085">            boolean accepted=expected.equals(pending[3]);</span>
+<span class="pc bpc" id="L1086" title="2 of 4 branches missed.">            return new NativeVerification(accepted,work.units,accepted?proof:null,accepted?move.ruleId():null,</span>
+<span class="pc bpc" id="L1087" title="1 of 2 branches missed.">                accepted?&quot;CHECKED_SCHEMA_OCCURRENCE_VERIFIED&quot;:&quot;CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH&quot;);</span>
         }
     }
-<span class="fc" id="L1029">    private static NativeVerification nativeRejected(Work work,String detail){return new NativeVerification(false,work.units,null,null,detail);}</span>
+<span class="fc" id="L1090">    private static NativeVerification nativeRejected(Work work,String detail){return new NativeVerification(false,work.units,null,null,detail);}</span>
     private static MoveVerifier.Verification rejected(Work work, String detail) {
-<span class="fc" id="L1031">        return new MoveVerifier.Verification(false, work.units, List.of(), detail);</span>
+<span class="fc" id="L1092">        return new MoveVerifier.Verification(false, work.units, List.of(), detail);</span>
     }
 
     private String render() {
-<span class="fc" id="L1035">        var root = JSON.createObjectNode().put(&quot;schema&quot;, REVISION).put(&quot;checkerRevision&quot;, CHECKER_REVISION)</span>
-<span class="fc" id="L1036">            .put(&quot;domain&quot;, DOMAIN).put(&quot;arithmeticProfile&quot;, ARITHMETIC_PROFILE).put(&quot;inventoryHash&quot;, inventoryHash)</span>
-<span class="fc" id="L1037">            .put(&quot;inventorySemanticsHash&quot;, inventorySemanticsHash).put(&quot;originStrategyHash&quot;, originStrategyHash);</span>
-<span class="fc" id="L1038">        root.set(&quot;bounds&quot;, boundsJson(bounds));</span>
-<span class="fc" id="L1039">        var required = root.putArray(&quot;requiredAssumptions&quot;);</span>
-<span class="fc" id="L1040">        requiredAssumptions.forEach(required::add);</span>
-<span class="fc" id="L1041">        root.put(&quot;formationWork&quot;, formationWork);</span>
-<span class="fc" id="L1042">        var values = root.putArray(&quot;schemas&quot;);</span>
-<span class="fc bfc" id="L1043" title="All 2 branches covered.">        for (var schema : schemas) {</span>
-<span class="fc" id="L1044">            var value = values.addObject().put(&quot;id&quot;, schema.id());</span>
-<span class="fc" id="L1045">            value.set(&quot;source&quot;, pattern(schema.source()));</span>
-<span class="fc" id="L1046">            value.set(&quot;target&quot;, pattern(schema.target()));</span>
-<span class="fc" id="L1047">            value.putArray(&quot;assumptions&quot;);</span>
-<span class="fc" id="L1048">            value.put(&quot;proofHash&quot;, schema.proofHash());</span>
-<span class="fc" id="L1049">            var origins = value.putArray(&quot;supportingObservationIds&quot;);</span>
-<span class="fc" id="L1050">            schema.supportingObservationIds().forEach(origins::add);</span>
-<span class="fc" id="L1051">        }</span>
-<span class="fc" id="L1052">        var records = root.putArray(&quot;attempts&quot;);</span>
-<span class="fc bfc" id="L1053" title="All 2 branches covered.">        for (var attempt : attempts) {</span>
-<span class="fc" id="L1054">            var value = records.addObject();</span>
-<span class="fc" id="L1055">            var origins = value.putArray(&quot;observationIds&quot;);</span>
-<span class="fc" id="L1056">            attempt.observationIds().forEach(origins::add);</span>
-<span class="fc" id="L1057">            value.put(&quot;status&quot;, attempt.status()).put(&quot;detail&quot;, attempt.detail());</span>
-<span class="fc" id="L1058">        }</span>
-<span class="fc" id="L1059">        return write(root);</span>
+<span class="fc" id="L1096">        var root = JSON.createObjectNode().put(&quot;schema&quot;, REVISION).put(&quot;checkerRevision&quot;, CHECKER_REVISION)</span>
+<span class="fc" id="L1097">            .put(&quot;domain&quot;, DOMAIN).put(&quot;arithmeticProfile&quot;, ARITHMETIC_PROFILE).put(&quot;inventoryHash&quot;, inventoryHash)</span>
+<span class="fc" id="L1098">            .put(&quot;inventorySemanticsHash&quot;, inventorySemanticsHash).put(&quot;originStrategyHash&quot;, originStrategyHash);</span>
+<span class="fc" id="L1099">        root.set(&quot;bounds&quot;, boundsJson(bounds));</span>
+<span class="fc" id="L1100">        var required = root.putArray(&quot;requiredAssumptions&quot;);</span>
+<span class="fc" id="L1101">        requiredAssumptions.forEach(required::add);</span>
+<span class="fc" id="L1102">        root.put(&quot;formationWork&quot;, formationWork);</span>
+<span class="fc" id="L1103">        var values = root.putArray(&quot;schemas&quot;);</span>
+<span class="fc bfc" id="L1104" title="All 2 branches covered.">        for (var schema : schemas) {</span>
+<span class="fc" id="L1105">            var value = values.addObject().put(&quot;id&quot;, schema.id());</span>
+<span class="fc" id="L1106">            value.set(&quot;source&quot;, pattern(schema.source()));</span>
+<span class="fc" id="L1107">            value.set(&quot;target&quot;, pattern(schema.target()));</span>
+<span class="fc" id="L1108">            value.putArray(&quot;assumptions&quot;);</span>
+<span class="fc" id="L1109">            value.put(&quot;proofHash&quot;, schema.proofHash());</span>
+<span class="fc" id="L1110">            var origins = value.putArray(&quot;supportingObservationIds&quot;);</span>
+<span class="fc" id="L1111">            schema.supportingObservationIds().forEach(origins::add);</span>
+<span class="fc" id="L1112">        }</span>
+<span class="fc" id="L1113">        var records = root.putArray(&quot;attempts&quot;);</span>
+<span class="fc bfc" id="L1114" title="All 2 branches covered.">        for (var attempt : attempts) {</span>
+<span class="fc" id="L1115">            var value = records.addObject();</span>
+<span class="fc" id="L1116">            var origins = value.putArray(&quot;observationIds&quot;);</span>
+<span class="fc" id="L1117">            attempt.observationIds().forEach(origins::add);</span>
+<span class="fc" id="L1118">            value.put(&quot;status&quot;, attempt.status()).put(&quot;detail&quot;, attempt.detail());</span>
+<span class="fc" id="L1119">        }</span>
+<span class="fc" id="L1120">        return write(root);</span>
     }
 
     /** Load verifies the symbolic statement before inspecting descriptive proof digests. */
     public static CheckedLearnedSchemaModel load(String json, String expectedInventoryHash) {
-<span class="fc" id="L1064">        hash(expectedInventoryHash);</span>
-<span class="fc" id="L1065">        var work = new Work();</span>
-<span class="fc" id="L1066">        work.add(1);</span>
-<span class="fc" id="L1067">        JsonNode root = read(json);</span>
-<span class="fc" id="L1068">        fields(root, &quot;schema&quot;, &quot;checkerRevision&quot;, &quot;domain&quot;, &quot;arithmeticProfile&quot;, &quot;inventoryHash&quot;, &quot;inventorySemanticsHash&quot;,</span>
+<span class="fc" id="L1125">        hash(expectedInventoryHash);</span>
+<span class="fc" id="L1126">        var work = new Work();</span>
+<span class="fc" id="L1127">        work.add(1);</span>
+<span class="fc" id="L1128">        JsonNode root = read(json);</span>
+<span class="fc" id="L1129">        fields(root, &quot;schema&quot;, &quot;checkerRevision&quot;, &quot;domain&quot;, &quot;arithmeticProfile&quot;, &quot;inventoryHash&quot;, &quot;inventorySemanticsHash&quot;,</span>
             &quot;originStrategyHash&quot;, &quot;bounds&quot;, &quot;requiredAssumptions&quot;, &quot;formationWork&quot;, &quot;schemas&quot;, &quot;attempts&quot;);
-<span class="pc bpc" id="L1070" title="1 of 4 branches missed.">        if (!REVISION.equals(text(root, &quot;schema&quot;)) || !CHECKER_REVISION.equals(text(root, &quot;checkerRevision&quot;))</span>
-<span class="pc bpc" id="L1071" title="2 of 4 branches missed.">                || !DOMAIN.equals(text(root, &quot;domain&quot;)) || !ARITHMETIC_PROFILE.equals(text(root, &quot;arithmeticProfile&quot;))</span>
-<span class="fc bfc" id="L1072" title="All 2 branches covered.">                || !expectedInventoryHash.equals(text(root, &quot;inventoryHash&quot;))</span>
-<span class="pc bpc" id="L1073" title="1 of 2 branches missed.">                || !inventorySemanticsHash(expectedInventoryHash).equals(text(root, &quot;inventorySemanticsHash&quot;))) {</span>
-<span class="fc" id="L1074">            throw new IllegalArgumentException(&quot;stale checked schema revision, domain or inventory semantics&quot;);</span>
+<span class="pc bpc" id="L1131" title="1 of 4 branches missed.">        if (!REVISION.equals(text(root, &quot;schema&quot;)) || !CHECKER_REVISION.equals(text(root, &quot;checkerRevision&quot;))</span>
+<span class="pc bpc" id="L1132" title="2 of 4 branches missed.">                || !DOMAIN.equals(text(root, &quot;domain&quot;)) || !ARITHMETIC_PROFILE.equals(text(root, &quot;arithmeticProfile&quot;))</span>
+<span class="fc bfc" id="L1133" title="All 2 branches covered.">                || !expectedInventoryHash.equals(text(root, &quot;inventoryHash&quot;))</span>
+<span class="pc bpc" id="L1134" title="1 of 2 branches missed.">                || !inventorySemanticsHash(expectedInventoryHash).equals(text(root, &quot;inventorySemanticsHash&quot;))) {</span>
+<span class="fc" id="L1135">            throw new IllegalArgumentException(&quot;stale checked schema revision, domain or inventory semantics&quot;);</span>
         }
-<span class="fc" id="L1076">        Bounds bounds = readBounds(root.get(&quot;bounds&quot;));</span>
-<span class="fc" id="L1077">        var schemas = new ArrayList&lt;Schema&gt;();</span>
-<span class="fc" id="L1078">        array(root.get(&quot;schemas&quot;), bounds.maximumSchemas());</span>
-<span class="fc bfc" id="L1079" title="All 2 branches covered.">        for (var value : root.get(&quot;schemas&quot;)) {</span>
-<span class="fc" id="L1080">            fields(value, &quot;id&quot;, &quot;source&quot;, &quot;target&quot;, &quot;assumptions&quot;, &quot;proofHash&quot;, &quot;supportingObservationIds&quot;);</span>
-<span class="fc" id="L1081">            array(value.get(&quot;assumptions&quot;), 0);</span>
-<span class="fc" id="L1082">            PatternExpr source = pattern(value.get(&quot;source&quot;), bounds, work);</span>
-<span class="fc" id="L1083">            PatternExpr target = pattern(value.get(&quot;target&quot;), bounds, work);</span>
-<span class="fc" id="L1084">            String proof = prove(source, target, bounds, work);</span>
-<span class="fc" id="L1085">            var schema = new Schema(source, target, proof, inventorySemanticsHash(expectedInventoryHash),</span>
-<span class="fc" id="L1086">                texts(value.get(&quot;supportingObservationIds&quot;), 256));</span>
-<span class="pc bpc" id="L1087" title="2 of 4 branches missed.">            if (!schema.id().equals(text(value, &quot;id&quot;)) || !schema.proofHash().equals(text(value, &quot;proofHash&quot;))) {</span>
-<span class="nc" id="L1088">                throw new IllegalArgumentException(&quot;checked schema statement identity differs after semantic recheck&quot;);</span>
+<span class="fc" id="L1137">        Bounds bounds = readBounds(root.get(&quot;bounds&quot;));</span>
+<span class="fc" id="L1138">        var schemas = new ArrayList&lt;Schema&gt;();</span>
+<span class="fc" id="L1139">        array(root.get(&quot;schemas&quot;), bounds.maximumSchemas());</span>
+<span class="fc bfc" id="L1140" title="All 2 branches covered.">        for (var value : root.get(&quot;schemas&quot;)) {</span>
+<span class="fc" id="L1141">            fields(value, &quot;id&quot;, &quot;source&quot;, &quot;target&quot;, &quot;assumptions&quot;, &quot;proofHash&quot;, &quot;supportingObservationIds&quot;);</span>
+<span class="fc" id="L1142">            array(value.get(&quot;assumptions&quot;), 0);</span>
+<span class="fc" id="L1143">            PatternExpr source = pattern(value.get(&quot;source&quot;), bounds, work);</span>
+<span class="fc" id="L1144">            PatternExpr target = pattern(value.get(&quot;target&quot;), bounds, work);</span>
+<span class="fc" id="L1145">            String proof = prove(source, target, bounds, work);</span>
+<span class="fc" id="L1146">            var schema = new Schema(source, target, proof, inventorySemanticsHash(expectedInventoryHash),</span>
+<span class="fc" id="L1147">                texts(value.get(&quot;supportingObservationIds&quot;), 256));</span>
+<span class="pc bpc" id="L1148" title="2 of 4 branches missed.">            if (!schema.id().equals(text(value, &quot;id&quot;)) || !schema.proofHash().equals(text(value, &quot;proofHash&quot;))) {</span>
+<span class="nc" id="L1149">                throw new IllegalArgumentException(&quot;checked schema statement identity differs after semantic recheck&quot;);</span>
             }
-<span class="fc" id="L1090">            schemas.add(schema);</span>
-<span class="fc" id="L1091">        }</span>
-<span class="fc" id="L1092">        array(root.get(&quot;attempts&quot;), bounds.maximumPairAttempts() + 66);</span>
-<span class="fc" id="L1093">        var attempts = new ArrayList&lt;Attempt&gt;();</span>
-<span class="fc bfc" id="L1094" title="All 2 branches covered.">        for (var value : root.get(&quot;attempts&quot;)) {</span>
-<span class="fc" id="L1095">            fields(value, &quot;observationIds&quot;, &quot;status&quot;, &quot;detail&quot;);</span>
-<span class="fc" id="L1096">            attempts.add(new Attempt(texts(value.get(&quot;observationIds&quot;), 2), text(value, &quot;status&quot;), text(value, &quot;detail&quot;)));</span>
-<span class="fc" id="L1097">            work.add(1);</span>
-<span class="fc" id="L1098">        }</span>
-<span class="fc" id="L1099">        work.add(schemas.size());</span>
-<span class="fc" id="L1100">        var loaded = new CheckedLearnedSchemaModel(expectedInventoryHash, text(root, &quot;originStrategyHash&quot;), bounds,</span>
-<span class="fc" id="L1101">            texts(root.get(&quot;requiredAssumptions&quot;), 32), schemas, attempts, number(root, &quot;formationWork&quot;), work.units);</span>
-<span class="pc bpc" id="L1102" title="1 of 2 branches missed.">        if (!loaded.toCanonicalJson().equals(json)) throw new IllegalArgumentException(&quot;noncanonical checked schema model&quot;);</span>
-<span class="fc" id="L1103">        return loaded;</span>
+<span class="fc" id="L1151">            schemas.add(schema);</span>
+<span class="fc" id="L1152">        }</span>
+<span class="fc" id="L1153">        array(root.get(&quot;attempts&quot;), bounds.maximumPairAttempts() + 66);</span>
+<span class="fc" id="L1154">        var attempts = new ArrayList&lt;Attempt&gt;();</span>
+<span class="fc bfc" id="L1155" title="All 2 branches covered.">        for (var value : root.get(&quot;attempts&quot;)) {</span>
+<span class="fc" id="L1156">            fields(value, &quot;observationIds&quot;, &quot;status&quot;, &quot;detail&quot;);</span>
+<span class="fc" id="L1157">            attempts.add(new Attempt(texts(value.get(&quot;observationIds&quot;), 2), text(value, &quot;status&quot;), text(value, &quot;detail&quot;)));</span>
+<span class="fc" id="L1158">            work.add(1);</span>
+<span class="fc" id="L1159">        }</span>
+<span class="fc" id="L1160">        work.add(schemas.size());</span>
+<span class="fc" id="L1161">        var loaded = new CheckedLearnedSchemaModel(expectedInventoryHash, text(root, &quot;originStrategyHash&quot;), bounds,</span>
+<span class="fc" id="L1162">            texts(root.get(&quot;requiredAssumptions&quot;), 32), schemas, attempts, number(root, &quot;formationWork&quot;), work.units);</span>
+<span class="pc bpc" id="L1163" title="1 of 2 branches missed.">        if (!loaded.toCanonicalJson().equals(json)) throw new IllegalArgumentException(&quot;noncanonical checked schema model&quot;);</span>
+<span class="fc" id="L1164">        return loaded;</span>
     }
 
     private static ObjectNode boundsJson(Bounds bounds) {
-<span class="fc" id="L1107">        return JSON.createObjectNode().put(&quot;maximumExpressionNodes&quot;, bounds.maximumExpressionNodes())</span>
-<span class="fc" id="L1108">            .put(&quot;maximumPatternNodes&quot;, bounds.maximumPatternNodes()).put(&quot;maximumDepth&quot;, bounds.maximumDepth())</span>
-<span class="fc" id="L1109">            .put(&quot;maximumCoefficientBits&quot;, bounds.maximumCoefficientBits()).put(&quot;maximumExponent&quot;, bounds.maximumExponent())</span>
-<span class="fc" id="L1110">            .put(&quot;maximumExamples&quot;, bounds.maximumExamples()).put(&quot;maximumPairAttempts&quot;, bounds.maximumPairAttempts())</span>
-<span class="fc" id="L1111">            .put(&quot;maximumSchemas&quot;, bounds.maximumSchemas()).put(&quot;maximumMatchAttempts&quot;, bounds.maximumMatchAttempts())</span>
-<span class="fc" id="L1112">            .put(&quot;maximumCandidates&quot;, bounds.maximumCandidates());</span>
+<span class="fc" id="L1168">        return JSON.createObjectNode().put(&quot;maximumExpressionNodes&quot;, bounds.maximumExpressionNodes())</span>
+<span class="fc" id="L1169">            .put(&quot;maximumPatternNodes&quot;, bounds.maximumPatternNodes()).put(&quot;maximumDepth&quot;, bounds.maximumDepth())</span>
+<span class="fc" id="L1170">            .put(&quot;maximumCoefficientBits&quot;, bounds.maximumCoefficientBits()).put(&quot;maximumExponent&quot;, bounds.maximumExponent())</span>
+<span class="fc" id="L1171">            .put(&quot;maximumExamples&quot;, bounds.maximumExamples()).put(&quot;maximumPairAttempts&quot;, bounds.maximumPairAttempts())</span>
+<span class="fc" id="L1172">            .put(&quot;maximumSchemas&quot;, bounds.maximumSchemas()).put(&quot;maximumMatchAttempts&quot;, bounds.maximumMatchAttempts())</span>
+<span class="fc" id="L1173">            .put(&quot;maximumCandidates&quot;, bounds.maximumCandidates());</span>
     }
     private static Bounds readBounds(JsonNode value) {
-<span class="fc" id="L1115">        String[] names = {&quot;maximumExpressionNodes&quot;, &quot;maximumPatternNodes&quot;, &quot;maximumDepth&quot;, &quot;maximumCoefficientBits&quot;, &quot;maximumExponent&quot;,</span>
+<span class="fc" id="L1176">        String[] names = {&quot;maximumExpressionNodes&quot;, &quot;maximumPatternNodes&quot;, &quot;maximumDepth&quot;, &quot;maximumCoefficientBits&quot;, &quot;maximumExponent&quot;,</span>
             &quot;maximumExamples&quot;, &quot;maximumPairAttempts&quot;, &quot;maximumSchemas&quot;, &quot;maximumMatchAttempts&quot;, &quot;maximumCandidates&quot;};
-<span class="fc" id="L1117">        fields(value, names);</span>
-<span class="fc" id="L1118">        int[] counts = new int[names.length];</span>
-<span class="fc bfc" id="L1119" title="All 2 branches covered.">        for (int i = 0; i &lt; counts.length; i++) {</span>
-<span class="fc" id="L1120">            long count = number(value, names[i]);</span>
-<span class="fc bfc" id="L1121" title="All 2 branches covered.">            if (count &gt; Integer.MAX_VALUE) throw new IllegalArgumentException(&quot;checked schema bound exceeds supported range&quot;);</span>
-<span class="fc" id="L1122">            counts[i] = (int) count;</span>
+<span class="fc" id="L1178">        fields(value, names);</span>
+<span class="fc" id="L1179">        int[] counts = new int[names.length];</span>
+<span class="fc bfc" id="L1180" title="All 2 branches covered.">        for (int i = 0; i &lt; counts.length; i++) {</span>
+<span class="fc" id="L1181">            long count = number(value, names[i]);</span>
+<span class="fc bfc" id="L1182" title="All 2 branches covered.">            if (count &gt; Integer.MAX_VALUE) throw new IllegalArgumentException(&quot;checked schema bound exceeds supported range&quot;);</span>
+<span class="fc" id="L1183">            counts[i] = (int) count;</span>
         }
-<span class="fc" id="L1124">        return new Bounds(counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7], counts[8], counts[9]);</span>
+<span class="fc" id="L1185">        return new Bounds(counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7], counts[8], counts[9]);</span>
     }
     private static List&lt;String&gt; texts(JsonNode value, int maximum) {
-<span class="fc" id="L1127">        array(value, maximum);</span>
-<span class="fc" id="L1128">        var values = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L1129" title="All 2 branches covered.">        for (var item : value) {</span>
-<span class="pc bpc" id="L1130" title="3 of 6 branches missed.">            if (!item.isTextual() || item.textValue().isBlank() || item.textValue().length() &gt; 512) {</span>
-<span class="nc" id="L1131">                throw new IllegalArgumentException(&quot;invalid checked schema text list&quot;);</span>
+<span class="fc" id="L1188">        array(value, maximum);</span>
+<span class="fc" id="L1189">        var values = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L1190" title="All 2 branches covered.">        for (var item : value) {</span>
+<span class="pc bpc" id="L1191" title="3 of 6 branches missed.">            if (!item.isTextual() || item.textValue().isBlank() || item.textValue().length() &gt; 512) {</span>
+<span class="nc" id="L1192">                throw new IllegalArgumentException(&quot;invalid checked schema text list&quot;);</span>
             }
-<span class="fc" id="L1133">            values.add(item.textValue());</span>
-<span class="fc" id="L1134">        }</span>
-<span class="fc" id="L1135">        return List.copyOf(values);</span>
+<span class="fc" id="L1194">            values.add(item.textValue());</span>
+<span class="fc" id="L1195">        }</span>
+<span class="fc" id="L1196">        return List.copyOf(values);</span>
     }
     private static List&lt;String&gt; normalizedRequirements(List&lt;String&gt; values) {
-<span class="fc" id="L1138">        Objects.requireNonNull(values, &quot;requirements&quot;);</span>
-<span class="pc bpc" id="L1139" title="4 of 8 branches missed.">        if (values.size() &gt; 32 || values.stream().anyMatch(value -&gt; value == null || value.length() &gt; 512)) {</span>
-<span class="nc" id="L1140">            throw new IllegalArgumentException(&quot;checked model prerequisite limit&quot;);</span>
+<span class="fc" id="L1199">        Objects.requireNonNull(values, &quot;requirements&quot;);</span>
+<span class="pc bpc" id="L1200" title="4 of 8 branches missed.">        if (values.size() &gt; 32 || values.stream().anyMatch(value -&gt; value == null || value.length() &gt; 512)) {</span>
+<span class="nc" id="L1201">            throw new IllegalArgumentException(&quot;checked model prerequisite limit&quot;);</span>
         }
-<span class="fc" id="L1142">        return AssumptionSignature.ofExpressions(values).normalizedAssumptions();</span>
+<span class="fc" id="L1203">        return AssumptionSignature.ofExpressions(values).normalizedAssumptions();</span>
     }
     private static String inventorySemanticsHash(String inventoryHash) {
-<span class="fc" id="L1145">        return SchematicProofPlan.hash(INVENTORY_REVISION + &quot;\n&quot; + inventoryHash);</span>
+<span class="fc" id="L1206">        return SchematicProofPlan.hash(INVENTORY_REVISION + &quot;\n&quot; + inventoryHash);</span>
     }
     private static String shape(Expr expression) {
-<span class="fc bfc" id="L1148" title="All 2 branches covered.">        return expression instanceof BinaryExpr binary ? binary.operator().name() : &quot;LEAF&quot;;</span>
+<span class="fc bfc" id="L1209" title="All 2 branches covered.">        return expression instanceof BinaryExpr binary ? binary.operator().name() : &quot;LEAF&quot;;</span>
     }
     private static String shape(PatternExpr pattern) {
-<span class="fc bfc" id="L1151" title="All 2 branches covered.">        return pattern instanceof PatternExpr.Operation operation ? operation.operator().name()</span>
-<span class="pc bpc" id="L1152" title="1 of 2 branches missed.">            : pattern instanceof PatternExpr.Placeholder ? &quot;P&quot; : &quot;LEAF&quot;;</span>
+<span class="fc bfc" id="L1212" title="All 2 branches covered.">        return pattern instanceof PatternExpr.Operation operation ? operation.operator().name()</span>
+<span class="pc bpc" id="L1213" title="1 of 2 branches missed.">            : pattern instanceof PatternExpr.Placeholder ? &quot;P&quot; : &quot;LEAF&quot;;</span>
     }
     private static int patternNodes(PatternExpr expression) {
-<span class="fc bfc" id="L1155" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) return 1 + patternNodes(operation.left()) + patternNodes(operation.right());</span>
-<span class="fc" id="L1156">        return 1;</span>
+<span class="fc bfc" id="L1216" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) return 1 + patternNodes(operation.left()) + patternNodes(operation.right());</span>
+<span class="fc" id="L1217">        return 1;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

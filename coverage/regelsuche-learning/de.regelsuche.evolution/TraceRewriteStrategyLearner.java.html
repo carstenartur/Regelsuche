@@ -244,7 +244,7 @@ import java.util.TreeSet;
 <span class="fc" id="L244">            java.util.Collections.shuffle(shuffled, random);</span>
             // An unchanged random permutation is not an order ablation.
             // This fixed fallback never consults application results.
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (shuffled.equals(sequence)) java.util.Collections.rotate(shuffled, 1);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (shuffled.equals(sequence)) java.util.Collections.rotate(shuffled, 1);</span>
 <span class="fc" id="L248">            shuffledSequences.add(List.copyOf(shuffled));</span>
 <span class="fc" id="L249">        }</span>
 <span class="fc" id="L250">        return new FrozenStrategy(inventory, limits, observations, excluded, plan,</span>

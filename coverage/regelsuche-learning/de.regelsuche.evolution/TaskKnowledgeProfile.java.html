@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TaskKnowledgeProfile.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TaskKnowledgeProfile.java</span></div><h1>TaskKnowledgeProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.search.moves.NativeNodeCountObjective;
+
+/** Bounded input-only routing features; never a rewrite or proof authority. */
+final class TaskKnowledgeProfile {
+    private TaskKnowledgeProfile() { }
+<span class="fc" id="L12">    record Profile(String key, long work) { }</span>
+
+    static Profile inspect(CheckedSchemaTaskSolver.Task task) {
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (task.goal().objective() != NativeNodeCountObjective.INSTANCE) return new Profile(&quot;custom&quot;, 1);</span>
+<span class="fc" id="L16">        var text = new StringBuilder(&quot;nodes:&quot;).append(task.goal().maximumOutputScore()).append(':');</span>
+<span class="fc" id="L17">        long work = append(task.source(), 2, text) + 2;</span>
+<span class="fc" id="L18">        return new Profile(text.toString(), work);</span>
+    }
+    private static long append(Expr expression, int depth, StringBuilder text) {
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L22">            text.append(binary.operator().name());</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">            if (depth &gt; 0) {</span>
+<span class="fc" id="L24">                text.append('(');</span>
+<span class="fc" id="L25">                long work = append(binary.left(), depth - 1, text);</span>
+<span class="fc" id="L26">                text.append(',');</span>
+<span class="fc" id="L27">                work += append(binary.right(), depth - 1, text);</span>
+<span class="fc" id="L28">                text.append(')');</span>
+<span class="fc" id="L29">                return work + 1;</span>
+            }
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">        } else text.append(expression instanceof NumberExpr ? 'N' : expression instanceof FunctionExpr ? 'F' : 'V');</span>
+<span class="fc" id="L32">        return 1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

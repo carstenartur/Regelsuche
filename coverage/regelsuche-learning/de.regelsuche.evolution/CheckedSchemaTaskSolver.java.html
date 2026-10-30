@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CheckedSchemaTaskSolver.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CheckedSchemaTaskSolver.java</span></div><h1>CheckedSchemaTaskSolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MovePriorityPolicy;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.NativeNodeCountObjective;
+import de.regelsuche.search.moves.SearchContinuationContract;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.search.moves.StateValue;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.moves.TypedSourceOnlySearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Prepared, experimental task solving using the existing frontier and independently checked schemata.
+ * A declared quality goal ends work; an applicable schema alone does not. Unsolved remainders retain
+ * the primitive fallback in the same frontier and budget. This is not exhaustive simplification.
+ */
+public final class CheckedSchemaTaskSolver {
+    public static final String REVISION = &quot;regelsuche.checked-schema-task-solver/v1&quot;;
+    private static final int CODEC_ENTRIES = 256;
+    private static final long CODEC_CHARACTERS = 2_000_000;
+
+    /** The caller fixes this measured criterion before solving, not from the observed answer. */
+    public record Goal(TypedSourceOnlySearch.Objective objective, long maximumOutputScore) {
+<span class="fc" id="L33">        public Goal { Objects.requireNonNull(objective, &quot;objective&quot;); }</span>
+        public static Goal atMostNodes(int maximumNodes) {
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (maximumNodes &lt; 1) throw new IllegalArgumentException(&quot;node goal must be positive&quot;);</span>
+<span class="fc" id="L36">            return new Goal(NativeNodeCountObjective.INSTANCE, maximumNodes);</span>
+        }
+    }
+
+    public record Task(Expr source, List&lt;String&gt; assumptions, Goal goal, MoveSearch.Budget budget) {
+<span class="fc" id="L41">        public Task {</span>
+<span class="fc" id="L42">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L43">            assumptions = List.copyOf(Objects.requireNonNull(assumptions, &quot;assumptions&quot;));</span>
+<span class="fc" id="L44">            Objects.requireNonNull(goal, &quot;goal&quot;);</span>
+<span class="fc" id="L45">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L46">        }</span>
+    }
+
+    /** Issued only after the existing independent final replay has returned successfully. */
+    public static final class Solution {
+        private final Task task;
+        private final TypedSourceOnlySearch.Result evidence;
+<span class="fc" id="L53">        private Solution(Task task, TypedSourceOnlySearch.Result evidence) {</span>
+<span class="fc" id="L54">            this.task = task;</span>
+<span class="fc" id="L55">            this.evidence = evidence;</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        public Task task() { return task; }</span>
+<span class="fc" id="L58">        public TypedSourceOnlySearch.Result evidence() { return evidence; }</span>
+        public boolean solved() {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            return evidence.search().outcome() == MoveSearch.Outcome.QUALITY_REACHED</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                &amp;&amp; evidence.outputScore() &lt;= task.goal().maximumOutputScore()</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                &amp;&amp; evidence.withinBudget();</span>
+        }
+        public long learnedApplications() {
+<span class="fc" id="L65">            return evidence.witness().stream()</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                .filter(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED).count();</span>
+        }
+        public long primitiveSteps() {
+<span class="fc" id="L69">            return evidence.witness().stream().mapToLong(step -&gt; step.move().primitiveStepCount()).sum();</span>
+        }
+    }
+
+    private final TypedLearnedMoveInventory.SearchSession session;
+    private final CheckedSchemaMatcherPlan.Compilation preparation;
+
+    CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
+<span class="fc" id="L77">            CheckedSchemaMatcherPlan.Compilation preparation) {</span>
+<span class="fc" id="L78">        this.session = Objects.requireNonNull(session, &quot;session&quot;);</span>
+<span class="fc" id="L79">        this.preparation = preparation;</span>
+<span class="fc" id="L80">    }</span>
+
+    /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
+<span class="fc bfc" id="L83" title="All 2 branches covered.">    public long preparationWork() { return preparation == null ? 0 : preparation.workUnits(); }</span>
+    public Optional&lt;CheckedSchemaMatcherPlan.Compilation&gt; preparationReceipt() {
+<span class="nc" id="L85">        return Optional.ofNullable(preparation);</span>
+    }
+
+    /** Fresh cursors, scoped codec reuse, one budget, and final replay for every invocation. */
+    public Solution solve(Task task) {
+<span class="fc" id="L90">        Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L91">        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
+<span class="fc" id="L92">            () -&gt; new TypedSourceOnlySearch().searchUntil(problem(task), task.goal().objective(),</span>
+<span class="fc" id="L93">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));</span>
+<span class="fc" id="L94">        return new Solution(task, result);</span>
+    }
+
+    // The primitive control uses its cheaper batch scheduler; it is not handicapped by unused cursor machinery.
+    TypedMoveSearch.Problem problem(Task task) {
+<span class="fc" id="L99">        return new TypedMoveSearch.Problem(task.source(),</span>
+<span class="fc" id="L100">            TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),</span>
+<span class="fc" id="L101">            session.providers(), KnowledgeFirst.INSTANCE, session.verifier(), state -&gt; 0,</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            MoveSearch.Mode.FAST, preparation == null ? MoveSearch.Scheduling.STAGED</span>
+<span class="fc" id="L103">                : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),</span>
+            (state, context) -&gt; {
+<span class="fc" id="L105">                var size = NativeNodeCountObjective.INSTANCE.evaluate(state);</span>
+<span class="fc" id="L106">                return new StateValue.Assessment(Math.toIntExact(size.value()), -size.value(), size.work(), 0, Map.of());</span>
+            });
+    }
+
+    /** Ordering alone grants no mathematical authority; the normal verifier still admits each edge. */
+<span class="fc" id="L111">    private enum KnowledgeFirst implements TypedMoveSearch.TypedPolicy {</span>
+<span class="fc" id="L112">        INSTANCE;</span>
+<span class="fc" id="L113">        @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }</span>
+        @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED</span>
+<span class="fc" id="L116">                : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

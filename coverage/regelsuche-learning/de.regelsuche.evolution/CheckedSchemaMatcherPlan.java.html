@@ -286,7 +286,7 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
     private static Map&lt;String, List&lt;Entry&gt;&gt; orderedIndex(List&lt;Entry&gt; entries, Map&lt;String, Double&gt; utility, Work comparisons) {
 <span class="fc" id="L287">        var comparator = Comparator.&lt;Entry&gt;comparingDouble(entry -&gt; utility.getOrDefault(entry.schema().id(), 0.0))</span>
 <span class="fc" id="L288">            .reversed().thenComparing(Comparator.comparingInt(Entry::reduction).reversed())</span>
-<span class="pc" id="L289">            .thenComparing(entry -&gt; entry.schema().id());</span>
+<span class="fc" id="L289">            .thenComparing(entry -&gt; entry.schema().id());</span>
 <span class="fc" id="L290">        entries.sort((left, right) -&gt; { comparisons.add(1); return comparator.compare(left, right); });</span>
 <span class="fc" id="L291">        var grouped = new TreeMap&lt;String, List&lt;Entry&gt;&gt;();</span>
 <span class="fc bfc" id="L292" title="All 2 branches covered.">        for (var entry : entries) {</span>

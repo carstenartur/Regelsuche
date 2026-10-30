@@ -251,7 +251,7 @@ final class CheckedSchemaSupport {
 
     private static void binaryDomain(BinaryExpr binary, CheckedLearnedSchemaModel.Bounds bounds) {
 <span class="fc bfc" id="L253" title="All 4 branches covered.">        if (binary.operator() == BinaryOperator.DIV &amp;&amp; (!(binary.right() instanceof NumberExpr number)</span>
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                || number.value().numerator().signum() == 0)) {</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                || number.value().numerator().signum() == 0)) {</span>
 <span class="fc" id="L255">            throw new DomainRejected(&quot;checked scalar division needs nonzero literal denominator&quot;);</span>
         }
 <span class="fc bfc" id="L257" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>

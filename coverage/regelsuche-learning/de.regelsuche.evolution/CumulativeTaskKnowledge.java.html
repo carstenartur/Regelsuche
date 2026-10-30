@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CumulativeTaskKnowledge.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CumulativeTaskKnowledge.java</span></div><h1>CumulativeTaskKnowledge.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.NativeNodeCountObjective;
+import java.util.Set;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
+
+/**
+ * Immutable knowledge generations over the existing task solver and schema generalizer.
+ * Lessons use the old generation; validation can select a successor but is not held-out evidence.
+ * Costs use the existing declared logical units, not a complete JVM work/heap contract.
+ */
+public final class CumulativeTaskKnowledge {
+    public static final String REVISION = &quot;regelsuche.cumulative-task-knowledge/v1&quot;;
+<span class="fc" id="L25">    public enum Strategy { BASELINE, KNOWLEDGE_FIRST, AUTOMATIC }</span>
+<span class="fc" id="L26">    public enum Decision { INITIAL, PROMOTED, NO_NEW_SCHEMA, NO_VALIDATED_BENEFIT, ACQUISITION_LIMIT }</span>
+    public static final long DEFAULT_LEARNING_WORK = 1_000_000;
+    private static final int MAX_BATCH = 32;
+    private static final int MAX_ROUTES = 256;
+
+    /** Historical acquisition receipts are descriptive, never mathematical proof authority. */
+    public record Costs(long lessons, long formation, long preparation, long validation, long selection,
+            long restoration, long splitChecking) {
+<span class="fc" id="L34">        public Costs {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            for (long value : new long[] {lessons, formation, preparation, validation, selection, restoration, splitChecking})</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                if (value &lt; 0) throw new IllegalArgumentException(&quot;negative knowledge cost&quot;);</span>
+<span class="fc" id="L37">            sum(lessons, formation, preparation, validation, selection, restoration, splitChecking);</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        public long total() { return sum(lessons, formation, preparation, validation, selection, restoration, splitChecking); }</span>
+        Costs plus(Costs other) {
+<span class="fc" id="L41">            return new Costs(sum(lessons, other.lessons), sum(formation, other.formation),</span>
+<span class="fc" id="L42">                sum(preparation, other.preparation), sum(validation, other.validation),</span>
+<span class="fc" id="L43">                sum(selection, other.selection), sum(restoration, other.restoration), sum(splitChecking, other.splitChecking));</span>
+        }
+<span class="fc" id="L45">        static Costs zero() { return new Costs(0, 0, 0, 0, 0, 0, 0); }</span>
+    }
+
+    /** Issued by an actual execution; no public constructor can fabricate a completed lesson. */
+    public static final class Execution {
+        private final String generationId;
+        private final CheckedSchemaTaskSolver.Task task;
+        private final Strategy selected;
+        private final long selectionWork;
+        private final CheckedSchemaTaskSolver.Solution solution;
+        private Execution(String generationId, CheckedSchemaTaskSolver.Task task, Strategy selected,
+<span class="fc" id="L56">                long selectionWork, CheckedSchemaTaskSolver.Solution solution) {</span>
+<span class="fc" id="L57">            this.generationId = generationId; this.task = task; this.selected = selected;</span>
+<span class="fc" id="L58">            this.selectionWork = selectionWork; this.solution = solution;</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        public String generationId() { return generationId; }</span>
+<span class="nc" id="L61">        public CheckedSchemaTaskSolver.Task task() { return task; }</span>
+<span class="fc" id="L62">        public Strategy selectedStrategy() { return selected; }</span>
+<span class="nc" id="L63">        public long selectionWork() { return selectionWork; }</span>
+<span class="fc" id="L64">        public Optional&lt;CheckedSchemaTaskSolver.Solution&gt; solution() { return Optional.ofNullable(solution); }</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        public long totalWork() { return sum(selectionWork, solution == null ? 0 : solution.evidence().totalWork()); }</span>
+<span class="pc bpc" id="L66" title="1 of 6 branches missed.">        public boolean solved() { return solution != null &amp;&amp; solution.solved() &amp;&amp; totalWork() &lt;= task.budget().totalWork(); }</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        long score() { return solution == null ? Long.MAX_VALUE : solution.evidence().outputScore(); }</span>
+    }
+
+<span class="fc" id="L70">    public record Validation(CheckedSchemaTaskSolver.Task task, String profile,</span>
+            Execution baseline, Execution previous, Execution candidate, Optional&lt;Execution&gt; automatic) { }
+    public record Update(CumulativeTaskKnowledge next, Decision reason, List&lt;Execution&gt; training,
+            List&lt;Validation&gt; validation, Costs work, List&lt;CheckedLearnedSchemaModel.Attempt&gt; attempts) {
+<span class="fc" id="L74">        public Update { training = List.copyOf(training); validation = List.copyOf(validation); attempts = List.copyOf(attempts); }</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        public boolean promoted() { return reason == Decision.PROMOTED; }</span>
+    }
+
+    /** A technical failure never hides completed lessons or authorizes a new knowledge state. */
+    public static final class BatchFailure extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+        private final String parentId;
+        private final Costs knownWork;
+        private final List&lt;Execution&gt; completedLessons;
+        private BatchFailure(String parentId, Costs knownWork, List&lt;Execution&gt; completedLessons, RuntimeException cause) {
+<span class="fc" id="L85">            super(&quot;knowledge batch failed; unfinished work is unknown&quot;, cause);</span>
+<span class="fc" id="L86">            this.parentId = parentId; this.knownWork = knownWork; this.completedLessons = List.copyOf(completedLessons);</span>
+<span class="fc" id="L87">        }</span>
+<span class="nc" id="L88">        public String parentId() { return parentId; }</span>
+<span class="fc" id="L89">        public Costs knownWork() { return knownWork; }</span>
+<span class="fc" id="L90">        public List&lt;Execution&gt; completedLessons() { return completedLessons; }</span>
+<span class="fc" id="L91">        public boolean accountingComplete() { return false; }</span>
+    }
+<span class="fc" id="L93">    private static final class Progress {</span>
+        long lessons, formation, preparation, validation, selection, split;
+<span class="fc" id="L95">        final List&lt;Execution&gt; training = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L96">        final List&lt;Validation&gt; trials = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L97">        List&lt;CheckedLearnedSchemaModel.Attempt&gt; attempts = List.of();</span>
+<span class="fc" id="L98">        Costs costs() { return new Costs(lessons, formation, preparation, validation, selection, 0, split); }</span>
+    }
+
+    private final EvolutionGenome inventory;
+    private final CheckedLearnedSchemaModel model;
+    private final CheckedSchemaTaskSolver baseline;
+    private final CheckedSchemaTaskSolver learned;
+    private final int generation;
+    private final String parentId;
+    private final Map&lt;String, Strategy&gt; routes;
+    private final Set&lt;Long&gt; knowledgeGoals;
+    private final Costs acquisition;
+    private final Costs sessionSetup;
+    private final Decision lastDecision;
+    private final List&lt;CheckedLearnedSchemaModel.Attempt&gt; lastAttempts;
+    private final String canonicalJson;
+    private final String id;
+
+    private CumulativeTaskKnowledge(EvolutionGenome inventory, CheckedLearnedSchemaModel model,
+            CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned, int generation,
+            String parentId, Map&lt;String, Strategy&gt; routes, Costs acquisition, Costs sessionSetup,
+<span class="fc" id="L119">            Decision lastDecision, List&lt;CheckedLearnedSchemaModel.Attempt&gt; lastAttempts) {</span>
+<span class="fc" id="L120">        this.inventory = Objects.requireNonNull(inventory); this.model = Objects.requireNonNull(model);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (!inventory.contentHash().equals(model.inventoryHash())) throw new IllegalArgumentException(&quot;foreign inventory&quot;);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!model.requiredAssumptions().isEmpty()) throw new IllegalArgumentException(&quot;conditional knowledge unsupported&quot;);</span>
+<span class="pc bpc" id="L123" title="3 of 10 branches missed.">        if (generation &lt; 0 || generation &gt; 100_000 || (generation == 0) != parentId.isEmpty()</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                || generation &gt; 0 &amp;&amp; !parentId.matches(&quot;sha256:[0-9a-f]{64}&quot;)) throw new IllegalArgumentException(&quot;invalid generation parent&quot;);</span>
+<span class="pc bpc" id="L125" title="3 of 6 branches missed.">        if (routes.size() &gt; MAX_ROUTES || routes.entrySet().stream().anyMatch(e -&gt; e.getKey().length() &gt; 512</span>
+<span class="pc bpc" id="L126" title="3 of 6 branches missed.">                || !e.getKey().matches(&quot;nodes:-?[0-9]{1,19}:[A-Z(),]+&quot;) || e.getValue() == null || e.getValue() == Strategy.AUTOMATIC))</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(&quot;invalid routing policy&quot;);</span>
+<span class="fc" id="L128">        this.baseline = baseline; this.learned = learned; this.generation = generation; this.parentId = parentId;</span>
+<span class="fc" id="L129">        this.routes = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(routes));</span>
+<span class="fc" id="L130">        knowledgeGoals = knowledgeGoals(this.routes);</span>
+<span class="fc" id="L131">        this.acquisition = acquisition; this.sessionSetup = sessionSetup;</span>
+<span class="fc" id="L132">        this.lastDecision = Objects.requireNonNull(lastDecision); this.lastAttempts = List.copyOf(lastAttempts);</span>
+<span class="pc bpc" id="L133" title="1 of 8 branches missed.">        if ((generation == 0) != (lastDecision == Decision.INITIAL)</span>
+<span class="pc bpc" id="L134" title="3 of 6 branches missed.">                || generation == 0 &amp;&amp; (!model.schemas().isEmpty() || !routes.isEmpty() || acquisition.total() != 0))</span>
+<span class="nc" id="L135">            throw new IllegalArgumentException(&quot;invalid initial generation&quot;);</span>
+<span class="fc" id="L136">        canonicalJson = TaskKnowledgeSnapshot.encode(generation, parentId, model, this.routes, acquisition,</span>
+            lastDecision, this.lastAttempts);
+<span class="fc" id="L138">        id = SchematicProofPlan.hash(canonicalJson);</span>
+<span class="fc" id="L139">    }</span>
+
+    public static CumulativeTaskKnowledge empty(EvolutionGenome inventory) {
+<span class="fc" id="L142">        Objects.requireNonNull(inventory, &quot;inventory&quot;);</span>
+<span class="fc" id="L143">        var baseline = TypedLearnedMoveInventory.primitives(inventory).newTaskSolver();</span>
+<span class="fc" id="L144">        return new CumulativeTaskKnowledge(inventory, CheckedLearnedSchemaModel.empty(inventory.contentHash()),</span>
+<span class="fc" id="L145">            baseline, baseline, 0, &quot;&quot;, Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of());</span>
+    }
+<span class="fc" id="L147">    public String id() { return id; }</span>
+<span class="fc" id="L148">    public int generation() { return generation; }</span>
+<span class="fc" id="L149">    public String parentId() { return parentId; }</span>
+<span class="fc" id="L150">    public int schemaCount() { return model.schemas().size(); }</span>
+<span class="fc" id="L151">    public long acquisitionWork() { return acquisition.total(); }</span>
+<span class="nc" id="L152">    public Costs acquisitionCosts() { return acquisition; }</span>
+<span class="fc" id="L153">    public long sessionSetupWork() { return sessionSetup.total(); }</span>
+<span class="nc" id="L154">    public Map&lt;String, Strategy&gt; routingPolicy() { return routes; }</span>
+<span class="fc" id="L155">    public Decision lastDecision() { return lastDecision; }</span>
+<span class="fc" id="L156">    public List&lt;CheckedLearnedSchemaModel.Attempt&gt; lastAttempts() { return lastAttempts; }</span>
+<span class="fc" id="L157">    public String toCanonicalJson() { return canonicalJson; }</span>
+
+    /** Fresh query state, fixed library, paid routing, and no training side effect. */
+    public Execution solve(CheckedSchemaTaskSolver.Task task, Strategy strategy) {
+<span class="fc" id="L161">        Objects.requireNonNull(task, &quot;task&quot;); Objects.requireNonNull(strategy, &quot;strategy&quot;);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (strategy != Strategy.AUTOMATIC) return run(id, task, strategy, 0, baseline, learned);</span>
+<span class="fc" id="L163">        return automatic(id, task, routes, knowledgeGoals, baseline, learned);</span>
+    }
+
+    private static Set&lt;Long&gt; knowledgeGoals(Map&lt;String, Strategy&gt; routes) {
+<span class="fc" id="L167">        var goals = new HashSet&lt;Long&gt;();</span>
+<span class="fc" id="L168">        routes.forEach((key, strategy) -&gt; {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (strategy == Strategy.KNOWLEDGE_FIRST) goals.add(Long.parseLong(key.split(&quot;:&quot;, 3)[1]));</span>
+<span class="fc" id="L170">        });</span>
+<span class="fc" id="L171">        return Set.copyOf(goals);</span>
+    }
+    private static Execution automatic(String id, CheckedSchemaTaskSolver.Task task, Map&lt;String, Strategy&gt; routes,
+            Set&lt;Long&gt; goals, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned) {
+        // A constant baseline policy does not inspect the source at all.
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (goals.isEmpty()) return run(id, task, Strategy.BASELINE, 0, baseline, learned);</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (task.goal().objective() != NativeNodeCountObjective.INSTANCE</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                || !goals.contains(task.goal().maximumOutputScore()))</span>
+<span class="fc" id="L179">            return run(id, task, Strategy.BASELINE, 2, baseline, learned);</span>
+<span class="fc" id="L180">        var profile = TaskKnowledgeProfile.inspect(task);</span>
+<span class="fc" id="L181">        return run(id, task, routes.getOrDefault(profile.key(), Strategy.BASELINE), profile.work() + 2, baseline, learned);</span>
+    }
+
+    private static Execution run(String generationId, CheckedSchemaTaskSolver.Task task, Strategy selected,
+            long selectionWork, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned) {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (selectionWork &gt;= task.budget().totalWork()) return new Execution(generationId, task, selected, selectionWork, null);</span>
+<span class="fc" id="L187">        var remaining = task.budget();</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (selectionWork &gt; 0) remaining = new MoveSearch.Budget(remaining.maxPrimitiveSteps(), remaining.maxSearchDepth(),</span>
+<span class="fc" id="L189">            remaining.maxTheoryWork(), remaining.maxStates(), remaining.totalWork() - selectionWork, remaining.maxComplexityDebt());</span>
+<span class="fc" id="L190">        var actual = new CheckedSchemaTaskSolver.Task(task.source(), task.assumptions(), task.goal(), remaining);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        var solution = (selected == Strategy.BASELINE ? baseline : learned).solve(actual);</span>
+<span class="fc" id="L192">        return new Execution(generationId, task, selected, selectionWork, solution);</span>
+    }
+
+    /**
+     * All lessons run against this immutable parent. Validation inputs never enter formation.
+     * A rejected candidate still produces a cost-bearing snapshot with the old mathematics.
+     * Each task owns its explicit budget; batch size and the existing formation bounds limit learning.
+     */
+    public Update learnBatch(List&lt;CheckedSchemaTaskSolver.Task&gt; lessons, List&lt;CheckedSchemaTaskSolver.Task&gt; validationTasks) {
+<span class="fc" id="L201">        return learnBatch(lessons, validationTasks, DEFAULT_LEARNING_WORK);</span>
+    }
+
+    /** Bounded phases may overrun atomically, but their full work remains paid and cannot promote knowledge. */
+    public Update learnBatch(List&lt;CheckedSchemaTaskSolver.Task&gt; lessons, List&lt;CheckedSchemaTaskSolver.Task&gt; validationTasks,
+            long maximumAcquisitionWork) {
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (maximumAcquisitionWork &lt; 1) throw new IllegalArgumentException(&quot;positive learning budget required&quot;);</span>
+<span class="fc" id="L208">        lessons = bounded(lessons, 2); validationTasks = bounded(validationTasks, 1);</span>
+<span class="fc" id="L209">        var progress = new Progress();</span>
+        // Invalid/non-polynomial/overlapping batches are rejected before running any lesson.
+<span class="fc" id="L211">        progress.split = disjoint(lessons, validationTasks);</span>
+        try {
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return limited(progress);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (!learnLessons(lessons, progress, maximumAcquisitionWork)) return limited(progress);</span>
+<span class="fc" id="L215">            var candidate = CheckedLearnedSchemaModel.extendFromSolutions(model,</span>
+<span class="fc" id="L216">                progress.training.stream().flatMap(e -&gt; e.solution().stream()).toList());</span>
+<span class="fc" id="L217">            progress.formation = candidate.formationWork(); progress.attempts = candidate.attempts();</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return limited(progress);</span>
+<span class="fc" id="L219">            boolean newSchemas = !candidate.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(java.util.stream.Collectors.toSet())</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                .equals(model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(java.util.stream.Collectors.toSet()));</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            var prepared = newSchemas ? TypedLearnedMoveInventory.primitives(inventory).newTaskSolver(candidate) : learned;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            progress.preparation = newSchemas ? prepared.preparationWork() : 0;</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return limited(progress);</span>
+<span class="fc" id="L224">            var proposedRoutes = new TreeMap&lt;&gt;(routes);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (newSchemas) {</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                if (!validateCandidate(validationTasks, candidate, prepared, progress, maximumAcquisitionWork))</span>
+<span class="fc" id="L227">                    return limited(progress);</span>
+<span class="fc" id="L228">                fitRoutes(progress, proposedRoutes);</span>
+            }
+<span class="fc" id="L230">            boolean improved = validatePolicy(candidate, prepared, proposedRoutes, progress, maximumAcquisitionWork);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return limited(progress);</span>
+<span class="fc" id="L232">            return selectSuccessor(progress, candidate, prepared, proposedRoutes, newSchemas, improved);</span>
+<span class="fc" id="L233">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L234">            throw new BatchFailure(id, progress.costs(), progress.training, failure);</span>
+        }
+    }
+
+    /** Every lesson uses this frozen parent; completed work survives an acquisition cutoff. */
+    private boolean learnLessons(List&lt;CheckedSchemaTaskSolver.Task&gt; lessons, Progress progress, long maximumAcquisitionWork) {
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (var task : lessons) {</span>
+<span class="fc" id="L241">            var execution = solve(task, Strategy.KNOWLEDGE_FIRST);</span>
+<span class="fc" id="L242">            progress.training.add(execution);</span>
+<span class="fc" id="L243">            progress.lessons = sum(progress.lessons, execution.totalWork());</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return false;</span>
+<span class="fc" id="L245">        }</span>
+<span class="fc" id="L246">        return true;</span>
+    }
+
+    /** Preserve the paid prefix between the baseline, previous-policy and candidate arms. */
+    private boolean validateCandidate(List&lt;CheckedSchemaTaskSolver.Task&gt; validationTasks,
+            CheckedLearnedSchemaModel candidate, CheckedSchemaTaskSolver prepared,
+            Progress progress, long maximumAcquisitionWork) {
+<span class="fc" id="L253">        String candidateId = &quot;candidate:&quot; + SchematicProofPlan.hash(candidate.toCanonicalJson());</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (var task : validationTasks) {</span>
+<span class="fc" id="L255">            var profile = TaskKnowledgeProfile.inspect(task);</span>
+<span class="fc" id="L256">            progress.selection = sum(progress.selection, profile.work());</span>
+<span class="fc" id="L257">            var b = profiledRun(id, task, Strategy.BASELINE, baseline, learned);</span>
+<span class="fc" id="L258">            progress.validation = sum(progress.validation, b.totalWork());</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return false;</span>
+<span class="fc" id="L260">            var p = solve(task, Strategy.AUTOMATIC);</span>
+<span class="fc" id="L261">            progress.validation = sum(progress.validation, p.totalWork());</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return false;</span>
+<span class="fc" id="L263">            var c = profiledRun(candidateId, task, Strategy.KNOWLEDGE_FIRST, baseline, prepared);</span>
+<span class="fc" id="L264">            progress.validation = sum(progress.validation, c.totalWork());</span>
+<span class="fc" id="L265">            progress.trials.add(new Validation(task, profile.key(), b, p, c, Optional.empty()));</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return false;</span>
+<span class="fc" id="L267">        }</span>
+<span class="fc" id="L268">        return true;</span>
+    }
+
+    private static void fitRoutes(Progress progress, Map&lt;String, Strategy&gt; proposedRoutes) {
+<span class="fc" id="L272">        var groups = new TreeMap&lt;String, List&lt;Validation&gt;&gt;();</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        for (var trial : progress.trials) groups.computeIfAbsent(trial.profile(), key -&gt; new ArrayList&lt;&gt;()).add(trial);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        for (var group : groups.entrySet()) {</span>
+<span class="fc" id="L275">            progress.selection = sum(progress.selection, group.getValue().size());</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (group.getKey().equals(&quot;custom&quot;)) continue;</span>
+<span class="fc" id="L277">            boolean safe = group.getValue().stream().allMatch(row -&gt; noWorse(row.candidate(), row.baseline()));</span>
+<span class="fc" id="L278">            long baseWork = group.getValue().stream().map(Validation::baseline).mapToLong(Execution::totalWork).reduce(0, Math::addExact);</span>
+<span class="fc" id="L279">            long candidateWork = group.getValue().stream().map(Validation::candidate).mapToLong(Execution::totalWork).reduce(0, Math::addExact);</span>
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">            boolean moreSolved = group.getValue().stream().anyMatch(row -&gt; row.candidate().solved() &amp;&amp; !row.baseline().solved());</span>
+<span class="pc bpc" id="L281" title="2 of 6 branches missed.">            proposedRoutes.put(group.getKey(), safe &amp;&amp; (moreSolved || candidateWork &lt; baseWork)</span>
+<span class="fc" id="L282">                ? Strategy.KNOWLEDGE_FIRST : Strategy.BASELINE);</span>
+<span class="fc" id="L283">        }</span>
+<span class="fc" id="L284">    }</span>
+
+    /** Re-execute the actual fitted policy; counterfactual receipts cannot justify activation. */
+    private boolean validatePolicy(CheckedLearnedSchemaModel candidate, CheckedSchemaTaskSolver prepared,
+            Map&lt;String, Strategy&gt; proposedRoutes, Progress progress, long maximumAcquisitionWork) {
+<span class="fc" id="L289">        boolean safe = true, benefit = false;</span>
+<span class="fc" id="L290">        long previousWork = 0, nextWork = 0;</span>
+<span class="fc" id="L291">        var proposedGoals = knowledgeGoals(proposedRoutes);</span>
+<span class="fc" id="L292">        progress.selection = sum(progress.selection, proposedRoutes.size());</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (int i = 0; i &lt; progress.trials.size(); i++) {</span>
+<span class="fc" id="L294">            var row = progress.trials.get(i);</span>
+            // Execute the fitted policy itself, including its real cheap-baseline paths and budget.
+            // Reusing a counterfactual arm's receipt would misstate routing work and tight-budget outcomes.
+<span class="fc" id="L297">            var next = automatic(&quot;candidate:&quot; + SchematicProofPlan.hash(candidate.toCanonicalJson()), row.task(),</span>
+                proposedRoutes, proposedGoals, baseline, prepared);
+<span class="fc" id="L299">            progress.validation = sum(progress.validation, next.totalWork());</span>
+<span class="fc" id="L300">            progress.trials.set(i, new Validation(row.task(), row.profile(), row.baseline(), row.previous(), row.candidate(), Optional.of(next)));</span>
+<span class="fc" id="L301">            safe &amp;= noWorse(next, row.previous());</span>
+<span class="pc bpc" id="L302" title="1 of 4 branches missed.">            benefit |= next.solved() &amp;&amp; !row.previous().solved();</span>
+<span class="fc" id="L303">            previousWork = sum(previousWork, row.previous().totalWork()); nextWork = sum(nextWork, next.totalWork());</span>
+<span class="fc" id="L304">            progress.selection = sum(progress.selection, 1);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (progress.costs().total() &gt; maximumAcquisitionWork) return false;</span>
+        }
+<span class="pc bpc" id="L307" title="2 of 6 branches missed.">        return safe &amp;&amp; (benefit || nextWork &lt; previousWork);</span>
+    }
+
+    private Update selectSuccessor(Progress progress, CheckedLearnedSchemaModel candidate,
+            CheckedSchemaTaskSolver prepared, Map&lt;String, Strategy&gt; proposedRoutes,
+            boolean newSchemas, boolean improved) {
+<span class="pc bpc" id="L313" title="1 of 6 branches missed.">        if (newSchemas &amp;&amp; improved &amp;&amp; proposedRoutes.size() &lt;= MAX_ROUTES)</span>
+<span class="fc" id="L314">            return finish(progress, Decision.PROMOTED, candidate, prepared, proposedRoutes);</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        return finish(progress, newSchemas ? Decision.NO_VALIDATED_BENEFIT : Decision.NO_NEW_SCHEMA,</span>
+            model, learned, routes);
+    }
+
+    private static Execution profiledRun(String id, CheckedSchemaTaskSolver.Task task, Strategy strategy,
+            CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned) {
+<span class="fc" id="L321">        return run(id, task, strategy, TaskKnowledgeProfile.inspect(task).work() + 2, baseline, learned);</span>
+    }
+    private Update limited(Progress progress) {
+<span class="fc" id="L324">        return finish(progress, Decision.ACQUISITION_LIMIT, model, learned, routes);</span>
+    }
+    private Update finish(Progress progress, Decision decision, CheckedLearnedSchemaModel chosen,
+            CheckedSchemaTaskSolver solver, Map&lt;String, Strategy&gt; policy) {
+<span class="fc" id="L328">        var work = progress.costs();</span>
+<span class="fc" id="L329">        var successor = new CumulativeTaskKnowledge(inventory, chosen, baseline, solver,</span>
+<span class="fc" id="L330">            Math.addExact(generation, 1), id, policy, acquisition.plus(sessionSetup).plus(work), Costs.zero(),</span>
+            decision, progress.attempts);
+<span class="fc" id="L332">        return new Update(successor, decision, progress.training, progress.trials, work, progress.attempts);</span>
+    }
+
+    private static boolean noWorse(Execution proposed, Execution previous) {
+<span class="pc bpc" id="L336" title="2 of 4 branches missed.">        if (proposed.solution().isPresent() &amp;&amp; !proposed.solution().orElseThrow().evidence().accountingComplete()) return false;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (previous.solved()) return proposed.solved();</span>
+<span class="pc bpc" id="L338" title="2 of 4 branches missed.">        return proposed.solved() || proposed.score() &lt;= previous.score();</span>
+    }
+    private static List&lt;CheckedSchemaTaskSolver.Task&gt; bounded(List&lt;CheckedSchemaTaskSolver.Task&gt; tasks, int minimum) {
+<span class="fc" id="L341">        var copy = List.copyOf(tasks);</span>
+<span class="pc bpc" id="L342" title="2 of 4 branches missed.">        if (copy.size() &lt; minimum || copy.size() &gt; MAX_BATCH) throw new IllegalArgumentException(&quot;batch size outside bounds&quot;);</span>
+<span class="fc" id="L343">        return copy;</span>
+    }
+    private static long disjoint(List&lt;CheckedSchemaTaskSolver.Task&gt; lessons, List&lt;CheckedSchemaTaskSolver.Task&gt; validation) {
+<span class="fc" id="L346">        long[] work = {0};</span>
+<span class="fc" id="L347">        var exact = new ExactPolynomialAnalysis(units -&gt; work[0] = sum(work[0], units));</span>
+<span class="fc" id="L348">        var training = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (var task : lessons) training.add(alphaIdentity(task, exact, work));</span>
+<span class="fc bfc" id="L350" title="All 4 branches covered.">        for (var task : validation) if (training.contains(alphaIdentity(task, exact, work)))</span>
+<span class="fc" id="L351">            throw new IllegalArgumentException(&quot;lesson/validation polynomial alpha overlap&quot;);</span>
+<span class="fc" id="L352">        return work[0];</span>
+    }
+
+    private static String alphaIdentity(CheckedSchemaTaskSolver.Task task, ExactPolynomialAnalysis exact, long[] work) {
+<span class="fc" id="L356">        var bounded = new CheckedSchemaSupport.Work();</span>
+<span class="fc" id="L357">        CheckedSchemaSupport.domain(task.source(), CheckedLearnedSchemaModel.Bounds.defaults(), bounded);</span>
+<span class="fc" id="L358">        work[0] = sum(work[0], bounded.units);</span>
+<span class="fc" id="L359">        String text = ExpressionFormatter.format(task.source());</span>
+<span class="fc" id="L360">        work[0] = sum(work[0], text.length());</span>
+<span class="fc" id="L361">        return exact.alphaIdentity(text);</span>
+    }
+
+    /** Write an immutable, bounded snapshot. No implicit latest pointer or destructive replacement. */
+<span class="fc" id="L365">    public Path save(Path directory) throws IOException { return TaskKnowledgeSnapshot.save(directory, id, canonicalJson); }</span>
+    public static CumulativeTaskKnowledge load(EvolutionGenome inventory, Path path) throws IOException {
+<span class="fc" id="L367">        return restore(inventory, TaskKnowledgeSnapshot.read(path));</span>
+    }
+    public static CumulativeTaskKnowledge restore(EvolutionGenome inventory, String json) {
+<span class="fc" id="L370">        Objects.requireNonNull(inventory, &quot;inventory&quot;);</span>
+<span class="fc" id="L371">        var snapshot = TaskKnowledgeSnapshot.decode(json);</span>
+        // A recomputed digest cannot authorize false mathematics: load re-proves every schema.
+<span class="fc" id="L373">        var model = CheckedLearnedSchemaModel.load(snapshot.model(), inventory.contentHash());</span>
+<span class="fc" id="L374">        var base = TypedLearnedMoveInventory.primitives(inventory);</span>
+<span class="fc" id="L375">        var baseline = base.newTaskSolver();</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        var learned = model.schemas().isEmpty() ? baseline : base.newTaskSolver(model);</span>
+<span class="fc" id="L377">        var setup = new Costs(0, 0, learned.preparationWork(), 0, 0, model.loadWork(), 0);</span>
+<span class="fc" id="L378">        var restored = new CumulativeTaskKnowledge(inventory, model, baseline, learned,</span>
+<span class="fc" id="L379">            snapshot.generation(), snapshot.parentId(), snapshot.routes(), snapshot.costs(), setup, snapshot.decision(), snapshot.attempts());</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (!restored.toCanonicalJson().equals(json)) throw new IllegalArgumentException(&quot;noncanonical knowledge snapshot&quot;);</span>
+<span class="fc" id="L381">        return restored;</span>
+    }
+    private static long sum(long... values) {
+<span class="fc" id="L384">        long total = 0;</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        for (long value : values) total = Math.addExact(total, value);</span>
+<span class="fc" id="L386">        return total;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
