@@ -79,6 +79,19 @@ public final class CheckedSchemaTaskSolver {
         this.preparation = preparation;
     }
 
+    CheckedSchemaTaskSolver withConstructions() {
+        var providers = new java.util.ArrayList<>(session.providers());
+        var verifiers = new java.util.HashMap<String, TypedMoveSearch.Verifier>();
+        for (var operation : StructuralConstructionPrograms.Operation.values()) {
+            var provider = new StructuralConstructionProvider(operation);
+            providers.add(preparation == null ? provider : provider.incremental());
+            verifiers.put(provider.descriptor().id(), provider.verifier());
+        }
+        var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),
+            (source, move, context) -> verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));
+        return new CheckedSchemaTaskSolver(augmented, preparation);
+    }
+
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
     public long preparationWork() { return preparation == null ? 0 : preparation.workUnits(); }
     public Optional<CheckedSchemaMatcherPlan.Compilation> preparationReceipt() {
