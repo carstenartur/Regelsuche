@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteIteration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast.iteration</a> &gt; <span class="el_source">FiniteIteration.java</span></div><h1>FiniteIteration.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast.iteration;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.symbol.SymbolId;
+import java.util.*;
+
+/** Immutable finite binders beside (not inside) the scalar AST. Invalid scope fails at construction. */
+public sealed interface FiniteIteration permits FiniteIteration.Sum, FiniteIteration.Recurrence {
+    int MAX_NODES = 2048, MAX_DEPTH = 64, MAX_PARAMETERS = 16, MAX_COEFFICIENT_BITS = 4096;
+    IndexRange range();
+    SymbolId index();
+    Set&lt;SymbolId&gt; parameters();
+    IntegerArithmetic arithmetic();
+
+    record Sum(IndexRange range, SymbolId index, Set&lt;SymbolId&gt; parameters, Expr term,
+               IntegerArithmetic arithmetic) implements FiniteIteration {
+<span class="fc" id="L17">        public Sum {</span>
+<span class="fc" id="L18">            IterationScope.parameterCount(parameters);</span>
+<span class="fc" id="L19">            parameters = Set.copyOf(parameters);</span>
+<span class="fc" id="L20">            IterationScope.binders(range, index, null, parameters, arithmetic);</span>
+<span class="fc" id="L21">            IterationScope.validate(term, IterationScope.union(parameters, index));</span>
+<span class="fc" id="L22">        }</span>
+    }
+    /** update is evaluated with the previous state; initial may mention parameters only. */
+    record Recurrence(IndexRange range, SymbolId index, SymbolId state, Set&lt;SymbolId&gt; parameters,
+                      Expr initial, Expr update, IntegerArithmetic arithmetic) implements FiniteIteration {
+<span class="fc" id="L27">        public Recurrence {</span>
+<span class="fc" id="L28">            Objects.requireNonNull(state);</span>
+<span class="fc" id="L29">            IterationScope.parameterCount(parameters);</span>
+<span class="fc" id="L30">            parameters = Set.copyOf(parameters);</span>
+<span class="fc" id="L31">            IterationScope.binders(range, index, state, parameters, arithmetic);</span>
+<span class="fc" id="L32">            IterationScope.validate(initial, parameters);</span>
+<span class="fc" id="L33">            IterationScope.validate(update, IterationScope.union(IterationScope.union(parameters, index), state));</span>
+<span class="fc" id="L34">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

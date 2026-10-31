@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IterationScope.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast.iteration</a> &gt; <span class="el_source">IterationScope.java</span></div><h1>IterationScope.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast.iteration;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.symbol.SymbolId;
+import java.util.*;
+import static de.regelsuche.ast.iteration.FiniteIteration.*;
+
+/** Bounded construction checks shared by the finite binder records. */
+final class IterationScope {
+    private IterationScope() {}
+    static void parameterCount(Set&lt;SymbolId&gt; parameters) {
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">        if (parameters.size() &gt; MAX_PARAMETERS) throw new IllegalArgumentException(&quot;TOO_MANY_PARAMETERS&quot;);</span>
+<span class="fc" id="L13">    }</span>
+    static void binders(IndexRange range, SymbolId index, SymbolId state,
+                        Set&lt;SymbolId&gt; parameters, IntegerArithmetic arithmetic) {
+<span class="fc" id="L16">        Objects.requireNonNull(range); Objects.requireNonNull(index); Objects.requireNonNull(arithmetic);</span>
+<span class="pc bpc" id="L17" title="1 of 8 branches missed.">        if (index.equals(state) || parameters.contains(index) || (state != null &amp;&amp; parameters.contains(state)))</span>
+<span class="fc" id="L18">            throw new IllegalArgumentException(&quot;COLLIDING_BINDERS&quot;);</span>
+<span class="fc" id="L19">    }</span>
+    static Set&lt;SymbolId&gt; union(Set&lt;SymbolId&gt; symbols, SymbolId extra) {
+<span class="fc" id="L21">        var result = new HashSet&lt;&gt;(symbols); result.add(extra); return result;</span>
+    }
+    static void validate(Expr expression, Set&lt;SymbolId&gt; allowed) {
+<span class="fc" id="L24">        record Node(Expr expression, int depth) {}</span>
+<span class="fc" id="L25">        var pending = new ArrayDeque&lt;Node&gt;(); pending.push(new Node(Objects.requireNonNull(expression), 1));</span>
+<span class="fc" id="L26">        int count = 0;</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L28">            Node node = pending.pop();</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">            if (++count &gt; MAX_NODES || node.depth() &gt; MAX_DEPTH) throw new IllegalArgumentException(&quot;EXPRESSION_LIMIT&quot;);</span>
+<span class="fc bfc" id="L30" title="All 4 branches covered.">            switch (node.expression()) {</span>
+<span class="fc" id="L31">                case VariableExpr v -&gt; {</span>
+<span class="fc bfc" id="L32" title="All 4 branches covered.">                    if (v.symbol().isEmpty() || !allowed.contains(v.symbol().orElseThrow()))</span>
+<span class="fc" id="L33">                        throw new IllegalArgumentException(&quot;UNBOUND_SYMBOL&quot;);</span>
+                }
+<span class="fc" id="L35">                case NumberExpr n -&gt; {</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">                    if (n.value().numerator().bitLength() &gt; MAX_COEFFICIENT_BITS || n.value().denominator().bitLength() &gt; MAX_COEFFICIENT_BITS)</span>
+<span class="nc" id="L37">                        throw new IllegalArgumentException(&quot;COEFFICIENT_LIMIT&quot;);</span>
+                }
+<span class="fc" id="L39">                case BinaryExpr b -&gt; {</span>
+<span class="fc" id="L40">                    pending.push(new Node(b.left(), node.depth()+1)); pending.push(new Node(b.right(), node.depth()+1));</span>
+<span class="fc" id="L41">                }</span>
+<span class="fc" id="L42">                case FunctionExpr f -&gt; {</span>
+<span class="pc bpc" id="L43" title="3 of 4 branches missed.">                    if (f.name().length() &gt; 128 || f.arguments().size() &gt; MAX_NODES - count - pending.size())</span>
+<span class="fc" id="L44">                        throw new IllegalArgumentException(&quot;EXPRESSION_LIMIT&quot;);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                    for (Expr arg : f.arguments()) pending.push(new Node(arg, node.depth()+1));</span>
+                }
+            }
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

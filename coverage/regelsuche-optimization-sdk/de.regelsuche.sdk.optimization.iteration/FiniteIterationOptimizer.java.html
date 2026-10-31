@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteIterationOptimizer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">FiniteIterationOptimizer.java</span></div><h1>FiniteIterationOptimizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.iteration.FiniteIteration;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+
+/** Bounded candidate search; only FiniteIterationVerifier can establish the identity. */
+<span class="fc" id="L12">public final class FiniteIterationOptimizer {</span>
+    /** Source-bound rational antidifference. Public construction permits independent transport/checking. */
+    public record Certificate(FiniteIteration source, Expr antidifference) {
+<span class="fc" id="L15">        public Certificate { Objects.requireNonNull(source); Objects.requireNonNull(antidifference); }</span>
+    }
+    /** Arithmetic-operation estimates only: no loop-control, loads or compiler/runtime cost claims. */
+    public record Cost(BigInteger originalOperations, long resultOperations) {
+<span class="fc" id="L19">        public Cost {</span>
+<span class="fc" id="L20">            Objects.requireNonNull(originalOperations);</span>
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">            if(originalOperations.signum()&lt;0 || resultOperations&lt;0) throw new IllegalArgumentException(&quot;NEGATIVE_COST&quot;);</span>
+<span class="fc" id="L22">        }</span>
+    }
+    /** Search work and cost are informational; the checker recomputes its own values. */
+    public record Candidate(Expr result, Certificate certificate, long work, Cost cost) {
+<span class="fc" id="L26">        public Candidate { Objects.requireNonNull(result); Objects.requireNonNull(certificate); Objects.requireNonNull(cost); }</span>
+    }
+    public record SearchResult(Optional&lt;Candidate&gt; candidate, String reason, long work) {
+<span class="fc" id="L29">        public SearchResult { Objects.requireNonNull(candidate); Objects.requireNonNull(reason); }</span>
+    }
+    public SearchResult search(FiniteIteration source, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L32">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L33">        var work=new Work(budget,cancellation);</span>
+        try {
+<span class="fc" id="L35">            var parsed=source(source,work);</span>
+<span class="fc" id="L36">            var remaining=parsed.term(); var antidifference=zero(work);</span>
+            // Triangular elimination in the index degree; no range unrolling or stored sum formulas.
+<span class="fc" id="L38">            int rounds=0;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            while(!remaining.terms.isEmpty()) {</span>
+<span class="fc" id="L40">                work.charge(remaining.terms.size());</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                if(++rounds&gt;MAX_TERMS*(MAX_DEGREE+1)) throw new Unavailable(&quot;SYNTHESIS_LIMIT&quot;);</span>
+<span class="fc" id="L42">                var leading=remaining.terms.entrySet().stream().max(Comparator.comparingInt(e -&gt; e.getKey().degree(source.index()))).orElseThrow();</span>
+<span class="fc" id="L43">                int degree=leading.getKey().degree(source.index())+1;</span>
+<span class="fc" id="L44">                var denominator=ExactRational.integer(source.range().step().multiply(BigInteger.valueOf(degree)));</span>
+<span class="fc" id="L45">                var primitive=single(leading.getKey(),leading.getValue().divide(denominator),work).multiply(variable(source.index(),work));</span>
+<span class="fc" id="L46">                antidifference=antidifference.add(primitive);</span>
+<span class="fc" id="L47">                remaining=remaining.subtract(primitive.shifted(source.index(),source.range().step()).subtract(primitive));</span>
+<span class="fc" id="L48">            }</span>
+<span class="fc" id="L49">            var value=antidifference.at(source.index(),source.range().endExclusive())</span>
+<span class="fc" id="L50">                .subtract(antidifference.at(source.index(),source.range().start())).add(parsed.initial()).integral(source.arithmetic());</span>
+<span class="fc" id="L51">            Expr result=value.expression(), proof=antidifference.expression();</span>
+            // Generated trees obey the same transport limits as untrusted inputs to the checker.
+<span class="fc" id="L53">            parse(proof,symbols(source,false),false,MAX_DEGREE+1,work);</span>
+<span class="fc" id="L54">            parse(result,source.parameters(),true,MAX_DEGREE,work);</span>
+<span class="fc" id="L55">            var cost=cost(source,result,work);</span>
+<span class="fc" id="L56">            var candidate=new Candidate(result,new Certificate(source,proof),work.used,cost);</span>
+<span class="fc" id="L57">            return new SearchResult(Optional.of(candidate),&quot;CANDIDATE&quot;,work.used);</span>
+<span class="fc" id="L58">        } catch(Unavailable unavailable) { return new SearchResult(Optional.empty(),unavailable.getMessage(),work.used); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
