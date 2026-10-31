@@ -102,6 +102,7 @@ class MavenOptimizationSdkDistributionTest {
         assertTrue(log.contains("optimization=VERIFIED"), log);
         assertTrue(log.contains("checked=ORIGINAL_OVERFLOW_DETECTED"), log);
         assertTrue(log.contains("iteration=VERIFIED_TELESCOPING_5050"), log);
+        assertTrue(log.contains("series=VERIFIED_RUNTIME_POLYNOMIAL_AND_AFFINE"), log);
         try (JarFile binary = new JarFile(jar.toFile())) {
             assertEquals(revision, binary.getManifest().getMainAttributes().getValue("Source-Revision"));
         }

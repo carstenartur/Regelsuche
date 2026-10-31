@@ -17,9 +17,12 @@ final class IterationPolynomial {
     static final class Work {
         final OptimizationBudget budget;
         final CancellationToken cancellation;
+        final int maximumDegree;
         final long start = System.nanoTime(), timeout;
         long used;
-        Work(OptimizationBudget budget, CancellationToken cancellation) {
+        Work(OptimizationBudget budget, CancellationToken cancellation) { this(budget,cancellation,MAX_DEGREE+1); }
+        Work(OptimizationBudget budget, CancellationToken cancellation, int maximumDegree) {
+            this.maximumDegree=maximumDegree;
             this.budget = Objects.requireNonNull(budget); this.cancellation = Objects.requireNonNull(cancellation);
             timeout = budget.timeoutMillis() > Long.MAX_VALUE / 1_000_000 ? Long.MAX_VALUE : budget.timeoutMillis()*1_000_000;
         }
@@ -52,7 +55,7 @@ final class IterationPolynomial {
     }
     private static void put(Map<Monomial,ExactRational> map, Monomial m, ExactRational c, Work w) {
         w.coefficient(c);
-        if(m.symbols().size()>MAX_DEGREE+1) throw new Unavailable("DEGREE_LIMIT");
+        if(m.symbols().size()>w.maximumDegree) throw new Unavailable("DEGREE_LIMIT");
         if(c.signum()==0) map.remove(m); else map.put(m,c);
         if(map.size()>Math.min(MAX_TERMS,w.budget.maximumStates())) throw new Unavailable("TERM_LIMIT");
     }
@@ -72,7 +75,7 @@ final class IterationPolynomial {
         var map = new LinkedHashMap<Monomial,ExactRational>();
         for(var a:terms.entrySet()) for(var b:other.terms.entrySet()) {
             work.charge(1);
-            if(a.getKey().symbols().size()+b.getKey().symbols().size()>MAX_DEGREE+1) throw new Unavailable("DEGREE_LIMIT");
+            if(a.getKey().symbols().size()+b.getKey().symbols().size()>work.maximumDegree) throw new Unavailable("DEGREE_LIMIT");
             var symbols = new ArrayList<>(a.getKey().symbols()); symbols.addAll(b.getKey().symbols()); symbols.sort(ORDER);
             var m = new Monomial(symbols);
             put(map,m,map.getOrDefault(m,ExactRational.ZERO).add(a.getValue().multiply(b.getValue())),work);

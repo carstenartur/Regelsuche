@@ -1,5 +1,12 @@
 # Java computation optimization SDK
 
+Finite reductions have a separate scoped API alongside scalar computations. See
+[FINITE_SERIES.md](FINITE_SERIES.md) for constant and runtime-bound polynomial sums,
+nested/periodic/piecewise composition, exact rational telescoping, affine and coupled
+linear recurrences, geometric series, products, independent proof checks and explicit
+limits. The standalone Java25 consumer exercises runtime polynomial and affine plans,
+including rejection of changed evidence.
+
 The Java 25 headless facade `de.regelsuche.sdk.optimization.ComputationOptimizer`
 uses the existing `JointPlanSearch`, `JointComputationPlan` and
 `PreparedJointComputation`. It does not contain an Eclipse adapter or a second
