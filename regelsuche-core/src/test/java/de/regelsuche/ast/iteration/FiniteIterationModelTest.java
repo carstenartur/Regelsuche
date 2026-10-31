@@ -35,6 +35,16 @@ class FiniteIterationModelTest {
         Expr tooDeep = deep;
         assertThrows(IllegalArgumentException.class, () -> new FiniteIteration.Sum(range(), i, Set.of(), tooDeep, IntegerArithmetic.EXACT));
     }
+    @Test void scopeUsesOwnedSymbolEqualityRatherThanCallerSetOrdering() {
+        var parameter = new SymbolId(new UUID(0, 2), 1);
+        var symbols = new TreeSet<SymbolId>(Comparator.comparingLong(SymbolId::ordinal));
+        symbols.add(parameter);
+        var recurrence = new FiniteIteration.Recurrence(range(), i, s, symbols,
+            VariableExpr.scoped(parameter), VariableExpr.scoped(s), IntegerArithmetic.EXACT);
+        symbols.clear();
+        assertEquals(Set.of(parameter), recurrence.parameters());
+        assertThrows(UnsupportedOperationException.class, () -> recurrence.parameters().clear());
+    }
     @Test void rejectsOversizedFunctionMetadataBeforeSourceBinding() {
         assertThrows(IllegalArgumentException.class, () -> new FiniteIteration.Sum(range(), i, Set.of(),
             new FunctionExpr("x".repeat(10000), new NumberExpr(1)), IntegerArithmetic.EXACT));
