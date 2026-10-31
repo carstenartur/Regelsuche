@@ -11,16 +11,27 @@ final class VerificationWork {
 <span class="fc" id="L11">    private final long started = System.nanoTime();</span>
     private final long timeoutNanos;
     private long work;
-<span class="fc" id="L14">    VerificationWork(OptimizationRequest request, CancellationToken token) {</span>
-<span class="fc" id="L15">        this.token = java.util.Objects.requireNonNull(token);</span>
-<span class="fc" id="L16">        maximum = request.budget().maximumWork();</span>
-<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        timeoutNanos = request.budget().timeoutMillis() &gt; Long.MAX_VALUE / 1_000_000 ? Long.MAX_VALUE : request.budget().timeoutMillis() * 1_000_000;</span>
-<span class="fc" id="L18">    }</span>
+    VerificationWork(OptimizationRequest request, CancellationToken token) {
+<span class="fc" id="L15">        this(request, token, request.budget().maximumWork());</span>
+<span class="fc" id="L16">    }</span>
+<span class="fc" id="L17">    VerificationWork(OptimizationRequest request, CancellationToken token, long remainingWork) {</span>
+<span class="fc" id="L18">        this.token = java.util.Objects.requireNonNull(token);</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (remainingWork &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_REMAINING_WORK&quot;);</span>
+<span class="fc" id="L20">        maximum = Math.min(request.budget().maximumWork(), remainingWork);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        timeoutNanos = request.budget().timeoutMillis() &gt; Long.MAX_VALUE / 1_000_000 ? Long.MAX_VALUE : request.budget().timeoutMillis() * 1_000_000;</span>
+<span class="fc" id="L22">    }</span>
     void charge(long amount) {
-<span class="pc bpc" id="L20" title="1 of 4 branches missed.">        if (token.isCancelled() || Thread.currentThread().isInterrupted()) throw new Stopped(true);</span>
-<span class="pc bpc" id="L21" title="2 of 6 branches missed.">        if (amount &lt; 0 || amount &gt; maximum - work || System.nanoTime() - started &gt;= timeoutNanos) throw new Stopped(false);</span>
-<span class="fc" id="L22">        work += amount;</span>
-<span class="fc" id="L23">    }</span>
-<span class="fc" id="L24">    long used() { return work; }</span>
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (token.isCancelled() || Thread.currentThread().isInterrupted()) throw new Stopped(true);</span>
+<span class="pc bpc" id="L25" title="2 of 6 branches missed.">        if (amount &lt; 0 || amount &gt; maximum - work || System.nanoTime() - started &gt;= timeoutNanos) throw new Stopped(false);</span>
+<span class="fc" id="L26">        work += amount;</span>
+<span class="fc" id="L27">    }</span>
+<span class="fc" id="L28">    long used() { return work; }</span>
+    /** A completed external computation must remain debited even on exhaustion or cancellation. */
+    void chargeCompleted(long amount) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (amount &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_COMPLETED_WORK&quot;);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        work = amount &gt; Long.MAX_VALUE - work ? Long.MAX_VALUE : work + amount;</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        if (token.isCancelled() || Thread.currentThread().isInterrupted()) throw new Stopped(true);</span>
+<span class="pc bpc" id="L34" title="1 of 4 branches missed.">        if (work &gt; maximum || System.nanoTime() - started &gt;= timeoutNanos) throw new Stopped(false);</span>
+<span class="fc" id="L35">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

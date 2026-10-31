@@ -14,168 +14,172 @@ final class WordBitProjection {
     private final VerificationWork work;
 <span class="fc" id="L15">    private final Map&lt;Word, Word&gt; representatives = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc" id="L16">    private final Map&lt;Expr, Map&lt;Integer, Formula&gt;&gt; projected = new IdentityHashMap&lt;&gt;();</span>
+    private final WordPossibilities possibilities;
 
-<span class="fc" id="L18">    WordBitProjection(VerificationWork work) { this.work = work; }</span>
+<span class="fc" id="L19">    WordBitProjection(VerificationWork work) { this.work = work; possibilities = new WordPossibilities(work); }</span>
 
     boolean equivalent(Expr left, Expr right, NumericKind kind) {
-<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (!kind.integral()) return false;</span>
-<span class="fc bfc" id="L22" title="All 4 branches covered.">        if (!hasProjection(left, 0) &amp;&amp; !hasProjection(right, 0)) return false;</span>
-<span class="fc bfc" id="L23" title="All 2 branches covered.">        for (int bit = 0; bit &lt; kind.bits(); bit++) {</span>
-<span class="fc" id="L24">            Formula a = project(left, kind, bit, 0), b = project(right, kind, bit, 0);</span>
-<span class="fc" id="L25">            var variables = new LinkedHashSet&lt;Bit&gt;();</span>
-<span class="fc" id="L26">            var visited = Collections.newSetFromMap(new IdentityHashMap&lt;Formula, Boolean&gt;());</span>
-<span class="fc" id="L27">            collect(a, variables, visited); collect(b, variables, visited);</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (variables.size() &gt; 8) return false;</span>
-<span class="fc" id="L29">            var ordered = List.copyOf(variables);</span>
-<span class="fc bfc" id="L30" title="All 2 branches covered.">            for (int assignment = 0; assignment &lt; (1 &lt;&lt; ordered.size()); assignment++) {</span>
-<span class="fc" id="L31">                work.charge(1);</span>
-<span class="fc" id="L32">                var evaluated = new IdentityHashMap&lt;Formula, Boolean&gt;();</span>
-<span class="fc bfc" id="L33" title="All 2 branches covered.">                if (value(a, assignment, ordered, evaluated) != value(b, assignment, ordered, evaluated)) return false;</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (!kind.integral()) return false;</span>
+<span class="fc bfc" id="L23" title="All 4 branches covered.">        if (!hasProjection(left, 0) &amp;&amp; !hasProjection(right, 0)) return false;</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        for (int bit = 0; bit &lt; kind.bits(); bit++) {</span>
+<span class="fc" id="L25">            Formula a = project(left, kind, bit, 0), b = project(right, kind, bit, 0);</span>
+<span class="fc" id="L26">            var variables = new LinkedHashSet&lt;Bit&gt;();</span>
+<span class="fc" id="L27">            var visited = Collections.newSetFromMap(new IdentityHashMap&lt;Formula, Boolean&gt;());</span>
+<span class="fc" id="L28">            collect(a, variables, visited); collect(b, variables, visited);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            if (variables.size() &gt; 8) return false;</span>
+<span class="fc" id="L30">            var ordered = List.copyOf(variables);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (int assignment = 0; assignment &lt; (1 &lt;&lt; ordered.size()); assignment++) {</span>
+<span class="fc" id="L32">                work.charge(1);</span>
+<span class="fc" id="L33">                var evaluated = new IdentityHashMap&lt;Formula, Boolean&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                if (value(a, assignment, ordered, evaluated) != value(b, assignment, ordered, evaluated)) return false;</span>
             }
         }
-<span class="fc" id="L36">        return true;</span>
+<span class="fc" id="L37">        return true;</span>
     }
 
     private boolean hasProjection(Expr expression, int depth) {
-<span class="fc" id="L40">        work.charge(1);</span>
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;BIT_PROJECTION_DEPTH_BOUND&quot;);</span>
-<span class="fc" id="L42">        var from = JavaExpressions.castSourceKind(expression);</span>
-<span class="pc bpc" id="L43" title="2 of 6 branches missed.">        if (from.isPresent() &amp;&amp; from.get().integral() &amp;&amp; JavaExpressions.resultKind(expression).integral()) return true;</span>
-<span class="fc" id="L44">        var op = JavaExpressions.operationOf(expression).orElse(null);</span>
-<span class="fc" id="L45">        var args = JavaExpressions.operands(expression);</span>
-<span class="fc bfc" id="L46" title="All 6 branches covered.">        if ((op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT)</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                &amp;&amp; JavaExpressions.isLiteral(args.get(1))) return true;</span>
-<span class="fc bfc" id="L48" title="All 8 branches covered.">        if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR || op == NumericOperation.NOT)</span>
-<span class="fc bfc" id="L49" title="All 4 branches covered.">            for (var child : args) if (hasProjection(child, depth + 1)) return true;</span>
-<span class="fc" id="L50">        return false;</span>
+<span class="fc" id="L41">        work.charge(1);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;BIT_PROJECTION_DEPTH_BOUND&quot;);</span>
+<span class="fc" id="L43">        var from = JavaExpressions.castSourceKind(expression);</span>
+<span class="pc bpc" id="L44" title="2 of 6 branches missed.">        if (from.isPresent() &amp;&amp; from.get().integral() &amp;&amp; JavaExpressions.resultKind(expression).integral()) return true;</span>
+<span class="fc" id="L45">        var op = JavaExpressions.operationOf(expression).orElse(null);</span>
+<span class="fc" id="L46">        var args = JavaExpressions.operands(expression);</span>
+<span class="fc bfc" id="L47" title="All 4 branches covered.">        if (op == NumericOperation.ADD &amp;&amp; possibilities.disjoint(args.getFirst(), args.get(1), JavaExpressions.resultKind(expression))) return true;</span>
+<span class="fc bfc" id="L48" title="All 6 branches covered.">        if ((op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT)</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                &amp;&amp; JavaExpressions.isLiteral(args.get(1))) return true;</span>
+<span class="fc bfc" id="L50" title="All 8 branches covered.">        if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR || op == NumericOperation.NOT)</span>
+<span class="fc bfc" id="L51" title="All 4 branches covered.">            for (var child : args) if (hasProjection(child, depth + 1)) return true;</span>
+<span class="fc" id="L52">        return false;</span>
     }
 
     private void collect(Formula formula, Set&lt;Bit&gt; variables, Set&lt;Formula&gt; visited) {
-<span class="fc" id="L54">        work.charge(1);</span>
-<span class="fc bfc" id="L55" title="All 4 branches covered.">        if (variables.size() &gt; 8 || !visited.add(formula)) return;</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (formula instanceof Bit bit) variables.add(bit);</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">        else if (formula instanceof Operation op) {</span>
-<span class="fc" id="L58">            collect(op.left(), variables, visited);</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (op.right() != null) collect(op.right(), variables, visited);</span>
+<span class="fc" id="L56">        work.charge(1);</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        if (variables.size() &gt; 8 || !visited.add(formula)) return;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (formula instanceof Bit bit) variables.add(bit);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        else if (formula instanceof Operation op) {</span>
+<span class="fc" id="L60">            collect(op.left(), variables, visited);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (op.right() != null) collect(op.right(), variables, visited);</span>
         }
-<span class="fc" id="L61">    }</span>
+<span class="fc" id="L63">    }</span>
 
     private boolean value(Formula formula, int assignment, List&lt;Bit&gt; variables, Map&lt;Formula, Boolean&gt; evaluated) {
-<span class="fc" id="L64">        work.charge(1);</span>
-<span class="fc" id="L65">        Boolean known = evaluated.get(formula);</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (known != null) return known;</span>
+<span class="fc" id="L66">        work.charge(1);</span>
+<span class="fc" id="L67">        Boolean known = evaluated.get(formula);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (known != null) return known;</span>
         boolean result;
-<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (formula instanceof Constant constant) result = constant.bit();</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">        else if (formula instanceof Bit bit) {</span>
-<span class="fc" id="L70">            int index = variables.indexOf(bit);</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (index &lt; 0) throw new IllegalArgumentException(&quot;UNBOUND_PROOF_BIT&quot;);</span>
-<span class="fc bfc" id="L72" title="All 2 branches covered.">            result = (assignment &amp; (1 &lt;&lt; index)) != 0;</span>
-<span class="fc" id="L73">        } else {</span>
-<span class="fc" id="L74">            var op = (Operation) formula;</span>
-<span class="fc" id="L75">            boolean a = value(op.left(), assignment, variables, evaluated);</span>
-<span class="pc bpc" id="L76" title="3 of 5 branches missed.">            result = switch (op.operation()) {</span>
-<span class="nc bnc" id="L77" title="All 2 branches missed.">                case NOT -&gt; !a;</span>
-<span class="fc" id="L78">                case AND -&gt; a &amp; value(op.right(), assignment, variables, evaluated);</span>
-<span class="fc" id="L79">                case OR -&gt; a | value(op.right(), assignment, variables, evaluated);</span>
-<span class="nc" id="L80">                case XOR -&gt; a ^ value(op.right(), assignment, variables, evaluated);</span>
-<span class="nc" id="L81">                default -&gt; throw new IllegalArgumentException(&quot;UNKNOWN_PROOF_BIT_OPERATION&quot;);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (formula instanceof Constant constant) result = constant.bit();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        else if (formula instanceof Bit bit) {</span>
+<span class="fc" id="L72">            int index = variables.indexOf(bit);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (index &lt; 0) throw new IllegalArgumentException(&quot;UNBOUND_PROOF_BIT&quot;);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            result = (assignment &amp; (1 &lt;&lt; index)) != 0;</span>
+<span class="fc" id="L75">        } else {</span>
+<span class="fc" id="L76">            var op = (Operation) formula;</span>
+<span class="fc" id="L77">            boolean a = value(op.left(), assignment, variables, evaluated);</span>
+<span class="pc bpc" id="L78" title="4 of 5 branches missed.">            result = switch (op.operation()) {</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                case NOT -&gt; !a;</span>
+<span class="nc" id="L80">                case AND -&gt; a &amp; value(op.right(), assignment, variables, evaluated);</span>
+<span class="fc" id="L81">                case OR -&gt; a | value(op.right(), assignment, variables, evaluated);</span>
+<span class="nc" id="L82">                case XOR -&gt; a ^ value(op.right(), assignment, variables, evaluated);</span>
+<span class="nc" id="L83">                default -&gt; throw new IllegalArgumentException(&quot;UNKNOWN_PROOF_BIT_OPERATION&quot;);</span>
             };
         }
-<span class="fc" id="L84">        evaluated.put(formula, result);</span>
-<span class="fc" id="L85">        return result;</span>
+<span class="fc" id="L86">        evaluated.put(formula, result);</span>
+<span class="fc" id="L87">        return result;</span>
     }
 
     private Formula project(Expr expression, NumericKind kind, int bit, int depth) {
-<span class="fc" id="L89">        work.charge(1);</span>
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;BIT_PROJECTION_DEPTH_BOUND&quot;);</span>
-<span class="pc bpc" id="L91" title="2 of 4 branches missed.">        if (bit &lt; 0 || bit &gt;= kind.bits()) throw new IllegalArgumentException(&quot;INVALID_PROOF_BIT&quot;);</span>
-<span class="fc" id="L92">        int key = kind.ordinal() * 64 + bit;</span>
-<span class="fc" id="L93">        var cache = projected.computeIfAbsent(expression, ignored -&gt; new HashMap&lt;&gt;());</span>
-<span class="fc" id="L94">        Formula known = cache.get(key);</span>
-<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (known != null) return known;</span>
-<span class="fc" id="L96">        Formula result = projectUncached(expression, kind, bit, depth);</span>
-<span class="fc" id="L97">        cache.put(key, result);</span>
-<span class="fc" id="L98">        return result;</span>
+<span class="fc" id="L91">        work.charge(1);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;BIT_PROJECTION_DEPTH_BOUND&quot;);</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">        if (bit &lt; 0 || bit &gt;= kind.bits()) throw new IllegalArgumentException(&quot;INVALID_PROOF_BIT&quot;);</span>
+<span class="fc" id="L94">        int key = kind.ordinal() * 64 + bit;</span>
+<span class="fc" id="L95">        var cache = projected.computeIfAbsent(expression, ignored -&gt; new HashMap&lt;&gt;());</span>
+<span class="fc" id="L96">        Formula known = cache.get(key);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (known != null) return known;</span>
+<span class="fc" id="L98">        Formula result = projectUncached(expression, kind, bit, depth);</span>
+<span class="fc" id="L99">        cache.put(key, result);</span>
+<span class="fc" id="L100">        return result;</span>
     }
 
     private Formula projectUncached(Expr expression, NumericKind kind, int bit, int depth) {
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(expression))</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">            return SemanticChecker.integer(JavaExpressions.literalValue(expression)).testBit(bit) ? ONE : ZERO;</span>
-<span class="fc" id="L104">        var from = JavaExpressions.castSourceKind(expression);</span>
-<span class="fc" id="L105">        var args = JavaExpressions.operands(expression);</span>
-<span class="pc bpc" id="L106" title="2 of 6 branches missed.">        if (from.isPresent() &amp;&amp; from.get().integral() &amp;&amp; JavaExpressions.resultKind(expression).integral())</span>
-<span class="fc" id="L107">            return castBit(args.getFirst(), from.get(), bit, depth);</span>
-<span class="fc" id="L108">        var op = JavaExpressions.operationOf(expression).orElse(null);</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (op == NumericOperation.NOT)</span>
-<span class="nc" id="L110">            return new Operation(op, project(args.getFirst(), kind, bit, depth + 1), null);</span>
-<span class="fc bfc" id="L111" title="All 6 branches covered.">        if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR)</span>
-<span class="fc" id="L112">            return booleanBit(op, args, kind, bit, depth);</span>
-<span class="pc bpc" id="L113" title="1 of 10 branches missed.">        if ((op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT)</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                &amp;&amp; (kind == NumericKind.INT || kind == NumericKind.LONG) &amp;&amp; JavaExpressions.isLiteral(args.get(1)))</span>
-<span class="fc" id="L115">            return shiftedBit(op, args, kind, bit, depth);</span>
-<span class="fc" id="L116">        Word representative = representative(new Word(expression, kind));</span>
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (JavaExpressions.isLiteral(representative.expression()))</span>
-<span class="nc bnc" id="L118" title="All 2 branches missed.">            return SemanticChecker.integer(JavaExpressions.literalValue(representative.expression())).testBit(bit) ? ONE : ZERO;</span>
-<span class="fc" id="L119">        return new Bit(representative, bit);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(expression))</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            return SemanticChecker.integer(JavaExpressions.literalValue(expression)).testBit(bit) ? ONE : ZERO;</span>
+<span class="fc" id="L106">        var from = JavaExpressions.castSourceKind(expression);</span>
+<span class="fc" id="L107">        var args = JavaExpressions.operands(expression);</span>
+<span class="pc bpc" id="L108" title="2 of 6 branches missed.">        if (from.isPresent() &amp;&amp; from.get().integral() &amp;&amp; JavaExpressions.resultKind(expression).integral())</span>
+<span class="fc" id="L109">            return castBit(args.getFirst(), from.get(), bit, depth);</span>
+<span class="fc" id="L110">        var op = JavaExpressions.operationOf(expression).orElse(null);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (op == NumericOperation.NOT)</span>
+<span class="nc" id="L112">            return new Operation(op, project(args.getFirst(), kind, bit, depth + 1), null);</span>
+<span class="fc bfc" id="L113" title="All 6 branches covered.">        if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR)</span>
+<span class="fc" id="L114">            return booleanBit(op, args, kind, bit, depth);</span>
+<span class="fc bfc" id="L115" title="All 4 branches covered.">        if (op == NumericOperation.ADD &amp;&amp; possibilities.disjoint(args.getFirst(), args.get(1), kind))</span>
+<span class="fc" id="L116">            return booleanBit(NumericOperation.OR, args, kind, bit, depth);</span>
+<span class="pc bpc" id="L117" title="1 of 10 branches missed.">        if ((op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT)</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                &amp;&amp; (kind == NumericKind.INT || kind == NumericKind.LONG) &amp;&amp; JavaExpressions.isLiteral(args.get(1)))</span>
+<span class="fc" id="L119">            return shiftedBit(op, args, kind, bit, depth);</span>
+<span class="fc" id="L120">        Word representative = representative(new Word(expression, kind));</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(representative.expression()))</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            return SemanticChecker.integer(JavaExpressions.literalValue(representative.expression())).testBit(bit) ? ONE : ZERO;</span>
+<span class="fc" id="L123">        return new Bit(representative, bit);</span>
     }
 
     private Formula castBit(Expr value, NumericKind input, int bit, int depth) {
-<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (bit &gt;= input.bits()) {</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (!input.signed()) return ZERO;</span>
-<span class="fc" id="L125">            bit = input.bits() - 1;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (bit &gt;= input.bits()) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (!input.signed()) return ZERO;</span>
+<span class="fc" id="L129">            bit = input.bits() - 1;</span>
         }
-<span class="fc" id="L127">        return project(value, input, bit, depth + 1);</span>
+<span class="fc" id="L131">        return project(value, input, bit, depth + 1);</span>
     }
 
     private Formula booleanBit(NumericOperation op, List&lt;Expr&gt; args, NumericKind kind, int bit, int depth) {
-<span class="fc" id="L131">        Formula a = project(args.getFirst(), kind, bit, depth + 1);</span>
-<span class="fc" id="L132">        Formula b = project(args.get(1), kind, bit, depth + 1);</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (a instanceof Constant constant) return constant(op, constant.bit(), b);</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (b instanceof Constant constant) return constant(op, constant.bit(), a);</span>
-<span class="fc" id="L135">        return new Operation(op, a, b);</span>
+<span class="fc" id="L135">        Formula a = project(args.getFirst(), kind, bit, depth + 1);</span>
+<span class="fc" id="L136">        Formula b = project(args.get(1), kind, bit, depth + 1);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (a instanceof Constant constant) return constant(op, constant.bit(), b);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (b instanceof Constant constant) return constant(op, constant.bit(), a);</span>
+<span class="fc" id="L139">        return new Operation(op, a, b);</span>
     }
 
     private Formula shiftedBit(NumericOperation op, List&lt;Expr&gt; args, NumericKind kind, int bit, int depth) {
-<span class="fc" id="L139">        int distance = SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).intValue() &amp; (kind.bits() - 1);</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">        int sourceBit = op == NumericOperation.SHIFT_LEFT ? bit - distance : bit + distance;</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (sourceBit &lt; 0) return ZERO;</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (sourceBit &gt;= kind.bits()) {</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (op != NumericOperation.SHIFT_RIGHT) return ZERO;</span>
-<span class="fc" id="L144">            sourceBit = kind.bits() - 1;</span>
+<span class="fc" id="L143">        int distance = SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).intValue() &amp; (kind.bits() - 1);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        int sourceBit = op == NumericOperation.SHIFT_LEFT ? bit - distance : bit + distance;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (sourceBit &lt; 0) return ZERO;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (sourceBit &gt;= kind.bits()) {</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (op != NumericOperation.SHIFT_RIGHT) return ZERO;</span>
+<span class="fc" id="L148">            sourceBit = kind.bits() - 1;</span>
         }
-<span class="fc" id="L146">        return project(args.getFirst(), kind, sourceBit, depth + 1);</span>
+<span class="fc" id="L150">        return project(args.getFirst(), kind, sourceBit, depth + 1);</span>
     }
 
     private static Formula constant(NumericOperation operation, boolean value, Formula other) {
-<span class="pc bpc" id="L150" title="1 of 4 branches missed.">        return switch (operation) {</span>
-<span class="fc bfc" id="L151" title="All 2 branches covered.">            case AND -&gt; value ? other : ZERO;</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            case OR -&gt; value ? ONE : other;</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            case XOR -&gt; value ? new Operation(NumericOperation.NOT, other, null) : other;</span>
-<span class="nc" id="L154">            default -&gt; throw new IllegalArgumentException(&quot;UNKNOWN_PROOF_BIT_OPERATION&quot;);</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        return switch (operation) {</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            case AND -&gt; value ? other : ZERO;</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            case OR -&gt; value ? ONE : other;</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            case XOR -&gt; value ? new Operation(NumericOperation.NOT, other, null) : other;</span>
+<span class="nc" id="L158">            default -&gt; throw new IllegalArgumentException(&quot;UNKNOWN_PROOF_BIT_OPERATION&quot;);</span>
         };
     }
 
     private Word representative(Word atom) {
-<span class="fc" id="L159">        Word known = representatives.get(atom);</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (known != null) return known;</span>
+<span class="fc" id="L163">        Word known = representatives.get(atom);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (known != null) return known;</span>
         // Independent polynomial normalization never identifies different widths.
-<span class="fc bfc" id="L162" title="All 4 branches covered.">        if (atom.kind() == NumericKind.INT || atom.kind() == NumericKind.LONG) {</span>
-<span class="fc" id="L163">            var options = new ArrayList&lt;Word&gt;();</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">            options.add(new Word(atom.kind() == NumericKind.LONG ? JavaExpressions.literal(0L) : JavaExpressions.literal(0), atom.kind()));</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">            options.add(new Word(atom.kind() == NumericKind.LONG ? JavaExpressions.literal(-1L) : JavaExpressions.literal(-1), atom.kind()));</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">            representatives.values().stream().filter(w -&gt; w.kind() == atom.kind()).distinct().forEach(options::add);</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">            for (var option : options) {</span>
-<span class="fc" id="L168">                work.charge(1);</span>
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        if (atom.kind() == NumericKind.INT || atom.kind() == NumericKind.LONG) {</span>
+<span class="fc" id="L167">            var options = new ArrayList&lt;Word&gt;();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            options.add(new Word(atom.kind() == NumericKind.LONG ? JavaExpressions.literal(0L) : JavaExpressions.literal(0), atom.kind()));</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            options.add(new Word(atom.kind() == NumericKind.LONG ? JavaExpressions.literal(-1L) : JavaExpressions.literal(-1), atom.kind()));</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            representatives.values().stream().filter(w -&gt; w.kind() == atom.kind()).distinct().forEach(options::add);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            for (var option : options) {</span>
+<span class="fc" id="L172">                work.charge(1);</span>
                 try {
-<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                    if (new PolynomialProof(atom.kind(), false, false, work).equivalent(atom.expression(), option.expression())) {</span>
-<span class="nc" id="L171">                        representatives.put(atom, option);</span>
-<span class="nc" id="L172">                        return option;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                    if (new PolynomialProof(atom.kind(), false, false, work).equivalent(atom.expression(), option.expression())) {</span>
+<span class="fc" id="L175">                        representatives.put(atom, option);</span>
+<span class="fc" id="L176">                        return option;</span>
                     }
-<span class="pc" id="L174">                } catch (PolynomialProof.OutsideFragment outside) { /* Unproved words stay independent. */ }</span>
-<span class="fc" id="L175">            }</span>
+<span class="pc" id="L178">                } catch (PolynomialProof.OutsideFragment outside) { /* Unproved words stay independent. */ }</span>
+<span class="fc" id="L179">            }</span>
         }
-<span class="fc" id="L177">        representatives.put(atom, atom);</span>
-<span class="fc" id="L178">        return atom;</span>
+<span class="fc" id="L181">        representatives.put(atom, atom);</span>
+<span class="fc" id="L182">        return atom;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -13,246 +13,293 @@ import java.util.*;
     public static final String SEMANTICS_REVISION = &quot;java25-numeric/v1&quot;;
 <span class="fc" id="L14">    public static PreparedJointComputation prepare(JointComputationPlan plan) { return plan.prepare(new JavaNumericBackend(plan.inputs())); }</span>
     public OptimizationResult optimize(OptimizationRequest request, CancellationToken token) {
-<span class="fc" id="L16">        Objects.requireNonNull(request); var work=new VerificationWork(request,token);</span>
+<span class="fc" id="L16">        return optimize(request, token, null);</span>
+    }
+    /** Optional consumer ranking uses the same verified frontier and shared search work allowance. */
+    public OptimizationResult optimize(OptimizationRequest request, CancellationToken token, CandidateRanking ranking) {
+<span class="fc" id="L20">        Objects.requireNonNull(request); var work=new VerificationWork(request,token);</span>
         try {
-<span class="fc" id="L18">            var checker=new SemanticChecker(request,work);</span>
+<span class="fc" id="L22">            var checker=new SemanticChecker(request,work);</span>
             PreparedJointComputation.Cost sourceCost;
             try {
-<span class="fc" id="L21">                sourceCost=checker.validate();</span>
-<span class="fc" id="L22">            } catch (IllegalArgumentException invalid) {</span>
-<span class="fc bfc" id="L23" title="All 2 branches covered.">                if (!diagnostic(invalid).contains(&quot;plan preparation work bound exceeded&quot;)) throw invalid;</span>
+<span class="fc" id="L25">                sourceCost=checker.validate();</span>
+<span class="fc" id="L26">            } catch (IllegalArgumentException invalid) {</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">                if (!diagnostic(invalid).contains(&quot;plan preparation work bound exceeded&quot;)) throw invalid;</span>
                 // Before search starts, every completed source/trace check is in
                 // this ledger. Reserve the failed bounded preparation as well;
                 // the unused request allowance is not work already performed.
-<span class="fc" id="L27">                long failedPreparation = JointComputationPlan.MAX_RESOLUTION_WORK + JointComputationPlan.MAX_NODES;</span>
-<span class="fc" id="L28">                return new OptimizationResult.Unsupported(diagnostic(invalid), Math.addExact(work.used(), failedPreparation));</span>
-<span class="fc" id="L29">            }</span>
-<span class="fc" id="L30">            long setup=work.used();</span>
-<span class="fc" id="L31">            var generator=new JavaCandidateGenerator(request,work);</span>
-<span class="fc" id="L32">            var domain=new JointPlanSearch.Domain() {</span>
-<span class="fc" id="L33">                @Override public String revision() { return SEMANTICS_REVISION; }</span>
-<span class="fc" id="L34">                @Override public JointPlanSearch.Generation generate(JointComputationPlan source,int maximum) { return generator.generate(source,maximum); }</span>
+<span class="fc" id="L31">                long failedPreparation = JointComputationPlan.MAX_RESOLUTION_WORK + JointComputationPlan.MAX_NODES;</span>
+<span class="fc" id="L32">                return new OptimizationResult.Unsupported(diagnostic(invalid), Math.addExact(work.used(), failedPreparation));</span>
+<span class="fc" id="L33">            }</span>
+<span class="fc" id="L34">            boolean projectedWords = hasLiteralWordProjection(request, work);</span>
+<span class="fc" id="L35">            long setup=work.used();</span>
+<span class="fc" id="L36">            var generator=new JavaCandidateGenerator(request,work);</span>
+<span class="fc" id="L37">            var domain=new JointPlanSearch.Domain() {</span>
+<span class="fc" id="L38">                @Override public String revision() { return SEMANTICS_REVISION; }</span>
+<span class="fc" id="L39">                @Override public JointPlanSearch.Generation generate(JointComputationPlan source,int maximum) { return generator.generate(source,maximum); }</span>
                 @Override public JointPlanSearch.Verification verify(JointComputationPlan source,JointComputationPlan target) {
-<span class="fc" id="L36">                    var proof=checker.check(source,target);</span>
-<span class="fc" id="L37">                    return new JointPlanSearch.Verification(proof.accepted(),proof.work());</span>
+<span class="fc" id="L41">                    var proof=checker.check(source,target);</span>
+<span class="fc" id="L42">                    return new JointPlanSearch.Verification(proof.accepted(),proof.work());</span>
                 }
             };
-<span class="fc" id="L40">            var budget=request.budget();</span>
-<span class="fc" id="L41">            var search=new JointPlanSearch(new JavaNumericBackend(request.plan().inputs()),domain,weights(request.goal()),budget.maximumCandidates());</span>
-            // Search is an anytime producer, not the final proof. Reserve half
-            // the remaining request allowance for independently checking and
-            // preparing the incumbent after bounded exploration stops.
-<span class="fc" id="L45">            long explorationAllowance=Math.max(1,(budget.maximumWork()-setup)/2);</span>
-<span class="fc" id="L46">            var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,explorationAllowance,budget.maximumStates(),explorationAllowance,64));</span>
-<span class="fc" id="L47">            work.charge(1);</span>
-<span class="fc" id="L48">            long searchWork=Math.addExact(Math.addExact(setup,found.totalWork()),1);</span>
-<span class="fc" id="L49">            var outcome=found.search().search().outcome();</span>
-<span class="pc bpc" id="L50" title="3 of 8 branches missed.">            boolean explorationLimited=!found.withinBudget() || !found.search().withinBudget()</span>
+<span class="fc" id="L45">            var budget=request.budget();</span>
+<span class="fc" id="L46">            var search=new JointPlanSearch(new JavaNumericBackend(request.plan().inputs()),domain,weights(request.goal()),budget.maximumCandidates(),</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                    ranking == null ? null : (plan, prepared) -&gt; {</span>
+<span class="fc" id="L48">                        var assessment = ranking.assess(plan, prepared);</span>
+<span class="fc" id="L49">                        return new JointPlanSearch.Rank(assessment.score(), assessment.work());</span>
+                    });
+            // Literal word projections need more final proof work than structural
+            // arithmetic. Reserve two thirds for these requests, otherwise half.
+            // The trusted Candidate constructor also prepares the final graph.
+            // Reserve the known initial incumbent's preparation before splitting
+            // the rest between exploration and the independent final proof.
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            long explorationAllowance=Math.max(1,(budget.maximumWork()-setup-sourceCost.inspectionWork())/(projectedWords ? 3 : 2));</span>
+<span class="fc" id="L57">            var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,explorationAllowance,budget.maximumStates(),explorationAllowance,64));</span>
+<span class="fc" id="L58">            work.charge(1);</span>
+<span class="fc" id="L59">            long searchWork=Math.addExact(Math.addExact(setup,found.totalWork()),1);</span>
+<span class="fc" id="L60">            var outcome=found.search().search().outcome();</span>
+<span class="pc bpc" id="L61" title="3 of 8 branches missed.">            boolean explorationLimited=!found.withinBudget() || !found.search().withinBudget()</span>
                     || outcome==MoveSearch.Outcome.WORK_EXHAUSTED || outcome==MoveSearch.Outcome.STATE_LIMIT;
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if(searchWork&gt;budget.maximumWork())</span>
-<span class="nc" id="L53">                return new OptimizationResult.BudgetExceeded(&quot;SEARCH_BUDGET_EXCEEDED&quot;,Math.max(searchWork,work.used()));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if(searchWork&gt;budget.maximumWork())</span>
+<span class="fc" id="L64">                return new OptimizationResult.BudgetExceeded(&quot;SEARCH_BUDGET_EXCEEDED&quot;,Math.max(searchWork,work.used()));</span>
             // A rejected alternative makes the explored relation incomplete; it
             // does not invalidate an independently verified incumbent. Preserve
             // the incomplete status when no improvement was actually proved.
-<span class="fc" id="L57">            long beforeFinal=work.used();</span>
-<span class="fc" id="L58">            var proof=checker.check(request.plan(),found.plan());</span>
-<span class="fc" id="L59">            long total=Math.max(work.used(),Math.addExact(searchWork,work.used()-beforeFinal));</span>
-<span class="fc" id="L60">            var finalOutcome=finalVerificationOutcome(proof.accepted(),total,budget.maximumWork());</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if(finalOutcome.isPresent()) return finalOutcome.get();</span>
-<span class="fc" id="L62">            var obligations=obligations(request,found.plan());</span>
-<span class="fc" id="L63">            var cost=cost(request,sourceCost,found.prepared().cost(),obligations);</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">            boolean improved=cost.candidateScore()&lt;cost.sourceScore();</span>
+<span class="fc" id="L68">            long beforeFinal=work.used();</span>
+<span class="fc" id="L69">            var proof=checker.check(request.plan(),found.plan());</span>
+<span class="fc" id="L70">            long total=Math.max(work.used(),Math.addExact(searchWork,work.used()-beforeFinal));</span>
+<span class="fc" id="L71">            var finalOutcome=finalVerificationOutcome(proof.accepted(),total,budget.maximumWork());</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if(finalOutcome.isPresent()) return finalOutcome.get();</span>
+<span class="fc" id="L73">            var obligations=obligations(request,found.plan());</span>
+<span class="fc" id="L74">            var cost=cost(request,sourceCost,found.prepared().cost(),obligations);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (ranking != null) {</span>
+<span class="fc" id="L76">                long beforeRanking = work.used();</span>
+<span class="fc" id="L77">                cost = rankedCost(request, ranking, found, obligations, cost, work);</span>
+<span class="fc" id="L78">                total = Math.addExact(total, work.used() - beforeRanking);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (total &gt; budget.maximumWork()) return new OptimizationResult.BudgetExceeded(&quot;RANKING_BUDGET_EXCEEDED&quot;, total);</span>
+            }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            boolean improved=cost.candidateScore()&lt;cost.sourceScore();</span>
             // Reaching the exploration limit says nothing about the validity of
             // an incumbent that has now passed the full original-source proof.
             // Without an improvement, do not misreport an exhausted search space.
-<span class="fc bfc" id="L68" title="All 4 branches covered.">            if(!improved &amp;&amp; explorationLimited)</span>
-<span class="fc" id="L69">                return new OptimizationResult.BudgetExceeded(&quot;SEARCH_BUDGET_EXCEEDED&quot;,total);</span>
-<span class="fc bfc" id="L70" title="All 4 branches covered.">            if(!improved &amp;&amp; outcome==MoveSearch.Outcome.INCONCLUSIVE)</span>
-<span class="fc" id="L71">                return new OptimizationResult.Inconclusive(&quot;INCOMPLETE_SEARCH_RELATION&quot;,total);</span>
-<span class="fc bfc" id="L72" title="All 4 branches covered.">            if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?&quot;CONSTANT_FOLD_BUDGET_LIMIT&quot;:&quot;NO_IMPROVEMENT_WITH_FULL_POLICY_COST&quot;,OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);</span>
+<span class="fc bfc" id="L85" title="All 4 branches covered.">            if(!improved &amp;&amp; explorationLimited)</span>
+<span class="fc" id="L86">                return new OptimizationResult.BudgetExceeded(&quot;SEARCH_BUDGET_EXCEEDED&quot;,total);</span>
+<span class="fc bfc" id="L87" title="All 4 branches covered.">            if(!improved &amp;&amp; outcome==MoveSearch.Outcome.INCONCLUSIVE)</span>
+<span class="fc" id="L88">                return new OptimizationResult.Inconclusive(&quot;INCOMPLETE_SEARCH_RELATION&quot;,total);</span>
+<span class="fc bfc" id="L89" title="All 4 branches covered.">            if(!improved) return new OptimizationResult.NoImprovement(generator.skippedConstantFold()?&quot;CONSTANT_FOLD_BUDGET_LIMIT&quot;:&quot;NO_IMPROVEMENT_WITH_FULL_POLICY_COST&quot;,OptimizationResult.SearchCompletion.EXHAUSTED_BOUNDED_SPACE,total);</span>
             // Only an actual Candidate executes its trusted constructor's fresh
             // preparation. Non-improvement paths must not charge unused work.
-<span class="fc" id="L75">            long preparationWork=cost.candidateCost().inspectionWork();</span>
-<span class="fc" id="L76">            work.charge(preparationWork); total=Math.addExact(total,preparationWork);</span>
-<span class="fc bfc" id="L77" title="All 2 branches covered.">            if(total&gt;budget.maximumWork()) return new OptimizationResult.BudgetExceeded(&quot;FINAL_PREPARATION_BUDGET_EXCEEDED&quot;,total);</span>
-<span class="fc" id="L78">            var receipt = evidence(request,found.plan(),proof,obligations);</span>
-<span class="fc" id="L79">            long beforeDerivation = work.used();</span>
-<span class="fc" id="L80">            var derivation = SearchDerivations.capture(request, receipt, found, work);</span>
-<span class="fc" id="L81">            total = Math.addExact(total, work.used() - beforeDerivation);</span>
-<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (total &gt; budget.maximumWork()) return new OptimizationResult.BudgetExceeded(&quot;DERIVATION_CAPTURE_BUDGET_EXCEEDED&quot;, total);</span>
-<span class="fc" id="L83">            return new OptimizationResult.Candidate(found.plan(),found.prepared(),receipt,obligations,cost,</span>
-<span class="fc" id="L84">                OptimizationResult.SearchCompletion.IMPROVEMENT_FOUND,total,Optional.of(derivation));</span>
-<span class="fc" id="L85">        } catch(VerificationWork.Stopped stopped) {</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            return stopped.cancelled ? new OptimizationResult.Cancelled(&quot;CANCELLED&quot;) : new OptimizationResult.BudgetExceeded(&quot;OPTIMIZATION_BUDGET_EXCEEDED&quot;,work.used());</span>
-<span class="fc" id="L87">        } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }</span>
+<span class="fc" id="L92">            long preparationWork=cost.candidateCost().inspectionWork();</span>
+<span class="fc" id="L93">            work.charge(preparationWork); total=Math.addExact(total,preparationWork);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if(total&gt;budget.maximumWork()) return new OptimizationResult.BudgetExceeded(&quot;FINAL_PREPARATION_BUDGET_EXCEEDED&quot;,total);</span>
+<span class="fc" id="L95">            var receipt = evidence(request,found.plan(),proof,obligations);</span>
+<span class="fc" id="L96">            long beforeDerivation = work.used();</span>
+<span class="fc" id="L97">            var derivation = SearchDerivations.capture(request, receipt, found, work);</span>
+<span class="fc" id="L98">            total = Math.addExact(total, work.used() - beforeDerivation);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (total &gt; budget.maximumWork()) return new OptimizationResult.BudgetExceeded(&quot;DERIVATION_CAPTURE_BUDGET_EXCEEDED&quot;, total);</span>
+<span class="fc" id="L100">            return new OptimizationResult.Candidate(found.plan(),found.prepared(),receipt,obligations,cost,</span>
+<span class="fc" id="L101">                OptimizationResult.SearchCompletion.IMPROVEMENT_FOUND,total,Optional.of(derivation));</span>
+<span class="fc" id="L102">        } catch(VerificationWork.Stopped stopped) {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            return stopped.cancelled ? new OptimizationResult.Cancelled(&quot;CANCELLED&quot;) : new OptimizationResult.BudgetExceeded(&quot;OPTIMIZATION_BUDGET_EXCEEDED&quot;,work.used());</span>
+<span class="fc" id="L104">        } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }</span>
     }
+    /** Inspect the source once, preserving the request's charged early-exit behavior. */
+    private static boolean hasLiteralWordProjection(OptimizationRequest request, VerificationWork work) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (var occurrence : request.sourceTrace().occurrences()) {</span>
+<span class="fc" id="L109">            work.charge(1);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (JavaExpressions.operationOf(occurrence.expression()).orElse(null) == NumericOperation.AND) {</span>
+<span class="fc" id="L111">                work.charge(2);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                if (JavaExpressions.operands(occurrence.expression()).stream().anyMatch(JavaExpressions::isLiteral))</span>
+<span class="fc" id="L113">                    return true;</span>
+            }
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">        return false;</span>
+    }
+
+    /** Reassess the independently proved incumbent using the same paid consumer ranking. */
+    private static OptimizationResult.CostAssessment rankedCost(OptimizationRequest request,
+            CandidateRanking ranking, JointPlanSearch.Result found, RuntimeObligations obligations,
+            OptimizationResult.CostAssessment cost, VerificationWork work) {
+<span class="fc" id="L123">        var original = prepare(request.plan()); work.chargeCompleted(original.cost().inspectionWork());</span>
+<span class="fc" id="L124">        var sourceRank = ranking.assessSource(request.plan(), original); work.chargeCompleted(sourceRank.work());</span>
+<span class="fc" id="L125">        var candidateRank = ranking.assess(found.plan(), found.prepared()); work.chargeCompleted(candidateRank.work());</span>
+<span class="fc" id="L126">        long targetScore = Math.addExact(candidateRank.score(),</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                request.goal() == OptimizationGoal.READABILITY ? 0 : obligations.estimatedCheckWork() + obligations.fallbackOperationCount());</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">        boolean runtime = sourceRank.runtimeWork() &lt; 0 || candidateRank.runtimeWork() &lt; 0 ? cost.estimatedRuntimeImprovement()</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                : candidateRank.runtimeWork() + obligations.estimatedCheckWork() + obligations.fallbackOperationCount() &lt; sourceRank.runtimeWork();</span>
+<span class="fc" id="L130">        return new OptimizationResult.CostAssessment(sourceRank.score(), targetScore, cost.checkWork(), cost.fallbackOperations(),</span>
+<span class="fc" id="L131">                cost.sourceCost(), cost.candidateCost(), runtime);</span>
+    }
+
     /** Classify aggregate search/proof work before any final proof outcome or preparation. */
     static Optional&lt;OptimizationResult&gt; finalVerificationOutcome(boolean proofAccepted,long totalWork,long maximumWork) {
-<span class="fc bfc" id="L91" title="All 2 branches covered.">        if(totalWork&gt;maximumWork) return Optional.of(new OptimizationResult.BudgetExceeded(&quot;FINAL_VERIFICATION_BUDGET_EXCEEDED&quot;,totalWork));</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        if(!proofAccepted) return Optional.of(new OptimizationResult.Inconclusive(&quot;FINAL_INDEPENDENT_CHECK_NOT_PROVED&quot;,totalWork));</span>
-<span class="fc" id="L93">        return Optional.empty();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if(totalWork&gt;maximumWork) return Optional.of(new OptimizationResult.BudgetExceeded(&quot;FINAL_VERIFICATION_BUDGET_EXCEEDED&quot;,totalWork));</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if(!proofAccepted) return Optional.of(new OptimizationResult.Inconclusive(&quot;FINAL_INDEPENDENT_CHECK_NOT_PROVED&quot;,totalWork));</span>
+<span class="fc" id="L138">        return Optional.empty();</span>
     }
     public VerificationResult verify(OptimizationRequest request, JointComputationPlan candidate, CancellationToken token) {
-<span class="fc" id="L96">        Objects.requireNonNull(request); Objects.requireNonNull(candidate);</span>
-<span class="fc" id="L97">        return verifyWithin(request, candidate, new VerificationWork(request, token));</span>
+<span class="fc" id="L141">        Objects.requireNonNull(request); Objects.requireNonNull(candidate);</span>
+<span class="fc" id="L142">        return verifyWithin(request, candidate, new VerificationWork(request, token));</span>
     }
     private VerificationResult verifyWithin(OptimizationRequest request, JointComputationPlan candidate, VerificationWork work) {
         try {
-<span class="fc" id="L101">            var checker=new SemanticChecker(request,work); checker.validate();</span>
-<span class="fc" id="L102">            var proof=checker.check(request.plan(),candidate);</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">            if(proof.accepted()) {</span>
-<span class="fc" id="L104">                var obligations=obligations(request,candidate);</span>
-<span class="fc" id="L105">                return new VerificationResult.Verified(evidence(request,candidate,proof,obligations),obligations);</span>
+<span class="fc" id="L146">            var checker=new SemanticChecker(request,work); checker.validate();</span>
+<span class="fc" id="L147">            var proof=checker.check(request.plan(),candidate);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if(proof.accepted()) {</span>
+<span class="fc" id="L149">                var obligations=obligations(request,candidate);</span>
+<span class="fc" id="L150">                return new VerificationResult.Verified(evidence(request,candidate,proof,obligations),obligations);</span>
             }
-<span class="fc" id="L107">            var counterexample=counterexample(request,candidate,work);</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            if(counterexample!=null) return new VerificationResult.Refuted(&quot;JAVA_NUMERIC_COUNTEREXAMPLE&quot;,counterexample);</span>
-<span class="fc" id="L109">            return new VerificationResult.Inconclusive(&quot;OUTSIDE_PROVED_NUMERIC_FRAGMENT&quot;);</span>
-<span class="fc" id="L110">        } catch(VerificationWork.Stopped stopped) {</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">            return stopped.cancelled ? new VerificationResult.Cancelled(&quot;CANCELLED&quot;) : new VerificationResult.BudgetExceeded(&quot;VERIFICATION_BUDGET_EXCEEDED&quot;,work.used());</span>
-<span class="fc" id="L112">        } catch(IllegalArgumentException invalid) { return new VerificationResult.Unsupported(diagnostic(invalid)); }</span>
+<span class="fc" id="L152">            var counterexample=counterexample(request,candidate,work);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if(counterexample!=null) return new VerificationResult.Refuted(&quot;JAVA_NUMERIC_COUNTEREXAMPLE&quot;,counterexample);</span>
+<span class="fc" id="L154">            return new VerificationResult.Inconclusive(&quot;OUTSIDE_PROVED_NUMERIC_FRAGMENT&quot;);</span>
+<span class="fc" id="L155">        } catch(VerificationWork.Stopped stopped) {</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            return stopped.cancelled ? new VerificationResult.Cancelled(&quot;CANCELLED&quot;) : new VerificationResult.BudgetExceeded(&quot;VERIFICATION_BUDGET_EXCEEDED&quot;,work.used());</span>
+<span class="fc" id="L157">        } catch(IllegalArgumentException invalid) { return new VerificationResult.Unsupported(diagnostic(invalid)); }</span>
     }
     public VerificationResult reverify(OptimizationRequest request, OptimizationResult.Candidate candidate, CancellationToken token) {
-<span class="fc" id="L115">        Objects.requireNonNull(request); Objects.requireNonNull(candidate);</span>
-<span class="fc" id="L116">        return reverifyWithin(request, candidate, new VerificationWork(request, token));</span>
+<span class="fc" id="L160">        Objects.requireNonNull(request); Objects.requireNonNull(candidate);</span>
+<span class="fc" id="L161">        return reverifyWithin(request, candidate, new VerificationWork(request, token));</span>
     }
     /** Continue the same caller budget and deadline through proof and presentation. */
     VerificationResult reverifyWithin(OptimizationRequest request, OptimizationResult.Candidate candidate, VerificationWork work) {
-<span class="fc" id="L120">        Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(work);</span>
-<span class="fc" id="L121">        var verified=verifyWithin(request,candidate.plan(),work);</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        if(!(verified instanceof VerificationResult.Verified proof)) return verified;</span>
-<span class="pc bpc" id="L123" title="1 of 4 branches missed.">        if(!proof.evidence().equals(candidate.evidence()) || !proof.obligations().equals(candidate.obligations()))</span>
-<span class="fc" id="L124">            return new VerificationResult.Unsupported(&quot;EVIDENCE_BINDING_OR_REVISION_DIFFERS&quot;);</span>
+<span class="fc" id="L165">        Objects.requireNonNull(request); Objects.requireNonNull(candidate); Objects.requireNonNull(work);</span>
+<span class="fc" id="L166">        var verified=verifyWithin(request,candidate.plan(),work);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if(!(verified instanceof VerificationResult.Verified proof)) return verified;</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">        if(!proof.evidence().equals(candidate.evidence()) || !proof.obligations().equals(candidate.obligations()))</span>
+<span class="fc" id="L169">            return new VerificationResult.Unsupported(&quot;EVIDENCE_BINDING_OR_REVISION_DIFFERS&quot;);</span>
         try {
-<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (candidate.derivation().isPresent())</span>
-<span class="fc" id="L127">                SearchDerivations.replay(request, candidate, candidate.derivation().orElseThrow(), work);</span>
-<span class="fc" id="L128">        } catch (VerificationWork.Stopped stopped) {</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">            return stopped.cancelled ? new VerificationResult.Cancelled(&quot;CANCELLED&quot;)</span>
-<span class="fc" id="L130">                : new VerificationResult.BudgetExceeded(&quot;DERIVATION_REPLAY_BUDGET_EXCEEDED&quot;, work.used());</span>
-<span class="fc" id="L131">        } catch (IllegalArgumentException invalid) {</span>
-<span class="fc" id="L132">            return new VerificationResult.Unsupported(diagnostic(invalid));</span>
-<span class="fc" id="L133">        }</span>
-<span class="fc" id="L134">        return proof;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (candidate.derivation().isPresent())</span>
+<span class="fc" id="L172">                SearchDerivations.replay(request, candidate, candidate.derivation().orElseThrow(), work);</span>
+<span class="fc" id="L173">        } catch (VerificationWork.Stopped stopped) {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            return stopped.cancelled ? new VerificationResult.Cancelled(&quot;CANCELLED&quot;)</span>
+<span class="fc" id="L175">                : new VerificationResult.BudgetExceeded(&quot;DERIVATION_REPLAY_BUDGET_EXCEEDED&quot;, work.used());</span>
+<span class="fc" id="L176">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L177">            return new VerificationResult.Unsupported(diagnostic(invalid));</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">        return proof;</span>
     }
     /** Reference policy evaluator for consumer qualification. Generated Java needs no SDK runtime. */
     public Map&lt;String,Object&gt; evaluateChecked(OptimizationRequest request, OptimizationResult.Candidate candidate, Map&lt;String,?&gt; inputs) {
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if(request.safetyProfile()!=SafetyProfile.CHECKED_THROW) throw new IllegalArgumentException(&quot;CHECKED_PROFILE_REQUIRED&quot;);</span>
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if(!(reverify(request,candidate,CancellationToken.NONE) instanceof VerificationResult.Verified)) throw new IllegalArgumentException(&quot;CANDIDATE_NOT_REVERIFIED&quot;);</span>
-<span class="fc" id="L140">        return RuntimeChecks.checked(request,candidate.plan(),candidate.obligations(),inputs);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if(request.safetyProfile()!=SafetyProfile.CHECKED_THROW) throw new IllegalArgumentException(&quot;CHECKED_PROFILE_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if(!(reverify(request,candidate,CancellationToken.NONE) instanceof VerificationResult.Verified)) throw new IllegalArgumentException(&quot;CANDIDATE_NOT_REVERIFIED&quot;);</span>
+<span class="fc" id="L185">        return RuntimeChecks.checked(request,candidate.plan(),candidate.obligations(),inputs);</span>
     }
     /** Reference fallback. The boolean guard has no user effects; a failed gate selects the original values. */
     public Map&lt;String,Object&gt; evaluateGuarded(OptimizationRequest request, OptimizationResult.Candidate candidate, Map&lt;String,?&gt; inputs) {
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if(request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK) throw new IllegalArgumentException(&quot;GUARDED_PROFILE_REQUIRED&quot;);</span>
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if(!(reverify(request,candidate,CancellationToken.NONE) instanceof VerificationResult.Verified)) throw new IllegalArgumentException(&quot;CANDIDATE_NOT_REVERIFIED&quot;);</span>
-<span class="fc" id="L146">        try { return RuntimeChecks.checked(request,candidate.plan(),candidate.obligations(),inputs); }</span>
-<span class="fc" id="L147">        catch(RuntimeChecks.AssumptionGuardFailure | ArithmeticException numericalGate) { return prepare(request.plan()).execute(inputs); }</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if(request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK) throw new IllegalArgumentException(&quot;GUARDED_PROFILE_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if(!(reverify(request,candidate,CancellationToken.NONE) instanceof VerificationResult.Verified)) throw new IllegalArgumentException(&quot;CANDIDATE_NOT_REVERIFIED&quot;);</span>
+<span class="fc" id="L191">        try { return RuntimeChecks.checked(request,candidate.plan(),candidate.obligations(),inputs); }</span>
+<span class="fc" id="L192">        catch(RuntimeChecks.AssumptionGuardFailure | ArithmeticException numericalGate) { return prepare(request.plan()).execute(inputs); }</span>
     }
     private static RuntimeObligations obligations(OptimizationRequest request,JointComputationPlan target) {
-<span class="fc" id="L150">        var kinds=EnumSet.noneOf(NumericKind.class);</span>
-<span class="fc" id="L151">        request.plan().inputs().values().forEach(type -&gt; kinds.add(NumericKind.fromType(type)));</span>
-<span class="fc" id="L152">        request.sourceTrace().occurrences().forEach(o -&gt; kinds.add(o.evaluatedKind()));</span>
-<span class="fc" id="L153">        target.outputs().forEach(o -&gt; kinds.add(NumericKind.fromType(o.type())));</span>
-<span class="fc" id="L154">        var replacement=SourceEvaluationTrace.fromPlan(target);</span>
-<span class="fc bfc" id="L155" title="All 2 branches covered.">        boolean active=request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;</span>
-<span class="fc bfc" id="L156" title="All 4 branches covered.">        boolean integral=active&amp;&amp;(request.sourceTrace().occurrences().stream().anyMatch(o -&gt; o.evaluatedKind().integral())</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            || replacement.occurrences().stream().anyMatch(o -&gt; o.evaluatedKind().integral()));</span>
-<span class="fc bfc" id="L158" title="All 4 branches covered.">        boolean fp=active&amp;&amp;kinds.stream().anyMatch(NumericKind::floatingPoint);</span>
-<span class="fc" id="L159">        long checkWork=0;</span>
+<span class="fc" id="L195">        var kinds=EnumSet.noneOf(NumericKind.class);</span>
+<span class="fc" id="L196">        request.plan().inputs().values().forEach(type -&gt; kinds.add(NumericKind.fromType(type)));</span>
+<span class="fc" id="L197">        request.sourceTrace().occurrences().forEach(o -&gt; kinds.add(o.evaluatedKind()));</span>
+<span class="fc" id="L198">        target.outputs().forEach(o -&gt; kinds.add(NumericKind.fromType(o.type())));</span>
+<span class="fc" id="L199">        var replacement=SourceEvaluationTrace.fromPlan(target);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        boolean active=request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;</span>
+<span class="fc bfc" id="L201" title="All 4 branches covered.">        boolean integral=active&amp;&amp;(request.sourceTrace().occurrences().stream().anyMatch(o -&gt; o.evaluatedKind().integral())</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            || replacement.occurrences().stream().anyMatch(o -&gt; o.evaluatedKind().integral()));</span>
+<span class="fc bfc" id="L203" title="All 4 branches covered.">        boolean fp=active&amp;&amp;kinds.stream().anyMatch(NumericKind::floatingPoint);</span>
+<span class="fc" id="L204">        long checkWork=0;</span>
         // A BigInteger-only fallback has no primitive numerical gate. Receiver
         // guards belong to the source adapter; it must account for their real cost.
-<span class="fc bfc" id="L162" title="All 8 branches covered.">        boolean evaluateOriginal = active &amp;&amp; (request.safetyProfile()==SafetyProfile.CHECKED_THROW || integral || fp);</span>
-<span class="fc bfc" id="L163" title="All 2 branches covered.">        if(evaluateOriginal) {</span>
-<span class="fc" id="L164">            var backend=new JavaNumericBackend(request.plan().inputs());</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">            for(var occurrence:request.sourceTrace().occurrences()) checkWork+=backend.operation(occurrence.expression()).work();</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">            checkWork+=(request.sourceTrace().occurrences().size()+replacement.occurrences().size())*(fp?3L:2L)</span>
-<span class="fc" id="L167">                +request.plan().inputs().size()+2L*request.plan().outputs().size();</span>
+<span class="fc bfc" id="L207" title="All 8 branches covered.">        boolean evaluateOriginal = active &amp;&amp; (request.safetyProfile()==SafetyProfile.CHECKED_THROW || integral || fp);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if(evaluateOriginal) {</span>
+<span class="fc" id="L209">            var backend=new JavaNumericBackend(request.plan().inputs());</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for(var occurrence:request.sourceTrace().occurrences()) checkWork+=backend.operation(occurrence.expression()).work();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            checkWork+=(request.sourceTrace().occurrences().size()+replacement.occurrences().size())*(fp?3L:2L)</span>
+<span class="fc" id="L212">                +request.plan().inputs().size()+2L*request.plan().outputs().size();</span>
         }
-<span class="fc bfc" id="L169" title="All 6 branches covered.">        int fallback=request.safetyProfile()==SafetyProfile.GUARDED_FALLBACK &amp;&amp; (integral || fp)?request.sourceTrace().occurrences().size():0;</span>
-<span class="fc bfc" id="L170" title="All 4 branches covered.">        var guard=request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK?RuntimeObligations.GuardKind.NONE:fp?</span>
-<span class="fc bfc" id="L171" title="All 2 branches covered.">            RuntimeObligations.GuardKind.FINITE_AND_BITWISE_EQUAL:integral?RuntimeObligations.GuardKind.ORIGINAL_AND_REPLACEMENT_RANGE:RuntimeObligations.GuardKind.NONE;</span>
-<span class="fc" id="L172">        return new RuntimeObligations(guard,request.sourceTrace(),replacement,integral,fp,fp,checkWork,fallback);</span>
+<span class="fc bfc" id="L214" title="All 6 branches covered.">        int fallback=request.safetyProfile()==SafetyProfile.GUARDED_FALLBACK &amp;&amp; (integral || fp)?request.sourceTrace().occurrences().size():0;</span>
+<span class="fc bfc" id="L215" title="All 4 branches covered.">        var guard=request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK?RuntimeObligations.GuardKind.NONE:fp?</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            RuntimeObligations.GuardKind.FINITE_AND_BITWISE_EQUAL:integral?RuntimeObligations.GuardKind.ORIGINAL_AND_REPLACEMENT_RANGE:RuntimeObligations.GuardKind.NONE;</span>
+<span class="fc" id="L217">        return new RuntimeObligations(guard,request.sourceTrace(),replacement,integral,fp,fp,checkWork,fallback);</span>
     }
     private static VerificationEvidence evidence(OptimizationRequest request,JointComputationPlan target,SemanticChecker.Proof proof,RuntimeObligations obligations) {
-<span class="fc" id="L175">        return new VerificationEvidence(&quot;regelsuche.optimization-evidence/v1&quot;,SEMANTICS_REVISION,SemanticChecker.REVISION,JavaCandidateGenerator.REVISION,</span>
-<span class="fc" id="L176">            EvidenceHashes.plan(request.plan()),EvidenceHashes.plan(target),EvidenceHashes.trace(request.sourceTrace()),EvidenceHashes.assumptions(request.assumptions()),</span>
-<span class="fc" id="L177">            request.safetyProfile(),request.checkedPolicy(),obligations,proof.methods(),proof.work());</span>
+<span class="fc" id="L220">        return new VerificationEvidence(&quot;regelsuche.optimization-evidence/v1&quot;,SEMANTICS_REVISION,SemanticChecker.REVISION,JavaCandidateGenerator.REVISION,</span>
+<span class="fc" id="L221">            EvidenceHashes.plan(request.plan()),EvidenceHashes.plan(target),EvidenceHashes.trace(request.sourceTrace()),EvidenceHashes.assumptions(request.assumptions()),</span>
+<span class="fc" id="L222">            request.safetyProfile(),request.checkedPolicy(),obligations,proof.methods(),proof.work());</span>
     }
     private static JointPlanSearch.Weights weights(OptimizationGoal goal) {
-<span class="pc bpc" id="L180" title="1 of 3 branches missed.">        return switch(goal) {</span>
-<span class="fc" id="L181">            case LOWER_ESTIMATED_RUNTIME -&gt; new JointPlanSearch.Weights(10,1,1,1);</span>
-<span class="nc" id="L182">            case LOWER_ALLOCATION -&gt; new JointPlanSearch.Weights(1,10,10,1);</span>
-<span class="fc" id="L183">            case READABILITY -&gt; new JointPlanSearch.Weights(1,0,0,1);</span>
+<span class="pc bpc" id="L225" title="1 of 3 branches missed.">        return switch(goal) {</span>
+<span class="fc" id="L226">            case LOWER_ESTIMATED_RUNTIME -&gt; new JointPlanSearch.Weights(10,1,1,1);</span>
+<span class="nc" id="L227">            case LOWER_ALLOCATION -&gt; new JointPlanSearch.Weights(1,10,10,1);</span>
+<span class="fc" id="L228">            case READABILITY -&gt; new JointPlanSearch.Weights(1,0,0,1);</span>
         };
     }
     private static OptimizationResult.CostAssessment cost(OptimizationRequest request,
             PreparedJointComputation.Cost source,PreparedJointComputation.Cost candidate,RuntimeObligations obligations) {
-<span class="fc" id="L188">        var backend=new JavaNumericBackend(request.plan().inputs());</span>
-<span class="fc" id="L189">        long originalWork=0;</span>
-<span class="fc bfc" id="L190" title="All 2 branches covered.">        for(var occurrence:request.sourceTrace().occurrences()) originalWork+=backend.operation(occurrence.expression()).work();</span>
-<span class="fc" id="L191">        long sourceWork=Math.max(originalWork,source.operationWork());</span>
-<span class="fc" id="L192">        var weights=weights(request.goal());</span>
-<span class="fc" id="L193">        long sourceScore=source.weighted(weights.operation(),weights.liveStorage(),weights.retainedStorage(),weights.outputBindings())+(sourceWork-source.operationWork())*weights.operation();</span>
-<span class="fc" id="L194">        long candidateScore=candidate.weighted(weights.operation(),weights.liveStorage(),weights.retainedStorage(),weights.outputBindings());</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">        if(request.goal()!=OptimizationGoal.READABILITY) candidateScore+=obligations.estimatedCheckWork()*weights.operation()+obligations.fallbackOperationCount();</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">        boolean runtime=candidate.operationWork()+obligations.estimatedCheckWork()+obligations.fallbackOperationCount()&lt;sourceWork;</span>
-<span class="fc" id="L197">        return new OptimizationResult.CostAssessment(sourceScore,candidateScore,obligations.estimatedCheckWork(),obligations.fallbackOperationCount(),source,candidate,runtime);</span>
+<span class="fc" id="L233">        var backend=new JavaNumericBackend(request.plan().inputs());</span>
+<span class="fc" id="L234">        long originalWork=0;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        for(var occurrence:request.sourceTrace().occurrences()) originalWork+=backend.operation(occurrence.expression()).work();</span>
+<span class="fc" id="L236">        long sourceWork=Math.max(originalWork,source.operationWork());</span>
+<span class="fc" id="L237">        var weights=weights(request.goal());</span>
+<span class="fc" id="L238">        long sourceScore=source.weighted(weights.operation(),weights.liveStorage(),weights.retainedStorage(),weights.outputBindings())+(sourceWork-source.operationWork())*weights.operation();</span>
+<span class="fc" id="L239">        long candidateScore=candidate.weighted(weights.operation(),weights.liveStorage(),weights.retainedStorage(),weights.outputBindings());</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if(request.goal()!=OptimizationGoal.READABILITY) candidateScore+=obligations.estimatedCheckWork()*weights.operation()+obligations.fallbackOperationCount();</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        boolean runtime=candidate.operationWork()+obligations.estimatedCheckWork()+obligations.fallbackOperationCount()&lt;sourceWork;</span>
+<span class="fc" id="L242">        return new OptimizationResult.CostAssessment(sourceScore,candidateScore,obligations.estimatedCheckWork(),obligations.fallbackOperationCount(),source,candidate,runtime);</span>
     }
     private static Map&lt;String,Object&gt; counterexample(OptimizationRequest request,JointComputationPlan candidate,VerificationWork work) {
-<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if(!request.plan().inputs().equals(candidate.inputs())) return Map.of();</span>
-<span class="fc bfc" id="L201" title="All 2 branches covered.">        if(!safeToSample(request,candidate,work)) return null;</span>
-<span class="fc" id="L202">        var source=prepare(request.plan()); var target=prepare(candidate);</span>
-<span class="fc" id="L203">        var names=request.plan().inputs().keySet().stream().sorted().toList();</span>
-<span class="fc" id="L204">        var baseline=new LinkedHashMap&lt;String,Object&gt;();</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">        for(var name:names) baseline.put(name,samples(NumericKind.fromType(request.plan().inputs().get(name))).getFirst());</span>
-<span class="fc" id="L206">        var probes=new ArrayList&lt;Map&lt;String,Object&gt;&gt;(); probes.add(baseline);</span>
-<span class="fc bfc" id="L207" title="All 4 branches covered.">        for(var name:names) for(var sample:samples(NumericKind.fromType(request.plan().inputs().get(name)))) {</span>
-<span class="fc" id="L208">            work.charge(1); var probe=new LinkedHashMap&lt;&gt;(baseline); probe.put(name,sample); probes.add(probe);</span>
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if(probes.size()&gt;=256) break;</span>
-<span class="fc" id="L210">        }</span>
-<span class="fc bfc" id="L211" title="All 2 branches covered.">        for(var probe:probes) {</span>
-<span class="fc" id="L212">            work.charge(1);</span>
-<span class="fc" id="L213">            try { RuntimeChecks.validateAssumptions(request,probe); }</span>
-<span class="fc" id="L214">            catch(IllegalArgumentException assumptionViolated) { continue; }</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if(!request.plan().inputs().equals(candidate.inputs())) return Map.of();</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if(!safeToSample(request,candidate,work)) return null;</span>
+<span class="fc" id="L247">        var source=prepare(request.plan()); var target=prepare(candidate);</span>
+<span class="fc" id="L248">        work.chargeCompleted(source.cost().inspectionWork() + target.cost().inspectionWork());</span>
+<span class="fc" id="L249">        var names=request.plan().inputs().keySet().stream().sorted().toList();</span>
+<span class="fc" id="L250">        var baseline=new LinkedHashMap&lt;String,Object&gt;();</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for(var name:names) baseline.put(name,samples(NumericKind.fromType(request.plan().inputs().get(name))).getFirst());</span>
+<span class="fc" id="L252">        var probes=new ArrayList&lt;Map&lt;String,Object&gt;&gt;(); probes.add(baseline);</span>
+<span class="fc bfc" id="L253" title="All 4 branches covered.">        for(var name:names) for(var sample:samples(NumericKind.fromType(request.plan().inputs().get(name)))) {</span>
+<span class="fc" id="L254">            work.charge(1); var probe=new LinkedHashMap&lt;&gt;(baseline); probe.put(name,sample); probes.add(probe);</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            if(probes.size()&gt;=256) break;</span>
+<span class="fc" id="L256">        }</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for(var probe:probes) {</span>
+<span class="fc" id="L258">            work.charge(1);</span>
+<span class="fc" id="L259">            try { RuntimeChecks.validateAssumptions(request,probe); }</span>
+<span class="fc" id="L260">            catch(IllegalArgumentException assumptionViolated) { continue; }</span>
             try {
-<span class="fc" id="L216">                var left=source.execute(probe); var right=target.execute(probe);</span>
-<span class="pc bpc" id="L217" title="1 of 6 branches missed.">                if(!left.keySet().equals(right.keySet()) || left.keySet().stream().anyMatch(name -&gt; !RuntimeChecks.same(left.get(name),right.get(name)))) return probe;</span>
-<span class="pc" id="L218">            } catch(ArithmeticException existingException) { /* Throwing fragments are validated separately; samples never prove them. */ }</span>
-<span class="fc" id="L219">        }</span>
-<span class="fc" id="L220">        return null;</span>
+<span class="fc" id="L262">                work.charge(source.nodes().size() + target.nodes().size() + 2L * names.size());</span>
+<span class="fc" id="L263">                var left=source.execute(probe); var right=target.execute(probe);</span>
+<span class="pc bpc" id="L264" title="1 of 6 branches missed.">                if(!left.keySet().equals(right.keySet()) || left.keySet().stream().anyMatch(name -&gt; !RuntimeChecks.same(left.get(name),right.get(name)))) return probe;</span>
+<span class="pc" id="L265">            } catch(ArithmeticException existingException) { /* Throwing fragments are validated separately; samples never prove them. */ }</span>
+<span class="fc" id="L266">        }</span>
+<span class="fc" id="L267">        return null;</span>
     }
     /** Diagnostic samples can refute only. Never execute resource-heavy operations to obtain one. */
     private static boolean safeToSample(OptimizationRequest request,JointComputationPlan candidate,VerificationWork work) {
-<span class="fc" id="L224">        var bounds=new BigIntegerBounds(request,work,4096);</span>
-<span class="fc" id="L225">        var pending=new ArrayDeque&lt;Expr&gt;();</span>
-<span class="fc" id="L226">        pending.addAll(request.plan().outputExpressions()); pending.addAll(candidate.outputExpressions());</span>
-<span class="fc" id="L227">        request.sourceTrace().occurrences().forEach(o -&gt; pending.add(o.expression()));</span>
-<span class="fc" id="L228">        var seen=new HashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L271">        var bounds=new BigIntegerBounds(request,work,4096);</span>
+<span class="fc" id="L272">        var pending=new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L273">        pending.addAll(request.plan().outputExpressions()); pending.addAll(candidate.outputExpressions());</span>
+<span class="fc" id="L274">        request.sourceTrace().occurrences().forEach(o -&gt; pending.add(o.expression()));</span>
+<span class="fc" id="L275">        var seen=new HashSet&lt;Expr&gt;();</span>
         try {
-<span class="fc bfc" id="L230" title="All 2 branches covered.">            while(!pending.isEmpty()) {</span>
-<span class="fc" id="L231">                work.charge(1); var expression=pending.removeFirst();</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">                if(!seen.add(expression)) continue;</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">                if(JavaExpressions.kindOf(expression,request.plan().inputs())==NumericKind.BIG_INTEGER) {</span>
-<span class="fc" id="L234">                    var operation=JavaExpressions.operationOf(expression).orElse(null);</span>
-<span class="fc bfc" id="L235" title="All 2 branches covered.">                    if(operation!=null &amp;&amp; EnumSet.of(NumericOperation.POW,NumericOperation.MOD_POW,NumericOperation.MOD_MULTIPLY,</span>
-<span class="fc bfc" id="L236" title="All 2 branches covered.">                            NumericOperation.SHIFT_LEFT,NumericOperation.SHIFT_RIGHT).contains(operation)) return false;</span>
-<span class="fc" id="L237">                    bounds.require(expression);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            while(!pending.isEmpty()) {</span>
+<span class="fc" id="L278">                work.charge(1); var expression=pending.removeFirst();</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                if(!seen.add(expression)) continue;</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">                if(JavaExpressions.kindOf(expression,request.plan().inputs())==NumericKind.BIG_INTEGER) {</span>
+<span class="fc" id="L281">                    var operation=JavaExpressions.operationOf(expression).orElse(null);</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">                    if(operation!=null &amp;&amp; EnumSet.of(NumericOperation.POW,NumericOperation.MOD_POW,NumericOperation.MOD_MULTIPLY,</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">                            NumericOperation.SHIFT_LEFT,NumericOperation.SHIFT_RIGHT).contains(operation)) return false;</span>
+<span class="fc" id="L284">                    bounds.require(expression);</span>
                 }
-<span class="fc bfc" id="L239" title="All 2 branches covered.">                if(!JavaExpressions.isLiteral(expression)) pending.addAll(JavaExpressions.operands(expression));</span>
-<span class="fc" id="L240">            }</span>
-<span class="fc" id="L241">            return true;</span>
-<span class="fc" id="L242">        } catch(IllegalArgumentException outsideBound) { return false; }</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                if(!JavaExpressions.isLiteral(expression)) pending.addAll(JavaExpressions.operands(expression));</span>
+<span class="fc" id="L287">            }</span>
+<span class="fc" id="L288">            return true;</span>
+<span class="fc" id="L289">        } catch(IllegalArgumentException outsideBound) { return false; }</span>
     }
     private static List&lt;Object&gt; samples(NumericKind kind) {
-<span class="pc bpc" id="L245" title="4 of 8 branches missed.">        return switch(kind) {</span>
-<span class="fc" id="L246">            case INT -&gt; List.of(1,Integer.MAX_VALUE,Integer.MIN_VALUE,0,-1,2,-2,1&lt;&lt;30);</span>
-<span class="fc" id="L247">            case LONG -&gt; List.of(1L,Long.MAX_VALUE,Long.MIN_VALUE,0L,-1L,2L,-2L,1L&lt;&lt;62);</span>
-<span class="nc" id="L248">            case BYTE -&gt; List.of((byte)1,Byte.MIN_VALUE,Byte.MAX_VALUE,(byte)0,(byte)-1);</span>
-<span class="nc" id="L249">            case SHORT -&gt; List.of((short)1,Short.MIN_VALUE,Short.MAX_VALUE,(short)0,(short)-1);</span>
-<span class="nc" id="L250">            case CHAR -&gt; List.of((char)1,Character.MIN_VALUE,Character.MAX_VALUE);</span>
-<span class="nc" id="L251">            case FLOAT -&gt; List.of(1f,16_777_216f,-0f,0f,Float.MAX_VALUE,Float.MIN_VALUE,Float.MIN_NORMAL,Float.POSITIVE_INFINITY,Float.NaN,-1f);</span>
-<span class="fc" id="L252">            case DOUBLE -&gt; List.of(1d,1e16,-0d,0d,Double.MAX_VALUE,Double.MIN_VALUE,Double.MIN_NORMAL,Double.POSITIVE_INFINITY,Double.NaN,-1d);</span>
-<span class="fc" id="L253">            case BIG_INTEGER -&gt; List.of(BigInteger.ONE,BigInteger.TEN,BigInteger.ZERO,BigInteger.ONE.negate(),BigInteger.valueOf(17));</span>
+<span class="pc bpc" id="L292" title="4 of 8 branches missed.">        return switch(kind) {</span>
+<span class="fc" id="L293">            case INT -&gt; List.of(1,Integer.MAX_VALUE,Integer.MIN_VALUE,0,-1,2,-2,1&lt;&lt;30);</span>
+<span class="fc" id="L294">            case LONG -&gt; List.of(1L,Long.MAX_VALUE,Long.MIN_VALUE,0L,-1L,2L,-2L,1L&lt;&lt;62);</span>
+<span class="nc" id="L295">            case BYTE -&gt; List.of((byte)1,Byte.MIN_VALUE,Byte.MAX_VALUE,(byte)0,(byte)-1);</span>
+<span class="nc" id="L296">            case SHORT -&gt; List.of((short)1,Short.MIN_VALUE,Short.MAX_VALUE,(short)0,(short)-1);</span>
+<span class="nc" id="L297">            case CHAR -&gt; List.of((char)1,Character.MIN_VALUE,Character.MAX_VALUE);</span>
+<span class="nc" id="L298">            case FLOAT -&gt; List.of(1f,16_777_216f,-0f,0f,Float.MAX_VALUE,Float.MIN_VALUE,Float.MIN_NORMAL,Float.POSITIVE_INFINITY,Float.NaN,-1f);</span>
+<span class="fc" id="L299">            case DOUBLE -&gt; List.of(1d,1e16,-0d,0d,Double.MAX_VALUE,Double.MIN_VALUE,Double.MIN_NORMAL,Double.POSITIVE_INFINITY,Double.NaN,-1d);</span>
+<span class="fc" id="L300">            case BIG_INTEGER -&gt; List.of(BigInteger.ONE,BigInteger.TEN,BigInteger.ZERO,BigInteger.ONE.negate(),BigInteger.valueOf(17));</span>
         };
     }
-<span class="pc bpc" id="L256" title="1 of 2 branches missed.">    private static String diagnostic(IllegalArgumentException invalid) { return invalid.getMessage()==null?&quot;INVALID_TYPED_PLAN&quot;:invalid.getMessage(); }</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">    private static String diagnostic(IllegalArgumentException invalid) { return invalid.getMessage()==null?&quot;INVALID_TYPED_PLAN&quot;:invalid.getMessage(); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

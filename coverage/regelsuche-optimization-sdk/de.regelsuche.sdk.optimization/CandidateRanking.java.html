@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CandidateRanking.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">CandidateRanking.java</span></div><h1>CandidateRanking.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.search.program.JointComputationPlan;
+import de.regelsuche.search.program.PreparedJointComputation;
+
+/** Consumer cost estimates order the existing search; they never establish equivalence.
+ * Implementations must be deterministic, bounded and report their inspection work.
+ */
+@FunctionalInterface
+public interface CandidateRanking {
+    Assessment assess(JointComputationPlan plan, PreparedJointComputation prepared);
+    /** Original execution may repeat values already shared in the prepared graph. */
+    default Assessment assessSource(JointComputationPlan plan, PreparedJointComputation prepared) {
+<span class="fc" id="L14">        return assess(plan, prepared);</span>
+    }
+    /** runtimeWork is separate from the weighted score; -1 retains the SDK's structural estimate. */
+    record Assessment(long score, long work, long runtimeWork) {
+<span class="fc" id="L18">        public Assessment(long score, long work) { this(score, work, -1); }</span>
+<span class="fc" id="L19">        public Assessment {</span>
+<span class="pc bpc" id="L20" title="5 of 10 branches missed.">            if (score &lt; 0 || score &gt; Long.MAX_VALUE / 16 || work &lt; 1 || runtimeWork &lt; -1 || runtimeWork &gt; Long.MAX_VALUE / 16)</span>
+<span class="nc" id="L21">                throw new IllegalArgumentException(&quot;INVALID_CANDIDATE_RANKING&quot;);</span>
+<span class="fc" id="L22">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

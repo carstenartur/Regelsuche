@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LowWordProof.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">LowWordProof.java</span></div><h1>LowWordProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Independent quotient-ring proof for values observed through the same low-bit projection. */
+final class LowWordProof {
+    private final VerificationWork work;
+<span class="fc" id="L11">    LowWordProof(VerificationWork work) { this.work = work; }</span>
+    boolean equivalent(Expr left, Expr right, NumericKind kind) {
+<span class="pc bpc" id="L13" title="1 of 4 branches missed.">        if (kind != NumericKind.INT &amp;&amp; kind != NumericKind.LONG) return false;</span>
+<span class="fc" id="L14">        Projection a = projection(left, kind), b = projection(right, kind);</span>
+<span class="pc bpc" id="L15" title="1 of 6 branches missed.">        if (a == null || b == null || a.bits != b.bits) return false;</span>
+        try {
+<span class="fc" id="L17">            return new PolynomialProof(kind, a.bits, work).equivalent(</span>
+<span class="fc" id="L18">                    quotient(a.value, a.bits, kind, 0), quotient(b.value, b.bits, kind, 0));</span>
+<span class="nc" id="L19">        } catch (PolynomialProof.OutsideFragment outside) { return false; }</span>
+    }
+<span class="fc" id="L21">    private record Projection(Expr value, int bits) { }</span>
+    private Projection projection(Expr expression, NumericKind kind) {
+<span class="fc" id="L23">        work.charge(1);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (JavaExpressions.operationOf(expression).orElse(null) != NumericOperation.AND) return null;</span>
+<span class="fc" id="L25">        var args = JavaExpressions.operands(expression);</span>
+<span class="fc bfc" id="L26" title="All 4 branches covered.">        for (int i = 0; i &lt; 2; i++) if (JavaExpressions.isLiteral(args.get(i))) {</span>
+<span class="fc" id="L27">            BigInteger mask = SemanticChecker.integer(JavaExpressions.literalValue(args.get(i)))</span>
+<span class="fc" id="L28">                    .and(BigInteger.ONE.shiftLeft(kind.bits()).subtract(BigInteger.ONE));</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">            if (mask.signum() &gt; 0 &amp;&amp; mask.and(mask.add(BigInteger.ONE)).signum() == 0)</span>
+<span class="fc" id="L30">                return new Projection(args.get(1 - i), mask.bitLength());</span>
+        }
+<span class="fc" id="L32">        return null;</span>
+    }
+    private Expr quotient(Expr expression, int bits, NumericKind kind, int depth) {
+<span class="fc" id="L35">        work.charge(1);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new PolynomialProof.OutsideFragment();</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;</span>
+<span class="fc" id="L38">        var actual = JavaExpressions.resultKind(expression);</span>
+<span class="pc bpc" id="L39" title="3 of 6 branches missed.">        if (!actual.integral() || actual == NumericKind.BIG_INTEGER || actual.bits() &lt; bits) return expression;</span>
+<span class="fc" id="L40">        var args = JavaExpressions.operands(expression);</span>
+<span class="fc" id="L41">        var from = JavaExpressions.castSourceKind(expression);</span>
+<span class="pc bpc" id="L42" title="7 of 8 branches missed.">        if (from.isPresent() &amp;&amp; from.get().integral() &amp;&amp; from.get() != NumericKind.BIG_INTEGER &amp;&amp; from.get().bits() &gt;= bits)</span>
+<span class="nc" id="L43">            return quotient(args.getFirst(), bits, kind, depth + 1);</span>
+<span class="fc" id="L44">        Projection projection = projection(expression, actual);</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">        if (projection != null &amp;&amp; projection.bits &gt;= bits) return quotient(projection.value, bits, kind, depth + 1);</span>
+<span class="fc" id="L46">        var op = JavaExpressions.operationOf(expression).orElse(null);</span>
+<span class="pc bpc" id="L47" title="3 of 8 branches missed.">        if (op == NumericOperation.ADD || op == NumericOperation.SUBTRACT || op == NumericOperation.MULTIPLY || op == NumericOperation.NEGATE) {</span>
+<span class="fc" id="L48">            var children = args.stream().map(e -&gt; quotient(e, bits, kind, depth + 1)).toArray(Expr[]::new);</span>
+<span class="fc" id="L49">            return JavaExpressions.operation(kind, op, children);</span>
+        }
+<span class="nc" id="L51">        return expression;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

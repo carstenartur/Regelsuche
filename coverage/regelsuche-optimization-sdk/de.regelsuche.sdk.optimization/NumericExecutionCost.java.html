@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NumericExecutionCost.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">NumericExecutionCost.java</span></div><h1>NumericExecutionCost.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.search.program.PreparedJointComputation;
+import java.util.*;
+
+/** Static word-work estimates, not timings or arithmetic proof. Unknown magnitudes stay unknown. */
+public final class NumericExecutionCost {
+    private NumericExecutionCost() { }
+<span class="fc" id="L11">    public record Estimate(long operationWork, long peakWords, long inspectionWork) { }</span>
+
+    public static Optional&lt;Estimate&gt; estimate(OptimizationRequest request, PreparedJointComputation prepared) {
+<span class="fc" id="L14">        return estimate(request, prepared, false);</span>
+    }
+    /** Original occurrences are charged separately even when their value graph shares a node. */
+    public static Optional&lt;Estimate&gt; estimateSource(OptimizationRequest request, PreparedJointComputation prepared) {
+<span class="nc" id="L18">        return estimate(request, prepared, true);</span>
+    }
+    private static Optional&lt;Estimate&gt; estimate(OptimizationRequest request, PreparedJointComputation prepared, boolean original) {
+<span class="fc" id="L21">        Objects.requireNonNull(request); Objects.requireNonNull(prepared);</span>
+<span class="fc" id="L22">        var nodes = prepared.nodes();</span>
+<span class="fc" id="L23">        long[] bits = new long[nodes.size()], storage = new long[nodes.size()];</span>
+<span class="fc" id="L24">        int[] last = new int[nodes.size()];</span>
+<span class="fc" id="L25">        Map&lt;Expr, Long&gt; costs = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L26">        long total = 0, live = 0, peak = 0, inspected = 1;</span>
+        try {
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L29">                var node = nodes.get(i); last[i] = i;</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                for (int argument : node.arguments()) last[argument] = i;</span>
+<span class="fc" id="L31">                inspected += 1L + node.arguments().size();</span>
+            }
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            for (int index : prepared.outputBindings().values()) last[index] = nodes.size();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L35">                var node = nodes.get(i); Expr expression = node.expression();</span>
+<span class="fc" id="L36">                NumericKind kind = NumericKind.fromType(node.type());</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">                long cost = node.operation() == null ? 0 : node.operation().work();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                if (kind == NumericKind.BIG_INTEGER) {</span>
+<span class="fc" id="L39">                    bits[i] = magnitude(request, expression, node.arguments().stream().mapToLong(j -&gt; bits[j]).toArray());</span>
+<span class="pc bpc" id="L40" title="1 of 4 branches missed.">                    if (bits[i] &lt; 0 || bits[i] &gt; BigIntegerBounds.MAX_BITS) return Optional.empty();</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">                    if (node.operation() != null &amp;&amp; !JavaExpressions.isLiteral(expression)) {</span>
+<span class="fc" id="L42">                        cost = bigIntegerOperationWork(node, bits, i);</span>
+                    }
+<span class="fc" id="L44">                    storage[i] = 2 + words(bits[i]);</span>
+<span class="fc" id="L45">                } else { bits[i] = kind.bits(); storage[i] = node.storage(); }</span>
+<span class="fc" id="L46">                total = Math.addExact(total, cost); costs.put(expression, cost);</span>
+<span class="fc" id="L47">                live += storage[i]; peak = Math.max(peak, live);</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">                for (int argument : new HashSet&lt;&gt;(node.arguments())) if (last[argument] == i) live -= storage[argument];</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                if (last[i] == i) live -= storage[i];</span>
+<span class="fc" id="L50">                inspected += 2L + node.arguments().size();</span>
+            }
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (original) {</span>
+<span class="nc" id="L53">                long traced = 0;</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                for (var occurrence : request.sourceTrace().occurrences()) {</span>
+<span class="nc" id="L55">                    inspected++;</span>
+<span class="nc" id="L56">                    Long cost = costs.get(occurrence.expression());</span>
+                    // A dead operation may not be in the output DAG. Keep the existing source estimate
+                    // rather than invent its magnitude or pretend it did not execute.
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                    if (cost == null) return Optional.empty();</span>
+<span class="nc" id="L60">                    traced = Math.addExact(traced, cost);</span>
+<span class="nc" id="L61">                }</span>
+<span class="nc" id="L62">                total = Math.max(total, traced);</span>
+            }
+<span class="fc" id="L64">            return Optional.of(new Estimate(total, peak, inspected));</span>
+<span class="nc" id="L65">        } catch (ArithmeticException | IllegalArgumentException unsupported) { return Optional.empty(); }</span>
+    }
+    /** Word-work for one already bounded BigInteger node; no liveness or occurrence accounting. */
+    private static long bigIntegerOperationWork(PreparedJointComputation.Node node, long[] bits, int index) {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        long a = node.arguments().isEmpty() ? 1 : words(bits[node.arguments().getFirst()]);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        long b = node.arguments().size() &lt; 2 ? 1 : words(bits[node.arguments().get(1)]);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        long modulus = node.arguments().size() &lt; 3 ? b : words(bits[node.arguments().get(2)]);</span>
+<span class="pc bpc" id="L72" title="5 of 6 branches missed.">        return 4 * switch (JavaExpressions.operationOf(node.expression()).orElseThrow()) {</span>
+<span class="fc" id="L73">            case MULTIPLY -&gt; a * b;</span>
+<span class="nc" id="L74">            case DIVIDE, REMAINDER, MOD -&gt; a * b + a;</span>
+<span class="nc" id="L75">            case MOD_MULTIPLY -&gt; a * b + words(bits[node.arguments().getFirst()] + bits[node.arguments().get(1)]) * modulus;</span>
+<span class="nc" id="L76">            case MOD_POW -&gt; 32 + 2 * Math.max(1, bits[node.arguments().get(1)]) * modulus * modulus;</span>
+<span class="nc" id="L77">            case POW -&gt; Math.max(1, bits[index]) * Math.max(a, words(bits[index]));</span>
+<span class="nc" id="L78">            default -&gt; Math.max(words(bits[index]), Math.max(a, b));</span>
+        };
+    }
+<span class="fc" id="L81">    private static long words(long bits) { return Math.max(1, (bits + 31) / 32); }</span>
+    private static long magnitude(OptimizationRequest request, Expr expression, long[] args) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (JavaExpressions.isLiteral(expression)) return SemanticChecker.integer(JavaExpressions.literalValue(expression)).abs().bitLength();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) return request.assumptions().stream()</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">                .filter(a -&gt; a.kind() == SemanticAssumption.Kind.BIG_INTEGER_BIT_LENGTH_BOUND &amp;&amp; a.subject().equals(variable.name()))</span>
+<span class="fc" id="L86">                .mapToLong(a -&gt; BigIntegerBounds.parameter(a.parameter())).min().orElse(-1);</span>
+<span class="pc bpc" id="L87" title="3 of 6 branches missed.">        if (args.length == 0 || Arrays.stream(args).anyMatch(n -&gt; n &lt; 0)) return -1;</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        long a = args[0], b = args.length &lt; 2 ? 0 : args[1];</span>
+<span class="fc" id="L89">        var operands = JavaExpressions.operands(expression);</span>
+<span class="pc bpc" id="L90" title="9 of 10 branches missed.">        return switch (JavaExpressions.operationOf(expression).orElseThrow()) {</span>
+<span class="nc" id="L91">            case NEGATE, ABS, DIVIDE -&gt; a;</span>
+<span class="nc" id="L92">            case NOT -&gt; a + 1;</span>
+<span class="nc" id="L93">            case ADD, SUBTRACT, AND, OR, XOR -&gt; Math.max(a, b) + 1;</span>
+<span class="fc" id="L94">            case MULTIPLY -&gt; a + b;</span>
+<span class="nc" id="L95">            case REMAINDER -&gt; Math.min(a, b);</span>
+<span class="nc" id="L96">            case MOD -&gt; b;</span>
+<span class="nc" id="L97">            case MOD_MULTIPLY, MOD_POW -&gt; args[2];</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            case POW -&gt; JavaExpressions.isLiteral(operands.get(1))</span>
+<span class="nc" id="L99">                    ? Math.multiplyExact(a, Math.max(1, SemanticChecker.integer(JavaExpressions.literalValue(operands.get(1))).longValueExact())) : -1;</span>
+            case SHIFT_LEFT, SHIFT_RIGHT -&gt; {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                if (!JavaExpressions.isLiteral(operands.get(1))) yield -1;</span>
+<span class="nc" id="L102">                long distance = SemanticChecker.integer(JavaExpressions.literalValue(operands.get(1))).longValueExact();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                yield a + Math.max(0, JavaExpressions.operationOf(expression).orElseThrow() == NumericOperation.SHIFT_LEFT ? distance : -distance);</span>
+            }
+<span class="nc" id="L105">            default -&gt; -1;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
