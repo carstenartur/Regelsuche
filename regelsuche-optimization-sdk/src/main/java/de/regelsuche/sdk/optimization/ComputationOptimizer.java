@@ -31,16 +31,7 @@ public final class ComputationOptimizer {
                 long failedPreparation = JointComputationPlan.MAX_RESOLUTION_WORK + JointComputationPlan.MAX_NODES;
                 return new OptimizationResult.Unsupported(diagnostic(invalid), Math.addExact(work.used(), failedPreparation));
             }
-            boolean projectedWords = false;
-            for (var occurrence : request.sourceTrace().occurrences()) {
-                work.charge(1);
-                if (JavaExpressions.operationOf(occurrence.expression()).orElse(null) == NumericOperation.AND) {
-                    work.charge(2);
-                    if (JavaExpressions.operands(occurrence.expression()).stream().anyMatch(JavaExpressions::isLiteral)) {
-                        projectedWords = true; break;
-                    }
-                }
-            }
+            boolean projectedWords = hasLiteralWordProjection(request, work);
             long setup=work.used();
             var generator=new JavaCandidateGenerator(request,work);
             var domain=new JointPlanSearch.Domain() {
@@ -83,15 +74,7 @@ public final class ComputationOptimizer {
             var cost=cost(request,sourceCost,found.prepared().cost(),obligations);
             if (ranking != null) {
                 long beforeRanking = work.used();
-                var original = prepare(request.plan()); work.chargeCompleted(original.cost().inspectionWork());
-                var sourceRank = ranking.assessSource(request.plan(), original); work.chargeCompleted(sourceRank.work());
-                var candidateRank = ranking.assess(found.plan(), found.prepared()); work.chargeCompleted(candidateRank.work());
-                long targetScore = Math.addExact(candidateRank.score(),
-                        request.goal() == OptimizationGoal.READABILITY ? 0 : obligations.estimatedCheckWork() + obligations.fallbackOperationCount());
-                boolean runtime = sourceRank.runtimeWork() < 0 || candidateRank.runtimeWork() < 0 ? cost.estimatedRuntimeImprovement()
-                        : candidateRank.runtimeWork() + obligations.estimatedCheckWork() + obligations.fallbackOperationCount() < sourceRank.runtimeWork();
-                cost = new OptimizationResult.CostAssessment(sourceRank.score(), targetScore, cost.checkWork(), cost.fallbackOperations(),
-                        cost.sourceCost(), cost.candidateCost(), runtime);
+                cost = rankedCost(request, ranking, found, obligations, cost, work);
                 total = Math.addExact(total, work.used() - beforeRanking);
                 if (total > budget.maximumWork()) return new OptimizationResult.BudgetExceeded("RANKING_BUDGET_EXCEEDED", total);
             }
@@ -120,6 +103,34 @@ public final class ComputationOptimizer {
             return stopped.cancelled ? new OptimizationResult.Cancelled("CANCELLED") : new OptimizationResult.BudgetExceeded("OPTIMIZATION_BUDGET_EXCEEDED",work.used());
         } catch(IllegalArgumentException invalid) { return new OptimizationResult.Unsupported(diagnostic(invalid)); }
     }
+    /** Inspect the source once, preserving the request's charged early-exit behavior. */
+    private static boolean hasLiteralWordProjection(OptimizationRequest request, VerificationWork work) {
+        for (var occurrence : request.sourceTrace().occurrences()) {
+            work.charge(1);
+            if (JavaExpressions.operationOf(occurrence.expression()).orElse(null) == NumericOperation.AND) {
+                work.charge(2);
+                if (JavaExpressions.operands(occurrence.expression()).stream().anyMatch(JavaExpressions::isLiteral))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /** Reassess the independently proved incumbent using the same paid consumer ranking. */
+    private static OptimizationResult.CostAssessment rankedCost(OptimizationRequest request,
+            CandidateRanking ranking, JointPlanSearch.Result found, RuntimeObligations obligations,
+            OptimizationResult.CostAssessment cost, VerificationWork work) {
+        var original = prepare(request.plan()); work.chargeCompleted(original.cost().inspectionWork());
+        var sourceRank = ranking.assessSource(request.plan(), original); work.chargeCompleted(sourceRank.work());
+        var candidateRank = ranking.assess(found.plan(), found.prepared()); work.chargeCompleted(candidateRank.work());
+        long targetScore = Math.addExact(candidateRank.score(),
+                request.goal() == OptimizationGoal.READABILITY ? 0 : obligations.estimatedCheckWork() + obligations.fallbackOperationCount());
+        boolean runtime = sourceRank.runtimeWork() < 0 || candidateRank.runtimeWork() < 0 ? cost.estimatedRuntimeImprovement()
+                : candidateRank.runtimeWork() + obligations.estimatedCheckWork() + obligations.fallbackOperationCount() < sourceRank.runtimeWork();
+        return new OptimizationResult.CostAssessment(sourceRank.score(), targetScore, cost.checkWork(), cost.fallbackOperations(),
+                cost.sourceCost(), cost.candidateCost(), runtime);
+    }
+
     /** Classify aggregate search/proof work before any final proof outcome or preparation. */
     static Optional<OptimizationResult> finalVerificationOutcome(boolean proofAccepted,long totalWork,long maximumWork) {
         if(totalWork>maximumWork) return Optional.of(new OptimizationResult.BudgetExceeded("FINAL_VERIFICATION_BUDGET_EXCEEDED",totalWork));

@@ -142,17 +142,8 @@ final class JavaCandidateGenerator {
     }
     private Expr simplifyProductsAndBitwise(Expr result, NumericOperation op, NumericKind kind,
                                            List<Expr> arguments, Expr left, Expr right, boolean lowWordMasks) {
-        if (op == NumericOperation.MULTIPLY) {
-            if (number(right, 1)) return left; if (number(left, 1)) return right;
-            if (number(right, 0) || number(left, 0)) return constant(kind, 0);
-        }
-        if (op == NumericOperation.DIVIDE) {
-            if (number(right, 1)) return left;
-            if (operation(left) == NumericOperation.MULTIPLY && JavaExpressions.isLiteral(right) && !number(right, 0)) {
-                if (children(left).get(1).equals(right)) return children(left).getFirst();
-                if (children(left).getFirst().equals(right)) return children(left).get(1);
-            }
-        }
+        Expr product = simplifyProductOrQuotient(op, kind, left, right);
+        if (product != null) return product;
         if ((op == NumericOperation.XOR || op == NumericOperation.OR) && number(right, 0)) return left;
         if (op == NumericOperation.XOR && left.equals(right)) return constant(kind, 0);
         if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
@@ -169,6 +160,21 @@ final class JavaCandidateGenerator {
             if (!bitwise.equals(result)) return bitwise;
         }
         return foldConstant(result, op, kind, arguments);
+    }
+    /** Null means that neither a product identity nor a quotient cancellation applies. */
+    private static Expr simplifyProductOrQuotient(NumericOperation op, NumericKind kind, Expr left, Expr right) {
+        if (op == NumericOperation.MULTIPLY) {
+            if (number(right, 1)) return left; if (number(left, 1)) return right;
+            if (number(right, 0) || number(left, 0)) return constant(kind, 0);
+        }
+        if (op == NumericOperation.DIVIDE) {
+            if (number(right, 1)) return left;
+            if (operation(left) == NumericOperation.MULTIPLY && JavaExpressions.isLiteral(right) && !number(right, 0)) {
+                if (children(left).get(1).equals(right)) return children(left).getFirst();
+                if (children(left).getFirst().equals(right)) return children(left).get(1);
+            }
+        }
+        return null;
     }
     private Expr foldConstant(Expr result, NumericOperation op, NumericKind kind, List<Expr> arguments) {
         if (arguments.stream().allMatch(JavaExpressions::isLiteral)) {

@@ -39,17 +39,7 @@ public final class NumericExecutionCost {
                     bits[i] = magnitude(request, expression, node.arguments().stream().mapToLong(j -> bits[j]).toArray());
                     if (bits[i] < 0 || bits[i] > BigIntegerBounds.MAX_BITS) return Optional.empty();
                     if (node.operation() != null && !JavaExpressions.isLiteral(expression)) {
-                        long a = node.arguments().isEmpty() ? 1 : words(bits[node.arguments().getFirst()]);
-                        long b = node.arguments().size() < 2 ? 1 : words(bits[node.arguments().get(1)]);
-                        long modulus = node.arguments().size() < 3 ? b : words(bits[node.arguments().get(2)]);
-                        cost = 4 * switch (JavaExpressions.operationOf(expression).orElseThrow()) {
-                            case MULTIPLY -> a * b;
-                            case DIVIDE, REMAINDER, MOD -> a * b + a;
-                            case MOD_MULTIPLY -> a * b + words(bits[node.arguments().getFirst()] + bits[node.arguments().get(1)]) * modulus;
-                            case MOD_POW -> 32 + 2 * Math.max(1, bits[node.arguments().get(1)]) * modulus * modulus;
-                            case POW -> Math.max(1, bits[i]) * Math.max(a, words(bits[i]));
-                            default -> Math.max(words(bits[i]), Math.max(a, b));
-                        };
+                        cost = bigIntegerOperationWork(node, bits, i);
                     }
                     storage[i] = 2 + words(bits[i]);
                 } else { bits[i] = kind.bits(); storage[i] = node.storage(); }
@@ -73,6 +63,20 @@ public final class NumericExecutionCost {
             }
             return Optional.of(new Estimate(total, peak, inspected));
         } catch (ArithmeticException | IllegalArgumentException unsupported) { return Optional.empty(); }
+    }
+    /** Word-work for one already bounded BigInteger node; no liveness or occurrence accounting. */
+    private static long bigIntegerOperationWork(PreparedJointComputation.Node node, long[] bits, int index) {
+        long a = node.arguments().isEmpty() ? 1 : words(bits[node.arguments().getFirst()]);
+        long b = node.arguments().size() < 2 ? 1 : words(bits[node.arguments().get(1)]);
+        long modulus = node.arguments().size() < 3 ? b : words(bits[node.arguments().get(2)]);
+        return 4 * switch (JavaExpressions.operationOf(node.expression()).orElseThrow()) {
+            case MULTIPLY -> a * b;
+            case DIVIDE, REMAINDER, MOD -> a * b + a;
+            case MOD_MULTIPLY -> a * b + words(bits[node.arguments().getFirst()] + bits[node.arguments().get(1)]) * modulus;
+            case MOD_POW -> 32 + 2 * Math.max(1, bits[node.arguments().get(1)]) * modulus * modulus;
+            case POW -> Math.max(1, bits[index]) * Math.max(a, words(bits[index]));
+            default -> Math.max(words(bits[index]), Math.max(a, b));
+        };
     }
     private static long words(long bits) { return Math.max(1, (bits + 31) / 32); }
     private static long magnitude(OptimizationRequest request, Expr expression, long[] args) {
