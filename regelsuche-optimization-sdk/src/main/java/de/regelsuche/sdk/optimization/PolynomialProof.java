@@ -28,6 +28,12 @@ final class PolynomialProof {
         this.kind = kind; this.exactDivision = exactDivision; this.floatingAlgebra = floatingAlgebra; this.work = work;
         modulus = kind.integral() && !exactDivision ? BigInteger.ONE.shiftLeft(kind.bits()) : null;
     }
+    PolynomialProof(NumericKind kind, int lowBits, VerificationWork work) {
+        if ((kind != NumericKind.INT && kind != NumericKind.LONG) || lowBits < 1 || lowBits > kind.bits())
+            throw new IllegalArgumentException("INVALID_LOW_WORD_WIDTH");
+        this.kind = kind; this.exactDivision = false; this.floatingAlgebra = false; this.work = work;
+        modulus = BigInteger.ONE.shiftLeft(lowBits);
+    }
     boolean equivalent(Expr source, Expr target) { return normalize(source, 0).equals(normalize(target, 0)); }
     private Map<Monomial, BigInteger> normalize(Expr expression, int depth) {
         work.charge(1);

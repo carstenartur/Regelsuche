@@ -76,12 +76,13 @@ class FinalPreparationReuseBudgetTest {
                 candidate.prepared().execute(Map.of("x", Integer.MAX_VALUE, "y", 2)));
     }
 
-    @Test void additionalInventoryWorkIsNotRefundedAtTheHistoricalTightLimit() {
+    @Test void sharedNormalizationNowFinishesWithinTheHistoricalTightLimit() {
         long historicalAllowance = 1_092;
-        var exhausted = assertInstanceOf(OptimizationResult.BudgetExceeded.class,
+        var candidate = assertInstanceOf(OptimizationResult.Candidate.class,
                 new ComputationOptimizer().optimize(request(historicalAllowance), CancellationToken.NONE));
-        assertTrue(exhausted.work() > historicalAllowance);
-        assertEquals("FINAL_PREPARATION_BUDGET_EXCEEDED", exhausted.diagnostic());
+        assertTrue(candidate.work() <= historicalAllowance);
+        assertInstanceOf(VerificationResult.Verified.class,
+                new ComputationOptimizer().reverify(request(historicalAllowance), candidate, CancellationToken.NONE));
     }
 
     private static OptimizationRequest request(long maximumWork) {

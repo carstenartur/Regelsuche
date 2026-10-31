@@ -277,3 +277,33 @@ arithmetic. It does not certify rational distribution over Java truncating
 division, undo earlier truncation, or cancel an overflowing primitive product in
 `PRESERVE_JAVA`. Existing assumption guards, BigInteger magnitude contracts,
 work limits, cancellation, and independent derivation replay still apply.
+
+### Bounded consumer ranking and complete explanation work
+
+`ComputationOptimizer.optimize(request, token, ranking)` lets a consumer price the
+actual realization of a candidate while the existing verified frontier is being
+explored. `CandidateRanking.Assessment` contains a nonnegative score and metered
+inspection work, plus optional runtime work separate from the weighted score.
+`assessSource` can price original occurrences separately from shared candidates.
+Ranking cannot admit an unproved transformation; the final
+independent checker and source trace remain authoritative. The two-argument entry
+point preserves its existing cost policy.
+
+`NumericExecutionCost.estimate` supplies optional operand-magnitude-sensitive
+word-work and live-storage estimates. `estimateSource` includes repeated original
+occurrences. Missing bounds return no estimate; estimates are not measurements,
+proofs, or claims about constant-time behavior. Consumers must still price their
+own guards, captures and emitted code.
+
+`ComputationExplanations.Result.work()` includes fresh independent verification,
+derivation replay and presentation. The overload with `remainingWork` bounds the
+call without changing the original search request. Legacy manually constructed
+results report unknown work (-1); consumers must reserve their allowance for those.
+Completed preparation work remains reported on budget exhaustion and cancellation,
+so reported work may exceed the allowance when an indivisible preparation finishes.
+
+The v12 checker proves low-word polynomial congruences and carry-free addition of
+disjoint bit ranges. Generic proposals remove redundant masks under a common low
+word observation and reconstruct high/low words joined by addition. Wrong masks,
+widths, signs and overlapping carry bits remain unproved. There are no source-name
+or cryptography-specific recognizers.

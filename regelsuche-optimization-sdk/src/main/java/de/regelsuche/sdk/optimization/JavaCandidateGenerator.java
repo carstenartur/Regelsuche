@@ -8,7 +8,7 @@ import java.util.*;
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
     // Signed-additive proposals now come exclusively from the shared core rule inventory.
-    static final String REVISION = "java-core-algebra-proposals/v10-canonical-preparation";
+    static final String REVISION = "java-core-algebra-proposals/v11-masked-arithmetic";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -30,7 +30,8 @@ final class JavaCandidateGenerator {
         var outputs = source.outputExpressions();
         var proposals = new ArrayList<JointPlanSearch.Proposal>();
         var seen = new HashSet<List<Expr>>();
-        var simplified = outputs.stream().map(expression -> simplify(expression, 0)).toList();
+        var simplifications = new IdentityHashMap<Expr, Expr>();
+        var simplified = outputs.stream().map(expression -> simplify(expression, 0, simplifications)).toList();
         addProposal(source, outputs, simplified, "typed-local-algebra", proposals, seen);
 
         // Keep the fast combined candidate, but never make its admissibility a
@@ -51,7 +52,7 @@ final class JavaCandidateGenerator {
         if (proposals.size() < maximum) {
             try {
                 var modular = new ModularBridge(request.assumptions()).generate(outputs, maximum - proposals.size());
-                work.charge(modular.work()); complete &= modular.complete();
+                work.chargeCompleted(modular.work()); complete &= modular.complete();
                 for (var rewrite : modular.rewrites())
                     addProposal(source, outputs, rewrite.outputs(), rewrite.rule(), proposals, seen);
             } catch (IllegalArgumentException outsideModularFragment) { /* Java arithmetic proposals remain available. */ }
@@ -95,14 +96,22 @@ final class JavaCandidateGenerator {
         memo.put(expression, result);
         return result;
     }
-    private Expr simplify(Expr expression, int depth) {
+    private Expr simplify(Expr expression, int depth, Map<Expr, Expr> memo) {
         work.charge(1);
         if (depth > 128) throw new IllegalArgumentException("GENERATION_STRUCTURAL_BOUND");
         if (JavaExpressions.isLiteral(expression) || expression instanceof VariableExpr) return expression;
-        var arguments = JavaExpressions.operands(expression).stream().map(child -> simplify(child, depth + 1)).toList();
-        return simplifyHere(new FunctionExpr(((FunctionExpr) expression).name(), arguments));
+        Expr cached = memo.get(expression); if (cached != null) return cached;
+        var arguments = JavaExpressions.operands(expression).stream().map(child -> simplify(child, depth + 1, memo)).toList();
+        // Low-word rewrites are independently proposed below. Combining them with
+        // an outer Boolean rewrite can hide the projection needed by its proof.
+        Expr result = simplifyHere(new FunctionExpr(((FunctionExpr) expression).name(), arguments), false);
+        memo.put(expression, result);
+        return result;
     }
     private Expr simplifyHere(Expr result) {
+        return simplifyHere(result, true);
+    }
+    private Expr simplifyHere(Expr result, boolean lowWordMasks) {
         work.charge(1);
         if (JavaExpressions.isLiteral(result) || result instanceof VariableExpr) return result;
         var arguments = JavaExpressions.operands(result);
@@ -111,9 +120,9 @@ final class JavaCandidateGenerator {
         NumericOperation op = optional.get(); NumericKind kind = JavaExpressions.resultKind(result);
         if (op.name().endsWith("EXACT")) return result;
         if (kind.floatingPoint() && request.safetyProfile() == SafetyProfile.PRESERVE_JAVA) return floating(result, op, arguments);
-        return simplifyAdditive(result, op, kind, arguments);
+        return simplifyAdditive(result, op, kind, arguments, lowWordMasks);
     }
-    private Expr simplifyAdditive(Expr result, NumericOperation op, NumericKind kind, List<Expr> arguments) {
+    private Expr simplifyAdditive(Expr result, NumericOperation op, NumericKind kind, List<Expr> arguments, boolean lowWordMasks) {
         Expr left = arguments.getFirst(); Expr right = arguments.size() > 1 ? arguments.get(1) : null;
         if (op == NumericOperation.NEGATE && operation(left) == NumericOperation.NEGATE) return children(left).getFirst();
         if (op == NumericOperation.ADD) {
@@ -129,10 +138,31 @@ final class JavaCandidateGenerator {
                 if (children(left).getFirst().equals(right)) return children(left).get(1);
             }
         }
-        return simplifyProductsAndBitwise(result, op, kind, arguments, left, right);
+        return simplifyProductsAndBitwise(result, op, kind, arguments, left, right, lowWordMasks);
     }
     private Expr simplifyProductsAndBitwise(Expr result, NumericOperation op, NumericKind kind,
-                                           List<Expr> arguments, Expr left, Expr right) {
+                                           List<Expr> arguments, Expr left, Expr right, boolean lowWordMasks) {
+        Expr product = simplifyProductOrQuotient(op, kind, left, right);
+        if (product != null) return product;
+        if ((op == NumericOperation.XOR || op == NumericOperation.OR) && number(right, 0)) return left;
+        if (op == NumericOperation.XOR && left.equals(right)) return constant(kind, 0);
+        if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
+        boolean bitwiseProposal = op == NumericOperation.OR || op == NumericOperation.XOR || op == NumericOperation.AND && lowWordMasks;
+        if (op == NumericOperation.ADD) {
+            work.charge(2);
+            var leftOperation = operation(left); var rightOperation = operation(right);
+            bitwiseProposal = leftOperation == NumericOperation.SHIFT_LEFT && rightOperation == NumericOperation.AND
+                    || rightOperation == NumericOperation.SHIFT_LEFT && leftOperation == NumericOperation.AND;
+        }
+        if (bitwiseProposal) {
+            work.charge(8);
+            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments, work);
+            if (!bitwise.equals(result)) return bitwise;
+        }
+        return foldConstant(result, op, kind, arguments);
+    }
+    /** Null means that neither a product identity nor a quotient cancellation applies. */
+    private static Expr simplifyProductOrQuotient(NumericOperation op, NumericKind kind, Expr left, Expr right) {
         if (op == NumericOperation.MULTIPLY) {
             if (number(right, 1)) return left; if (number(left, 1)) return right;
             if (number(right, 0) || number(left, 0)) return constant(kind, 0);
@@ -144,15 +174,7 @@ final class JavaCandidateGenerator {
                 if (children(left).getFirst().equals(right)) return children(left).get(1);
             }
         }
-        if ((op == NumericOperation.XOR || op == NumericOperation.OR) && number(right, 0)) return left;
-        if (op == NumericOperation.XOR && left.equals(right)) return constant(kind, 0);
-        if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
-        if (op == NumericOperation.OR || op == NumericOperation.XOR) {
-            work.charge(8);
-            Expr bitwise = JavaBitwiseCandidates.simplify(result, op, kind, arguments, work);
-            if (!bitwise.equals(result)) return bitwise;
-        }
-        return foldConstant(result, op, kind, arguments);
+        return null;
     }
     private Expr foldConstant(Expr result, NumericOperation op, NumericKind kind, List<Expr> arguments) {
         if (arguments.stream().allMatch(JavaExpressions::isLiteral)) {

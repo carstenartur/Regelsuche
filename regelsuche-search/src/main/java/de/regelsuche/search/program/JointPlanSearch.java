@@ -58,13 +58,22 @@ public final class JointPlanSearch {
     private final Domain domain;
     private final Weights weights;
     private final int maximumCandidates;
+    public record Rank(long score, long work) {
+        public Rank { if (score < 0 || score > Long.MAX_VALUE / 16 || work < 0) throw new IllegalArgumentException("invalid rank"); }
+    }
+    @FunctionalInterface public interface Ranking { Rank assess(JointComputationPlan plan, PreparedJointComputation prepared); }
+    private final Ranking ranking;
 
     public JointPlanSearch(ComputationBackend backend, Domain domain, Weights weights, int maximumCandidates) {
+        this(backend, domain, weights, maximumCandidates, null);
+    }
+    public JointPlanSearch(ComputationBackend backend, Domain domain, Weights weights, int maximumCandidates, Ranking ranking) {
         this.backend = Objects.requireNonNull(backend, "backend");
         this.domain = Objects.requireNonNull(domain, "domain");
         this.weights = Objects.requireNonNull(weights, "weights");
         if (maximumCandidates < 1) throw new IllegalArgumentException("positive candidate cap required");
         this.maximumCandidates = maximumCandidates;
+        this.ranking = ranking;
     }
     public PreparedJointComputation prepareVerified(JointComputationPlan source, JointComputationPlan candidate) {
         return prepare(source, candidate).plan();
@@ -132,17 +141,24 @@ public final class JointPlanSearch {
             TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION), List.of(provider),
             MovePriorityPolicy.INVENTORY_ORDER, verifier, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
             searchBudget, (state, context) -> {
-                var cost = source.withExpression(state.expression()).prepare(backend).cost();
-                return new StateValue.Assessment(cost.operationCount(), -weights.score(cost), cost.inspectionWork(), 0, Map.of());
+                var plan = source.withExpression(state.expression());
+                var prepared = plan.prepare(backend);
+                var rank = rank(plan, prepared);
+                return new StateValue.Assessment(prepared.cost().operationCount(), -rank.score(), rank.work(), 0, Map.of());
             });
         var search = new TypedSourceOnlySearch().search(problem, state -> {
-            var cost = source.withExpression(state.expression()).prepare(backend).cost();
-            return new TypedSourceOnlySearch.Score(weights.score(cost), cost.inspectionWork());
+            var plan = source.withExpression(state.expression());
+            var rank = rank(plan, plan.prepare(backend));
+            return new TypedSourceOnlySearch.Score(rank.score(), rank.work());
         });
         var candidate = source.withExpression(search.incumbent().expression());
         var checked = prepare(source, candidate);
         return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()),
                 budget.totalWork(), sourceExpression.expression());
+    }
+    private Rank rank(JointComputationPlan plan, PreparedJointComputation prepared) {
+        var result = ranking == null ? new Rank(weights.score(prepared.cost()), 0) : ranking.assess(plan, prepared);
+        return new Rank(result.score(), Math.addExact(prepared.cost().inspectionWork(), result.work()));
     }
     private static String key(String source, String target, String rule) {
         try {

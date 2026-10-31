@@ -14,8 +14,9 @@ final class WordBitProjection {
     private final VerificationWork work;
     private final Map<Word, Word> representatives = new LinkedHashMap<>();
     private final Map<Expr, Map<Integer, Formula>> projected = new IdentityHashMap<>();
+    private final WordPossibilities possibilities;
 
-    WordBitProjection(VerificationWork work) { this.work = work; }
+    WordBitProjection(VerificationWork work) { this.work = work; possibilities = new WordPossibilities(work); }
 
     boolean equivalent(Expr left, Expr right, NumericKind kind) {
         if (!kind.integral()) return false;
@@ -43,6 +44,7 @@ final class WordBitProjection {
         if (from.isPresent() && from.get().integral() && JavaExpressions.resultKind(expression).integral()) return true;
         var op = JavaExpressions.operationOf(expression).orElse(null);
         var args = JavaExpressions.operands(expression);
+        if (op == NumericOperation.ADD && possibilities.disjoint(args.getFirst(), args.get(1), JavaExpressions.resultKind(expression))) return true;
         if ((op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT)
                 && JavaExpressions.isLiteral(args.get(1))) return true;
         if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR || op == NumericOperation.NOT)
@@ -110,6 +112,8 @@ final class WordBitProjection {
             return new Operation(op, project(args.getFirst(), kind, bit, depth + 1), null);
         if (op == NumericOperation.AND || op == NumericOperation.OR || op == NumericOperation.XOR)
             return booleanBit(op, args, kind, bit, depth);
+        if (op == NumericOperation.ADD && possibilities.disjoint(args.getFirst(), args.get(1), kind))
+            return booleanBit(NumericOperation.OR, args, kind, bit, depth);
         if ((op == NumericOperation.SHIFT_LEFT || op == NumericOperation.SHIFT_RIGHT || op == NumericOperation.UNSIGNED_SHIFT_RIGHT)
                 && (kind == NumericKind.INT || kind == NumericKind.LONG) && JavaExpressions.isLiteral(args.get(1)))
             return shiftedBit(op, args, kind, bit, depth);

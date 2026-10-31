@@ -22,7 +22,7 @@ class CompletedSearchWorkTest {
         var result = assertInstanceOf(OptimizationResult.BudgetExceeded.class,
                 new ComputationOptimizer().optimize(request(2), CancellationToken.NONE));
         assertEquals("OPTIMIZATION_BUDGET_EXCEEDED", result.diagnostic());
-        assertTrue(result.work() < 2, result.toString());
+        assertEquals(1 + ComputationOptimizer.prepare(request(2).plan()).cost().inspectionWork(), result.work());
         assertFalse(result.hasCompleteWorkAccounting());
     }
 
