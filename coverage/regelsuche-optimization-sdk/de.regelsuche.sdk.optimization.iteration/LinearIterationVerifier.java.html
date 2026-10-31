@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearIterationVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">LinearIterationVerifier.java</span></div><h1>LinearIterationVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.LinearIterationAlgebra.*;
+
+/** Checks original update identities and actual supplied results without calling candidate search. */
+<span class="fc" id="L11">public final class LinearIterationVerifier {</span>
+<span class="fc" id="L12">    public record Verification(boolean verified,String reason,long work) {}</span>
+    public Verification verify(LinearIteration source,LinearIterationOptimizer.Candidate candidate,
+            OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L15">        var w=new Work(budget,cancellation);</span>
+<span class="fc" id="L16">        try { check(source,candidate,w); return new Verification(true,&quot;VERIFIED_LINEAR_TRANSITION&quot;,w.used); }</span>
+<span class="fc" id="L17">        catch(Unavailable ex) { return new Verification(false,ex.getMessage(),w.used); }</span>
+    }
+    public Verification verifyResult(LinearIteration source,LinearIterationOptimizer.Candidate candidate,
+            Map&lt;SymbolId,BigInteger&gt; bindings,List&lt;BigInteger&gt; emitted,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L21">        var w=new Work(budget,cancellation);</span>
+        try {
+<span class="fc" id="L23">            check(source,candidate,w);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            if(emitted.size()!=source.states().size()) throw new Unavailable(&quot;RESULT_DIMENSION&quot;);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            for(var n:emitted) w.checked(Objects.requireNonNull(n));</span>
+<span class="fc" id="L26">            var actual=LinearIterationEvaluator.power(source,candidate.transition(),bindings,w);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if(!actual.equals(emitted)) throw new Unavailable(&quot;RESULT_MISMATCH&quot;);</span>
+<span class="fc" id="L28">            return new Verification(true,&quot;VERIFIED_LINEAR_RESULT&quot;,w.used);</span>
+<span class="fc" id="L29">        } catch(Unavailable ex) { return new Verification(false,ex.getMessage(),w.used); }</span>
+    }
+    static void check(LinearIteration source,LinearIterationOptimizer.Candidate candidate,Work w) {
+<span class="fc" id="L32">        Objects.requireNonNull(source); Objects.requireNonNull(candidate); w.charge();</span>
+        // Every transported tree is constructor-bounded; charge an upper bound before structural equality.
+<span class="fc" id="L34">        w.charge((long)LinearIteration.MAX_NODES*(2L*source.states().size()+3));</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if(!source.equals(candidate.source())) throw new Unavailable(&quot;SOURCE_MISMATCH&quot;);</span>
+<span class="fc" id="L36">        var t=candidate.transition(); int n=source.states().size(),dimension=t.matrix().size();</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if(t.stateCount()!=n) throw new Unavailable(&quot;STATE_DIMENSION&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if(dimension&gt;w.budget.maximumStates()) throw new Unavailable(&quot;STATE_LIMIT&quot;);</span>
+<span class="fc" id="L39">        var paramEnv=environment(source,w,false);</span>
+<span class="fc" id="L40">        parse(source.count(),paramEnv,source,w);</span>
+<span class="fc" id="L41">        var basis=basis(source,w,t.indexDegree());</span>
+<span class="fc" id="L42">        var actualRows=new ArrayList&lt;Poly&gt;();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for(var row:t.matrix()) {</span>
+<span class="fc" id="L44">            var value=constant(source,w,BigInteger.ZERO);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            for(int j=0;j&lt;dimension;j++) value=value.add(parse(row.get(j),paramEnv,source,w).multiply(basis.get(j)));</span>
+<span class="fc" id="L46">            actualRows.add(value);</span>
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        var old=environment(source,w,true); var seen=new HashMap&lt;&gt;(old);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for(var update:source.updates()) {</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            int coordinate=0; while(!source.states().get(coordinate).symbol().equals(update.state())) coordinate++;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            var expected=parse(update.expression(),source.order()==LinearIteration.UpdateOrder.SEQUENTIAL?seen:old,source,w);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if(!expected.terms.equals(actualRows.get(coordinate).terms)) throw new Unavailable(&quot;TRANSITION_MISMATCH&quot;);</span>
+            // Inductively verified prior coordinates are the values visible to later assignments.
+<span class="fc" id="L54">            seen.put(update.state(),actualRows.get(coordinate));</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        var expectedPower=constant(source,w,BigInteger.ONE);</span>
+<span class="fc" id="L57">        var nextIndex=variable(source,w,source.index()).add(constant(source,w,source.indexStep()));</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for(int k=0;k&lt;=t.indexDegree();k++) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if(!expectedPower.terms.equals(actualRows.get(n+k).terms)) throw new Unavailable(&quot;INDEX_TRANSITION_MISMATCH&quot;);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if(k&lt;t.indexDegree()) expectedPower=expectedPower.multiply(nextIndex);</span>
+        }
+        // Check initial values independently, including every augmentation coordinate.
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for(int k=0;k&lt;n;k++) same(parse(source.states().get(k).initial(),paramEnv,source,w),parse(t.initial().get(k),paramEnv,source,w));</span>
+<span class="fc" id="L64">        var initialPower=constant(source,w,BigInteger.ONE);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        Poly start=t.indexDegree()&gt;0?parse(source.indexStart(),paramEnv,source,w):null;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for(int k=0;k&lt;=t.indexDegree();k++) {</span>
+<span class="fc" id="L67">            same(initialPower,parse(t.initial().get(n+k),paramEnv,source,w));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if(k&lt;t.indexDegree()) initialPower=initialPower.multiply(start);</span>
+        }
+<span class="fc" id="L70">    }</span>
+    private static void same(Poly expected,Poly actual) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if(!expected.terms.equals(actual.terms)) throw new Unavailable(&quot;INITIAL_MISMATCH&quot;);</span>
+<span class="fc" id="L73">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

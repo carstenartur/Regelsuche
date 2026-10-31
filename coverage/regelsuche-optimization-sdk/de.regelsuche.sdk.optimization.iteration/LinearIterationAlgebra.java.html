@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearIterationAlgebra.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">LinearIterationAlgebra.java</span></div><h1>LinearIterationAlgebra.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.ast.iteration.IntegerArithmetic;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.LinearIteration.*;
+
+/** Bounded integer polynomial primitives; shared arithmetic, never candidate search. */
+final class LinearIterationAlgebra {
+    private LinearIterationAlgebra() {}
+    static final class Unavailable extends RuntimeException {
+<span class="fc" id="L16">        Unavailable(String reason) { super(reason); }</span>
+    }
+    static final class Work {
+        final OptimizationBudget budget;
+        final CancellationToken cancellation;
+<span class="fc" id="L21">        final long start=System.nanoTime(),timeout;</span>
+        long used;
+<span class="fc" id="L23">        Work(OptimizationBudget b,CancellationToken c) {</span>
+<span class="fc" id="L24">            budget=Objects.requireNonNull(b); cancellation=Objects.requireNonNull(c);</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">            timeout=b.timeoutMillis()&gt;Long.MAX_VALUE/1_000_000 ? Long.MAX_VALUE:b.timeoutMillis()*1_000_000;</span>
+<span class="fc" id="L26">        }</span>
+<span class="fc" id="L27">        void charge() { charge(1); }</span>
+        void charge(long n) {
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">            if(cancellation.isCancelled() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">            if(n&gt;budget.maximumWork()-used || System.nanoTime()-start&gt;=timeout) throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L31">            used+=n;</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        BigInteger checked(BigInteger n) { charge(); if(n.abs().bitLength()&gt;MAX_BITS) throw new Unavailable(&quot;VALUE_LIMIT&quot;); return n; }</span>
+        BigInteger add(BigInteger a,BigInteger b,IntegerArithmetic ring) {
+<span class="fc" id="L35">            charge();</span>
+<span class="fc bfc" id="L36" title="All 6 branches covered.">            if(ring==IntegerArithmetic.EXACT &amp;&amp; a.signum()==b.signum() &amp;&amp; a.signum()!=0</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                    &amp;&amp; Math.max(a.abs().bitLength(),b.abs().bitLength())&gt;=MAX_BITS) throw new Unavailable(&quot;VALUE_LIMIT&quot;);</span>
+<span class="fc" id="L38">            return checked(ring.normalize(a.add(b)));</span>
+        }
+        BigInteger multiply(BigInteger a,BigInteger b,IntegerArithmetic ring) {
+<span class="fc" id="L41">            charge();</span>
+<span class="fc bfc" id="L42" title="All 6 branches covered.">            if(ring==IntegerArithmetic.EXACT &amp;&amp; a.signum()!=0 &amp;&amp; b.signum()!=0</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                    &amp;&amp; (long)a.abs().bitLength()+b.abs().bitLength()&gt;MAX_BITS) throw new Unavailable(&quot;VALUE_LIMIT&quot;);</span>
+<span class="fc" id="L44">            return checked(ring.normalize(a.multiply(b)));</span>
+        }
+    }
+    record Monomial(List&lt;SymbolId&gt; symbols) {
+<span class="fc" id="L48">        Monomial { symbols=List.copyOf(symbols); }</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        int degree(SymbolId s) { int n=0; for(var x:symbols) if(x.equals(s)) n++; return n; }</span>
+    }
+<span class="fc" id="L51">    private static final Comparator&lt;SymbolId&gt; ORDER=Comparator.comparing(SymbolId::namespace).thenComparingLong(SymbolId::ordinal);</span>
+    static final class Poly {
+        final Map&lt;Monomial,BigInteger&gt; terms;
+        final LinearIteration source;
+        final Work work;
+<span class="fc" id="L56">        Poly(Map&lt;Monomial,BigInteger&gt; terms,LinearIteration source,Work work) { this.terms=terms; this.source=source; this.work=work; }</span>
+        void put(Map&lt;Monomial,BigInteger&gt; map,Monomial m,BigInteger coefficient) {
+<span class="fc" id="L58">            work.checked(coefficient);</span>
+<span class="fc" id="L59">            int indexDegree=m.degree(source.index()), parameterDegree=0,stateDegree=0;</span>
+<span class="fc bfc" id="L60" title="All 6 branches covered.">            for(var s:m.symbols()) { if(source.parameters().contains(s)) parameterDegree++; else if(!s.equals(source.index())) stateDegree++; }</span>
+<span class="pc bpc" id="L61" title="2 of 6 branches missed.">            if(indexDegree&gt;MAX_INDEX_DEGREE || parameterDegree&gt;MAX_PARAMETER_DEGREE || stateDegree&gt;1) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
+<span class="fc bfc" id="L62" title="All 4 branches covered.">            if(stateDegree&gt;0 &amp;&amp; indexDegree&gt;0) throw new Unavailable(&quot;INDEX_DEPENDENT_STATE_COEFFICIENT&quot;);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if(coefficient.signum()==0) map.remove(m); else map.put(m,coefficient);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            if(map.size()&gt;Math.min(MAX_TERMS,work.budget.maximumStates())) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L65">        }</span>
+        Poly add(Poly other) {
+<span class="fc" id="L67">            var out=new LinkedHashMap&lt;&gt;(terms); work.charge(terms.size());</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            for(var e:other.terms.entrySet()) put(out,e.getKey(),work.add(out.getOrDefault(e.getKey(),BigInteger.ZERO),e.getValue(),source.arithmetic()));</span>
+<span class="fc" id="L69">            return new Poly(out,source,work);</span>
+        }
+        Poly multiply(Poly other) {
+<span class="fc" id="L72">            var out=new LinkedHashMap&lt;Monomial,BigInteger&gt;();</span>
+<span class="fc bfc" id="L73" title="All 4 branches covered.">            for(var a:terms.entrySet()) for(var b:other.terms.entrySet()) {</span>
+<span class="fc" id="L74">                work.charge(); var symbols=new ArrayList&lt;&gt;(a.getKey().symbols()); symbols.addAll(b.getKey().symbols()); symbols.sort(ORDER);</span>
+<span class="fc" id="L75">                var m=new Monomial(symbols);</span>
+<span class="fc" id="L76">                put(out,m,work.add(out.getOrDefault(m,BigInteger.ZERO),work.multiply(a.getValue(),b.getValue(),source.arithmetic()),source.arithmetic()));</span>
+<span class="fc" id="L77">            }</span>
+<span class="fc" id="L78">            return new Poly(out,source,work);</span>
+        }
+        Expr expression() {
+<span class="fc" id="L81">            var pieces=new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            for(var e:terms.entrySet()) {</span>
+<span class="fc" id="L83">                var factors=new ArrayList&lt;Expr&gt;(); factors.add(number(e.getValue()));</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                for(var s:e.getKey().symbols()) factors.add(VariableExpr.scoped(s));</span>
+<span class="fc" id="L85">                pieces.add(tree(factors,BinaryOperator.MUL,number(BigInteger.ONE)));</span>
+<span class="fc" id="L86">            }</span>
+<span class="fc" id="L87">            var result=tree(pieces,BinaryOperator.ADD,number(BigInteger.ZERO));</span>
+<span class="pc" id="L88">            try { LinearIteration.validate(result,null); } catch(IllegalArgumentException ex) { throw new Unavailable(ex.getMessage()); }</span>
+<span class="fc" id="L89">            return result;</span>
+        }
+    }
+<span class="fc" id="L92">    static Expr number(BigInteger n) { return new NumberExpr(ExactRational.integer(n)); }</span>
+    static Expr tree(List&lt;Expr&gt; parts,BinaryOperator operator,Expr empty) {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if(parts.isEmpty()) return empty;</span>
+<span class="fc" id="L95">        var level=new ArrayList&lt;&gt;(parts);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        while(level.size()&gt;1) {</span>
+<span class="fc" id="L97">            var next=new ArrayList&lt;Expr&gt;();</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">            for(int i=0;i&lt;level.size();i+=2) next.add(i+1==level.size()?level.get(i):new BinaryExpr(level.get(i),operator,level.get(i+1)));</span>
+<span class="fc" id="L99">            level=next;</span>
+<span class="fc" id="L100">        }</span>
+<span class="fc" id="L101">        return level.getFirst();</span>
+    }
+    static Poly constant(LinearIteration s,Work w,BigInteger n) {
+<span class="fc" id="L104">        var p=new Poly(new LinkedHashMap&lt;&gt;(),s,w); p.put(p.terms,new Monomial(List.of()),s.arithmetic().normalize(w.checked(n))); return p;</span>
+    }
+    static Poly variable(LinearIteration s,Work w,SymbolId symbol) {
+<span class="fc" id="L107">        var p=new Poly(new LinkedHashMap&lt;&gt;(),s,w); p.put(p.terms,new Monomial(List.of(symbol)),BigInteger.ONE); return p;</span>
+    }
+    static Map&lt;SymbolId,Poly&gt; environment(LinearIteration source,Work w,boolean includeState) {
+<span class="fc" id="L110">        var out=new HashMap&lt;SymbolId,Poly&gt;();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for(var p:source.parameters()) out.put(p,variable(source,w,p));</span>
+<span class="fc bfc" id="L112" title="All 4 branches covered.">        if(includeState) { out.put(source.index(),variable(source,w,source.index())); for(var s:source.states()) out.put(s.symbol(),variable(source,w,s.symbol())); }</span>
+<span class="fc" id="L113">        return out;</span>
+    }
+    static Poly parse(Expr expr,Map&lt;SymbolId,Poly&gt; env,LinearIteration source,Work w) {
+<span class="fc" id="L116">        w.charge();</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        return switch(expr) {</span>
+<span class="fc" id="L118">            case NumberExpr n -&gt; {</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if(!n.value().denominator().equals(BigInteger.ONE)) throw new Unavailable(&quot;NON_INTEGER&quot;);</span>
+<span class="fc" id="L120">                yield constant(source,w,n.value().numerator());</span>
+            }
+<span class="fc" id="L122">            case VariableExpr v -&gt; {</span>
+<span class="fc" id="L123">                var value=env.get(v.symbol().orElseThrow());</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                if(value==null) throw new Unavailable(&quot;UNBOUND_SYMBOL&quot;); yield value;</span>
+            }
+<span class="fc" id="L126">            case BinaryExpr b -&gt; {</span>
+<span class="pc bpc" id="L127" title="1 of 6 branches missed.">                if(b.operator()!=BinaryOperator.ADD &amp;&amp; b.operator()!=BinaryOperator.SUB &amp;&amp; b.operator()!=BinaryOperator.MUL)</span>
+<span class="fc" id="L128">                    throw new Unavailable(&quot;UNSUPPORTED_OPERATOR&quot;);</span>
+<span class="fc" id="L129">                var left=parse(b.left(),env,source,w); var right=parse(b.right(),env,source,w);</span>
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">                yield switch(b.operator()) {</span>
+<span class="fc" id="L131">                    case ADD -&gt; left.add(right);</span>
+<span class="nc" id="L132">                    case SUB -&gt; left.add(right.multiply(constant(source,w,BigInteger.ONE.negate())));</span>
+<span class="fc" id="L133">                    case MUL -&gt; left.multiply(right);</span>
+<span class="nc" id="L134">                    default -&gt; throw new Unavailable(&quot;UNSUPPORTED_OPERATOR&quot;);</span>
+                };
+            }
+<span class="nc" id="L137">            default -&gt; throw new Unavailable(&quot;UNSUPPORTED_EXPRESSION&quot;);</span>
+        };
+    }
+    static List&lt;Poly&gt; basis(LinearIteration s,Work w,int degree) {
+<span class="fc" id="L141">        var basis=new ArrayList&lt;Poly&gt;();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for(var state:s.states()) basis.add(variable(s,w,state.symbol()));</span>
+<span class="fc" id="L143">        var power=constant(s,w,BigInteger.ONE); basis.add(power);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for(int k=1;k&lt;=degree;k++) { power=power.multiply(variable(s,w,s.index())); basis.add(power); }</span>
+<span class="fc" id="L145">        return basis;</span>
+    }
+    static List&lt;Expr&gt; initial(LinearIteration s,Work w,int degree) {
+<span class="fc" id="L148">        var env=environment(s,w,false); var values=new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for(var state:s.states()) values.add(parse(state.initial(),env,s,w).expression());</span>
+<span class="fc" id="L150">        var power=constant(s,w,BigInteger.ONE); values.add(power.expression());</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if(degree&gt;0) {</span>
+<span class="fc" id="L152">            var start=parse(s.indexStart(),env,s,w);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for(int k=1;k&lt;=degree;k++) { power=power.multiply(start); values.add(power.expression()); }</span>
+        }
+<span class="fc" id="L155">        return values;</span>
+    }
+    static List&lt;Expr&gt; row(Poly value,int degree) {
+<span class="fc" id="L158">        var s=value.source; var w=value.work; int n=s.states().size();</span>
+<span class="fc" id="L159">        var coefficients=new ArrayList&lt;Poly&gt;();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for(int i=0;i&lt;n+degree+1;i++) coefficients.add(constant(s,w,BigInteger.ZERO));</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for(var e:value.terms.entrySet()) {</span>
+<span class="fc" id="L162">            int column=n+e.getKey().degree(s.index());</span>
+<span class="fc" id="L163">            var remaining=new ArrayList&lt;&gt;(e.getKey().symbols()); remaining.removeIf(s.index()::equals);</span>
+<span class="fc bfc" id="L164" title="All 4 branches covered.">            for(int k=0;k&lt;n;k++) if(remaining.remove(s.states().get(k).symbol())) column=k;</span>
+<span class="fc" id="L165">            var p=new Poly(new LinkedHashMap&lt;&gt;(),s,w); p.put(p.terms,new Monomial(remaining),e.getValue());</span>
+<span class="fc" id="L166">            coefficients.set(column,coefficients.get(column).add(p));</span>
+<span class="fc" id="L167">        }</span>
+<span class="fc" id="L168">        return coefficients.stream().map(Poly::expression).toList();</span>
+    }
+    static BigInteger eval(Expr expr,Map&lt;SymbolId,BigInteger&gt; bindings,IntegerArithmetic ring,Work w) {
+<span class="fc" id="L171">        w.charge();</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        return switch(expr) {</span>
+<span class="fc" id="L173">            case NumberExpr n -&gt; {</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                if(!n.value().denominator().equals(BigInteger.ONE)) throw new Unavailable(&quot;NON_INTEGER&quot;);</span>
+<span class="fc" id="L175">                yield ring.normalize(w.checked(n.value().numerator()));</span>
+            }
+<span class="fc" id="L177">            case VariableExpr v -&gt; {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                var n=bindings.get(v.symbol().orElseThrow()); if(n==null) throw new Unavailable(&quot;MISSING_PARAMETER&quot;);</span>
+<span class="fc" id="L179">                yield ring.normalize(w.checked(n));</span>
+            }
+<span class="fc" id="L181">            case BinaryExpr b -&gt; {</span>
+<span class="fc" id="L182">                var a=eval(b.left(),bindings,ring,w); var c=eval(b.right(),bindings,ring,w);</span>
+<span class="pc bpc" id="L183" title="3 of 4 branches missed.">                yield switch(b.operator()) {</span>
+<span class="nc" id="L184">                    case ADD -&gt; w.add(a,c,ring);</span>
+<span class="nc" id="L185">                    case SUB -&gt; w.add(a,c.negate(),ring);</span>
+<span class="fc" id="L186">                    case MUL -&gt; w.multiply(a,c,ring);</span>
+<span class="nc" id="L187">                    default -&gt; throw new Unavailable(&quot;UNSUPPORTED_OPERATOR&quot;);</span>
+                };
+            }
+<span class="nc" id="L190">            default -&gt; throw new Unavailable(&quot;UNSUPPORTED_EXPRESSION&quot;);</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

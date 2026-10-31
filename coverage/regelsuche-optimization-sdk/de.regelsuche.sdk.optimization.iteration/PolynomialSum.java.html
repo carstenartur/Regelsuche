@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSum.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">PolynomialSum.java</span></div><h1>PolynomialSum.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.ast.iteration.*;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Symbolic start and fixed stride; runtime count is supplied separately and must be nonnegative. */
+public record PolynomialSum(SymbolId index, Set&lt;SymbolId&gt; parameters, Expr start, BigInteger stride,
+                            Expr term, Expr initial, IntegerArithmetic arithmetic) {
+    public static final int MAX_INDEX_DEGREE=8, MAX_TOTAL_DEGREE=32, MAX_RUNTIME_BITS=65536;
+<span class="fc" id="L13">    public PolynomialSum {</span>
+<span class="fc" id="L14">        Objects.requireNonNull(index); Objects.requireNonNull(stride); Objects.requireNonNull(arithmetic);</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if(parameters.size()&gt;FiniteIteration.MAX_PARAMETERS) throw new IllegalArgumentException(&quot;TOO_MANY_PARAMETERS&quot;);</span>
+<span class="fc" id="L16">        parameters=Set.copyOf(parameters);</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if(parameters.contains(index)) throw new IllegalArgumentException(&quot;COLLIDING_BINDERS&quot;);</span>
+<span class="pc bpc" id="L18" title="2 of 4 branches missed.">        if(stride.signum()==0 || stride.bitLength()&gt;FiniteIteration.MAX_COEFFICIENT_BITS) throw new IllegalArgumentException(&quot;INVALID_STRIDE&quot;);</span>
+<span class="fc" id="L19">        var range=new IndexRange(BigInteger.ZERO,stride,BigInteger.ZERO);</span>
+<span class="fc" id="L20">        new FiniteIteration.Sum(range,index,parameters,term,arithmetic);</span>
+        // Existing scope validator permits the index in terms; explicitly forbid it in bound/initial.
+<span class="fc" id="L22">        new FiniteIteration.Sum(range,index,parameters,start,arithmetic);</span>
+<span class="fc" id="L23">        new FiniteIteration.Sum(range,index,parameters,initial,arithmetic);</span>
+<span class="fc" id="L24">        SeriesSupport.forbid(start,index); SeriesSupport.forbid(initial,index);</span>
+<span class="fc" id="L25">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

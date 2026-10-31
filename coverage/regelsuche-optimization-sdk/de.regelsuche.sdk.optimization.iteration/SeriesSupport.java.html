@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SeriesSupport.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">SeriesSupport.java</span></div><h1>SeriesSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+
+/** Shared bounded arithmetic, not a certificate authority. */
+final class SeriesSupport {
+    private SeriesSupport() {}
+    static void forbid(Expr e,SymbolId index) {
+<span class="pc bpc" id="L14" title="1 of 4 branches missed.">        if(e instanceof VariableExpr v &amp;&amp; v.symbol().orElseThrow().equals(index)) throw new IllegalArgumentException(&quot;INDEX_IN_BOUND&quot;);</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if(e instanceof BinaryExpr b) { forbid(b.left(),index); forbid(b.right(),index); }</span>
+<span class="pc bpc" id="L16" title="3 of 4 branches missed.">        if(e instanceof FunctionExpr f) for(var a:f.arguments()) forbid(a,index);</span>
+<span class="fc" id="L17">    }</span>
+<span class="fc" id="L18">    static Set&lt;SymbolId&gt; symbols(PolynomialSum s) { var ids=new HashSet&lt;&gt;(s.parameters()); ids.add(s.index()); return ids; }</span>
+    static IterationPolynomial parse(Expr e,Set&lt;SymbolId&gt; ids,Work w) {
+<span class="fc" id="L20">        return IterationPolynomial.parse(e,ids,false,PolynomialSum.MAX_TOTAL_DEGREE,w);</span>
+    }
+    static int degree(IterationPolynomial p,SymbolId index) {
+<span class="fc" id="L23">        p.work.charge(p.terms.size()); return p.terms.keySet().stream().mapToInt(m-&gt;m.degree(index)).max().orElse(0);</span>
+    }
+    /** Integer-valued polynomial criterion: every multivariate Newton coefficient is integral. */
+    static void integerValued(IterationPolynomial p) {
+<span class="fc" id="L27">        p.work.charge(p.terms.size());</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if(p.terms.values().stream().allMatch(ExactRational::isInteger)) return;</span>
+<span class="fc" id="L29">        var symbol=p.terms.keySet().stream().flatMap(m-&gt;m.symbols().stream()).findFirst();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if(symbol.isEmpty()) throw new Unavailable(&quot;NONINTEGRAL_POLYNOMIAL&quot;);</span>
+<span class="fc" id="L31">        var x=symbol.orElseThrow(); int d=degree(p,x); var difference=p;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for(int j=0;j&lt;=d;j++) {</span>
+<span class="fc" id="L33">            integerValued(difference.at(x,BigInteger.ZERO));</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if(j&lt;d) difference=difference.shifted(x,BigInteger.ONE).subtract(difference);</span>
+        }
+<span class="fc" id="L36">    }</span>
+    static IterationPolynomial source(PolynomialSum s,Work w) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        boolean integralLeaves=s.arithmetic()!=de.regelsuche.ast.iteration.IntegerArithmetic.EXACT;</span>
+<span class="fc" id="L39">        var term=IterationPolynomial.parse(s.term(),symbols(s),integralLeaves,PolynomialSum.MAX_TOTAL_DEGREE,w);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if(degree(term,s.index())&gt;PolynomialSum.MAX_INDEX_DEGREE) throw new Unavailable(&quot;INDEX_DEGREE_LIMIT&quot;);</span>
+<span class="fc" id="L41">        integerValued(term);</span>
+<span class="fc" id="L42">        var start=IterationPolynomial.parse(s.start(),s.parameters(),integralLeaves,PolynomialSum.MAX_TOTAL_DEGREE,w); integerValued(start);</span>
+<span class="fc" id="L43">        var initial=IterationPolynomial.parse(s.initial(),s.parameters(),integralLeaves,PolynomialSum.MAX_TOTAL_DEGREE,w); integerValued(initial);</span>
+<span class="fc" id="L44">        var ordinal=variable(s.index(),w).scale(ExactRational.integer(s.stride())).add(start);</span>
+<span class="fc" id="L45">        return term.substitute(s.index(),ordinal);</span>
+    }
+    static void bits(BigInteger x,Work w) {
+<span class="fc" id="L48">        w.charge(1+((long)x.bitLength()/64));</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if(x.bitLength()&gt;PolynomialSum.MAX_RUNTIME_BITS) throw new Unavailable(&quot;RUNTIME_BIT_LIMIT&quot;);</span>
+<span class="fc" id="L50">    }</span>
+<span class="fc" id="L51">    static ExactRational bounded(ExactRational x,Work w) { bits(x.numerator(),w); bits(x.denominator(),w); return x; }</span>
+    static BigInteger value(IterationPolynomial p,Map&lt;SymbolId,BigInteger&gt; values) {
+<span class="fc" id="L53">        var r=rationalValue(p,values);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if(!r.isInteger()) throw new Unavailable(&quot;NONINTEGRAL_VALUE&quot;); return r.numerator();</span>
+    }
+    static ExactRational rationalValue(IterationPolynomial p,Map&lt;SymbolId,BigInteger&gt; values) {
+<span class="fc" id="L57">        var r=ExactRational.ZERO;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for(var e:p.terms.entrySet()) {</span>
+<span class="fc" id="L59">            var term=e.getValue();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            for(var symbol:e.getKey().symbols()) {</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                var n=values.get(symbol); if(n==null) throw new Unavailable(&quot;UNBOUND_SYMBOL&quot;); bits(n,p.work);</span>
+<span class="fc" id="L62">                term=bounded(term.multiply(ExactRational.integer(n)),p.work);</span>
+<span class="fc" id="L63">            }</span>
+<span class="fc" id="L64">            r=bounded(r.add(term),p.work);</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">        return r;</span>
+    }
+    static IterationPolynomial binomial(IterationPolynomial x,int k) {
+<span class="fc" id="L69">        var result=constant(BigInteger.ONE,x.work);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for(int j=0;j&lt;k;j++) result=result.multiply(x.add(constant(BigInteger.valueOf(-j),x.work))).scale(ExactRational.ONE.divide(ExactRational.integer(j+1)));</span>
+<span class="fc" id="L71">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

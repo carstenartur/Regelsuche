@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearTransition.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">LinearTransition.java</span></div><h1>LinearTransition.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.Expr;
+import java.util.*;
+
+/** Immutable transport: states, constant one, then index powers in ascending degree. */
+public record LinearTransition(List&lt;List&lt;Expr&gt;&gt; matrix, List&lt;Expr&gt; initial, int stateCount, int indexDegree) {
+<span class="fc" id="L8">    public LinearTransition {</span>
+<span class="fc" id="L9">        int dimension=stateCount+indexDegree+1;</span>
+<span class="pc bpc" id="L10" title="4 of 8 branches missed.">        if(stateCount&lt;1 || stateCount&gt;LinearIteration.MAX_STATES || indexDegree&lt;0 || indexDegree&gt;LinearIteration.MAX_INDEX_DEGREE</span>
+<span class="pc bpc" id="L11" title="1 of 4 branches missed.">                || matrix.size()!=dimension || initial.size()!=dimension)</span>
+<span class="fc" id="L12">            throw new IllegalArgumentException(&quot;TRANSITION_DIMENSION&quot;);</span>
+<span class="fc" id="L13">        var copy=new ArrayList&lt;List&lt;Expr&gt;&gt;();</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        for(var row:matrix) {</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">            if(row.size()!=dimension) throw new IllegalArgumentException(&quot;TRANSITION_DIMENSION&quot;);</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">            for(var value:row) LinearIteration.validate(value,null);</span>
+<span class="fc" id="L17">            copy.add(List.copyOf(row));</span>
+<span class="fc" id="L18">        }</span>
+<span class="fc" id="L19">        matrix=List.copyOf(copy); initial=List.copyOf(initial);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        for(var value:initial) LinearIteration.validate(value,null);</span>
+<span class="fc" id="L21">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

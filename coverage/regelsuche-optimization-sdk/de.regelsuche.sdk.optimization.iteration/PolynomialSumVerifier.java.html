@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSumVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">PolynomialSumVerifier.java</span></div><h1>PolynomialSumVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.iteration.FiniteIteration;
+import de.regelsuche.sdk.optimization.*;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+
+/** Independent Newton reconstruction certificate checker; never invokes synthesis. */
+<span class="fc" id="L9">public final class PolynomialSumVerifier {</span>
+<span class="fc" id="L10">    public record Verification(boolean verified,String reason,long work) {}</span>
+    public Verification verify(PolynomialSum source,PolynomialSumPlan plan,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L12">        Objects.requireNonNull(source); Objects.requireNonNull(plan); var w=new Work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);</span>
+<span class="fc" id="L13">        try { check(source,plan,w); return new Verification(true,&quot;VERIFIED_NEWTON_SUM&quot;,w.used); }</span>
+<span class="fc" id="L14">        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used); }</span>
+    }
+    static void check(PolynomialSum source,PolynomialSumPlan plan,Work w) {
+<span class="fc" id="L17">        w.charge(6L*FiniteIteration.MAX_NODES);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if(!source.equals(plan.source())) throw new Unavailable(&quot;SOURCE_MISMATCH&quot;);</span>
+<span class="fc" id="L19">        var expected=SeriesSupport.source(source,w);</span>
+<span class="fc" id="L20">        var initial=SeriesSupport.parse(plan.initial(),source.parameters(),w); SeriesSupport.integerValued(initial);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if(!initial.same(SeriesSupport.parse(source.initial(),source.parameters(),w))) throw new Unavailable(&quot;INITIAL_MISMATCH&quot;);</span>
+<span class="fc" id="L22">        var actual=zero(w); var x=variable(source.index(),w);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        for(int j=0;j&lt;plan.coefficients().size();j++) {</span>
+<span class="fc" id="L24">            var coefficient=SeriesSupport.parse(plan.coefficients().get(j),source.parameters(),w); SeriesSupport.integerValued(coefficient);</span>
+<span class="fc" id="L25">            actual=actual.add(coefficient.multiply(SeriesSupport.binomial(x,j)));</span>
+        }
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if(!actual.same(expected)) throw new Unavailable(&quot;COEFFICIENT_MISMATCH&quot;);</span>
+<span class="fc" id="L28">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

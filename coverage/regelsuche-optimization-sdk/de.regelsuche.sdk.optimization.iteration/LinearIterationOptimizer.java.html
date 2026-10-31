@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearIterationOptimizer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">LinearIterationOptimizer.java</span></div><h1>LinearIterationOptimizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.LinearIterationAlgebra.*;
+
+/** Constructs one bounded, division-free transition candidate; verification is separate. */
+<span class="fc" id="L11">public final class LinearIterationOptimizer {</span>
+    public record Candidate(LinearIteration source,LinearTransition transition,long work) {
+<span class="fc" id="L13">        public Candidate { Objects.requireNonNull(source); Objects.requireNonNull(transition); }</span>
+    }
+<span class="fc" id="L15">    public record SearchResult(Optional&lt;Candidate&gt; candidate,String reason,long work) {}</span>
+    public SearchResult search(LinearIteration source,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L17">        Objects.requireNonNull(source); var w=new Work(budget,cancellation);</span>
+        try {
+<span class="fc" id="L19">            w.charge();</span>
+<span class="fc" id="L20">            var original=environment(source,w,true); var current=new HashMap&lt;&gt;(original);</span>
+<span class="fc" id="L21">            parse(source.count(),environment(source,w,false),source,w);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            for(var u:source.updates()) {</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">                var env=source.order()==LinearIteration.UpdateOrder.SEQUENTIAL?current:original;</span>
+<span class="fc" id="L24">                current.put(u.state(),parse(u.expression(),env,source,w));</span>
+<span class="fc" id="L25">            }</span>
+<span class="fc" id="L26">            int degree=0;</span>
+<span class="fc bfc" id="L27" title="All 4 branches covered.">            for(var state:source.states()) for(var m:current.get(state.symbol()).terms.keySet()) degree=Math.max(degree,m.degree(source.index()));</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">            if(source.states().size()+degree+1&gt;budget.maximumStates()) throw new Unavailable(&quot;STATE_LIMIT&quot;);</span>
+<span class="fc" id="L29">            var matrix=new ArrayList&lt;List&lt;Expr&gt;&gt;();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            for(var state:source.states()) matrix.add(row(current.get(state.symbol()),degree));</span>
+<span class="fc" id="L31">            var power=constant(source,w,BigInteger.ONE);</span>
+<span class="fc" id="L32">            var shifted=variable(source,w,source.index()).add(constant(source,w,source.indexStep()));</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            for(int k=0;k&lt;=degree;k++) {</span>
+<span class="fc" id="L34">                matrix.add(row(power,degree));</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">                if(k&lt;degree) power=power.multiply(shifted);</span>
+            }
+<span class="fc" id="L37">            var transition=new LinearTransition(matrix,initial(source,w,degree),source.states().size(),degree);</span>
+<span class="fc" id="L38">            return new SearchResult(Optional.of(new Candidate(source,transition,w.used)),&quot;CANDIDATE&quot;,w.used);</span>
+<span class="fc" id="L39">        } catch(Unavailable ex) { return new SearchResult(Optional.empty(),ex.getMessage(),w.used); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

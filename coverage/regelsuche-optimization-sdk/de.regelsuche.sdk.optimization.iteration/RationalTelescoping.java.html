@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalTelescoping.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">RationalTelescoping.java</span></div><h1>RationalTelescoping.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.ast.iteration.*;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+
+/** Exact rational fragment N(parameters)/(a*(i+b(parameters))*(i+b(parameters)+stride)).
+ * a is a nonzero rational constant. No Java division semantics are represented by this API.
+ * The checker proves a cross-multiplication identity and a complete affine pole factorization. */
+public final class RationalTelescoping {
+    private RationalTelescoping() {}
+    public record Source(SymbolId index,Set&lt;SymbolId&gt; parameters,Expr start,BigInteger stride,
+                         Expr numerator,Expr denominator,ExactRational initial) {
+<span class="fc" id="L19">        public Source {</span>
+<span class="fc" id="L20">            Objects.requireNonNull(initial); parameters=Set.copyOf(parameters);</span>
+            // Reuse bounded structural/scoping validation without assigning integer meaning to the quotient.
+<span class="fc" id="L22">            new PolynomialSum(index,parameters,start,stride,new BinaryExpr(numerator,BinaryOperator.ADD,denominator),new NumberExpr(initial),IntegerArithmetic.EXACT);</span>
+<span class="fc" id="L23">        }</span>
+    }
+<span class="fc" id="L25">    public record SearchResult(Optional&lt;Plan&gt; plan,String reason,long work) {}</span>
+<span class="fc" id="L26">    public record Verification(boolean verified,String reason,long work) {}</span>
+<span class="fc" id="L27">    private static Work work(OptimizationBudget b,CancellationToken c) { return new Work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }</span>
+<span class="fc" id="L28">    private static Set&lt;SymbolId&gt; symbols(Source s) { var ids=new HashSet&lt;&gt;(s.parameters()); ids.add(s.index()); return ids; }</span>
+    private static IterationPolynomial coefficient(IterationPolynomial p,SymbolId index,int power) {
+<span class="fc" id="L30">        var r=zero(p.work);</span>
+<span class="fc bfc" id="L31" title="All 4 branches covered.">        for(var e:p.terms.entrySet()) if(e.getKey().degree(index)==power)</span>
+<span class="fc" id="L32">            r=r.add(single(e.getKey().without(index),e.getValue(),p.work));</span>
+<span class="fc" id="L33">        return r;</span>
+    }
+    private static ExactRational nonzeroConstant(IterationPolynomial p) {
+<span class="fc" id="L36">        p.work.charge(p.terms.size()+1);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if(p.terms.size()!=1) throw new Unavailable(&quot;NONCONSTANT_LEADING_COEFFICIENT&quot;);</span>
+<span class="fc" id="L38">        var entry=p.terms.entrySet().iterator().next();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if(!entry.getKey().symbols().isEmpty()) throw new Unavailable(&quot;NONCONSTANT_LEADING_COEFFICIENT&quot;);</span>
+<span class="fc" id="L40">        return entry.getValue();</span>
+    }
+    private static void source(Source source,Work w) {
+<span class="fc" id="L43">        var start=SeriesSupport.parse(source.start(),source.parameters(),w); SeriesSupport.integerValued(start);</span>
+<span class="fc" id="L44">        var numerator=SeriesSupport.parse(source.numerator(),symbols(source),w);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if(!numerator.independent(source.index())) throw new Unavailable(&quot;INDEX_DEPENDENT_NUMERATOR&quot;);</span>
+<span class="fc" id="L46">        var denominator=SeriesSupport.parse(source.denominator(),symbols(source),w);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if(SeriesSupport.degree(denominator,source.index())!=2) throw new Unavailable(&quot;NONQUADRATIC_DENOMINATOR&quot;);</span>
+<span class="fc" id="L48">        nonzeroConstant(coefficient(denominator,source.index(),2)); w.coefficient(source.initial());</span>
+<span class="fc" id="L49">    }</span>
+    public static SearchResult search(Source source,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L51">        Objects.requireNonNull(source); var w=work(budget,cancellation);</span>
+        try {
+<span class="fc" id="L53">            source(source,w); var ids=symbols(source);</span>
+<span class="fc" id="L54">            var denominator=SeriesSupport.parse(source.denominator(),ids,w);</span>
+<span class="fc" id="L55">            var a=nonzeroConstant(coefficient(denominator,source.index(),2));</span>
+<span class="fc" id="L56">            var linear=coefficient(denominator,source.index(),1).scale(ExactRational.ONE.divide(a));</span>
+<span class="fc" id="L57">            var intercept=linear.subtract(constant(source.stride(),w)).scale(ExactRational.ONE.divide(ExactRational.integer(2)));</span>
+<span class="fc" id="L58">            var factor=variable(source.index(),w).add(intercept);</span>
+<span class="fc" id="L59">            var scale=a.multiply(ExactRational.integer(source.stride()));</span>
+<span class="fc" id="L60">            var numerator=SeriesSupport.parse(source.numerator(),ids,w).scale(ExactRational.NEGATIVE_ONE.divide(scale));</span>
+<span class="fc" id="L61">            var plan=new Plan(source,numerator.expression(),factor.expression());</span>
+<span class="fc" id="L62">            check(source,plan,w);</span>
+<span class="fc" id="L63">            return new SearchResult(Optional.of(plan),&quot;CANDIDATE&quot;,w.used);</span>
+<span class="fc" id="L64">        } catch(Unavailable e) { return new SearchResult(Optional.empty(),e.getMessage(),w.used); }</span>
+    }
+    /** Primitive numerator and denominator are the emitted rational boundary expression. */
+    public record Plan(Source source,Expr primitiveNumerator,Expr primitiveDenominator) {
+<span class="fc" id="L68">        public Plan { Objects.requireNonNull(source); Objects.requireNonNull(primitiveNumerator); Objects.requireNonNull(primitiveDenominator); }</span>
+        public ExactRational evaluate(BigInteger count,Map&lt;SymbolId,BigInteger&gt; parameters,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L70">            var w=work(budget,cancellation);</span>
+            try {
+<span class="fc" id="L72">                check(source,this,w); SeriesSupport.bits(count,w);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                if(count.signum()&lt;0) throw new Unavailable(&quot;NEGATIVE_COUNT&quot;);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                if(count.signum()==0) return source.initial();</span>
+<span class="fc" id="L75">                var start=SeriesSupport.value(SeriesSupport.parse(source.start(),source.parameters(),w),parameters);</span>
+<span class="fc" id="L76">                var end=start.add(source.stride().multiply(count)); SeriesSupport.bits(end,w);</span>
+<span class="fc" id="L77">                var p=SeriesSupport.parse(primitiveNumerator,symbols(source),w);</span>
+<span class="fc" id="L78">                var q=SeriesSupport.parse(primitiveDenominator,symbols(source),w);</span>
+<span class="fc" id="L79">                var slope=nonzeroConstant(coefficient(q,source.index(),1));</span>
+<span class="fc" id="L80">                var values=new HashMap&lt;&gt;(parameters); values.put(source.index(),start);</span>
+<span class="fc" id="L81">                var first=SeriesSupport.rationalValue(q,values);</span>
+                // Q(start+k*stride)=0 iff k=-Q(start)/(slope*stride), checked exactly.
+<span class="fc" id="L83">                var root=SeriesSupport.bounded(first.negate().divide(slope.multiply(ExactRational.integer(source.stride()))),w);</span>
+<span class="pc bpc" id="L84" title="1 of 6 branches missed.">                if(root.isInteger() &amp;&amp; root.signum()&gt;=0 &amp;&amp; root.numerator().compareTo(count)&lt;=0) throw new Unavailable(&quot;POLE_IN_RANGE&quot;);</span>
+<span class="fc" id="L85">                var left=SeriesSupport.bounded(SeriesSupport.rationalValue(p,values).divide(first),w);</span>
+<span class="fc" id="L86">                values.put(source.index(),end);</span>
+<span class="fc" id="L87">                var right=SeriesSupport.bounded(SeriesSupport.rationalValue(p,values).divide(SeriesSupport.rationalValue(q,values)),w);</span>
+<span class="fc" id="L88">                return SeriesSupport.bounded(source.initial().add(right).subtract(left),w);</span>
+<span class="fc" id="L89">            } catch(Unavailable e) { throw new IllegalArgumentException(e.getMessage(),e); }</span>
+        }
+    }
+    public static Verification verify(Source source,Plan plan,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L93">        Objects.requireNonNull(source); Objects.requireNonNull(plan); var w=work(budget,cancellation);</span>
+<span class="fc" id="L94">        try { check(source,plan,w); return new Verification(true,&quot;VERIFIED_RATIONAL_TELESCOPE&quot;,w.used); }</span>
+<span class="fc" id="L95">        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used); }</span>
+    }
+    private static void check(Source source,Plan plan,Work w) {
+<span class="fc" id="L98">        w.charge(6L*FiniteIteration.MAX_NODES);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if(!source.equals(plan.source())) throw new Unavailable(&quot;SOURCE_MISMATCH&quot;);</span>
+<span class="fc" id="L100">        source(source,w); var ids=symbols(source);</span>
+<span class="fc" id="L101">        var p=SeriesSupport.parse(plan.primitiveNumerator(),ids,w);</span>
+<span class="fc" id="L102">        var q=SeriesSupport.parse(plan.primitiveDenominator(),ids,w);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if(SeriesSupport.degree(q,source.index())!=1) throw new Unavailable(&quot;NONAFFINE_PRIMITIVE_DENOMINATOR&quot;);</span>
+<span class="fc" id="L104">        var slope=nonzeroConstant(coefficient(q,source.index(),1));</span>
+<span class="fc" id="L105">        var ps=p.shifted(source.index(),source.stride()); var qs=q.shifted(source.index(),source.stride());</span>
+<span class="fc" id="L106">        var n=SeriesSupport.parse(source.numerator(),ids,w); var d=SeriesSupport.parse(source.denominator(),ids,w);</span>
+<span class="fc" id="L107">        var a=nonzeroConstant(coefficient(d,source.index(),2));</span>
+        // Establish that Q and its shift account for every source pole, including zero-numerator cases.
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if(!d.same(q.multiply(qs).scale(a.divide(slope.multiply(slope))))) throw new Unavailable(&quot;DENOMINATOR_FACTORIZATION_MISMATCH&quot;);</span>
+<span class="fc" id="L110">        var left=ps.multiply(q).subtract(p.multiply(qs)).multiply(d);</span>
+<span class="fc" id="L111">        var right=n.multiply(qs).multiply(q);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if(!left.same(right)) throw new Unavailable(&quot;RATIONAL_IDENTITY_MISMATCH&quot;);</span>
+<span class="fc" id="L113">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

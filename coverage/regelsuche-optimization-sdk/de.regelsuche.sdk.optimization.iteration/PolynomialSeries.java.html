@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSeries.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">PolynomialSeries.java</span></div><h1>PolynomialSeries.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.iteration.IntegerArithmetic;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+
+/** Bounded exact finite compositions. All child proofs and runtime arithmetic share one work ledger. */
+public final class PolynomialSeries {
+    public static final int MAX_PARTS=32;
+    private PolynomialSeries() {}
+<span class="fc" id="L16">    private static Work work(OptimizationBudget b,CancellationToken c) { return new Work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }</span>
+    private static void count(BigInteger count,Work w) {
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        SeriesSupport.bits(count,w); if(count.signum()&lt;0) throw new Unavailable(&quot;NEGATIVE_COUNT&quot;);</span>
+<span class="fc" id="L19">    }</span>
+    /** Inner count is affine in the outer index; its parameter coefficients may be polynomial.
+     * Runtime endpoint checks establish nonnegativity over every executed inner range.
+     * Inner initial is included on every outer iteration, including empty inner ranges. */
+    public record NestedSum(PolynomialSum inner,Expr innerCount,SymbolId index,Set&lt;SymbolId&gt; parameters,
+                            Expr start,BigInteger stride,Expr initial,IntegerArithmetic arithmetic) {
+<span class="fc" id="L25">        public NestedSum {</span>
+<span class="fc" id="L26">            Objects.requireNonNull(inner); Objects.requireNonNull(innerCount); parameters=Set.copyOf(parameters);</span>
+<span class="fc" id="L27">            new PolynomialSum(index,parameters,start,stride,innerCount,initial,arithmetic);</span>
+<span class="fc" id="L28">            var symbols=new HashSet&lt;&gt;(parameters); symbols.add(index);</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">            if(index.equals(inner.index()) || !symbols.containsAll(inner.parameters())) throw new IllegalArgumentException(&quot;NESTED_SCOPE_MISMATCH&quot;);</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">            if(arithmetic!=IntegerArithmetic.EXACT || inner.arithmetic()!=IntegerArithmetic.EXACT) throw new IllegalArgumentException(&quot;NESTED_REQUIRES_EXACT&quot;);</span>
+<span class="fc" id="L31">        }</span>
+    }
+    public static NestedPlan nested(NestedSum source,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L34">        var w=work(budget,cancellation);</span>
+        try {
+<span class="fc" id="L36">            var inner=PolynomialSumOptimizer.create(source.inner(),w);</span>
+<span class="fc" id="L37">            var outer=PolynomialSumOptimizer.create(outerSource(source,inner,w),w);</span>
+<span class="fc" id="L38">            return new NestedPlan(source,inner,outer);</span>
+<span class="fc" id="L39">        } catch(Unavailable e) { throw new IllegalArgumentException(e.getMessage(),e); }</span>
+    }
+    private static PolynomialSum outerSource(NestedSum source,PolynomialSumPlan inner,Work w) {
+<span class="fc" id="L42">        PolynomialSumVerifier.check(source.inner(),inner,w);</span>
+<span class="fc" id="L43">        var ids=new HashSet&lt;&gt;(source.parameters()); ids.add(source.index());</span>
+<span class="fc" id="L44">        var bound=SeriesSupport.parse(source.innerCount(),ids,w); SeriesSupport.integerValued(bound);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if(SeriesSupport.degree(bound,source.index())&gt;1) throw new Unavailable(&quot;NONAFFINE_INNER_COUNT&quot;);</span>
+<span class="fc" id="L46">        var term=SeriesSupport.parse(inner.initial(),ids,w);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for(int j=0;j&lt;inner.coefficients().size();j++)</span>
+<span class="fc" id="L48">            term=term.add(SeriesSupport.parse(inner.coefficients().get(j),ids,w).multiply(SeriesSupport.binomial(bound,j+1)));</span>
+<span class="fc" id="L49">        SeriesSupport.integerValued(term);</span>
+<span class="fc" id="L50">        var expression=term.expression();</span>
+        // Reject generated transport limits through Unavailable before the model constructor.
+        // This keeps verifier failures structured without catching caller or programming errors.
+<span class="fc" id="L53">        SeriesSupport.parse(expression,ids,w);</span>
+<span class="fc" id="L54">        return new PolynomialSum(source.index(),source.parameters(),source.start(),source.stride(),expression,source.initial(),source.arithmetic());</span>
+    }
+    public record NestedPlan(NestedSum source,PolynomialSumPlan inner,PolynomialSumPlan outer) {
+<span class="fc" id="L57">        public NestedPlan { Objects.requireNonNull(source); Objects.requireNonNull(inner); Objects.requireNonNull(outer); }</span>
+        private void check(Work w) {
+<span class="fc" id="L59">            var expected=outerSource(source,inner,w);</span>
+<span class="fc" id="L60">            PolynomialSumVerifier.check(expected,outer,w);</span>
+<span class="fc" id="L61">        }</span>
+        public PolynomialSumVerifier.Verification verify(OptimizationBudget b,CancellationToken c) {
+<span class="fc" id="L63">            var w=work(b,c);</span>
+<span class="fc" id="L64">            try { check(w); return new PolynomialSumVerifier.Verification(true,&quot;VERIFIED_NESTED_SUM&quot;,w.used); }</span>
+<span class="fc" id="L65">            catch(Unavailable e) { return new PolynomialSumVerifier.Verification(false,e.getMessage(),w.used); }</span>
+        }
+        public BigInteger evaluate(BigInteger count,Map&lt;SymbolId,BigInteger&gt; parameters,OptimizationBudget b,CancellationToken c) {
+<span class="fc" id="L68">            var w=work(b,c);</span>
+            try {
+<span class="fc" id="L70">                check(w); count(count,w);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                if(count.signum()&gt;0) {</span>
+<span class="fc" id="L72">                    var start=SeriesSupport.value(SeriesSupport.parse(source.start(),source.parameters(),w),parameters);</span>
+<span class="fc" id="L73">                    var end=start.add(count.subtract(BigInteger.ONE).multiply(source.stride())); SeriesSupport.bits(end,w);</span>
+<span class="fc" id="L74">                    var ids=new HashSet&lt;&gt;(source.parameters()); ids.add(source.index());</span>
+<span class="fc" id="L75">                    var bound=SeriesSupport.parse(source.innerCount(),ids,w);</span>
+<span class="fc" id="L76">                    var values=new HashMap&lt;&gt;(parameters); boolean allEmpty=true;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                    for(var point:List.of(start,end)) {</span>
+<span class="fc" id="L78">                        values.put(source.index(),point);</span>
+<span class="fc" id="L79">                        var innerCount=SeriesSupport.value(bound,values);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                        if(innerCount.signum()&lt;0) throw new Unavailable(&quot;NEGATIVE_INNER_COUNT&quot;);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                        allEmpty &amp;= innerCount.signum()==0;</span>
+<span class="fc" id="L82">                    }</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                    if(allEmpty) {</span>
+<span class="fc" id="L84">                        var initialOnly=new PolynomialSum(source.index(),source.parameters(),source.start(),source.stride(),source.inner().initial(),source.initial(),source.arithmetic());</span>
+<span class="fc" id="L85">                        return PolynomialSumOptimizer.create(initialOnly,w).evaluate(count,parameters,w);</span>
+                    }
+                }
+<span class="fc" id="L88">                return outer.evaluate(count,parameters,w);</span>
+<span class="fc" id="L89">            } catch(Unavailable e) { throw new IllegalArgumentException(e.getMessage(),e); }</span>
+        }
+    }
+    /** Residue r receives ceil((count-r)/period) terms, clamped at zero.
+     * Child source starts/strides describe that residue's local progression. Child initial values
+     * are additive incoming states and included exactly once, even for an empty residue. */
+    public record PeriodicPlan(List&lt;PolynomialSumPlan&gt; residues) {
+<span class="fc" id="L96">        public PeriodicPlan { residues=parts(residues); sameArithmetic(residues); }</span>
+        public BigInteger evaluate(BigInteger count,Map&lt;SymbolId,BigInteger&gt; parameters,OptimizationBudget b,CancellationToken c) {
+<span class="fc" id="L98">            var w=work(b,c);</span>
+            try {
+<span class="fc" id="L100">                count(count,w); var result=BigInteger.ZERO; var period=BigInteger.valueOf(residues.size());</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                for(int r=0;r&lt;residues.size();r++) {</span>
+<span class="fc" id="L102">                    var local=count.add(period).subtract(BigInteger.valueOf(r+1)).divide(period).max(BigInteger.ZERO);</span>
+<span class="fc" id="L103">                    result=result.add(residues.get(r).evaluate(local,parameters,w)); SeriesSupport.bits(result,w);</span>
+                }
+<span class="fc" id="L105">                return residues.getFirst().source().arithmetic().normalize(result);</span>
+<span class="nc" id="L106">            } catch(Unavailable e) { throw new IllegalArgumentException(e.getMessage(),e); }</span>
+        }
+    }
+    /** A contiguous ordinal segment ends here (exclusive). Null denotes an unbounded final segment. */
+<span class="fc" id="L110">    public record Piece(BigInteger endExclusive,PolynomialSumPlan plan) { public Piece { Objects.requireNonNull(plan); } }</span>
+    /** Pieces implicitly begin at the previous endpoint, initially zero: no gaps or overlap.
+     * Each child progression starts locally at ordinal zero; initial states are added once each. */
+    public record PiecewisePlan(List&lt;Piece&gt; pieces) {
+<span class="fc" id="L114">        public PiecewisePlan {</span>
+<span class="fc" id="L115">            pieces=parts(pieces); var previous=BigInteger.ZERO;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            for(int j=0;j&lt;pieces.size();j++) {</span>
+<span class="fc" id="L117">                var end=pieces.get(j).endExclusive();</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">                if(end==null) { if(j!=pieces.size()-1) throw new IllegalArgumentException(&quot;NONFINAL_UNBOUNDED_PIECE&quot;); }</span>
+                else {
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">                    if(end.bitLength()&gt;PolynomialSum.MAX_RUNTIME_BITS || end.compareTo(previous)&lt;=0) throw new IllegalArgumentException(&quot;INVALID_PARTITION&quot;);</span>
+<span class="fc" id="L121">                    previous=end;</span>
+                }
+            }
+<span class="fc" id="L124">            sameArithmetic(pieces.stream().map(Piece::plan).toList());</span>
+<span class="fc" id="L125">        }</span>
+        public BigInteger evaluate(BigInteger count,Map&lt;SymbolId,BigInteger&gt; parameters,OptimizationBudget b,CancellationToken c) {
+<span class="fc" id="L127">            var w=work(b,c);</span>
+            try {
+<span class="fc" id="L129">                count(count,w); var last=pieces.getLast().endExclusive();</span>
+<span class="pc bpc" id="L130" title="3 of 4 branches missed.">                if(last!=null &amp;&amp; count.compareTo(last)&gt;0) throw new Unavailable(&quot;UNCOVERED_RANGE&quot;);</span>
+<span class="fc" id="L131">                var result=BigInteger.ZERO; var start=BigInteger.ZERO;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                for(var piece:pieces) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    var end=piece.endExclusive()==null?count:count.min(piece.endExclusive());</span>
+<span class="fc" id="L134">                    var local=end.subtract(start).max(BigInteger.ZERO);</span>
+<span class="fc" id="L135">                    result=result.add(piece.plan().evaluate(local,parameters,w)); SeriesSupport.bits(result,w);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                    if(piece.endExclusive()!=null) start=piece.endExclusive();</span>
+<span class="fc" id="L137">                }</span>
+<span class="fc" id="L138">                return pieces.getFirst().plan().source().arithmetic().normalize(result);</span>
+<span class="fc" id="L139">            } catch(Unavailable e) { throw new IllegalArgumentException(e.getMessage(),e); }</span>
+        }
+    }
+    private static &lt;T&gt; List&lt;T&gt; parts(List&lt;T&gt; parts) {
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">        if(parts.isEmpty() || parts.size()&gt;MAX_PARTS) throw new IllegalArgumentException(&quot;PART_COUNT_LIMIT&quot;);</span>
+<span class="fc" id="L144">        return List.copyOf(parts);</span>
+    }
+    private static void sameArithmetic(List&lt;PolynomialSumPlan&gt; plans) {
+<span class="fc" id="L147">        var arithmetic=plans.getFirst().source().arithmetic();</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">        if(plans.stream().anyMatch(p-&gt;p.source().arithmetic()!=arithmetic)) throw new IllegalArgumentException(&quot;ARITHMETIC_MISMATCH&quot;);</span>
+<span class="fc" id="L149">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

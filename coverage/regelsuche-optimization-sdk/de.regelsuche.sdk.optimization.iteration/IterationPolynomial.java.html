@@ -17,157 +17,160 @@ final class IterationPolynomial {
     static final class Work {
         final OptimizationBudget budget;
         final CancellationToken cancellation;
-<span class="fc" id="L20">        final long start = System.nanoTime(), timeout;</span>
+        final int maximumDegree;
+<span class="fc" id="L21">        final long start = System.nanoTime(), timeout;</span>
         long used;
-<span class="fc" id="L22">        Work(OptimizationBudget budget, CancellationToken cancellation) {</span>
-<span class="fc" id="L23">            this.budget = Objects.requireNonNull(budget); this.cancellation = Objects.requireNonNull(cancellation);</span>
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            timeout = budget.timeoutMillis() &gt; Long.MAX_VALUE / 1_000_000 ? Long.MAX_VALUE : budget.timeoutMillis()*1_000_000;</span>
-<span class="fc" id="L25">        }</span>
+<span class="fc" id="L23">        Work(OptimizationBudget budget, CancellationToken cancellation) { this(budget,cancellation,MAX_DEGREE+1); }</span>
+<span class="fc" id="L24">        Work(OptimizationBudget budget, CancellationToken cancellation, int maximumDegree) {</span>
+<span class="fc" id="L25">            this.maximumDegree=maximumDegree;</span>
+<span class="fc" id="L26">            this.budget = Objects.requireNonNull(budget); this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            timeout = budget.timeoutMillis() &gt; Long.MAX_VALUE / 1_000_000 ? Long.MAX_VALUE : budget.timeoutMillis()*1_000_000;</span>
+<span class="fc" id="L28">        }</span>
         void charge(long amount) {
-<span class="pc bpc" id="L27" title="1 of 4 branches missed.">            if (cancellation.isCancelled() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
-<span class="pc bpc" id="L28" title="2 of 6 branches missed.">            if (amount &lt; 0 || amount &gt; budget.maximumWork()-used || System.nanoTime()-start &gt;= timeout)</span>
-<span class="fc" id="L29">                throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
-<span class="fc" id="L30">            used += amount;</span>
-<span class="fc" id="L31">        }</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">            if (cancellation.isCancelled() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L31" title="2 of 6 branches missed.">            if (amount &lt; 0 || amount &gt; budget.maximumWork()-used || System.nanoTime()-start &gt;= timeout)</span>
+<span class="fc" id="L32">                throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L33">            used += amount;</span>
+<span class="fc" id="L34">        }</span>
         void coefficient(ExactRational c) {
-<span class="fc" id="L33">            charge(1);</span>
-<span class="pc bpc" id="L34" title="1 of 4 branches missed.">            if(c.numerator().bitLength()&gt;FiniteIteration.MAX_COEFFICIENT_BITS || c.denominator().bitLength()&gt;FiniteIteration.MAX_COEFFICIENT_BITS)</span>
-<span class="fc" id="L35">                throw new Unavailable(&quot;COEFFICIENT_LIMIT&quot;);</span>
-<span class="fc" id="L36">        }</span>
+<span class="fc" id="L36">            charge(1);</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">            if(c.numerator().bitLength()&gt;FiniteIteration.MAX_COEFFICIENT_BITS || c.denominator().bitLength()&gt;FiniteIteration.MAX_COEFFICIENT_BITS)</span>
+<span class="fc" id="L38">                throw new Unavailable(&quot;COEFFICIENT_LIMIT&quot;);</span>
+<span class="fc" id="L39">        }</span>
     }
     record Monomial(List&lt;SymbolId&gt; symbols) {
-<span class="fc" id="L39">        Monomial { symbols = List.copyOf(symbols); }</span>
-<span class="fc bfc" id="L40" title="All 4 branches covered.">        int degree(SymbolId symbol) { int result=0; for(var s:symbols) if(s.equals(symbol)) result++; return result; }</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        Monomial without(SymbolId symbol) { return new Monomial(symbols.stream().filter(s -&gt; !s.equals(symbol)).toList()); }</span>
+<span class="fc" id="L42">        Monomial { symbols = List.copyOf(symbols); }</span>
+<span class="fc bfc" id="L43" title="All 4 branches covered.">        int degree(SymbolId symbol) { int result=0; for(var s:symbols) if(s.equals(symbol)) result++; return result; }</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        Monomial without(SymbolId symbol) { return new Monomial(symbols.stream().filter(s -&gt; !s.equals(symbol)).toList()); }</span>
     }
-<span class="fc" id="L43">    private static final Comparator&lt;SymbolId&gt; ORDER = Comparator.comparing(SymbolId::namespace).thenComparingLong(SymbolId::ordinal);</span>
+<span class="fc" id="L46">    private static final Comparator&lt;SymbolId&gt; ORDER = Comparator.comparing(SymbolId::namespace).thenComparingLong(SymbolId::ordinal);</span>
     final Map&lt;Monomial,ExactRational&gt; terms;
     final Work work;
-<span class="fc" id="L46">    private IterationPolynomial(Map&lt;Monomial,ExactRational&gt; terms, Work work) { this.terms=Collections.unmodifiableMap(terms); this.work=work; }</span>
-<span class="fc" id="L47">    static IterationPolynomial zero(Work w) { return new IterationPolynomial(new LinkedHashMap&lt;&gt;(),w); }</span>
-<span class="fc" id="L48">    static IterationPolynomial constant(BigInteger n, Work w) { return single(new Monomial(List.of()),ExactRational.integer(n),w); }</span>
-<span class="fc" id="L49">    static IterationPolynomial variable(SymbolId s, Work w) { return single(new Monomial(List.of(s)),ExactRational.ONE,w); }</span>
+<span class="fc" id="L49">    private IterationPolynomial(Map&lt;Monomial,ExactRational&gt; terms, Work work) { this.terms=Collections.unmodifiableMap(terms); this.work=work; }</span>
+<span class="fc" id="L50">    static IterationPolynomial zero(Work w) { return new IterationPolynomial(new LinkedHashMap&lt;&gt;(),w); }</span>
+<span class="fc" id="L51">    static IterationPolynomial constant(BigInteger n, Work w) { return single(new Monomial(List.of()),ExactRational.integer(n),w); }</span>
+<span class="fc" id="L52">    static IterationPolynomial variable(SymbolId s, Work w) { return single(new Monomial(List.of(s)),ExactRational.ONE,w); }</span>
     static IterationPolynomial single(Monomial m, ExactRational c, Work w) {
-<span class="fc" id="L51">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;(); put(map,m,c,w); return new IterationPolynomial(map,w);</span>
+<span class="fc" id="L54">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;(); put(map,m,c,w); return new IterationPolynomial(map,w);</span>
     }
     private static void put(Map&lt;Monomial,ExactRational&gt; map, Monomial m, ExactRational c, Work w) {
-<span class="fc" id="L54">        w.coefficient(c);</span>
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if(m.symbols().size()&gt;MAX_DEGREE+1) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        if(c.signum()==0) map.remove(m); else map.put(m,c);</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">        if(map.size()&gt;Math.min(MAX_TERMS,w.budget.maximumStates())) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
-<span class="fc" id="L58">    }</span>
+<span class="fc" id="L57">        w.coefficient(c);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if(m.symbols().size()&gt;w.maximumDegree) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if(c.signum()==0) map.remove(m); else map.put(m,c);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if(map.size()&gt;Math.min(MAX_TERMS,w.budget.maximumStates())) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L61">    }</span>
     IterationPolynomial add(IterationPolynomial other) {
-<span class="fc" id="L60">        var map = new LinkedHashMap&lt;&gt;(terms); work.charge(terms.size());</span>
-<span class="fc bfc" id="L61" title="All 2 branches covered.">        for(var entry:other.terms.entrySet()) put(map,entry.getKey(),map.getOrDefault(entry.getKey(),ExactRational.ZERO).add(entry.getValue()),work);</span>
-<span class="fc" id="L62">        return new IterationPolynomial(map,work);</span>
+<span class="fc" id="L63">        var map = new LinkedHashMap&lt;&gt;(terms); work.charge(terms.size());</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for(var entry:other.terms.entrySet()) put(map,entry.getKey(),map.getOrDefault(entry.getKey(),ExactRational.ZERO).add(entry.getValue()),work);</span>
+<span class="fc" id="L65">        return new IterationPolynomial(map,work);</span>
     }
     IterationPolynomial scale(ExactRational factor) {
-<span class="fc" id="L65">        work.coefficient(factor);</span>
-<span class="fc" id="L66">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;();</span>
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        for(var entry:terms.entrySet()) put(map,entry.getKey(),entry.getValue().multiply(factor),work);</span>
-<span class="fc" id="L68">        return new IterationPolynomial(map,work);</span>
+<span class="fc" id="L68">        work.coefficient(factor);</span>
+<span class="fc" id="L69">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for(var entry:terms.entrySet()) put(map,entry.getKey(),entry.getValue().multiply(factor),work);</span>
+<span class="fc" id="L71">        return new IterationPolynomial(map,work);</span>
     }
-<span class="fc" id="L70">    IterationPolynomial subtract(IterationPolynomial other) { return add(other.scale(ExactRational.NEGATIVE_ONE)); }</span>
+<span class="fc" id="L73">    IterationPolynomial subtract(IterationPolynomial other) { return add(other.scale(ExactRational.NEGATIVE_ONE)); }</span>
     IterationPolynomial multiply(IterationPolynomial other) {
-<span class="fc" id="L72">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;();</span>
-<span class="fc bfc" id="L73" title="All 4 branches covered.">        for(var a:terms.entrySet()) for(var b:other.terms.entrySet()) {</span>
-<span class="fc" id="L74">            work.charge(1);</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if(a.getKey().symbols().size()+b.getKey().symbols().size()&gt;MAX_DEGREE+1) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
-<span class="fc" id="L76">            var symbols = new ArrayList&lt;&gt;(a.getKey().symbols()); symbols.addAll(b.getKey().symbols()); symbols.sort(ORDER);</span>
-<span class="fc" id="L77">            var m = new Monomial(symbols);</span>
-<span class="fc" id="L78">            put(map,m,map.getOrDefault(m,ExactRational.ZERO).add(a.getValue().multiply(b.getValue())),work);</span>
-<span class="fc" id="L79">        }</span>
-<span class="fc" id="L80">        return new IterationPolynomial(map,work);</span>
+<span class="fc" id="L75">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;();</span>
+<span class="fc bfc" id="L76" title="All 4 branches covered.">        for(var a:terms.entrySet()) for(var b:other.terms.entrySet()) {</span>
+<span class="fc" id="L77">            work.charge(1);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if(a.getKey().symbols().size()+b.getKey().symbols().size()&gt;work.maximumDegree) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
+<span class="fc" id="L79">            var symbols = new ArrayList&lt;&gt;(a.getKey().symbols()); symbols.addAll(b.getKey().symbols()); symbols.sort(ORDER);</span>
+<span class="fc" id="L80">            var m = new Monomial(symbols);</span>
+<span class="fc" id="L81">            put(map,m,map.getOrDefault(m,ExactRational.ZERO).add(a.getValue().multiply(b.getValue())),work);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        return new IterationPolynomial(map,work);</span>
     }
     IterationPolynomial substitute(SymbolId symbol, IterationPolynomial value) {
-<span class="fc" id="L83">        var result=zero(work);</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">        for(var entry:terms.entrySet()) {</span>
-<span class="fc" id="L85">            var term=single(entry.getKey().without(symbol),entry.getValue(),work);</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            for(int n=entry.getKey().degree(symbol);n&gt;0;n--) term=term.multiply(value);</span>
-<span class="fc" id="L87">            result=result.add(term);</span>
-<span class="fc" id="L88">        }</span>
-<span class="fc" id="L89">        return result;</span>
+<span class="fc" id="L86">        var result=zero(work);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for(var entry:terms.entrySet()) {</span>
+<span class="fc" id="L88">            var term=single(entry.getKey().without(symbol),entry.getValue(),work);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            for(int n=entry.getKey().degree(symbol);n&gt;0;n--) term=term.multiply(value);</span>
+<span class="fc" id="L90">            result=result.add(term);</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        return result;</span>
     }
-<span class="fc" id="L91">    IterationPolynomial at(SymbolId symbol, BigInteger value) { return substitute(symbol,constant(value,work)); }</span>
-<span class="fc" id="L92">    IterationPolynomial shifted(SymbolId symbol, BigInteger step) { return substitute(symbol,variable(symbol,work).add(constant(step,work))); }</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">    boolean independent(SymbolId symbol) { work.charge(terms.size()); return terms.keySet().stream().noneMatch(m -&gt; m.degree(symbol)&gt;0); }</span>
-<span class="fc" id="L94">    boolean same(IterationPolynomial other) { work.charge(terms.size()+other.terms.size()); return terms.equals(other.terms); }</span>
+<span class="fc" id="L94">    IterationPolynomial at(SymbolId symbol, BigInteger value) { return substitute(symbol,constant(value,work)); }</span>
+<span class="fc" id="L95">    IterationPolynomial shifted(SymbolId symbol, BigInteger step) { return substitute(symbol,variable(symbol,work).add(constant(step,work))); }</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">    boolean independent(SymbolId symbol) { work.charge(terms.size()); return terms.keySet().stream().noneMatch(m -&gt; m.degree(symbol)&gt;0); }</span>
+<span class="fc" id="L97">    boolean same(IterationPolynomial other) { work.charge(terms.size()+other.terms.size()); return terms.equals(other.terms); }</span>
     IterationPolynomial integral(IntegerArithmetic arithmetic) {
-<span class="fc" id="L96">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;();</span>
-<span class="fc bfc" id="L97" title="All 2 branches covered.">        for(var e:terms.entrySet()) {</span>
-<span class="fc" id="L98">            work.charge(1);</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if(!e.getValue().isInteger()) throw new Unavailable(&quot;FRACTIONAL_RESULT&quot;);</span>
-<span class="fc" id="L100">            put(map,e.getKey(),ExactRational.integer(arithmetic.normalize(e.getValue().numerator())),work);</span>
-<span class="fc" id="L101">        }</span>
-<span class="fc" id="L102">        return new IterationPolynomial(map,work);</span>
+<span class="fc" id="L99">        var map = new LinkedHashMap&lt;Monomial,ExactRational&gt;();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for(var e:terms.entrySet()) {</span>
+<span class="fc" id="L101">            work.charge(1);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if(!e.getValue().isInteger()) throw new Unavailable(&quot;FRACTIONAL_RESULT&quot;);</span>
+<span class="fc" id="L103">            put(map,e.getKey(),ExactRational.integer(arithmetic.normalize(e.getValue().numerator())),work);</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        return new IterationPolynomial(map,work);</span>
     }
     static IterationPolynomial parse(Expr expression, Set&lt;SymbolId&gt; allowed, boolean integers, int degree, Work w) {
-<span class="fc" id="L105">        return parse(expression,allowed,integers,degree,w,1,new int[]{0});</span>
+<span class="fc" id="L108">        return parse(expression,allowed,integers,degree,w,1,new int[]{0});</span>
     }
     private static IterationPolynomial parse(Expr expression, Set&lt;SymbolId&gt; allowed, boolean integers, int degree, Work w, int depth, int[] nodes) {
-<span class="fc" id="L108">        w.charge(1);</span>
-<span class="pc bpc" id="L109" title="1 of 4 branches missed.">        if(depth&gt;FiniteIteration.MAX_DEPTH || ++nodes[0]&gt;FiniteIteration.MAX_NODES) throw new Unavailable(&quot;EXPRESSION_LIMIT&quot;);</span>
+<span class="fc" id="L111">        w.charge(1);</span>
+<span class="fc bfc" id="L112" title="All 4 branches covered.">        if(depth&gt;FiniteIteration.MAX_DEPTH || ++nodes[0]&gt;FiniteIteration.MAX_NODES) throw new Unavailable(&quot;EXPRESSION_LIMIT&quot;);</span>
         IterationPolynomial result;
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        if(expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L112">            w.coefficient(number.value());</span>
-<span class="fc bfc" id="L113" title="All 4 branches covered.">            if(integers &amp;&amp; !number.value().isInteger()) throw new Unavailable(&quot;FRACTIONAL_SOURCE&quot;);</span>
-<span class="fc" id="L114">            result=single(new Monomial(List.of()),number.value(),w);</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">        } else if(expression instanceof VariableExpr variable) {</span>
-<span class="pc bpc" id="L116" title="1 of 4 branches missed.">            if(variable.symbol().isEmpty() || !allowed.contains(variable.symbol().orElseThrow())) throw new Unavailable(&quot;UNBOUND_SYMBOL&quot;);</span>
-<span class="fc" id="L117">            result=variable(variable.symbol().orElseThrow(),w);</span>
-<span class="fc bfc" id="L118" title="All 2 branches covered.">        } else if(expression instanceof BinaryExpr binary) {</span>
-<span class="fc bfc" id="L119" title="All 6 branches covered.">            if(binary.operator()!=BinaryOperator.ADD &amp;&amp; binary.operator()!=BinaryOperator.SUB &amp;&amp; binary.operator()!=BinaryOperator.MUL) throw new Unavailable(&quot;UNSUPPORTED_OPERATOR&quot;);</span>
-<span class="fc" id="L120">            var left=parse(binary.left(),allowed,integers,degree,w,depth+1,nodes);</span>
-<span class="fc" id="L121">            var right=parse(binary.right(),allowed,integers,degree,w,depth+1,nodes);</span>
-<span class="pc bpc" id="L122" title="1 of 4 branches missed.">            result=switch(binary.operator()) { case ADD -&gt; left.add(right); case SUB -&gt; left.subtract(right); case MUL -&gt; left.multiply(right); default -&gt; throw new AssertionError(); };</span>
-<span class="fc" id="L123">        } else throw new Unavailable(&quot;UNSUPPORTED_EXPRESSION&quot;);</span>
-<span class="fc bfc" id="L124" title="All 4 branches covered.">        for(var m:result.terms.keySet()) { w.charge(1); if(m.symbols().size()&gt;degree) throw new Unavailable(&quot;DEGREE_LIMIT&quot;); }</span>
-<span class="fc" id="L125">        return result;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if(expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L115">            w.coefficient(number.value());</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">            if(integers &amp;&amp; !number.value().isInteger()) throw new Unavailable(&quot;FRACTIONAL_SOURCE&quot;);</span>
+<span class="fc" id="L117">            result=single(new Monomial(List.of()),number.value(),w);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        } else if(expression instanceof VariableExpr variable) {</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">            if(variable.symbol().isEmpty() || !allowed.contains(variable.symbol().orElseThrow())) throw new Unavailable(&quot;UNBOUND_SYMBOL&quot;);</span>
+<span class="fc" id="L120">            result=variable(variable.symbol().orElseThrow(),w);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        } else if(expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L122" title="All 6 branches covered.">            if(binary.operator()!=BinaryOperator.ADD &amp;&amp; binary.operator()!=BinaryOperator.SUB &amp;&amp; binary.operator()!=BinaryOperator.MUL) throw new Unavailable(&quot;UNSUPPORTED_OPERATOR&quot;);</span>
+<span class="fc" id="L123">            var left=parse(binary.left(),allowed,integers,degree,w,depth+1,nodes);</span>
+<span class="fc" id="L124">            var right=parse(binary.right(),allowed,integers,degree,w,depth+1,nodes);</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            result=switch(binary.operator()) { case ADD -&gt; left.add(right); case SUB -&gt; left.subtract(right); case MUL -&gt; left.multiply(right); default -&gt; throw new AssertionError(); };</span>
+<span class="fc" id="L126">        } else throw new Unavailable(&quot;UNSUPPORTED_EXPRESSION&quot;);</span>
+<span class="fc bfc" id="L127" title="All 4 branches covered.">        for(var m:result.terms.keySet()) { w.charge(1); if(m.symbols().size()&gt;degree) throw new Unavailable(&quot;DEGREE_LIMIT&quot;); }</span>
+<span class="fc" id="L128">        return result;</span>
     }
     Expr expression() {
-<span class="fc" id="L128">        var summands=new ArrayList&lt;Expr&gt;();</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">        for(var entry:terms.entrySet()) {</span>
-<span class="fc" id="L130">            work.charge(1);</span>
-<span class="fc" id="L131">            Expr term=null;</span>
-<span class="pc bpc" id="L132" title="1 of 4 branches missed.">            if(!entry.getValue().equals(ExactRational.ONE) || entry.getKey().symbols().isEmpty()) term=new NumberExpr(entry.getValue());</span>
-<span class="fc bfc" id="L133" title="All 4 branches covered.">            for(var symbol:entry.getKey().symbols()) term=term==null ? VariableExpr.scoped(symbol) : new BinaryExpr(term,BinaryOperator.MUL,VariableExpr.scoped(symbol));</span>
-<span class="fc" id="L134">            summands.add(term);</span>
-<span class="fc" id="L135">        }</span>
-<span class="fc" id="L136">        return balanced(summands,0,summands.size());</span>
+<span class="fc" id="L131">        var summands=new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for(var entry:terms.entrySet()) {</span>
+<span class="fc" id="L133">            work.charge(1);</span>
+<span class="fc" id="L134">            Expr term=null;</span>
+<span class="fc bfc" id="L135" title="All 4 branches covered.">            if(!entry.getValue().equals(ExactRational.ONE) || entry.getKey().symbols().isEmpty()) term=new NumberExpr(entry.getValue());</span>
+<span class="fc bfc" id="L136" title="All 4 branches covered.">            for(var symbol:entry.getKey().symbols()) term=term==null ? VariableExpr.scoped(symbol) : new BinaryExpr(term,BinaryOperator.MUL,VariableExpr.scoped(symbol));</span>
+<span class="fc" id="L137">            summands.add(term);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return balanced(summands,0,summands.size());</span>
     }
     private Expr balanced(List&lt;Expr&gt; expressions,int from,int to) {
-<span class="fc" id="L139">        work.charge(1);</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">        if(from==to) return new NumberExpr(0);</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">        if(to-from==1) return expressions.get(from);</span>
-<span class="fc" id="L142">        int middle=(from+to)/2;</span>
-<span class="fc" id="L143">        return new BinaryExpr(balanced(expressions,from,middle),BinaryOperator.ADD,balanced(expressions,middle,to));</span>
+<span class="fc" id="L142">        work.charge(1);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if(from==to) return new NumberExpr(0);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if(to-from==1) return expressions.get(from);</span>
+<span class="fc" id="L145">        int middle=(from+to)/2;</span>
+<span class="fc" id="L146">        return new BinaryExpr(balanced(expressions,from,middle),BinaryOperator.ADD,balanced(expressions,middle,to));</span>
     }
     static Set&lt;SymbolId&gt; symbols(FiniteIteration source, boolean state) {
-<span class="fc" id="L146">        var result=new HashSet&lt;&gt;(source.parameters()); result.add(source.index());</span>
-<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        if(state &amp;&amp; source instanceof FiniteIteration.Recurrence recurrence) result.add(recurrence.state());</span>
-<span class="fc" id="L148">        return result;</span>
+<span class="fc" id="L149">        var result=new HashSet&lt;&gt;(source.parameters()); result.add(source.index());</span>
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">        if(state &amp;&amp; source instanceof FiniteIteration.Recurrence recurrence) result.add(recurrence.state());</span>
+<span class="fc" id="L151">        return result;</span>
     }
-<span class="fc" id="L150">    record Source(IterationPolynomial term, IterationPolynomial initial) {}</span>
+<span class="fc" id="L153">    record Source(IterationPolynomial term, IterationPolynomial initial) {}</span>
     static Source source(FiniteIteration source, Work w) {
-<span class="fc" id="L152">        w.charge(1);</span>
-<span class="fc bfc" id="L153" title="All 2 branches covered.">        if(source instanceof FiniteIteration.Sum sum)</span>
-<span class="fc" id="L154">            return new Source(parse(sum.term(),symbols(source,false),true,MAX_DEGREE,w),zero(w));</span>
-<span class="fc" id="L155">        var recurrence=(FiniteIteration.Recurrence)source;</span>
-<span class="fc" id="L156">        var update=parse(recurrence.update(),symbols(source,true),true,MAX_DEGREE,w);</span>
-<span class="fc" id="L157">        var term=update.subtract(variable(recurrence.state(),w));</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        if(!term.independent(recurrence.state())) throw new Unavailable(&quot;NONLINEAR_STATE_UPDATE&quot;);</span>
-<span class="fc" id="L159">        return new Source(term,parse(recurrence.initial(),source.parameters(),true,MAX_DEGREE,w));</span>
+<span class="fc" id="L155">        w.charge(1);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if(source instanceof FiniteIteration.Sum sum)</span>
+<span class="fc" id="L157">            return new Source(parse(sum.term(),symbols(source,false),true,MAX_DEGREE,w),zero(w));</span>
+<span class="fc" id="L158">        var recurrence=(FiniteIteration.Recurrence)source;</span>
+<span class="fc" id="L159">        var update=parse(recurrence.update(),symbols(source,true),true,MAX_DEGREE,w);</span>
+<span class="fc" id="L160">        var term=update.subtract(variable(recurrence.state(),w));</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if(!term.independent(recurrence.state())) throw new Unavailable(&quot;NONLINEAR_STATE_UPDATE&quot;);</span>
+<span class="fc" id="L162">        return new Source(term,parse(recurrence.initial(),source.parameters(),true,MAX_DEGREE,w));</span>
     }
-<span class="fc" id="L161">    static long operations(Expr expression, Work w) { return operations(expression,w,1,new int[]{0}); }</span>
+<span class="fc" id="L164">    static long operations(Expr expression, Work w) { return operations(expression,w,1,new int[]{0}); }</span>
     private static long operations(Expr e, Work w, int depth,int[] nodes) {
-<span class="fc" id="L163">        w.charge(1);</span>
-<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if(depth&gt;FiniteIteration.MAX_DEPTH || ++nodes[0]&gt;FiniteIteration.MAX_NODES) throw new Unavailable(&quot;EXPRESSION_LIMIT&quot;);</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">        return e instanceof BinaryExpr b ? 1+operations(b.left(),w,depth+1,nodes)+operations(b.right(),w,depth+1,nodes) : 0;</span>
+<span class="fc" id="L166">        w.charge(1);</span>
+<span class="pc bpc" id="L167" title="2 of 4 branches missed.">        if(depth&gt;FiniteIteration.MAX_DEPTH || ++nodes[0]&gt;FiniteIteration.MAX_NODES) throw new Unavailable(&quot;EXPRESSION_LIMIT&quot;);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        return e instanceof BinaryExpr b ? 1+operations(b.left(),w,depth+1,nodes)+operations(b.right(),w,depth+1,nodes) : 0;</span>
     }
     static FiniteIterationOptimizer.Cost cost(FiniteIteration source, Expr emitted, Work w) {
-<span class="fc bfc" id="L168" title="All 2 branches covered.">        long perIteration=source instanceof FiniteIteration.Sum s ? 1+operations(s.term(),w) : operations(((FiniteIteration.Recurrence)source).update(),w);</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">        long initial=source instanceof FiniteIteration.Recurrence r ? operations(r.initial(),w) : 0;</span>
-<span class="fc" id="L170">        return new FiniteIterationOptimizer.Cost(source.range().count().multiply(BigInteger.valueOf(perIteration)).add(BigInteger.valueOf(initial)),operations(emitted,w));</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        long perIteration=source instanceof FiniteIteration.Sum s ? 1+operations(s.term(),w) : operations(((FiniteIteration.Recurrence)source).update(),w);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        long initial=source instanceof FiniteIteration.Recurrence r ? operations(r.initial(),w) : 0;</span>
+<span class="fc" id="L173">        return new FiniteIterationOptimizer.Cost(source.range().count().multiply(BigInteger.valueOf(perIteration)).add(BigInteger.valueOf(initial)),operations(emitted,w));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

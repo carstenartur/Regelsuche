@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearIterationEvaluator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">LinearIterationEvaluator.java</span></div><h1>LinearIterationEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.iteration.IntegerArithmetic;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+import static de.regelsuche.sdk.optimization.iteration.LinearIterationAlgebra.*;
+
+/** Reference evaluator using bounded binary powering, never iteration-count source unrolling. */
+<span class="fc" id="L11">public final class LinearIterationEvaluator {</span>
+    public record Evaluation(Optional&lt;List&lt;BigInteger&gt;&gt; values,String reason,long work) {
+<span class="fc" id="L13">        public Evaluation { values=values.map(List::copyOf); }</span>
+    }
+    public Evaluation evaluate(LinearIteration source,LinearIterationOptimizer.Candidate candidate,
+            Map&lt;SymbolId,BigInteger&gt; bindings,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L17">        var w=new Work(budget,cancellation);</span>
+        try {
+<span class="fc" id="L19">            LinearIterationVerifier.check(source,candidate,w);</span>
+<span class="fc" id="L20">            return new Evaluation(Optional.of(power(source,candidate.transition(),bindings,w)),&quot;EVALUATED_LINEAR_TRANSITION&quot;,w.used);</span>
+<span class="fc" id="L21">        } catch(Unavailable ex) { return new Evaluation(Optional.empty(),ex.getMessage(),w.used); }</span>
+    }
+    static List&lt;BigInteger&gt; power(LinearIteration source,LinearTransition t,Map&lt;SymbolId,BigInteger&gt; bindings,Work w) {
+<span class="fc" id="L24">        Objects.requireNonNull(bindings);</span>
+<span class="fc" id="L25">        var count=eval(source.count(),bindings,IntegerArithmetic.EXACT,w);</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if(count.signum()&lt;0) throw new Unavailable(&quot;NEGATIVE_COUNT&quot;);</span>
+<span class="fc" id="L27">        var ring=source.arithmetic(); int dimension=t.matrix().size();</span>
+<span class="fc" id="L28">        var values=new ArrayList&lt;BigInteger&gt;();</span>
+        // Incoming states are preserved on an empty range without evaluating index or update coefficients.
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if(count.signum()==0) {</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for(var state:source.states()) values.add(eval(state.initial(),bindings,ring,w));</span>
+<span class="fc" id="L32">            return List.copyOf(values);</span>
+        }
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for(var initial:t.initial()) values.add(eval(initial,bindings,ring,w));</span>
+<span class="fc" id="L35">        var matrix=new BigInteger[dimension][dimension];</span>
+<span class="fc bfc" id="L36" title="All 4 branches covered.">        for(int i=0;i&lt;dimension;i++) for(int j=0;j&lt;dimension;j++) matrix[i][j]=eval(t.matrix().get(i).get(j),bindings,ring,w);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        while(count.signum()&gt;0) {</span>
+<span class="fc" id="L38">            w.charge();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if(count.testBit(0)) {</span>
+<span class="fc" id="L40">                var next=new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">                for(int i=0;i&lt;dimension;i++) {</span>
+<span class="fc" id="L42">                    var value=BigInteger.ZERO;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                    for(int j=0;j&lt;dimension;j++) value=w.add(value,w.multiply(matrix[i][j],values.get(j),ring),ring);</span>
+<span class="fc" id="L44">                    next.add(value);</span>
+                }
+<span class="fc" id="L46">                values=next;</span>
+            }
+<span class="fc" id="L48">            count=count.shiftRight(1);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if(count.signum()&gt;0) matrix=square(matrix,ring,w);</span>
+        }
+<span class="fc" id="L51">        return List.copyOf(values.subList(0,source.states().size()));</span>
+    }
+    private static BigInteger[][] square(BigInteger[][] matrix,IntegerArithmetic ring,Work w) {
+<span class="fc" id="L54">        int n=matrix.length; var result=new BigInteger[n][n];</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">        for(int i=0;i&lt;n;i++) for(int j=0;j&lt;n;j++) {</span>
+<span class="fc" id="L56">            var value=BigInteger.ZERO;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            for(int k=0;k&lt;n;k++) value=w.add(value,w.multiply(matrix[i][k],matrix[k][j],ring),ring);</span>
+<span class="fc" id="L58">            result[i][j]=value;</span>
+        }
+<span class="fc" id="L60">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
