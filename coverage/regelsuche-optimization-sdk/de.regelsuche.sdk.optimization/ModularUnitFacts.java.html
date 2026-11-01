@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModularUnitFacts.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">ModularUnitFacts.java</span></div><h1>ModularUnitFacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.*;
+import java.math.BigInteger;
+
+/** Units are established from supplied domain facts and closure, never a prime/name assumption. */
+final class ModularUnitFacts {
+    private final OptimizationRequest request;
+    private final VerificationWork work;
+<span class="fc" id="L10">    ModularUnitFacts(OptimizationRequest request,VerificationWork work) { this.request=request; this.work=work; }</span>
+<span class="fc" id="L11">    boolean unit(Expr value,Expr modulus) { return unit(value,modulus,0); }</span>
+    private boolean unit(Expr value,Expr modulus,int depth) {
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        work.charge(1); if(depth&gt;64) return false;</span>
+<span class="pc bpc" id="L14" title="1 of 4 branches missed.">        if(value instanceof VariableExpr v &amp;&amp; modulus instanceof VariableExpr q) {</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">            for(var fact:request.assumptions()) {</span>
+<span class="fc" id="L16">                work.charge(1);</span>
+<span class="pc bpc" id="L17" title="2 of 6 branches missed.">                if(fact.kind()==SemanticAssumption.Kind.MODULAR_UNIT_INPUT &amp;&amp; fact.subject().equals(v.name()) &amp;&amp; fact.parameter().equals(q.name())) return true;</span>
+<span class="fc" id="L18">            }</span>
+<span class="fc" id="L19">            return false;</span>
+        }
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if(JavaExpressions.isLiteral(value)) {</span>
+<span class="nc" id="L22">            BigInteger n=SemanticChecker.integer(JavaExpressions.literalValue(value));</span>
+<span class="nc bnc" id="L23" title="All 4 branches missed.">            return n.equals(BigInteger.ONE) || n.equals(BigInteger.ONE.negate());</span>
+        }
+<span class="fc" id="L25">        var op=JavaExpressions.operationOf(value).orElse(null); var args=JavaExpressions.operands(value);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if(op==null) return false;</span>
+<span class="pc bpc" id="L27" title="3 of 6 branches missed.">        return switch(op) {</span>
+<span class="pc bpc" id="L28" title="1 of 4 branches missed.">            case MULTIPLY -&gt; unit(args.getFirst(),modulus,depth+1) &amp;&amp; unit(args.get(1),modulus,depth+1);</span>
+<span class="nc" id="L29">            case NEGATE -&gt; unit(args.getFirst(),modulus,depth+1);</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">            case MOD, MOD_INVERSE -&gt; args.get(1).equals(modulus) &amp;&amp; unit(args.getFirst(),modulus,depth+1);</span>
+<span class="nc bnc" id="L31" title="All 6 branches missed.">            case MOD_MULTIPLY -&gt; args.get(2).equals(modulus) &amp;&amp; unit(args.getFirst(),modulus,depth+1) &amp;&amp; unit(args.get(1),modulus,depth+1);</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">            case POW -&gt; JavaExpressions.isLiteral(args.get(1))</span>
+<span class="nc bnc" id="L33" title="All 4 branches missed.">                &amp;&amp; SemanticChecker.integer(JavaExpressions.literalValue(args.get(1))).signum()&gt;=0 &amp;&amp; unit(args.getFirst(),modulus,depth+1);</span>
+<span class="fc" id="L34">            default -&gt; false;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

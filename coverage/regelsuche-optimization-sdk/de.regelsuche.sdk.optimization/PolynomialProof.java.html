@@ -9,97 +9,197 @@ import java.util.*;
  */
 final class PolynomialProof {
     static final int MAX_TERMS = 256, MAX_DEGREE = 64, MAX_COEFFICIENT_BITS = 4096;
-<span class="nc" id="L12">    static final class OutsideFragment extends RuntimeException {}</span>
+    // A signed sum can cancel larger intermediates before producing its bounded normal form.
+    private static final int MAX_SUM_CONTRIBUTIONS = 2048;
+<span class="fc" id="L14">    static final class OutsideFragment extends RuntimeException {}</span>
     private record Monomial(Map&lt;Expr, Integer&gt; powers) {
-<span class="fc" id="L14">        Monomial { powers = Map.copyOf(powers); }</span>
+<span class="fc" id="L16">        Monomial { powers = Map.copyOf(powers); }</span>
         Monomial times(Monomial other) {
-<span class="fc" id="L16">            var result = new HashMap&lt;&gt;(powers);</span>
-<span class="fc" id="L17">            other.powers.forEach((key, power) -&gt; result.merge(key, power, Integer::sum));</span>
-<span class="pc bpc" id="L18" title="1 of 2 branches missed.">            if (result.values().stream().mapToInt(Integer::intValue).sum() &gt; MAX_DEGREE) throw new OutsideFragment();</span>
-<span class="fc" id="L19">            return new Monomial(result);</span>
+<span class="fc" id="L18">            var result = new HashMap&lt;&gt;(powers);</span>
+<span class="fc" id="L19">            other.powers.forEach((key, power) -&gt; result.merge(key, power, Integer::sum));</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">            if (result.values().stream().mapToInt(Integer::intValue).sum() &gt; MAX_DEGREE) throw new OutsideFragment();</span>
+<span class="fc" id="L21">            return new Monomial(result);</span>
         }
     }
     private final NumericKind kind;
     private final BigInteger modulus;
+    private final Expr residueModulus;
     private final boolean exactDivision;
     private final boolean floatingAlgebra;
     private final VerificationWork work;
-<span class="fc" id="L27">    PolynomialProof(NumericKind kind, boolean exactDivision, boolean floatingAlgebra, VerificationWork work) {</span>
-<span class="fc" id="L28">        this.kind = kind; this.exactDivision = exactDivision; this.floatingAlgebra = floatingAlgebra; this.work = work;</span>
-<span class="fc bfc" id="L29" title="All 4 branches covered.">        modulus = kind.integral() &amp;&amp; !exactDivision ? BigInteger.ONE.shiftLeft(kind.bits()) : null;</span>
-<span class="fc" id="L30">    }</span>
-<span class="fc" id="L31">    PolynomialProof(NumericKind kind, int lowBits, VerificationWork work) {</span>
-<span class="pc bpc" id="L32" title="3 of 8 branches missed.">        if ((kind != NumericKind.INT &amp;&amp; kind != NumericKind.LONG) || lowBits &lt; 1 || lowBits &gt; kind.bits())</span>
-<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;INVALID_LOW_WORD_WIDTH&quot;);</span>
-<span class="fc" id="L34">        this.kind = kind; this.exactDivision = false; this.floatingAlgebra = false; this.work = work;</span>
-<span class="fc" id="L35">        modulus = BigInteger.ONE.shiftLeft(lowBits);</span>
-<span class="fc" id="L36">    }</span>
-<span class="fc" id="L37">    boolean equivalent(Expr source, Expr target) { return normalize(source, 0).equals(normalize(target, 0)); }</span>
+<span class="fc" id="L30">    PolynomialProof(NumericKind kind, boolean exactDivision, boolean floatingAlgebra, VerificationWork work) {</span>
+<span class="fc" id="L31">        this.kind = kind; this.exactDivision = exactDivision; this.floatingAlgebra = floatingAlgebra; this.work = work;</span>
+<span class="fc bfc" id="L32" title="All 4 branches covered.">        modulus = kind.integral() &amp;&amp; !exactDivision ? BigInteger.ONE.shiftLeft(kind.bits()) : null;</span>
+<span class="fc" id="L33">        residueModulus = null;</span>
+<span class="fc" id="L34">    }</span>
+<span class="fc" id="L35">    PolynomialProof(NumericKind kind, int lowBits, VerificationWork work) {</span>
+<span class="pc bpc" id="L36" title="3 of 8 branches missed.">        if ((kind != NumericKind.INT &amp;&amp; kind != NumericKind.LONG) || lowBits &lt; 1 || lowBits &gt; kind.bits())</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;INVALID_LOW_WORD_WIDTH&quot;);</span>
+<span class="fc" id="L38">        this.kind = kind; this.exactDivision = false; this.floatingAlgebra = false; this.work = work;</span>
+<span class="fc" id="L39">        modulus = BigInteger.ONE.shiftLeft(lowBits);</span>
+<span class="fc" id="L40">        residueModulus = null;</span>
+<span class="fc" id="L41">    }</span>
+    /** Caller independently establishes positivity. Only this exact modulus is erased. */
+<span class="fc" id="L43">    PolynomialProof(Expr positiveModulus, VerificationWork work) {</span>
+<span class="fc" id="L44">        kind = NumericKind.BIG_INTEGER; exactDivision = false; floatingAlgebra = false;</span>
+<span class="fc" id="L45">        this.work = work; residueModulus = Objects.requireNonNull(positiveModulus);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        modulus = JavaExpressions.isLiteral(positiveModulus)</span>
+<span class="fc" id="L47">            ? SemanticChecker.integer(JavaExpressions.literalValue(positiveModulus)) : null;</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (modulus != null &amp;&amp; modulus.signum() &lt;= 0) throw new OutsideFragment();</span>
+<span class="fc" id="L49">    }</span>
+<span class="fc" id="L50">    boolean equivalent(Expr source, Expr target) { return normalize(source, 0).equals(normalize(target, 0)); }</span>
+    /** Clear the powers of one known unit inverse. Multiplication by the unit's
+     * maximum denominator power is injective even when the modulus is composite.
+     */
+    boolean equivalentAssumingInverse(Expr source,Expr target,Expr inverse) {
+<span class="fc" id="L55">        work.charge(1);</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        if(residueModulus==null || JavaExpressions.operationOf(inverse).orElse(null)!=NumericOperation.MOD_INVERSE</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                || !JavaExpressions.operands(inverse).get(1).equals(residueModulus)) return false;</span>
+<span class="fc" id="L58">        var difference=add(normalize(source,0),normalize(target,0),BigInteger.ONE.negate());</span>
+<span class="fc" id="L59">        int degree=0;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for(var term:difference.keySet()) { work.charge(1); degree=Math.max(degree,term.powers().getOrDefault(inverse,0)); }</span>
+<span class="fc" id="L61">        var operand=normalize(JavaExpressions.operands(inverse).getFirst(),0);</span>
+<span class="fc" id="L62">        var powers=new ArrayList&lt;Map&lt;Monomial,BigInteger&gt;&gt;(); powers.add(constant(BigInteger.ONE));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for(int i=1;i&lt;=degree;i++) powers.add(multiply(powers.getLast(),operand));</span>
+<span class="fc" id="L64">        var numerator=new SumAccumulator();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for(var term:difference.entrySet()) {</span>
+<span class="fc" id="L66">            work.charge(1); var factors=new HashMap&lt;&gt;(term.getKey().powers()); int inverseDegree=factors.getOrDefault(inverse,0); factors.remove(inverse);</span>
+<span class="fc" id="L67">            numerator.product(Map.of(new Monomial(factors),term.getValue()),powers.get(degree-inverseDegree),BigInteger.ONE);</span>
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">        return numerator.terms.isEmpty();</span>
+    }
     private Map&lt;Monomial, BigInteger&gt; normalize(Expr expression, int depth) {
-<span class="fc" id="L39">        work.charge(1);</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new OutsideFragment();</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(expression)) {</span>
-<span class="fc" id="L42">            Object value = JavaExpressions.literalValue(expression);</span>
-            BigInteger number;
-<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (value instanceof BigInteger b) number = b;</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            else if (value instanceof Character c) number = BigInteger.valueOf(c);</span>
-<span class="pc bpc" id="L46" title="2 of 4 branches missed.">            else if (value instanceof Float || value instanceof Double) {</span>
-<span class="nc" id="L47">                double d = ((Number)value).doubleValue();</span>
-<span class="nc bnc" id="L48" title="All 8 branches missed.">                if (!floatingAlgebra || !Double.isFinite(d) || d != Math.rint(d) || Math.abs(d) &gt; 1e15) throw new OutsideFragment();</span>
-<span class="nc" id="L49">                number = BigInteger.valueOf((long)d);</span>
-<span class="pc" id="L50">            } else number = BigInteger.valueOf(((Number)value).longValue());</span>
-<span class="fc" id="L51">            return constant(number);</span>
-        }
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (expression instanceof VariableExpr) return atom(expression);</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (JavaExpressions.resultKind(expression) != kind) return atom(expression);</span>
-<span class="fc" id="L55">        var operation = JavaExpressions.operationOf(expression);</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (operation.isEmpty()) return atom(expression);</span>
-<span class="fc" id="L57">        var args = JavaExpressions.operands(expression);</span>
-<span class="pc bpc" id="L58" title="1 of 6 branches missed.">        return switch (operation.get()) {</span>
-<span class="fc" id="L59">            case ADD -&gt; add(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1), BigInteger.ONE);</span>
-<span class="fc" id="L60">            case SUBTRACT -&gt; add(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1), BigInteger.ONE.negate());</span>
-<span class="nc" id="L61">            case NEGATE -&gt; multiply(constant(BigInteger.ONE.negate()), normalize(args.getFirst(), depth+1));</span>
-<span class="fc" id="L62">            case MULTIPLY -&gt; multiply(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1));</span>
-            case DIVIDE -&gt; {
-<span class="fc bfc" id="L64" title="All 4 branches covered.">                if (!exactDivision || !JavaExpressions.isLiteral(args.get(1))) yield atom(expression);</span>
-<span class="fc" id="L65">                Object divisorValue = JavaExpressions.literalValue(args.get(1));</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">                BigInteger divisor = divisorValue instanceof BigInteger b ? b : BigInteger.valueOf(((Number)divisorValue).longValue());</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                if (divisor.signum() == 0) throw new OutsideFragment();</span>
-<span class="fc" id="L68">                var numerator = normalize(args.getFirst(), depth+1);</span>
-<span class="fc" id="L69">                var result = new HashMap&lt;Monomial, BigInteger&gt;();</span>
-<span class="fc bfc" id="L70" title="All 2 branches covered.">                for (var entry : numerator.entrySet()) {</span>
-<span class="fc" id="L71">                    var qr = entry.getValue().divideAndRemainder(divisor);</span>
-<span class="fc bfc" id="L72" title="All 2 branches covered.">                    if (qr[1].signum() != 0) yield atom(expression);</span>
-<span class="fc" id="L73">                    put(result, entry.getKey(), qr[0]);</span>
-<span class="fc" id="L74">                }</span>
-<span class="fc" id="L75">                yield Map.copyOf(result);</span>
-            }
-<span class="fc" id="L77">            default -&gt; atom(expression);</span>
+<span class="fc" id="L72">        work.charge(1);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new OutsideFragment();</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">        if(residueModulus!=null &amp;&amp; residueModulus.equals(expression)) return constant(BigInteger.ZERO);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (JavaExpressions.isLiteral(expression)) return constant(literal(expression));</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (expression instanceof VariableExpr) return atom(expression);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (JavaExpressions.resultKind(expression) != kind) return atom(expression);</span>
+<span class="fc" id="L78">        var operation = JavaExpressions.operationOf(expression);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (operation.isEmpty()) return atom(expression);</span>
+<span class="fc" id="L80">        var args = JavaExpressions.operands(expression);</span>
+<span class="fc bfc" id="L81" title="All 8 branches covered.">        return switch (operation.get()) {</span>
+<span class="fc bfc" id="L82" title="All 4 branches covered.">            case MOD -&gt; residueModulus != null &amp;&amp; residueModulus.equals(args.get(1))</span>
+<span class="fc" id="L83">                ? normalize(args.getFirst(), depth+1) : atom(expression);</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">            case MOD_MULTIPLY -&gt; residueModulus != null &amp;&amp; residueModulus.equals(args.get(2))</span>
+<span class="fc" id="L85">                ? multiply(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1)) : atom(expression);</span>
+<span class="fc" id="L86">            case ADD, SUBTRACT, NEGATE -&gt; sum(expression,depth);</span>
+<span class="fc" id="L87">            case MULTIPLY -&gt; multiply(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1));</span>
+<span class="fc" id="L88">            case SHIFT_LEFT -&gt; leftShift(expression,args,depth);</span>
+<span class="fc" id="L89">            case POW -&gt; power(expression,args,depth);</span>
+<span class="fc" id="L90">            case DIVIDE -&gt; divide(expression,args,depth);</span>
+<span class="fc" id="L91">            default -&gt; atom(expression);</span>
         };
     }
-<span class="fc" id="L80">    private Map&lt;Monomial, BigInteger&gt; atom(Expr expression) { return Map.of(new Monomial(Map.of(expression, 1)), BigInteger.ONE); }</span>
+    private BigInteger literal(Expr expression) {
+<span class="fc" id="L95">        Object value=JavaExpressions.literalValue(expression);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if(value instanceof BigInteger b) return b;</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if(value instanceof Character c) return BigInteger.valueOf(c);</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        if(value instanceof Float || value instanceof Double) {</span>
+<span class="nc" id="L99">            double d=((Number)value).doubleValue();</span>
+<span class="nc bnc" id="L100" title="All 8 branches missed.">            if(!floatingAlgebra || !Double.isFinite(d) || d!=Math.rint(d) || Math.abs(d)&gt;1e15) throw new OutsideFragment();</span>
+<span class="nc" id="L101">            return BigInteger.valueOf((long)d);</span>
+        }
+<span class="fc" id="L103">        return BigInteger.valueOf(((Number)value).longValue());</span>
+    }
+    private Map&lt;Monomial,BigInteger&gt; power(Expr expression,List&lt;Expr&gt; args,int depth) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if(!JavaExpressions.isLiteral(args.get(1))) return atom(expression);</span>
+<span class="fc" id="L107">        BigInteger exponent=SemanticChecker.integer(JavaExpressions.literalValue(args.get(1)));</span>
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        if(exponent.signum()&lt;0 || exponent.compareTo(BigInteger.valueOf(MAX_DEGREE))&gt;0) return atom(expression);</span>
+<span class="fc" id="L109">        var base=normalize(args.getFirst(),depth+1); var result=constant(BigInteger.ONE);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for(int i=0;i&lt;exponent.intValue();i++) result=multiply(result,base);</span>
+<span class="fc" id="L111">        return result;</span>
+    }
+    private Map&lt;Monomial,BigInteger&gt; leftShift(Expr expression,List&lt;Expr&gt; args,int depth) {
+<span class="fc bfc" id="L114" title="All 4 branches covered.">        if(kind!=NumericKind.BIG_INTEGER || !JavaExpressions.isLiteral(args.get(1))</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                || !(JavaExpressions.literalValue(args.get(1)) instanceof Integer distance)</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">                || distance&lt;0 || distance&gt;=MAX_COEFFICIENT_BITS) return atom(expression);</span>
+        // BigInteger shifts have no primitive distance masking. Bound and pay
+        // for the exact coefficient before allocating 2^distance.
+<span class="fc" id="L119">        work.charge(1L+distance);</span>
+<span class="fc" id="L120">        return multiply(normalize(args.getFirst(),depth+1),constant(BigInteger.ONE.shiftLeft(distance)));</span>
+    }
+    private Map&lt;Monomial,BigInteger&gt; divide(Expr expression,List&lt;Expr&gt; args,int depth) {
+<span class="fc bfc" id="L123" title="All 4 branches covered.">        if(!exactDivision || !JavaExpressions.isLiteral(args.get(1))) return atom(expression);</span>
+<span class="fc" id="L124">        BigInteger divisor=SemanticChecker.integer(JavaExpressions.literalValue(args.get(1)));</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if(divisor.signum()==0) throw new OutsideFragment();</span>
+<span class="fc" id="L126">        var result=new HashMap&lt;Monomial,BigInteger&gt;();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for(var entry:normalize(args.getFirst(),depth+1).entrySet()) {</span>
+<span class="fc" id="L128">            work.charge(1);</span>
+<span class="fc" id="L129">            var qr=entry.getValue().divideAndRemainder(divisor);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if(qr[1].signum()!=0) return atom(expression);</span>
+<span class="fc" id="L131">            put(result,entry.getKey(),qr[0]);</span>
+<span class="fc" id="L132">        }</span>
+<span class="fc" id="L133">        return Map.copyOf(result);</span>
+    }
+<span class="fc" id="L135">    private record SignedTerm(Expr expression,int depth,BigInteger sign) { }</span>
+    private Map&lt;Monomial,BigInteger&gt; sum(Expr expression,int depth) {
+<span class="fc" id="L137">        var pending=new ArrayDeque&lt;SignedTerm&gt;(); pending.push(new SignedTerm(expression,depth,BigInteger.ONE));</span>
+<span class="fc" id="L138">        var scratch=new SumAccumulator();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        while(!pending.isEmpty()) {</span>
+<span class="fc" id="L140">            work.charge(1); var term=pending.pop();</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if(term.depth()&gt;128) throw new OutsideFragment();</span>
+<span class="fc" id="L142">            var e=term.expression(); var operation=JavaExpressions.operationOf(e).orElse(null); var args=JavaExpressions.operands(e);</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">            boolean sameKind=operation!=null &amp;&amp; JavaExpressions.resultKind(e)==kind;</span>
+<span class="pc bpc" id="L144" title="1 of 8 branches missed.">            if(sameKind &amp;&amp; operation==NumericOperation.MOD &amp;&amp; residueModulus!=null &amp;&amp; residueModulus.equals(args.get(1))) {</span>
+<span class="fc" id="L145">                pending.push(new SignedTerm(args.getFirst(),term.depth()+1,term.sign()));</span>
+<span class="fc bfc" id="L146" title="All 8 branches covered.">            } else if(sameKind &amp;&amp; (operation==NumericOperation.ADD || operation==NumericOperation.SUBTRACT || operation==NumericOperation.NEGATE)) {</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if(operation!=NumericOperation.NEGATE) pending.push(new SignedTerm(args.get(1),term.depth()+1,</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                    operation==NumericOperation.SUBTRACT?term.sign().negate():term.sign()));</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                pending.push(new SignedTerm(args.getFirst(),term.depth()+1,operation==NumericOperation.NEGATE?term.sign().negate():term.sign()));</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">            } else if(sameKind &amp;&amp; operation==NumericOperation.MULTIPLY)</span>
+<span class="fc" id="L151">                scratch.product(normalize(args.getFirst(),term.depth()+1),normalize(args.get(1),term.depth()+1),term.sign());</span>
+<span class="fc" id="L152">            else scratch.add(normalize(e,term.depth()),term.sign());</span>
+<span class="fc" id="L153">        }</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if(scratch.terms.size()&gt;MAX_TERMS) throw new OutsideFragment();</span>
+<span class="fc" id="L155">        return Map.copyOf(scratch.terms);</span>
+    }
+<span class="fc" id="L157">    private final class SumAccumulator {</span>
+<span class="fc" id="L158">        private final Map&lt;Monomial,BigInteger&gt; terms=new HashMap&lt;&gt;();</span>
+        private int contributions;
+        private void reserve() {
+<span class="fc" id="L161">            work.charge(1);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if(++contributions&gt;MAX_SUM_CONTRIBUTIONS) throw new OutsideFragment();</span>
+<span class="fc" id="L163">        }</span>
+        void add(Map&lt;Monomial,BigInteger&gt; polynomial,BigInteger sign) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for(var entry:polynomial.entrySet()) { reserve(); accumulate(entry.getKey(),entry.getValue().multiply(sign)); }</span>
+<span class="fc" id="L166">        }</span>
+        void product(Map&lt;Monomial,BigInteger&gt; left,Map&lt;Monomial,BigInteger&gt; right,BigInteger sign) {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if((long)left.size()*right.size()&gt;MAX_TERMS*4L) throw new OutsideFragment();</span>
+<span class="fc bfc" id="L169" title="All 4 branches covered.">            for(var l:left.entrySet()) for(var r:right.entrySet()) {</span>
+<span class="fc" id="L170">                reserve(); accumulate(l.getKey().times(r.getKey()),l.getValue().multiply(r.getValue()).multiply(sign));</span>
+<span class="fc" id="L171">            }</span>
+<span class="fc" id="L172">        }</span>
+        private void accumulate(Monomial monomial,BigInteger coefficient) {
+<span class="fc" id="L174">            putCoefficient(terms,monomial,terms.getOrDefault(monomial,BigInteger.ZERO).add(coefficient));</span>
+<span class="fc" id="L175">        }</span>
+    }
+<span class="fc" id="L177">    private Map&lt;Monomial, BigInteger&gt; atom(Expr expression) { return Map.of(new Monomial(Map.of(expression, 1)), BigInteger.ONE); }</span>
     private Map&lt;Monomial, BigInteger&gt; constant(BigInteger value) {
-<span class="fc" id="L82">        var result = new HashMap&lt;Monomial, BigInteger&gt;(); put(result, new Monomial(Map.of()), value); return Map.copyOf(result);</span>
+<span class="fc" id="L179">        var result = new HashMap&lt;Monomial, BigInteger&gt;(); put(result, new Monomial(Map.of()), value); return Map.copyOf(result);</span>
     }
     private Map&lt;Monomial, BigInteger&gt; add(Map&lt;Monomial, BigInteger&gt; left, Map&lt;Monomial, BigInteger&gt; right, BigInteger sign) {
-<span class="fc" id="L85">        var result = new HashMap&lt;&gt;(left);</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (var entry : right.entrySet()) { work.charge(1); put(result, entry.getKey(), result.getOrDefault(entry.getKey(), BigInteger.ZERO).add(entry.getValue().multiply(sign))); }</span>
-<span class="fc" id="L87">        return Map.copyOf(result);</span>
+<span class="fc" id="L182">        var result=new SumAccumulator(); result.add(left,BigInteger.ONE); result.add(right,sign);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if(result.terms.size()&gt;MAX_TERMS) throw new OutsideFragment();</span>
+<span class="fc" id="L184">        return Map.copyOf(result.terms);</span>
     }
     private Map&lt;Monomial, BigInteger&gt; multiply(Map&lt;Monomial, BigInteger&gt; left, Map&lt;Monomial, BigInteger&gt; right) {
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if ((long)left.size() * right.size() &gt; MAX_TERMS * 4L) throw new OutsideFragment();</span>
-<span class="fc" id="L91">        var result = new HashMap&lt;Monomial, BigInteger&gt;();</span>
-<span class="fc bfc" id="L92" title="All 4 branches covered.">        for (var l : left.entrySet()) for (var r : right.entrySet()) {</span>
-<span class="fc" id="L93">            work.charge(1); var monomial = l.getKey().times(r.getKey());</span>
-<span class="fc" id="L94">            put(result, monomial, result.getOrDefault(monomial, BigInteger.ZERO).add(l.getValue().multiply(r.getValue())));</span>
-<span class="fc" id="L95">        }</span>
-<span class="fc" id="L96">        return Map.copyOf(result);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if ((long)left.size() * right.size() &gt; MAX_TERMS * 4L) throw new OutsideFragment();</span>
+<span class="fc" id="L188">        var result = new HashMap&lt;Monomial, BigInteger&gt;();</span>
+<span class="fc bfc" id="L189" title="All 4 branches covered.">        for (var l : left.entrySet()) for (var r : right.entrySet()) {</span>
+<span class="fc" id="L190">            work.charge(1); var monomial = l.getKey().times(r.getKey());</span>
+<span class="fc" id="L191">            put(result, monomial, result.getOrDefault(monomial, BigInteger.ZERO).add(l.getValue().multiply(r.getValue())));</span>
+<span class="fc" id="L192">        }</span>
+<span class="fc" id="L193">        return Map.copyOf(result);</span>
     }
     private void put(Map&lt;Monomial, BigInteger&gt; target, Monomial monomial, BigInteger value) {
-<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (modulus != null) value = value.mod(modulus);</span>
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (value.bitLength() &gt; MAX_COEFFICIENT_BITS) throw new OutsideFragment();</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (value.signum() == 0) target.remove(monomial); else target.put(monomial, value);</span>
-<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (target.size() &gt; MAX_TERMS) throw new OutsideFragment();</span>
-<span class="fc" id="L103">    }</span>
+<span class="fc" id="L196">        putCoefficient(target,monomial,value);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (target.size() &gt; MAX_TERMS) throw new OutsideFragment();</span>
+<span class="fc" id="L198">    }</span>
+    private void putCoefficient(Map&lt;Monomial, BigInteger&gt; target, Monomial monomial, BigInteger value) {
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (modulus != null) value = value.mod(modulus);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (value.bitLength() &gt; MAX_COEFFICIENT_BITS) throw new OutsideFragment();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (value.signum() == 0) target.remove(monomial); else target.put(monomial, value);</span>
+<span class="fc" id="L203">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModularInverseCandidates.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">ModularInverseCandidates.java</span></div><h1>ModularInverseCandidates.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import java.math.BigInteger;
+import java.util.List;
+
+/** Finds retained inverses of bounded powers; the independent checker proves the product identity. */
+final class ModularInverseCandidates {
+    private ModularInverseCandidates() { }
+    static Expr replacement(Expr node,List&lt;Expr&gt; nodes,VerificationWork work) {
+<span class="fc bfc" id="L11" title="All 2 branches covered.">        if(JavaExpressions.operationOf(node).orElse(null)!=NumericOperation.MOD_INVERSE) return node;</span>
+<span class="fc" id="L12">        var source=JavaExpressions.operands(node);</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        for(Expr known:nodes) {</span>
+<span class="fc" id="L14">            work.charge(1);</span>
+<span class="fc bfc" id="L15" title="All 4 branches covered.">            if(known.equals(node) || JavaExpressions.operationOf(known).orElse(null)!=NumericOperation.MOD_INVERSE) continue;</span>
+<span class="fc" id="L16">            var args=JavaExpressions.operands(known);</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">            if(!source.get(1).equals(args.get(1))) continue;</span>
+<span class="fc" id="L18">            int power=power(args.getFirst(),source.getFirst(),work,0);</span>
+<span class="pc bpc" id="L19" title="1 of 4 branches missed.">            if(power&lt;2 || power&gt;PolynomialProof.MAX_DEGREE) continue;</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">            Expr residual=power==2 ? source.getFirst() : JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.POW,source.getFirst(),JavaExpressions.literal(power-1));</span>
+<span class="fc" id="L21">            return JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MOD,</span>
+<span class="fc" id="L22">                JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,residual,known),source.get(1));</span>
+        }
+<span class="fc" id="L24">        return node;</span>
+    }
+    private static int power(Expr value,Expr base,VerificationWork work,int depth) {
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        work.charge(1); if(depth&gt;64) return -1;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if(value.equals(base)) return 1;</span>
+<span class="fc" id="L29">        var op=JavaExpressions.operationOf(value).orElse(null); var args=JavaExpressions.operands(value);</span>
+<span class="pc bpc" id="L30" title="5 of 6 branches missed.">        if(op==NumericOperation.POW &amp;&amp; args.getFirst().equals(base) &amp;&amp; JavaExpressions.isLiteral(args.get(1))) {</span>
+<span class="nc" id="L31">            BigInteger n=SemanticChecker.integer(JavaExpressions.literalValue(args.get(1)));</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">            return n.signum()&gt;0 &amp;&amp; n.compareTo(BigInteger.valueOf(PolynomialProof.MAX_DEGREE))&lt;=0 ? n.intValue() : -1;</span>
+        }
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if(op==NumericOperation.MULTIPLY) {</span>
+<span class="fc" id="L35">            int a=power(args.getFirst(),base,work,depth+1), b=power(args.get(1),base,work,depth+1);</span>
+<span class="pc bpc" id="L36" title="3 of 6 branches missed.">            return a&gt;0 &amp;&amp; b&gt;0 &amp;&amp; a+b&lt;=PolynomialProof.MAX_DEGREE ? a+b : -1;</span>
+        }
+<span class="fc" id="L38">        return -1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>UnitInverseReusePlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">UnitInverseReusePlan.java</span></div><h1>UnitInverseReusePlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import java.math.BigInteger;
+import java.util.Objects;
+
+/** Proposed x^(k-1) * knownInverse(x^k); the original successful inverse must remain.
+ * This plan does not authorize deleting or moving a potentially throwing inverse operation.
+ */
+public record UnitInverseReusePlan(Premises source,FixedPowerPlan predecessorPower) {
+    public static final int MAX_BINDING_ID_LENGTH=4096;
+    /** Caller-established premises in one algebra and domain: poweredBinding is baseBinding^power,
+     * knownInverseBinding is the retained original successful two-sided inverse of poweredBinding,
+     * and multiplication is total and associative with a two-sided identity. These statements
+     * require source proof; neither names, a prime-looking modulus nor this transport establishes them.
+     */
+    public record Premises(BigInteger power,String algebraId,String domainId,String baseBinding,
+            String poweredBinding,String knownInverseBinding,boolean totalAssociativeMultiplicationWithIdentity,
+            boolean successfulTwoSidedInverse) {
+<span class="fc" id="L19">        public Premises {</span>
+<span class="fc" id="L20">            FixedPowerPlan.boundedExponent(power);</span>
+<span class="fc" id="L21">            boundedId(algebraId); boundedId(domainId); boundedId(baseBinding); boundedId(poweredBinding); boundedId(knownInverseBinding);</span>
+<span class="fc" id="L22">        }</span>
+        private static void boundedId(String id) {
+            // No content scan in transport: optimizer/verifier must reserve/check its work first.
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">            if(id==null || id.length()&gt;MAX_BINDING_ID_LENGTH) throw new IllegalArgumentException(&quot;BINDING_ID_LIMIT&quot;);</span>
+<span class="fc" id="L26">        }</span>
+    }
+<span class="fc" id="L28">    public UnitInverseReusePlan { Objects.requireNonNull(source); Objects.requireNonNull(predecessorPower); }</span>
+    static void checkPremises(Premises source,PowerWork work) {
+<span class="fc" id="L30">        work.charge(1); Objects.requireNonNull(source); work.exponent(source.power());</span>
+<span class="fc" id="L31">        work.identifier(source.algebraId()); work.identifier(source.domainId()); work.identifier(source.baseBinding());</span>
+<span class="fc" id="L32">        work.identifier(source.poweredBinding()); work.identifier(source.knownInverseBinding());</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if(source.power().signum()&lt;=0) throw new PowerWork.Unavailable(&quot;POSITIVE_POWER_REQUIRED&quot;);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if(!source.totalAssociativeMultiplicationWithIdentity()) throw new PowerWork.Unavailable(&quot;TOTAL_ASSOCIATIVE_MULTIPLICATION_WITH_IDENTITY_REQUIRED&quot;);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if(!source.successfulTwoSidedInverse()) throw new PowerWork.Unavailable(&quot;ORIGINAL_SUCCESSFUL_TWO_SIDED_INVERSE_REQUIRED&quot;);</span>
+<span class="fc" id="L36">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

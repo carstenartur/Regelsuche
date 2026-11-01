@@ -69,40 +69,41 @@ public final class NumericExecutionCost {
 <span class="pc bpc" id="L69" title="1 of 2 branches missed.">        long a = node.arguments().isEmpty() ? 1 : words(bits[node.arguments().getFirst()]);</span>
 <span class="pc bpc" id="L70" title="1 of 2 branches missed.">        long b = node.arguments().size() &lt; 2 ? 1 : words(bits[node.arguments().get(1)]);</span>
 <span class="pc bpc" id="L71" title="1 of 2 branches missed.">        long modulus = node.arguments().size() &lt; 3 ? b : words(bits[node.arguments().get(2)]);</span>
-<span class="pc bpc" id="L72" title="5 of 6 branches missed.">        return 4 * switch (JavaExpressions.operationOf(node.expression()).orElseThrow()) {</span>
+<span class="pc bpc" id="L72" title="6 of 7 branches missed.">        return 4 * switch (JavaExpressions.operationOf(node.expression()).orElseThrow()) {</span>
 <span class="fc" id="L73">            case MULTIPLY -&gt; a * b;</span>
 <span class="nc" id="L74">            case DIVIDE, REMAINDER, MOD -&gt; a * b + a;</span>
 <span class="nc" id="L75">            case MOD_MULTIPLY -&gt; a * b + words(bits[node.arguments().getFirst()] + bits[node.arguments().get(1)]) * modulus;</span>
 <span class="nc" id="L76">            case MOD_POW -&gt; 32 + 2 * Math.max(1, bits[node.arguments().get(1)]) * modulus * modulus;</span>
-<span class="nc" id="L77">            case POW -&gt; Math.max(1, bits[index]) * Math.max(a, words(bits[index]));</span>
-<span class="nc" id="L78">            default -&gt; Math.max(words(bits[index]), Math.max(a, b));</span>
+<span class="nc" id="L77">            case MOD_INVERSE -&gt; 32 + Math.max(a,b) * Math.max(a,b) * 2;</span>
+<span class="nc" id="L78">            case POW -&gt; Math.max(1, bits[index]) * Math.max(a, words(bits[index]));</span>
+<span class="nc" id="L79">            default -&gt; Math.max(words(bits[index]), Math.max(a, b));</span>
         };
     }
-<span class="fc" id="L81">    private static long words(long bits) { return Math.max(1, (bits + 31) / 32); }</span>
+<span class="fc" id="L82">    private static long words(long bits) { return Math.max(1, (bits + 31) / 32); }</span>
     private static long magnitude(OptimizationRequest request, Expr expression, long[] args) {
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (JavaExpressions.isLiteral(expression)) return SemanticChecker.integer(JavaExpressions.literalValue(expression)).abs().bitLength();</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) return request.assumptions().stream()</span>
-<span class="pc bpc" id="L85" title="1 of 4 branches missed.">                .filter(a -&gt; a.kind() == SemanticAssumption.Kind.BIG_INTEGER_BIT_LENGTH_BOUND &amp;&amp; a.subject().equals(variable.name()))</span>
-<span class="fc" id="L86">                .mapToLong(a -&gt; BigIntegerBounds.parameter(a.parameter())).min().orElse(-1);</span>
-<span class="pc bpc" id="L87" title="3 of 6 branches missed.">        if (args.length == 0 || Arrays.stream(args).anyMatch(n -&gt; n &lt; 0)) return -1;</span>
-<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        long a = args[0], b = args.length &lt; 2 ? 0 : args[1];</span>
-<span class="fc" id="L89">        var operands = JavaExpressions.operands(expression);</span>
-<span class="pc bpc" id="L90" title="9 of 10 branches missed.">        return switch (JavaExpressions.operationOf(expression).orElseThrow()) {</span>
-<span class="nc" id="L91">            case NEGATE, ABS, DIVIDE -&gt; a;</span>
-<span class="nc" id="L92">            case NOT -&gt; a + 1;</span>
-<span class="nc" id="L93">            case ADD, SUBTRACT, AND, OR, XOR -&gt; Math.max(a, b) + 1;</span>
-<span class="fc" id="L94">            case MULTIPLY -&gt; a + b;</span>
-<span class="nc" id="L95">            case REMAINDER -&gt; Math.min(a, b);</span>
-<span class="nc" id="L96">            case MOD -&gt; b;</span>
-<span class="nc" id="L97">            case MOD_MULTIPLY, MOD_POW -&gt; args[2];</span>
-<span class="nc bnc" id="L98" title="All 2 branches missed.">            case POW -&gt; JavaExpressions.isLiteral(operands.get(1))</span>
-<span class="nc" id="L99">                    ? Math.multiplyExact(a, Math.max(1, SemanticChecker.integer(JavaExpressions.literalValue(operands.get(1))).longValueExact())) : -1;</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (JavaExpressions.isLiteral(expression)) return SemanticChecker.integer(JavaExpressions.literalValue(expression)).abs().bitLength();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) return request.assumptions().stream()</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">                .filter(a -&gt; a.kind() == SemanticAssumption.Kind.BIG_INTEGER_BIT_LENGTH_BOUND &amp;&amp; a.subject().equals(variable.name()))</span>
+<span class="fc" id="L87">                .mapToLong(a -&gt; BigIntegerBounds.parameter(a.parameter())).min().orElse(-1);</span>
+<span class="pc bpc" id="L88" title="3 of 6 branches missed.">        if (args.length == 0 || Arrays.stream(args).anyMatch(n -&gt; n &lt; 0)) return -1;</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        long a = args[0], b = args.length &lt; 2 ? 0 : args[1];</span>
+<span class="fc" id="L90">        var operands = JavaExpressions.operands(expression);</span>
+<span class="pc bpc" id="L91" title="9 of 10 branches missed.">        return switch (JavaExpressions.operationOf(expression).orElseThrow()) {</span>
+<span class="nc" id="L92">            case NEGATE, ABS, DIVIDE -&gt; a;</span>
+<span class="nc" id="L93">            case NOT -&gt; a + 1;</span>
+<span class="nc" id="L94">            case ADD, SUBTRACT, AND, OR, XOR -&gt; Math.max(a, b) + 1;</span>
+<span class="fc" id="L95">            case MULTIPLY -&gt; a + b;</span>
+<span class="nc" id="L96">            case REMAINDER -&gt; Math.min(a, b);</span>
+<span class="nc" id="L97">            case MOD, MOD_INVERSE -&gt; b;</span>
+<span class="nc" id="L98">            case MOD_MULTIPLY, MOD_POW -&gt; args[2];</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            case POW -&gt; JavaExpressions.isLiteral(operands.get(1))</span>
+<span class="nc" id="L100">                    ? Math.multiplyExact(a, Math.max(1, SemanticChecker.integer(JavaExpressions.literalValue(operands.get(1))).longValueExact())) : -1;</span>
             case SHIFT_LEFT, SHIFT_RIGHT -&gt; {
-<span class="nc bnc" id="L101" title="All 2 branches missed.">                if (!JavaExpressions.isLiteral(operands.get(1))) yield -1;</span>
-<span class="nc" id="L102">                long distance = SemanticChecker.integer(JavaExpressions.literalValue(operands.get(1))).longValueExact();</span>
-<span class="nc bnc" id="L103" title="All 2 branches missed.">                yield a + Math.max(0, JavaExpressions.operationOf(expression).orElseThrow() == NumericOperation.SHIFT_LEFT ? distance : -distance);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (!JavaExpressions.isLiteral(operands.get(1))) yield -1;</span>
+<span class="nc" id="L103">                long distance = SemanticChecker.integer(JavaExpressions.literalValue(operands.get(1))).longValueExact();</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                yield a + Math.max(0, JavaExpressions.operationOf(expression).orElseThrow() == NumericOperation.SHIFT_LEFT ? distance : -distance);</span>
             }
-<span class="nc" id="L105">            default -&gt; -1;</span>
+<span class="nc" id="L106">            default -&gt; -1;</span>
         };
     }
 }

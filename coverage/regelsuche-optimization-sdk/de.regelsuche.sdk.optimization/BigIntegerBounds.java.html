@@ -44,7 +44,7 @@ final class BigIntegerBounds {
 <span class="fc" id="L44">                case MULTIPLY -&gt; left + bits(args.get(1));</span>
 <span class="fc" id="L45">                case DIVIDE -&gt; { bits(args.get(1)); yield left; }</span>
 <span class="nc" id="L46">                case REMAINDER -&gt; Math.min(left, bits(args.get(1)));</span>
-<span class="fc" id="L47">                case MOD -&gt; bits(args.get(1));</span>
+<span class="fc" id="L47">                case MOD, MOD_INVERSE -&gt; bits(args.get(1));</span>
 <span class="fc" id="L48">                case MOD_MULTIPLY -&gt; { bounded(left + bits(args.get(1))); yield bits(args.get(2)); }</span>
 <span class="fc" id="L49">                case MOD_POW -&gt; { bits(args.get(1)); yield bits(args.get(2)); }</span>
                 case POW -&gt; {

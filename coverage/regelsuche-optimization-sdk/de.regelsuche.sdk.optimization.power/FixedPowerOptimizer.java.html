@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FixedPowerOptimizer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">FixedPowerOptimizer.java</span></div><h1>FixedPowerOptimizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Bounded binary-chain synthesis. Search proposes a schedule without assuming an algebra. */
+<span class="fc" id="L8">public final class FixedPowerOptimizer {</span>
+<span class="fc" id="L9">    public record SearchResult(Optional&lt;FixedPowerPlan&gt; plan,String reason,long work) { }</span>
+    public SearchResult search(BigInteger exponent,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L11">        var work=new PowerWork(budget,cancellation);</span>
+<span class="fc" id="L12">        try { return new SearchResult(Optional.of(synthesize(exponent,work)),&quot;CANDIDATE&quot;,work.used); }</span>
+<span class="fc" id="L13">        catch(PowerWork.Unavailable stop) { return new SearchResult(Optional.empty(),stop.getMessage(),work.used); }</span>
+    }
+    static FixedPowerPlan synthesize(BigInteger exponent,PowerWork work) {
+<span class="fc" id="L16">        work.exponent(exponent);</span>
+<span class="fc" id="L17">        var steps=new ArrayList&lt;FixedPowerPlan.Multiplication&gt;();</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        int result=exponent.signum()==0 ? 0 : 1;</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for(int bit=exponent.bitLength()-2;bit&gt;=0;bit--) {</span>
+<span class="fc" id="L20">            result=append(steps,result,result,work);</span>
+<span class="fc" id="L21">            work.charge(1);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            if(exponent.testBit(bit)) result=append(steps,result,1,work);</span>
+        }
+<span class="fc" id="L24">        work.charge(1L+steps.size()); // bounded constructor transport is included in this request's debit</span>
+<span class="fc" id="L25">        return new FixedPowerPlan(exponent,steps,result);</span>
+    }
+    private static int append(List&lt;FixedPowerPlan.Multiplication&gt; steps,int left,int right,PowerWork work) {
+<span class="fc" id="L28">        work.charge(1);</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">        if(steps.size()&gt;=FixedPowerPlan.MAX_STEPS || steps.size()&gt;=work.budget.maximumStates()) throw new PowerWork.Unavailable(&quot;STATE_LIMIT&quot;);</span>
+<span class="fc" id="L30">        steps.add(new FixedPowerPlan.Multiplication(left,right));</span>
+<span class="fc" id="L31">        return steps.size()+1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

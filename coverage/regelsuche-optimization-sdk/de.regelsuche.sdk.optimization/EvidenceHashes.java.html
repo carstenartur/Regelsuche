@@ -2,43 +2,146 @@
 
 import de.regelsuche.search.program.JointComputationPlan;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.search.program.PreparedJointComputation;
+import de.regelsuche.ast.*;
 import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
 import java.security.*;
 import java.util.*;
 
 final class EvidenceHashes {
-<span class="fc" id="L10">    private static final CompiledAstReplayCodec CODEC=new CompiledAstReplayCodec();</span>
+<span class="fc" id="L13">    private static final CompiledAstReplayCodec CODEC=new CompiledAstReplayCodec();</span>
     private EvidenceHashes() {}
+<span class="fc" id="L15">    record Digests(String source,String target,String trace) { }</span>
+    static final class Capture {
+        private final GraphHash graph;
+        private final String source,trace;
+<span class="fc" id="L19">        Capture(OptimizationRequest request,PreparedJointComputation prepared,VerificationWork work) {</span>
+<span class="fc" id="L20">            graph=new GraphHash(work);</span>
+<span class="fc" id="L21">            source=plan(request.plan(),prepared,graph); trace=traceHash(request.sourceTrace(),graph);</span>
+<span class="fc" id="L22">        }</span>
+        Digests finish(JointComputationPlan target,PreparedJointComputation prepared) {
+<span class="fc" id="L24">            return new Digests(source,plan(target,prepared,graph),trace);</span>
+        }
+    }
     static String plan(JointComputationPlan plan) {
-<span class="fc" id="L13">        var text=new StringBuilder();</span>
-<span class="fc" id="L14">        plan.inputs().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -&gt; text.append(field(e.getKey())).append(field(e.getValue().id())));</span>
-<span class="fc" id="L15">        plan.outputs().forEach(o -&gt; text.append(field(o.name())).append(field(o.type().id())));</span>
-<span class="fc" id="L16">        text.append(field(CODEC.encodeExpression(plan.expression()))); return hash(text.toString());</span>
+<span class="fc" id="L28">        return plan(plan,null);</span>
+    }
+    static String plan(JointComputationPlan plan,VerificationWork work) {
+<span class="fc" id="L31">        return plan(plan,null,new GraphHash(work));</span>
+    }
+    private static String plan(JointComputationPlan plan,PreparedJointComputation prepared,GraphHash graph) {
+<span class="fc" id="L34">        var text=new ByteArrayOutputStream();</span>
+<span class="fc" id="L35">        graph.append(text,&quot;typed-value-plan-dag/v1&quot;);</span>
+<span class="fc" id="L36">        plan.inputs().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -&gt; graph.append(text,e.getKey(),e.getValue().id()));</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        var expressions=prepared==null ? plan.resolveOutputs(graph::charge).expressions()</span>
+<span class="fc" id="L38">                : plan.outputs().stream().map(o -&gt; prepared.nodes().get(prepared.outputBindings().get(o.name())).expression()).toList();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for(int i=0;i&lt;plan.outputs().size();i++) {</span>
+<span class="fc" id="L40">            var output=plan.outputs().get(i);</span>
+<span class="fc" id="L41">            graph.append(text,output.name(),output.type().id());</span>
+<span class="fc" id="L42">            graph.appendDigest(text,graph.expression(expressions.get(i),0));</span>
+        }
+<span class="fc" id="L44">        return graph.digest(text);</span>
     }
     static String trace(SourceEvaluationTrace trace) {
-<span class="fc" id="L19">        var text=new StringBuilder();</span>
-<span class="fc" id="L20">        trace.occurrences().forEach(o -&gt; text.append(field(o.sourceId())).append(field(o.declaredKind().name())).append(field(o.evaluatedKind().name())).append(field(CODEC.encodeExpression(o.expression()))));</span>
-<span class="fc" id="L21">        return hash(text.toString());</span>
+<span class="fc" id="L47">        return trace(trace,null);</span>
+    }
+    static String trace(SourceEvaluationTrace trace,VerificationWork work) {
+<span class="fc" id="L50">        return traceHash(trace,new GraphHash(work));</span>
+    }
+    private static String traceHash(SourceEvaluationTrace trace,GraphHash graph) {
+<span class="fc" id="L53">        var text=new ByteArrayOutputStream();</span>
+<span class="fc" id="L54">        graph.append(text,&quot;typed-source-occurrences-dag/v1&quot;);</span>
+<span class="fc" id="L55">        trace.occurrences().forEach(o -&gt; {</span>
+<span class="fc" id="L56">            graph.append(text,o.sourceId(),o.declaredKind().name(),o.evaluatedKind().name());</span>
+<span class="fc" id="L57">            graph.appendDigest(text,graph.expression(o.expression(),0));</span>
+<span class="fc" id="L58">        });</span>
+<span class="fc" id="L59">        return graph.digest(text);</span>
+    }
+    /** Structural digests are independent of object sharing while traversal is bounded by the DAG. */
+    private static final class GraphHash {
+<span class="fc" id="L63">        private final IdentityHashMap&lt;Expr,String&gt; memo=new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L64">        private record FunctionKey(String name,List&lt;String&gt; children) { }</span>
+<span class="fc" id="L65">        private final Map&lt;FunctionKey,String&gt; functions=new HashMap&lt;&gt;();</span>
+<span class="fc" id="L66">        private final Map&lt;String,String&gt; variables=new HashMap&lt;&gt;();</span>
+        private final VerificationWork work;
+        private int nodes;
+        private long digestBytes;
+<span class="fc" id="L70">        GraphHash(VerificationWork work) { this.work=work; }</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        void charge(long units) { if(work!=null) work.charge(units); }</span>
+        String expression(Expr expression,int depth) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if(work!=null) work.charge(1);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if(depth&gt;JointComputationPlan.MAX_DEPTH) throw new IllegalArgumentException(&quot;EVIDENCE_GRAPH_BOUND&quot;);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            String known=memo.get(expression); if(known!=null) return known;</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if(++nodes&gt;JointComputationPlan.MAX_NODES) throw new IllegalArgumentException(&quot;EVIDENCE_GRAPH_BOUND&quot;);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if(expression instanceof VariableExpr variable) {</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                if(variable.name().length()&gt;CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS) throw new IllegalArgumentException(&quot;EVIDENCE_TEXT_BOUND&quot;);</span>
+<span class="fc" id="L79">                charge(1L+(variable.name().length()+15L)/16L);</span>
+<span class="fc" id="L80">                known=variables.get(variable.name());</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                if(known!=null) { memo.put(expression,known); return known; }</span>
+            }
+<span class="fc" id="L83">            FunctionKey key=null;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if(expression instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                if(function.name().length()&gt;CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS) throw new IllegalArgumentException(&quot;EVIDENCE_TEXT_BOUND&quot;);</span>
+<span class="fc" id="L86">                charge(2L+function.arguments().size()+(function.name().length()+15L)/16L);</span>
+<span class="fc" id="L87">                key=new FunctionKey(function.name(),function.arguments().stream().map(child -&gt; expression(child,depth+1)).toList());</span>
+<span class="fc" id="L88">                known=functions.get(key);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                if(known!=null) { memo.put(expression,known); return known; }</span>
+            }
+<span class="fc" id="L91">            var text=new ByteArrayOutputStream();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if(expression instanceof VariableExpr variable) append(text,&quot;variable&quot;,variable.name());</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            else if(expression instanceof NumberExpr number) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                if(work!=null) work.charge(1L+(number.value().numerator().bitLength()+number.value().denominator().bitLength()+63L)/64L);</span>
+<span class="fc" id="L95">                append(text,&quot;number&quot;,CODEC.encodeExpression(number));</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            } else if(expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L97">                append(text,&quot;function&quot;,function.name());</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                for(String child:key.children()) appendDigest(text,child);</span>
+<span class="nc" id="L99">            } else throw new IllegalArgumentException(&quot;TYPED_JAVA_EVIDENCE_REQUIRED&quot;);</span>
+<span class="fc" id="L100">            String result=digest(text); memo.put(expression,result);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if(key!=null) functions.put(key,result);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if(expression instanceof VariableExpr variable) variables.put(variable.name(),result);</span>
+<span class="fc" id="L103">            return result;</span>
+        }
+        void appendDigest(ByteArrayOutputStream target,String digest) {
+<span class="fc" id="L106">            charge(2); // The internally generated SHA-256 hex field is always 67 ASCII bytes.</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if(target.size()&gt;CompiledAstReplayCodec.MAXIMUM_BYTES-67) throw new IllegalArgumentException(&quot;EVIDENCE_TEXT_BOUND&quot;);</span>
+<span class="fc" id="L108">            target.writeBytes((&quot;64:&quot;+digest).getBytes(StandardCharsets.US_ASCII));</span>
+<span class="fc" id="L109">        }</span>
+        void append(ByteArrayOutputStream target,String... values) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            for(String value:values) {</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                if(value.length()&gt;CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS) throw new IllegalArgumentException(&quot;EVIDENCE_TEXT_BOUND&quot;);</span>
+<span class="fc" id="L113">                charge(1L+(value.length()+15L)/16L);</span>
+<span class="fc" id="L114">                byte[] encoded=field(value).getBytes(StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if(encoded.length&gt;CompiledAstReplayCodec.MAXIMUM_BYTES-target.size()) throw new IllegalArgumentException(&quot;EVIDENCE_TEXT_BOUND&quot;);</span>
+<span class="fc" id="L116">                target.writeBytes(encoded);</span>
+            }
+<span class="fc" id="L118">        }</span>
+        String digest(ByteArrayOutputStream value) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if(value.size()&gt;CompiledAstReplayCodec.MAXIMUM_BYTES-digestBytes) throw new IllegalArgumentException(&quot;EVIDENCE_TEXT_BOUND&quot;);</span>
+<span class="fc" id="L121">            charge(1L+(value.size()+63L)/64L);</span>
+<span class="fc" id="L122">            digestBytes+=value.size(); return hash(value.toByteArray());</span>
+        }
     }
     static String assumptions(Set&lt;SemanticAssumption&gt; assumptions) {
-<span class="fc" id="L24">        return hash(assumptions.stream().map(a -&gt; field(a.kind().name())+field(a.subject())+field(a.parameter())+field(a.provenance())).sorted().reduce(&quot;&quot;,String::concat));</span>
+<span class="fc" id="L126">        return hash(assumptions.stream().map(a -&gt; field(a.kind().name())+field(a.subject())+field(a.parameter())+field(a.provenance())).sorted().reduce(&quot;&quot;,String::concat));</span>
     }
     private static String field(String value) {
-<span class="fc" id="L27">        Objects.requireNonNull(value, &quot;canonical field&quot;);</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">        for(int i=0;i&lt;value.length();i++) {</span>
-<span class="fc" id="L29">            char c=value.charAt(i);</span>
-<span class="fc bfc" id="L30" title="All 2 branches covered.">            if(Character.isHighSurrogate(c)) {</span>
-<span class="pc bpc" id="L31" title="1 of 4 branches missed.">                if(++i&gt;=value.length() || !Character.isLowSurrogate(value.charAt(i)))</span>
-<span class="fc" id="L32">                    throw new IllegalArgumentException(&quot;malformed Unicode in canonical field&quot;);</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            } else if(Character.isLowSurrogate(c)) {</span>
-<span class="nc" id="L34">                throw new IllegalArgumentException(&quot;malformed Unicode in canonical field&quot;);</span>
+<span class="fc" id="L129">        Objects.requireNonNull(value, &quot;canonical field&quot;);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for(int i=0;i&lt;value.length();i++) {</span>
+<span class="fc" id="L131">            char c=value.charAt(i);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if(Character.isHighSurrogate(c)) {</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">                if(++i&gt;=value.length() || !Character.isLowSurrogate(value.charAt(i)))</span>
+<span class="fc" id="L134">                    throw new IllegalArgumentException(&quot;malformed Unicode in canonical field&quot;);</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            } else if(Character.isLowSurrogate(c)) {</span>
+<span class="nc" id="L136">                throw new IllegalArgumentException(&quot;malformed Unicode in canonical field&quot;);</span>
             }
         }
-<span class="fc" id="L37">        return value.getBytes(StandardCharsets.UTF_8).length+&quot;:&quot;+value;</span>
+<span class="fc" id="L139">        return value.getBytes(StandardCharsets.UTF_8).length+&quot;:&quot;+value;</span>
     }
-    static String hash(String value) {
-<span class="fc" id="L40">        try { return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8))); }</span>
-<span class="nc" id="L41">        catch(NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+<span class="fc" id="L141">    static String hash(String value) { return hash(value.getBytes(StandardCharsets.UTF_8)); }</span>
+    private static String hash(byte[] value) {
+<span class="fc" id="L143">        try { return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value)); }</span>
+<span class="nc" id="L144">        catch(NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

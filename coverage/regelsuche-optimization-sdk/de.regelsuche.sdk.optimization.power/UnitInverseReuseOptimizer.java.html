@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>UnitInverseReuseOptimizer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">UnitInverseReuseOptimizer.java</span></div><h1>UnitInverseReuseOptimizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.Optional;
+
+/** Proposes reuse only under explicit caller-proved domain and original-inverse obligations. */
+<span class="fc" id="L8">public final class UnitInverseReuseOptimizer {</span>
+<span class="fc" id="L9">    public record SearchResult(Optional&lt;UnitInverseReusePlan&gt; plan,String reason,long work) { }</span>
+    public SearchResult search(UnitInverseReusePlan.Premises source,OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L11">        var work=new PowerWork(budget,cancellation);</span>
+        try {
+<span class="fc" id="L13">            UnitInverseReusePlan.checkPremises(source,work);</span>
+<span class="fc" id="L14">            work.charge(1L+(source.power().bitLength()+63)/64);</span>
+<span class="fc" id="L15">            var predecessor=FixedPowerOptimizer.synthesize(source.power().subtract(BigInteger.ONE),work);</span>
+<span class="fc" id="L16">            return new SearchResult(Optional.of(new UnitInverseReusePlan(source,predecessor)),&quot;CANDIDATE&quot;,work.used);</span>
+<span class="fc" id="L17">        } catch(PowerWork.Unavailable stop) { return new SearchResult(Optional.empty(),stop.getMessage(),work.used); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

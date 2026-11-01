@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearCandidates.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">BilinearCandidates.java</span></div><h1>BilinearCandidates.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+import java.util.*;
+
+/** Proposals over a joint pair of bilinear expressions. PolynomialProof owns acceptance. */
+final class BilinearCandidates {
+    private final VerificationWork work;
+<span class="fc" id="L9">    private record Eligible(int index,Expr expression,Expr modulus) { }</span>
+<span class="fc" id="L10">    BilinearCandidates(VerificationWork work) { this.work=work; }</span>
+    List&lt;List&lt;Expr&gt;&gt; generate(List&lt;Expr&gt; outputs,int maximum) {
+<span class="fc" id="L12">        var proposals=new ArrayList&lt;List&lt;Expr&gt;&gt;();</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        if(maximum&lt;=0) return List.of();</span>
+<span class="fc" id="L14">        var subtractions=new ArrayList&lt;Eligible&gt;(); var additions=new ArrayList&lt;Eligible&gt;();</span>
+<span class="fc" id="L15">        collectEligible(outputs,subtractions,additions);</span>
+<span class="fc bfc" id="L16" title="All 4 branches covered.">        for(var subtraction:subtractions) for(var addition:additions) {</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">            if(proposals.size()&gt;=maximum) return List.copyOf(proposals);</span>
+<span class="fc" id="L18">            addPairProposals(outputs,subtraction,addition,proposals);</span>
+<span class="fc" id="L19">        }</span>
+<span class="fc" id="L20">        return List.copyOf(proposals.subList(0,Math.min(maximum,proposals.size())));</span>
+    }
+    private void addPairProposals(List&lt;Expr&gt; outputs,Eligible subtraction,Eligible addition,List&lt;List&lt;Expr&gt;&gt; proposals) {
+<span class="fc" id="L23">        work.charge(1);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if(!Objects.equals(subtraction.modulus(),addition.modulus())) return;</span>
+<span class="fc" id="L25">        Expr left=subtraction.expression(),right=addition.expression(),modulus=subtraction.modulus();</span>
+<span class="fc" id="L26">        Expr p=args(left).getFirst(), q=args(left).get(1);</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">        if(op(p)!=NumericOperation.MULTIPLY || op(q)!=NumericOperation.MULTIPLY) return;</span>
+<span class="pc bpc" id="L28" title="1 of 4 branches missed.">        for(int first=0;first&lt;2;first++) for(int second=0;second&lt;2;second++) {</span>
+<span class="fc" id="L29">            work.charge(1);</span>
+<span class="fc" id="L30">            Expr a=args(p).get(first), c=args(p).get(1-first), b=args(q).get(second), d=args(q).get(1-second);</span>
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">            if(!(product(args(right).getFirst(),a,d) &amp;&amp; product(args(right).get(1),b,c))</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">                    &amp;&amp; !(product(args(right).get(1),a,d) &amp;&amp; product(args(right).getFirst(),b,c))) continue;</span>
+<span class="fc" id="L33">            Expr shared=operation(NumericOperation.MULTIPLY,operation(NumericOperation.ADD,a,b),operation(NumericOperation.ADD,c,d));</span>
+<span class="fc" id="L34">            Expr imaginary=operation(NumericOperation.SUBTRACT,operation(NumericOperation.SUBTRACT,shared,p),q);</span>
+<span class="fc" id="L35">            work.charge(2L*outputs.size());</span>
+<span class="fc" id="L36">            var changed=new ArrayList&lt;&gt;(outputs);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            changed.set(addition.index(),modulus==null?imaginary:operation(NumericOperation.MOD,imaginary,modulus));</span>
+<span class="fc" id="L38">            proposals.add(List.copyOf(changed));</span>
+<span class="fc" id="L39">            break; // Keep the next first-factor orientation, even when this one matched.</span>
+        }
+<span class="fc" id="L41">    }</span>
+    private void collectEligible(List&lt;Expr&gt; outputs,List&lt;Eligible&gt; subtractions,List&lt;Eligible&gt; additions) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for(int index=0;index&lt;outputs.size();index++) {</span>
+<span class="fc" id="L44">            work.charge(1);</span>
+<span class="fc" id="L45">            Expr expression=outputs.get(index),modulus=null;</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if(op(expression)==NumericOperation.MOD) {</span>
+<span class="fc" id="L47">                modulus=args(expression).get(1); expression=args(expression).getFirst();</span>
+            }
+<span class="fc" id="L49">            var operation=op(expression);</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">            if((operation!=NumericOperation.SUBTRACT &amp;&amp; operation!=NumericOperation.ADD)</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                    || JavaExpressions.resultKind(expression)!=NumericKind.BIG_INTEGER) continue;</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">            if(op(args(expression).getFirst())!=NumericOperation.MULTIPLY || op(args(expression).get(1))!=NumericOperation.MULTIPLY) continue;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            (operation==NumericOperation.SUBTRACT?subtractions:additions).add(new Eligible(index,expression,modulus));</span>
+        }
+<span class="fc" id="L55">    }</span>
+    private static boolean product(Expr expression,Expr a,Expr b) {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if(op(expression)!=NumericOperation.MULTIPLY) return false;</span>
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">        return args(expression).getFirst().equals(a) &amp;&amp; args(expression).get(1).equals(b)</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">            || args(expression).getFirst().equals(b) &amp;&amp; args(expression).get(1).equals(a);</span>
+    }
+<span class="fc" id="L61">    private static NumericOperation op(Expr e) { return JavaExpressions.operationOf(e).orElse(null); }</span>
+<span class="fc" id="L62">    private static List&lt;Expr&gt; args(Expr e) { return JavaExpressions.operands(e); }</span>
+<span class="fc" id="L63">    private static Expr operation(NumericOperation op,Expr... args) { return JavaExpressions.operation(NumericKind.BIG_INTEGER,op,args); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

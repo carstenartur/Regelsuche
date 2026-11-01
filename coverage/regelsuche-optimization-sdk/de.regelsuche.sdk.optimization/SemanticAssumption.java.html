@@ -3,13 +3,20 @@
 public record SemanticAssumption(Kind kind, String subject, String parameter, String provenance) {
 <span class="fc" id="L4">    public enum Kind {</span>
 <span class="fc" id="L5">        BIG_INTEGER_VALUE_SEMANTICS, BIG_INTEGER_BIT_LENGTH_BOUND, NON_NEGATIVE_UPPER_BOUND,</span>
-<span class="fc" id="L6">        NON_NEGATIVE, POSITIVE, NORMALIZED_MODULAR_INPUT,</span>
-<span class="fc" id="L7">        NO_NAN_PAYLOAD_OBSERVATION</span>
+<span class="fc" id="L6">        NON_NEGATIVE, POSITIVE, NORMALIZED_MODULAR_INPUT, MODULAR_UNIT_INPUT,</span>
+<span class="fc" id="L7">        SUCCESSFUL_MODULAR_INVERSE,</span>
+<span class="fc" id="L8">        NO_NAN_PAYLOAD_OBSERVATION</span>
     }
-<span class="fc" id="L9">    public SemanticAssumption {</span>
-<span class="fc" id="L10">        java.util.Objects.requireNonNull(kind);</span>
-<span class="pc bpc" id="L11" title="5 of 10 branches missed.">        if (subject == null || subject.isBlank() || parameter == null || provenance == null || provenance.isBlank())</span>
-<span class="nc" id="L12">            throw new IllegalArgumentException(&quot;ASSUMPTION_PROVENANCE_REQUIRED&quot;);</span>
-<span class="fc" id="L13">    }</span>
+<span class="fc" id="L10">    public SemanticAssumption {</span>
+<span class="fc" id="L11">        java.util.Objects.requireNonNull(kind);</span>
+<span class="pc bpc" id="L12" title="5 of 10 branches missed.">        if (subject == null || subject.isBlank() || parameter == null || provenance == null || provenance.isBlank())</span>
+<span class="nc" id="L13">            throw new IllegalArgumentException(&quot;ASSUMPTION_PROVENANCE_REQUIRED&quot;);</span>
+<span class="fc" id="L14">    }</span>
+    /** A conditional source law premise, not an execution observation. The caller must
+     * establish success of this exact retained operation before applying the law.
+     */
+    public static SemanticAssumption successfulModularInverse(SourceEvaluationTrace.Occurrence occurrence,String provenance) {
+<span class="fc" id="L19">        return new SemanticAssumption(Kind.SUCCESSFUL_MODULAR_INVERSE,occurrence.sourceId(),SuccessfulInverseFacts.commitment(occurrence,null),provenance);</span>
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

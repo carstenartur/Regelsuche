@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PowerWork.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">PowerWork.java</span></div><h1>PowerWork.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.Objects;
+
+/** One ledger and deadline cover preparation, synthesis and replay in each public call. */
+final class PowerWork {
+<span class="fc" id="L9">    static final class Unavailable extends RuntimeException { Unavailable(String reason) { super(reason); } }</span>
+    final OptimizationBudget budget;
+    private final CancellationToken cancellation;
+<span class="fc" id="L12">    private final long started=System.nanoTime(), timeoutNanos;</span>
+    long used;
+<span class="fc" id="L14">    PowerWork(OptimizationBudget budget,CancellationToken cancellation) {</span>
+<span class="fc" id="L15">        this.budget=Objects.requireNonNull(budget); this.cancellation=Objects.requireNonNull(cancellation);</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        timeoutNanos=budget.timeoutMillis()&gt;Long.MAX_VALUE/1_000_000 ? Long.MAX_VALUE : budget.timeoutMillis()*1_000_000;</span>
+<span class="fc" id="L17">    }</span>
+    void charge(long amount) {
+<span class="pc bpc" id="L19" title="1 of 4 branches missed.">        if(cancellation.isCancelled() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L20" title="1 of 4 branches missed.">        if(amount&lt;0 || amount&gt;budget.maximumWork()-used) throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if(System.nanoTime()-started&gt;=timeoutNanos) throw new Unavailable(&quot;TIME_LIMIT&quot;);</span>
+<span class="fc" id="L22">        used+=amount;</span>
+<span class="fc" id="L23">    }</span>
+    void exponent(BigInteger exponent) {
+<span class="fc" id="L25">        charge(1);</span>
+<span class="fc" id="L26">        try { FixedPowerPlan.boundedExponent(exponent); }</span>
+<span class="fc" id="L27">        catch(IllegalArgumentException invalid) { throw new Unavailable(invalid.getMessage()); }</span>
+<span class="fc" id="L28">        charge(1L+(exponent.bitLength()+63)/64);</span>
+<span class="fc" id="L29">    }</span>
+    void identifier(String id) {
+<span class="fc" id="L31">        charge(0);</span>
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">        if(id==null || id.length()&gt;UnitInverseReusePlan.MAX_BINDING_ID_LENGTH) throw new Unavailable(&quot;BINDING_ID_LIMIT&quot;);</span>
+        // Reserve all bounded content inspection before isBlank, even for invalid IDs.
+<span class="fc" id="L34">        charge(1L+id.length());</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if(id.isBlank()) throw new Unavailable(&quot;BLANK_BINDING_ID&quot;);</span>
+<span class="fc" id="L36">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

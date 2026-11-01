@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>UnitInverseReuseVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">UnitInverseReuseVerifier.java</span></div><h1>UnitInverseReuseVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import de.regelsuche.sdk.optimization.*;
+import java.math.BigInteger;
+import java.util.Objects;
+
+/** Independent conditional monoid theorem. Powers of x commute with x; if x^k has a
+ * two-sided inverse y, x commutes with y as well, so x^(k-1)y is a two-sided inverse of x.
+ * There is no commutativity or primality assumption about the surrounding algebra.
+ */
+<span class="fc" id="L11">public final class UnitInverseReuseVerifier {</span>
+<span class="fc" id="L12">    public record Verification(boolean verified,String reason,long work) { }</span>
+    public Verification verify(UnitInverseReusePlan.Premises expected,UnitInverseReusePlan plan,
+            OptimizationBudget budget,CancellationToken cancellation) {
+<span class="fc" id="L15">        var work=new PowerWork(budget,cancellation);</span>
+        try {
+<span class="fc" id="L17">            UnitInverseReusePlan.checkPremises(expected,work); Objects.requireNonNull(plan);</span>
+<span class="fc" id="L18">            UnitInverseReusePlan.checkPremises(plan.source(),work);</span>
+            // Validation scans were paid; separately reserve full bounded field comparisons.
+<span class="fc" id="L20">            var actual=plan.source();</span>
+<span class="fc" id="L21">            work.charge(5L+expected.algebraId().length()+expected.domainId().length()+expected.baseBinding().length()</span>
+<span class="fc" id="L22">                +expected.poweredBinding().length()+expected.knownInverseBinding().length()+(expected.power().bitLength()+63)/64);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">            if(!expected.equals(actual)) throw new PowerWork.Unavailable(&quot;INVERSE_SOURCE_OR_DOMAIN_MISMATCH&quot;);</span>
+<span class="fc" id="L24">            work.charge(1L+(expected.power().bitLength()+63)/64);</span>
+<span class="fc" id="L25">            FixedPowerVerifier.check(expected.power().subtract(BigInteger.ONE),plan.predecessorPower(),true,work);</span>
+<span class="fc" id="L26">            return new Verification(true,&quot;VERIFIED_CONDITIONAL_UNIT_INVERSE_REUSE&quot;,work.used);</span>
+<span class="fc" id="L27">        } catch(PowerWork.Unavailable stop) { return new Verification(false,stop.getMessage(),work.used); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FixedPowerPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">FixedPowerPlan.java</span></div><h1>FixedPowerPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import java.math.BigInteger;
+import java.util.*;
+
+/** A proposed multiplication schedule. Node 0 is the identity, node 1 is the base;
+ * step i produces node i+2. Only FixedPowerVerifier establishes the claimed exponent.
+ */
+public record FixedPowerPlan(BigInteger exponent,List&lt;Multiplication&gt; multiplications,int resultIndex) {
+    public static final int MAX_STEPS=8192, MAX_EXPONENT_BITS=4096;
+<span class="fc" id="L11">    public record Multiplication(int left,int right) { }</span>
+<span class="fc" id="L12">    public FixedPowerPlan {</span>
+<span class="fc" id="L13">        boundedExponent(exponent);</span>
+<span class="fc" id="L14">        Objects.requireNonNull(multiplications);</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if(multiplications.size()&gt;MAX_STEPS) throw new IllegalArgumentException(&quot;POWER_STEP_LIMIT&quot;);</span>
+        // Do not trust size(), toArray(), or bulk collection copying. A custom list
+        // can advertise a small size while enumerating an unbounded number of steps.
+<span class="fc" id="L18">        var bounded=new ArrayList&lt;Multiplication&gt;();</span>
+<span class="fc" id="L19">        var iterator=multiplications.iterator();</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        while(iterator.hasNext()) {</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">            if(bounded.size()==MAX_STEPS) throw new IllegalArgumentException(&quot;POWER_STEP_LIMIT&quot;);</span>
+<span class="fc" id="L22">            bounded.add(Objects.requireNonNull(iterator.next()));</span>
+        }
+<span class="fc" id="L24">        multiplications=List.copyOf(bounded);</span>
+<span class="fc" id="L25">    }</span>
+    static void boundedExponent(BigInteger exponent) {
+<span class="pc bpc" id="L27" title="3 of 8 branches missed.">        if(exponent==null || exponent.getClass()!=BigInteger.class || exponent.signum()&lt;0 || exponent.bitLength()&gt;MAX_EXPONENT_BITS)</span>
+<span class="fc" id="L28">            throw new IllegalArgumentException(&quot;POWER_EXPONENT_LIMIT&quot;);</span>
+<span class="fc" id="L29">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

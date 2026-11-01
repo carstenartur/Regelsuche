@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModularInverseProof.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization</a> &gt; <span class="el_source">ModularInverseProof.java</span></div><h1>ModularInverseProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization;
+
+import de.regelsuche.ast.Expr;
+
+/** If x*r=y and an original y inverse succeeds, r*y^-1 is an inverse of x in Z/mZ. */
+final class ModularInverseProof {
+    private final OptimizationRequest request;
+    private final VerificationWork work;
+<span class="fc" id="L9">    ModularInverseProof(OptimizationRequest request,VerificationWork work) { this.request=request; this.work=work; }</span>
+<span class="pc bpc" id="L10" title="1 of 4 branches missed.">    boolean equivalent(Expr a,Expr b) { return directed(a,b) || directed(b,a); }</span>
+    private boolean directed(Expr original,Expr replacement) {
+<span class="fc" id="L12">        work.charge(1);</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        if(op(original)!=NumericOperation.MOD_INVERSE) return false;</span>
+<span class="fc" id="L14">        var source=JavaExpressions.operands(original); Expr modulus=source.get(1);</span>
+        Expr product;
+<span class="pc bpc" id="L16" title="2 of 4 branches missed.">        if(op(replacement)==NumericOperation.MOD &amp;&amp; JavaExpressions.operands(replacement).get(1).equals(modulus))</span>
+<span class="fc" id="L17">            product=JavaExpressions.operands(replacement).getFirst();</span>
+<span class="nc bnc" id="L18" title="All 4 branches missed.">        else if(op(replacement)==NumericOperation.MOD_MULTIPLY &amp;&amp; JavaExpressions.operands(replacement).get(2).equals(modulus))</span>
+<span class="nc" id="L19">            product=JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,</span>
+<span class="nc" id="L20">                JavaExpressions.operands(replacement).getFirst(),JavaExpressions.operands(replacement).get(1));</span>
+<span class="nc" id="L21">        else return false;</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if(op(product)!=NumericOperation.MULTIPLY) return false;</span>
+<span class="fc" id="L23">        var factors=JavaExpressions.operands(product);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        for(int i=0;i&lt;2;i++) {</span>
+<span class="fc" id="L25">            Expr known=factors.get(i);</span>
+<span class="pc bpc" id="L26" title="1 of 4 branches missed.">            if(op(known)!=NumericOperation.MOD_INVERSE || !JavaExpressions.operands(known).get(1).equals(modulus)) continue;</span>
+<span class="fc" id="L27">            boolean retained=false;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for(var occurrence:request.sourceTrace().occurrences()) {</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">                work.charge(1); if(occurrence.expression().equals(known)) { retained=true; break; }</span>
+<span class="fc" id="L30">            }</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if(!retained) continue;</span>
+<span class="fc" id="L32">            Expr multiplied=JavaExpressions.operation(NumericKind.BIG_INTEGER,NumericOperation.MULTIPLY,source.getFirst(),factors.get(1-i));</span>
+            try {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                if(new PolynomialProof(modulus,work).equivalent(multiplied,JavaExpressions.operands(known).getFirst())) return true;</span>
+<span class="pc" id="L35">            } catch(PolynomialProof.OutsideFragment bounded) { /* Unknown within finite caps. */ }</span>
+        }
+<span class="fc" id="L37">        return false;</span>
+    }
+<span class="fc" id="L39">    private static NumericOperation op(Expr e) { return JavaExpressions.operationOf(e).orElse(null); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
