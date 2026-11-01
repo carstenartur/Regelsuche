@@ -10,6 +10,13 @@ import java.util.*;
 final class JavaNumericBackend implements ComputationBackend {
     private final Map<String, Type> inputs;
     JavaNumericBackend(Map<String, Type> inputs) { this.inputs = Map.copyOf(inputs); }
+    @Override public void validateInputs(Map<String, Object> supplied) {
+        for (var input : inputs.entrySet()) if (input.getValue().equals(NumericKind.BIG_INTEGER.type())) {
+            Object value = supplied.get(input.getKey());
+            if (value == null || value.getClass() != BigInteger.class)
+                throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_VIOLATED");
+        }
+    }
     @Override public Type literalType(NumberExpr literal) {
         if (!literal.value().isInteger()) throw new IllegalArgumentException("INTEGER_LITERAL_REQUIRED");
         return NumericKind.BIG_INTEGER.type();
@@ -39,12 +46,15 @@ final class JavaNumericBackend implements ComputationBackend {
                 NumericOperation.DIVIDE, NumericOperation.REMAINDER, NumericOperation.NEGATE, NumericOperation.ABS).contains(op))
             throw new IllegalArgumentException("UNSUPPORTED_IEEE_OPERATION");
         if (kind != NumericKind.BIG_INTEGER && EnumSet.of(NumericOperation.MOD, NumericOperation.MOD_POW,
-                NumericOperation.MOD_MULTIPLY, NumericOperation.POW).contains(op)) throw new IllegalArgumentException("BIG_INTEGER_OPERATION_REQUIRED");
+                NumericOperation.MOD_MULTIPLY, NumericOperation.MOD_INVERSE, NumericOperation.POW).contains(op)) throw new IllegalArgumentException("BIG_INTEGER_OPERATION_REQUIRED");
         if (kind == NumericKind.BIG_INTEGER && (op.name().endsWith("EXACT") || op == NumericOperation.UNSIGNED_SHIFT_RIGHT))
             throw new IllegalArgumentException("UNSUPPORTED_BIG_INTEGER_OPERATION");
         long work = op == NumericOperation.MOD_POW ? ModularOperationCosts.POWER_FALLBACK_WORK
                 : op == NumericOperation.MOD_MULTIPLY ? ModularOperationCosts.MULTIPLY_WORK
-                : kind == NumericKind.BIG_INTEGER ? ModularOperationCosts.ARITHMETIC_WORK : 1;
+                : kind == NumericKind.BIG_INTEGER ? ModularOperationCosts.ARITHMETIC_WORK
+                // Deterministic relative word-work, not a timing claim. Signed
+                // remainder is costlier than one bitwise mask in the cost model.
+                : kind.integral() && op == NumericOperation.REMAINDER ? 4 : 1;
         if (op == NumericOperation.MOD_POW && function.arguments().size() == 3)
             work = ModularOperationCosts.powerWork(function.arguments().get(1));
         return new Operation(function.name(), argumentTypes, kind.type(), work, kind == NumericKind.BIG_INTEGER ? 2 : 1);
@@ -90,7 +100,7 @@ final class JavaNumericBackend implements ComputationBackend {
         BigInteger y = other instanceof BigInteger value ? value : null;
         return switch (op) {
             case ADD -> x.add(y); case SUBTRACT -> x.subtract(y); case MULTIPLY -> x.multiply(y);
-            case DIVIDE -> x.divide(y); case REMAINDER -> x.remainder(y); case MOD -> x.mod(y);
+            case DIVIDE -> x.divide(y); case REMAINDER -> x.remainder(y); case MOD -> x.mod(y); case MOD_INVERSE -> x.modInverse(y);
             case NEGATE -> x.negate(); case ABS -> x.abs(); case AND -> x.and(y); case OR -> x.or(y);
             case XOR -> x.xor(y); case NOT -> x.not(); case SHIFT_LEFT -> x.shiftLeft(((Number)other).intValue());
             case SHIFT_RIGHT -> x.shiftRight(((Number)other).intValue()); case POW -> x.pow((Integer)other);

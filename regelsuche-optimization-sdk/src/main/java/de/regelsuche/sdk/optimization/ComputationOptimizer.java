@@ -32,14 +32,18 @@ public final class ComputationOptimizer {
                 return new OptimizationResult.Unsupported(diagnostic(invalid), Math.addExact(work.used(), failedPreparation));
             }
             boolean projectedWords = hasLiteralWordProjection(request, work);
+            long beforeCapture=work.used();
+            var receiptCapture=sourceCost.operationCount()==0 ? null : new EvidenceHashes.Capture(request,checker.sourcePrepared(),work);
+            long receiptReserve=work.used()-beforeCapture;
             long setup=work.used();
             var generator=new JavaCandidateGenerator(request,work);
             var domain=new JointPlanSearch.Domain() {
                 @Override public String revision() { return SEMANTICS_REVISION; }
                 @Override public JointPlanSearch.Generation generate(JointComputationPlan source,int maximum) { return generator.generate(source,maximum); }
                 @Override public JointPlanSearch.Verification verify(JointComputationPlan source,JointComputationPlan target) {
+                    long before=work.used();
                     var proof=checker.check(source,target);
-                    return new JointPlanSearch.Verification(proof.accepted(),proof.work());
+                    return new JointPlanSearch.Verification(proof.accepted(),Math.max(1,work.used()-before));
                 }
             };
             var budget=request.budget();
@@ -52,8 +56,10 @@ public final class ComputationOptimizer {
             // arithmetic. Reserve two thirds for these requests, otherwise half.
             // The trusted Candidate constructor also prepares the final graph.
             // Reserve the known initial incumbent's preparation before splitting
-            // the rest between exploration and the independent final proof.
-            long explorationAllowance=Math.max(1,(budget.maximumWork()-setup-sourceCost.inspectionWork())/(projectedWords ? 3 : 2));
+            // the rest between exploration and the independent final proof. The source
+            // receipt is captured once; reserve its measured work for a similar-size
+            // target receipt, whose actual traversal remains charged below.
+            long explorationAllowance=Math.max(1,(budget.maximumWork()-setup-sourceCost.inspectionWork()-receiptReserve)/(projectedWords ? 3 : 2));
             var found=search.optimize(request.plan(),new MoveSearch.Budget(8,8,explorationAllowance,budget.maximumStates(),explorationAllowance,64));
             work.charge(1);
             long searchWork=Math.addExact(Math.addExact(setup,found.totalWork()),1);
@@ -70,7 +76,10 @@ public final class ComputationOptimizer {
             long total=Math.max(work.used(),Math.addExact(searchWork,work.used()-beforeFinal));
             var finalOutcome=finalVerificationOutcome(proof.accepted(),total,budget.maximumWork());
             if(finalOutcome.isPresent()) return finalOutcome.get();
-            var obligations=obligations(request,found.plan());
+            long beforeObligations=work.used();
+            var obligations=obligations(request,found.plan(),found.prepared(),work);
+            total=Math.addExact(total,work.used()-beforeObligations);
+            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("RUNTIME_OBLIGATIONS_BUDGET_EXCEEDED",total);
             var cost=cost(request,sourceCost,found.prepared().cost(),obligations);
             if (ranking != null) {
                 long beforeRanking = work.used();
@@ -92,7 +101,10 @@ public final class ComputationOptimizer {
             long preparationWork=cost.candidateCost().inspectionWork();
             work.charge(preparationWork); total=Math.addExact(total,preparationWork);
             if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("FINAL_PREPARATION_BUDGET_EXCEEDED",total);
-            var receipt = evidence(request,found.plan(),proof,obligations);
+            long beforeEvidence=work.used();
+            var receipt = evidence(request,found.plan(),checker.sourcePrepared(),checker.lastPrepared(),proof,obligations,work,receiptCapture);
+            total=Math.addExact(total,work.used()-beforeEvidence);
+            if(total>budget.maximumWork()) return new OptimizationResult.BudgetExceeded("EVIDENCE_BUDGET_EXCEEDED",total);
             long beforeDerivation = work.used();
             var derivation = SearchDerivations.capture(request, receipt, found, work);
             total = Math.addExact(total, work.used() - beforeDerivation);
@@ -146,8 +158,9 @@ public final class ComputationOptimizer {
             var checker=new SemanticChecker(request,work); checker.validate();
             var proof=checker.check(request.plan(),candidate);
             if(proof.accepted()) {
-                var obligations=obligations(request,candidate);
-                return new VerificationResult.Verified(evidence(request,candidate,proof,obligations),obligations);
+                var prepared=checker.lastPrepared();
+                var obligations=obligations(request,candidate,prepared,work);
+                return new VerificationResult.Verified(evidence(request,candidate,checker.sourcePrepared(),prepared,proof,obligations,work,null),obligations);
             }
             var counterexample=counterexample(request,candidate,work);
             if(counterexample!=null) return new VerificationResult.Refuted("JAVA_NUMERIC_COUNTEREXAMPLE",counterexample);
@@ -188,15 +201,17 @@ public final class ComputationOptimizer {
     public Map<String,Object> evaluateGuarded(OptimizationRequest request, OptimizationResult.Candidate candidate, Map<String,?> inputs) {
         if(request.safetyProfile()!=SafetyProfile.GUARDED_FALLBACK) throw new IllegalArgumentException("GUARDED_PROFILE_REQUIRED");
         if(!(reverify(request,candidate,CancellationToken.NONE) instanceof VerificationResult.Verified)) throw new IllegalArgumentException("CANDIDATE_NOT_REVERIFIED");
-        try { return RuntimeChecks.checked(request,candidate.plan(),candidate.obligations(),inputs); }
-        catch(RuntimeChecks.AssumptionGuardFailure | ArithmeticException numericalGate) { return prepare(request.plan()).execute(inputs); }
+        var captured=RuntimeChecks.snapshot(request.plan(),inputs);
+        try { return RuntimeChecks.checked(request,candidate.plan(),candidate.obligations(),captured); }
+        catch(RuntimeChecks.AssumptionGuardFailure | ArithmeticException numericalGate) { return prepare(request.plan()).execute(captured); }
     }
-    private static RuntimeObligations obligations(OptimizationRequest request,JointComputationPlan target) {
+    private static RuntimeObligations obligations(OptimizationRequest request,JointComputationPlan target,PreparedJointComputation prepared,VerificationWork work) {
         var kinds=EnumSet.noneOf(NumericKind.class);
         request.plan().inputs().values().forEach(type -> kinds.add(NumericKind.fromType(type)));
         request.sourceTrace().occurrences().forEach(o -> kinds.add(o.evaluatedKind()));
         target.outputs().forEach(o -> kinds.add(NumericKind.fromType(o.type())));
-        var replacement=SourceEvaluationTrace.fromPlan(target);
+        work.charge(1L+2L*prepared.nodes().size());
+        var replacement=SourceEvaluationTrace.fromPrepared(prepared);
         boolean active=request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
         boolean integral=active&&(request.sourceTrace().occurrences().stream().anyMatch(o -> o.evaluatedKind().integral())
             || replacement.occurrences().stream().anyMatch(o -> o.evaluatedKind().integral()));
@@ -216,9 +231,10 @@ public final class ComputationOptimizer {
             RuntimeObligations.GuardKind.FINITE_AND_BITWISE_EQUAL:integral?RuntimeObligations.GuardKind.ORIGINAL_AND_REPLACEMENT_RANGE:RuntimeObligations.GuardKind.NONE;
         return new RuntimeObligations(guard,request.sourceTrace(),replacement,integral,fp,fp,checkWork,fallback);
     }
-    private static VerificationEvidence evidence(OptimizationRequest request,JointComputationPlan target,SemanticChecker.Proof proof,RuntimeObligations obligations) {
+    private static VerificationEvidence evidence(OptimizationRequest request,JointComputationPlan target,PreparedJointComputation sourcePrepared,PreparedJointComputation targetPrepared,SemanticChecker.Proof proof,RuntimeObligations obligations,VerificationWork work,EvidenceHashes.Capture capture) {
+        var hashes=(capture==null ? new EvidenceHashes.Capture(request,sourcePrepared,work) : capture).finish(target,targetPrepared);
         return new VerificationEvidence("regelsuche.optimization-evidence/v1",SEMANTICS_REVISION,SemanticChecker.REVISION,JavaCandidateGenerator.REVISION,
-            EvidenceHashes.plan(request.plan()),EvidenceHashes.plan(target),EvidenceHashes.trace(request.sourceTrace()),EvidenceHashes.assumptions(request.assumptions()),
+            hashes.source(),hashes.target(),hashes.trace(),EvidenceHashes.assumptions(request.assumptions()),
             request.safetyProfile(),request.checkedPolicy(),obligations,proof.methods(),proof.work());
     }
     private static JointPlanSearch.Weights weights(OptimizationGoal goal) {
@@ -279,7 +295,7 @@ public final class ComputationOptimizer {
                 if(!seen.add(expression)) continue;
                 if(JavaExpressions.kindOf(expression,request.plan().inputs())==NumericKind.BIG_INTEGER) {
                     var operation=JavaExpressions.operationOf(expression).orElse(null);
-                    if(operation!=null && EnumSet.of(NumericOperation.POW,NumericOperation.MOD_POW,NumericOperation.MOD_MULTIPLY,
+                    if(operation!=null && EnumSet.of(NumericOperation.POW,NumericOperation.MOD_POW,NumericOperation.MOD_MULTIPLY,NumericOperation.MOD_INVERSE,
                             NumericOperation.SHIFT_LEFT,NumericOperation.SHIFT_RIGHT).contains(operation)) return false;
                     bounds.require(expression);
                 }

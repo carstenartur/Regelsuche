@@ -78,8 +78,8 @@ class FinalPreparationReuseBudgetTest {
 
     @Test void sharedNormalizationNowFinishesWithinTheHistoricalTightLimit() {
         long historicalAllowance = 1_092;
-        var candidate = assertInstanceOf(OptimizationResult.Candidate.class,
-                new ComputationOptimizer().optimize(request(historicalAllowance), CancellationToken.NONE));
+        var result = new ComputationOptimizer().optimize(request(historicalAllowance), CancellationToken.NONE);
+        var candidate = assertInstanceOf(OptimizationResult.Candidate.class, result, result.toString());
         assertTrue(candidate.work() <= historicalAllowance);
         assertInstanceOf(VerificationResult.Verified.class,
                 new ComputationOptimizer().reverify(request(historicalAllowance), candidate, CancellationToken.NONE));
