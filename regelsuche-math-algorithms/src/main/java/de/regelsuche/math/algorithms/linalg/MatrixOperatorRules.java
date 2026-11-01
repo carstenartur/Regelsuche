@@ -15,6 +15,8 @@ public final class MatrixOperatorRules {
         algebra.evaluate(source);
         List<Rewrite> result = new ArrayList<>();
         visit(source, result, algebra, work);
+        OrderedMatrixChain.propose(source, algebra, work).ifPresent(candidate ->
+            result.add(new Rewrite("ORDERED_MATRIX_CHAIN_MIN_MULTIPLIES", candidate)));
         return List.copyOf(result);
     }
 
