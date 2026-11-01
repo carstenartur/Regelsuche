@@ -14,27 +14,29 @@ public final class MatrixOperatorRules {
             ExactMatrixAlgebra.Work work) {
         algebra.evaluate(source);
         List<Rewrite> result = new ArrayList<>();
-        visit(source, result, work);
+        visit(source, result, algebra, work);
         return List.copyOf(result);
     }
 
-    private static void visit(ExactMatrixExpression source, List<Rewrite> result, ExactMatrixAlgebra.Work work) {
+    private static void visit(ExactMatrixExpression source, List<Rewrite> result,
+            ExactMatrixAlgebra algebra, ExactMatrixAlgebra.Work work) {
         work.consume(1);
         switch (source) {
             case Product product -> {
                 productRules(product, result);
-                for (Rewrite child : children(product.left(), work)) {
+                for (Rewrite child : children(product.left(), algebra, work)) {
                     result.add(new Rewrite(child.rule(), new Product(child.expression(), product.right())));
                 }
-                for (Rewrite child : children(product.right(), work)) {
+                for (Rewrite child : children(product.right(), algebra, work)) {
                     result.add(new Rewrite(child.rule(), new Product(product.left(), child.expression())));
                 }
             }
             case Sum sum -> {
-                for (Rewrite child : children(sum.left(), work)) {
+                sumRules(sum, result, algebra, work);
+                for (Rewrite child : children(sum.left(), algebra, work)) {
                     result.add(new Rewrite(child.rule(), new Sum(child.expression(), sum.right())));
                 }
-                for (Rewrite child : children(sum.right(), work)) {
+                for (Rewrite child : children(sum.right(), algebra, work)) {
                     result.add(new Rewrite(child.rule(), new Sum(sum.left(), child.expression())));
                 }
             }
@@ -42,10 +44,29 @@ public final class MatrixOperatorRules {
         }
     }
 
-    private static List<Rewrite> children(ExactMatrixExpression expression, ExactMatrixAlgebra.Work work) {
+    private static List<Rewrite> children(ExactMatrixExpression expression,
+            ExactMatrixAlgebra algebra, ExactMatrixAlgebra.Work work) {
         List<Rewrite> results = new ArrayList<>();
-        visit(expression, results, work);
+        visit(expression, results, algebra, work);
         return results;
+    }
+
+    /** Reverse distributivity retains factor order; matrix multiplication is not commutative. */
+    private static void sumRules(Sum sum, List<Rewrite> result,
+            ExactMatrixAlgebra algebra, ExactMatrixAlgebra.Work work) {
+        if (!(sum.left() instanceof Product left) || !(sum.right() instanceof Product right)) return;
+        work.consume(1);
+        // The bounded algebra compares complete polynomial values, not display
+        // names or an unmetered recursive equals traversal of an expression DAG.
+        if (algebra.equal(algebra.evaluate(left.left()), algebra.evaluate(right.left()))) {
+            result.add(new Rewrite("COMMON_LEFT_FACTOR", new Product(left.left(),
+                    new Sum(left.right(), right.right()))));
+        }
+        work.consume(1);
+        if (algebra.equal(algebra.evaluate(left.right()), algebra.evaluate(right.right()))) {
+            result.add(new Rewrite("COMMON_RIGHT_FACTOR", new Product(
+                    new Sum(left.left(), right.left()), left.right())));
+        }
     }
 
     private static void productRules(Product product, List<Rewrite> result) {
