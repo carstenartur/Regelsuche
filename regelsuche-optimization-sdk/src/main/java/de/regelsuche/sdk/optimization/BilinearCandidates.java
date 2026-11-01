@@ -15,26 +15,29 @@ final class BilinearCandidates {
         collectEligible(outputs,subtractions,additions);
         for(var subtraction:subtractions) for(var addition:additions) {
             if(proposals.size()>=maximum) return List.copyOf(proposals);
-            work.charge(1);
-            if(!Objects.equals(subtraction.modulus(),addition.modulus())) continue;
-            Expr left=subtraction.expression(),right=addition.expression(),modulus=subtraction.modulus();
-            Expr p=args(left).getFirst(), q=args(left).get(1);
-            if(op(p)!=NumericOperation.MULTIPLY || op(q)!=NumericOperation.MULTIPLY) continue;
-            for(int first=0;first<2;first++) for(int second=0;second<2;second++) {
-                work.charge(1);
-                Expr a=args(p).get(first), c=args(p).get(1-first), b=args(q).get(second), d=args(q).get(1-second);
-                if(!(product(args(right).getFirst(),a,d) && product(args(right).get(1),b,c))
-                        && !(product(args(right).get(1),a,d) && product(args(right).getFirst(),b,c))) continue;
-                Expr shared=operation(NumericOperation.MULTIPLY,operation(NumericOperation.ADD,a,b),operation(NumericOperation.ADD,c,d));
-                Expr imaginary=operation(NumericOperation.SUBTRACT,operation(NumericOperation.SUBTRACT,shared,p),q);
-                work.charge(2L*outputs.size());
-                var changed=new ArrayList<>(outputs);
-                changed.set(addition.index(),modulus==null?imaginary:operation(NumericOperation.MOD,imaginary,modulus));
-                proposals.add(List.copyOf(changed));
-                break;
-            }
+            addPairProposals(outputs,subtraction,addition,proposals);
         }
         return List.copyOf(proposals.subList(0,Math.min(maximum,proposals.size())));
+    }
+    private void addPairProposals(List<Expr> outputs,Eligible subtraction,Eligible addition,List<List<Expr>> proposals) {
+        work.charge(1);
+        if(!Objects.equals(subtraction.modulus(),addition.modulus())) return;
+        Expr left=subtraction.expression(),right=addition.expression(),modulus=subtraction.modulus();
+        Expr p=args(left).getFirst(), q=args(left).get(1);
+        if(op(p)!=NumericOperation.MULTIPLY || op(q)!=NumericOperation.MULTIPLY) return;
+        for(int first=0;first<2;first++) for(int second=0;second<2;second++) {
+            work.charge(1);
+            Expr a=args(p).get(first), c=args(p).get(1-first), b=args(q).get(second), d=args(q).get(1-second);
+            if(!(product(args(right).getFirst(),a,d) && product(args(right).get(1),b,c))
+                    && !(product(args(right).get(1),a,d) && product(args(right).getFirst(),b,c))) continue;
+            Expr shared=operation(NumericOperation.MULTIPLY,operation(NumericOperation.ADD,a,b),operation(NumericOperation.ADD,c,d));
+            Expr imaginary=operation(NumericOperation.SUBTRACT,operation(NumericOperation.SUBTRACT,shared,p),q);
+            work.charge(2L*outputs.size());
+            var changed=new ArrayList<>(outputs);
+            changed.set(addition.index(),modulus==null?imaginary:operation(NumericOperation.MOD,imaginary,modulus));
+            proposals.add(List.copyOf(changed));
+            break; // Keep the next first-factor orientation, even when this one matched.
+        }
     }
     private void collectEligible(List<Expr> outputs,List<Eligible> subtractions,List<Eligible> additions) {
         for(int index=0;index<outputs.size();index++) {
