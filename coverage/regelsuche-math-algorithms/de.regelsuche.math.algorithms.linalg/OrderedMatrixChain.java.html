@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedMatrixChain.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">OrderedMatrixChain.java</span></div><h1>OrderedMatrixChain.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.math.algorithms.linalg.ExactMatrixExpression.Product;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Bounded matrix-chain parenthesization, never a permutation of factors.
+ * The score counts dense scalar multiplications, not measured execution time.
+ * Scalar costs, sparsity and allocation costs are deliberately not inferred.
+ */
+final class OrderedMatrixChain {
+    private static final int MAX_FACTORS = 32;
+
+<span class="fc" id="L17">    private record Shape(int rows, int columns, long multiplications) { }</span>
+
+    private OrderedMatrixChain() { }
+
+    /** The caller validates the complete original expression before entering. */
+    static Optional&lt;ExactMatrixExpression&gt; propose(ExactMatrixExpression source,
+            ExactMatrixAlgebra algebra, ExactMatrixAlgebra.Work work) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (!(source instanceof Product)) return Optional.empty();</span>
+<span class="fc" id="L25">        List&lt;ExactMatrixExpression&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L26">        List&lt;Shape&gt; shapes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L27">        Shape original = collect(source, factors, shapes, algebra, work);</span>
+<span class="fc bfc" id="L28" title="All 4 branches covered.">        if (original == null || factors.size() &lt; 3) return Optional.empty();</span>
+
+<span class="fc" id="L30">        int count = factors.size();</span>
+<span class="fc" id="L31">        work.consume(2L * count * count); // Reserve bounded DP storage before allocation.</span>
+<span class="fc" id="L32">        long[][] costs = new long[count][count];</span>
+<span class="fc" id="L33">        int[][] splits = new int[count][count];</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (int length = 2; length &lt;= count; length++) {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            for (int start = 0; start + length &lt;= count; start++) {</span>
+<span class="fc" id="L36">                int end = start + length - 1;</span>
+<span class="fc" id="L37">                costs[start][end] = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                for (int middle = start; middle &lt; end; middle++) {</span>
+<span class="fc" id="L39">                    work.consume(1);</span>
+<span class="fc" id="L40">                    long product = (long) shapes.get(start).rows()</span>
+<span class="fc" id="L41">                        * shapes.get(middle).columns() * shapes.get(end).columns();</span>
+<span class="fc" id="L42">                    long candidate = costs[start][middle] + costs[middle + 1][end] + product;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                    if (candidate &lt; costs[start][end]) {</span>
+<span class="fc" id="L44">                        costs[start][end] = candidate;</span>
+<span class="fc" id="L45">                        splits[start][end] = middle;</span>
+                    }
+                }
+            }
+        }
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (costs[0][count - 1] &gt;= original.multiplications()) return Optional.empty();</span>
+<span class="fc" id="L51">        ExactMatrixExpression candidate = rebuild(factors, splits, 0, count - 1, work);</span>
+        try {
+            // A new grouping can exceed the existing depth/intermediate-polynomial caps.
+            // Such a plan is unavailable, even if its final polynomial would be small.
+<span class="fc" id="L55">            new ExactMatrixAlgebra(work).evaluate(candidate);</span>
+<span class="fc" id="L56">        } catch (ExactMatrixAlgebra.Unsupported outsideExistingCaps) {</span>
+<span class="fc" id="L57">            return Optional.empty();</span>
+<span class="fc" id="L58">        }</span>
+        // This is only a proposal. MatrixRepresentationBridge independently checks
+        // every ordered coefficient and VectorReplay checks the staged application.
+<span class="fc" id="L61">        return Optional.of(candidate);</span>
+    }
+
+    private static Shape collect(ExactMatrixExpression expression,
+            List&lt;ExactMatrixExpression&gt; factors, List&lt;Shape&gt; shapes,
+            ExactMatrixAlgebra algebra, ExactMatrixAlgebra.Work work) {
+<span class="fc" id="L67">        work.consume(1);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (expression instanceof Product product) {</span>
+<span class="fc" id="L69">            Shape left = collect(product.left(), factors, shapes, algebra, work);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (left == null) return null;</span>
+<span class="fc" id="L71">            Shape right = collect(product.right(), factors, shapes, algebra, work);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (right == null) return null;</span>
+<span class="fc" id="L73">            return new Shape(left.rows(), right.columns(), left.multiplications() + right.multiplications()</span>
+<span class="fc" id="L74">                + (long) left.rows() * left.columns() * right.columns());</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (factors.size() == MAX_FACTORS) return null;</span>
+<span class="fc" id="L77">        var value = algebra.evaluate(expression);</span>
+<span class="fc" id="L78">        Shape shape = new Shape(value.rows(), value.columns(), 0);</span>
+<span class="fc" id="L79">        factors.add(expression);</span>
+<span class="fc" id="L80">        shapes.add(shape);</span>
+<span class="fc" id="L81">        return shape;</span>
+    }
+
+    private static ExactMatrixExpression rebuild(List&lt;ExactMatrixExpression&gt; factors, int[][] splits,
+            int start, int end, ExactMatrixAlgebra.Work work) {
+<span class="fc" id="L86">        work.consume(1);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (start == end) return factors.get(start);</span>
+<span class="fc" id="L88">        int middle = splits[start][end];</span>
+<span class="fc" id="L89">        return new Product(rebuild(factors, splits, start, middle, work),</span>
+<span class="fc" id="L90">            rebuild(factors, splits, middle + 1, end, work));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

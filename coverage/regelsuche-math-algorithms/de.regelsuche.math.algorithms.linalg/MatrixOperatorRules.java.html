@@ -15,67 +15,69 @@ public final class MatrixOperatorRules {
 <span class="fc" id="L15">        algebra.evaluate(source);</span>
 <span class="fc" id="L16">        List&lt;Rewrite&gt; result = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L17">        visit(source, result, work);</span>
-<span class="fc" id="L18">        return List.copyOf(result);</span>
+<span class="fc" id="L18">        OrderedMatrixChain.propose(source, algebra, work).ifPresent(candidate -&gt;</span>
+<span class="fc" id="L19">            result.add(new Rewrite(&quot;ORDERED_MATRIX_CHAIN_MIN_MULTIPLIES&quot;, candidate)));</span>
+<span class="fc" id="L20">        return List.copyOf(result);</span>
     }
 
     private static void visit(ExactMatrixExpression source, List&lt;Rewrite&gt; result, ExactMatrixAlgebra.Work work) {
-<span class="fc" id="L22">        work.consume(1);</span>
-<span class="fc bfc" id="L23" title="All 3 branches covered.">        switch (source) {</span>
-<span class="fc" id="L24">            case Product product -&gt; {</span>
-<span class="fc" id="L25">                productRules(product, result);</span>
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">                for (Rewrite child : children(product.left(), work)) {</span>
-<span class="nc" id="L27">                    result.add(new Rewrite(child.rule(), new Product(child.expression(), product.right())));</span>
-<span class="nc" id="L28">                }</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">                for (Rewrite child : children(product.right(), work)) {</span>
-<span class="nc" id="L30">                    result.add(new Rewrite(child.rule(), new Product(product.left(), child.expression())));</span>
-<span class="nc" id="L31">                }</span>
-<span class="fc" id="L32">            }</span>
-<span class="fc" id="L33">            case Sum sum -&gt; {</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                for (Rewrite child : children(sum.left(), work)) {</span>
-<span class="nc" id="L35">                    result.add(new Rewrite(child.rule(), new Sum(child.expression(), sum.right())));</span>
-<span class="nc" id="L36">                }</span>
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                for (Rewrite child : children(sum.right(), work)) {</span>
-<span class="nc" id="L38">                    result.add(new Rewrite(child.rule(), new Sum(sum.left(), child.expression())));</span>
-<span class="nc" id="L39">                }</span>
-<span class="fc" id="L40">            }</span>
+<span class="fc" id="L24">        work.consume(1);</span>
+<span class="fc bfc" id="L25" title="All 3 branches covered.">        switch (source) {</span>
+<span class="fc" id="L26">            case Product product -&gt; {</span>
+<span class="fc" id="L27">                productRules(product, result);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">                for (Rewrite child : children(product.left(), work)) {</span>
+<span class="fc" id="L29">                    result.add(new Rewrite(child.rule(), new Product(child.expression(), product.right())));</span>
+<span class="fc" id="L30">                }</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">                for (Rewrite child : children(product.right(), work)) {</span>
+<span class="fc" id="L32">                    result.add(new Rewrite(child.rule(), new Product(product.left(), child.expression())));</span>
+<span class="fc" id="L33">                }</span>
+<span class="fc" id="L34">            }</span>
+<span class="fc" id="L35">            case Sum sum -&gt; {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                for (Rewrite child : children(sum.left(), work)) {</span>
+<span class="nc" id="L37">                    result.add(new Rewrite(child.rule(), new Sum(child.expression(), sum.right())));</span>
+<span class="nc" id="L38">                }</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                for (Rewrite child : children(sum.right(), work)) {</span>
+<span class="nc" id="L40">                    result.add(new Rewrite(child.rule(), new Sum(sum.left(), child.expression())));</span>
+<span class="nc" id="L41">                }</span>
+<span class="fc" id="L42">            }</span>
             default -&gt; { }
         }
-<span class="fc" id="L43">    }</span>
+<span class="fc" id="L45">    }</span>
 
     private static List&lt;Rewrite&gt; children(ExactMatrixExpression expression, ExactMatrixAlgebra.Work work) {
-<span class="fc" id="L46">        List&lt;Rewrite&gt; results = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L47">        visit(expression, results, work);</span>
-<span class="fc" id="L48">        return results;</span>
+<span class="fc" id="L48">        List&lt;Rewrite&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L49">        visit(expression, results, work);</span>
+<span class="fc" id="L50">        return results;</span>
     }
 
     private static void productRules(Product product, List&lt;Rewrite&gt; result) {
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (product.left() instanceof Identity) {</span>
-<span class="nc" id="L53">            result.add(new Rewrite(&quot;LEFT_IDENTITY&quot;, product.right()));</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (product.left() instanceof Identity) {</span>
+<span class="nc" id="L55">            result.add(new Rewrite(&quot;LEFT_IDENTITY&quot;, product.right()));</span>
         }
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (product.right() instanceof Identity) {</span>
-<span class="nc" id="L56">            result.add(new Rewrite(&quot;RIGHT_IDENTITY&quot;, product.left()));</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (product.right() instanceof Identity) {</span>
+<span class="nc" id="L58">            result.add(new Rewrite(&quot;RIGHT_IDENTITY&quot;, product.left()));</span>
         }
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (product.left() instanceof Product nested) {</span>
-<span class="nc" id="L59">            result.add(new Rewrite(&quot;ORDERED_ASSOCIATIVITY&quot;, new Product(nested.left(),</span>
-<span class="nc" id="L60">                new Product(nested.right(), product.right()))));</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (product.left() instanceof Product nested) {</span>
+<span class="fc" id="L61">            result.add(new Rewrite(&quot;ORDERED_ASSOCIATIVITY&quot;, new Product(nested.left(),</span>
+<span class="fc" id="L62">                new Product(nested.right(), product.right()))));</span>
         }
-<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (product.right() instanceof Sum sum) {</span>
-<span class="fc" id="L63">            result.add(new Rewrite(&quot;LEFT_DISTRIBUTIVITY&quot;, new Sum(</span>
-<span class="fc" id="L64">                new Product(product.left(), sum.left()), new Product(product.left(), sum.right()))));</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (product.right() instanceof Sum sum) {</span>
+<span class="fc" id="L65">            result.add(new Rewrite(&quot;LEFT_DISTRIBUTIVITY&quot;, new Sum(</span>
+<span class="fc" id="L66">                new Product(product.left(), sum.left()), new Product(product.left(), sum.right()))));</span>
         }
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (product.left() instanceof Sum sum) {</span>
-<span class="nc" id="L67">            result.add(new Rewrite(&quot;RIGHT_DISTRIBUTIVITY&quot;, new Sum(</span>
-<span class="nc" id="L68">                new Product(sum.left(), product.right()), new Product(sum.right(), product.right()))));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (product.left() instanceof Sum sum) {</span>
+<span class="fc" id="L69">            result.add(new Rewrite(&quot;RIGHT_DISTRIBUTIVITY&quot;, new Sum(</span>
+<span class="fc" id="L70">                new Product(sum.left(), product.right()), new Product(sum.right(), product.right()))));</span>
         }
-<span class="fc" id="L70">        cancellation(product.left(), product.right(), result);</span>
-<span class="fc" id="L71">        cancellation(product.right(), product.left(), result);</span>
-<span class="fc" id="L72">    }</span>
+<span class="fc" id="L72">        cancellation(product.left(), product.right(), result);</span>
+<span class="fc" id="L73">        cancellation(product.right(), product.left(), result);</span>
+<span class="fc" id="L74">    }</span>
 
     private static void cancellation(ExactMatrixExpression possibleInverse, ExactMatrixExpression other,
             List&lt;Rewrite&gt; result) {
-<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (possibleInverse instanceof Inverse inverse &amp;&amp; inverse.operand().equals(other)) {</span>
-<span class="fc" id="L77">            result.add(new Rewrite(&quot;VERIFIED_INVERSE_CANCELLATION&quot;, new Identity(inverse.witness().rows())));</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (possibleInverse instanceof Inverse inverse &amp;&amp; inverse.operand().equals(other)) {</span>
+<span class="fc" id="L79">            result.add(new Rewrite(&quot;VERIFIED_INVERSE_CANCELLATION&quot;, new Identity(inverse.witness().rows())));</span>
         }
-<span class="fc" id="L79">    }</span>
+<span class="fc" id="L81">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

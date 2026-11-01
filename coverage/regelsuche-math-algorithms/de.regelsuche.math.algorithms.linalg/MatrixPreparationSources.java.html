@@ -48,7 +48,7 @@ final class MatrixPreparationSources {
 <span class="fc" id="L48">        }</span>
 <span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!request.matrixExpression().isBlank()) {</span>
 <span class="fc" id="L50">            ExactMatrixExpression expression = operator(request.matrixExpression());</span>
-<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            if (request.profile() != MatrixPreparation.Profile.EXPERIMENTAL_OPERATOR_V1 &amp;&amp; containsInverse(expression)) {</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">            if (request.profile() != MatrixPreparation.Profile.EXPERIMENTAL_OPERATOR_V1 &amp;&amp; containsInverse(expression)) {</span>
 <span class="nc" id="L52">                throw new ExactMatrixAlgebra.Unsupported(&quot;INVERSE_REQUIRES_EXPERIMENTAL_PROFILE&quot;);</span>
             }
 <span class="fc" id="L54">            return fromMatrix(algebra.evaluate(expression), request.unknowns(), request.rightHandSide());</span>
@@ -126,7 +126,7 @@ final class MatrixPreparationSources {
 <span class="fc" id="L126">        experimental(accept);</span>
 <span class="fc bfc" id="L127" title="All 2 branches covered.">        for (Declared left : catalog.values()) {</span>
 <span class="fc" id="L128">            accept.accept(new Proposal(&quot;VISIBLE_CATALOG_MATRIX&quot;, left.matrix(), List.of(&quot;catalog: &quot; + left.matrix().name())));</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (left.matrix().value().rows() == left.matrix().value().columns()) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (left.matrix().value().rows() == left.matrix().value().columns()) {</span>
 <span class="fc" id="L130">                accept.accept(new Proposal(&quot;VISIBLE_IDENTITY_PLUS_OPERATOR&quot;,</span>
 <span class="fc" id="L131">                    new Sum(new Identity(left.matrix().value().rows()), left.matrix()),</span>
 <span class="fc" id="L132">                    List.of(&quot;catalog: &quot; + left.matrix().name())));</span>
@@ -243,7 +243,7 @@ final class MatrixPreparationSources {
     }
 
     private Optional&lt;Proposal&gt; blocks(SymbolicLinearSystem system, ExactLinearSystemBlockDecomposition decomposition) {
-<span class="pc bpc" id="L246" title="1 of 6 branches missed.">        if (decomposition.components().stream().anyMatch(c -&gt; c.sourceRowIndices().isEmpty() || c.sourceColumnIndices().isEmpty())) {</span>
+<span class="fc bfc" id="L246" title="All 6 branches covered.">        if (decomposition.components().stream().anyMatch(c -&gt; c.sourceRowIndices().isEmpty() || c.sourceColumnIndices().isEmpty())) {</span>
 <span class="fc" id="L247">            return Optional.empty();</span>
         }
 <span class="fc" id="L249">        List&lt;ExactMatrixExpression&gt; blocks = new ArrayList&lt;&gt;();</span>
