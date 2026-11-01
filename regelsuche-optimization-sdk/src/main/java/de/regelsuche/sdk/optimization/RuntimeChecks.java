@@ -13,27 +13,27 @@ final class RuntimeChecks {
 
     private RuntimeChecks() {}
     static Map<String,Object> checked(OptimizationRequest request, JointComputationPlan target, RuntimeObligations obligations, Map<String,?> inputs) {
-        for(var input:request.plan().inputs().entrySet()) input.getValue().requireValue(inputs.get(input.getKey()));
-        validateAssumptions(request,inputs);
-        if(obligations.requireFinite()) for(var value:inputs.values()) finite(value);
+        var captured=snapshot(request.plan(),inputs);
+        validateCapturedAssumptions(request,captured);
+        if(obligations.requireFinite()) for(var value:captured.values()) finite(value);
         boolean evaluateOriginal=request.safetyProfile()==SafetyProfile.CHECKED_THROW
             || obligations.checkIntegralRange() || obligations.requireFinite() || obligations.compareFloatingPointBits();
         // The prepared DAG is also the source of candidate operation costs. A
         // trace expands shared outputs and would execute that arithmetic again.
-        if(!evaluateOriginal) return ComputationOptimizer.prepare(target).execute(inputs);
-        var original=trace(request.plan(),obligations.originalTrace(),inputs,obligations);
-        var replacement=trace(target,obligations.replacementTrace(),inputs,obligations);
+        if(!evaluateOriginal) return ComputationOptimizer.prepare(target).execute(captured);
+        var original=trace(request.plan(),obligations.originalTrace(),captured,obligations);
+        var replacement=trace(target,obligations.replacementTrace(),captured,obligations);
         if(obligations.compareFloatingPointBits()) for(var name:original.keySet())
             if(!same(original.get(name),replacement.get(name))) throw new ArithmeticException("MATH_NUMERIC_DEVIATION");
         return replacement;
     }
     static Map<String,Object> trace(JointComputationPlan plan,SourceEvaluationTrace trace,Map<String,?> inputs,RuntimeObligations obligations) {
         var backend=new JavaNumericBackend(plan.inputs());
-        for(var entry:plan.inputs().entrySet()) entry.getValue().requireValue(inputs.get(entry.getKey()));
+        var captured=snapshot(plan,inputs);
         var values=new HashMap<Expr,Object>();
         for(var occurrence:trace.occurrences()) {
             Expr expression=occurrence.expression();
-            var args=JavaExpressions.operands(expression).stream().map(e -> value(e,values,inputs)).toList();
+            var args=JavaExpressions.operands(expression).stream().map(e -> value(e,values,captured)).toList();
             if(obligations.checkIntegralRange()) range(expression,args);
             Object value=backend.apply(backend.operation(expression),args);
             if(obligations.requireFinite()) finite(value);
@@ -41,7 +41,7 @@ final class RuntimeChecks {
         }
         var outputs=new LinkedHashMap<String,Object>(); var expressions=plan.outputExpressions();
         for(int i=0;i<expressions.size();i++) {
-            Object value=value(expressions.get(i),values,inputs);
+            Object value=value(expressions.get(i),values,captured);
             if(obligations.requireFinite()) finite(value);
             outputs.put(plan.outputs().get(i).name(),value);
         }
@@ -92,14 +92,25 @@ final class RuntimeChecks {
         return Objects.equals(left,right);
     }
     static void validateAssumptions(OptimizationRequest request,Map<String,?> inputs) {
-        // Guard every receiver before any assumption may invoke a virtual BigInteger method.
-        for(var input:request.plan().inputs().entrySet()) if(input.getValue().equals(NumericKind.BIG_INTEGER.type())) {
-            Object value=inputs.get(input.getKey());
-            if(value==null || value.getClass()!=BigInteger.class) throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_VIOLATED");
+        validateCapturedAssumptions(request,snapshot(request.plan(),inputs));
+    }
+    /** Read only declared bindings once; caller maps may change or enumerate arbitrarily many entries. */
+    static Map<String,Object> snapshot(JointComputationPlan plan,Map<String,?> inputs) {
+        var captured=new LinkedHashMap<String,Object>();
+        for(var input:plan.inputs().entrySet()) {
+            Object value=inputs.get(input.getKey()); input.getValue().requireValue(value);
+            captured.put(input.getKey(),value);
         }
+        new JavaNumericBackend(plan.inputs()).validateInputs(captured);
+        return Collections.unmodifiableMap(captured);
+    }
+    private static void validateCapturedAssumptions(OptimizationRequest request,Map<String,Object> inputs) {
         for(var assumption:request.assumptions()) {
             Object supplied=inputs.get(assumption.subject());
             switch(assumption.kind()) {
+                // A caller's conditional proof premise is not an observed runtime success.
+                // Guarded evaluation selects the original captured source and its exceptions.
+                case SUCCESSFUL_MODULAR_INVERSE -> throw new AssumptionGuardFailure("SUCCESSFUL_INVERSE_RUNTIME_OBSERVATION_REQUIRED");
                 case BIG_INTEGER_VALUE_SEMANTICS -> {
                     if(supplied==null || supplied.getClass()!=BigInteger.class) throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_VIOLATED");
                 }

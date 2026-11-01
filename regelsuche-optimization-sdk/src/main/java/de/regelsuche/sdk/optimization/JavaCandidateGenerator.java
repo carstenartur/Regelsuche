@@ -8,7 +8,7 @@ import java.util.*;
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
     // Signed-additive proposals now come exclusively from the shared core rule inventory.
-    static final String REVISION = "java-core-algebra-proposals/v12-value-arithmetic";
+    static final String REVISION = "java-core-algebra-proposals/v13-filtered-value-arithmetic";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;

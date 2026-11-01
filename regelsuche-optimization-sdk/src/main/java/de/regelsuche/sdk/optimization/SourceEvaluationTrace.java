@@ -2,6 +2,7 @@ package de.regelsuche.sdk.optimization;
 
 import de.regelsuche.ast.*;
 import de.regelsuche.search.program.JointComputationPlan;
+import de.regelsuche.search.program.PreparedJointComputation;
 import java.util.*;
 
 /** Ordered operation occurrences, including duplicates and eliminated/dead computations. */
@@ -15,6 +16,18 @@ public record SourceEvaluationTrace(List<Occurrence> occurrences) {
         }
     }
     public SourceEvaluationTrace { occurrences = List.copyOf(occurrences); }
+    /** Actual replacement schedule: one occurrence per prepared DAG operation.
+     * This does not reconstruct or replace the adapter's original source occurrences.
+     */
+    public static SourceEvaluationTrace fromPrepared(PreparedJointComputation prepared) {
+        if(prepared.nodes().size()>JointComputationPlan.MAX_NODES) throw new IllegalArgumentException("TRACE_STRUCTURAL_BOUND");
+        var result=new ArrayList<Occurrence>();
+        for(var node:prepared.nodes()) if(node.operation()!=null && !JavaExpressions.isLiteral(node.expression())) {
+            var kind=NumericKind.fromType(node.type());
+            result.add(new Occurrence("prepared-operation-"+result.size(),node.expression(),kind,kind));
+        }
+        return new SourceEvaluationTrace(result);
+    }
     /** For synthetic expression plans only. Source adapters must supply the actual statement trace. */
     public static SourceEvaluationTrace fromPlan(JointComputationPlan plan) {
         var result = new ArrayList<Occurrence>();

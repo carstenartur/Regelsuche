@@ -6,18 +6,18 @@ import java.util.*;
 /** Proposals over a joint pair of bilinear expressions. PolynomialProof owns acceptance. */
 final class BilinearCandidates {
     private final VerificationWork work;
+    private record Eligible(int index,Expr expression,Expr modulus) { }
     BilinearCandidates(VerificationWork work) { this.work=work; }
     List<List<Expr>> generate(List<Expr> outputs,int maximum) {
         var proposals=new ArrayList<List<Expr>>();
-        for(int i=0;i<outputs.size() && proposals.size()<maximum;i++) for(int j=0;j<outputs.size() && proposals.size()<maximum;j++) {
-            work.charge(1); if(i==j) continue;
-            Expr left=outputs.get(i), right=outputs.get(j), modulus=null;
-            if(op(left)==NumericOperation.MOD && op(right)==NumericOperation.MOD) {
-                if(!args(left).get(1).equals(args(right).get(1))) continue;
-                modulus=args(left).get(1); left=args(left).getFirst(); right=args(right).getFirst();
-            }
-            if(op(left)!=NumericOperation.SUBTRACT || op(right)!=NumericOperation.ADD
-                    || JavaExpressions.resultKind(left)!=NumericKind.BIG_INTEGER || JavaExpressions.resultKind(right)!=NumericKind.BIG_INTEGER) continue;
+        if(maximum<=0) return List.of();
+        var subtractions=new ArrayList<Eligible>(); var additions=new ArrayList<Eligible>();
+        collectEligible(outputs,subtractions,additions);
+        for(var subtraction:subtractions) for(var addition:additions) {
+            if(proposals.size()>=maximum) return List.copyOf(proposals);
+            work.charge(1);
+            if(!Objects.equals(subtraction.modulus(),addition.modulus())) continue;
+            Expr left=subtraction.expression(),right=addition.expression(),modulus=subtraction.modulus();
             Expr p=args(left).getFirst(), q=args(left).get(1);
             if(op(p)!=NumericOperation.MULTIPLY || op(q)!=NumericOperation.MULTIPLY) continue;
             for(int first=0;first<2;first++) for(int second=0;second<2;second++) {
@@ -27,13 +27,28 @@ final class BilinearCandidates {
                         && !(product(args(right).get(1),a,d) && product(args(right).getFirst(),b,c))) continue;
                 Expr shared=operation(NumericOperation.MULTIPLY,operation(NumericOperation.ADD,a,b),operation(NumericOperation.ADD,c,d));
                 Expr imaginary=operation(NumericOperation.SUBTRACT,operation(NumericOperation.SUBTRACT,shared,p),q);
+                work.charge(2L*outputs.size());
                 var changed=new ArrayList<>(outputs);
-                changed.set(j,modulus==null?imaginary:operation(NumericOperation.MOD,imaginary,modulus));
+                changed.set(addition.index(),modulus==null?imaginary:operation(NumericOperation.MOD,imaginary,modulus));
                 proposals.add(List.copyOf(changed));
                 break;
             }
         }
         return List.copyOf(proposals.subList(0,Math.min(maximum,proposals.size())));
+    }
+    private void collectEligible(List<Expr> outputs,List<Eligible> subtractions,List<Eligible> additions) {
+        for(int index=0;index<outputs.size();index++) {
+            work.charge(1);
+            Expr expression=outputs.get(index),modulus=null;
+            if(op(expression)==NumericOperation.MOD) {
+                modulus=args(expression).get(1); expression=args(expression).getFirst();
+            }
+            var operation=op(expression);
+            if((operation!=NumericOperation.SUBTRACT && operation!=NumericOperation.ADD)
+                    || JavaExpressions.resultKind(expression)!=NumericKind.BIG_INTEGER) continue;
+            if(op(args(expression).getFirst())!=NumericOperation.MULTIPLY || op(args(expression).get(1))!=NumericOperation.MULTIPLY) continue;
+            (operation==NumericOperation.SUBTRACT?subtractions:additions).add(new Eligible(index,expression,modulus));
+        }
     }
     private static boolean product(Expr expression,Expr a,Expr b) {
         if(op(expression)!=NumericOperation.MULTIPLY) return false;
