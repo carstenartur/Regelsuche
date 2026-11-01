@@ -21,7 +21,7 @@ final class OrderedMatrixChain {
     /** The caller validates the complete original expression before entering. */
     static Optional&lt;ExactMatrixExpression&gt; propose(ExactMatrixExpression source,
             ExactMatrixAlgebra algebra, ExactMatrixAlgebra.Work work) {
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (!(source instanceof Product)) return Optional.empty();</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (!(source instanceof Product)) return Optional.empty();</span>
 <span class="fc" id="L25">        List&lt;ExactMatrixExpression&gt; factors = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L26">        List&lt;Shape&gt; shapes = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L27">        Shape original = collect(source, factors, shapes, algebra, work);</span>
