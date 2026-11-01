@@ -1,0 +1,204 @@
+{
+  "schema": "regelsuche.release-preparation/v1",
+  "prepared_on": "2026-10-31",
+  "release_version": "0.5.1",
+  "development_version": "0.5.1-SNAPSHOT",
+  "next_development_version": "0.5.2-SNAPSHOT",
+  "previous_release": "v0.5.0",
+  "previous_release_published_at": "2026-10-25T06:12:56Z",
+  "previous_release_commit": "f4d12bc698f2fa92e37ac018957cc125e74289f8",
+  "merge_base": "b8ae3f3fb6b595e8b2cdb0c5aa71f3ff5a7a4f26",
+  "source_commit": "f7c7c36c99002ec93818775660de616af848e058",
+  "source_tree": "4deea321c5fe2ae6441357f3c1d6c8ac8bdf3aa0",
+  "source_ci": {
+    "run_id": 41226365889,
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/41226365889",
+    "head_sha": "f7c7c36c99002ec93818775660de616af848e058",
+    "conclusion": "success",
+    "successful_jobs": 9,
+    "skipped_optional_jmh_precision_jobs": 4
+  },
+  "metadata_check": {
+    "command": "python3 .github/scripts/update-release-metadata.py 0.5.1-SNAPSHOT --check",
+    "result": "passed",
+    "maven_poms_checked": 30,
+    "openapi_checked": true,
+    "scope": "Fetched authoritative metadata at source_commit; no Java build executed locally"
+  },
+  "included_pull_requests": [
+    1114,
+    1115,
+    1117,
+    1119,
+    1120,
+    1121,
+    1122,
+    1123,
+    1124,
+    1125,
+    1126,
+    1118,
+    1116,
+    1127,
+    1128
+  ],
+  "excluded_open_pull_requests": [
+    1095
+  ],
+  "completed_issue_claims": [],
+  "release_gate_status": {
+    "preparation_pr_ci": "not_yet_observed_at_manifest_creation",
+    "semantic_touched_issue_audit": "completed for bound preparation scope; no qualifying completed-issue candidates; refresh at frozen publication candidate",
+    "release_dry_run": "not_started; authoritative main requires merged versioned notes",
+    "release_artifacts": "not_built_for_this_preparation",
+    "github_release": "not_published",
+    "zenodo": "not_verified_or_published"
+  },
+  "expected_assets": [
+    "regelsuche-0.5.1.jar",
+    "regelsuche-0.5.1.zip",
+    "regelsuche-0.5.1.tar",
+    "regelsuche-sdk-0.5.1.zip",
+    "RELEASE-MANIFEST.txt",
+    "SHA256SUMS.txt"
+  ],
+  "publication_authorized": false,
+  "semantic_audit": {
+    "checked_on": "2026-10-31",
+    "scope": "All 15 included merged PR bodies/merge metadata and complete comparison commit messages; named research parents read live; no completed-issue claim is made",
+    "included_prs": [
+      {
+        "number": 1114,
+        "merge_commit": "ca67c0133898e10c21fec9ce5493bdc2b2a4a546",
+        "merged_at": "2026-10-27T05:45:13Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1115,
+        "merge_commit": "38b804a36fb5321ed7ba184ba9805048748a838f",
+        "merged_at": "2026-10-27T08:07:06Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1117,
+        "merge_commit": "1f53cc311dfcc75cc0d31819e9d2fa3c3f929588",
+        "merged_at": "2026-10-29T11:58:19Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1119,
+        "merge_commit": "e3575455e207959d296b8264d793f3a8bfd73f2a",
+        "merged_at": "2026-10-30T04:50:32Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1120,
+        "merge_commit": "687b7cccdb82cae715fc1ca68e5ac1f4593b5da1",
+        "merged_at": "2026-10-30T08:14:30Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1121,
+        "merge_commit": "525565034cfbb3a606eff15d105411e36644336f",
+        "merged_at": "2026-10-30T08:50:10Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1122,
+        "merge_commit": "3de90b5f8dcdb7275ac0e27abe8bbb61c07bfdcf",
+        "merged_at": "2026-10-30T12:40:15Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1123,
+        "merge_commit": "459293be659a4adf3fd30f5e9576c934ea00ca21",
+        "merged_at": "2026-10-30T15:50:28Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1124,
+        "merge_commit": "7cb836ec3b7ec1f326949ab8b78f2ce3979d572f",
+        "merged_at": "2026-10-30T18:19:02Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1125,
+        "merge_commit": "ea5e7da3e199c2e052133317f089ab5c2da8e5be",
+        "merged_at": "2026-10-30T22:05:15Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1126,
+        "merge_commit": "600239fc9e93dd94143f3240ecd91324b89a06ce",
+        "merged_at": "2026-10-31T04:52:43Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1118,
+        "merge_commit": "468e918686ef4a6c6829c63821b1c6dfbb006c1f",
+        "merged_at": "2026-10-31T04:53:08Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1116,
+        "merge_commit": "2dbf8e4a11e2aabc78e5d5c51c10cfe23d8a86a3",
+        "merged_at": "2026-10-31T04:53:31Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1127,
+        "merge_commit": "101e504a82375a74882c3a92a8cf9adf0d89069a",
+        "merged_at": "2026-10-31T14:49:03Z",
+        "completed_issue_claim": false
+      },
+      {
+        "number": 1128,
+        "merge_commit": "f7c7c36c99002ec93818775660de616af848e058",
+        "merged_at": "2026-10-31T17:49:09Z",
+        "completed_issue_claim": false
+      }
+    ],
+    "repository_issue_closing_references_found": [],
+    "research_parent_issues": [
+      {
+        "number": 696,
+        "state": "open",
+        "title": "P0 search scaling: indexed applicability, lazy learned moves and reusable search knowledge",
+        "disposition": "open; broader acceptance not claimed"
+      },
+      {
+        "number": 730,
+        "state": "open",
+        "title": "P0 evaluation: quantify SymPy rule amplification through preparation planning",
+        "disposition": "open; broader acceptance not claimed"
+      },
+      {
+        "number": 1026,
+        "state": "open",
+        "title": "P1 learn reusable arithmetic DAG pattern and transfer to held-out program shapes",
+        "disposition": "open; broader acceptance not claimed"
+      },
+      {
+        "number": 533,
+        "state": "open",
+        "title": "P0 irreversible boundary: freeze flagship corpus, thresholds and implementation envelope",
+        "disposition": "open; broader acceptance not claimed"
+      },
+      {
+        "number": 235,
+        "state": "open",
+        "title": "Benchmark: Complete information-parity baselines and discovery ablations",
+        "disposition": "open; broader acceptance not claimed"
+      },
+      {
+        "number": 220,
+        "state": "open",
+        "title": "Learning: Complete evolutionary populations, nested splits and final TEST evaluation",
+        "disposition": "open; broader acceptance not claimed"
+      }
+    ],
+    "external_refs": "Sandbox PRs1769/1768 and upstream dependency issues are provenance/context, not completed Regelsuche issues",
+    "completed_issue_candidates": [],
+    "refresh_required_at_final_candidate": true
+  }
+}
