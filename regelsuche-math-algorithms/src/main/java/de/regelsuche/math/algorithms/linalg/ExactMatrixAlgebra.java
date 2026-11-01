@@ -36,6 +36,9 @@ public final class ExactMatrixAlgebra {
         enter(depth);
         PolynomialMatrix cached = values.get(expression);
         if (cached != null) {
+            // Cached values are context-free; the depth of this occurrence is not.
+            // Walk descendants without the value cache, on the same work ledger.
+            checkDescendantDepth(expression, depth);
             return cached;
         }
         PolynomialMatrix value = switch (expression) {
@@ -51,6 +54,31 @@ public final class ExactMatrixAlgebra {
         };
         values.put(expression, value);
         return value;
+    }
+
+    private void checkDepth(ExactMatrixExpression expression, int depth) {
+        enter(depth);
+        checkDescendantDepth(expression, depth);
+    }
+
+    private void checkDescendantDepth(ExactMatrixExpression expression, int depth) {
+        switch (expression) {
+            case ExactMatrixExpression.Matrix ignored -> { }
+            case ExactMatrixExpression.Identity ignored -> { }
+            case ExactMatrixExpression.Product product -> {
+                checkDepth(product.left(), depth + 1);
+                checkDepth(product.right(), depth + 1);
+            }
+            case ExactMatrixExpression.Sum sum -> {
+                checkDepth(sum.left(), depth + 1);
+                checkDepth(sum.right(), depth + 1);
+            }
+            case ExactMatrixExpression.Inverse inverse -> checkDepth(inverse.operand(), depth + 1);
+            case ExactMatrixExpression.BlockDiagonal block -> {
+                for (ExactMatrixExpression child : block.blocks()) checkDepth(child, depth + 1);
+            }
+            case ExactMatrixExpression.Mapped mapped -> checkDepth(mapped.expression(), depth + 1);
+        }
     }
 
     private PolynomialMatrix inverse(ExactMatrixExpression.Inverse inverse, int depth) {
