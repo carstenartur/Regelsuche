@@ -148,13 +148,8 @@ final class JavaCandidateGenerator {
                                            List<Expr> arguments, Expr left, Expr right, boolean lowWordMasks) {
         Expr product = simplifyProductOrQuotient(op, kind, left, right);
         if (product != null) return product;
-        if (op == NumericOperation.REMAINDER && (kind == NumericKind.INT || kind == NumericKind.LONG)
-                && JavaExpressions.isLiteral(right) && new EstablishedNumericFacts(request,work).nonnegative(left)) {
-            BigInteger divisor = SemanticChecker.integer(JavaExpressions.literalValue(right));
-            if (divisor.signum() > 0 && divisor.bitCount() == 1)
-                return JavaExpressions.operation(kind, NumericOperation.AND, left,
-                    kind == NumericKind.INT ? JavaExpressions.literal(divisor.intValue()-1) : JavaExpressions.literal(divisor.longValue()-1));
-        }
+        Expr remainder = simplifyNonnegativeRemainder(op, kind, left, right);
+        if (remainder != null) return remainder;
         if ((op == NumericOperation.XOR || op == NumericOperation.OR) && number(right, 0)) return left;
         if (op == NumericOperation.XOR && left.equals(right)) return constant(kind, 0);
         if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
@@ -171,6 +166,16 @@ final class JavaCandidateGenerator {
             if (!bitwise.equals(result)) return bitwise;
         }
         return foldConstant(result, op, kind, arguments);
+    }
+    private Expr simplifyNonnegativeRemainder(NumericOperation op, NumericKind kind, Expr left, Expr right) {
+        if (op == NumericOperation.REMAINDER && (kind == NumericKind.INT || kind == NumericKind.LONG)
+                && JavaExpressions.isLiteral(right) && new EstablishedNumericFacts(request,work).nonnegative(left)) {
+            BigInteger divisor = SemanticChecker.integer(JavaExpressions.literalValue(right));
+            if (divisor.signum() > 0 && divisor.bitCount() == 1)
+                return JavaExpressions.operation(kind, NumericOperation.AND, left,
+                    kind == NumericKind.INT ? JavaExpressions.literal(divisor.intValue()-1) : JavaExpressions.literal(divisor.longValue()-1));
+        }
+        return null;
     }
     /** Null means that neither a product identity nor a quotient cancellation applies. */
     private static Expr simplifyProductOrQuotient(NumericOperation op, NumericKind kind, Expr left, Expr right) {

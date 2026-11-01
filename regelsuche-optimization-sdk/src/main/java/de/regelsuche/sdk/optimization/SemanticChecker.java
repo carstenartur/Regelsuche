@@ -209,6 +209,12 @@ final class SemanticChecker {
             a = normalizedA;
             b = normalizedB;
         }
+        if (polynomialOrQuotientEquivalent(a, b, kind, exact, methods)) return true;
+        if (kind==NumericKind.BIG_INTEGER && bigIntegerModularEquivalent(a, b, methods)) return true;
+        if (kind.integral() && new BitwiseProof(work).equivalent(a,b,kind)) { methods.add("BITVECTOR_TRUTH_TABLE"); return true; }
+        return false;
+    }
+    private boolean polynomialOrQuotientEquivalent(Expr a, Expr b, NumericKind kind, boolean exact, Set<String> methods) {
         try {
             if (new PolynomialProof(kind,exact,false,work).equivalent(a,b)) {
                 methods.add(kind==NumericKind.BIG_INTEGER ? "INTEGER_POLYNOMIAL_NORMAL_FORM" : exact ? "INTEGER_NORMAL_FORM_WITH_BOTH_TRACE_RANGE_GATE" : "BITVECTOR_POLYNOMIAL_MOD_2_"+kind.bits());
@@ -221,34 +227,38 @@ final class SemanticChecker {
                 return true;
             }
         } catch (PolynomialProof.OutsideFragment bounded) { /* Divisibility was not established within the proof bounds. */ }
-        if (kind==NumericKind.BIG_INTEGER) {
-            if (new ModularInverseProof(request, work).equivalent(a,b)) {
-                methods.add("RETAINED_MODULAR_UNIT_INVERSE_IDENTITY"); return true;
-            }
-            if (JavaExpressions.operationOf(a).orElse(null) == NumericOperation.MOD
-                    && JavaExpressions.operationOf(b).orElse(null) == NumericOperation.MOD) {
-                var aa = JavaExpressions.operands(a); var bb = JavaExpressions.operands(b);
-                if (aa.get(1).equals(bb.get(1)) && positive(aa.get(1))) try {
-                    if (new PolynomialProof(aa.get(1), work).equivalent(aa.getFirst(), bb.getFirst())) {
-                        methods.add("SAME_MODULUS_POLYNOMIAL_NORMAL_FORM"); return true;
-                    }
-                    if(successfulInverse.inverse()!=null && new PolynomialProof(aa.get(1),work)
-                            .equivalentAssumingInverse(aa.getFirst(),bb.getFirst(),successfulInverse.inverse())) {
-                        methods.add("CONDITIONAL_SUCCESSFUL_MODULAR_INVERSE"); return true;
-                    }
-                } catch (PolynomialProof.OutsideFragment bounded) { /* Bounded unknown, never a proof. */ }
-            }
-            // This is an exact typed expansion, not equality modulo an unspecified modulus.
-            // Both traces and every intermediate range have already been checked by the caller.
-            if (expandModularProduct(a).equals(expandModularProduct(b))) {
-                methods.add("TYPED_MODULAR_PRODUCT_EXPANSION"); return true;
-            }
-            try {
-                var proof = new ModularBridge(request.assumptions()).verify(a,b); work.chargeCompleted(proof.work());
-                if (proof.accepted()) { methods.add("AFFINE_MODULAR_NORMAL_FORM"); return true; }
-            } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }
+        return false;
+    }
+    private boolean bigIntegerModularEquivalent(Expr a, Expr b, Set<String> methods) {
+        if (new ModularInverseProof(request, work).equivalent(a,b)) {
+            methods.add("RETAINED_MODULAR_UNIT_INVERSE_IDENTITY"); return true;
         }
-        if (kind.integral() && new BitwiseProof(work).equivalent(a,b,kind)) { methods.add("BITVECTOR_TRUTH_TABLE"); return true; }
+        if (sameModulusEquivalent(a, b, methods)) return true;
+        // This is an exact typed expansion, not equality modulo an unspecified modulus.
+        // Both traces and every intermediate range have already been checked by the caller.
+        if (expandModularProduct(a).equals(expandModularProduct(b))) {
+            methods.add("TYPED_MODULAR_PRODUCT_EXPANSION"); return true;
+        }
+        try {
+            var proof = new ModularBridge(request.assumptions()).verify(a,b); work.chargeCompleted(proof.work());
+            if (proof.accepted()) { methods.add("AFFINE_MODULAR_NORMAL_FORM"); return true; }
+        } catch (IllegalArgumentException outsideModular) { /* Different exact fragments are not interchangeable. */ }
+        return false;
+    }
+    private boolean sameModulusEquivalent(Expr a, Expr b, Set<String> methods) {
+        if (JavaExpressions.operationOf(a).orElse(null) == NumericOperation.MOD
+                && JavaExpressions.operationOf(b).orElse(null) == NumericOperation.MOD) {
+            var aa = JavaExpressions.operands(a); var bb = JavaExpressions.operands(b);
+            if (aa.get(1).equals(bb.get(1)) && positive(aa.get(1))) try {
+                if (new PolynomialProof(aa.get(1), work).equivalent(aa.getFirst(), bb.getFirst())) {
+                    methods.add("SAME_MODULUS_POLYNOMIAL_NORMAL_FORM"); return true;
+                }
+                if(successfulInverse.inverse()!=null && new PolynomialProof(aa.get(1),work)
+                        .equivalentAssumingInverse(aa.getFirst(),bb.getFirst(),successfulInverse.inverse())) {
+                    methods.add("CONDITIONAL_SUCCESSFUL_MODULAR_INVERSE"); return true;
+                }
+            } catch (PolynomialProof.OutsideFragment bounded) { /* Bounded unknown, never a proof. */ }
+        }
         return false;
     }
     private static boolean booleanRoot(Expr expression) {
@@ -342,7 +352,10 @@ final class SemanticChecker {
             if (!facts.nonzero(args.get(1)))
                 throw new IllegalArgumentException("POSSIBLE_DIVISION_EXCEPTION");
         }
-        if (kind==NumericKind.BIG_INTEGER) switch(op.get()) {
+        if (kind==NumericKind.BIG_INTEGER) requireBigIntegerTotal(expression,op.get(),args);
+    }
+    private void requireBigIntegerTotal(Expr expression, NumericOperation op, List<Expr> args) {
+        switch(op) {
             case MOD -> { if (!positive(args.get(1))) throw new IllegalArgumentException("POSITIVE_MODULUS_REQUIRED"); }
             case MOD_INVERSE -> {
                 if (!positive(args.get(1))) throw new IllegalArgumentException("POSITIVE_MODULUS_REQUIRED");
@@ -356,13 +369,14 @@ final class SemanticChecker {
                 } catch (NoSuchElementException malformed) { throw new IllegalArgumentException("MODULAR_FRAGMENT_REQUIRED",malformed); }
             }
             case MOD_MULTIPLY -> { if (!positive(args.get(2))) throw new IllegalArgumentException("POSITIVE_MODULUS_REQUIRED"); }
-            case POW -> {
-                if (!(JavaExpressions.isLiteral(args.get(1)) && integer(JavaExpressions.literalValue(args.get(1))).signum()>=0)
-                        && !(args.get(1) instanceof VariableExpr v && (has(SemanticAssumption.Kind.NON_NEGATIVE,v.name()) || has(SemanticAssumption.Kind.POSITIVE,v.name()))))
-                    throw new IllegalArgumentException("NONNEGATIVE_EXPONENT_REQUIRED");
-            }
+            case POW -> requireNonnegativeExponent(args.get(1));
             default -> { }
         }
+    }
+    private void requireNonnegativeExponent(Expr exponent) {
+        if (!(JavaExpressions.isLiteral(exponent) && integer(JavaExpressions.literalValue(exponent)).signum()>=0)
+                && !(exponent instanceof VariableExpr v && (has(SemanticAssumption.Kind.NON_NEGATIVE,v.name()) || has(SemanticAssumption.Kind.POSITIVE,v.name()))))
+            throw new IllegalArgumentException("NONNEGATIVE_EXPONENT_REQUIRED");
     }
     static BigInteger integer(Object value) {
         if (value instanceof BigInteger b) return b;
