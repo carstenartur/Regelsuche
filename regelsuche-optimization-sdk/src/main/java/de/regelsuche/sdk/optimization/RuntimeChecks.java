@@ -92,6 +92,11 @@ final class RuntimeChecks {
         return Objects.equals(left,right);
     }
     static void validateAssumptions(OptimizationRequest request,Map<String,?> inputs) {
+        // Guard every receiver before any assumption may invoke a virtual BigInteger method.
+        for(var input:request.plan().inputs().entrySet()) if(input.getValue().equals(NumericKind.BIG_INTEGER.type())) {
+            Object value=inputs.get(input.getKey());
+            if(value==null || value.getClass()!=BigInteger.class) throw new IllegalArgumentException("BIG_INTEGER_VALUE_CONTRACT_VIOLATED");
+        }
         for(var assumption:request.assumptions()) {
             Object supplied=inputs.get(assumption.subject());
             switch(assumption.kind()) {
@@ -113,6 +118,11 @@ final class RuntimeChecks {
                 case NORMALIZED_MODULAR_INPUT -> {
                     var value=SemanticChecker.integer(supplied); var modulus=SemanticChecker.integer(inputs.get(assumption.parameter()));
                     if(modulus.signum()<=0 || value.signum()<0 || value.compareTo(modulus)>=0) throw new AssumptionGuardFailure("NORMALIZATION_ASSUMPTION_VIOLATED");
+                }
+                case MODULAR_UNIT_INPUT -> {
+                    var value=SemanticChecker.integer(supplied); var modulus=SemanticChecker.integer(inputs.get(assumption.parameter()));
+                    if(modulus.signum()<=0 || !value.gcd(modulus).equals(BigInteger.ONE))
+                        throw new AssumptionGuardFailure("MODULAR_UNIT_ASSUMPTION_VIOLATED");
                 }
                 default -> { }
             }

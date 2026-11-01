@@ -74,6 +74,7 @@ public final class NumericExecutionCost {
             case DIVIDE, REMAINDER, MOD -> a * b + a;
             case MOD_MULTIPLY -> a * b + words(bits[node.arguments().getFirst()] + bits[node.arguments().get(1)]) * modulus;
             case MOD_POW -> 32 + 2 * Math.max(1, bits[node.arguments().get(1)]) * modulus * modulus;
+            case MOD_INVERSE -> 32 + Math.max(a,b) * Math.max(a,b) * 2;
             case POW -> Math.max(1, bits[index]) * Math.max(a, words(bits[index]));
             default -> Math.max(words(bits[index]), Math.max(a, b));
         };
@@ -93,7 +94,7 @@ public final class NumericExecutionCost {
             case ADD, SUBTRACT, AND, OR, XOR -> Math.max(a, b) + 1;
             case MULTIPLY -> a + b;
             case REMAINDER -> Math.min(a, b);
-            case MOD -> b;
+            case MOD, MOD_INVERSE -> b;
             case MOD_MULTIPLY, MOD_POW -> args[2];
             case POW -> JavaExpressions.isLiteral(operands.get(1))
                     ? Math.multiplyExact(a, Math.max(1, SemanticChecker.integer(JavaExpressions.literalValue(operands.get(1))).longValueExact())) : -1;

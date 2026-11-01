@@ -8,7 +8,7 @@ import java.util.*;
 /** Independent checker. No candidate generator, rewrite name, hash or sampled success is a proof. */
 final class SemanticChecker {
     // Opaque Boolean proofs precede context normalization and typed bit projection.
-    static final String REVISION = "java-numeric-independent/v12";
+    static final String REVISION = "java-numeric-independent/v13-value-arithmetic";
     record Proof(boolean accepted, List<String> methods, long work) { Proof { methods = List.copyOf(methods); } }
     private final OptimizationRequest request;
     private final VerificationWork work;
@@ -98,6 +98,11 @@ final class SemanticChecker {
             if (assumption.kind() == SemanticAssumption.Kind.NORMALIZED_MODULAR_INPUT &&
                     (!plan.inputs().containsKey(assumption.parameter()) || !has(SemanticAssumption.Kind.POSITIVE, assumption.parameter())))
                 throw new IllegalArgumentException("NORMALIZATION_REQUIRES_POSITIVE_MODULUS");
+            if (assumption.kind() == SemanticAssumption.Kind.MODULAR_UNIT_INPUT &&
+                    (!NumericKind.BIG_INTEGER.type().equals(plan.inputs().get(assumption.subject()))
+                    || !NumericKind.BIG_INTEGER.type().equals(plan.inputs().get(assumption.parameter()))
+                    || !has(SemanticAssumption.Kind.POSITIVE, assumption.parameter())))
+                throw new IllegalArgumentException("MODULAR_UNIT_REQUIRES_BIG_INTEGER_AND_POSITIVE_MODULUS");
         }
     }
     Proof check(JointComputationPlan source, JointComputationPlan target) {
@@ -173,6 +178,9 @@ final class SemanticChecker {
     private boolean integralEquivalent(Expr a, Expr b, NumericKind kind, Set<String> methods) {
         boolean exact = kind==NumericKind.BIG_INTEGER || request.safetyProfile()!=SafetyProfile.PRESERVE_JAVA;
         if (kind == NumericKind.INT || kind == NumericKind.LONG) {
+            if (new NonnegativeRemainderProof(facts, work).equivalent(a, b, kind)) {
+                methods.add("NONNEGATIVE_POWER_OF_TWO_REMAINDER"); return true;
+            }
             if (new LowWordProof(work).equivalent(a, b, kind)) {
                 methods.add("LOW_WORD_POLYNOMIAL_CONGRUENCE"); return true;
             }
@@ -195,6 +203,18 @@ final class SemanticChecker {
             }
         } catch (PolynomialProof.OutsideFragment bounded) { /* Divisibility was not established within the proof bounds. */ }
         if (kind==NumericKind.BIG_INTEGER) {
+            if (new ModularInverseProof(request, work).equivalent(a,b)) {
+                methods.add("RETAINED_MODULAR_UNIT_INVERSE_IDENTITY"); return true;
+            }
+            if (JavaExpressions.operationOf(a).orElse(null) == NumericOperation.MOD
+                    && JavaExpressions.operationOf(b).orElse(null) == NumericOperation.MOD) {
+                var aa = JavaExpressions.operands(a); var bb = JavaExpressions.operands(b);
+                if (aa.get(1).equals(bb.get(1)) && positive(aa.get(1))) try {
+                    if (new PolynomialProof(aa.get(1), work).equivalent(aa.getFirst(), bb.getFirst())) {
+                        methods.add("SAME_MODULUS_POLYNOMIAL_NORMAL_FORM"); return true;
+                    }
+                } catch (PolynomialProof.OutsideFragment bounded) { /* Bounded unknown, never a proof. */ }
+            }
             // This is an exact typed expansion, not equality modulo an unspecified modulus.
             // Both traces and every intermediate range have already been checked by the caller.
             if (expandModularProduct(a).equals(expandModularProduct(b))) {
@@ -301,6 +321,11 @@ final class SemanticChecker {
         }
         if (kind==NumericKind.BIG_INTEGER) switch(op.get()) {
             case MOD -> { if (!positive(args.get(1))) throw new IllegalArgumentException("POSITIVE_MODULUS_REQUIRED"); }
+            case MOD_INVERSE -> {
+                if (!positive(args.get(1))) throw new IllegalArgumentException("POSITIVE_MODULUS_REQUIRED");
+                if (!new ModularUnitFacts(request,work).unit(args.getFirst(),args.get(1)))
+                    throw new IllegalArgumentException("MODULAR_UNIT_AND_SUCCESSFUL_INVERSE_REQUIRED");
+            }
             case MOD_POW -> {
                 try {
                     var proof = new ModularBridge(request.assumptions()).verify(expression,expression); work.chargeCompleted(proof.work());

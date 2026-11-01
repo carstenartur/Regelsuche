@@ -8,7 +8,7 @@ import java.util.*;
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
     // Signed-additive proposals now come exclusively from the shared core rule inventory.
-    static final String REVISION = "java-core-algebra-proposals/v11-masked-arithmetic";
+    static final String REVISION = "java-core-algebra-proposals/v12-value-arithmetic";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -33,6 +33,8 @@ final class JavaCandidateGenerator {
         var simplifications = new IdentityHashMap<Expr, Expr>();
         var simplified = outputs.stream().map(expression -> simplify(expression, 0, simplifications)).toList();
         addProposal(source, outputs, simplified, "typed-local-algebra", proposals, seen);
+        for (var changed : new BilinearCandidates(work).generate(outputs, maximum - proposals.size()))
+            addProposal(source, outputs, changed, "joint-bilinear-three-products", proposals, seen);
 
         // Keep the fast combined candidate, but never make its admissibility a
         // prerequisite for independent changes. Only the checker admits a move.
@@ -42,9 +44,11 @@ final class JavaCandidateGenerator {
         boolean complete = true;
         for (Expr node : nodes) {
             Expr local = simplifyHere(node);
+            if (node.equals(local)) local = ModularInverseCandidates.replacement(node,nodes,work);
             if (node.equals(local)) continue;
+            Expr replacement = local;
             var memo = new IdentityHashMap<Expr, Expr>();
-            var changed = outputs.stream().map(output -> replace(output, node, local, memo, 0)).toList();
+            var changed = outputs.stream().map(output -> replace(output, node, replacement, memo, 0)).toList();
             if (seen.contains(changed)) continue;
             if (proposals.size() == maximum) { complete = false; break; }
             addProposal(source, outputs, changed, "typed-local-algebra-at-subexpression", proposals, seen);
@@ -144,6 +148,13 @@ final class JavaCandidateGenerator {
                                            List<Expr> arguments, Expr left, Expr right, boolean lowWordMasks) {
         Expr product = simplifyProductOrQuotient(op, kind, left, right);
         if (product != null) return product;
+        if (op == NumericOperation.REMAINDER && (kind == NumericKind.INT || kind == NumericKind.LONG)
+                && JavaExpressions.isLiteral(right) && new EstablishedNumericFacts(request,work).nonnegative(left)) {
+            BigInteger divisor = SemanticChecker.integer(JavaExpressions.literalValue(right));
+            if (divisor.signum() > 0 && divisor.bitCount() == 1)
+                return JavaExpressions.operation(kind, NumericOperation.AND, left,
+                    kind == NumericKind.INT ? JavaExpressions.literal(divisor.intValue()-1) : JavaExpressions.literal(divisor.longValue()-1));
+        }
         if ((op == NumericOperation.XOR || op == NumericOperation.OR) && number(right, 0)) return left;
         if (op == NumericOperation.XOR && left.equals(right)) return constant(kind, 0);
         if ((op == NumericOperation.OR || op == NumericOperation.AND) && left.equals(right)) return left;
@@ -187,7 +198,7 @@ final class JavaCandidateGenerator {
     }
     private static boolean boundedConstantFold(NumericKind kind, NumericOperation operation, List<Expr> arguments) {
         if (kind != NumericKind.BIG_INTEGER) return true;
-        if (EnumSet.of(NumericOperation.POW, NumericOperation.MOD_POW, NumericOperation.MOD_MULTIPLY,
+        if (EnumSet.of(NumericOperation.POW, NumericOperation.MOD_POW, NumericOperation.MOD_MULTIPLY, NumericOperation.MOD_INVERSE,
                 NumericOperation.SHIFT_LEFT, NumericOperation.SHIFT_RIGHT).contains(operation)) return false;
         return arguments.stream().map(JavaExpressions::literalValue)
             .allMatch(value -> value instanceof BigInteger integer && integer.abs().bitLength() <= 256);

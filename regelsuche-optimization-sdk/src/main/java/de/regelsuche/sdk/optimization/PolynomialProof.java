@@ -21,18 +21,29 @@ final class PolynomialProof {
     }
     private final NumericKind kind;
     private final BigInteger modulus;
+    private final Expr residueModulus;
     private final boolean exactDivision;
     private final boolean floatingAlgebra;
     private final VerificationWork work;
     PolynomialProof(NumericKind kind, boolean exactDivision, boolean floatingAlgebra, VerificationWork work) {
         this.kind = kind; this.exactDivision = exactDivision; this.floatingAlgebra = floatingAlgebra; this.work = work;
         modulus = kind.integral() && !exactDivision ? BigInteger.ONE.shiftLeft(kind.bits()) : null;
+        residueModulus = null;
     }
     PolynomialProof(NumericKind kind, int lowBits, VerificationWork work) {
         if ((kind != NumericKind.INT && kind != NumericKind.LONG) || lowBits < 1 || lowBits > kind.bits())
             throw new IllegalArgumentException("INVALID_LOW_WORD_WIDTH");
         this.kind = kind; this.exactDivision = false; this.floatingAlgebra = false; this.work = work;
         modulus = BigInteger.ONE.shiftLeft(lowBits);
+        residueModulus = null;
+    }
+    /** Caller independently establishes positivity. Only this exact modulus is erased. */
+    PolynomialProof(Expr positiveModulus, VerificationWork work) {
+        kind = NumericKind.BIG_INTEGER; exactDivision = false; floatingAlgebra = false;
+        this.work = work; residueModulus = Objects.requireNonNull(positiveModulus);
+        modulus = JavaExpressions.isLiteral(positiveModulus)
+            ? SemanticChecker.integer(JavaExpressions.literalValue(positiveModulus)) : null;
+        if (modulus != null && modulus.signum() <= 0) throw new OutsideFragment();
     }
     boolean equivalent(Expr source, Expr target) { return normalize(source, 0).equals(normalize(target, 0)); }
     private Map<Monomial, BigInteger> normalize(Expr expression, int depth) {
@@ -56,10 +67,22 @@ final class PolynomialProof {
         if (operation.isEmpty()) return atom(expression);
         var args = JavaExpressions.operands(expression);
         return switch (operation.get()) {
+            case MOD -> residueModulus != null && residueModulus.equals(args.get(1))
+                ? normalize(args.getFirst(), depth+1) : atom(expression);
+            case MOD_MULTIPLY -> residueModulus != null && residueModulus.equals(args.get(2))
+                ? multiply(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1)) : atom(expression);
             case ADD -> add(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1), BigInteger.ONE);
             case SUBTRACT -> add(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1), BigInteger.ONE.negate());
             case NEGATE -> multiply(constant(BigInteger.ONE.negate()), normalize(args.getFirst(), depth+1));
             case MULTIPLY -> multiply(normalize(args.getFirst(), depth+1), normalize(args.get(1), depth+1));
+            case POW -> {
+                if (!JavaExpressions.isLiteral(args.get(1))) yield atom(expression);
+                BigInteger exponent = SemanticChecker.integer(JavaExpressions.literalValue(args.get(1)));
+                if (exponent.signum() < 0 || exponent.compareTo(BigInteger.valueOf(MAX_DEGREE)) > 0) yield atom(expression);
+                var base = normalize(args.getFirst(),depth+1); var result = constant(BigInteger.ONE);
+                for(int i=0;i<exponent.intValue();i++) result = multiply(result,base);
+                yield result;
+            }
             case DIVIDE -> {
                 if (!exactDivision || !JavaExpressions.isLiteral(args.get(1))) yield atom(expression);
                 Object divisorValue = JavaExpressions.literalValue(args.get(1));

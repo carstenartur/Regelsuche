@@ -3,7 +3,7 @@ package de.regelsuche.sdk.optimization;
 public record SemanticAssumption(Kind kind, String subject, String parameter, String provenance) {
     public enum Kind {
         BIG_INTEGER_VALUE_SEMANTICS, BIG_INTEGER_BIT_LENGTH_BOUND, NON_NEGATIVE_UPPER_BOUND,
-        NON_NEGATIVE, POSITIVE, NORMALIZED_MODULAR_INPUT,
+        NON_NEGATIVE, POSITIVE, NORMALIZED_MODULAR_INPUT, MODULAR_UNIT_INPUT,
         NO_NAN_PAYLOAD_OBSERVATION
     }
     public SemanticAssumption {

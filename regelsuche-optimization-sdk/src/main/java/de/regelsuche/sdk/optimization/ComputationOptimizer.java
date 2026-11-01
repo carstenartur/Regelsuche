@@ -279,7 +279,7 @@ public final class ComputationOptimizer {
                 if(!seen.add(expression)) continue;
                 if(JavaExpressions.kindOf(expression,request.plan().inputs())==NumericKind.BIG_INTEGER) {
                     var operation=JavaExpressions.operationOf(expression).orElse(null);
-                    if(operation!=null && EnumSet.of(NumericOperation.POW,NumericOperation.MOD_POW,NumericOperation.MOD_MULTIPLY,
+                    if(operation!=null && EnumSet.of(NumericOperation.POW,NumericOperation.MOD_POW,NumericOperation.MOD_MULTIPLY,NumericOperation.MOD_INVERSE,
                             NumericOperation.SHIFT_LEFT,NumericOperation.SHIFT_RIGHT).contains(operation)) return false;
                     bounds.require(expression);
                 }
