@@ -26,15 +26,15 @@ final class TaskKnowledgeSnapshot {
     private TaskKnowledgeSnapshot() { }
     record Decoded(int generation, String parentId, String model,
             Map<String, CumulativeTaskKnowledge.Strategy> routes, CumulativeTaskKnowledge.Costs costs,
-            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts, TaskConstructionProfile profile) { }
+            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts, TaskConstructionProfile profile, String recurrences) { }
 
     static String encode(int generation, String parentId, CheckedLearnedSchemaModel model,
             Map<String, CumulativeTaskKnowledge.Strategy> routes, CumulativeTaskKnowledge.Costs costs,
-            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts, TaskConstructionProfile profile) {
-        var root = JSON.createObjectNode().put("revision", profile == TaskConstructionProfile.NONE
-                ? CumulativeTaskKnowledge.REVISION : CumulativeTaskKnowledge.CONSTRUCTION_REVISION)
+            CumulativeTaskKnowledge.Decision decision, List<CheckedLearnedSchemaModel.Attempt> attempts, TaskConstructionProfile profile, List<RecurrenceKnowledge.Entry> recurrences) {
+        var root = JSON.createObjectNode().put("revision", revision(profile, recurrences, decision))
             .put("generation", generation).put("parentId", parentId).put("model", model.toCanonicalJson());
-        if (profile != TaskConstructionProfile.NONE) root.put("constructionProfile", profile.name());
+        if (profile != TaskConstructionProfile.NONE || hasRecurrences(recurrences, decision)) root.put("constructionProfile", profile.name());
+        if (hasRecurrences(recurrences, decision)) root.put("recurrences", RecurrenceKnowledgeCodec.encode(recurrences));
         var policy = root.putObject("routes");
         new TreeMap<>(routes).forEach((key, value) -> policy.put(key, value.name()));
         var work = root.putObject("costs");
@@ -84,10 +84,17 @@ final class TaskKnowledgeSnapshot {
                 new CumulativeTaskKnowledge.Costs(number(costs, "lessons"), number(costs, "formation"),
                     number(costs, "preparation"), number(costs, "validation"), number(costs, "selection"),
                     number(costs, "restoration"), number(costs, "splitChecking")),
-                CumulativeTaskKnowledge.Decision.valueOf(text(root, "decision")), List.copyOf(attempts), profile);
+                CumulativeTaskKnowledge.Decision.valueOf(text(root, "decision")), List.copyOf(attempts), profile, root.has("recurrences") ? text(root, "recurrences") : "");
         } catch (IOException | ArithmeticException failure) {
             throw new IllegalArgumentException("invalid knowledge snapshot", failure);
         }
+    }
+    private static boolean hasRecurrences(List<RecurrenceKnowledge.Entry> entries, CumulativeTaskKnowledge.Decision decision) {
+        return !entries.isEmpty() || decision == CumulativeTaskKnowledge.Decision.NO_NEW_LAW;
+    }
+    private static String revision(TaskConstructionProfile profile, List<RecurrenceKnowledge.Entry> recurrences, CumulativeTaskKnowledge.Decision decision) {
+        if (hasRecurrences(recurrences, decision)) return CumulativeTaskKnowledge.RECURRENCE_REVISION;
+        return profile == TaskConstructionProfile.NONE ? CumulativeTaskKnowledge.REVISION : CumulativeTaskKnowledge.CONSTRUCTION_REVISION;
     }
     private static TaskConstructionProfile profile(JsonNode root) {
         if (root == null || !root.isObject() || !root.hasNonNull("revision"))
@@ -96,6 +103,10 @@ final class TaskKnowledgeSnapshot {
         if (revision.equals(CumulativeTaskKnowledge.REVISION)) {
             fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts"));
             return TaskConstructionProfile.NONE;
+        }
+        if (revision.equals(CumulativeTaskKnowledge.RECURRENCE_REVISION)) {
+            fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts", "constructionProfile", "recurrences"));
+            return TaskConstructionProfile.valueOf(text(root, "constructionProfile"));
         }
         if (!revision.equals(CumulativeTaskKnowledge.CONSTRUCTION_REVISION)) throw new IllegalArgumentException("unknown knowledge revision");
         fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts", "constructionProfile"));

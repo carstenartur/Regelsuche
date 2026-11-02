@@ -220,6 +220,37 @@ class RecurrenceInvariantSynthesisTest {
         illegal(() -> new Proposal("x0+".repeat(1366) + "x1", Evolution.FIXED));
     }
 
+    @Test void persistenceIsCheckedInTwoSeparateJvms() throws Exception {
+        var directory = java.nio.file.Files.createTempDirectory("recurrence-proposal-jvms-");
+        var proposal = directory.resolve("proposal.properties");
+        String saved = runChild("save", proposal, directory.resolve("save.log"));
+        String restored = runChild("restore", proposal, directory.resolve("restore.log"));
+        check(saved.contains("synthesisWork="), "producer must synthesize");
+        check(restored.contains("restoreWithoutSynthesisWork=") && restored.contains("invariantAt10pow100=5"),
+            "consumer must check the stored law with changed initial values");
+    }
+
+    private static String runChild(String mode, java.nio.file.Path target, java.nio.file.Path output) throws Exception {
+        var entries = new java.util.LinkedHashSet<String>();
+        entries.add(System.getProperty("java.class.path"));
+        for (ClassLoader loader = RecurrenceInvariantSynthesisTest.class.getClassLoader(); loader != null; loader = loader.getParent()) {
+            if (loader instanceof java.net.URLClassLoader urls)
+                for (var url : urls.getURLs()) entries.add(java.nio.file.Path.of(url.toURI()).toString());
+        }
+        String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
+        var process = new ProcessBuilder(java.nio.file.Path.of(System.getProperty("java.home"),"bin",executable).toString(),
+            "--enable-preview", "-cp", String.join(java.io.File.pathSeparator,entries), RecurrenceInvariantSynthesisTest.class.getName(), mode, target.toString())
+            .redirectErrorStream(true).redirectOutput(output.toFile()).start();
+        try {
+            check(process.waitFor(45, java.util.concurrent.TimeUnit.SECONDS), "child JVM must terminate");
+            String text = java.nio.file.Files.readString(output);
+            check(process.exitValue() == 0, "child failed: " + text);
+            return text;
+        } finally {
+            if (process.isAlive()) { process.destroyForcibly(); process.waitFor(5,java.util.concurrent.TimeUnit.SECONDS); }
+        }
+    }
+
     private static void freshProcess(String mode, java.nio.file.Path path) throws Exception {
         var properties = new java.util.Properties();
         var verifier = new RecurrenceInvariantVerifier();
@@ -270,6 +301,7 @@ class RecurrenceInvariantSynthesisTest {
         tests.checksAffineTransferOnIndependentConcreteTrajectories();
         tests.respectsLinearAnsatzAndRejectsOversizedInputs();
         tests.reportsOversizedValidLawsAsUnsupportedInsteadOfThrowing();
+        tests.persistenceIsCheckedInTwoSeparateJvms();
         System.out.println("PASS recurrence invariant contracts; assertions="+checks);
     }
 }

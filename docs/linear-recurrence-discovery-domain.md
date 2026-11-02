@@ -167,12 +167,13 @@ In the directly executed example, synthesis plus independent checking costs
 4,350 declared units. Reloading the proposal and checking it for initial state
 `(2,1)` costs 545 units and proves alternating values starting at 5, with no
 coefficient search. This is a narrow reuse observation, not a full lifecycle
-benchmark or cumulative-learning comparison. It does not yet insert recurrence
-proofs into `CumulativeTaskKnowledge`, synthesize arbitrary proof plans, infer a
-true infinite recurrence from observations, or implement the remaining historic
-Euclid/Ferrari tasks. The existing finite-fitting domain remains unchanged.
+benchmark or cumulative-learning comparison. The subsequent integration into
+`CumulativeTaskKnowledge` is documented below. Neither slice synthesizes arbitrary
+proof plans, infers a true infinite recurrence from observations, or implements
+the remaining historic Euclid/Ferrari tasks. The existing finite-fitting domain
+remains unchanged.
 
-### Validation and implementation ledger
+### Initial standalone validation and implementation ledger
 
 - Tests precede the new API; the first compile fails because it is absent.
 - Eleven JUnit methods cover Cassini/Pell, rational and affine transitions,
@@ -208,4 +209,101 @@ extractor measurement or permission for the feature to exceed its allowance.
 mvn -pl regelsuche-math-algorithms -am \
   -Dtest=RecurrenceInvariantSynthesisTest -Dsurefire.failIfNoSpecifiedTests=false test
 ./gradlew --no-daemon --no-configuration-cache ciCheck
+```
+
+## Integration into cumulative task knowledge
+
+`CumulativeTaskKnowledge` now also owns a bounded recurrence catalog. There is
+no second persistent learner: expression schemata and recurrence proposals share
+one immutable generation, parent identity, acquisition ledger and snapshot.
+`learnRecurrences(lessons, validation, budget)` delegates mathematical discovery
+to `RecurrenceInvariantSynthesis` and checks every reuse with
+`RecurrenceInvariantVerifier`. Ordinary `solve(request, strategy)` never learns.
+
+The typed recurrence request asks for **one nonconstant fixed or alternating
+law within its degree bound**. A stored law is not evidence that a whole
+nullspace has been enumerated. The full-basis synthesis API remains available
+separately. For recurrence tasks `BASELINE` always invokes synthesis;
+`KNOWLEDGE_FIRST` and `AUTOMATIC` use matching source-bound knowledge, otherwise
+fall back within the same budget. This is deterministic source/degree routing,
+not a newly learned general strategy grammar. Every successful reuse checks the
+caller's transition and new initial state, rather than caching the old answer.
+
+Lessons use the frozen parent. Candidate activation requires validation on
+separate initial-state tasks, coverage of every newly proposed transition, no
+lost validation success, and either less measured validation work or additional
+success. Merely reusing an existing law does not create another capability.
+Failed, duplicate, rejected and acquisition-limited batches keep their paid
+work. A failure in an unfinished technical operation exposes incomplete
+accounting rather than authorizing a successor. The catalog is bounded to 32
+entries. This first adapter transfers across initial states of the same exact
+transition; it does not generalize a symbolic family of transition matrices.
+
+Snapshots carrying recurrence data use v3; old v1/v2 snapshots retain their
+canonical bytes. Load validates strict fields, bounds and exact rational
+components and re-proves every recurrence identity, including its claimed
+degree. A hash, saved strategy or historical cost counter is not proof. Learning
+in either domain preserves the other domain's payload. Acquisition and
+restoration use the existing shared cost categories. Costs still describe
+bounded logical operations, not complete JVM, serialization or wall-clock work.
+
+### Executed mixed-stream development check
+
+Two actual learning blocks acquire Fibonacci and Pell laws, with distinct
+initial states for validation. Saved generation one is the frozen control;
+saved generation two is the cumulative control. Both are loaded again before
+48 real requests: 16 rounds with changed initial states for the two known
+transitions and an unhelpful one-coordinate transition. No answer cache is used.
+
+| Arm | Declared total work | Successful requests |
+| --- | ---: | ---: |
+| Same synthesis baseline | 157,216 | 32/48 |
+| Acquire one transition, freeze and reload | 106,293 | 32/48 |
+| Acquire both transitions, reload | 54,704 | 32/48 |
+
+The cumulative total includes 18,656 acquisition/validation units, 1,360
+restoration units and 34,688 query units. This is about 65.2% less declared work
+than the same synthesis baseline, not a runtime factor. These are variants of
+three development transitions, not 48 independent families or a sealed holdout.
+The benefit establishes avoiding repeated coefficient search after acquiring
+these laws, not autonomous invention of an invariant grammar or general
+superiority to alternative solvers.
+
+The nine new cumulative test methods cover generations, budgets, source/degree
+binding, falsified payloads, preservation of expression schemata, negative
+acquisition, the mixed stream and actual child JVMs. The mathematical test suite
+also now invokes its proposal save/restore subprocesses from JUnit, addressing
+the earlier review gap rather than only demonstrating restart through `main`.
+Every child has a bounded wait, checked exit status, retained output and forced
+cleanup on failure; classpaths include Gradle's separate worker loaders.
+
+Final direct execution: 123 cumulative assertions and 465 mathematical
+assertions, including real save/restore child processes. Four compiled fault
+injections are rejected (lost source binding, free final proof, trusting stored
+claims, dropping the previously learned domain). Existing task-completion and
+three-generation expression contracts keep their original results, including
+225,536 / 229,264 / 186,706 for the 512-request comparison.
+
+Local integration execution uses Java 21 and the real seven-module production
+sources/resources. A separate, unpublished compatibility copy uses Java 21's
+`ScopedValue.Carrier.get(Supplier)` at three pre-existing Java-25 `call` sites;
+only that copy and the JUnit-free direct test copies are altered for the local
+harness. This is not a Java-25/JUnit-discovery, timeout, coverage or native-JDT
+qualification. The normal Gradle command was attempted but dependency download
+failed because network DNS is unavailable. The complete unchanged hosted CI and
+independent review remain required. No workflow, threshold, baseline or original
+reference result is changed by this integration.
+
+```java
+var knowledge = CumulativeTaskKnowledge.empty(genome);
+var update = knowledge.learnRecurrences(lessons, validation, new Budget(500_000));
+knowledge = update.next();
+var path = knowledge.save(directory);
+var restored = CumulativeTaskKnowledge.load(genome, path);
+var result = restored.solve(recurrenceRequest, CumulativeTaskKnowledge.Strategy.AUTOMATIC);
+```
+
+```bash
+./gradlew --no-daemon :regelsuche-learning:test --tests '*CumulativeRecurrenceKnowledgeTest'
+./gradlew --no-daemon :regelsuche-math-algorithms:test --tests '*RecurrenceInvariantSynthesisTest'
 ```
