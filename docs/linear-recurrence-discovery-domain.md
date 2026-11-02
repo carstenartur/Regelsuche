@@ -116,6 +116,10 @@ certificate or a general induction-tactic implementation.
 
 All solver stages and final verification share one non-resetting logical-work
 budget. Exhaustion returns `BUDGET_INCONCLUSIVE` without a complete set of laws.
+A valid ansatz direction whose normalized text exceeds the 4,096-character
+proposal guard, or which the verifier reports as `UNSUPPORTED`, yields an
+explicit `UNSUPPORTED` report without laws instead of an exception; the
+representation guards are not raised and no direction is silently dropped.
 `COMPLETE` means the declared coefficient problem was completed, not that all
 possible mathematical invariants were enumerated. An empty degree-one result
 must not be interpreted as ruling out a quadratic or nonpolynomial invariant.

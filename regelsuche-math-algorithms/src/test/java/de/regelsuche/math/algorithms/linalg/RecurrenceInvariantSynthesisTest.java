@@ -204,6 +204,22 @@ class RecurrenceInvariantSynthesisTest {
             new Proposal("x0^3+x1^3", Evolution.FIXED), values(0,1), BUDGET).outcome());
     }
 
+    @Test void reportsOversizedValidLawsAsUnsupportedInsteadOfThrowing() {
+        var transition = new Transition(new ExactMatrix(List.of(
+                values(0, -1, 0),
+                List.of(Rational.of(-1), ratio("-24402839367495703042404871834352035752", "26333050882828419407775062651959254809"), Rational.ONE),
+                values(0, 0, 0))),
+            new ExactVector(List.of(
+                ratio("21483844301554108744711421673995363106", "22975977712300925394603424805469836863"),
+                ratio("12264347322807890882286157959284470611", "7376799742270097422755889420238910814"),
+                ratio("61564151475901760944591302486959482587", "62204651478189102752098365946853233994"))));
+        var report = synthesis.solve(new Request(transition, values(1, 1, 1), 2, new Budget(Integer.MAX_VALUE)));
+        equal(Status.UNSUPPORTED, report.status());
+        check(report.laws().isEmpty(), "no partial law set is published as complete");
+        check(report.work().consumedWorkUnits() > 0, "work up to the guard is still accounted");
+        illegal(() -> new Proposal("x0+".repeat(1366) + "x1", Evolution.FIXED));
+    }
+
     private static void freshProcess(String mode, java.nio.file.Path path) throws Exception {
         var properties = new java.util.Properties();
         var verifier = new RecurrenceInvariantVerifier();
@@ -230,6 +246,9 @@ class RecurrenceInvariantSynthesisTest {
         return new Transition(new ExactMatrix(java.util.Arrays.stream(matrix).map(RecurrenceInvariantSynthesisTest::values).toList()),
             new ExactVector(values(offset)));
     }
+    private static Rational ratio(String numerator, String denominator) {
+        return new Rational(new BigInteger(numerator), new BigInteger(denominator));
+    }
     private static List<Rational> values(long... values) { return java.util.Arrays.stream(values).mapToObj(Rational::of).toList(); }
     private static void equivalent(String left, String right) { new ExactPolynomialAnalysis().requireEquivalent(left,right); checks++; }
     private static void equal(Object expected, Object actual) { check(expected.equals(actual), "expected="+expected+", actual="+actual); }
@@ -250,6 +269,7 @@ class RecurrenceInvariantSynthesisTest {
         tests.reusesAStoredProposalWithAnIndependentlyCheckedNewInitialState();
         tests.checksAffineTransferOnIndependentConcreteTrajectories();
         tests.respectsLinearAnsatzAndRejectsOversizedInputs();
+        tests.reportsOversizedValidLawsAsUnsupportedInsteadOfThrowing();
         System.out.println("PASS recurrence invariant contracts; assertions="+checks);
     }
 }

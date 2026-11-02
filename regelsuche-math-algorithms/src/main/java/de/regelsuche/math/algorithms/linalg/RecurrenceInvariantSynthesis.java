@@ -28,7 +28,9 @@ public final class RecurrenceInvariantSynthesis {
         Evolution(int multiplier) { this.multiplier = multiplier; }
         public int multiplier() { return multiplier; }
     }
-    public enum Status { COMPLETE, BUDGET_INCONCLUSIVE }
+    /** UNSUPPORTED: a valid ansatz direction exceeds the proposal/verifier representation guards. */
+    public enum Status { COMPLETE, BUDGET_INCONCLUSIVE, UNSUPPORTED }
+    static final int MAX_PROPOSAL_LENGTH = 4096;
 
     /** x(n+1) = linear*x(n) + offset over Q; coordinates are named x0, x1, x2. */
     public record Transition(ExactMatrix linear, ExactVector offset) {
@@ -54,7 +56,7 @@ public final class RecurrenceInvariantSynthesis {
     public record Proposal(String polynomial, Evolution evolution) {
         public Proposal {
             Objects.requireNonNull(polynomial, "polynomial"); Objects.requireNonNull(evolution, "evolution");
-            if (polynomial.isBlank() || polynomial.length() > 4096)
+            if (polynomial.isBlank() || polynomial.length() > MAX_PROPOSAL_LENGTH)
                 throw new IllegalArgumentException("bounded nonempty polynomial text is required");
         }
     }
@@ -83,6 +85,8 @@ public final class RecurrenceInvariantSynthesis {
             return new Report(Status.COMPLETE, laws, work.ledger());
         } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
             return new Report(Status.BUDGET_INCONCLUSIVE, List.of(), work.ledger());
+        } catch (Unsupported unsupported) {
+            return new Report(Status.UNSUPPORTED, List.of(), work.ledger());
         }
     }
 
@@ -101,8 +105,11 @@ public final class RecurrenceInvariantSynthesis {
         var reduction = reduced.reduction().orElseThrow(() -> new IllegalStateException("coefficient reduction failed"));
         for (var vector : reduction.nullspaceBasis()) {
             var polynomial = reconstruct(basis, system.variables(), vector, work);
-            if (polynomial.totalDegree() > 0)
-                admit(request, new Proposal(polynomial.toCanonicalString(), evolution), laws, work);
+            if (polynomial.totalDegree() == 0) continue;
+            String text = polynomial.toCanonicalString();
+            // Keep the representation guard; never silently drop a direction while claiming COMPLETE.
+            if (text.length() > MAX_PROPOSAL_LENGTH) throw new Unsupported();
+            admit(request, new Proposal(text, evolution), laws, work);
         }
     }
 
@@ -152,8 +159,11 @@ public final class RecurrenceInvariantSynthesis {
         work.add(checked.work().consumedWorkUnits());
         if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE)
             throw new RecurrenceInvariantSupport.Exhausted();
+        if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.UNSUPPORTED) throw new Unsupported();
         laws.add(checked.law().orElseThrow(() -> new IllegalStateException("synthesized law failed independent identity check")));
     }
+
+    private static final class Unsupported extends RuntimeException { }
 
     static List<Rational> checkedInitial(Transition source, List<Rational> initial) {
         Objects.requireNonNull(initial, "initialState");
