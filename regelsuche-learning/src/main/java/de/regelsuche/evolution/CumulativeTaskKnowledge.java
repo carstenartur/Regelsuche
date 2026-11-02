@@ -22,8 +22,9 @@ import java.util.TreeMap;
 public final class CumulativeTaskKnowledge {
     public static final String REVISION = "regelsuche.cumulative-task-knowledge/v1";
     static final String CONSTRUCTION_REVISION = "regelsuche.cumulative-task-knowledge/v2";
+    static final String RECURRENCE_REVISION = "regelsuche.cumulative-task-knowledge/v3";
     public enum Strategy { BASELINE, KNOWLEDGE_FIRST, AUTOMATIC }
-    public enum Decision { INITIAL, PROMOTED, NO_NEW_SCHEMA, NO_VALIDATED_BENEFIT, ACQUISITION_LIMIT }
+    public enum Decision { INITIAL, PROMOTED, NO_NEW_SCHEMA, NO_NEW_LAW, NO_VALIDATED_BENEFIT, ACQUISITION_LIMIT }
     public static final long DEFAULT_LEARNING_WORK = 1_000_000;
     private static final int MAX_BATCH = 32;
     private static final int MAX_ROUTES = 256;
@@ -111,13 +112,17 @@ public final class CumulativeTaskKnowledge {
     private final Costs sessionSetup;
     private final Decision lastDecision;
     private final List<CheckedLearnedSchemaModel.Attempt> lastAttempts;
+    private final List<RecurrenceKnowledge.Entry> recurrences;
     private final String canonicalJson;
     private final String id;
 
     private CumulativeTaskKnowledge(EvolutionGenome inventory, CheckedLearnedSchemaModel model,
             CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned, int generation,
             String parentId, Map<String, Strategy> routes, Costs acquisition, Costs sessionSetup,
-            Decision lastDecision, List<CheckedLearnedSchemaModel.Attempt> lastAttempts, TaskConstructionProfile constructionProfile) {
+            Decision lastDecision, List<CheckedLearnedSchemaModel.Attempt> lastAttempts, TaskConstructionProfile constructionProfile,
+            List<RecurrenceKnowledge.Entry> recurrences) {
+        this.recurrences = List.copyOf(recurrences);
+        if (this.recurrences.size() > RecurrenceKnowledge.MAX_ENTRIES) throw new IllegalArgumentException("recurrence catalog too large");
         this.inventory = Objects.requireNonNull(inventory); this.model = Objects.requireNonNull(model);
         this.constructionProfile = Objects.requireNonNull(constructionProfile);
         if (!inventory.contentHash().equals(model.inventoryHash())) throw new IllegalArgumentException("foreign inventory");
@@ -133,10 +138,10 @@ public final class CumulativeTaskKnowledge {
         this.acquisition = acquisition; this.sessionSetup = sessionSetup;
         this.lastDecision = Objects.requireNonNull(lastDecision); this.lastAttempts = List.copyOf(lastAttempts);
         if ((generation == 0) != (lastDecision == Decision.INITIAL)
-                || generation == 0 && (!model.schemas().isEmpty() || !routes.isEmpty() || acquisition.total() != 0))
+                || generation == 0 && (!model.schemas().isEmpty() || !routes.isEmpty() || !recurrences.isEmpty() || acquisition.total() != 0))
             throw new IllegalArgumentException("invalid initial generation");
         canonicalJson = TaskKnowledgeSnapshot.encode(generation, parentId, model, this.routes, acquisition,
-            lastDecision, this.lastAttempts, constructionProfile);
+            lastDecision, this.lastAttempts, constructionProfile, this.recurrences);
         id = SchematicProofPlan.hash(canonicalJson);
     }
 
@@ -147,8 +152,28 @@ public final class CumulativeTaskKnowledge {
         Objects.requireNonNull(inventory, "inventory"); Objects.requireNonNull(profile, "profile");
         var baseline = profile.attach(TypedLearnedMoveInventory.primitives(inventory).newTaskSolver());
         return new CumulativeTaskKnowledge(inventory, CheckedLearnedSchemaModel.empty(inventory.contentHash()),
-            baseline, baseline, 0, "", Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of(), profile);
+            baseline, baseline, 0, "", Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of(), profile, List.of());
     }
+    public int recurrenceCount() { return recurrences.size(); }
+
+    /** Find one checked nonconstant recurrence law; this is not an exhaustive-basis query. */
+    public RecurrenceKnowledge.Execution solve(
+            de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request task, Strategy strategy) {
+        return RecurrenceKnowledge.execute(id, recurrences, task, strategy);
+    }
+
+    public RecurrenceKnowledge.Update learnRecurrences(
+            List<de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request> lessons,
+            List<de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request> validation,
+            de.regelsuche.representation.RepresentationBridge.Budget budget) {
+        return RecurrenceKnowledge.learn(this, recurrences, lessons, validation, Objects.requireNonNull(budget));
+    }
+
+    CumulativeTaskKnowledge withRecurrences(List<RecurrenceKnowledge.Entry> catalog, Decision decision, Costs work) {
+        return new CumulativeTaskKnowledge(inventory, model, baseline, learned, Math.addExact(generation, 1), id,
+            routes, acquisition.plus(sessionSetup).plus(work), Costs.zero(), decision, List.of(), constructionProfile, catalog);
+    }
+
     public TaskConstructionProfile constructionProfile() { return constructionProfile; }
     public String id() { return id; }
     public int generation() { return generation; }
@@ -337,7 +362,7 @@ public final class CumulativeTaskKnowledge {
         var work = progress.costs();
         var successor = new CumulativeTaskKnowledge(inventory, chosen, baseline, solver,
             Math.addExact(generation, 1), id, policy, acquisition.plus(sessionSetup).plus(work), Costs.zero(),
-            decision, progress.attempts, constructionProfile);
+            decision, progress.attempts, constructionProfile, recurrences);
         return new Update(successor, decision, progress.training, progress.trials, work, progress.attempts);
     }
 
@@ -383,9 +408,10 @@ public final class CumulativeTaskKnowledge {
         var base = TypedLearnedMoveInventory.primitives(inventory);
         var baseline = snapshot.profile().attach(base.newTaskSolver());
         var learned = model.schemas().isEmpty() ? baseline : snapshot.profile().attach(base.newTaskSolver(model));
-        var setup = new Costs(0, 0, learned.preparationWork(), 0, 0, model.loadWork(), 0);
+        var recurrenceLoad = RecurrenceKnowledgeCodec.restore(snapshot.recurrences());
+        var setup = new Costs(0, 0, learned.preparationWork(), 0, 0, sum(model.loadWork(), recurrenceLoad.work()), 0);
         var restored = new CumulativeTaskKnowledge(inventory, model, baseline, learned,
-            snapshot.generation(), snapshot.parentId(), snapshot.routes(), snapshot.costs(), setup, snapshot.decision(), snapshot.attempts(), snapshot.profile());
+            snapshot.generation(), snapshot.parentId(), snapshot.routes(), snapshot.costs(), setup, snapshot.decision(), snapshot.attempts(), snapshot.profile(), recurrenceLoad.entries());
         if (!restored.toCanonicalJson().equals(json)) throw new IllegalArgumentException("noncanonical knowledge snapshot");
         return restored;
     }
