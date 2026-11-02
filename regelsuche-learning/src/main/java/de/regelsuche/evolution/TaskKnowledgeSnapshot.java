@@ -93,6 +93,7 @@ final class TaskKnowledgeSnapshot {
         return !entries.isEmpty() || decision == CumulativeTaskKnowledge.Decision.NO_NEW_LAW;
     }
     private static String revision(TaskConstructionProfile profile, List<RecurrenceKnowledge.Entry> recurrences, CumulativeTaskKnowledge.Decision decision) {
+        if (recurrences.stream().anyMatch(e -> e.family().isPresent())) return CumulativeTaskKnowledge.RECURRENCE_FAMILY_REVISION;
         if (hasRecurrences(recurrences, decision)) return CumulativeTaskKnowledge.RECURRENCE_REVISION;
         return profile == TaskConstructionProfile.NONE ? CumulativeTaskKnowledge.REVISION : CumulativeTaskKnowledge.CONSTRUCTION_REVISION;
     }
@@ -104,7 +105,8 @@ final class TaskKnowledgeSnapshot {
             fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts"));
             return TaskConstructionProfile.NONE;
         }
-        if (revision.equals(CumulativeTaskKnowledge.RECURRENCE_REVISION)) {
+        if (revision.equals(CumulativeTaskKnowledge.RECURRENCE_REVISION)
+                || revision.equals(CumulativeTaskKnowledge.RECURRENCE_FAMILY_REVISION)) {
             fields(root, Set.of("revision", "generation", "parentId", "model", "routes", "costs", "decision", "attempts", "constructionProfile", "recurrences"));
             return TaskConstructionProfile.valueOf(text(root, "constructionProfile"));
         }

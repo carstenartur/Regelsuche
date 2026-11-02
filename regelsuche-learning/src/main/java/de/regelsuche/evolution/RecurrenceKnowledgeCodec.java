@@ -12,6 +12,8 @@ import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Evoluti
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Proposal;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily.Anchor;
 import de.regelsuche.representation.RepresentationBridge.Budget;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -29,16 +31,21 @@ final class RecurrenceKnowledgeCodec {
     static String encode(List<RecurrenceKnowledge.Entry> entries) {
         var root = JSON.createArrayNode();
         for (var entry : entries) {
-            var node = root.addObject().put("degree", entry.degree()).put("polynomial", entry.proposal().polynomial())
-                .put("evolution", entry.proposal().evolution().name());
-            var matrix = node.putArray("linear");
-            for (var row : entry.transition().linear().rows()) {
-                var cells = matrix.addArray(); row.forEach(value -> cells.add(value.toString()));
-            }
-            var offset = node.putArray("offset");
-            entry.transition().offset().values().forEach(value -> offset.add(value.toString()));
+            var node = root.addObject();
+            writeAnchor(node,entry.transition(),entry.degree(),entry.proposal());
+            entry.family().ifPresent(f -> writeAnchor(node.putObject("family"),f.second().transition(),f.degree(),f.second().proposal()));
         }
         return root.toString();
+    }
+    private static void writeAnchor(com.fasterxml.jackson.databind.node.ObjectNode node,
+            Transition transition, int degree, Proposal proposal) {
+        node.put("degree",degree).put("polynomial",proposal.polynomial()).put("evolution",proposal.evolution().name());
+        var matrix=node.putArray("linear");
+        for (var row : transition.linear().rows()) {
+            var cells=matrix.addArray(); row.forEach(value -> cells.add(value.toString()));
+        }
+        var offset=node.putArray("offset");
+        transition.offset().values().forEach(value -> offset.add(value.toString()));
     }
     static Loaded restore(String json) {
         if (json.isEmpty()) return new Loaded(List.of(), 0);
@@ -50,8 +57,8 @@ final class RecurrenceKnowledgeCodec {
                 throw new IllegalArgumentException("invalid recurrence catalog size");
             var entries = new ArrayList<RecurrenceKnowledge.Entry>();
             for (var node : root) {
-                var entry = readEntry(node);
-                if (entries.stream().anyMatch(e -> e.transition().equals(entry.transition()) && e.degree() == entry.degree()))
+                var entry = readEntry(node, work);
+                if (entries.stream().anyMatch(e -> sameKey(e, entry)))
                     throw new IllegalArgumentException("duplicate recurrence key");
                 verify(entry, work); entries.add(entry);
             }
@@ -61,11 +68,28 @@ final class RecurrenceKnowledgeCodec {
             throw new IllegalArgumentException("invalid or unproved recurrence payload; knownWork=" + work[0], failure);
         }
     }
-    private static RecurrenceKnowledge.Entry readEntry(JsonNode node) {
+    private static boolean sameKey(RecurrenceKnowledge.Entry a, RecurrenceKnowledge.Entry b) {
+        if (!a.transition().equals(b.transition()) || a.degree()!=b.degree() || a.family().isPresent()!=b.family().isPresent()) return false;
+        return a.family().isEmpty() || a.family().get().second().transition().equals(b.family().get().second().transition());
+    }
+    private static RecurrenceKnowledge.Entry readEntry(JsonNode node, long[] work) {
+        var exact=readAnchor(node,true);
+        if (!node.has("family")) return exact;
+        var other=readAnchor(node.get("family"),false);
+        if (other.degree()!=exact.degree()) throw new IllegalArgumentException("family degree mismatch");
+        var formation=new RecurrenceInvariantFamily().form(new Anchor(exact.transition(),exact.proposal()),
+            new Anchor(other.transition(),other.proposal()),exact.degree(),new Budget(200_000));
+        work[0]=Math.addExact(work[0],formation.work().consumedWorkUnits());
+        return RecurrenceKnowledge.Entry.fromFamily(formation.family()
+            .orElseThrow(() -> new IllegalArgumentException("stored family failed symbolic verification")));
+    }
+    private static RecurrenceKnowledge.Entry readAnchor(JsonNode node, boolean allowFamily) {
         var names = new HashSet<String>();
         if (!node.isObject()) throw new IllegalArgumentException("recurrence object required");
         node.fieldNames().forEachRemaining(names::add);
-        if (!names.equals(Set.of("degree", "polynomial", "evolution", "linear", "offset")))
+        var expected=new HashSet<>(Set.of("degree", "polynomial", "evolution", "linear", "offset"));
+        if (allowFamily && node.has("family")) expected.add("family");
+        if (!names.equals(expected))
             throw new IllegalArgumentException("unexpected recurrence fields");
         var degree = node.get("degree");
         if (!degree.isIntegralNumber() || !degree.canConvertToInt()) throw new IllegalArgumentException("integer degree required");
