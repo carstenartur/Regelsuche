@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RecurrenceInvariantSupport.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">RecurrenceInvariantSupport.java</span></div><h1>RecurrenceInvariantSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.representation.RepresentationBridge.WorkLedger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Shared finite representation helpers; arithmetic stays in the existing exact polynomial core. */
+final class RecurrenceInvariantSupport {
+    private RecurrenceInvariantSupport() { }
+
+    static void requireBounded(Rational number) {
+<span class="fc" id="L17">        Objects.requireNonNull(number, &quot;coefficient&quot;);</span>
+<span class="pc bpc" id="L18" title="1 of 4 branches missed.">        if (number.numerator().bitLength() &gt; 128 || number.denominator().bitLength() &gt; 128)</span>
+<span class="fc" id="L19">            throw new IllegalArgumentException(&quot;recurrence inputs are limited to 128-bit exact coefficients&quot;);</span>
+<span class="fc" id="L20">    }</span>
+
+    static List&lt;String&gt; variables(int dimension) {
+<span class="fc" id="L23">        var variables = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        for (int i = 0; i &lt; dimension; i++) variables.add(&quot;x&quot; + i);</span>
+<span class="fc" id="L25">        return List.copyOf(variables);</span>
+    }
+
+    static List&lt;Monomial&gt; basis(int dimension, int degree) {
+<span class="fc" id="L29">        var result = new ArrayList&lt;Monomial&gt;();</span>
+<span class="fc" id="L30">        result.add(Monomial.constant());</span>
+<span class="fc" id="L31">        var variables = variables(dimension);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (String variable : variables) result.add(Monomial.variable(variable));</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (degree == 2) {</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            for (int i = 0; i &lt; dimension; i++)</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">                for (int j = i; j &lt; dimension; j++)</span>
+<span class="fc" id="L36">                    result.add(Monomial.variable(variables.get(i)).multiply(Monomial.variable(variables.get(j))));</span>
+        }
+<span class="fc" id="L38">        return List.copyOf(result);</span>
+    }
+
+    static List&lt;String&gt; images(RecurrenceInvariantSynthesis.Transition transition, Work work) {
+<span class="fc" id="L42">        int dimension = transition.linear().columns();</span>
+<span class="fc" id="L43">        var result = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L45">            StringBuilder image = new StringBuilder(&quot;(&quot; + transition.offset().get(row) + &quot;)&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            for (int column = 0; column &lt; dimension; column++) {</span>
+<span class="fc" id="L47">                work.add(1);</span>
+<span class="fc" id="L48">                image.append(&quot;+(&quot;).append(transition.linear().get(row, column)).append(&quot;)*x&quot;).append(column);</span>
+            }
+<span class="fc" id="L50">            result.add(image.toString());</span>
+        }
+<span class="fc" id="L52">        return List.copyOf(result);</span>
+    }
+
+    /** Simultaneous substitution, never sequential textual replacement of variable names. */
+    static String monomial(Monomial monomial, List&lt;String&gt; images, Work work) {
+<span class="fc" id="L57">        var result = new StringBuilder(&quot;1&quot;);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (int i = 0; i &lt; images.size(); i++) {</span>
+<span class="fc" id="L59">            work.add(1);</span>
+<span class="fc" id="L60">            int power = monomial.exponentOf(&quot;x&quot; + i);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            if (power != 0) result.append(&quot;*(&quot;).append(images.get(i)).append(&quot;)^&quot;).append(power);</span>
+        }
+<span class="fc" id="L63">        work.add(result.length());</span>
+<span class="fc" id="L64">        return result.toString();</span>
+    }
+
+    static Polynomial substitute(Polynomial polynomial, List&lt;String&gt; images, Work work) {
+<span class="fc" id="L68">        var result = Polynomial.zero();</span>
+        // Project each monomial separately; do not raise the existing syntax guard for a large substitution.
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (var monomial : polynomial.terms().keySet().stream().sorted(java.util.Comparator.comparing(Monomial::key)).toList()) {</span>
+<span class="fc" id="L71">            String term = &quot;(&quot; + polynomial.terms().get(monomial) + &quot;)*(&quot; + monomial(monomial, images, work) + &quot;)&quot;;</span>
+<span class="fc" id="L72">            var projected = project(term, work);</span>
+<span class="fc" id="L73">            work.add(1L + result.termCount() + projected.termCount());</span>
+<span class="fc" id="L74">            result = result.add(projected);</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        return result;</span>
+    }
+
+    static Polynomial project(String expression, Work work) {
+<span class="fc" id="L80">        work.add(expression.length());</span>
+<span class="fc" id="L81">        return new ExactPolynomialAnalysis(work::add).normalForm(expression);</span>
+    }
+
+    static final class Work {
+        private final int configured;
+        private int consumed;
+<span class="fc" id="L87">        Work(int configured) { this.configured = configured; }</span>
+        void add(long units) {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (units &gt; configured - consumed) {</span>
+<span class="fc" id="L91">                consumed = configured;</span>
+<span class="fc" id="L92">                throw new Exhausted();</span>
+            }
+<span class="fc" id="L94">            consumed += (int) units;</span>
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">        int remaining() { return configured - consumed; }</span>
+<span class="fc" id="L97">        WorkLedger ledger() { return WorkLedger.of(configured, consumed); }</span>
+    }
+
+<span class="fc" id="L100">    static final class Exhausted extends RuntimeException { }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RecurrenceInvariantSynthesis.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">RecurrenceInvariantSynthesis.java</span></div><h1>RecurrenceInvariantSynthesis.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.ast.Equation;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier.VerifiedLaw;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.representation.RepresentationBridge;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import de.regelsuche.representation.RepresentationBridge.WorkLedger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Synthesizes degree-one/two laws of an explicitly supplied affine rational recurrence.
+ * Coefficient equations use the existing matrix bridge and exact RREF solver.
+ * No historical formula, sample sequence or desired answer enters candidate formation.
+ */
+<span class="fc" id="L24">public final class RecurrenceInvariantSynthesis {</span>
+<span class="fc" id="L25">    public enum Evolution {</span>
+<span class="fc" id="L26">        FIXED(1), ALTERNATING(-1);</span>
+        private final int multiplier;
+<span class="fc" id="L28">        Evolution(int multiplier) { this.multiplier = multiplier; }</span>
+<span class="fc" id="L29">        public int multiplier() { return multiplier; }</span>
+    }
+    /** UNSUPPORTED: a valid ansatz direction exceeds the proposal/verifier representation guards. */
+<span class="fc" id="L32">    public enum Status { COMPLETE, BUDGET_INCONCLUSIVE, UNSUPPORTED }</span>
+    static final int MAX_PROPOSAL_LENGTH = 4096;
+
+    /** x(n+1) = linear*x(n) + offset over Q; coordinates are named x0, x1, x2. */
+    public record Transition(ExactMatrix linear, ExactVector offset) {
+<span class="fc" id="L37">        public Transition {</span>
+<span class="fc" id="L38">            Objects.requireNonNull(linear, &quot;linear&quot;); Objects.requireNonNull(offset, &quot;offset&quot;);</span>
+<span class="pc bpc" id="L39" title="2 of 6 branches missed.">            if (linear.rowCount() &lt; 1 || linear.rowCount() &gt; 3 || linear.rowCount() != linear.columns()</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                    || offset.dimension() != linear.rowCount())</span>
+<span class="fc" id="L41">                throw new IllegalArgumentException(&quot;one to three coordinates and a square affine transition are required&quot;);</span>
+<span class="fc" id="L42">            linear.rows().forEach(row -&gt; row.forEach(RecurrenceInvariantSupport::requireBounded));</span>
+<span class="fc" id="L43">            offset.values().forEach(RecurrenceInvariantSupport::requireBounded);</span>
+<span class="fc" id="L44">        }</span>
+    }
+
+    public record Request(Transition transition, List&lt;Rational&gt; initialState, int degree, Budget budget) {
+<span class="fc" id="L48">        public Request {</span>
+<span class="fc" id="L49">            Objects.requireNonNull(transition, &quot;transition&quot;); Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L50">            initialState = checkedInitial(transition, initialState);</span>
+<span class="fc bfc" id="L51" title="All 4 branches covered.">            if (degree &lt; 1 || degree &gt; 2) throw new IllegalArgumentException(&quot;degree must be one or two&quot;);</span>
+<span class="fc" id="L52">        }</span>
+    }
+
+    /** Untrusted, persistable proposal: it must be checked again against the caller's transition. */
+    public record Proposal(String polynomial, Evolution evolution) {
+<span class="fc" id="L57">        public Proposal {</span>
+<span class="fc" id="L58">            Objects.requireNonNull(polynomial, &quot;polynomial&quot;); Objects.requireNonNull(evolution, &quot;evolution&quot;);</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">            if (polynomial.isBlank() || polynomial.length() &gt; MAX_PROPOSAL_LENGTH)</span>
+<span class="fc" id="L60">                throw new IllegalArgumentException(&quot;bounded nonempty polynomial text is required&quot;);</span>
+<span class="fc" id="L61">        }</span>
+    }
+
+    /** COMPLETE describes only the declared degree/sign ansatz, never all possible identities. */
+    public record Report(Status status, List&lt;VerifiedLaw&gt; laws, WorkLedger work) {
+<span class="fc" id="L66">        public Report {</span>
+<span class="fc" id="L67">            Objects.requireNonNull(status, &quot;status&quot;); Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L68">            laws = List.copyOf(laws);</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            if (status != Status.COMPLETE &amp;&amp; !laws.isEmpty())</span>
+<span class="nc" id="L70">                throw new IllegalArgumentException(&quot;incomplete searches do not publish a complete law set&quot;);</span>
+<span class="fc" id="L71">        }</span>
+    }
+
+    public Report solve(Request request) {
+<span class="fc" id="L75">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L76">        var work = new Work(request.budget().maxWorkUnits());</span>
+<span class="fc" id="L77">        var laws = new ArrayList&lt;VerifiedLaw&gt;();</span>
+        try {
+<span class="fc" id="L79">            int dimension = request.transition().linear().columns();</span>
+<span class="fc" id="L80">            var basis = RecurrenceInvariantSupport.basis(dimension, request.degree());</span>
+<span class="fc" id="L81">            work.add(basis.size());</span>
+<span class="fc" id="L82">            var images = RecurrenceInvariantSupport.images(request.transition(), work);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            for (Evolution evolution : Evolution.values())</span>
+<span class="fc" id="L84">                solveSign(request, basis, images, evolution, laws, work);</span>
+<span class="fc" id="L85">            return new Report(Status.COMPLETE, laws, work.ledger());</span>
+<span class="fc" id="L86">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
+<span class="fc" id="L87">            return new Report(Status.BUDGET_INCONCLUSIVE, List.of(), work.ledger());</span>
+<span class="fc" id="L88">        } catch (Unsupported unsupported) {</span>
+<span class="fc" id="L89">            return new Report(Status.UNSUPPORTED, List.of(), work.ledger());</span>
+        }
+    }
+
+    private static void solveSign(Request request, List&lt;Monomial&gt; basis, List&lt;String&gt; images,
+            Evolution evolution, List&lt;VerifiedLaw&gt; laws, Work work) {
+<span class="fc" id="L95">        var equations = coefficientEquations(basis, images, evolution, work);</span>
+<span class="fc" id="L96">        var matrix = new LinearSystemRepresentationBridge().analyze(equations, new Budget(work.remaining()));</span>
+<span class="fc" id="L97">        work.add(matrix.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (matrix.status() == RepresentationBridge.Status.BUDGET_INCONCLUSIVE)</span>
+<span class="nc" id="L99">            throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc" id="L100">        var system = matrix.representation().orElseThrow(() -&gt; new IllegalStateException(&quot;affine coefficient bridge failed&quot;));</span>
+<span class="fc" id="L101">        var reduced = new ExactRrefSolver().solve(system, new Budget(work.remaining()));</span>
+<span class="fc" id="L102">        work.add(reduced.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (reduced.status() == ExactRrefSolver.Status.BUDGET_INCONCLUSIVE)</span>
+<span class="nc" id="L104">            throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc" id="L105">        var reduction = reduced.reduction().orElseThrow(() -&gt; new IllegalStateException(&quot;coefficient reduction failed&quot;));</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (var vector : reduction.nullspaceBasis()) {</span>
+<span class="fc" id="L107">            var polynomial = reconstruct(basis, system.variables(), vector, work);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (polynomial.totalDegree() == 0) continue;</span>
+<span class="fc" id="L109">            String text = polynomial.toCanonicalString();</span>
+            // Keep the representation guard; never silently drop a direction while claiming COMPLETE.
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (text.length() &gt; MAX_PROPOSAL_LENGTH) throw new Unsupported();</span>
+<span class="fc" id="L112">            admit(request, new Proposal(text, evolution), laws, work);</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">    }</span>
+
+    private static List&lt;Equation&gt; coefficientEquations(List&lt;Monomial&gt; basis, List&lt;String&gt; images,
+            Evolution evolution, Work work) {
+<span class="fc" id="L118">        var columns = new ArrayList&lt;Polynomial&gt;();</span>
+<span class="fc" id="L119">        var original = RecurrenceInvariantSupport.variables(images.size());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (var monomial : basis) {</span>
+<span class="fc" id="L121">            String before = RecurrenceInvariantSupport.monomial(monomial, original, work);</span>
+<span class="fc" id="L122">            String after = RecurrenceInvariantSupport.monomial(monomial, images, work);</span>
+<span class="fc" id="L123">            columns.add(RecurrenceInvariantSupport.project(&quot;(&quot; + after + &quot;)-(&quot; + evolution.multiplier() + &quot;)*(&quot; + before + &quot;)&quot;, work));</span>
+<span class="fc" id="L124">        }</span>
+<span class="fc" id="L125">        var equations = new ArrayList&lt;Equation&gt;();</span>
+<span class="fc" id="L126">        var parser = new ExpressionParser();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (var monomial : basis) {</span>
+<span class="fc" id="L128">            var left = new StringBuilder(&quot;0&quot;);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (int column = 0; column &lt; basis.size(); column++) {</span>
+<span class="fc" id="L130">                work.add(1);</span>
+<span class="fc" id="L131">                Rational coefficient = columns.get(column).terms().getOrDefault(monomial, Rational.ZERO);</span>
+                // Keep zero*coefficient-variable: the bridge must retain unconstrained columns.
+<span class="fc" id="L133">                left.append(&quot;+(&quot;).append(coefficient).append(&quot;)*k&quot;).append(column);</span>
+            }
+<span class="fc" id="L135">            work.add(left.length());</span>
+<span class="fc" id="L136">            equations.add(new Equation(parser.parseExactTerm(left.toString()).expression(), parser.parseExactTerm(&quot;0&quot;).expression()));</span>
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        return List.copyOf(equations);</span>
+    }
+
+    private static Polynomial reconstruct(List&lt;Monomial&gt; basis, List&lt;String&gt; variables, ExactVector vector, Work work) {
+<span class="fc" id="L142">        var coefficients = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc" id="L144">            work.add(variables.size());</span>
+<span class="fc" id="L145">            coefficients.add(vector.get(variables.indexOf(&quot;k&quot; + i)));</span>
+        }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        Rational first = coefficients.stream().filter(value -&gt; !value.isZero()).findFirst().orElseThrow();</span>
+<span class="fc" id="L148">        var result = Polynomial.zero();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc" id="L150">            work.add(1L + result.termCount());</span>
+<span class="fc" id="L151">            result = result.add(Polynomial.term(basis.get(i), coefficients.get(i).divide(first)));</span>
+        }
+<span class="fc" id="L153">        return result;</span>
+    }
+
+    private static void admit(Request request, Proposal proposal, List&lt;VerifiedLaw&gt; laws, Work work) {
+<span class="fc" id="L157">        var checked = new RecurrenceInvariantVerifier().verify(request.transition(), proposal,</span>
+<span class="fc" id="L158">            request.initialState(), new Budget(work.remaining()));</span>
+<span class="fc" id="L159">        work.add(checked.work().consumedWorkUnits());</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE)</span>
+<span class="fc" id="L161">            throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.UNSUPPORTED) throw new Unsupported();</span>
+<span class="pc" id="L163">        laws.add(checked.law().orElseThrow(() -&gt; new IllegalStateException(&quot;synthesized law failed independent identity check&quot;)));</span>
+<span class="fc" id="L164">    }</span>
+
+    private static final class Unsupported extends RuntimeException { }
+
+    static List&lt;Rational&gt; checkedInitial(Transition source, List&lt;Rational&gt; initial) {
+<span class="fc" id="L169">        Objects.requireNonNull(initial, &quot;initialState&quot;);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (initial.size() != source.linear().columns()) throw new IllegalArgumentException(&quot;initial-state dimension mismatch&quot;);</span>
+<span class="fc" id="L171">        var values = List.copyOf(initial);</span>
+<span class="fc" id="L172">        values.forEach(RecurrenceInvariantSupport::requireBounded);</span>
+<span class="fc" id="L173">        return values;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

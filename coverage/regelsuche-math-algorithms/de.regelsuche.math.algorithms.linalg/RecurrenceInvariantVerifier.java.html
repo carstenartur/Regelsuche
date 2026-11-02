@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RecurrenceInvariantVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">RecurrenceInvariantVerifier.java</span></div><h1>RecurrenceInvariantVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Evolution;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Proposal;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import de.regelsuche.representation.RepresentationBridge.WorkLedger;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Independent symbolic step/base checker, not a replay of observed numerical samples. */
+<span class="fc" id="L17">public final class RecurrenceInvariantVerifier {</span>
+<span class="fc" id="L18">    public enum Outcome { VERIFIED, REJECTED, UNSUPPORTED, BUDGET_INCONCLUSIVE }</span>
+    public record Verification(Outcome outcome, Optional&lt;VerifiedLaw&gt; law, WorkLedger work) {
+<span class="fc" id="L20">        public Verification {</span>
+<span class="fc" id="L21">            Objects.requireNonNull(outcome, &quot;outcome&quot;); Objects.requireNonNull(law, &quot;law&quot;); Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L22" title="1 of 4 branches missed.">            if ((outcome == Outcome.VERIFIED) != law.isPresent()) throw new IllegalArgumentException(&quot;only verified results carry a law&quot;);</span>
+<span class="fc" id="L23">        }</span>
+    }
+
+    /** Issuer-owned proof of P(T^n(initial)) = multiplier^n P(initial), for every n &gt;= 0. */
+    public static final class VerifiedLaw {
+        private final Transition transition;
+        private final Proposal proposal;
+        private final List&lt;Rational&gt; initialState;
+        private final Rational initialValue;
+<span class="fc" id="L32">        private VerifiedLaw(Transition transition, Proposal proposal, List&lt;Rational&gt; initialState, Rational initialValue) {</span>
+<span class="fc" id="L33">            this.transition = transition; this.proposal = proposal;</span>
+<span class="fc" id="L34">            this.initialState = List.copyOf(initialState); this.initialValue = initialValue;</span>
+<span class="fc" id="L35">        }</span>
+<span class="nc" id="L36">        public Transition transition() { return transition; }</span>
+<span class="fc" id="L37">        public Proposal proposal() { return proposal; }</span>
+<span class="nc" id="L38">        public List&lt;Rational&gt; initialState() { return initialState; }</span>
+<span class="fc" id="L39">        public Rational initialValue() { return initialValue; }</span>
+        /** Value of the proved invariant, NOT a closed form for each coordinate of the recurrence. */
+        public Rational valueAt(BigInteger index) {
+<span class="fc" id="L42">            Objects.requireNonNull(index, &quot;index&quot;);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (index.signum() &lt; 0) throw new IllegalArgumentException(&quot;index must be nonnegative&quot;);</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">            return proposal.evolution() == Evolution.ALTERNATING &amp;&amp; index.testBit(0) ? initialValue.negate() : initialValue;</span>
+        }
+    }
+
+    public Verification verify(Transition source, Proposal proposal, List&lt;Rational&gt; initialState, Budget budget) {
+<span class="fc" id="L49">        Objects.requireNonNull(source, &quot;source&quot;); Objects.requireNonNull(proposal, &quot;proposal&quot;); Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L50">        var initial = RecurrenceInvariantSynthesis.checkedInitial(source, initialState);</span>
+<span class="fc" id="L51">        var work = new Work(budget.maxWorkUnits());</span>
+        try {
+<span class="fc" id="L53">            return check(source, proposal, initial, work);</span>
+<span class="fc" id="L54">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
+<span class="fc" id="L55">            return withoutLaw(Outcome.BUDGET_INCONCLUSIVE, work);</span>
+<span class="fc" id="L56">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L57">            return withoutLaw(Outcome.UNSUPPORTED, work);</span>
+        }
+    }
+
+    private static Verification check(Transition source, Proposal proposal, List&lt;Rational&gt; initial, Work work) {
+<span class="fc" id="L62">        var polynomial = RecurrenceInvariantSupport.project(proposal.polynomial(), work);</span>
+<span class="fc" id="L63">        var variables = RecurrenceInvariantSupport.variables(source.linear().columns());</span>
+<span class="fc" id="L64">        work.add(polynomial.termCount());</span>
+<span class="fc bfc" id="L65" title="All 4 branches covered.">        if (polynomial.totalDegree() == 0 || !variables.containsAll(polynomial.variables()))</span>
+<span class="fc" id="L66">            return withoutLaw(Outcome.REJECTED, work);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (polynomial.totalDegree() &gt; 2) return withoutLaw(Outcome.UNSUPPORTED, work);</span>
+<span class="fc" id="L68">        var images = RecurrenceInvariantSupport.images(source, work);</span>
+<span class="fc" id="L69">        Polynomial transformed = RecurrenceInvariantSupport.substitute(polynomial, images, work);</span>
+<span class="fc" id="L70">        work.add(polynomial.termCount() + transformed.termCount());</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!transformed.equals(polynomial.multiply(Rational.of(proposal.evolution().multiplier()))))</span>
+<span class="fc" id="L72">            return withoutLaw(Outcome.REJECTED, work);</span>
+<span class="fc" id="L73">        var initialImages = initial.stream().map(Rational::toString).toList();</span>
+<span class="fc" id="L74">        Polynomial value = RecurrenceInvariantSupport.substitute(polynomial, initialImages, work);</span>
+<span class="fc" id="L75">        work.add(value.termCount() + 1L);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (!value.variables().isEmpty()) throw new IllegalStateException(&quot;initial substitution did not eliminate all coordinates&quot;);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        Rational initialValue = value.isZero() ? Rational.ZERO : value.terms().values().iterator().next();</span>
+<span class="fc" id="L78">        var canonicalProposal = new Proposal(polynomial.toCanonicalString(), proposal.evolution());</span>
+<span class="fc" id="L79">        var law = new VerifiedLaw(source, canonicalProposal, initial, initialValue);</span>
+<span class="fc" id="L80">        return new Verification(Outcome.VERIFIED, Optional.of(law), work.ledger());</span>
+    }
+
+    private static Verification withoutLaw(Outcome outcome, Work work) {
+<span class="fc" id="L84">        return new Verification(outcome, Optional.empty(), work.ledger());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
