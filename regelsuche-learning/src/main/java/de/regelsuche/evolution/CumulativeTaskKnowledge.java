@@ -23,6 +23,7 @@ public final class CumulativeTaskKnowledge {
     public static final String REVISION = "regelsuche.cumulative-task-knowledge/v1";
     static final String CONSTRUCTION_REVISION = "regelsuche.cumulative-task-knowledge/v2";
     static final String RECURRENCE_REVISION = "regelsuche.cumulative-task-knowledge/v3";
+    static final String RECURRENCE_FAMILY_REVISION = "regelsuche.cumulative-task-knowledge/v4";
     public enum Strategy { BASELINE, KNOWLEDGE_FIRST, AUTOMATIC }
     public enum Decision { INITIAL, PROMOTED, NO_NEW_SCHEMA, NO_NEW_LAW, NO_VALIDATED_BENEFIT, ACQUISITION_LIMIT }
     public static final long DEFAULT_LEARNING_WORK = 1_000_000;
@@ -155,6 +156,14 @@ public final class CumulativeTaskKnowledge {
             baseline, baseline, 0, "", Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of(), profile, List.of());
     }
     public int recurrenceCount() { return recurrences.size(); }
+    public long recurrenceFamilyCount() { return recurrences.stream().filter(e -> e.family().isPresent()).count(); }
+
+    /** Generalize previously acquired laws; validation must include a previously uncovered transition. */
+    public RecurrenceKnowledge.Update generalizeRecurrences(
+            List<de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request> validation,
+            de.regelsuche.representation.RepresentationBridge.Budget budget) {
+        return RecurrenceKnowledge.generalize(this, recurrences, validation, Objects.requireNonNull(budget));
+    }
 
     /** Find one checked nonconstant recurrence law; this is not an exhaustive-basis query. */
     public RecurrenceKnowledge.Execution solve(
