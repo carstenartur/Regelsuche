@@ -123,8 +123,8 @@ public final class RecurrenceKnowledge {
         if (formed.family().isEmpty()) return Optional.empty();
         var entry=Entry.fromFamily(formed.family().get());
         if (!hasUnseenValidation(entry,catalog,validation,progress.meter)) return Optional.empty();
-        if (catalog.size()>=MAX_ENTRIES) throw new Limit();
-        var candidate=new ArrayList<>(catalog); candidate.add(entry);
+        var candidate=new ArrayList<>(catalog);
+        addCandidate(candidate,entry,progress.meter);
         return validate(id,catalog,candidate,validation,progress) ? Optional.of(candidate) : Optional.empty();
     }
     private static boolean alreadyCovered(List<Entry> catalog, Entry a, Entry b, Meter work) {
@@ -189,9 +189,13 @@ public final class RecurrenceKnowledge {
             if (!run.solved() || run.reused()) continue;
             var entry = new Entry(task.transition(), task.degree(), run.law().orElseThrow().proposal());
             if (candidate.contains(entry)) continue;
-            if (candidate.size() >= MAX_ENTRIES) throw new Limit();
-            candidate.add(entry);
+            addCandidate(candidate, entry, progress.meter);
         }
+    }
+    private static void addCandidate(List<Entry> candidate, Entry entry, Meter work) {
+        if (candidate.size() >= MAX_ENTRIES) throw new Limit();
+        candidate.add(entry);
+        if (!RecurrenceKnowledgeCodec.fitsPayload(candidate, work::add)) throw new Limit();
     }
     private static boolean validate(String id, List<Entry> parent, List<Entry> candidate,
             List<Request> tasks, Progress progress) {
