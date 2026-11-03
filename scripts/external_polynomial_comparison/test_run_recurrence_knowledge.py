@@ -343,6 +343,74 @@ class ProtocolTests(unittest.TestCase):
                     'scope':'EXECUTE_CHILD_AND_REAPED_WORKER_DESCENDANTS;INCLUDES_CONTROLLER'}}
             (out/'command-receipt.json').write_bytes(canonical(receipt))
             self.m.verify(out)
+            # Complete learned arms must retain their actual saved bytes even after rehashing all evidence.
+            blocked_sequences = copy.deepcopy(sequences)
+            added_files = []
+
+            def retain_sequences():
+                for seq in sequences:
+                    seq['accounting'] = self.m.account_sequence(p, seq)
+                for name, value in {
+                    'sequences.json': sequences, 'rows.json': [r for seq in sequences for r in seq['rows']],
+                    'summary.json': self.m.summarize(p, sequences),
+                    'paired-comparisons.json': self.m.paired_comparisons(p, sequences),
+                }.items():
+                    (out/name).write_bytes(canonical(value))
+                self.m.write_manifest(out)
+                receipt['manifestHash'] = 'sha256:' + hashlib.sha256((out/'manifest.json').read_bytes()).hexdigest()
+                (out/'command-receipt.json').write_bytes(canonical(receipt))
+
+            baseline = complete_sequence(self.m, p)
+            baseline['command'] = command
+            sequences[0] = baseline
+            stderr = out / (baseline['id'] + '.query.stderr.txt')
+            stderr.write_text(''); added_files.append(stderr)
+            for profile in ('EXACT_FROZEN', 'FAMILY'):
+                learned = complete_sequence(self.m, p, profile)
+                learned['command'] = command
+                index = next(i for i, seq in enumerate(sequences) if seq['id'] == learned['id'])
+                sequences[index] = learned
+                snapshot_path = out/'snapshots'/learned['id']/'knowledge.json'
+                snapshot_path.parent.mkdir(parents=True)
+                snapshot_bytes = b'{"fixture":"retained snapshot bytes"}\n'
+                snapshot_path.write_bytes(snapshot_bytes); added_files.append(snapshot_path)
+                digest = 'sha256:' + hashlib.sha256(snapshot_bytes).hexdigest()
+                learned['snapshot'] = {'file': snapshot_path.relative_to(out).as_posix(), 'sha256': digest}
+                learned['snapshotInventory'] = self.m._file_inventory(snapshot_path.parent)
+                for op in learned['operations']:
+                    if op['name'] == 'save':
+                        op['request']['directory'] = str(snapshot_path.parent)
+                    if op['name'] == 'restore':
+                        op['request']['snapshot'] = str(snapshot_path)
+                    if op['name'] in ('save', 'restore'):
+                        op['response'].update(snapshot=str(snapshot_path), snapshotHash=digest)
+                for stage in ('producer', 'query'):
+                    stderr = out/(learned['id'] + '.' + stage + '.stderr.txt')
+                    stderr.write_text(''); added_files.append(stderr)
+                retain_sequences()
+                self.m.verify(out)
+                pair = next(pair for pair in json.loads((out/'paired-comparisons.json').read_text())
+                            if pair['profile'] == profile and pair['length'] == 1 and pair['repetition'] == 0)
+                self.assertEqual(pair['fullLifecycleWallSpeedup'], 1)
+                retained = copy.deepcopy(learned)
+                del learned['snapshot']; learned['snapshotInventory'] = {}; snapshot_path.unlink()
+                retain_sequences()
+                self.assertTrue(learned['accounting']['complete'])
+                with self.subTest(profile=profile, tamper='remove snapshot and inventory then rehash'):
+                    with self.assertRaisesRegex(ValueError, 'complete learned lifecycle requires retained snapshot'):
+                        self.m.verify(out)
+                # Missing snapshots remain representable for actual incomplete attempts.
+                next(op for op in learned['operations'] if op['name'] == 'restore')['status'] = 'ERROR'
+                learned['errors'].append('fixture consumer restore failed')
+                retain_sequences()
+                self.assertFalse(learned['accounting']['complete'])
+                self.m.verify(out)
+                learned.clear(); learned.update(retained); snapshot_path.write_bytes(snapshot_bytes)
+                retain_sequences(); self.m.verify(out)
+            sequences[:] = blocked_sequences
+            for path in added_files:
+                path.unlink()
+            retain_sequences()
             # Relocation preserves recorded original invocation and does not require old inputs to exist.
             import shutil
             moved=out/'moved-copy'; shutil.copytree(out,moved)

@@ -112,6 +112,32 @@ The full retained bundle contains the 938 runtime files, raw operations, laws,
 snapshots, stderr and process receipts as well as the numeric summary. The
 historical v2 experiment and its results remain unchanged.
 
+### Download and verify this recorded run
+
+The [complete original evidence ZIP](https://raw.githubusercontent.com/carstenartur/Regelsuche/1780d5445d0a6c4d139a43a4a89bd193e4fa8fff/Regelsuche-Rekurrenz-Lebenszyklus-2026-11-03.zip)
+is retained at immutable evidence commit
+[`1780d5445d0a6c4d139a43a4a89bd193e4fa8fff`](https://github.com/carstenartur/Regelsuche/tree/1780d5445d0a6c4d139a43a4a89bd193e4fa8fff).
+It is 9,032,673 bytes with archive SHA-256
+`a73e5d081f2f97a77b123a78f7a8f495e30d618866e2c0685f46cafc52623cb6`.
+This is the original measured bundle, including the actual raw responses,
+snapshots, full runtime bytes and inventory, and process receipts. It is not a
+new run reconstructed from the numeric summary.
+
+From a checkout containing the current verifier, check the download's digest,
+unpack it and verify the retained `evidence` directory:
+
+```bash
+sha256sum Regelsuche-Rekurrenz-Lebenszyklus-2026-11-03.zip
+unzip Regelsuche-Rekurrenz-Lebenszyklus-2026-11-03.zip -d recurrence-lifecycle-run1
+python3 -m scripts.external_polynomial_comparison.run_recurrence_knowledge \
+  --verify /absolute/path/to/recurrence-lifecycle-run1/evidence
+```
+
+Offline verification uses the retained bytes and Python standard library; it
+does not start another measurement or require the original workspace paths.
+Later verifier corrections recheck this same original evidence. The source
+commit recorded above remains the provenance of the actual measurement.
+
 ## Reproduction
 
 Requires Java 25, Maven, Python standard library and a POSIX host with `wait4`.

@@ -629,19 +629,27 @@ def verify(output: Path):
         snapshot_inventory = sequence.get('snapshotInventory', {})
         _require(snapshot_inventory == _file_inventory(output / 'snapshots' / sequence['id']), 'sequence snapshot inventory mismatch')
         expected_snapshots.update('snapshots/' + sequence['id'] + '/' + p for p in snapshot_inventory)
+        accounting = account_sequence(protocol, sequence)
         snapshot = sequence.get('snapshot')
+        if sequence['profile'] in {'EXACT_FROZEN', 'FAMILY'} and accounting['complete']:
+            _require(isinstance(snapshot, dict), 'complete learned lifecycle requires retained snapshot')
         if snapshot is not None:
+            _require(isinstance(snapshot, dict) and set(snapshot) == {'file', 'sha256'}, 'invalid snapshot metadata')
             path = Path(snapshot['file'])
             _require(not path.is_absolute() and '..' not in path.parts
                      and path.parent == Path('snapshots') / sequence['id'], 'invalid snapshot inventory binding')
             expected_snapshots.add(path.as_posix())
-            digest = 'sha256:' + hashlib.sha256((output / path).read_bytes()).hexdigest()
-            _require(digest == snapshot['sha256'], 'snapshot hash mismatch')
+            snapshot_file = output / path
+            _require(snapshot_file.is_file(), 'retained snapshot file missing')
+            digest = 'sha256:' + hashlib.sha256(snapshot_file.read_bytes()).hexdigest()
+            _require(digest == snapshot['sha256'] and snapshot_inventory.get(path.name) ==
+                     {'bytes': snapshot_file.stat().st_size, 'sha256': digest.removeprefix('sha256:')},
+                     'snapshot hash/inventory mismatch')
             for op in sequence['operations']:
                 if op['name'] in {'save', 'restore'} and op['status'] == 'COMPLETE':
                     _require(op['response']['snapshotHash'] == digest
                              and op['response']['snapshot'] == str(Path(metadata['outputDirectoryAtExecution']) / path), 'saved/restored snapshot trace mismatch')
-        _require(sequence['accounting'] == account_sequence(protocol, sequence), 'recomputed lifecycle accounting mismatch')
+        _require(sequence['accounting'] == accounting, 'recomputed lifecycle accounting mismatch')
     files = _file_inventory(output)
     _require({p for p in files if p.endswith('.stderr.txt')} == expected_stderr, 'stderr inventory mismatch')
     _require({p for p in files if p.startswith('snapshots/')} == expected_snapshots, 'snapshot inventory mismatch')
