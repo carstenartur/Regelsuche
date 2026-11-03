@@ -52,6 +52,66 @@ quality contract withhold complete performance ratios. Evidence verification
 can validate a faithfully recorded unsuccessful experiment without classifying
 it as a successful comparison.
 
+## Recorded execution on 2026-11-03
+
+Published source `0d218aec11c8e610bf0097538c22b6c06eaa483b`, source tree
+`fb5cbf1bd6b498ec5b3c303199a00527d45ce42a`, Temurin Java 25.0.5+8,
+Python 3.12.14. The observed shared Linux x86-64 environment reports an AMD
+EPYC 9V74 processor, nine affinity-visible CPUs, an eight-CPU cgroup quota and
+an 8 GiB memory limit. This was not an exclusive-host precision study.
+
+All **27 lifecycles, 657 query receipts and 45 JVM process receipts** completed
+and passed registered quality acceptance. All 657 responses were retained and
+audited; 576 contain independently verified laws and 81 are the expected negative
+outcomes. The command exited zero. A separate offline verification also exited
+zero and reproduced the accounting, summaries and comparisons.
+
+Each table cell is the median of three actual runs. RSS is the median of each
+run's maximum worker-process peak. The retained
+[numeric summary](recurrence-lifecycle-20261103-summary.json) includes all 27
+accounting rows and the per-repetition paired comparisons.
+
+| Queries | Profile | Solved per run | Wall seconds | Full CPU seconds | Worker peak RSS MiB | Logical work |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | BASELINE | 1/1 | 0.679 | 1.319 | 98.69 | 4,416 |
+| 1 | EXACT_FROZEN | 1/1 | 1.542 | 3.223 | 117.40 | 24,820 |
+| 1 | FAMILY | 1/1 | 1.664 | 3.236 | 127.80 | 35,493 |
+| 8 | BASELINE | 7/8 | 0.847 | 2.002 | 125.13 | 33,075 |
+| 8 | EXACT_FROZEN | 7/8 | 1.596 | 3.661 | 126.84 | 53,557 |
+| 8 | FAMILY | 7/8 | 1.571 | 3.670 | 128.23 | 39,966 |
+| 64 | BASELINE | 56/64 | 1.519 | 4.345 | 208.64 | 264,736 |
+| 64 | EXACT_FROZEN | 56/64 | 2.363 | 5.865 | 206.84 | 285,848 |
+| 64 | FAMILY | 56/64 | 2.000 | 5.190 | 128.84 | 75,595 |
+
+**The complete lifecycle has not amortized elapsed time or CPU by 64 requests.**
+At that length, comparing the group medians, FAMILY takes 31.7% more elapsed
+time and 19.5% more CPU than BASELINE, while using 71.4% less declared logical
+work. The lower worker peak at length 64 does not establish an intrinsic heap
+or total-machine memory advantage; the shorter sequences have higher FAMILY
+process peaks. Different valid baseline/family laws pass the same task-quality
+contract. No inputs or lengths were retuned after observing this result.
+
+The retained phase receipts help locate the overhead: for 64 requests, the
+query phase itself has a median of 0.408 seconds for FAMILY versus 1.005 for
+BASELINE. The remaining lifecycle has medians of 1.592 versus 0.515 seconds.
+These are separately summarized phase measurements, not a projected break-even
+point. A longer sequence would need its own declared, actually executed run;
+the present data cannot establish where elapsed-time amortization begins.
+
+The outer command took 42.2725 seconds and recorded 97.6505 CPU seconds for
+the execute-child process tree including reaped JVM descendants, plus 0.000469
+supervisor CPU seconds. It includes runtime retention and report/manifest
+writing through child exit. The separately written final supervisor receipt
+is explicitly outside its own measured wall boundary.
+
+Runtime bytes bind to
+`sha256:e483e120bbdd2e1993970f04f794d4b2755f30818cfd5f5467a39277115f8a3f`;
+the complete evidence manifest binds to
+`sha256:d18cee6a3db145243881d6537f83278453328c353daf3012957e9ea6dd267ec6`.
+The full retained bundle contains the 938 runtime files, raw operations, laws,
+snapshots, stderr and process receipts as well as the numeric summary. The
+historical v2 experiment and its results remain unchanged.
+
 ## Reproduction
 
 Requires Java 25, Maven, Python standard library and a POSIX host with `wait4`.
