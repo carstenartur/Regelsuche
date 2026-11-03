@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RecurrenceKnowledge.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RecurrenceKnowledge.java</span></div><h1>RecurrenceKnowledge.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
 
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily.Anchor;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily.VerifiedFamily;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Proposal;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
@@ -16,157 +19,236 @@ import java.util.Optional;
 public final class RecurrenceKnowledge {
     static final int MAX_ENTRIES = 32;
     private RecurrenceKnowledge() { }
-<span class="fc" id="L19">    public enum Outcome { VERIFIED, NO_LAW_IN_ANSATZ, UNSUPPORTED, BUDGET_INCONCLUSIVE }</span>
+<span class="fc" id="L22">    public enum Outcome { VERIFIED, NO_LAW_IN_ANSATZ, UNSUPPORTED, BUDGET_INCONCLUSIVE }</span>
 
     /** Success means one nonconstant law, never completeness of a stored invariant basis. */
     public record Execution(String generationId, CumulativeTaskKnowledge.Strategy selectedStrategy,
             Outcome outcome, Optional&lt;VerifiedLaw&gt; law, long totalWork, boolean reused) {
-<span class="fc" id="L24">        public Execution {</span>
-<span class="fc" id="L25">            Objects.requireNonNull(generationId); Objects.requireNonNull(selectedStrategy);</span>
-<span class="fc" id="L26">            Objects.requireNonNull(outcome); Objects.requireNonNull(law);</span>
-<span class="pc bpc" id="L27" title="3 of 10 branches missed.">            if (totalWork &lt; 0 || (outcome == Outcome.VERIFIED) != law.isPresent() || reused &amp;&amp; law.isEmpty())</span>
-<span class="nc" id="L28">                throw new IllegalArgumentException(&quot;invalid recurrence execution&quot;);</span>
-<span class="fc" id="L29">        }</span>
-<span class="fc" id="L30">        public boolean solved() { return law.isPresent(); }</span>
+<span class="fc" id="L27">        public Execution {</span>
+<span class="fc" id="L28">            Objects.requireNonNull(generationId); Objects.requireNonNull(selectedStrategy);</span>
+<span class="fc" id="L29">            Objects.requireNonNull(outcome); Objects.requireNonNull(law);</span>
+<span class="pc bpc" id="L30" title="3 of 10 branches missed.">            if (totalWork &lt; 0 || (outcome == Outcome.VERIFIED) != law.isPresent() || reused &amp;&amp; law.isEmpty())</span>
+<span class="nc" id="L31">                throw new IllegalArgumentException(&quot;invalid recurrence execution&quot;);</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        public boolean solved() { return law.isPresent(); }</span>
     }
-<span class="fc" id="L32">    public record Validation(Request task, Execution previous, Execution candidate) { }</span>
+<span class="fc" id="L35">    public record Validation(Request task, Execution previous, Execution candidate) { }</span>
     public record Update(CumulativeTaskKnowledge next, CumulativeTaskKnowledge.Decision reason,
             List&lt;Execution&gt; training, List&lt;Validation&gt; validation, CumulativeTaskKnowledge.Costs work) {
-<span class="fc" id="L35">        public Update { training = List.copyOf(training); validation = List.copyOf(validation); }</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        public boolean promoted() { return reason == CumulativeTaskKnowledge.Decision.PROMOTED; }</span>
+<span class="fc" id="L38">        public Update { training = List.copyOf(training); validation = List.copyOf(validation); }</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        public boolean promoted() { return reason == CumulativeTaskKnowledge.Decision.PROMOTED; }</span>
     }
     /** Only proposals are persisted. Every use and every load rechecks the caller-bound mathematics. */
-    record Entry(Transition transition, int degree, Proposal proposal) {
-<span class="fc" id="L40">        Entry {</span>
-<span class="fc" id="L41">            Objects.requireNonNull(transition); Objects.requireNonNull(proposal);</span>
-<span class="pc bpc" id="L42" title="2 of 4 branches missed.">            if (degree &lt; 1 || degree &gt; 2) throw new IllegalArgumentException(&quot;invalid recurrence degree&quot;);</span>
-<span class="fc" id="L43">        }</span>
-<span class="fc bfc" id="L44" title="All 4 branches covered.">        boolean applies(Request task) { return degree &lt;= task.degree() &amp;&amp; transition.equals(task.transition()); }</span>
+    record Entry(Transition transition, int degree, Proposal proposal, Optional&lt;VerifiedFamily&gt; family) {
+<span class="fc" id="L43">        Entry(Transition transition, int degree, Proposal proposal) { this(transition, degree, proposal, Optional.empty()); }</span>
+<span class="fc" id="L44">        Entry {</span>
+<span class="fc" id="L45">            Objects.requireNonNull(transition); Objects.requireNonNull(proposal); Objects.requireNonNull(family);</span>
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">            if (degree &lt; 1 || degree &gt; 2) throw new IllegalArgumentException(&quot;invalid recurrence degree&quot;);</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">            if (family.isPresent() &amp;&amp; (family.get().degree()!=degree</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                    || !family.get().first().equals(new Anchor(transition,proposal))))</span>
+<span class="nc" id="L49">                throw new IllegalArgumentException(&quot;family anchor mismatch&quot;);</span>
+<span class="fc" id="L50">        }</span>
+        static Entry fromFamily(VerifiedFamily family) {
+<span class="fc" id="L52">            return new Entry(family.first().transition(),family.degree(),family.first().proposal(),Optional.of(family));</span>
+        }
+        boolean applies(Request task) {
+<span class="fc bfc" id="L55" title="All 8 branches covered.">            return degree &lt;= task.degree() &amp;&amp; (family.isEmpty() ? transition.equals(task.transition()) : family.get().matches(task.transition()));</span>
+        }
     }
 
     static Execution execute(String id, List&lt;Entry&gt; catalog, Request task, CumulativeTaskKnowledge.Strategy strategy) {
-<span class="fc" id="L48">        Objects.requireNonNull(task); Objects.requireNonNull(strategy);</span>
-<span class="fc" id="L49">        var paid = new Meter(task.budget().maxWorkUnits());</span>
+<span class="fc" id="L60">        Objects.requireNonNull(task); Objects.requireNonNull(strategy);</span>
+<span class="fc" id="L61">        var paid = new Meter(task.budget().maxWorkUnits());</span>
         try {
-<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (strategy != CumulativeTaskKnowledge.Strategy.BASELINE) {</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">                for (var entry : catalog) {</span>
-<span class="fc" id="L53">                    paid.add(2L + task.transition().linear().columns() * task.transition().linear().columns());</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">                    if (!entry.applies(task)) continue;</span>
-<span class="fc" id="L55">                    var proof = new RecurrenceInvariantVerifier().verify(task.transition(), entry.proposal(),</span>
-<span class="fc" id="L56">                        task.initialState(), new Budget(paid.remaining()));</span>
-<span class="fc" id="L57">                    paid.add(proof.work().consumedWorkUnits());</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">                    if (proof.law().isPresent()) return receipt(id, Outcome.VERIFIED, proof.law(), paid, true);</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                    if (proof.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();</span>
-<span class="nc" id="L60">                }</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (strategy != CumulativeTaskKnowledge.Strategy.BASELINE) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                for (var entry : catalog) {</span>
+<span class="fc" id="L65">                    paid.add(2L + task.transition().linear().columns() * task.transition().linear().columns());</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                    if (!entry.applies(task)) continue;</span>
+<span class="fc" id="L67">                    var proposal = proposalFor(entry, task, paid);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                    if (proposal.isEmpty()) continue;</span>
+<span class="fc" id="L69">                    var proof = new RecurrenceInvariantVerifier().verify(task.transition(), proposal.get(),</span>
+<span class="fc" id="L70">                        task.initialState(), new Budget(paid.remaining()));</span>
+<span class="fc" id="L71">                    paid.add(proof.work().consumedWorkUnits());</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                    if (proof.law().isPresent()) return receipt(id, Outcome.VERIFIED, proof.law(), paid, true);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                    if (proof.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();</span>
+<span class="nc" id="L74">                }</span>
             }
-<span class="fc" id="L62">            var result = new RecurrenceInvariantSynthesis().solve(new Request(task.transition(), task.initialState(),</span>
-<span class="fc" id="L63">                task.degree(), new Budget(paid.remaining())));</span>
-<span class="fc" id="L64">            paid.add(result.work().consumedWorkUnits());</span>
-<span class="fc" id="L65">            return receipt(id, outcome(result), result.laws().stream().findFirst(), paid, false);</span>
-<span class="fc" id="L66">        } catch (Limit exhausted) {</span>
-<span class="fc" id="L67">            return receipt(id, Outcome.BUDGET_INCONCLUSIVE, Optional.empty(), paid, false);</span>
+<span class="fc" id="L76">            var result = new RecurrenceInvariantSynthesis().solve(new Request(task.transition(), task.initialState(),</span>
+<span class="fc" id="L77">                task.degree(), new Budget(paid.remaining())));</span>
+<span class="fc" id="L78">            paid.add(result.work().consumedWorkUnits());</span>
+<span class="fc" id="L79">            return receipt(id, outcome(result), result.laws().stream().findFirst(), paid, false);</span>
+<span class="fc" id="L80">        } catch (Limit exhausted) {</span>
+<span class="fc" id="L81">            return receipt(id, Outcome.BUDGET_INCONCLUSIVE, Optional.empty(), paid, false);</span>
         }
     }
+    private static Optional&lt;Proposal&gt; proposalFor(Entry entry, Request task, Meter paid) {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (entry.family().isEmpty()) return Optional.of(entry.proposal());</span>
+<span class="fc" id="L86">        var specialized=entry.family().get().specialize(task.transition(),new Budget(paid.remaining()));</span>
+<span class="fc" id="L87">        paid.add(specialized.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (specialized.outcome()==RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();</span>
+<span class="fc" id="L89">        return specialized.proposal();</span>
+    }
+
+    /** One bounded, symbolically proved family per generation; validation never enters its formation. */
+    static Update generalize(CumulativeTaskKnowledge owner, List&lt;Entry&gt; catalog, List&lt;Request&gt; validationInput, Budget budget) {
+<span class="fc" id="L94">        var validation=bounded(validationInput);</span>
+<span class="fc" id="L95">        var progress=new Progress(budget.maxWorkUnits());</span>
+<span class="fc" id="L96">        var exact=catalog.stream().filter(e -&gt; e.family().isEmpty()).toList();</span>
+        try {
+<span class="fc" id="L98">            var next=generalizePairs(owner.id(),catalog,exact,validation,progress);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            return finish(owner,next.orElse(catalog),next.isPresent() ? CumulativeTaskKnowledge.Decision.PROMOTED</span>
+<span class="fc" id="L100">                : CumulativeTaskKnowledge.Decision.NO_VALIDATED_BENEFIT,progress);</span>
+<span class="fc" id="L101">        } catch (Limit exhausted) {</span>
+<span class="fc" id="L102">            return finish(owner,catalog,CumulativeTaskKnowledge.Decision.ACQUISITION_LIMIT,progress);</span>
+<span class="nc" id="L103">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L104">            throw new LearningFailure(progress.costs(),progress.training,failure);</span>
+        }
+    }
+    private static Optional&lt;List&lt;Entry&gt;&gt; generalizePairs(String id, List&lt;Entry&gt; catalog, List&lt;Entry&gt; exact,
+            List&lt;Request&gt; validation, Progress progress) {
+<span class="fc bfc" id="L109" title="All 4 branches covered.">        for (int i=0;i&lt;exact.size();i++) for (int j=i+1;j&lt;exact.size();j++) {</span>
+<span class="fc" id="L110">            var result=generalizePair(id,catalog,exact.get(i),exact.get(j),validation,progress);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (result.isPresent()) return result;</span>
+        }
+<span class="fc" id="L113">        return Optional.empty();</span>
+    }
+    private static Optional&lt;List&lt;Entry&gt;&gt; generalizePair(String id, List&lt;Entry&gt; catalog, Entry a, Entry b,
+            List&lt;Request&gt; validation, Progress progress) {
+<span class="fc" id="L117">        progress.meter.add(1);</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (a.degree()!=b.degree() || alreadyCovered(catalog,a,b,progress.meter)) return Optional.empty();</span>
+<span class="fc" id="L119">        var formed=new RecurrenceInvariantFamily().form(new Anchor(a.transition(),a.proposal()),</span>
+<span class="fc" id="L120">            new Anchor(b.transition(),b.proposal()),a.degree(),new Budget(progress.meter.remaining()));</span>
+<span class="fc" id="L121">        progress.meter.add(formed.work().consumedWorkUnits());</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (formed.outcome()==RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (formed.family().isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L124">        var entry=Entry.fromFamily(formed.family().get());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (!hasUnseenValidation(entry,catalog,validation,progress.meter)) return Optional.empty();</span>
+<span class="fc" id="L126">        var candidate=new ArrayList&lt;&gt;(catalog);</span>
+<span class="fc" id="L127">        addCandidate(candidate,entry,progress.meter);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        return validate(id,catalog,candidate,validation,progress) ? Optional.of(candidate) : Optional.empty();</span>
+    }
+    private static boolean alreadyCovered(List&lt;Entry&gt; catalog, Entry a, Entry b, Meter work) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (var entry : catalog) {</span>
+<span class="fc" id="L132">            work.add(1);</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">            if (entry.degree()&gt;a.degree() || entry.family().isEmpty()) continue;</span>
+<span class="fc" id="L134">            int dimension=a.transition().linear().columns();</span>
+<span class="fc" id="L135">            work.add(2L*dimension*(dimension+1));</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">            if (entry.family().get().matches(a.transition()) &amp;&amp; entry.family().get().matches(b.transition())) return true;</span>
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        return false;</span>
+    }
+    private static boolean hasUnseenValidation(Entry candidate, List&lt;Entry&gt; catalog, List&lt;Request&gt; tasks, Meter work) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (var task : tasks) {</span>
+<span class="fc" id="L142">            work.add(1L+catalog.size());</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">            if (candidate.applies(task) &amp;&amp; catalog.stream().noneMatch(e -&gt; e.applies(task))) return true;</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">        return false;</span>
+    }
+
     private static Outcome outcome(RecurrenceInvariantSynthesis.Report result) {
-<span class="pc bpc" id="L71" title="1 of 3 branches missed.">        return switch (result.status()) {</span>
-<span class="fc" id="L72">            case BUDGET_INCONCLUSIVE -&gt; Outcome.BUDGET_INCONCLUSIVE;</span>
-<span class="nc" id="L73">            case UNSUPPORTED -&gt; Outcome.UNSUPPORTED;</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">            case COMPLETE -&gt; result.laws().isEmpty() ? Outcome.NO_LAW_IN_ANSATZ : Outcome.VERIFIED;</span>
+<span class="pc bpc" id="L149" title="1 of 3 branches missed.">        return switch (result.status()) {</span>
+<span class="fc" id="L150">            case BUDGET_INCONCLUSIVE -&gt; Outcome.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L151">            case UNSUPPORTED -&gt; Outcome.UNSUPPORTED;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            case COMPLETE -&gt; result.laws().isEmpty() ? Outcome.NO_LAW_IN_ANSATZ : Outcome.VERIFIED;</span>
         };
     }
     private static Execution receipt(String id, Outcome outcome, Optional&lt;VerifiedLaw&gt; law, Meter work, boolean reused) {
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        return new Execution(id, reused ? CumulativeTaskKnowledge.Strategy.KNOWLEDGE_FIRST : CumulativeTaskKnowledge.Strategy.BASELINE,</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        return new Execution(id, reused ? CumulativeTaskKnowledge.Strategy.KNOWLEDGE_FIRST : CumulativeTaskKnowledge.Strategy.BASELINE,</span>
             outcome, law, work.used, reused);
     }
 
     /** Validation is separate by initial-state task; reuse deliberately transfers across initial states. */
     static Update learn(CumulativeTaskKnowledge owner, List&lt;Entry&gt; catalog, List&lt;Request&gt; lessonInput,
             List&lt;Request&gt; validationInput, Budget budget) {
-<span class="fc" id="L85">        var lessons = bounded(lessonInput); var validation = bounded(validationInput);</span>
-<span class="fc" id="L86">        var progress = new Progress(budget.maxWorkUnits());</span>
-<span class="fc" id="L87">        var candidate = new ArrayList&lt;&gt;(catalog);</span>
+<span class="fc" id="L163">        var lessons = bounded(lessonInput); var validation = bounded(validationInput);</span>
+<span class="fc" id="L164">        var progress = new Progress(budget.maxWorkUnits());</span>
+<span class="fc" id="L165">        var candidate = new ArrayList&lt;&gt;(catalog);</span>
         try {
-<span class="fc" id="L89">            requireDisjoint(lessons, validation, progress.meter);</span>
-<span class="fc" id="L90">            progress.split = progress.meter.used;</span>
-<span class="fc" id="L91">            learnLessons(owner.id(), catalog, candidate, lessons, progress);</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (candidate.equals(catalog)) return finish(owner, catalog, CumulativeTaskKnowledge.Decision.NO_NEW_LAW, progress);</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">            boolean covered = candidate.stream().filter(e -&gt; !catalog.contains(e))</span>
-<span class="fc" id="L94">                .allMatch(e -&gt; validation.stream().anyMatch(e::applies));</span>
-<span class="pc bpc" id="L95" title="1 of 4 branches missed.">            boolean benefit = covered &amp;&amp; validate(owner.id(), catalog, candidate, validation, progress);</span>
-<span class="fc bfc" id="L96" title="All 4 branches covered.">            return finish(owner, benefit ? candidate : catalog, benefit ? CumulativeTaskKnowledge.Decision.PROMOTED</span>
-<span class="fc" id="L97">                : CumulativeTaskKnowledge.Decision.NO_VALIDATED_BENEFIT, progress);</span>
-<span class="fc" id="L98">        } catch (Limit exhausted) {</span>
-<span class="fc" id="L99">            return finish(owner, catalog, CumulativeTaskKnowledge.Decision.ACQUISITION_LIMIT, progress);</span>
-<span class="fc" id="L100">        } catch (RuntimeException failure) {</span>
-<span class="pc bpc" id="L101" title="2 of 4 branches missed.">            if (failure instanceof IllegalArgumentException invalid &amp;&amp; progress.training.isEmpty()) throw invalid;</span>
-<span class="nc" id="L102">            throw new LearningFailure(progress.costs(), progress.training, failure);</span>
+<span class="fc" id="L167">            requireDisjoint(lessons, validation, progress.meter);</span>
+<span class="fc" id="L168">            progress.split = progress.meter.used;</span>
+<span class="fc" id="L169">            learnLessons(owner.id(), catalog, candidate, lessons, progress);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (candidate.equals(catalog)) return finish(owner, catalog, CumulativeTaskKnowledge.Decision.NO_NEW_LAW, progress);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            boolean covered = candidate.stream().filter(e -&gt; !catalog.contains(e))</span>
+<span class="fc" id="L172">                .allMatch(e -&gt; validation.stream().anyMatch(e::applies));</span>
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">            boolean benefit = covered &amp;&amp; validate(owner.id(), catalog, candidate, validation, progress);</span>
+<span class="fc bfc" id="L174" title="All 4 branches covered.">            return finish(owner, benefit ? candidate : catalog, benefit ? CumulativeTaskKnowledge.Decision.PROMOTED</span>
+<span class="fc" id="L175">                : CumulativeTaskKnowledge.Decision.NO_VALIDATED_BENEFIT, progress);</span>
+<span class="fc" id="L176">        } catch (Limit exhausted) {</span>
+<span class="fc" id="L177">            return finish(owner, catalog, CumulativeTaskKnowledge.Decision.ACQUISITION_LIMIT, progress);</span>
+<span class="fc" id="L178">        } catch (RuntimeException failure) {</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">            if (failure instanceof IllegalArgumentException invalid &amp;&amp; progress.training.isEmpty()) throw invalid;</span>
+<span class="nc" id="L180">            throw new LearningFailure(progress.costs(), progress.training, failure);</span>
         }
     }
     private static void learnLessons(String id, List&lt;Entry&gt; parent, List&lt;Entry&gt; candidate,
             List&lt;Request&gt; lessons, Progress progress) {
-<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (var task : lessons) {</span>
-<span class="fc" id="L108">            var run = runPaid(id, parent, task, progress.meter);</span>
-<span class="fc" id="L109">            progress.training.add(run); progress.lessons += run.totalWork();</span>
-<span class="fc bfc" id="L110" title="All 4 branches covered.">            if (progress.meter.remaining() == 0 &amp;&amp; !run.solved()) throw new Limit();</span>
-<span class="fc bfc" id="L111" title="All 4 branches covered.">            if (!run.solved() || run.reused()) continue;</span>
-<span class="fc" id="L112">            var entry = new Entry(task.transition(), task.degree(), run.law().orElseThrow().proposal());</span>
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (candidate.contains(entry)) continue;</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (candidate.size() &gt;= MAX_ENTRIES) throw new Limit();</span>
-<span class="fc" id="L115">            candidate.add(entry);</span>
-<span class="fc" id="L116">        }</span>
-<span class="fc" id="L117">    }</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (var task : lessons) {</span>
+<span class="fc" id="L186">            var run = runPaid(id, parent, task, progress.meter);</span>
+<span class="fc" id="L187">            progress.training.add(run); progress.lessons += run.totalWork();</span>
+<span class="fc bfc" id="L188" title="All 4 branches covered.">            if (progress.meter.remaining() == 0 &amp;&amp; !run.solved()) throw new Limit();</span>
+<span class="fc bfc" id="L189" title="All 4 branches covered.">            if (!run.solved() || run.reused()) continue;</span>
+<span class="fc" id="L190">            var entry = new Entry(task.transition(), task.degree(), run.law().orElseThrow().proposal());</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (candidate.contains(entry)) continue;</span>
+<span class="fc" id="L192">            addCandidate(candidate, entry, progress.meter);</span>
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">    }</span>
+    private static void addCandidate(List&lt;Entry&gt; candidate, Entry entry, Meter work) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (candidate.size() &gt;= MAX_ENTRIES) throw new Limit();</span>
+<span class="fc" id="L197">        candidate.add(entry);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (!RecurrenceKnowledgeCodec.fitsPayload(candidate, work::add)) throw new Limit();</span>
+<span class="fc" id="L199">    }</span>
     private static boolean validate(String id, List&lt;Entry&gt; parent, List&lt;Entry&gt; candidate,
             List&lt;Request&gt; tasks, Progress progress) {
-<span class="fc" id="L120">        long oldWork = 0, newWork = 0;</span>
-<span class="fc" id="L121">        boolean safe = true, moreSolved = false;</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (var task : tasks) {</span>
-<span class="fc" id="L123">            var before = runPaid(id, parent, task, progress.meter);</span>
-<span class="fc" id="L124">            progress.validationWork += before.totalWork();</span>
-<span class="fc" id="L125">            var after = runPaid(id, candidate, task, progress.meter);</span>
-<span class="fc" id="L126">            progress.validationWork += after.totalWork();</span>
-<span class="fc" id="L127">            progress.validation.add(new Validation(task, before, after));</span>
-<span class="fc bfc" id="L128" title="All 4 branches covered.">            if (progress.meter.remaining() == 0 &amp;&amp; !after.solved()) throw new Limit();</span>
-<span class="pc bpc" id="L129" title="2 of 4 branches missed.">            safe &amp;= !before.solved() || after.solved();</span>
-<span class="pc bpc" id="L130" title="3 of 4 branches missed.">            moreSolved |= !before.solved() &amp;&amp; after.solved();</span>
-<span class="fc" id="L131">            oldWork += before.totalWork(); newWork += after.totalWork();</span>
-<span class="fc" id="L132">        }</span>
-<span class="pc bpc" id="L133" title="3 of 6 branches missed.">        return safe &amp;&amp; (moreSolved || newWork &lt; oldWork);</span>
+<span class="fc" id="L202">        long oldWork = 0, newWork = 0;</span>
+<span class="fc" id="L203">        boolean safe = true, moreSolved = false;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (var task : tasks) {</span>
+<span class="fc" id="L205">            var before = runPaid(id, parent, task, progress.meter);</span>
+<span class="fc" id="L206">            progress.validationWork += before.totalWork();</span>
+<span class="fc" id="L207">            var after = runPaid(id, candidate, task, progress.meter);</span>
+<span class="fc" id="L208">            progress.validationWork += after.totalWork();</span>
+<span class="fc" id="L209">            progress.validation.add(new Validation(task, before, after));</span>
+<span class="fc bfc" id="L210" title="All 4 branches covered.">            if (progress.meter.remaining() == 0 &amp;&amp; !after.solved()) throw new Limit();</span>
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">            safe &amp;= !before.solved() || after.solved();</span>
+<span class="pc bpc" id="L212" title="3 of 4 branches missed.">            moreSolved |= !before.solved() &amp;&amp; after.solved();</span>
+<span class="fc" id="L213">            oldWork += before.totalWork(); newWork += after.totalWork();</span>
+<span class="fc" id="L214">        }</span>
+<span class="pc bpc" id="L215" title="3 of 6 branches missed.">        return safe &amp;&amp; (moreSolved || newWork &lt; oldWork);</span>
     }
     private static Execution runPaid(String id, List&lt;Entry&gt; catalog, Request task, Meter acquisition) {
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (acquisition.remaining() == 0) throw new Limit();</span>
-<span class="fc" id="L137">        var bounded = new Request(task.transition(), task.initialState(), task.degree(),</span>
-<span class="fc" id="L138">            new Budget(Math.min(task.budget().maxWorkUnits(), acquisition.remaining())));</span>
-<span class="fc" id="L139">        var run = execute(id, catalog, bounded, CumulativeTaskKnowledge.Strategy.AUTOMATIC);</span>
-<span class="fc" id="L140">        acquisition.add(run.totalWork());</span>
-<span class="fc" id="L141">        return run;</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (acquisition.remaining() == 0) throw new Limit();</span>
+<span class="fc" id="L219">        var bounded = new Request(task.transition(), task.initialState(), task.degree(),</span>
+<span class="fc" id="L220">            new Budget(Math.min(task.budget().maxWorkUnits(), acquisition.remaining())));</span>
+<span class="fc" id="L221">        var run = execute(id, catalog, bounded, CumulativeTaskKnowledge.Strategy.AUTOMATIC);</span>
+<span class="fc" id="L222">        acquisition.add(run.totalWork());</span>
+<span class="fc" id="L223">        return run;</span>
     }
     private static Update finish(CumulativeTaskKnowledge owner, List&lt;Entry&gt; catalog,
             CumulativeTaskKnowledge.Decision decision, Progress progress) {
         // A cutoff after a partial query retains the meter's paid prefix, not only completed receipts.
-<span class="fc" id="L146">        var costs = progress.costs();</span>
-<span class="fc" id="L147">        var next = owner.withRecurrences(catalog, decision, costs);</span>
-<span class="fc" id="L148">        return new Update(next, decision, progress.training, progress.validation, costs);</span>
+<span class="fc" id="L228">        var costs = progress.costs();</span>
+<span class="fc" id="L229">        var next = owner.withRecurrences(catalog, decision, costs);</span>
+<span class="fc" id="L230">        return new Update(next, decision, progress.training, progress.validation, costs);</span>
     }
     private static List&lt;Request&gt; bounded(List&lt;Request&gt; input) {
-<span class="fc" id="L151">        var tasks = List.copyOf(input);</span>
-<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        if (tasks.isEmpty() || tasks.size() &gt; 32) throw new IllegalArgumentException(&quot;one to 32 recurrence tasks required&quot;);</span>
-<span class="fc" id="L153">        return tasks;</span>
+<span class="fc" id="L233">        var tasks = List.copyOf(input);</span>
+<span class="pc bpc" id="L234" title="2 of 4 branches missed.">        if (tasks.isEmpty() || tasks.size() &gt; 32) throw new IllegalArgumentException(&quot;one to 32 recurrence tasks required&quot;);</span>
+<span class="fc" id="L235">        return tasks;</span>
     }
     private static void requireDisjoint(List&lt;Request&gt; lessons, List&lt;Request&gt; validation, Meter work) {
-<span class="fc bfc" id="L156" title="All 4 branches covered.">        for (var a : lessons) for (var b : validation) {</span>
-<span class="fc" id="L157">            work.add(1);</span>
-<span class="pc bpc" id="L158" title="1 of 6 branches missed.">            if (a.transition().equals(b.transition()) &amp;&amp; a.initialState().equals(b.initialState()) &amp;&amp; a.degree() == b.degree())</span>
-<span class="fc" id="L159">                throw new IllegalArgumentException(&quot;lesson/validation task overlap&quot;);</span>
-<span class="fc" id="L160">        }</span>
-<span class="fc" id="L161">    }</span>
+<span class="fc bfc" id="L238" title="All 4 branches covered.">        for (var a : lessons) for (var b : validation) {</span>
+<span class="fc" id="L239">            work.add(1);</span>
+<span class="pc bpc" id="L240" title="1 of 6 branches missed.">            if (a.transition().equals(b.transition()) &amp;&amp; a.initialState().equals(b.initialState()) &amp;&amp; a.degree() == b.degree())</span>
+<span class="fc" id="L241">                throw new IllegalArgumentException(&quot;lesson/validation task overlap&quot;);</span>
+<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">    }</span>
     private static final class Progress {
         final Meter meter;
-<span class="fc" id="L164">        final List&lt;Execution&gt; training = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L165">        final List&lt;Validation&gt; validation = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L246">        final List&lt;Execution&gt; training = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L247">        final List&lt;Validation&gt; validation = new ArrayList&lt;&gt;();</span>
         long lessons, validationWork, split;
-<span class="fc" id="L167">        Progress(int budget) { meter = new Meter(budget); }</span>
+<span class="fc" id="L249">        Progress(int budget) { meter = new Meter(budget); }</span>
         CumulativeTaskKnowledge.Costs costs() {
-<span class="fc" id="L169">            return new CumulativeTaskKnowledge.Costs(lessons, meter.used - lessons - validationWork - split,</span>
+<span class="fc" id="L251">            return new CumulativeTaskKnowledge.Costs(lessons, meter.used - lessons - validationWork - split,</span>
                 0, validationWork, 0, 0, split);
         }
     }
@@ -176,22 +258,22 @@ public final class RecurrenceKnowledge {
         private final CumulativeTaskKnowledge.Costs knownWork;
         private final List&lt;Execution&gt; completed;
         private LearningFailure(CumulativeTaskKnowledge.Costs work, List&lt;Execution&gt; completed, RuntimeException cause) {
-<span class="nc" id="L179">            super(&quot;recurrence learning failed; unfinished operation work is unknown&quot;, cause);</span>
-<span class="nc" id="L180">            this.knownWork = work; this.completed = List.copyOf(completed);</span>
-<span class="nc" id="L181">        }</span>
-<span class="nc" id="L182">        public CumulativeTaskKnowledge.Costs knownWork() { return knownWork; }</span>
-<span class="nc" id="L183">        public List&lt;Execution&gt; completedLessons() { return completed; }</span>
-<span class="nc" id="L184">        public boolean accountingComplete() { return false; }</span>
+<span class="nc" id="L261">            super(&quot;recurrence learning failed; unfinished operation work is unknown&quot;, cause);</span>
+<span class="nc" id="L262">            this.knownWork = work; this.completed = List.copyOf(completed);</span>
+<span class="nc" id="L263">        }</span>
+<span class="nc" id="L264">        public CumulativeTaskKnowledge.Costs knownWork() { return knownWork; }</span>
+<span class="nc" id="L265">        public List&lt;Execution&gt; completedLessons() { return completed; }</span>
+<span class="nc" id="L266">        public boolean accountingComplete() { return false; }</span>
     }
     private static final class Meter {
         final int limit; int used;
-<span class="fc" id="L188">        Meter(int limit) { this.limit = limit; }</span>
-<span class="fc" id="L189">        int remaining() { return limit - used; }</span>
+<span class="fc" id="L270">        Meter(int limit) { this.limit = limit; }</span>
+<span class="fc" id="L271">        int remaining() { return limit - used; }</span>
         void add(long amount) {
-<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (amount &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (amount &gt; remaining()) { used = limit; throw new Limit(); }</span>
-<span class="fc" id="L193">            used += (int) amount;</span>
-<span class="fc" id="L194">        }</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (amount &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if (amount &gt; remaining()) { used = limit; throw new Limit(); }</span>
+<span class="fc" id="L275">            used += (int) amount;</span>
+<span class="fc" id="L276">        }</span>
     }
     private static final class Limit extends RuntimeException { private static final long serialVersionUID = 1L; }
 }

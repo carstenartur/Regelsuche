@@ -12,94 +12,131 @@ import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Evoluti
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Proposal;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily.Anchor;
 import de.regelsuche.representation.RepresentationBridge.Budget;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.LongConsumer;
 
 /** Strict bounded payload inside the existing content-addressed knowledge snapshot. */
 final class RecurrenceKnowledgeCodec {
-<span class="fc" id="L24">    private static final ObjectMapper JSON = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
-<span class="fc" id="L25">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+    private static final int MAX_PAYLOAD_LENGTH = 200_000;
+<span class="fc" id="L28">    private static final ObjectMapper JSON = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L29">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
     private RecurrenceKnowledgeCodec() { }
-<span class="fc" id="L27">    record Loaded(List&lt;RecurrenceKnowledge.Entry&gt; entries, long work) { }</span>
+<span class="fc" id="L31">    record Loaded(List&lt;RecurrenceKnowledge.Entry&gt; entries, long work) { }</span>
 
     static String encode(List&lt;RecurrenceKnowledge.Entry&gt; entries) {
-<span class="fc" id="L30">        var root = JSON.createArrayNode();</span>
-<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (var entry : entries) {</span>
-<span class="fc" id="L32">            var node = root.addObject().put(&quot;degree&quot;, entry.degree()).put(&quot;polynomial&quot;, entry.proposal().polynomial())</span>
-<span class="fc" id="L33">                .put(&quot;evolution&quot;, entry.proposal().evolution().name());</span>
-<span class="fc" id="L34">            var matrix = node.putArray(&quot;linear&quot;);</span>
-<span class="fc bfc" id="L35" title="All 2 branches covered.">            for (var row : entry.transition().linear().rows()) {</span>
-<span class="fc" id="L36">                var cells = matrix.addArray(); row.forEach(value -&gt; cells.add(value.toString()));</span>
-<span class="fc" id="L37">            }</span>
-<span class="fc" id="L38">            var offset = node.putArray(&quot;offset&quot;);</span>
-<span class="fc" id="L39">            entry.transition().offset().values().forEach(value -&gt; offset.add(value.toString()));</span>
-<span class="fc" id="L40">        }</span>
-<span class="fc" id="L41">        return root.toString();</span>
+<span class="fc" id="L34">        String json = payload(entries);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (json.length() &gt; MAX_PAYLOAD_LENGTH) throw new IllegalArgumentException(&quot;recurrence payload too large&quot;);</span>
+<span class="fc" id="L36">        return json;</span>
     }
+    /** Admission pays for the actual canonical payload, including both anchors of every family. */
+    static boolean fitsPayload(List&lt;RecurrenceKnowledge.Entry&gt; entries, LongConsumer work) {
+<span class="fc" id="L40">        String json = payload(entries);</span>
+<span class="fc" id="L41">        work.accept(json.length());</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        return json.length() &lt;= MAX_PAYLOAD_LENGTH;</span>
+    }
+    private static String payload(List&lt;RecurrenceKnowledge.Entry&gt; entries) {
+<span class="fc" id="L45">        var root = JSON.createArrayNode();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (var entry : entries) {</span>
+<span class="fc" id="L47">            var node = root.addObject();</span>
+<span class="fc" id="L48">            writeAnchor(node,entry.transition(),entry.degree(),entry.proposal());</span>
+<span class="fc" id="L49">            entry.family().ifPresent(f -&gt; writeAnchor(node.putObject(&quot;family&quot;),f.second().transition(),f.degree(),f.second().proposal()));</span>
+<span class="fc" id="L50">        }</span>
+<span class="fc" id="L51">        return root.toString();</span>
+    }
+    private static void writeAnchor(com.fasterxml.jackson.databind.node.ObjectNode node,
+            Transition transition, int degree, Proposal proposal) {
+<span class="fc" id="L55">        node.put(&quot;degree&quot;,degree).put(&quot;polynomial&quot;,proposal.polynomial()).put(&quot;evolution&quot;,proposal.evolution().name());</span>
+<span class="fc" id="L56">        var matrix=node.putArray(&quot;linear&quot;);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (var row : transition.linear().rows()) {</span>
+<span class="fc" id="L58">            var cells=matrix.addArray(); row.forEach(value -&gt; cells.add(value.toString()));</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        var offset=node.putArray(&quot;offset&quot;);</span>
+<span class="fc" id="L61">        transition.offset().values().forEach(value -&gt; offset.add(value.toString()));</span>
+<span class="fc" id="L62">    }</span>
     static Loaded restore(String json) {
-<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (json.isEmpty()) return new Loaded(List.of(), 0);</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (json.length() &gt; 200_000) throw new IllegalArgumentException(&quot;recurrence payload too large&quot;);</span>
-<span class="fc" id="L46">        long[] work = {json.length()};</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (json.isEmpty()) return new Loaded(List.of(), 0);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (json.length() &gt; MAX_PAYLOAD_LENGTH) throw new IllegalArgumentException(&quot;recurrence payload too large&quot;);</span>
+<span class="fc" id="L66">        long[] work = {json.length()};</span>
         try {
-<span class="fc" id="L48">            JsonNode root = JSON.readTree(json);</span>
-<span class="pc bpc" id="L49" title="2 of 6 branches missed.">            if (root == null || !root.isArray() || root.size() &gt; RecurrenceKnowledge.MAX_ENTRIES)</span>
-<span class="fc" id="L50">                throw new IllegalArgumentException(&quot;invalid recurrence catalog size&quot;);</span>
-<span class="fc" id="L51">            var entries = new ArrayList&lt;RecurrenceKnowledge.Entry&gt;();</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (var node : root) {</span>
-<span class="fc" id="L53">                var entry = readEntry(node);</span>
-<span class="pc bpc" id="L54" title="1 of 6 branches missed.">                if (entries.stream().anyMatch(e -&gt; e.transition().equals(entry.transition()) &amp;&amp; e.degree() == entry.degree()))</span>
-<span class="fc" id="L55">                    throw new IllegalArgumentException(&quot;duplicate recurrence key&quot;);</span>
-<span class="fc" id="L56">                verify(entry, work); entries.add(entry);</span>
-<span class="fc" id="L57">            }</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (!encode(entries).equals(json)) throw new IllegalArgumentException(&quot;noncanonical recurrence catalog&quot;);</span>
-<span class="fc" id="L59">            return new Loaded(List.copyOf(entries), work[0]);</span>
-<span class="fc" id="L60">        } catch (java.io.IOException | IllegalArgumentException | ArithmeticException failure) {</span>
-<span class="fc" id="L61">            throw new IllegalArgumentException(&quot;invalid or unproved recurrence payload; knownWork=&quot; + work[0], failure);</span>
+<span class="fc" id="L68">            JsonNode root = JSON.readTree(json);</span>
+<span class="pc bpc" id="L69" title="2 of 6 branches missed.">            if (root == null || !root.isArray() || root.size() &gt; RecurrenceKnowledge.MAX_ENTRIES)</span>
+<span class="fc" id="L70">                throw new IllegalArgumentException(&quot;invalid recurrence catalog size&quot;);</span>
+<span class="fc" id="L71">            var entries = new ArrayList&lt;RecurrenceKnowledge.Entry&gt;();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (var node : root) {</span>
+<span class="fc" id="L73">                var entry = readEntry(node, work);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                if (entries.stream().anyMatch(e -&gt; sameKey(e, entry)))</span>
+<span class="fc" id="L75">                    throw new IllegalArgumentException(&quot;duplicate recurrence key&quot;);</span>
+<span class="fc" id="L76">                verify(entry, work); entries.add(entry);</span>
+<span class="fc" id="L77">            }</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (!encode(entries).equals(json)) throw new IllegalArgumentException(&quot;noncanonical recurrence catalog&quot;);</span>
+<span class="fc" id="L79">            return new Loaded(List.copyOf(entries), work[0]);</span>
+<span class="fc" id="L80">        } catch (java.io.IOException | IllegalArgumentException | ArithmeticException failure) {</span>
+<span class="fc" id="L81">            throw new IllegalArgumentException(&quot;invalid or unproved recurrence payload; knownWork=&quot; + work[0], failure);</span>
         }
     }
-    private static RecurrenceKnowledge.Entry readEntry(JsonNode node) {
-<span class="fc" id="L65">        var names = new HashSet&lt;String&gt;();</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (!node.isObject()) throw new IllegalArgumentException(&quot;recurrence object required&quot;);</span>
-<span class="fc" id="L67">        node.fieldNames().forEachRemaining(names::add);</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (!names.equals(Set.of(&quot;degree&quot;, &quot;polynomial&quot;, &quot;evolution&quot;, &quot;linear&quot;, &quot;offset&quot;)))</span>
-<span class="fc" id="L69">            throw new IllegalArgumentException(&quot;unexpected recurrence fields&quot;);</span>
-<span class="fc" id="L70">        var degree = node.get(&quot;degree&quot;);</span>
-<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (!degree.isIntegralNumber() || !degree.canConvertToInt()) throw new IllegalArgumentException(&quot;integer degree required&quot;);</span>
-<span class="fc" id="L72">        var matrix = node.get(&quot;linear&quot;);</span>
-<span class="pc bpc" id="L73" title="3 of 6 branches missed.">        if (!matrix.isArray() || matrix.isEmpty() || matrix.size() &gt; 3) throw new IllegalArgumentException(&quot;bounded matrix required&quot;);</span>
-<span class="fc" id="L74">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (var row : matrix) rows.add(vector(row));</span>
-<span class="fc" id="L76">        var source = new Transition(new ExactMatrix(rows), new ExactVector(vector(node.get(&quot;offset&quot;))));</span>
-<span class="fc" id="L77">        return new RecurrenceKnowledge.Entry(source, degree.intValue(),</span>
-<span class="fc" id="L78">            new Proposal(text(node.get(&quot;polynomial&quot;)), Evolution.valueOf(text(node.get(&quot;evolution&quot;)))));</span>
+    private static boolean sameKey(RecurrenceKnowledge.Entry a, RecurrenceKnowledge.Entry b) {
+<span class="pc bpc" id="L85" title="1 of 6 branches missed.">        if (!a.transition().equals(b.transition()) || a.degree()!=b.degree() || a.family().isPresent()!=b.family().isPresent()) return false;</span>
+<span class="pc bpc" id="L86" title="3 of 4 branches missed.">        return a.family().isEmpty() || a.family().get().second().transition().equals(b.family().get().second().transition());</span>
+    }
+    private static RecurrenceKnowledge.Entry readEntry(JsonNode node, long[] work) {
+<span class="fc" id="L89">        var exact=readAnchor(node,true);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (!node.has(&quot;family&quot;)) return exact;</span>
+<span class="fc" id="L91">        var other=readAnchor(node.get(&quot;family&quot;),false);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (other.degree()!=exact.degree()) throw new IllegalArgumentException(&quot;family degree mismatch&quot;);</span>
+<span class="fc" id="L93">        var formation=new RecurrenceInvariantFamily().form(new Anchor(exact.transition(),exact.proposal()),</span>
+<span class="fc" id="L94">            new Anchor(other.transition(),other.proposal()),exact.degree(),new Budget(200_000));</span>
+<span class="fc" id="L95">        work[0]=Math.addExact(work[0],formation.work().consumedWorkUnits());</span>
+<span class="fc" id="L96">        return RecurrenceKnowledge.Entry.fromFamily(formation.family()</span>
+<span class="fc" id="L97">            .orElseThrow(() -&gt; new IllegalArgumentException(&quot;stored family failed symbolic verification&quot;)));</span>
+    }
+    private static RecurrenceKnowledge.Entry readAnchor(JsonNode node, boolean allowFamily) {
+<span class="fc" id="L100">        var names = new HashSet&lt;String&gt;();</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!node.isObject()) throw new IllegalArgumentException(&quot;recurrence object required&quot;);</span>
+<span class="fc" id="L102">        node.fieldNames().forEachRemaining(names::add);</span>
+<span class="fc" id="L103">        var expected=new HashSet&lt;&gt;(Set.of(&quot;degree&quot;, &quot;polynomial&quot;, &quot;evolution&quot;, &quot;linear&quot;, &quot;offset&quot;));</span>
+<span class="fc bfc" id="L104" title="All 4 branches covered.">        if (allowFamily &amp;&amp; node.has(&quot;family&quot;)) expected.add(&quot;family&quot;);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (!names.equals(expected))</span>
+<span class="fc" id="L106">            throw new IllegalArgumentException(&quot;unexpected recurrence fields&quot;);</span>
+<span class="fc" id="L107">        var degree = node.get(&quot;degree&quot;);</span>
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        if (!degree.isIntegralNumber() || !degree.canConvertToInt()) throw new IllegalArgumentException(&quot;integer degree required&quot;);</span>
+<span class="fc" id="L109">        var matrix = node.get(&quot;linear&quot;);</span>
+<span class="pc bpc" id="L110" title="3 of 6 branches missed.">        if (!matrix.isArray() || matrix.isEmpty() || matrix.size() &gt; 3) throw new IllegalArgumentException(&quot;bounded matrix required&quot;);</span>
+<span class="fc" id="L111">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (var row : matrix) rows.add(vector(row));</span>
+<span class="fc" id="L113">        var source = new Transition(new ExactMatrix(rows), new ExactVector(vector(node.get(&quot;offset&quot;))));</span>
+<span class="fc" id="L114">        return new RecurrenceKnowledge.Entry(source, degree.intValue(),</span>
+<span class="fc" id="L115">            new Proposal(text(node.get(&quot;polynomial&quot;)), Evolution.valueOf(text(node.get(&quot;evolution&quot;)))));</span>
     }
     private static List&lt;Rational&gt; vector(JsonNode node) {
-<span class="pc bpc" id="L81" title="3 of 6 branches missed.">        if (!node.isArray() || node.isEmpty() || node.size() &gt; 3) throw new IllegalArgumentException(&quot;bounded vector required&quot;);</span>
-<span class="fc" id="L82">        var values = new ArrayList&lt;Rational&gt;();</span>
-<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (var value : node) {</span>
-<span class="fc" id="L84">            String text = text(value);</span>
-<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (!text.matches(&quot;-?[0-9]{1,40}(/[0-9]{1,40})?&quot;)) throw new IllegalArgumentException(&quot;bounded exact rational required&quot;);</span>
-<span class="fc" id="L86">            String[] pair = text.split(&quot;/&quot;, -1);</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            values.add(new Rational(new BigInteger(pair[0]), pair.length == 1 ? BigInteger.ONE : new BigInteger(pair[1])));</span>
-<span class="fc" id="L88">        }</span>
-<span class="fc" id="L89">        return List.copyOf(values);</span>
+<span class="pc bpc" id="L118" title="3 of 6 branches missed.">        if (!node.isArray() || node.isEmpty() || node.size() &gt; 3) throw new IllegalArgumentException(&quot;bounded vector required&quot;);</span>
+<span class="fc" id="L119">        var values = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (var value : node) {</span>
+<span class="fc" id="L121">            String text = text(value);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (!text.matches(&quot;-?[0-9]{1,40}(/[0-9]{1,40})?&quot;)) throw new IllegalArgumentException(&quot;bounded exact rational required&quot;);</span>
+<span class="fc" id="L123">            String[] pair = text.split(&quot;/&quot;, -1);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            values.add(new Rational(new BigInteger(pair[0]), pair.length == 1 ? BigInteger.ONE : new BigInteger(pair[1])));</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">        return List.copyOf(values);</span>
     }
     private static String text(JsonNode node) {
-<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (!node.isTextual()) throw new IllegalArgumentException(&quot;text required&quot;);</span>
-<span class="fc" id="L93">        return node.textValue();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (!node.isTextual()) throw new IllegalArgumentException(&quot;text required&quot;);</span>
+<span class="fc" id="L130">        return node.textValue();</span>
     }
     private static void verify(RecurrenceKnowledge.Entry entry, long[] work) {
-<span class="fc" id="L96">        var initial = java.util.Collections.nCopies(entry.transition().linear().columns(), Rational.ZERO);</span>
-<span class="fc" id="L97">        var checked = new RecurrenceInvariantVerifier().verify(entry.transition(), entry.proposal(), initial, new Budget(200_000));</span>
-<span class="fc" id="L98">        work[0] = Math.addExact(work[0], checked.work().consumedWorkUnits());</span>
-<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (checked.law().isEmpty()) throw new IllegalArgumentException(&quot;stored recurrence identity failed revalidation&quot;);</span>
-<span class="fc" id="L100">        var polynomial = new ExactPolynomialAnalysis(units -&gt; work[0] = Math.addExact(work[0], units))</span>
-<span class="fc" id="L101">            .normalForm(entry.proposal().polynomial());</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (polynomial.totalDegree() &gt; entry.degree()) throw new IllegalArgumentException(&quot;stored degree bound is false&quot;);</span>
-<span class="fc" id="L103">    }</span>
+<span class="fc" id="L133">        var initial = java.util.Collections.nCopies(entry.transition().linear().columns(), Rational.ZERO);</span>
+<span class="fc" id="L134">        var checked = new RecurrenceInvariantVerifier().verify(entry.transition(), entry.proposal(), initial, new Budget(200_000));</span>
+<span class="fc" id="L135">        work[0] = Math.addExact(work[0], checked.work().consumedWorkUnits());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (checked.law().isEmpty()) throw new IllegalArgumentException(&quot;stored recurrence identity failed revalidation&quot;);</span>
+<span class="fc" id="L137">        var polynomial = new ExactPolynomialAnalysis(units -&gt; work[0] = Math.addExact(work[0], units))</span>
+<span class="fc" id="L138">            .normalForm(entry.proposal().polynomial());</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (polynomial.totalDegree() &gt; entry.degree()) throw new IllegalArgumentException(&quot;stored degree bound is false&quot;);</span>
+<span class="fc" id="L140">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

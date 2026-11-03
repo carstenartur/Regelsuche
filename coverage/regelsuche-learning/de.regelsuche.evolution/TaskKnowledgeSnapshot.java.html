@@ -93,68 +93,70 @@ final class TaskKnowledgeSnapshot {
 <span class="fc bfc" id="L93" title="All 4 branches covered.">        return !entries.isEmpty() || decision == CumulativeTaskKnowledge.Decision.NO_NEW_LAW;</span>
     }
     private static String revision(TaskConstructionProfile profile, List&lt;RecurrenceKnowledge.Entry&gt; recurrences, CumulativeTaskKnowledge.Decision decision) {
-<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (hasRecurrences(recurrences, decision)) return CumulativeTaskKnowledge.RECURRENCE_REVISION;</span>
-<span class="fc bfc" id="L97" title="All 2 branches covered.">        return profile == TaskConstructionProfile.NONE ? CumulativeTaskKnowledge.REVISION : CumulativeTaskKnowledge.CONSTRUCTION_REVISION;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (recurrences.stream().anyMatch(e -&gt; e.family().isPresent())) return CumulativeTaskKnowledge.RECURRENCE_FAMILY_REVISION;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (hasRecurrences(recurrences, decision)) return CumulativeTaskKnowledge.RECURRENCE_REVISION;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        return profile == TaskConstructionProfile.NONE ? CumulativeTaskKnowledge.REVISION : CumulativeTaskKnowledge.CONSTRUCTION_REVISION;</span>
     }
     private static TaskConstructionProfile profile(JsonNode root) {
-<span class="pc bpc" id="L100" title="3 of 6 branches missed.">        if (root == null || !root.isObject() || !root.hasNonNull(&quot;revision&quot;))</span>
-<span class="nc" id="L101">            throw new IllegalArgumentException(&quot;snapshot revision required&quot;);</span>
-<span class="fc" id="L102">        String revision = text(root, &quot;revision&quot;);</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (revision.equals(CumulativeTaskKnowledge.REVISION)) {</span>
-<span class="fc" id="L104">            fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;));</span>
-<span class="fc" id="L105">            return TaskConstructionProfile.NONE;</span>
+<span class="pc bpc" id="L101" title="3 of 6 branches missed.">        if (root == null || !root.isObject() || !root.hasNonNull(&quot;revision&quot;))</span>
+<span class="nc" id="L102">            throw new IllegalArgumentException(&quot;snapshot revision required&quot;);</span>
+<span class="fc" id="L103">        String revision = text(root, &quot;revision&quot;);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (revision.equals(CumulativeTaskKnowledge.REVISION)) {</span>
+<span class="fc" id="L105">            fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;));</span>
+<span class="fc" id="L106">            return TaskConstructionProfile.NONE;</span>
         }
-<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (revision.equals(CumulativeTaskKnowledge.RECURRENCE_REVISION)) {</span>
-<span class="fc" id="L108">            fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;, &quot;constructionProfile&quot;, &quot;recurrences&quot;));</span>
-<span class="fc" id="L109">            return TaskConstructionProfile.valueOf(text(root, &quot;constructionProfile&quot;));</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (revision.equals(CumulativeTaskKnowledge.RECURRENCE_REVISION)</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                || revision.equals(CumulativeTaskKnowledge.RECURRENCE_FAMILY_REVISION)) {</span>
+<span class="fc" id="L110">            fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;, &quot;constructionProfile&quot;, &quot;recurrences&quot;));</span>
+<span class="fc" id="L111">            return TaskConstructionProfile.valueOf(text(root, &quot;constructionProfile&quot;));</span>
         }
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (!revision.equals(CumulativeTaskKnowledge.CONSTRUCTION_REVISION)) throw new IllegalArgumentException(&quot;unknown knowledge revision&quot;);</span>
-<span class="fc" id="L112">        fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;, &quot;constructionProfile&quot;));</span>
-<span class="fc" id="L113">        var profile = TaskConstructionProfile.valueOf(text(root, &quot;constructionProfile&quot;));</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (profile == TaskConstructionProfile.NONE) throw new IllegalArgumentException(&quot;construction snapshot requires a profile&quot;);</span>
-<span class="fc" id="L115">        return profile;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!revision.equals(CumulativeTaskKnowledge.CONSTRUCTION_REVISION)) throw new IllegalArgumentException(&quot;unknown knowledge revision&quot;);</span>
+<span class="fc" id="L114">        fields(root, Set.of(&quot;revision&quot;, &quot;generation&quot;, &quot;parentId&quot;, &quot;model&quot;, &quot;routes&quot;, &quot;costs&quot;, &quot;decision&quot;, &quot;attempts&quot;, &quot;constructionProfile&quot;));</span>
+<span class="fc" id="L115">        var profile = TaskConstructionProfile.valueOf(text(root, &quot;constructionProfile&quot;));</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (profile == TaskConstructionProfile.NONE) throw new IllegalArgumentException(&quot;construction snapshot requires a profile&quot;);</span>
+<span class="fc" id="L117">        return profile;</span>
     }
     private static void fields(JsonNode node, Set&lt;String&gt; expected) {
-<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IllegalArgumentException(&quot;object required&quot;);</span>
-<span class="fc" id="L119">        var names = new HashSet&lt;String&gt;(); node.fieldNames().forEachRemaining(names::add);</span>
-<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!names.equals(expected)) throw new IllegalArgumentException(&quot;unexpected snapshot fields&quot;);</span>
-<span class="fc" id="L121">    }</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IllegalArgumentException(&quot;object required&quot;);</span>
+<span class="fc" id="L121">        var names = new HashSet&lt;String&gt;(); node.fieldNames().forEachRemaining(names::add);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (!names.equals(expected)) throw new IllegalArgumentException(&quot;unexpected snapshot fields&quot;);</span>
+<span class="fc" id="L123">    }</span>
     private static String text(JsonNode node, String key) {
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!node.get(key).isTextual()) throw new IllegalArgumentException(&quot;text required: &quot; + key);</span>
-<span class="fc" id="L124">        return node.get(key).textValue();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!node.get(key).isTextual()) throw new IllegalArgumentException(&quot;text required: &quot; + key);</span>
+<span class="fc" id="L126">        return node.get(key).textValue();</span>
     }
     private static long number(JsonNode node, String key) {
-<span class="fc" id="L127">        var value = node.get(key);</span>
-<span class="pc bpc" id="L128" title="3 of 6 branches missed.">        if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() &lt; 0)</span>
-<span class="nc" id="L129">            throw new IllegalArgumentException(&quot;nonnegative integer required: &quot; + key);</span>
-<span class="fc" id="L130">        return value.longValue();</span>
+<span class="fc" id="L129">        var value = node.get(key);</span>
+<span class="pc bpc" id="L130" title="3 of 6 branches missed.">        if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() &lt; 0)</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;nonnegative integer required: &quot; + key);</span>
+<span class="fc" id="L132">        return value.longValue();</span>
     }
     static Path save(Path directory, String id, String json) throws IOException {
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(directory)) throw new IOException(&quot;snapshot directory is a symbolic link&quot;);</span>
-<span class="fc" id="L134">        Files.createDirectories(directory);</span>
-<span class="fc" id="L135">        var path = directory.resolve(id.substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;);</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) { requireSame(path, json); return path; }</span>
-<span class="fc" id="L137">        Path temporary = Files.createTempFile(directory, &quot;.knowledge-&quot;, &quot;.tmp&quot;);</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(directory)) throw new IOException(&quot;snapshot directory is a symbolic link&quot;);</span>
+<span class="fc" id="L136">        Files.createDirectories(directory);</span>
+<span class="fc" id="L137">        var path = directory.resolve(id.substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) { requireSame(path, json); return path; }</span>
+<span class="fc" id="L139">        Path temporary = Files.createTempFile(directory, &quot;.knowledge-&quot;, &quot;.tmp&quot;);</span>
         try {
-<span class="fc" id="L139">            Files.writeString(temporary, json, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L141">            Files.writeString(temporary, json, StandardCharsets.UTF_8);</span>
             // Same-filesystem hard link publishes complete bytes atomically, without replacing a rival file.
-<span class="fc" id="L141">            try { Files.createLink(path, temporary); }</span>
-<span class="pc" id="L142">            catch (FileAlreadyExistsException race) { requireSame(path, json); }</span>
-<span class="fc" id="L143">        } finally { Files.deleteIfExists(temporary); }</span>
-<span class="fc" id="L144">        return path;</span>
+<span class="fc" id="L143">            try { Files.createLink(path, temporary); }</span>
+<span class="pc" id="L144">            catch (FileAlreadyExistsException race) { requireSame(path, json); }</span>
+<span class="fc" id="L145">        } finally { Files.deleteIfExists(temporary); }</span>
+<span class="fc" id="L146">        return path;</span>
     }
     private static void requireSame(Path path, String json) throws IOException {
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (!read(path).equals(json)) throw new IOException(&quot;existing knowledge snapshot differs&quot;);</span>
-<span class="fc" id="L148">    }</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!read(path).equals(json)) throw new IOException(&quot;existing knowledge snapshot differs&quot;);</span>
+<span class="fc" id="L150">    }</span>
     static String read(Path path) throws IOException {
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;regular snapshot file required&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;regular snapshot file required&quot;);</span>
         byte[] bytes;
-<span class="fc" id="L152">        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { bytes = input.readNBytes(MAX_BYTES + 1); }</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_BYTES) throw new IOException(&quot;knowledge snapshot too large&quot;);</span>
-<span class="fc" id="L154">        var json = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();</span>
-<span class="fc" id="L155">        String expected = SchematicProofPlan.hash(json).substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;;</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (!path.getFileName().toString().equals(expected)) throw new IOException(&quot;snapshot content address differs&quot;);</span>
-<span class="fc" id="L157">        return json;</span>
+<span class="fc" id="L154">        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { bytes = input.readNBytes(MAX_BYTES + 1); }</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_BYTES) throw new IOException(&quot;knowledge snapshot too large&quot;);</span>
+<span class="fc" id="L156">        var json = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();</span>
+<span class="fc" id="L157">        String expected = SchematicProofPlan.hash(json).substring(&quot;sha256:&quot;.length()) + &quot;.json&quot;;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (!path.getFileName().toString().equals(expected)) throw new IOException(&quot;snapshot content address differs&quot;);</span>
+<span class="fc" id="L159">        return json;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

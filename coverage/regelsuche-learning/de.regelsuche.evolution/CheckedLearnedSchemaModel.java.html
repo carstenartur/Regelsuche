@@ -69,7 +69,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
 <span class="pc bpc" id="L69" title="2 of 8 branches missed.">        boolean useful = solution.solved() || progress &amp;&amp; evidence.withinBudget() &amp;&amp; evidence.improved();</span>
 <span class="pc bpc" id="L70" title="1 of 4 branches missed.">        if (!useful || !evidence.withinBudget()) return false;</span>
 <span class="fc bfc" id="L71" title="All 2 branches covered.">        if (evidence.witness().size() &gt;= 2) return true;</span>
-<span class="pc bpc" id="L72" title="2 of 4 branches missed.">        return progress &amp;&amp; evidence.witness().size() == 1</span>
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        return progress &amp;&amp; evidence.witness().size() == 1</span>
 <span class="pc bpc" id="L73" title="1 of 2 branches missed.">            &amp;&amp; evidence.witness().getFirst().move().sourceKind() == SearchMove.SourceKind.PREPARATION</span>
 <span class="pc bpc" id="L74" title="1 of 2 branches missed.">            &amp;&amp; evidence.witness().getFirst().move().executionWork().exactTheorySteps() &gt; 0;</span>
     }
