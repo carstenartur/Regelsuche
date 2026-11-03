@@ -41,7 +41,12 @@ untrusted anchors, not a trusted symbolic-proof flag. Loading reconstructs and
 reproves their universal family relation; two individually valid anchors do not
 suffice. Unknown fields, recursive family payloads, conflicting degree bounds,
 duplicate keys and a version downgrade are rejected. The total catalog remains
-bounded to 32 entries, and the existing payload-size guards are unchanged.
+bounded to 32 entries and 200,000 canonical payload characters. Both learning
+paths check the actual serialized candidate before promotion, including both
+anchors of each family, and charge that inspection to acquisition. An oversized
+candidate returns `ACQUISITION_LIMIT` with the previous catalog and paid work;
+the successor remains saveable and restorable. Encoding independently enforces
+the same bound used by restoration.
 
 ```java
 // knowledge already contains independently acquired laws from different transitions.
@@ -66,12 +71,12 @@ cannot reuse a law on any evaluation transition.
 | Arm | Declared logical work including acquisition and reload |
 | --- | ---: |
 | Same synthesis baseline | 264,736 |
-| Two acquired exact laws, no generalization | 285,472 |
-| Acquired laws plus proved family, after reload | 74,709 |
+| Two acquired exact laws, no generalization | 285,848 |
+| Acquired laws plus proved family, after reload | 75,595 |
 
-The family total includes 30,280 acquisition/validation units (11,624 for the
+The family total includes 31,166 acquisition/validation units (12,134 for the
 family-generalization stage), 3,725 reload/proof units, and 40,704 query units.
-This is about 71.8% less declared work than the existing synthesis baseline in
+This is about 71.4% less declared work than the existing synthesis baseline in
 this developmental stream. It is neither a wall-clock speedup nor a complete
 JVM/memory/serialization accounting claim. The baseline's current task adapter
 still calls its complete bounded synthesizer before selecting one law; this is
@@ -80,8 +85,13 @@ not a comparison against every possible specialized first-law solver.
 Tests additionally cover a varying affine offset and FIXED rather than
 ALTERNATING laws, so the implementation is not a Fibonacci/Pell dispatch table.
 The actual persistence test launches separate save and restore JVMs from JUnit
-and checks transfer to a previously unseen coefficient after restart. Existing
-exact-only recurrence and expression-learning regressions remain unchanged.
+and checks transfer to a previously unseen coefficient after restart. The
+payload regression uses 28 genuinely verified entries occupying 199,855
+characters, then exercises both rejected learning paths and an actual save/load
+round trip. The existing 48-query recurrence comparison now pays the admission
+checks: 157,216 baseline / 106,418 frozen / 55,080 cumulative. The 512-query
+expression comparison remains 225,536 / 229,264 / 186,706. Existing stored
+snapshot encodings remain compatible.
 
 ### Remaining limits
 
@@ -91,11 +101,13 @@ bounds. Multiple independently varying coefficients, nonlinear parameter
 families, search for coordinate changes and arbitrary proof-plan grammars are
 not implemented. Complete historical coverage (including Euclid and Ferrari)
 is not claimed. Symbolic checks use the existing domain-specific exact checker,
-not a Lean kernel certificate. Local evidence uses the documented direct
-Java-21 compatibility harness; hosted Java-25/JUnit/coverage/quality verification
-and independent review are required for this extended head.
+not a Lean kernel certificate. The updated measurements and payload regression
+run through native Java 25, Maven and JUnit. Hosted checkout-local CI, coverage
+and quality gates remain required before merge; the original Java-21 direct
+compatibility evidence is historical rather than the current verification path.
 
 ```bash
 ./gradlew --no-daemon :regelsuche-math-algorithms:test --tests '*RecurrenceInvariantFamilyTest'
 ./gradlew --no-daemon :regelsuche-learning:test --tests '*RecurrenceFamilyKnowledgeTest'
+mvn -pl regelsuche-learning -am -Dtest=RecurrencePayloadLimitTest,RecurrenceFamilyKnowledgeTest,CumulativeRecurrenceKnowledgeTest,RecurrenceInvariantFamilyTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```

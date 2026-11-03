@@ -20,15 +20,28 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.LongConsumer;
 
 /** Strict bounded payload inside the existing content-addressed knowledge snapshot. */
 final class RecurrenceKnowledgeCodec {
+    private static final int MAX_PAYLOAD_LENGTH = 200_000;
     private static final ObjectMapper JSON = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     private RecurrenceKnowledgeCodec() { }
     record Loaded(List<RecurrenceKnowledge.Entry> entries, long work) { }
 
     static String encode(List<RecurrenceKnowledge.Entry> entries) {
+        String json = payload(entries);
+        if (json.length() > MAX_PAYLOAD_LENGTH) throw new IllegalArgumentException("recurrence payload too large");
+        return json;
+    }
+    /** Admission pays for the actual canonical payload, including both anchors of every family. */
+    static boolean fitsPayload(List<RecurrenceKnowledge.Entry> entries, LongConsumer work) {
+        String json = payload(entries);
+        work.accept(json.length());
+        return json.length() <= MAX_PAYLOAD_LENGTH;
+    }
+    private static String payload(List<RecurrenceKnowledge.Entry> entries) {
         var root = JSON.createArrayNode();
         for (var entry : entries) {
             var node = root.addObject();
@@ -49,7 +62,7 @@ final class RecurrenceKnowledgeCodec {
     }
     static Loaded restore(String json) {
         if (json.isEmpty()) return new Loaded(List.of(), 0);
-        if (json.length() > 200_000) throw new IllegalArgumentException("recurrence payload too large");
+        if (json.length() > MAX_PAYLOAD_LENGTH) throw new IllegalArgumentException("recurrence payload too large");
         long[] work = {json.length()};
         try {
             JsonNode root = JSON.readTree(json);
