@@ -28,9 +28,11 @@ rejected attempts remain paid. The original examples remain available.
 
 On an unfamiliar matching transition, the family is specialized with its actual
 rational coefficient. All other transition entries and the degree bound remain
-binding. The concrete proposal and the caller's new initial values are checked
-again by `RecurrenceInvariantVerifier`, within the same request budget as
-selection, specialization and any fallback synthesis. A specialization that is
+binding. The caller-bound specialization and new initial values are checked by
+`RecurrenceInvariantVerifier.verifyFamily`, using the immutable, previously
+proved `VerifiedFamily` as step authority. They share the same request budget as
+selection and any fallback synthesis. An untrusted `Proposal` still requires the
+original `verify` path, which independently replays the entire symbolic step. A specialization that is
 constant or zero cannot finish the task. Success remains **one** nonconstant law,
 not a claim that the complete invariant space has been enumerated.
 
@@ -57,7 +59,10 @@ var result = knowledge.solve(unseenTransitionTask,
     CumulativeTaskKnowledge.Strategy.AUTOMATIC);
 ```
 
-### Executed development comparison
+### Retained development comparison before proof reuse
+
+These results describe the merged `8f051ce1` source, before the following
+proof-reuse optimization. They are retained rather than overwritten.
 
 The exact precursor lessons use parameters 1 and 2 of a two-dimensional
 transition. Family promotion uses parameters 3 and 5. Evaluation uses different
@@ -111,3 +116,72 @@ compatibility evidence is historical rather than the current verification path.
 ./gradlew --no-daemon :regelsuche-learning:test --tests '*RecurrenceFamilyKnowledgeTest'
 mvn -pl regelsuche-learning -am -Dtest=RecurrencePayloadLimitTest,RecurrenceFamilyKnowledgeTest,CumulativeRecurrenceKnowledgeTest,RecurrenceInvariantFamilyTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
+
+
+### Reuse the proved step instead of proving every instance again
+
+A `VerifiedFamily` already establishes the step identity for every rational
+value of its one varying coefficient. The previous query adapter specialized
+that family and then independently expanded the entire concrete identity again.
+The new `verifyFamily(family, source, initialState, budget)` checks the fixed
+transition entries and instantiates the exact polynomial held by that proof
+object. It reuses the universal step and runs the **same existing initial-value
+checker** as full replay. New initial values are never cached or copied.
+
+The authority object has a private constructor and immutable polynomial fields.
+The new API does not accept a public `Specialization` or a saved success flag as
+proof. A stored family must still pass anchor and universal-identity checking on
+load. There is no new persistent format, process-wide cache, proof bypass for
+untrusted proposals, relaxed payload bound, or modified synthesis baseline.
+The public original verifier remains available for independent full-step audits.
+The specialization text guard, source binding, nonconstant-law requirement,
+initial-state guards and a single work budget remain enforced.
+
+This is a proved-lemma instantiation rule inside the existing exact rational
+checker, not a new independent theorem prover. Correctness depends on that
+checker and the small instantiation path. Tests therefore audit instances with
+the original full verifier **and** a separate exact numeric initial-value
+evaluator, including rational/negative parameters, fixed and alternating laws,
+affine offsets, changed sources, concurrent calls and cutoff budgets.
+
+On the same actually executed 64-query development stream:
+
+| Arm | Before | With proved-step reuse |
+| --- | ---: | ---: |
+| Same synthesis baseline | 264,736 | 264,736 |
+| Exact laws only | 285,848 | 285,848 |
+| Learned family, including acquisition and reload | 75,595 | 53,069 |
+| Family query portion only | 40,704 | 18,992 |
+
+All arms retain 56/64 successes and the family handles all 56 matching queries.
+The new family total is 30,352 acquisition/validation + 3,725 reload/proof +
+18,992 query units. The new method reduces the previous family's declared
+lifecycle work by about 29.8%; it does **not** establish a wall-clock speedup.
+One representative query changes from 602 to 195 units. Independently replaying
+that query's complete concrete step costs 551 units; the new method genuinely
+avoids work beyond the candidate-selection difference.
+
+The test first failed on unchanged production (602 >= 551), then passed after
+the implementation. Four compiled faults are caught: ignored fixed source
+entries, accepting an interpolated but false family, resetting the initial-value
+budget, and using stale initial values. Existing 48-query recurrence and
+512-query expression comparisons remain unchanged at
+157,216 / 106,418 / 55,080 and 225,536 / 229,264 / 186,706 respectively.
+Existing actual save/load JVM tests and the three payload regressions pass in
+the direct local harness. The payload test bodies use explicit local assertion
+adapters; their native JUnit sources are unchanged.
+
+Local evidence uses Java 21 with real dependencies and resources. Three existing
+Java-25 `ScopedValue` calls are adapted only in a separate compatibility copy;
+JUnit annotations are removed only from direct test copies. This is not native
+Java-25/JUnit discovery, timeout or complete-product qualification. A combined
+local command reached its outer tool time limit; suites were subsequently run
+separately to completion, not counted as passing from the timed-out command.
+A temporary assertion-adapter boxing error was corrected only in the local
+harness; no production or original payload test change was required.
+
+PR #1136's separately retained complete-JVM measurement remains unmodified:
+it found no time/CPU amortization through 64 queries for the preceding source.
+A new versioned full-lifecycle run is required to determine whether this actual
+work reduction changes that result. No new historical task, multi-parameter
+family, Ferrari method or Euclid proof is delivered by this optimization.
