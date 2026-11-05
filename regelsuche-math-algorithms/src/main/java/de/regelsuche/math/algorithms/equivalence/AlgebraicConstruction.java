@@ -6,6 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -127,42 +128,70 @@ public final class AlgebraicConstruction {
         var arithmetic = new ExactResidualPolynomialArithmetic(work::add, true);
         boundedPolynomial(arithmetic.parse(source));
         var parsed = arithmetic.exactTerm(source);
-        var fragments = new LinkedHashSet<String>();
-        var powerFactors = new LinkedHashSet<String>();
-        var squareBases = new ArrayList<String>();
+        var parts = collectAuxiliaryParts(operation, parsed, limit, work, arithmetic);
+        var terms = new LinkedHashSet<String>();
+        if (operation != Operation.ADDITIVE_COMPLEMENT && operation != Operation.EXACT_FACTOR_SPLIT) terms.add("2");
+        appendWithinLimit(terms, parts.powerFactors(), limit);
+        appendSquareCrossProducts(terms, parts.squareBases(), operation, limit, work, arithmetic);
+        if (operation == Operation.ADDITIVE_COMPLEMENT) return List.copyOf(terms);
+        appendWithinLimit(terms, parts.fragments(), limit);
+        if (operation != Operation.EXACT_FACTOR_SPLIT) appendCrossProducts(terms, limit, work);
+        return List.copyOf(terms);
+    }
+
+    private record AuxiliaryParts(LinkedHashSet<String> fragments, LinkedHashSet<String> powerFactors,
+            List<String> squareBases) { }
+
+    private static AuxiliaryParts collectAuxiliaryParts(Operation operation, ExactParsedTerm parsed,
+            int limit, Work work, ExactResidualPolynomialArithmetic arithmetic) {
+        var parts = new AuxiliaryParts(new LinkedHashSet<>(), new LinkedHashSet<>(), new ArrayList<>());
         var pending = new ArrayDeque<Expr>(); pending.add(parsed.expression());
         int inspected = 0;
         int maxInspections = Math.min(256, Math.max(16, limit * 8));
         while (!pending.isEmpty() && inspected++ < maxInspections) {
             Expr term = pending.removeFirst(); work.add(1);
             String text = ExactExpressionFormatter.format(term, parsed); work.add(text.length());
-            if (fragments.size() < limit && (operation != Operation.EXACT_FACTOR_SPLIT
-                    || (term != parsed.expression() && isNonconstant(term, text, arithmetic)))) fragments.add(text);
+            if (parts.fragments().size() < limit && (operation != Operation.EXACT_FACTOR_SPLIT
+                    || (term != parsed.expression() && isNonconstant(term, text, arithmetic)))) parts.fragments().add(text);
             if (term instanceof BinaryExpr binary) {
-                if (binary.operator() == BinaryOperator.POW && binary.right() instanceof NumberExpr exponent
-                        && exponent.value().equalsInteger(2) && squareBases.size() < limit) {
-                    String base = ExactExpressionFormatter.format(binary.left(), parsed);
-                    work.add(base.length()); squareBases.add(base);
-                }
-                if (operation == Operation.EXACT_FACTOR_SPLIT && binary.operator() == BinaryOperator.POW
-                        && binary.right() instanceof NumberExpr exponent && exponent.value().isInteger()
-                        && exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(2)) >= 0
-                        && exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(12)) <= 0) {
-                    String base = ExactExpressionFormatter.format(binary.left(), parsed);
-                    int power = exponent.value().numerator().intValueExact();
-                    if (isNonconstant(binary.left(), base, arithmetic)) {
-                        addPowerFactor(powerFactors, base, power / 2, limit, work);
-                        for (int split = 1; split < power && powerFactors.size() < limit; split++) {
-                            addPowerFactor(powerFactors, base, split, limit, work);
-                        }
-                    }
-                }
+                collectSquareBase(binary, parsed, limit, work, parts.squareBases());
+                collectPowerFactors(operation, binary, parsed, limit, work, arithmetic, parts.powerFactors());
                 pending.addLast(binary.left()); pending.addLast(binary.right());
             }
         }
-        var terms = new LinkedHashSet<String>();
-        if (operation != Operation.ADDITIVE_COMPLEMENT && operation != Operation.EXACT_FACTOR_SPLIT) terms.add("2");
-        for (String factor : powerFactors) { if (terms.size() == limit) break; terms.add(factor); }
+        return parts;
+    }
+
+    private static void collectSquareBase(BinaryExpr binary, ExactParsedTerm parsed, int limit, Work work,
+            List<String> squareBases) {
+        if (binary.operator() == BinaryOperator.POW && binary.right() instanceof NumberExpr exponent
+                && exponent.value().equalsInteger(2) && squareBases.size() < limit) {
+            String base = ExactExpressionFormatter.format(binary.left(), parsed);
+            work.add(base.length()); squareBases.add(base);
+        }
+    }
+
+    private static void collectPowerFactors(Operation operation, BinaryExpr binary, ExactParsedTerm parsed,
+            int limit, Work work, ExactResidualPolynomialArithmetic arithmetic, LinkedHashSet<String> powerFactors) {
+        if (operation != Operation.EXACT_FACTOR_SPLIT || binary.operator() != BinaryOperator.POW
+                || !(binary.right() instanceof NumberExpr exponent) || !exponent.value().isInteger()
+                || exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(2)) < 0
+                || exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(12)) > 0) return;
+        String base = ExactExpressionFormatter.format(binary.left(), parsed);
+        int power = exponent.value().numerator().intValueExact();
+        if (!isNonconstant(binary.left(), base, arithmetic)) return;
+        addPowerFactor(powerFactors, base, power / 2, limit, work);
+        for (int split = 1; split < power && powerFactors.size() < limit; split++) {
+            addPowerFactor(powerFactors, base, split, limit, work);
+        }
+    }
+
+    private static void appendWithinLimit(LinkedHashSet<String> terms, Iterable<String> candidates, int limit) {
+        for (String candidate : candidates) { if (terms.size() == limit) break; terms.add(candidate); }
+    }
+
+    private static void appendSquareCrossProducts(LinkedHashSet<String> terms, List<String> squareBases,
+            Operation operation, int limit, Work work, ExactResidualPolynomialArithmetic arithmetic) {
         for (int left = 0; left < squareBases.size() && terms.size() < limit; left++) {
             for (int right = left + 1; right < squareBases.size() && terms.size() < limit; right++) {
                 String cross = "2*(" + squareBases.get(left) + ")*(" + squareBases.get(right) + ")";
@@ -170,10 +199,6 @@ public final class AlgebraicConstruction {
                 if (operation != Operation.EXACT_FACTOR_SPLIT || arithmetic.parse(cross).totalDegree() > 0) terms.add(cross);
             }
         }
-        if (operation == Operation.ADDITIVE_COMPLEMENT) return List.copyOf(terms);
-        for (String fragment : fragments) { if (terms.size() == limit) break; terms.add(fragment); }
-        if (operation != Operation.EXACT_FACTOR_SPLIT) appendCrossProducts(terms, limit, work);
-        return List.copyOf(terms);
     }
 
     private static boolean isNonconstant(Expr term, String text, ExactResidualPolynomialArithmetic arithmetic) {

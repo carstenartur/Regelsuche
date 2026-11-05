@@ -189,6 +189,63 @@ class StructuralAuxiliarySearchTest {
     }
 
     @Test
+    void learnedAuxiliaryConstructionPaysForItsDevelopmentStream() {
+        var genome = TraceStrategyTransferExample.inventory();
+        var initial = CumulativeTaskKnowledge.empty(genome, TaskConstructionProfile.STRUCTURAL_AUX_V1);
+        var objective = StructuralTaskObjective.FACTORIZATION;
+        var lessons = List.of(StructuralConstructionTest.task("12*x^4", objective),
+            StructuralConstructionTest.task("20*y^4", objective));
+        var validation = List.of(StructuralConstructionTest.task("28*z^4", objective));
+        var update = initial.learnBatch(lessons, validation, 5_000_000);
+        assertTrue(update.promoted(), "only independently validated useful knowledge is promoted");
+        assertEquals(2, update.training().size());
+        for (var lesson : update.training()) {
+            assertTrue(lesson.solved());
+            assertTrue(lesson.solution().orElseThrow().evidence().witness().stream()
+                .anyMatch(step -> step.move().ruleId().endsWith(":AUXILIARY_FACTOR")),
+                "the lesson must actually use the new source-derived factor construction");
+        }
+        var restored = CumulativeTaskKnowledge.restore(genome, update.next().toCanonicalJson());
+        assertEquals(TaskConstructionProfile.STRUCTURAL_AUX_V1, restored.constructionProfile());
+
+        long baselineWork = initial.sessionSetupWork();
+        long learnedWork = update.work().total() + restored.sessionSetupWork();
+        var exact = new ExactPolynomialAnalysis();
+        for (int coefficient : new int[] {36, 44, 52, 60, 68, 76, 84, 92}) {
+            String source = coefficient + "*k^4";
+            var task = StructuralConstructionTest.task(source, objective);
+            var baseline = initial.solve(task, CumulativeTaskKnowledge.Strategy.BASELINE);
+            var learned = restored.solve(task, CumulativeTaskKnowledge.Strategy.AUTOMATIC);
+            assertTrue(baseline.solved() && learned.solved(), "both arms must reach the same nontrivial goal");
+            assertTrue(learned.solution().orElseThrow().learnedApplications() > 0,
+                "the restored schema must actually be applied");
+            assertTrue(baseline.totalWork() <= task.budget().totalWork());
+            assertTrue(learned.totalWork() <= task.budget().totalWork());
+            exact.requireEquivalent(source, ExpressionFormatter.format(
+                baseline.solution().orElseThrow().evidence().incumbent().expression()));
+            exact.requireEquivalent(source, ExpressionFormatter.format(
+                learned.solution().orElseThrow().evidence().incumbent().expression()));
+            baselineWork += baseline.totalWork(); learnedWork += learned.totalWork();
+        }
+        for (String source : List.of("x*y", "u^2+2")) {
+            var task = new CheckedSchemaTaskSolver.Task(new ExpressionParser().parseExactTerm(source).expression(),
+                List.of(), objective.goal(), new MoveSearch.Budget(8, 2, 1_000_000, 32, 200_000));
+            var baseline = initial.solve(task, CumulativeTaskKnowledge.Strategy.BASELINE);
+            var learned = restored.solve(task, CumulativeTaskKnowledge.Strategy.AUTOMATIC);
+            assertEquals(source.equals("x*y"), baseline.solved());
+            assertEquals(baseline.solved(), learned.solved(), "already solved and failed controls remain in both arms");
+            assertTrue(baseline.solution().orElseThrow().evidence().withinBudget());
+            assertTrue(learned.solution().orElseThrow().evidence().withinBudget());
+            assertEquals(baseline.solution().orElseThrow().evidence().outputScore(),
+                learned.solution().orElseThrow().evidence().outputScore(), "control quality must remain unchanged");
+            baselineWork += baseline.totalWork(); learnedWork += learned.totalWork();
+        }
+        assertTrue(learnedWork < baselineWork, "the stream must repay acquisition, validation and restore");
+        System.out.println("AUXILIARY_LEARNING_STREAM baseline=" + baselineWork + " learned=" + learnedWork
+            + " acquisition=" + update.work().total() + " restore=" + restored.sessionSetupWork());
+    }
+
+    @Test
     void earlierProfileExcludesAuxiliariesAndNewProfileSurvivesRestore() {
         var genome = TraceStrategyTransferExample.inventory();
         var oldSolver = TaskConstructionProfile.STRUCTURAL_V1

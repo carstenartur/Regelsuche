@@ -429,6 +429,28 @@ solver comparison uses the same per-task budget in both profiles:
 The new profile adds a bounded capability in the first development example but
 does more work in the two controls. These numbers use the profiles' respective
 work contracts: only the new path includes the new product-work accounting.
-They are not an equal-accounting speed comparison, learning benefit, JVM time or
-memory measurement. Autonomous plan invention, full historical coverage,
-Euclid and Ferrari remain open.
+They are not an equal-accounting speed comparison, JVM time or memory measurement.
+
+The new factor construction can also supply a checked lesson to the existing
+learner. A development run learns from `12*x^4` and `20*y^4`, validates on
+`28*z^4`, restores the promoted knowledge and then handles eight further
+coefficients of the same `k^4` template. Restoration here is in the same JVM
+from canonical JSON; file I/O and process restart are not measured. Both arms use the **same** auxiliary
+profile and the same per-task budgets. The stream also includes an already
+factored input and a bounded unsuccessful input, with identical outcomes in both
+arms. On the eight `c*k^4` queries both arms reach the nontrivial goal and the
+learned arm applies its checked schema. The already-factored control needs no
+learned step.
+
+| Stream work | Baseline | Learned |
+| --- | ---: | ---: |
+| Declared work including acquisition and restore | 52,719 | 30,074 |
+
+The learned total includes 27,197 units for lessons, formation, preparation,
+validation, selection and split checks, 616 for restore, and all ten query costs. This is
+about 43% less declared work for this specific development stream, not a result
+across independent mathematical families. Some existing acquisition and proof
+paths still do not count polynomial products separately, so this is not a
+complete total-work comparison. Serialization, external test checks, JVM time
+and memory are not covered by the logical work model. Autonomous plan
+invention, full historical coverage, Euclid and Ferrari remain open.
