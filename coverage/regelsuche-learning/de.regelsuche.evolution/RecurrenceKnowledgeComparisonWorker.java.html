@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RecurrenceKnowledgeComparisonWorker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RecurrenceKnowledgeComparisonWorker.java</span></div><h1>RecurrenceKnowledgeComparisonWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** JSONL boundary around paid public recurrence knowledge APIs; queries never update knowledge. */
+<span class="fc" id="L31">public final class RecurrenceKnowledgeComparisonWorker {</span>
+    private static final String REVISION = &quot;regelsuche.recurrence-knowledge-worker/v1&quot;;
+<span class="fc" id="L33">    private static final ObjectMapper JSON = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L34">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L35">    private static final Set&lt;String&gt; PROFILES = Set.of(&quot;BASELINE&quot;, &quot;EXACT_FROZEN&quot;, &quot;FAMILY&quot;);</span>
+<span class="fc" id="L36">    private enum State { NEW, PRODUCER, CONSUMER, SAVED, ERROR }</span>
+<span class="fc" id="L37">    private State state = State.NEW;</span>
+    private String profile;
+    private CumulativeTaskKnowledge knowledge;
+
+    /** Malformed requests and technical failures poison this process's session. Paid rejections do not. */
+    public Map&lt;String, Object&gt; handle(String line) throws IOException {
+        try {
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (state == State.ERROR) throw new IllegalStateException(&quot;session is poisoned&quot;);</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">            if (line == null || line.length() &gt; 4_000_000) throw new IllegalArgumentException(&quot;request size limit&quot;);</span>
+<span class="fc" id="L46">            var request = JSON.readTree(line);</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">            if (request == null || !request.isObject()) throw new IllegalArgumentException(&quot;object request required&quot;);</span>
+<span class="fc" id="L48">            return dispatch(request, text(request, &quot;command&quot;));</span>
+<span class="fc" id="L49">        } catch (IOException | RuntimeException failure) {</span>
+<span class="fc" id="L50">            state = State.ERROR;</span>
+<span class="fc" id="L51">            return error(failure);</span>
+        }
+    }
+
+    private Map&lt;String, Object&gt; dispatch(JsonNode request, String command) throws IOException {
+<span class="pc bpc" id="L56" title="1 of 7 branches missed.">        return switch (command) {</span>
+<span class="fc" id="L57">            case &quot;initialize&quot; -&gt; initialize(request);</span>
+<span class="fc" id="L58">            case &quot;learn&quot; -&gt; learn(request);</span>
+<span class="fc" id="L59">            case &quot;generalize&quot; -&gt; generalize(request);</span>
+<span class="fc" id="L60">            case &quot;save&quot; -&gt; save(request);</span>
+<span class="fc" id="L61">            case &quot;restore&quot; -&gt; restore(request);</span>
+<span class="fc" id="L62">            case &quot;run&quot; -&gt; run(request);</span>
+<span class="nc" id="L63">            default -&gt; throw new IllegalArgumentException(&quot;unknown command&quot;);</span>
+        };
+    }
+
+    private Map&lt;String, Object&gt; initialize(JsonNode request) {
+<span class="fc" id="L68">        fields(request, Set.of(&quot;command&quot;, &quot;profile&quot;));</span>
+<span class="fc" id="L69">        requireState(State.NEW);</span>
+<span class="fc" id="L70">        profile = requestedProfile(request);</span>
+<span class="fc" id="L71">        knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory());</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        state = profile.equals(&quot;BASELINE&quot;) ? State.CONSUMER : State.PRODUCER;</span>
+<span class="fc" id="L73">        return common(&quot;INITIALIZED&quot;);</span>
+    }
+
+    private Map&lt;String, Object&gt; learn(JsonNode request) {
+<span class="fc" id="L77">        fields(request, Set.of(&quot;command&quot;, &quot;training&quot;, &quot;validation&quot;, &quot;budget&quot;));</span>
+<span class="fc" id="L78">        requireState(State.PRODUCER);</span>
+<span class="fc" id="L79">        var training = tasks(request.get(&quot;training&quot;));</span>
+<span class="fc" id="L80">        var validation = tasks(request.get(&quot;validation&quot;));</span>
+<span class="fc" id="L81">        var update = knowledge.learnRecurrences(training, validation, new Budget(integer(request, &quot;budget&quot;, 1, Integer.MAX_VALUE)));</span>
+<span class="fc" id="L82">        return updated(&quot;LEARNED&quot;, update);</span>
+    }
+
+    private Map&lt;String, Object&gt; generalize(JsonNode request) {
+<span class="fc" id="L86">        fields(request, Set.of(&quot;command&quot;, &quot;validation&quot;, &quot;budget&quot;));</span>
+<span class="fc" id="L87">        requireState(State.PRODUCER);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (!profile.equals(&quot;FAMILY&quot;)) throw new IllegalStateException(&quot;only FAMILY generalizes&quot;);</span>
+<span class="fc" id="L89">        var update = knowledge.generalizeRecurrences(tasks(request.get(&quot;validation&quot;)),</span>
+<span class="fc" id="L90">            new Budget(integer(request, &quot;budget&quot;, 1, Integer.MAX_VALUE)));</span>
+<span class="fc" id="L91">        return updated(&quot;GENERALIZED&quot;, update);</span>
+    }
+
+    private Map&lt;String, Object&gt; updated(String status, RecurrenceKnowledge.Update update) {
+<span class="fc" id="L95">        knowledge = update.next();</span>
+<span class="fc" id="L96">        var response = common(status);</span>
+<span class="fc" id="L97">        response.put(&quot;reason&quot;, update.reason().name());</span>
+<span class="fc" id="L98">        response.put(&quot;promoted&quot;, update.promoted());</span>
+<span class="fc" id="L99">        response.put(&quot;work&quot;, costs(update.work()));</span>
+<span class="fc" id="L100">        response.put(&quot;training&quot;, update.training().stream().map(RecurrenceKnowledgeComparisonWorker::receipt).toList());</span>
+<span class="fc" id="L101">        return response;</span>
+    }
+
+    private Map&lt;String, Object&gt; save(JsonNode request) throws IOException {
+<span class="fc" id="L105">        fields(request, Set.of(&quot;command&quot;, &quot;directory&quot;));</span>
+<span class="fc" id="L106">        requireState(State.PRODUCER);</span>
+<span class="fc" id="L107">        Path path = knowledge.save(Path.of(text(request, &quot;directory&quot;)).toAbsolutePath().normalize());</span>
+<span class="fc" id="L108">        var response = snapshot(&quot;SAVED&quot;, path);</span>
+<span class="fc" id="L109">        state = State.SAVED;</span>
+<span class="fc" id="L110">        return response;</span>
+    }
+
+    private Map&lt;String, Object&gt; restore(JsonNode request) throws IOException {
+<span class="fc" id="L114">        fields(request, Set.of(&quot;command&quot;, &quot;profile&quot;, &quot;snapshot&quot;));</span>
+<span class="fc" id="L115">        requireState(State.NEW);</span>
+<span class="fc" id="L116">        profile = requestedProfile(request);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (profile.equals(&quot;BASELINE&quot;)) throw new IllegalArgumentException(&quot;baseline must initialize empty knowledge&quot;);</span>
+<span class="fc" id="L118">        var path = Path.of(text(request, &quot;snapshot&quot;)).toAbsolutePath().normalize();</span>
+<span class="fc" id="L119">        knowledge = CumulativeTaskKnowledge.load(TraceStrategyTransferExample.inventory(), path);</span>
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        if (profile.equals(&quot;EXACT_FROZEN&quot;) &amp;&amp; knowledge.recurrenceFamilyCount() != 0)</span>
+<span class="fc" id="L121">            throw new IllegalArgumentException(&quot;EXACT_FROZEN cannot restore a family&quot;);</span>
+<span class="fc" id="L122">        var response = snapshot(&quot;RESTORED&quot;, path);</span>
+<span class="fc" id="L123">        state = State.CONSUMER;</span>
+<span class="fc" id="L124">        return response;</span>
+    }
+
+    private Map&lt;String, Object&gt; snapshot(String status, Path path) throws IOException {
+<span class="fc" id="L128">        String hash = hash(Files.readAllBytes(path));</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (!hash.equals(knowledge.id())) throw new IOException(&quot;snapshot bytes changed during operation&quot;);</span>
+<span class="fc" id="L130">        var response = common(status);</span>
+<span class="fc" id="L131">        response.put(&quot;snapshot&quot;, path.toString());</span>
+<span class="fc" id="L132">        response.put(&quot;snapshotHash&quot;, hash);</span>
+<span class="fc" id="L133">        return response;</span>
+    }
+
+    private Map&lt;String, Object&gt; run(JsonNode request) {
+<span class="fc" id="L137">        fields(request, Set.of(&quot;command&quot;, &quot;id&quot;, &quot;task&quot;));</span>
+<span class="fc" id="L138">        requireState(State.CONSUMER);</span>
+<span class="fc" id="L139">        String id = text(request, &quot;id&quot;);</span>
+<span class="fc" id="L140">        var task = task(request.get(&quot;task&quot;));</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        var strategy = profile.equals(&quot;BASELINE&quot;) ? CumulativeTaskKnowledge.Strategy.BASELINE : CumulativeTaskKnowledge.Strategy.AUTOMATIC;</span>
+<span class="fc" id="L142">        var execution = knowledge.solve(task, strategy);</span>
+<span class="fc" id="L143">        var response = common(&quot;RESULT&quot;);</span>
+<span class="fc" id="L144">        response.put(&quot;id&quot;, id);</span>
+<span class="fc" id="L145">        response.put(&quot;task&quot;, JSON.convertValue(request.get(&quot;task&quot;), Map.class));</span>
+<span class="fc" id="L146">        response.putAll(receipt(execution));</span>
+<span class="fc" id="L147">        response.put(&quot;law&quot;, execution.law().map(law -&gt; Map.of(&quot;polynomial&quot;, law.proposal().polynomial(),</span>
+<span class="fc" id="L148">            &quot;evolution&quot;, law.proposal().evolution().name(), &quot;initialValue&quot;, law.initialValue().toString())).orElse(null));</span>
+<span class="fc" id="L149">        return response;</span>
+    }
+
+    private TreeMap&lt;String, Object&gt; common(String status) {
+<span class="fc" id="L153">        var response = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L154">        response.put(&quot;revision&quot;, REVISION);</span>
+<span class="fc" id="L155">        response.put(&quot;status&quot;, status);</span>
+<span class="fc" id="L156">        response.put(&quot;profile&quot;, profile);</span>
+<span class="fc" id="L157">        response.put(&quot;generationId&quot;, knowledge.id());</span>
+<span class="fc" id="L158">        response.put(&quot;acquisitionWork&quot;, knowledge.acquisitionWork());</span>
+<span class="fc" id="L159">        response.put(&quot;acquisitionCosts&quot;, costs(knowledge.acquisitionCosts()));</span>
+<span class="fc" id="L160">        response.put(&quot;sessionSetupWork&quot;, knowledge.sessionSetupWork());</span>
+<span class="fc" id="L161">        response.put(&quot;recurrenceCount&quot;, knowledge.recurrenceCount());</span>
+<span class="fc" id="L162">        response.put(&quot;recurrenceFamilyCount&quot;, knowledge.recurrenceFamilyCount());</span>
+<span class="fc" id="L163">        return response;</span>
+    }
+
+    private static Map&lt;String, Object&gt; costs(CumulativeTaskKnowledge.Costs work) {
+<span class="fc" id="L167">        return Map.of(&quot;lessons&quot;, work.lessons(), &quot;formation&quot;, work.formation(), &quot;preparation&quot;, work.preparation(),</span>
+<span class="fc" id="L168">            &quot;validation&quot;, work.validation(), &quot;selection&quot;, work.selection(), &quot;restoration&quot;, work.restoration(),</span>
+<span class="fc" id="L169">            &quot;splitChecking&quot;, work.splitChecking(), &quot;total&quot;, work.total());</span>
+    }
+
+    private static Map&lt;String, Object&gt; receipt(RecurrenceKnowledge.Execution execution) {
+<span class="fc" id="L173">        return Map.of(&quot;outcome&quot;, execution.outcome().name(), &quot;solved&quot;, execution.solved(),</span>
+<span class="fc" id="L174">            &quot;reused&quot;, execution.reused(), &quot;totalWork&quot;, execution.totalWork());</span>
+    }
+
+    private static Map&lt;String, Object&gt; error(Exception failure) {
+<span class="fc" id="L178">        var response = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L179">        response.put(&quot;revision&quot;, REVISION);</span>
+<span class="fc" id="L180">        response.put(&quot;status&quot;, &quot;ERROR&quot;);</span>
+<span class="fc" id="L181">        response.put(&quot;error&quot;, failure.toString());</span>
+<span class="fc" id="L182">        response.put(&quot;accountingComplete&quot;, false);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (failure instanceof RecurrenceKnowledge.LearningFailure learning) {</span>
+<span class="nc" id="L184">            response.put(&quot;knownWork&quot;, costs(learning.knownWork()));</span>
+<span class="nc" id="L185">            response.put(&quot;completedLessons&quot;, learning.completedLessons().stream().map(RecurrenceKnowledgeComparisonWorker::receipt).toList());</span>
+        }
+<span class="fc" id="L187">        return response;</span>
+    }
+
+    private static List&lt;Request&gt; tasks(JsonNode node) {
+<span class="pc bpc" id="L191" title="4 of 8 branches missed.">        if (node == null || !node.isArray() || node.isEmpty() || node.size() &gt; 32)</span>
+<span class="nc" id="L192">            throw new IllegalArgumentException(&quot;one to 32 tasks required&quot;);</span>
+<span class="fc" id="L193">        var result = new ArrayList&lt;Request&gt;();</span>
+<span class="fc" id="L194">        node.forEach(value -&gt; result.add(task(value)));</span>
+<span class="fc" id="L195">        return List.copyOf(result);</span>
+    }
+
+    private static Request task(JsonNode node) {
+<span class="fc" id="L199">        fields(node, Set.of(&quot;linear&quot;, &quot;offset&quot;, &quot;initial&quot;, &quot;degree&quot;, &quot;workBudget&quot;));</span>
+<span class="fc" id="L200">        var rows = node.get(&quot;linear&quot;);</span>
+<span class="pc bpc" id="L201" title="3 of 6 branches missed.">        if (!rows.isArray() || rows.isEmpty() || rows.size() &gt; 3) throw new IllegalArgumentException(&quot;one to three matrix rows required&quot;);</span>
+<span class="fc" id="L202">        var linear = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="fc" id="L203">        rows.forEach(row -&gt; linear.add(vector(row, rows.size())));</span>
+<span class="fc" id="L204">        var transition = new Transition(new ExactMatrix(linear), new ExactVector(vector(node.get(&quot;offset&quot;), rows.size())));</span>
+<span class="fc" id="L205">        return new Request(transition, vector(node.get(&quot;initial&quot;), rows.size()), integer(node, &quot;degree&quot;, 1, 2),</span>
+<span class="fc" id="L206">            new Budget(integer(node, &quot;workBudget&quot;, 0, Integer.MAX_VALUE)));</span>
+    }
+
+    private static List&lt;Rational&gt; vector(JsonNode node, int size) {
+<span class="pc bpc" id="L210" title="2 of 6 branches missed.">        if (node == null || !node.isArray() || node.size() != size) throw new IllegalArgumentException(&quot;coordinate count mismatch&quot;);</span>
+<span class="fc" id="L211">        var result = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc" id="L212">        node.forEach(value -&gt; result.add(rational(value)));</span>
+<span class="fc" id="L213">        return List.copyOf(result);</span>
+    }
+
+    private static Rational rational(JsonNode node) {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (!node.isTextual()) throw new IllegalArgumentException(&quot;canonical rational string required&quot;);</span>
+<span class="fc" id="L218">        String value = node.textValue();</span>
+<span class="fc bfc" id="L219" title="All 4 branches covered.">        if (value.length() &gt; 80 || !value.matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;))</span>
+<span class="fc" id="L220">            throw new IllegalArgumentException(&quot;bounded canonical rational required&quot;);</span>
+<span class="fc" id="L221">        String[] parts = value.split(&quot;/&quot;);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        var rational = new Rational(new BigInteger(parts[0]), parts.length == 1 ? BigInteger.ONE : new BigInteger(parts[1]));</span>
+<span class="pc bpc" id="L223" title="2 of 6 branches missed.">        if (rational.numerator().bitLength() &gt; 128 || rational.denominator().bitLength() &gt; 128 || !rational.toString().equals(value))</span>
+<span class="fc" id="L224">            throw new IllegalArgumentException(&quot;bounded canonical rational required&quot;);</span>
+<span class="fc" id="L225">        return rational;</span>
+    }
+
+    private void requireState(State expected) {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (state != expected) throw new IllegalStateException(&quot;command requires &quot; + expected + &quot;; actual &quot; + state);</span>
+<span class="fc" id="L230">    }</span>
+
+    private static String requestedProfile(JsonNode request) {
+<span class="fc" id="L233">        String result = text(request, &quot;profile&quot;);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (!PROFILES.contains(result)) throw new IllegalArgumentException(&quot;unknown profile&quot;);</span>
+<span class="fc" id="L235">        return result;</span>
+    }
+
+    private static void fields(JsonNode node, Set&lt;String&gt; expected) {
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IllegalArgumentException(&quot;object required&quot;);</span>
+<span class="fc" id="L240">        var actual = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L241">        node.fieldNames().forEachRemaining(actual::add);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (!actual.equals(expected)) throw new IllegalArgumentException(&quot;unexpected fields&quot;);</span>
+<span class="fc" id="L243">    }</span>
+
+    private static String text(JsonNode node, String field) {
+<span class="fc" id="L246">        var value = node.path(field);</span>
+<span class="pc bpc" id="L247" title="3 of 6 branches missed.">        if (!value.isTextual() || value.textValue().isBlank() || value.textValue().length() &gt; 4096)</span>
+<span class="nc" id="L248">            throw new IllegalArgumentException(&quot;bounded nonempty text required: &quot; + field);</span>
+<span class="fc" id="L249">        return value.textValue();</span>
+    }
+
+    private static int integer(JsonNode node, String field, int minimum, int maximum) {
+<span class="fc" id="L253">        var value = node.path(field);</span>
+<span class="fc bfc" id="L254" title="All 8 branches covered.">        if (!value.isIntegralNumber() || !value.canConvertToInt() || value.intValue() &lt; minimum || value.intValue() &gt; maximum)</span>
+<span class="fc" id="L255">            throw new IllegalArgumentException(&quot;bounded integer required: &quot; + field);</span>
+<span class="fc" id="L256">        return value.intValue();</span>
+    }
+
+    private static String hash(byte[] bytes) {
+<span class="fc" id="L260">        try { return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes)); }</span>
+<span class="nc" id="L261">        catch (NoSuchAlgorithmException unavailable) { throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, unavailable); }</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc" id="L265">        var worker = new RecurrenceKnowledgeComparisonWorker();</span>
+<span class="nc" id="L266">        System.out.println(JSON.writeValueAsString(Map.of(&quot;status&quot;, &quot;READY&quot;, &quot;java&quot;, Runtime.version().toString())));</span>
+<span class="nc" id="L267">        System.out.flush();</span>
+<span class="nc" id="L268">        try (var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            for (String line; (line = reader.readLine()) != null;) {</span>
+<span class="nc" id="L270">                System.out.println(JSON.writeValueAsString(worker.handle(line)));</span>
+<span class="nc" id="L271">                System.out.flush();</span>
+            }
+        }
+<span class="nc" id="L274">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

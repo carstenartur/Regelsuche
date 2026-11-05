@@ -43,11 +43,11 @@ import java.util.Optional;
 <span class="fc" id="L43">            this.first=first; this.second=second; this.degree=degree; this.coordinate=coordinate;</span>
 <span class="fc" id="L44">            this.intercept=intercept; this.slope=slope;</span>
 <span class="fc" id="L45">        }</span>
-<span class="nc" id="L46">        public Anchor first() { return first; }</span>
+<span class="fc" id="L46">        public Anchor first() { return first; }</span>
 <span class="nc" id="L47">        public Anchor second() { return second; }</span>
 <span class="nc" id="L48">        public int degree() { return degree; }</span>
         public boolean matches(Transition source) {
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (source.linear().columns()!=first.transition().linear().columns()) return false;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (source.linear().columns()!=first.transition().linear().columns()) return false;</span>
 <span class="fc" id="L51">            int count=source.linear().columns()*(source.linear().columns()+1);</span>
 <span class="fc bfc" id="L52" title="All 2 branches covered.">            for (int i=0;i&lt;count;i++)</span>
 <span class="fc bfc" id="L53" title="All 4 branches covered.">                if (i!=coordinate &amp;&amp; !cell(source,i).equals(cell(first.transition(),i))) return false;</span>
@@ -58,105 +58,115 @@ import java.util.Optional;
 <span class="fc" id="L58">            Objects.requireNonNull(source); Objects.requireNonNull(budget);</span>
 <span class="fc" id="L59">            var work=new Work(budget.maxWorkUnits());</span>
             try {
-<span class="fc" id="L61">                work.add(2L+source.linear().columns()*(source.linear().columns()+1));</span>
-<span class="fc bfc" id="L62" title="All 2 branches covered.">                if (!matches(source)) return specialized(Outcome.REJECTED, Optional.empty(),work);</span>
-<span class="fc" id="L63">                work.add(1L+intercept.termCount()+slope.termCount());</span>
-<span class="fc" id="L64">                var polynomial=intercept.add(slope.multiply(cell(source,coordinate)));</span>
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                if (polynomial.totalDegree()==0) return specialized(Outcome.REJECTED,Optional.empty(),work);</span>
-<span class="fc" id="L66">                var text=polynomial.toCanonicalString(); work.add(text.length());</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                if (text.length()&gt;RecurrenceInvariantSynthesis.MAX_PROPOSAL_LENGTH)</span>
-<span class="nc" id="L68">                    return specialized(Outcome.UNSUPPORTED,Optional.empty(),work);</span>
-<span class="fc" id="L69">                return specialized(Outcome.VERIFIED,Optional.of(new Proposal(text,first.proposal().evolution())),work);</span>
-<span class="fc" id="L70">            } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
-<span class="fc" id="L71">                return specialized(Outcome.BUDGET_INCONCLUSIVE,Optional.empty(),work);</span>
+<span class="fc" id="L61">                var polynomial=checkedSpecialization(source,work);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                if (polynomial==null) return specialized(Outcome.REJECTED,Optional.empty(),work);</span>
+<span class="fc" id="L63">                var text=polynomial.toCanonicalString(); work.add(text.length());</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                if (text.length()&gt;RecurrenceInvariantSynthesis.MAX_PROPOSAL_LENGTH)</span>
+<span class="nc" id="L65">                    return specialized(Outcome.UNSUPPORTED,Optional.empty(),work);</span>
+<span class="fc" id="L66">                return specialized(Outcome.VERIFIED,Optional.of(new Proposal(text,first.proposal().evolution())),work);</span>
+<span class="fc" id="L67">            } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
+<span class="fc" id="L68">                return specialized(Outcome.BUDGET_INCONCLUSIVE,Optional.empty(),work);</span>
             }
+        }
+
+        /**
+         * Instantiation of this issuer-owned universal proof, not a supplied proposal.
+         * The verifier consumes the exact polynomial directly, so a serialized or
+         * caller-constructed Specialization cannot become proof authority.
+         */
+        Polynomial checkedSpecialization(Transition source, Work work) {
+<span class="fc" id="L78">            work.add(2L+source.linear().columns()*(source.linear().columns()+1));</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (!matches(source)) return null;</span>
+<span class="fc" id="L80">            work.add(1L+intercept.termCount()+slope.termCount());</span>
+<span class="fc" id="L81">            var polynomial=intercept.add(slope.multiply(cell(source,coordinate)));</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            return polynomial.totalDegree()==0 ? null : polynomial;</span>
         }
     }
 
     public Formation form(Anchor first, Anchor second, int degree, Budget budget) {
-<span class="fc" id="L77">        Objects.requireNonNull(first); Objects.requireNonNull(second); Objects.requireNonNull(budget);</span>
-<span class="pc bpc" id="L78" title="2 of 4 branches missed.">        if (degree&lt;1 || degree&gt;2) throw new IllegalArgumentException(&quot;degree must be one or two&quot;);</span>
-<span class="fc" id="L79">        var work=new Work(budget.maxWorkUnits());</span>
+<span class="fc" id="L87">        Objects.requireNonNull(first); Objects.requireNonNull(second); Objects.requireNonNull(budget);</span>
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (degree&lt;1 || degree&gt;2) throw new IllegalArgumentException(&quot;degree must be one or two&quot;);</span>
+<span class="fc" id="L89">        var work=new Work(budget.maxWorkUnits());</span>
         try {
-<span class="fc" id="L81">            var family=infer(first,second,degree,work);</span>
-<span class="fc bfc" id="L82" title="All 2 branches covered.">            return new Formation(family==null ? Outcome.REJECTED : Outcome.VERIFIED,Optional.ofNullable(family),work.ledger());</span>
-<span class="fc" id="L83">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
-<span class="fc" id="L84">            return new Formation(Outcome.BUDGET_INCONCLUSIVE,Optional.empty(),work.ledger());</span>
-<span class="nc" id="L85">        } catch (IllegalArgumentException unsupported) {</span>
-<span class="nc" id="L86">            return new Formation(Outcome.UNSUPPORTED,Optional.empty(),work.ledger());</span>
+<span class="fc" id="L91">            var family=infer(first,second,degree,work);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            return new Formation(family==null ? Outcome.REJECTED : Outcome.VERIFIED,Optional.ofNullable(family),work.ledger());</span>
+<span class="fc" id="L93">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
+<span class="fc" id="L94">            return new Formation(Outcome.BUDGET_INCONCLUSIVE,Optional.empty(),work.ledger());</span>
+<span class="nc" id="L95">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L96">            return new Formation(Outcome.UNSUPPORTED,Optional.empty(),work.ledger());</span>
         }
     }
     private static VerifiedFamily infer(Anchor first, Anchor second, int degree, Work work) {
-<span class="fc" id="L90">        int coordinate=difference(first.transition(),second.transition(),work);</span>
-<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        if (coordinate&lt;0 || first.proposal().evolution()!=second.proposal().evolution()) return null;</span>
-<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        if (!verifyAnchor(first,work) || !verifyAnchor(second,work)) return null;</span>
-<span class="fc" id="L93">        var a=RecurrenceInvariantSupport.project(first.proposal().polynomial(),work);</span>
-<span class="fc" id="L94">        var b=RecurrenceInvariantSupport.project(second.proposal().polynomial(),work);</span>
-<span class="pc bpc" id="L95" title="1 of 4 branches missed.">        if (a.totalDegree()&gt;degree || b.totalDegree()&gt;degree) return null;</span>
+<span class="fc" id="L100">        int coordinate=difference(first.transition(),second.transition(),work);</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        if (coordinate&lt;0 || first.proposal().evolution()!=second.proposal().evolution()) return null;</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (!verifyAnchor(first,work) || !verifyAnchor(second,work)) return null;</span>
+<span class="fc" id="L103">        var a=RecurrenceInvariantSupport.project(first.proposal().polynomial(),work);</span>
+<span class="fc" id="L104">        var b=RecurrenceInvariantSupport.project(second.proposal().polynomial(),work);</span>
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">        if (a.totalDegree()&gt;degree || b.totalDegree()&gt;degree) return null;</span>
         // Scalar multiples represent the same law; align their normalization before interpolation.
-<span class="fc" id="L97">        work.add(1L+a.termCount()+b.termCount());</span>
-<span class="fc" id="L98">        var order=new de.regelsuche.math.algorithms.equivalence.GradedReverseLexOrder();</span>
-<span class="fc" id="L99">        a=a.monic(order); b=b.monic(order);</span>
-<span class="fc" id="L100">        Rational left=cell(first.transition(),coordinate), right=cell(second.transition(),coordinate);</span>
-<span class="fc" id="L101">        work.add(3L+a.termCount()+b.termCount());</span>
-<span class="fc" id="L102">        Polynomial slope=b.subtract(a).multiply(Rational.ONE.divide(right.subtract(left)));</span>
-<span class="fc" id="L103">        Polynomial intercept=a.subtract(slope.multiply(left));</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (!universalStep(first,coordinate,intercept,slope,work)) return null;</span>
-<span class="fc" id="L105">        return new VerifiedFamily(first,second,degree,coordinate,intercept,slope);</span>
+<span class="fc" id="L107">        work.add(1L+a.termCount()+b.termCount());</span>
+<span class="fc" id="L108">        var order=new de.regelsuche.math.algorithms.equivalence.GradedReverseLexOrder();</span>
+<span class="fc" id="L109">        a=a.monic(order); b=b.monic(order);</span>
+<span class="fc" id="L110">        Rational left=cell(first.transition(),coordinate), right=cell(second.transition(),coordinate);</span>
+<span class="fc" id="L111">        work.add(3L+a.termCount()+b.termCount());</span>
+<span class="fc" id="L112">        Polynomial slope=b.subtract(a).multiply(Rational.ONE.divide(right.subtract(left)));</span>
+<span class="fc" id="L113">        Polynomial intercept=a.subtract(slope.multiply(left));</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!universalStep(first,coordinate,intercept,slope,work)) return null;</span>
+<span class="fc" id="L115">        return new VerifiedFamily(first,second,degree,coordinate,intercept,slope);</span>
     }
     private static boolean verifyAnchor(Anchor anchor, Work work) {
-<span class="fc" id="L108">        var initial=Collections.nCopies(anchor.transition().linear().columns(),Rational.ZERO);</span>
-<span class="fc" id="L109">        var checked=new RecurrenceInvariantVerifier().verify(anchor.transition(),anchor.proposal(),initial,new Budget(work.remaining()));</span>
-<span class="fc" id="L110">        work.add(checked.work().consumedWorkUnits());</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (checked.outcome()==Outcome.BUDGET_INCONCLUSIVE) throw new RecurrenceInvariantSupport.Exhausted();</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (checked.outcome()==Outcome.UNSUPPORTED) throw new IllegalArgumentException(&quot;unsupported anchor&quot;);</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        return checked.outcome()==Outcome.VERIFIED;</span>
+<span class="fc" id="L118">        var initial=Collections.nCopies(anchor.transition().linear().columns(),Rational.ZERO);</span>
+<span class="fc" id="L119">        var checked=new RecurrenceInvariantVerifier().verify(anchor.transition(),anchor.proposal(),initial,new Budget(work.remaining()));</span>
+<span class="fc" id="L120">        work.add(checked.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (checked.outcome()==Outcome.BUDGET_INCONCLUSIVE) throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (checked.outcome()==Outcome.UNSUPPORTED) throw new IllegalArgumentException(&quot;unsupported anchor&quot;);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        return checked.outcome()==Outcome.VERIFIED;</span>
     }
     private static boolean universalStep(Anchor anchor, int coordinate, Polynomial intercept, Polynomial slope, Work work) {
-<span class="fc" id="L116">        var images=parameterImages(anchor.transition(),coordinate,work);</span>
-<span class="fc" id="L117">        var nextIntercept=RecurrenceInvariantSupport.substitute(intercept,images,work);</span>
-<span class="fc" id="L118">        var nextSlope=RecurrenceInvariantSupport.substitute(slope,images,work);</span>
-<span class="fc" id="L119">        var parameter=Polynomial.variable(PARAMETER);</span>
-<span class="fc" id="L120">        work.add(2L+intercept.termCount()+slope.termCount()+nextIntercept.termCount()+nextSlope.termCount());</span>
-<span class="fc" id="L121">        var before=intercept.add(parameter.multiply(slope));</span>
-<span class="fc" id="L122">        var after=nextIntercept.add(parameter.multiply(nextSlope));</span>
+<span class="fc" id="L126">        var images=parameterImages(anchor.transition(),coordinate,work);</span>
+<span class="fc" id="L127">        var nextIntercept=RecurrenceInvariantSupport.substitute(intercept,images,work);</span>
+<span class="fc" id="L128">        var nextSlope=RecurrenceInvariantSupport.substitute(slope,images,work);</span>
+<span class="fc" id="L129">        var parameter=Polynomial.variable(PARAMETER);</span>
+<span class="fc" id="L130">        work.add(2L+intercept.termCount()+slope.termCount()+nextIntercept.termCount()+nextSlope.termCount());</span>
+<span class="fc" id="L131">        var before=intercept.add(parameter.multiply(slope));</span>
+<span class="fc" id="L132">        var after=nextIntercept.add(parameter.multiply(nextSlope));</span>
         // Matching both training points alone is never accepted as a universal law.
-<span class="fc" id="L124">        return after.equals(before.multiply(Rational.of(anchor.proposal().evolution().multiplier())));</span>
+<span class="fc" id="L134">        return after.equals(before.multiply(Rational.of(anchor.proposal().evolution().multiplier())));</span>
     }
     private static List&lt;String&gt; parameterImages(Transition source, int coordinate, Work work) {
-<span class="fc" id="L127">        int dimension=source.linear().columns(), width=dimension+1;</span>
-<span class="fc" id="L128">        var images=new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (int row=0;row&lt;dimension;row++) {</span>
-<span class="fc" id="L130">            StringBuilder image=new StringBuilder(&quot;(&quot;+symbol(source,row*width+dimension,coordinate)+&quot;)&quot;);</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (int col=0;col&lt;dimension;col++) {</span>
-<span class="fc" id="L132">                work.add(1);</span>
-<span class="fc" id="L133">                image.append(&quot;+(&quot;).append(symbol(source,row*width+col,coordinate)).append(&quot;)*x&quot;).append(col);</span>
+<span class="fc" id="L137">        int dimension=source.linear().columns(), width=dimension+1;</span>
+<span class="fc" id="L138">        var images=new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (int row=0;row&lt;dimension;row++) {</span>
+<span class="fc" id="L140">            StringBuilder image=new StringBuilder(&quot;(&quot;+symbol(source,row*width+dimension,coordinate)+&quot;)&quot;);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            for (int col=0;col&lt;dimension;col++) {</span>
+<span class="fc" id="L142">                work.add(1);</span>
+<span class="fc" id="L143">                image.append(&quot;+(&quot;).append(symbol(source,row*width+col,coordinate)).append(&quot;)*x&quot;).append(col);</span>
             }
-<span class="fc" id="L135">            images.add(image.toString());</span>
+<span class="fc" id="L145">            images.add(image.toString());</span>
         }
-<span class="fc" id="L137">        return List.copyOf(images);</span>
+<span class="fc" id="L147">        return List.copyOf(images);</span>
     }
     private static String symbol(Transition source, int index, int coordinate) {
-<span class="fc bfc" id="L140" title="All 2 branches covered.">        return index==coordinate ? PARAMETER : cell(source,index).toString();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        return index==coordinate ? PARAMETER : cell(source,index).toString();</span>
     }
     private static int difference(Transition a, Transition b, Work work) {
-<span class="fc" id="L143">        work.add(1);</span>
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (a.linear().columns()!=b.linear().columns()) return -1;</span>
-<span class="fc" id="L145">        int found=-1, count=a.linear().columns()*(a.linear().columns()+1);</span>
-<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int i=0;i&lt;count;i++) {</span>
-<span class="fc" id="L147">            work.add(1);</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (cell(a,i).equals(cell(b,i))) continue;</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (found&gt;=0) return -1;</span>
-<span class="fc" id="L150">            found=i;</span>
+<span class="fc" id="L153">        work.add(1);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (a.linear().columns()!=b.linear().columns()) return -1;</span>
+<span class="fc" id="L155">        int found=-1, count=a.linear().columns()*(a.linear().columns()+1);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (int i=0;i&lt;count;i++) {</span>
+<span class="fc" id="L157">            work.add(1);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (cell(a,i).equals(cell(b,i))) continue;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (found&gt;=0) return -1;</span>
+<span class="fc" id="L160">            found=i;</span>
         }
-<span class="fc" id="L152">        return found;</span>
+<span class="fc" id="L162">        return found;</span>
     }
     private static Rational cell(Transition source, int index) {
-<span class="fc" id="L155">        int dimension=source.linear().columns(), row=index/(dimension+1), column=index%(dimension+1);</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        return column==dimension ? source.offset().get(row) : source.linear().get(row,column);</span>
+<span class="fc" id="L165">        int dimension=source.linear().columns(), row=index/(dimension+1), column=index%(dimension+1);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        return column==dimension ? source.offset().get(row) : source.linear().get(row,column);</span>
     }
     private static Specialization specialized(Outcome outcome, Optional&lt;Proposal&gt; proposal, Work work) {
-<span class="fc" id="L159">        return new Specialization(outcome,proposal,work.ledger());</span>
+<span class="fc" id="L169">        return new Specialization(outcome,proposal,work.ledger());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
