@@ -30,8 +30,13 @@ final class ExactResidualPolynomialArithmetic {
 
     private final ExpressionParser parser = new ExpressionParser();
     private final java.util.function.LongConsumer workObserver;
+    private final boolean includeProductWork;
     ExactResidualPolynomialArithmetic() { this(null); }
-    ExactResidualPolynomialArithmetic(java.util.function.LongConsumer workObserver) { this.workObserver = workObserver; }
+    ExactResidualPolynomialArithmetic(java.util.function.LongConsumer workObserver) { this(workObserver, false); }
+    ExactResidualPolynomialArithmetic(java.util.function.LongConsumer workObserver, boolean includeProductWork) {
+        this.workObserver = workObserver;
+        this.includeProductWork = includeProductWork;
+    }
 
     ExactParsedTerm exactTerm(String expression) {
         Objects.requireNonNull(expression, "expression");
@@ -57,7 +62,12 @@ final class ExactResidualPolynomialArithmetic {
         ExactParsedTerm parsed = exactTerm(expression);
         var work = new Work();
         try { return convert(parsed.expression(), parsed, work); }
-        finally { if (workObserver != null) workObserver.accept(Math.addExact(work.nodes, work.terms)); }
+        finally {
+            if (workObserver != null) {
+                long units = Math.addExact(work.nodes, work.terms);
+                workObserver.accept(includeProductWork ? Math.addExact(units, work.products) : units);
+            }
+        }
     }
 
     private Polynomial convert(Expr node, ExactParsedTerm parsed, Work work) {

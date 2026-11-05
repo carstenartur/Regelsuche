@@ -1,5 +1,41 @@
 # Structural construction and checked task learning
 
+## V2: coefficient-derived factors and expanded square sums
+
+`TaskConstructionProfile.STRUCTURAL_V2` adds two bounded capabilities to the
+unchanged V1 provider set. The first projects a source-exact polynomial into
+the existing `BinaryQuarticFactorizationEngine`, obtains only decompositions
+accepted by `FactorizationVerifier`, and subjects the rendered expression to
+the same source-bound construction replay and exact polynomial checking used
+by the task solver. Engine, verification, projection and rendering work enter
+the construction receipt. V2 projection and replay additionally charge bounded
+monomial-product attempts even when later cancellation or a limit stops the
+projection; a rejected multiplication may be charged conservatively before it
+is performed. These remain declared logical units, not a complete runtime or
+bit-operation measurement. No completeness or irreducibility claim is made.
+
+For example, the engine can derive a nontrivial product for
+`x^4+4*x^3*y+6*x^2*y^2+7*x*y^3+2*y^4` from coefficient constraints. This is
+not the general Ferrari procedure: the adapter supports two variables, integer
+coefficients, homogeneous degree four, nonzero extreme coefficients and two
+quadratic factors within the existing engine's coefficient and work bounds.
+Other domains and bounded misses remain inconclusive. In particular, rational
+coefficients, nonhomogeneous quartics and arbitrary symbolic coefficients are
+not supplied by this adapter.
+
+The second capability exposes the already present residual composer to an
+additive-root source, so an expanded four-term sum can be processed without
+first recovering its original product syntax. The existing limits of four or
+six exact square components and bounded composition still apply. Both V2
+capabilities use the existing frontier and are available to both baseline and
+learned arms. V1 and older snapshot semantics remain unchanged; V2 is persisted
+under its explicit profile identity.
+
+The integration test also learns a checked schema from two renamed instances
+of one quartic and applies it after restore to a composite substitution. This
+is evidence for reuse of that schema, not autonomous invention of a general
+coefficient-solving plan or a broad performance study.
+
 Source baseline: `459293be659a4adf3fd30f5e9576c934ea00ca21` (30 October 2026).
 This is an opt-in extension of the existing task solver and checked-schema learner,
 not a replacement search kernel, CAS, or a set of hard-coded historical answers.

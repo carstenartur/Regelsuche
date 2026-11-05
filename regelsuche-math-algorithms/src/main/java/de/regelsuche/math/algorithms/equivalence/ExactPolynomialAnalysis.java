@@ -18,9 +18,15 @@ public final class ExactPolynomialAnalysis {
     private final java.util.function.LongConsumer workObserver;
     public ExactPolynomialAnalysis() { this(null); }
     /** Optional exact node/term and alpha-renaming work receipt; mathematical results are unchanged. */
-    public ExactPolynomialAnalysis(java.util.function.LongConsumer workObserver) {
+    public ExactPolynomialAnalysis(java.util.function.LongConsumer workObserver) { this(workObserver, false); }
+    private ExactPolynomialAnalysis(java.util.function.LongConsumer workObserver, boolean includeProductWork) {
         this.workObserver = workObserver;
-        arithmetic = new ExactResidualPolynomialArithmetic(workObserver);
+        arithmetic = new ExactResidualPolynomialArithmetic(workObserver, includeProductWork);
+    }
+
+    /** Also charge the bounded monomial products used during exact projection, including failed projections. */
+    public static ExactPolynomialAnalysis withProductWork(java.util.function.LongConsumer workObserver) {
+        return new ExactPolynomialAnalysis(java.util.Objects.requireNonNull(workObserver), true);
     }
 
     /** Source-exact bounded projection for construction and structural objectives. */

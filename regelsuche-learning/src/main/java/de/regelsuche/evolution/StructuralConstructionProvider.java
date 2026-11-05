@@ -37,7 +37,10 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
         var source = CODEC.decodeExpression(state.expression());
         var generated = StructuralConstructionPrograms.generate(operation, source);
         long[] work = {generated.work()};
-        var exact = new ExactPolynomialAnalysis(units -> work[0] = Math.addExact(work[0], units));
+        java.util.function.LongConsumer account = units -> work[0] = Math.addExact(work[0], units);
+        var exact = operation == StructuralConstructionPrograms.Operation.BINARY_QUARTIC
+                || operation == StructuralConstructionPrograms.Operation.RESIDUAL_EXPANDED
+            ? ExactPolynomialAnalysis.withProductWork(account) : new ExactPolynomialAnalysis(account);
         String input = ExpressionFormatter.format(source); work[0] = Math.addExact(work[0], input.length());
         var proofs = new ArrayList<Transformation>();
         var seen = new java.util.HashSet<String>();
