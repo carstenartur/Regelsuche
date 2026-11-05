@@ -8,7 +8,6 @@ import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Case;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.json.JsonReader;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -368,8 +367,7 @@ final class HistoricalProductionSearchComparison {
     private final ExpressionCanonicalizer canonicalizer =
         new ExpressionCanonicalizer();
     private final ExpressionScorer scorer = new ExpressionScorer();
-    private final SymPyEquivalenceService equivalence =
-        new SymPyEquivalenceService();
+    private final HistoricalRediscoveryMatch matcher = new HistoricalRediscoveryMatch();
 
     Report run(
         Corpus corpus,
@@ -438,8 +436,8 @@ final class HistoricalProductionSearchComparison {
         List<SearchState> diversityStates =
             new StructuralDiversitySearchStrategy().search(searchProblem(
                 benchmarkCase, format(benchmarkCase.source()), counting));
-        SearchState match = findMatch(
-            benchmarkCase, format(benchmarkCase.target()), diversityStates);
+        SearchState match = matcher.find(
+            benchmarkCase, format(benchmarkCase.target()), diversityStates).orElse(null);
         int engineCalls = Math.toIntExact(work[0]);
         requireDiversityBinding(
             diversityRetained, diversityStates, match, engineCalls, work[1]);
@@ -461,7 +459,9 @@ final class HistoricalProductionSearchComparison {
             diversityStates.isEmpty() ? "NO_STATES" : "COMPLETED_BOUNDED_SEARCH");
         return new CaseComparison(
             benchmarkCase.id(),
-            classify(witnessSteps, scalar, diversity),
+            atlasCase.production().oracle().reachable() && witnessSteps == 0
+                ? ComparisonStatus.SOURCE_ALREADY_REPRESENTED
+                : classify(witnessSteps, scalar, diversity),
             witnessSteps,
             benchmarkCase.searchMaxDepth(),
             benchmarkCase.searchMaxVisitedStates(),
@@ -514,35 +514,6 @@ final class HistoricalProductionSearchComparison {
             prefix++;
         }
         return prefix;
-    }
-
-    private SearchState findMatch(
-        Case benchmarkCase,
-        String target,
-        List<SearchState> states
-    ) {
-        return states.stream()
-            .filter(state -> matches(benchmarkCase, state.expression(), target))
-            .min(Comparator.comparingInt(SearchState::depth)
-                .thenComparing(SearchState::expression)
-                .thenComparing(state ->
-                    String.join("->", state.appliedRuleIds())))
-            .orElse(null);
-    }
-
-    private boolean matches(
-        Case benchmarkCase,
-        String expression,
-        String target
-    ) {
-        if (benchmarkCase.targetRelation() == TargetRelation.SYNTAX_EXACT) {
-            try {
-                return format(expression).equals(target);
-            } catch (IllegalArgumentException exception) {
-                return false;
-            }
-        }
-        return equivalence.areEquivalent(expression, target);
     }
 
     private static void requireScalarBinding(
@@ -651,7 +622,8 @@ final class HistoricalProductionSearchComparison {
         Set<String> atlasIds = atlas.cases().stream()
             .map(value -> value.benchmarkCase().id())
             .collect(Collectors.toSet());
-        if (!corpus.schema().equals(atlas.corpusSchema())
+        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlas.schema())
+                || !corpus.schema().equals(atlas.corpusSchema())
                 || !corpus.contentSha256().equals(atlas.corpusSha256())
                 || !corpus.inventoryRevision().equals(atlas.inventoryRevision())
                 || !corpus.claimBoundary().equals(atlas.claimBoundary())
@@ -677,6 +649,7 @@ final class HistoricalProductionSearchComparison {
 
     enum ComparisonStatus {
         NOT_APPLICABLE_NO_PRODUCTION_WITNESS,
+        SOURCE_ALREADY_REPRESENTED,
         SCALAR_ALREADY_FOUND,
         DIVERSITY_RECOVERS_COMPLETE_WITNESS,
         DIVERSITY_FINDS_RELATION_VIA_ALTERNATE_PATH,
@@ -733,8 +706,9 @@ final class HistoricalProductionSearchComparison {
                     || diversity.exploredPrefixLength() > oracleWitnessStepCount
                     || prefixDelta != diversity.exploredPrefixLength()
                         - scalar.exploredPrefixLength()
-                    || status != classify(
-                        oracleWitnessStepCount, scalar, diversity)) {
+                    || (status == ComparisonStatus.SOURCE_ALREADY_REPRESENTED
+                        ? oracleWitnessStepCount != 0
+                        : status != classify(oracleWitnessStepCount, scalar, diversity))) {
                 throw new IllegalArgumentException(
                     "case comparison evidence is inconsistent");
             }
