@@ -21,7 +21,7 @@ import java.util.List;
 
 /** Declared finite procedures, not a learned strategy or a second search algorithm. */
 final class StructuralConstructionPrograms {
-    enum Operation { EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE }
+    enum Operation { EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE, BINARY_QUARTIC, RESIDUAL_EXPANDED }
     record Report(List<String> candidates, long work) { Report { candidates = List.copyOf(candidates); } }
     private static final long LIMIT = 100_000;
     private StructuralConstructionPrograms() { }
@@ -41,7 +41,9 @@ final class StructuralConstructionPrograms {
                 case COMPLETE_SQUARE -> apply(new SumOfSquaresCompletionOperator(), text, work);
                 case FACTOR_DIFFERENCE -> factorDifference(text, work);
                 case FACTOR_PARTITION -> partitionFactors(source, text, work);
-                case RESIDUAL_BALANCE -> residualBalance(source, text, work);
+                case RESIDUAL_BALANCE -> residualBalance(source, text, work, false);
+                case BINARY_QUARTIC -> QuarticConstruction.generate(text, LIMIT - work.units, work::add);
+                case RESIDUAL_EXPANDED -> residualBalance(source, text, work, true);
             };
             return new Report(candidates, work.units);
         } catch (Limit | IllegalArgumentException unsupported) {
@@ -81,14 +83,15 @@ final class StructuralConstructionPrograms {
         return result.expression().stream().toList();
     }
 
-    private static List<String> residualBalance(Expr expression, String source, Work work) {
-        if (!(expression instanceof BinaryExpr root) || root.operator() != BinaryOperator.MUL) return List.of();
-        var exact = new ExactPolynomialAnalysis(work::add);
+    private static List<String> residualBalance(Expr expression, String source, Work work, boolean expanded) {
+        if (!(expression instanceof BinaryExpr root)
+                || (expanded ? root.operator() != BinaryOperator.ADD : root.operator() != BinaryOperator.MUL)) return List.of();
+        var exact = expanded ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);
         var polynomial = exact.normalForm(source);
         int count = polynomial.termCount();
         if (count < 4 || count > 6 || count % 2 != 0) return List.of();
-        String prepared = exposeAll(polynomial.toCanonicalString(), work);
-        var composer = new ExactPolynomialResidualComposer(work::add);
+        String prepared = exposeAll(polynomial.toCanonicalString(), work, expanded);
+        var composer = expanded ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);
         var parts = composer.additiveComponents(prepared);
         if (parts.size() != count || !allSquares(parts, work)) return List.of();
         var effects = pairedEffects(parts, composer, work);
@@ -96,10 +99,10 @@ final class StructuralConstructionPrograms {
         work.add(results.size());
         return results.stream().map(ExactPolynomialResidualComposer.Composition::candidateExpression).toList();
     }
-    private static String exposeAll(String source, Work work) {
+    private static String exposeAll(String source, Work work, boolean includeProductWork) {
         String current = source;
         var exposure = new ExactMonomialSquareExposureOperator(1);
-        var exact = new ExactPolynomialAnalysis(work::add);
+        var exact = includeProductWork ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);
         for (int step = 0; step < 12; step++) {
             var candidates = apply(exposure, current, work);
             if (candidates.isEmpty()) return current;

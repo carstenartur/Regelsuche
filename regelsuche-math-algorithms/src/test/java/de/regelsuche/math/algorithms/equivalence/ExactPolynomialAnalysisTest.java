@@ -37,4 +37,19 @@ class ExactPolynomialAnalysisTest {
         assertThrows(IllegalArgumentException.class, () -> measured.requireEquivalent("x+1", "x+2"));
         assertTrue(work.get() > beforeFailure, "unsuccessful exact work remains observed");
     }
+
+    @Test
+    void productAccountingChargesExpansionEvenWhenTermsCancelOrProjectionAborts() {
+        var legacyWork = new java.util.concurrent.atomic.AtomicLong();
+        var completeWork = new java.util.concurrent.atomic.AtomicLong();
+        var legacy = new ExactPolynomialAnalysis(legacyWork::addAndGet);
+        var complete = ExactPolynomialAnalysis.withProductWork(completeWork::addAndGet);
+        String cancelled = "(a+b+c+d)^8-(a+b+c+d)^8+x^4+y^4";
+        assertEquals(legacy.normalForm(cancelled), complete.normalForm(cancelled));
+        assertTrue(completeWork.get() - legacyWork.get() >= 3_012,
+            "the two cancelled expansions each require at least 1,506 term products");
+        long before = completeWork.get();
+        assertThrows(IllegalArgumentException.class, () -> complete.normalForm("(a+b+c+d)^32"));
+        assertTrue(completeWork.get() > before, "failed expansion must retain incurred work");
+    }
 }

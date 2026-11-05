@@ -79,10 +79,10 @@ public final class CheckedSchemaTaskSolver {
         this.preparation = preparation;
     }
 
-    CheckedSchemaTaskSolver withConstructions() {
+    CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations) {
         var providers = new java.util.ArrayList<>(session.providers());
         var verifiers = new java.util.HashMap<String, TypedMoveSearch.Verifier>();
-        for (var operation : StructuralConstructionPrograms.Operation.values()) {
+        for (var operation : operations) {
             var provider = new StructuralConstructionProvider(operation);
             providers.add(preparation == null ? provider : provider.incremental());
             verifiers.put(provider.descriptor().id(), provider.verifier());
