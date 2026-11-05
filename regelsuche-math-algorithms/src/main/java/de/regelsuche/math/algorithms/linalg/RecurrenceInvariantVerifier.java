@@ -3,6 +3,7 @@ package de.regelsuche.math.algorithms.linalg;
 import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily.VerifiedFamily;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Evolution;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Proposal;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
@@ -58,6 +59,35 @@ public final class RecurrenceInvariantVerifier {
         }
     }
 
+    /**
+     * Checks an instance using a previously issued universal family proof. Fixed
+     * source entries and the concrete initial value are checked on every call.
+     * The already proved symbolic step is not expanded again. This accepts only
+     * an immutable VerifiedFamily, never an untrusted persisted proposal.
+     * Use verify(source, proposal, initial, budget) for an independent full replay.
+     */
+    public Verification verifyFamily(VerifiedFamily family, Transition source,
+            List<Rational> initialState, Budget budget) {
+        Objects.requireNonNull(family, "family"); Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(budget, "budget");
+        var initial=RecurrenceInvariantSynthesis.checkedInitial(source,initialState);
+        var work=new Work(budget.maxWorkUnits());
+        try {
+            var polynomial=family.checkedSpecialization(source,work);
+            if (polynomial==null) return withoutLaw(Outcome.REJECTED,work);
+            String text=polynomial.toCanonicalString();
+            work.add(text.length());
+            if (text.length()>RecurrenceInvariantSynthesis.MAX_PROPOSAL_LENGTH)
+                return withoutLaw(Outcome.UNSUPPORTED,work);
+            var proposal=new Proposal(text,family.first().proposal().evolution());
+            return bindInitial(source,proposal,polynomial,initial,work);
+        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
+            return withoutLaw(Outcome.BUDGET_INCONCLUSIVE,work);
+        } catch (IllegalArgumentException unsupported) {
+            return withoutLaw(Outcome.UNSUPPORTED,work);
+        }
+    }
+
     private static Verification check(Transition source, Proposal proposal, List<Rational> initial, Work work) {
         var polynomial = RecurrenceInvariantSupport.project(proposal.polynomial(), work);
         var variables = RecurrenceInvariantSupport.variables(source.linear().columns());
@@ -70,6 +100,12 @@ public final class RecurrenceInvariantVerifier {
         work.add(polynomial.termCount() + transformed.termCount());
         if (!transformed.equals(polynomial.multiply(Rational.of(proposal.evolution().multiplier()))))
             return withoutLaw(Outcome.REJECTED, work);
+        return bindInitial(source,proposal,polynomial,initial,work);
+    }
+
+    /** The same independently calculated base case for full replay and proof reuse. */
+    private static Verification bindInitial(Transition source, Proposal proposal, Polynomial polynomial,
+            List<Rational> initial, Work work) {
         var initialImages = initial.stream().map(Rational::toString).toList();
         Polynomial value = RecurrenceInvariantSupport.substitute(polynomial, initialImages, work);
         work.add(value.termCount() + 1L);
