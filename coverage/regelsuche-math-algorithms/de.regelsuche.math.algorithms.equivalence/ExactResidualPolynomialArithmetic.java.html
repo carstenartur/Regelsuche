@@ -30,162 +30,172 @@ final class ExactResidualPolynomialArithmetic {
 
 <span class="fc" id="L31">    private final ExpressionParser parser = new ExpressionParser();</span>
     private final java.util.function.LongConsumer workObserver;
-<span class="fc" id="L33">    ExactResidualPolynomialArithmetic() { this(null); }</span>
-<span class="fc" id="L34">    ExactResidualPolynomialArithmetic(java.util.function.LongConsumer workObserver) { this.workObserver = workObserver; }</span>
+    private final boolean includeProductWork;
+<span class="fc" id="L34">    ExactResidualPolynomialArithmetic() { this(null); }</span>
+<span class="fc" id="L35">    ExactResidualPolynomialArithmetic(java.util.function.LongConsumer workObserver) { this(workObserver, false); }</span>
+<span class="fc" id="L36">    ExactResidualPolynomialArithmetic(java.util.function.LongConsumer workObserver, boolean includeProductWork) {</span>
+<span class="fc" id="L37">        this.workObserver = workObserver;</span>
+<span class="fc" id="L38">        this.includeProductWork = includeProductWork;</span>
+<span class="fc" id="L39">    }</span>
 
     ExactParsedTerm exactTerm(String expression) {
-<span class="fc" id="L37">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        if (expression.isBlank() || expression.length() &gt; MAX_SOURCE_CHARS) {</span>
-<span class="fc" id="L39">            throw new IllegalArgumentException(&quot;residual source length limit&quot;);</span>
+<span class="fc" id="L42">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">        if (expression.isBlank() || expression.length() &gt; MAX_SOURCE_CHARS) {</span>
+<span class="fc" id="L44">            throw new IllegalArgumentException(&quot;residual source length limit&quot;);</span>
         }
-<span class="fc" id="L41">        int structuralTokens = 0;</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (int index = 0; index &lt; expression.length(); index++) {</span>
-<span class="fc bfc" id="L43" title="All 4 branches covered.">            if (&quot;+-*/^(),&quot;.indexOf(expression.charAt(index)) &gt;= 0</span>
+<span class="fc" id="L46">        int structuralTokens = 0;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (int index = 0; index &lt; expression.length(); index++) {</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">            if (&quot;+-*/^(),&quot;.indexOf(expression.charAt(index)) &gt;= 0</span>
                     &amp;&amp; ++structuralTokens &gt; MAX_STRUCTURAL_TOKENS) {
-<span class="fc" id="L45">                throw new IllegalArgumentException(&quot;residual syntax work limit&quot;);</span>
+<span class="fc" id="L50">                throw new IllegalArgumentException(&quot;residual syntax work limit&quot;);</span>
             }
         }
-<span class="fc" id="L48">        return parser.parseExactTerm(expression);</span>
+<span class="fc" id="L53">        return parser.parseExactTerm(expression);</span>
     }
 
     String syntax(String expression) {
-<span class="fc" id="L52">        ExactParsedTerm parsed = exactTerm(expression);</span>
-<span class="fc" id="L53">        return ExactExpressionFormatter.format(parsed.expression(), parsed);</span>
+<span class="fc" id="L57">        ExactParsedTerm parsed = exactTerm(expression);</span>
+<span class="fc" id="L58">        return ExactExpressionFormatter.format(parsed.expression(), parsed);</span>
     }
 
     Polynomial parse(String expression) {
-<span class="fc" id="L57">        ExactParsedTerm parsed = exactTerm(expression);</span>
-<span class="fc" id="L58">        var work = new Work();</span>
-<span class="fc" id="L59">        try { return convert(parsed.expression(), parsed, work); }</span>
-<span class="fc bfc" id="L60" title="All 2 branches covered.">        finally { if (workObserver != null) workObserver.accept(Math.addExact(work.nodes, work.terms)); }</span>
+<span class="fc" id="L62">        ExactParsedTerm parsed = exactTerm(expression);</span>
+<span class="fc" id="L63">        var work = new Work();</span>
+<span class="fc" id="L64">        try { return convert(parsed.expression(), parsed, work); }</span>
+        finally {
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            if (workObserver != null) {</span>
+<span class="fc" id="L67">                long units = Math.addExact(work.nodes, work.terms);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                workObserver.accept(includeProductWork ? Math.addExact(units, work.products) : units);</span>
+            }
+        }
     }
 
     private Polynomial convert(Expr node, ExactParsedTerm parsed, Work work) {
-<span class="fc" id="L64">        work.nodes++;</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (node instanceof NumberExpr number) {</span>
+<span class="fc" id="L74">        work.nodes++;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (node instanceof NumberExpr number) {</span>
             // ExactParsedTerm validates that the only unbacked numeric node is
             // the zero synthesized by its own unary-minus parser production.
-<span class="fc" id="L68">            ExactRational value = parsed.literalFor(number)</span>
-<span class="fc" id="L69">                .map(ExactParsedTerm.LiteralOccurrence::exactValue)</span>
-<span class="fc" id="L70">                .orElse(ExactRational.ZERO);</span>
-<span class="fc" id="L71">            return checked(Polynomial.constant(Rational.fromExact(value)), work);</span>
+<span class="fc" id="L78">            ExactRational value = parsed.literalFor(number)</span>
+<span class="fc" id="L79">                .map(ExactParsedTerm.LiteralOccurrence::exactValue)</span>
+<span class="fc" id="L80">                .orElse(ExactRational.ZERO);</span>
+<span class="fc" id="L81">            return checked(Polynomial.constant(Rational.fromExact(value)), work);</span>
         }
-<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (node instanceof VariableExpr variable) {</span>
-<span class="fc" id="L74">            work.terms++;</span>
-<span class="fc" id="L75">            return Polynomial.variable(variable.name());</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (node instanceof VariableExpr variable) {</span>
+<span class="fc" id="L84">            work.terms++;</span>
+<span class="fc" id="L85">            return Polynomial.variable(variable.name());</span>
         }
-<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (!(node instanceof BinaryExpr binary)) {</span>
-<span class="fc" id="L78">            throw new IllegalArgumentException(&quot;non-polynomial residual term&quot;);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!(node instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L88">            throw new IllegalArgumentException(&quot;non-polynomial residual term&quot;);</span>
         }
-<span class="fc" id="L80">        Polynomial left = convert(binary.left(), parsed, work);</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
-<span class="fc" id="L82">            work.nodes++;</span>
-<span class="fc" id="L83">            return power(left, exponent(binary.right(), parsed), work);</span>
+<span class="fc" id="L90">        Polynomial left = convert(binary.left(), parsed, work);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L92">            work.nodes++;</span>
+<span class="fc" id="L93">            return power(left, exponent(binary.right(), parsed), work);</span>
         }
-<span class="fc" id="L85">        Polynomial right = convert(binary.right(), parsed, work);</span>
-<span class="pc bpc" id="L86" title="1 of 5 branches missed.">        return switch (binary.operator()) {</span>
-<span class="fc" id="L87">            case ADD -&gt; add(left, right, false, work);</span>
-<span class="fc" id="L88">            case SUB -&gt; add(left, right, true, work);</span>
-<span class="fc" id="L89">            case MUL -&gt; multiply(left, right, work);</span>
-<span class="fc" id="L90">            case DIV -&gt; divide(left, right, work);</span>
-<span class="nc" id="L91">            case POW -&gt; throw new IllegalStateException(&quot;power handled above&quot;);</span>
+<span class="fc" id="L95">        Polynomial right = convert(binary.right(), parsed, work);</span>
+<span class="pc bpc" id="L96" title="1 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L97">            case ADD -&gt; add(left, right, false, work);</span>
+<span class="fc" id="L98">            case SUB -&gt; add(left, right, true, work);</span>
+<span class="fc" id="L99">            case MUL -&gt; multiply(left, right, work);</span>
+<span class="fc" id="L100">            case DIV -&gt; divide(left, right, work);</span>
+<span class="nc" id="L101">            case POW -&gt; throw new IllegalStateException(&quot;power handled above&quot;);</span>
         };
     }
 
     private static int exponent(Expr node, ExactParsedTerm parsed) {
-<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!(node instanceof NumberExpr number)) {</span>
-<span class="fc" id="L97">            throw new IllegalArgumentException(&quot;exponent must be a literal&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!(node instanceof NumberExpr number)) {</span>
+<span class="fc" id="L107">            throw new IllegalArgumentException(&quot;exponent must be a literal&quot;);</span>
         }
-<span class="fc" id="L99">        ExactRational value = parsed.literalFor(number)</span>
-<span class="pc" id="L100">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc" id="L109">        ExactRational value = parsed.literalFor(number)</span>
+<span class="pc" id="L110">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
                 &quot;exponent lacks exact provenance&quot;))
-<span class="fc" id="L102">            .exactValue();</span>
-<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        if (!value.isInteger() || value.numerator().signum() &lt; 0</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">                || value.numerator().bitLength() &gt; 6</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">                || value.numerator().intValue() &gt; MAX_EXPONENT) {</span>
-<span class="fc" id="L106">            throw new IllegalArgumentException(&quot;unsupported exact exponent&quot;);</span>
+<span class="fc" id="L112">            .exactValue();</span>
+<span class="pc bpc" id="L113" title="1 of 4 branches missed.">        if (!value.isInteger() || value.numerator().signum() &lt; 0</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                || value.numerator().bitLength() &gt; 6</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                || value.numerator().intValue() &gt; MAX_EXPONENT) {</span>
+<span class="fc" id="L116">            throw new IllegalArgumentException(&quot;unsupported exact exponent&quot;);</span>
         }
-<span class="fc" id="L108">        return value.numerator().intValueExact();</span>
+<span class="fc" id="L118">        return value.numerator().intValueExact();</span>
     }
 
     private static Polynomial power(Polynomial base, int exponent, Work work) {
-<span class="fc" id="L112">        Polynomial result = Polynomial.constant(Rational.ONE);</span>
-<span class="fc" id="L113">        work.terms = Math.addExact(work.terms, result.termCount());</span>
-<span class="fc" id="L114">        Polynomial factor = base;</span>
-<span class="fc" id="L115">        int remaining = exponent;</span>
-<span class="fc bfc" id="L116" title="All 2 branches covered.">        while (remaining != 0) {</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">            if ((remaining &amp; 1) != 0) {</span>
-<span class="fc" id="L118">                result = multiply(result, factor, work);</span>
+<span class="fc" id="L122">        Polynomial result = Polynomial.constant(Rational.ONE);</span>
+<span class="fc" id="L123">        work.terms = Math.addExact(work.terms, result.termCount());</span>
+<span class="fc" id="L124">        Polynomial factor = base;</span>
+<span class="fc" id="L125">        int remaining = exponent;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        while (remaining != 0) {</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if ((remaining &amp; 1) != 0) {</span>
+<span class="fc" id="L128">                result = multiply(result, factor, work);</span>
             }
-<span class="fc" id="L120">            remaining &gt;&gt;&gt;= 1;</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (remaining != 0) {</span>
-<span class="fc" id="L122">                factor = multiply(factor, factor, work);</span>
+<span class="fc" id="L130">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (remaining != 0) {</span>
+<span class="fc" id="L132">                factor = multiply(factor, factor, work);</span>
             }
         }
-<span class="fc" id="L125">        return result;</span>
+<span class="fc" id="L135">        return result;</span>
     }
 
     private static Polynomial add(
         Polynomial left, Polynomial right, boolean subtract, Work work
     ) {
-<span class="fc" id="L131">        requireCoefficientRoom(coefficientBits(left) + coefficientBits(right) + 1L);</span>
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        return checked(subtract ? left.subtract(right) : left.add(right), work);</span>
+<span class="fc" id="L141">        requireCoefficientRoom(coefficientBits(left) + coefficientBits(right) + 1L);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        return checked(subtract ? left.subtract(right) : left.add(right), work);</span>
     }
 
     private static Polynomial divide(
         Polynomial numerator, Polynomial denominator, Work work
     ) {
-<span class="fc bfc" id="L138" title="All 4 branches covered.">        if (denominator.isZero() || denominator.totalDegree() != 0) {</span>
-<span class="fc" id="L139">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L148" title="All 4 branches covered.">        if (denominator.isZero() || denominator.totalDegree() != 0) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(</span>
                 &quot;residual division requires a nonzero constant denominator&quot;);
         }
-<span class="fc" id="L142">        Rational constant = denominator.terms().values().iterator().next();</span>
-<span class="fc" id="L143">        return multiply(numerator,</span>
-<span class="fc" id="L144">            Polynomial.constant(Rational.ONE.divide(constant)), work);</span>
+<span class="fc" id="L152">        Rational constant = denominator.terms().values().iterator().next();</span>
+<span class="fc" id="L153">        return multiply(numerator,</span>
+<span class="fc" id="L154">            Polynomial.constant(Rational.ONE.divide(constant)), work);</span>
     }
 
     private static Polynomial multiply(
         Polynomial left, Polynomial right, Work work
     ) {
-<span class="fc" id="L150">        long products = (long) left.termCount() * right.termCount();</span>
-<span class="fc" id="L151">        work.consume(products);</span>
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (products &gt; 4_096L</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                || left.totalDegree() + right.totalDegree() &gt; MAX_DEGREE) {</span>
-<span class="fc" id="L154">            throw new IllegalArgumentException(&quot;residual expansion size limit&quot;);</span>
+<span class="fc" id="L160">        long products = (long) left.termCount() * right.termCount();</span>
+<span class="fc" id="L161">        work.consume(products);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (products &gt; 4_096L</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                || left.totalDegree() + right.totalDegree() &gt; MAX_DEGREE) {</span>
+<span class="fc" id="L164">            throw new IllegalArgumentException(&quot;residual expansion size limit&quot;);</span>
         }
         // A resulting monomial can receive at most min(m,n) products.
         // Bound rational denominator growth BEFORE convolution allocates it.
-<span class="fc" id="L158">        long collisions = Math.min(left.termCount(), right.termCount());</span>
-<span class="fc" id="L159">        long bits = (long) coefficientBits(left) + coefficientBits(right);</span>
-<span class="fc" id="L160">        requireCoefficientRoom(collisions * (bits + 1L));</span>
-<span class="fc" id="L161">        return checked(left.multiply(right), work);</span>
+<span class="fc" id="L168">        long collisions = Math.min(left.termCount(), right.termCount());</span>
+<span class="fc" id="L169">        long bits = (long) coefficientBits(left) + coefficientBits(right);</span>
+<span class="fc" id="L170">        requireCoefficientRoom(collisions * (bits + 1L));</span>
+<span class="fc" id="L171">        return checked(left.multiply(right), work);</span>
     }
 
     private static Polynomial checked(Polynomial polynomial, Work work) {
-<span class="fc" id="L165">        work.terms = Math.addExact(work.terms, polynomial.termCount());</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (polynomial.termCount() &gt; MAX_TERMS</span>
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                || polynomial.totalDegree() &gt; MAX_DEGREE) {</span>
-<span class="nc" id="L168">            throw new IllegalArgumentException(&quot;residual polynomial size limit&quot;);</span>
+<span class="fc" id="L175">        work.terms = Math.addExact(work.terms, polynomial.termCount());</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (polynomial.termCount() &gt; MAX_TERMS</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                || polynomial.totalDegree() &gt; MAX_DEGREE) {</span>
+<span class="nc" id="L178">            throw new IllegalArgumentException(&quot;residual polynomial size limit&quot;);</span>
         }
-<span class="fc" id="L170">        requireCoefficientRoom(coefficientBits(polynomial));</span>
-<span class="fc" id="L171">        return polynomial;</span>
+<span class="fc" id="L180">        requireCoefficientRoom(coefficientBits(polynomial));</span>
+<span class="fc" id="L181">        return polynomial;</span>
     }
 
     private static int coefficientBits(Polynomial polynomial) {
-<span class="fc" id="L175">        int result = 0;</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (Rational coefficient : polynomial.terms().values()) {</span>
-<span class="fc" id="L177">            result = Math.max(result, Math.max(</span>
-<span class="fc" id="L178">                coefficient.numerator().abs().bitLength(),</span>
-<span class="fc" id="L179">                coefficient.denominator().bitLength()));</span>
-<span class="fc" id="L180">        }</span>
-<span class="fc" id="L181">        return result;</span>
+<span class="fc" id="L185">        int result = 0;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (Rational coefficient : polynomial.terms().values()) {</span>
+<span class="fc" id="L187">            result = Math.max(result, Math.max(</span>
+<span class="fc" id="L188">                coefficient.numerator().abs().bitLength(),</span>
+<span class="fc" id="L189">                coefficient.denominator().bitLength()));</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        return result;</span>
     }
 
     private static void requireCoefficientRoom(long bits) {
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (bits &gt; MAX_COEFFICIENT_BITS) {</span>
-<span class="nc" id="L186">            throw new IllegalArgumentException(&quot;residual coefficient size limit&quot;);</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (bits &gt; MAX_COEFFICIENT_BITS) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(&quot;residual coefficient size limit&quot;);</span>
         }
-<span class="fc" id="L188">    }</span>
+<span class="fc" id="L198">    }</span>
 
     private static final class Work {
         private long products;
@@ -193,11 +203,11 @@ final class ExactResidualPolynomialArithmetic {
         private long terms;
 
         private void consume(long count) {
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            if (count &gt; MAX_TERM_PRODUCTS - products) {</span>
-<span class="nc" id="L197">                throw new IllegalArgumentException(&quot;residual arithmetic work limit&quot;);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            if (count &gt; MAX_TERM_PRODUCTS - products) {</span>
+<span class="nc" id="L207">                throw new IllegalArgumentException(&quot;residual arithmetic work limit&quot;);</span>
             }
-<span class="fc" id="L199">            products += count;</span>
-<span class="fc" id="L200">        }</span>
+<span class="fc" id="L209">            products += count;</span>
+<span class="fc" id="L210">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

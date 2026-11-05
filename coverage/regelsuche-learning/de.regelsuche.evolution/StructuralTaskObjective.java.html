@@ -35,7 +35,7 @@ import de.regelsuche.search.moves.TypedSourceOnlySearch;
 <span class="fc bfc" id="L35" title="All 4 branches covered.">        if (this == FACTORIZATION &amp;&amp; root.operator() == BinaryOperator.MUL</span>
 <span class="pc bpc" id="L36" title="1 of 4 branches missed.">                &amp;&amp; nonconstant(root.left(), exact, work) &amp;&amp; nonconstant(root.right(), exact, work)) return 0;</span>
 <span class="fc bfc" id="L37" title="All 4 branches covered.">        if (this == SUM_OF_TWO_SQUARES &amp;&amp; root.operator() == BinaryOperator.ADD</span>
-<span class="pc bpc" id="L38" title="1 of 4 branches missed.">                &amp;&amp; nonconstantSquare(root.left(), exact, work) &amp;&amp; nonconstantSquare(root.right(), exact, work)) return 0;</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">                &amp;&amp; nonconstantSquare(root.left(), exact, work) &amp;&amp; nonconstantSquare(root.right(), exact, work)) return 0;</span>
         // Generic preparation landmarks, not comparison with a stored historical answer.
 <span class="pc bpc" id="L40" title="1 of 6 branches missed.">        if (root.operator() == BinaryOperator.SUB &amp;&amp; isSquare(root.left())) return isSquare(root.right()) ? 1 : 2;</span>
 <span class="fc bfc" id="L41" title="All 6 branches covered.">        if (root.operator() == BinaryOperator.ADD) return 5 - (isSquare(root.left()) ? 1 : 0) - (isSquare(root.right()) ? 1 : 0);</span>
@@ -43,7 +43,7 @@ import de.regelsuche.search.moves.TypedSourceOnlySearch;
     }
 
     private static boolean nonconstantSquare(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
-<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        return isSquare(expression) &amp;&amp; nonconstant(((BinaryExpr) expression).left(), exact, work);</span>
+<span class="fc bfc" id="L46" title="All 4 branches covered.">        return isSquare(expression) &amp;&amp; nonconstant(((BinaryExpr) expression).left(), exact, work);</span>
     }
     private static boolean nonconstant(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
 <span class="fc" id="L49">        String text = ExpressionFormatter.format(expression); work.add(text.length());</span>

@@ -79,14 +79,14 @@ public final class CheckedSchemaTaskSolver {
 <span class="fc" id="L79">        this.preparation = preparation;</span>
 <span class="fc" id="L80">    }</span>
 
-    CheckedSchemaTaskSolver withConstructions() {
+    CheckedSchemaTaskSolver withConstructions(List&lt;StructuralConstructionPrograms.Operation&gt; operations) {
 <span class="fc" id="L83">        var providers = new java.util.ArrayList&lt;&gt;(session.providers());</span>
 <span class="fc" id="L84">        var verifiers = new java.util.HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (var operation : StructuralConstructionPrograms.Operation.values()) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (var operation : operations) {</span>
 <span class="fc" id="L86">            var provider = new StructuralConstructionProvider(operation);</span>
 <span class="fc bfc" id="L87" title="All 2 branches covered.">            providers.add(preparation == null ? provider : provider.incremental());</span>
 <span class="fc" id="L88">            verifiers.put(provider.descriptor().id(), provider.verifier());</span>
-        }
+<span class="fc" id="L89">        }</span>
 <span class="fc" id="L90">        var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),</span>
 <span class="fc" id="L91">            (source, move, context) -&gt; verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));</span>
 <span class="fc" id="L92">        return new CheckedSchemaTaskSolver(augmented, preparation);</span>

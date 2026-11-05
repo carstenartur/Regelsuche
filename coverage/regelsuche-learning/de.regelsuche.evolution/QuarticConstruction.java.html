@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuarticConstruction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">QuarticConstruction.java</span></div><h1>QuarticConstruction.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.BinaryQuarticFactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.FactorizationVerifier;
+import de.regelsuche.polynomial.Monomial;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialVariable;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.function.LongConsumer;
+
+/** Bounded adapter to the existing verified integer binary-quartic engine. */
+final class QuarticConstruction {
+    private static final long MAX_ENGINE_AND_CHECK_WORK = 16_384;
+    private static final int MAX_CANDIDATES = 8;
+<span class="fc" id="L22">    private static final FactorizationRequest.StructuralLimits LIMITS =</span>
+        new FactorizationRequest.StructuralLimits(2, 4, 5, 4_096);
+
+    private QuarticConstruction() { }
+
+    static List&lt;String&gt; generate(String source, long remaining, LongConsumer work) {
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (remaining &lt;= 0) return List.of();</span>
+<span class="fc" id="L29">        long[] projectionWork = {0};</span>
+<span class="fc" id="L30">        LongConsumer chargeProjection = units -&gt; {</span>
+<span class="fc" id="L31">            projectionWork[0] = Math.addExact(projectionWork[0], units);</span>
+<span class="fc" id="L32">            work.accept(units);</span>
+<span class="fc" id="L33">        };</span>
+<span class="fc" id="L34">        var input = ExactPolynomialAnalysis.withProductWork(chargeProjection).normalForm(source);</span>
+<span class="fc" id="L35">        var variables = input.variables().stream().sorted().toList();</span>
+<span class="fc" id="L36">        chargeProjection.accept(input.termCount() + variables.size());</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (variables.size() != 2 || input.totalDegree() != 4) return List.of();</span>
+<span class="fc" id="L38">        var ring = new PolynomialRing&lt;&gt;(BigIntegerDomain.INSTANCE,</span>
+<span class="fc" id="L39">            variables.stream().map(PolynomialVariable::new).toList(),</span>
+            PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC);
+<span class="fc" id="L41">        var terms = new HashMap&lt;Monomial, BigInteger&gt;();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (var entry : input.terms().entrySet()) {</span>
+<span class="fc" id="L43">            var coefficient = entry.getValue();</span>
+<span class="fc" id="L44">            var monomial = entry.getKey();</span>
+<span class="fc" id="L45">            chargeProjection.accept(coefficient.numerator().toString().length() + 1L);</span>
+<span class="fc bfc" id="L46" title="All 4 branches covered.">            if (!coefficient.denominator().equals(BigInteger.ONE) || monomial.totalDegree() != 4) return List.of();</span>
+<span class="fc" id="L47">            terms.put(Monomial.of(monomial.exponentOf(variables.get(0)), monomial.exponentOf(variables.get(1))),</span>
+<span class="fc" id="L48">                coefficient.numerator());</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        var polynomial = new SparsePolynomial&lt;&gt;(ring, terms);</span>
+        // Projection is atomic and paid even when it exhausts the allowance.
+        // Do not start another bounded call after the allowance is already spent.
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (projectionWork[0] &gt;= remaining) return List.of();</span>
+<span class="fc" id="L54">        long engineLimit = Math.min(remaining - projectionWork[0], MAX_ENGINE_AND_CHECK_WORK);</span>
+<span class="fc" id="L55">        var request = FactorizationRequest.verifiedDecomposition(polynomial, LIMITS, MAX_CANDIDATES, engineLimit);</span>
+<span class="fc" id="L56">        var report = FactorizationVerifier.execute(new BinaryQuarticFactorizationEngine(), request);</span>
+<span class="fc" id="L57">        work.accept(report.work().totalWorkUnits());</span>
+<span class="fc" id="L58">        var results = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var candidate : report.candidates()) {</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">            if (candidate.factors().size() != 2 || !candidate.unresolvedRemainder().isOne()</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">                    || candidate.factors().stream().anyMatch(factor -&gt; factor.multiplicity() != 1)) continue;</span>
+<span class="fc" id="L62">            String first = render(candidate.factors().get(0).polynomial(), work);</span>
+<span class="fc" id="L63">            String second = render(candidate.factors().get(1).polynomial(), work);</span>
+<span class="fc" id="L64">            String result = &quot;((&quot; + candidate.unit() + &quot;)*(&quot; + first + &quot;))*(&quot; + second + &quot;)&quot;;</span>
+<span class="fc" id="L65">            work.accept(result.length());</span>
+<span class="fc" id="L66">            results.add(result);</span>
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">        return List.copyOf(results);</span>
+    }
+
+    private static String render(SparsePolynomial&lt;BigInteger&gt; polynomial, LongConsumer work) {
+<span class="fc" id="L72">        var result = new StringBuilder();</span>
+<span class="fc" id="L73">        var variables = polynomial.ring().variables();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (var term : polynomial.terms().entrySet()) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (!result.isEmpty()) result.append('+');</span>
+<span class="fc" id="L76">            result.append('(').append(term.getValue()).append(')');</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (int i = 0; i &lt; variables.size(); i++) {</span>
+<span class="fc" id="L78">                int exponent = term.getKey().exponent(i);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                if (exponent &gt; 0) result.append('*').append(variables.get(i).id()).append('^').append(exponent);</span>
+            }
+<span class="fc" id="L81">            work.accept(1);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        work.accept(result.length());</span>
+<span class="fc" id="L84">        return result.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

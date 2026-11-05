@@ -4,10 +4,23 @@
 <span class="fc" id="L4">public enum TaskConstructionProfile {</span>
 <span class="fc" id="L5">    NONE,</span>
     /** Bounded rational-polynomial preparation/composition; no unrestricted neutral-term insertion. */
-<span class="fc" id="L7">    STRUCTURAL_V1;</span>
+<span class="fc" id="L7">    STRUCTURAL_V1,</span>
+    /** V1 plus bounded quartic synthesis and residual composition on expanded sums. */
+<span class="fc" id="L9">    STRUCTURAL_V2;</span>
 
     CheckedSchemaTaskSolver attach(CheckedSchemaTaskSolver solver) {
-<span class="fc bfc" id="L10" title="All 2 branches covered.">        return this == NONE ? solver : solver.withConstructions();</span>
+<span class="fc bfc" id="L12" title="All 2 branches covered.">        if (this == NONE) return solver;</span>
+<span class="fc" id="L13">        var operations = new java.util.ArrayList&lt;&gt;(java.util.List.of(</span>
+            StructuralConstructionPrograms.Operation.EXPOSE_SQUARE,
+            StructuralConstructionPrograms.Operation.COMPLETE_SQUARE,
+            StructuralConstructionPrograms.Operation.FACTOR_DIFFERENCE,
+            StructuralConstructionPrograms.Operation.FACTOR_PARTITION,
+            StructuralConstructionPrograms.Operation.RESIDUAL_BALANCE));
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (this == STRUCTURAL_V2) {</span>
+<span class="fc" id="L20">            operations.add(StructuralConstructionPrograms.Operation.BINARY_QUARTIC);</span>
+<span class="fc" id="L21">            operations.add(StructuralConstructionPrograms.Operation.RESIDUAL_EXPANDED);</span>
+        }
+<span class="fc" id="L23">        return solver.withConstructions(operations);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
