@@ -3,7 +3,10 @@
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -16,162 +19,281 @@ import java.util.Optional;
  * A chosen auxiliary is data, never an unbound rewrite placeholder. Products that introduce
  * division require the caller's existing nonzero premises; exact polynomial splitting does not.
  */
-<span class="fc" id="L19">public final class AlgebraicConstruction {</span>
+<span class="fc" id="L22">public final class AlgebraicConstruction {</span>
     public static final String REVISION = &quot;regelsuche.algebraic-construction/v1&quot;;
-<span class="fc" id="L21">    public enum Operation {</span>
-<span class="fc" id="L22">        ADDITIVE_COMPLEMENT, ADDITIVE_SPLIT, MULTIPLICATIVE_COMPLEMENT,</span>
-<span class="fc" id="L23">        MULTIPLICATIVE_SPLIT, EXACT_FACTOR_SPLIT, FACTOR_TRANSFER</span>
+<span class="fc" id="L24">    public enum Operation {</span>
+<span class="fc" id="L25">        ADDITIVE_COMPLEMENT, ADDITIVE_SPLIT, MULTIPLICATIVE_COMPLEMENT,</span>
+<span class="fc" id="L26">        MULTIPLICATIVE_SPLIT, EXACT_FACTOR_SPLIT, FACTOR_TRANSFER</span>
     }
-<span class="fc" id="L25">    public enum Status { GENERATED, NO_MATCH, MISSING_ASSUMPTION, UNSUPPORTED, WORK_LIMIT }</span>
+<span class="fc" id="L28">    public enum Status { GENERATED, NO_MATCH, MISSING_ASSUMPTION, UNSUPPORTED, WORK_LIMIT }</span>
     public record Request(Operation operation, String source, String auxiliary,
             List&lt;String&gt; assumptions, long maximumWork) {
-<span class="fc" id="L28">        public Request {</span>
-<span class="fc" id="L29">            Objects.requireNonNull(operation, &quot;operation&quot;);</span>
-<span class="fc" id="L30">            boundedText(source); boundedText(auxiliary);</span>
-<span class="fc" id="L31">            assumptions = List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L32" title="3 of 6 branches missed.">            if (assumptions.size() &gt; 16 || assumptions.stream().anyMatch(s -&gt; s.length() &gt; 512))</span>
-<span class="nc" id="L33">                throw new IllegalArgumentException(&quot;assumption bound exceeded&quot;);</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (maximumWork &lt; 1) throw new IllegalArgumentException(&quot;positive construction budget required&quot;);</span>
-<span class="fc" id="L35">        }</span>
+<span class="fc" id="L31">        public Request {</span>
+<span class="fc" id="L32">            Objects.requireNonNull(operation, &quot;operation&quot;);</span>
+<span class="fc" id="L33">            boundedText(source); boundedText(auxiliary);</span>
+<span class="fc" id="L34">            assumptions = List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L35" title="3 of 6 branches missed.">            if (assumptions.size() &gt; 16 || assumptions.stream().anyMatch(s -&gt; s.length() &gt; 512))</span>
+<span class="nc" id="L36">                throw new IllegalArgumentException(&quot;assumption bound exceeded&quot;);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (maximumWork &lt; 1) throw new IllegalArgumentException(&quot;positive construction budget required&quot;);</span>
+<span class="fc" id="L38">        }</span>
     }
     public record Result(Status status, Optional&lt;String&gt; expression, long work, String detail) {
-<span class="fc" id="L38">        public Result {</span>
-<span class="fc" id="L39">            Objects.requireNonNull(status); Objects.requireNonNull(expression); Objects.requireNonNull(detail);</span>
-<span class="pc bpc" id="L40" title="2 of 6 branches missed.">            if (work &lt; 0 || expression.isPresent() != (status == Status.GENERATED))</span>
-<span class="nc" id="L41">                throw new IllegalArgumentException(&quot;inconsistent construction result&quot;);</span>
-<span class="fc" id="L42">        }</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">        public boolean generated() { return status == Status.GENERATED; }</span>
+<span class="fc" id="L41">        public Result {</span>
+<span class="fc" id="L42">            Objects.requireNonNull(status); Objects.requireNonNull(expression); Objects.requireNonNull(detail);</span>
+<span class="pc bpc" id="L43" title="2 of 6 branches missed.">            if (work &lt; 0 || expression.isPresent() != (status == Status.GENERATED))</span>
+<span class="nc" id="L44">                throw new IllegalArgumentException(&quot;inconsistent construction result&quot;);</span>
+<span class="fc" id="L45">        }</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        public boolean generated() { return status == Status.GENERATED; }</span>
     }
     public record Exploration(List&lt;Result&gt; results, long work) {
-<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        public Exploration { results = List.copyOf(results); if (work &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;); }</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        public Exploration { results = List.copyOf(results); if (work &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;); }</span>
     }
 
     /** Failed and atomically over-budget attempts keep their work, but issue no candidate. */
     public Result construct(Request request) {
-<span class="fc" id="L51">        Objects.requireNonNull(request, &quot;request&quot;);</span>
-<span class="fc" id="L52">        var work = new Work(request.maximumWork());</span>
+<span class="fc" id="L54">        return construct(request, false);</span>
+    }
+
+    private Result construct(Request request, boolean polynomialAudit) {
+<span class="fc" id="L58">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L59">        var work = new Work(request.maximumWork());</span>
         try {
-<span class="fc" id="L54">            var arithmetic = new ExactResidualPolynomialArithmetic(work::add);</span>
-<span class="fc" id="L55">            work.add(1);</span>
-<span class="fc" id="L56">            Polynomial source = boundedPolynomial(arithmetic.parse(request.source()));</span>
-<span class="fc" id="L57">            Polynomial auxiliary = boundedPolynomial(arithmetic.parse(request.auxiliary()));</span>
-<span class="fc" id="L58">            String candidate = candidate(request, source, auxiliary, arithmetic, work);</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (candidate == null) return rejected(Status.NO_MATCH, work, &quot;NO_EXACT_CONSTRUCTION&quot;);</span>
-<span class="fc" id="L60">            work.add(candidate.length());</span>
+<span class="fc" id="L61">            var arithmetic = new ExactResidualPolynomialArithmetic(work::add, polynomialAudit);</span>
+<span class="fc" id="L62">            work.add(1);</span>
+<span class="fc" id="L63">            Polynomial source = boundedPolynomial(arithmetic.parse(request.source()));</span>
+<span class="fc" id="L64">            Polynomial auxiliary = boundedPolynomial(arithmetic.parse(request.auxiliary()));</span>
+<span class="fc" id="L65">            String candidate = candidate(request, source, auxiliary, arithmetic, work);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            if (candidate == null) return rejected(Status.NO_MATCH, work, &quot;NO_EXACT_CONSTRUCTION&quot;);</span>
+<span class="fc" id="L67">            work.add(candidate.length());</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (polynomialAudit) {</span>
+<span class="fc" id="L69">                ExactPolynomialAnalysis.withProductWork(work::add).requireEquivalent(request.source(), candidate);</span>
+<span class="fc" id="L70">                return new Result(Status.GENERATED, Optional.of(candidate), work.units, &quot;EXACT_POLYNOMIAL_CONSTRUCTION&quot;);</span>
+            }
             // Conservative declared charge for this bounded rational audit. This is not a CPU/heap receipt.
-<span class="fc" id="L62">            long terms = source.termCount() + (long) auxiliary.termCount() + 1;</span>
-<span class="fc" id="L63">            work.add(Math.multiplyExact(16, Math.multiplyExact(terms, terms)));</span>
-<span class="fc" id="L64">            var proof = new RationalFunctionNormalFormEquivalenceService()</span>
-<span class="fc" id="L65">                .evaluate(request.source(), candidate, request.assumptions());</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">            if (proof.equivalent()) return new Result(Status.GENERATED, Optional.of(candidate), work.units, &quot;EXACT_RATIONAL_CONSTRUCTION&quot;);</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            Status status = proof.status() == RationalFunctionNormalFormEquivalenceService.Status.MISSING_ASSUMPTION</span>
-<span class="pc" id="L68">                ? Status.MISSING_ASSUMPTION : Status.UNSUPPORTED;</span>
-<span class="fc" id="L69">            return rejected(status, work, proof.status().name());</span>
-<span class="fc" id="L70">        } catch (WorkLimit limit) {</span>
-<span class="fc" id="L71">            return rejected(Status.WORK_LIMIT, work, &quot;CONSTRUCTION_WORK_LIMIT&quot;);</span>
-<span class="fc" id="L72">        } catch (IllegalArgumentException | ArithmeticException unsupported) {</span>
-<span class="fc" id="L73">            return rejected(Status.UNSUPPORTED, work, &quot;OUTSIDE_BOUNDED_SCALAR_DOMAIN&quot;);</span>
+<span class="fc" id="L73">            long terms = source.termCount() + (long) auxiliary.termCount() + 1;</span>
+<span class="fc" id="L74">            work.add(Math.multiplyExact(16, Math.multiplyExact(terms, terms)));</span>
+<span class="fc" id="L75">            var proof = new RationalFunctionNormalFormEquivalenceService()</span>
+<span class="fc" id="L76">                .evaluate(request.source(), candidate, request.assumptions());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (proof.equivalent()) return new Result(Status.GENERATED, Optional.of(candidate), work.units, &quot;EXACT_RATIONAL_CONSTRUCTION&quot;);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            Status status = proof.status() == RationalFunctionNormalFormEquivalenceService.Status.MISSING_ASSUMPTION</span>
+<span class="pc" id="L79">                ? Status.MISSING_ASSUMPTION : Status.UNSUPPORTED;</span>
+<span class="fc" id="L80">            return rejected(status, work, proof.status().name());</span>
+<span class="fc" id="L81">        } catch (WorkLimit limit) {</span>
+<span class="fc" id="L82">            return rejected(Status.WORK_LIMIT, work, &quot;CONSTRUCTION_WORK_LIMIT&quot;);</span>
+<span class="fc" id="L83">        } catch (IllegalArgumentException | ArithmeticException unsupported) {</span>
+<span class="fc" id="L84">            return rejected(Status.UNSUPPORTED, work, &quot;OUTSIDE_BOUNDED_SCALAR_DOMAIN&quot;);</span>
         }
     }
 
     /** Source subexpressions and bounded cross-products; no target expression or historical name. */
     public Exploration explore(Operation operation, String source, List&lt;String&gt; assumptions,
             int maximumAttempts, long maximumWork) {
-<span class="pc bpc" id="L80" title="3 of 6 branches missed.">        if (maximumAttempts &lt; 1 || maximumAttempts &gt; 32 || maximumWork &lt; 1)</span>
-<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;finite positive construction limits required&quot;);</span>
-<span class="fc" id="L82">        boundedText(source);</span>
-<span class="fc" id="L83">        var results = new ArrayList&lt;Result&gt;();</span>
-<span class="fc" id="L84">        var work = new Work(maximumWork);</span>
-        try {
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            for (String auxiliary : auxiliaries(source, maximumAttempts, work)) {</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                if (work.units &gt;= maximumWork) break;</span>
-<span class="fc" id="L88">                var result = construct(new Request(operation, source, auxiliary, assumptions, maximumWork - work.units));</span>
-<span class="fc" id="L89">                results.add(result); work.add(result.work());</span>
-<span class="fc" id="L90">            }</span>
-<span class="nc" id="L91">        } catch (WorkLimit limited) {</span>
-            // No unperformed attempt or successful candidate is invented at the cutoff.
-<span class="nc" id="L93">        } catch (IllegalArgumentException unsupported) {</span>
-<span class="nc" id="L94">            results.add(new Result(Status.UNSUPPORTED, Optional.empty(), 0, &quot;UNSUPPORTED_AUXILIARY_SOURCE&quot;));</span>
-<span class="pc" id="L95">        }</span>
-<span class="fc" id="L96">        return new Exploration(results, work.units);</span>
+<span class="fc" id="L91">        return explore(operation, source, assumptions, maximumAttempts, maximumWork, false);</span>
     }
 
-    private static List&lt;String&gt; auxiliaries(String source, int limit, Work work) {
-<span class="fc" id="L100">        var arithmetic = new ExactResidualPolynomialArithmetic(work::add);</span>
-<span class="fc" id="L101">        boundedPolynomial(arithmetic.parse(source));</span>
-<span class="fc" id="L102">        var parsed = arithmetic.exactTerm(source);</span>
-<span class="fc" id="L103">        var terms = new LinkedHashSet&lt;String&gt;(); terms.add(&quot;2&quot;);</span>
-<span class="fc" id="L104">        var pending = new ArrayDeque&lt;Expr&gt;(); pending.add(parsed.expression());</span>
-<span class="pc bpc" id="L105" title="1 of 4 branches missed.">        while (!pending.isEmpty() &amp;&amp; terms.size() &lt; limit) {</span>
-<span class="fc" id="L106">            Expr term = pending.removeFirst(); work.add(1);</span>
-<span class="fc" id="L107">            String text = ExactExpressionFormatter.format(term, parsed); work.add(text.length()); terms.add(text);</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (term instanceof BinaryExpr binary) { pending.addLast(binary.left()); pending.addLast(binary.right()); }</span>
-<span class="fc" id="L109">        }</span>
-<span class="fc" id="L110">        var atoms = List.copyOf(terms);</span>
-<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        for (int left = 0; left &lt; atoms.size() &amp;&amp; terms.size() &lt; limit; left++) {</span>
-<span class="pc bpc" id="L112" title="1 of 4 branches missed.">            for (int right = left; right &lt; atoms.size() &amp;&amp; terms.size() &lt; limit; right++) {</span>
-<span class="fc" id="L113">                work.add(1); terms.add(&quot;2*(&quot; + atoms.get(left) + &quot;)*(&quot; + atoms.get(right) + &quot;)&quot;);</span>
+    /** Opt-in polynomial-only exploration with prioritized source-derived candidates and paid products. */
+    public Exploration explorePolynomial(Operation operation, String source, List&lt;String&gt; assumptions,
+            int maximumAttempts, long maximumWork) {
+<span class="pc bpc" id="L97" title="1 of 6 branches missed.">        if (operation != Operation.ADDITIVE_COMPLEMENT &amp;&amp; operation != Operation.ADDITIVE_SPLIT</span>
+                &amp;&amp; operation != Operation.EXACT_FACTOR_SPLIT) {
+<span class="fc" id="L99">            throw new IllegalArgumentException(&quot;polynomial exploration cannot introduce symbolic division&quot;);</span>
+        }
+<span class="fc" id="L101">        return explore(operation, source, assumptions, maximumAttempts, maximumWork, true);</span>
+    }
+
+    private Exploration explore(Operation operation, String source, List&lt;String&gt; assumptions,
+            int maximumAttempts, long maximumWork, boolean polynomialAudit) {
+<span class="pc bpc" id="L106" title="3 of 6 branches missed.">        if (maximumAttempts &lt; 1 || maximumAttempts &gt; 32 || maximumWork &lt; 1)</span>
+<span class="nc" id="L107">            throw new IllegalArgumentException(&quot;finite positive construction limits required&quot;);</span>
+<span class="fc" id="L108">        boundedText(source);</span>
+<span class="fc" id="L109">        var results = new ArrayList&lt;Result&gt;();</span>
+<span class="fc" id="L110">        var work = new Work(maximumWork);</span>
+        try {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            var candidates = polynomialAudit ? auxiliaries(operation, source, maximumAttempts, work)</span>
+<span class="fc" id="L113">                : legacyAuxiliaries(source, maximumAttempts, work);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (String auxiliary : candidates) {</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if (work.units &gt;= maximumWork) break;</span>
+<span class="fc" id="L116">                var result = construct(new Request(operation, source, auxiliary, assumptions, maximumWork - work.units), polynomialAudit);</span>
+<span class="fc" id="L117">                results.add(result); work.add(result.work());</span>
+<span class="fc" id="L118">            }</span>
+<span class="fc" id="L119">        } catch (WorkLimit limited) {</span>
+            // No unperformed attempt or successful candidate is invented at the cutoff.
+<span class="nc" id="L121">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L122">            results.add(new Result(Status.UNSUPPORTED, Optional.empty(), 0, &quot;UNSUPPORTED_AUXILIARY_SOURCE&quot;));</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        return new Exploration(results, work.units);</span>
+    }
+
+    private static List&lt;String&gt; auxiliaries(Operation operation, String source, int limit, Work work) {
+<span class="fc" id="L128">        var arithmetic = new ExactResidualPolynomialArithmetic(work::add, true);</span>
+<span class="fc" id="L129">        boundedPolynomial(arithmetic.parse(source));</span>
+<span class="fc" id="L130">        var parsed = arithmetic.exactTerm(source);</span>
+<span class="fc" id="L131">        var parts = collectAuxiliaryParts(operation, parsed, limit, work, arithmetic);</span>
+<span class="fc" id="L132">        var terms = new LinkedHashSet&lt;String&gt;();</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">        if (operation != Operation.ADDITIVE_COMPLEMENT &amp;&amp; operation != Operation.EXACT_FACTOR_SPLIT) terms.add(&quot;2&quot;);</span>
+<span class="fc" id="L134">        appendWithinLimit(terms, parts.powerFactors(), limit);</span>
+<span class="fc" id="L135">        appendSquareCrossProducts(terms, parts.squareBases(), operation, limit, work, arithmetic);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (operation == Operation.ADDITIVE_COMPLEMENT) return List.copyOf(terms);</span>
+<span class="fc" id="L137">        appendWithinLimit(terms, parts.fragments(), limit);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (operation != Operation.EXACT_FACTOR_SPLIT) appendCrossProducts(terms, limit, work);</span>
+<span class="fc" id="L139">        return List.copyOf(terms);</span>
+    }
+
+<span class="fc" id="L142">    private record AuxiliaryParts(LinkedHashSet&lt;String&gt; fragments, LinkedHashSet&lt;String&gt; powerFactors,</span>
+            List&lt;String&gt; squareBases) { }
+
+    private static AuxiliaryParts collectAuxiliaryParts(Operation operation, ExactParsedTerm parsed,
+            int limit, Work work, ExactResidualPolynomialArithmetic arithmetic) {
+<span class="fc" id="L147">        var parts = new AuxiliaryParts(new LinkedHashSet&lt;&gt;(), new LinkedHashSet&lt;&gt;(), new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L148">        var pending = new ArrayDeque&lt;Expr&gt;(); pending.add(parsed.expression());</span>
+<span class="fc" id="L149">        int inspected = 0;</span>
+<span class="fc" id="L150">        int maxInspections = Math.min(256, Math.max(16, limit * 8));</span>
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        while (!pending.isEmpty() &amp;&amp; inspected++ &lt; maxInspections) {</span>
+<span class="fc" id="L152">            Expr term = pending.removeFirst(); work.add(1);</span>
+<span class="fc" id="L153">            String text = ExactExpressionFormatter.format(term, parsed); work.add(text.length());</span>
+<span class="fc bfc" id="L154" title="All 4 branches covered.">            if (parts.fragments().size() &lt; limit &amp;&amp; (operation != Operation.EXACT_FACTOR_SPLIT</span>
+<span class="fc bfc" id="L155" title="All 4 branches covered.">                    || (term != parsed.expression() &amp;&amp; isNonconstant(term, text, arithmetic)))) parts.fragments().add(text);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (term instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L157">                collectSquareBase(binary, parsed, limit, work, parts.squareBases());</span>
+<span class="fc" id="L158">                collectPowerFactors(operation, binary, parsed, limit, work, arithmetic, parts.powerFactors());</span>
+<span class="fc" id="L159">                pending.addLast(binary.left()); pending.addLast(binary.right());</span>
+            }
+<span class="fc" id="L161">        }</span>
+<span class="fc" id="L162">        return parts;</span>
+    }
+
+    private static void collectSquareBase(BinaryExpr binary, ExactParsedTerm parsed, int limit, Work work,
+            List&lt;String&gt; squareBases) {
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (binary.operator() == BinaryOperator.POW &amp;&amp; binary.right() instanceof NumberExpr exponent</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">                &amp;&amp; exponent.value().equalsInteger(2) &amp;&amp; squareBases.size() &lt; limit) {</span>
+<span class="fc" id="L169">            String base = ExactExpressionFormatter.format(binary.left(), parsed);</span>
+<span class="fc" id="L170">            work.add(base.length()); squareBases.add(base);</span>
+        }
+<span class="fc" id="L172">    }</span>
+
+    private static void collectPowerFactors(Operation operation, BinaryExpr binary, ExactParsedTerm parsed,
+            int limit, Work work, ExactResidualPolynomialArithmetic arithmetic, LinkedHashSet&lt;String&gt; powerFactors) {
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        if (operation != Operation.EXACT_FACTOR_SPLIT || binary.operator() != BinaryOperator.POW</span>
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">                || !(binary.right() instanceof NumberExpr exponent) || !exponent.value().isInteger()</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                || exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(2)) &lt; 0</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                || exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(12)) &gt; 0) return;</span>
+<span class="fc" id="L180">        String base = ExactExpressionFormatter.format(binary.left(), parsed);</span>
+<span class="fc" id="L181">        int power = exponent.value().numerator().intValueExact();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!isNonconstant(binary.left(), base, arithmetic)) return;</span>
+<span class="fc" id="L183">        addPowerFactor(powerFactors, base, power / 2, limit, work);</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        for (int split = 1; split &lt; power &amp;&amp; powerFactors.size() &lt; limit; split++) {</span>
+<span class="fc" id="L185">            addPowerFactor(powerFactors, base, split, limit, work);</span>
+        }
+<span class="fc" id="L187">    }</span>
+
+    private static void appendWithinLimit(LinkedHashSet&lt;String&gt; terms, Iterable&lt;String&gt; candidates, int limit) {
+<span class="fc bfc" id="L190" title="All 4 branches covered.">        for (String candidate : candidates) { if (terms.size() == limit) break; terms.add(candidate); }</span>
+<span class="fc" id="L191">    }</span>
+
+    private static void appendSquareCrossProducts(LinkedHashSet&lt;String&gt; terms, List&lt;String&gt; squareBases,
+            Operation operation, int limit, Work work, ExactResidualPolynomialArithmetic arithmetic) {
+<span class="pc bpc" id="L195" title="1 of 4 branches missed.">        for (int left = 0; left &lt; squareBases.size() &amp;&amp; terms.size() &lt; limit; left++) {</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">            for (int right = left + 1; right &lt; squareBases.size() &amp;&amp; terms.size() &lt; limit; right++) {</span>
+<span class="fc" id="L197">                String cross = &quot;2*(&quot; + squareBases.get(left) + &quot;)*(&quot; + squareBases.get(right) + &quot;)&quot;;</span>
+<span class="fc" id="L198">                work.add(cross.length() + 1L);</span>
+<span class="pc bpc" id="L199" title="3 of 4 branches missed.">                if (operation != Operation.EXACT_FACTOR_SPLIT || arithmetic.parse(cross).totalDegree() &gt; 0) terms.add(cross);</span>
             }
         }
-<span class="fc" id="L116">        return List.copyOf(terms);</span>
+<span class="fc" id="L202">    }</span>
+
+    private static boolean isNonconstant(Expr term, String text, ExactResidualPolynomialArithmetic arithmetic) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (term instanceof NumberExpr) return false;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (term instanceof VariableExpr) return true;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        return arithmetic.parse(text).totalDegree() &gt; 0;</span>
     }
+
+    private static List&lt;String&gt; legacyAuxiliaries(String source, int limit, Work work) {
+<span class="fc" id="L211">        var arithmetic = new ExactResidualPolynomialArithmetic(work::add);</span>
+<span class="fc" id="L212">        boundedPolynomial(arithmetic.parse(source));</span>
+<span class="fc" id="L213">        var parsed = arithmetic.exactTerm(source);</span>
+<span class="fc" id="L214">        var terms = new LinkedHashSet&lt;String&gt;(); terms.add(&quot;2&quot;);</span>
+<span class="fc" id="L215">        var pending = new ArrayDeque&lt;Expr&gt;(); pending.add(parsed.expression());</span>
+<span class="fc bfc" id="L216" title="All 4 branches covered.">        while (!pending.isEmpty() &amp;&amp; terms.size() &lt; limit) {</span>
+<span class="fc" id="L217">            Expr term = pending.removeFirst(); work.add(1);</span>
+<span class="fc" id="L218">            String text = ExactExpressionFormatter.format(term, parsed); work.add(text.length()); terms.add(text);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (term instanceof BinaryExpr binary) { pending.addLast(binary.left()); pending.addLast(binary.right()); }</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">        appendCrossProducts(terms, limit, work);</span>
+<span class="fc" id="L222">        return List.copyOf(terms);</span>
+    }
+
+    private static void appendCrossProducts(LinkedHashSet&lt;String&gt; terms, int limit, Work work) {
+<span class="fc" id="L226">        var atoms = List.copyOf(terms);</span>
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        for (int left = 0; left &lt; atoms.size() &amp;&amp; terms.size() &lt; limit; left++) {</span>
+<span class="pc bpc" id="L228" title="1 of 4 branches missed.">            for (int right = left; right &lt; atoms.size() &amp;&amp; terms.size() &lt; limit; right++) {</span>
+<span class="fc" id="L229">                work.add(1); terms.add(&quot;2*(&quot; + atoms.get(left) + &quot;)*(&quot; + atoms.get(right) + &quot;)&quot;);</span>
+            }
+        }
+<span class="fc" id="L232">    }</span>
+
+    private static void addPowerFactor(LinkedHashSet&lt;String&gt; factors, String base, int power, int limit, Work work) {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (factors.size() &gt;= limit) return;</span>
+<span class="fc" id="L236">        String factor = &quot;(&quot; + base + &quot;)^&quot; + power;</span>
+<span class="fc" id="L237">        work.add(factor.length() + 1L);</span>
+<span class="fc" id="L238">        factors.add(factor);</span>
+<span class="fc" id="L239">    }</span>
 
     private static String candidate(Request request, Polynomial source, Polynomial auxiliary,
             ExactResidualPolynomialArithmetic arithmetic, Work work) {
-<span class="fc" id="L121">        String s = &quot;(&quot; + arithmetic.syntax(request.source()) + &quot;)&quot;;</span>
-<span class="fc" id="L122">        String a = &quot;(&quot; + arithmetic.syntax(request.auxiliary()) + &quot;)&quot;;</span>
-<span class="fc" id="L123">        work.add(s.length() + (long) a.length());</span>
-<span class="pc bpc" id="L124" title="1 of 6 branches missed.">        return switch (request.operation()) {</span>
-<span class="fc" id="L125">            case ADDITIVE_COMPLEMENT -&gt; &quot;(&quot; + s + &quot;+&quot; + a + &quot;)-&quot; + a;</span>
-<span class="fc" id="L126">            case ADDITIVE_SPLIT -&gt; a + &quot;+(&quot; + source.subtract(auxiliary).toCanonicalString() + &quot;)&quot;;</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            case MULTIPLICATIVE_COMPLEMENT -&gt; auxiliary.isZero() ? null : &quot;(&quot; + s + &quot;*&quot; + a + &quot;)/&quot; + a;</span>
-<span class="nc bnc" id="L128" title="All 2 branches missed.">            case MULTIPLICATIVE_SPLIT -&gt; auxiliary.isZero() ? null : a + &quot;*(&quot; + s + &quot;/&quot; + a + &quot;)&quot;;</span>
-<span class="fc" id="L129">            case EXACT_FACTOR_SPLIT -&gt; exactFactor(source, auxiliary, a, work);</span>
-<span class="fc" id="L130">            case FACTOR_TRANSFER -&gt; transfer(request, auxiliary, a, arithmetic);</span>
+<span class="fc" id="L243">        String s = &quot;(&quot; + arithmetic.syntax(request.source()) + &quot;)&quot;;</span>
+<span class="fc" id="L244">        String a = &quot;(&quot; + arithmetic.syntax(request.auxiliary()) + &quot;)&quot;;</span>
+<span class="fc" id="L245">        work.add(s.length() + (long) a.length());</span>
+<span class="pc bpc" id="L246" title="1 of 6 branches missed.">        return switch (request.operation()) {</span>
+<span class="fc" id="L247">            case ADDITIVE_COMPLEMENT -&gt; &quot;(&quot; + s + &quot;+&quot; + a + &quot;)-&quot; + a;</span>
+<span class="fc" id="L248">            case ADDITIVE_SPLIT -&gt; a + &quot;+(&quot; + source.subtract(auxiliary).toCanonicalString() + &quot;)&quot;;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            case MULTIPLICATIVE_COMPLEMENT -&gt; auxiliary.isZero() ? null : &quot;(&quot; + s + &quot;*&quot; + a + &quot;)/&quot; + a;</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            case MULTIPLICATIVE_SPLIT -&gt; auxiliary.isZero() ? null : a + &quot;*(&quot; + s + &quot;/&quot; + a + &quot;)&quot;;</span>
+<span class="fc" id="L251">            case EXACT_FACTOR_SPLIT -&gt; exactFactor(source, auxiliary, a, work);</span>
+<span class="fc" id="L252">            case FACTOR_TRANSFER -&gt; transfer(request, auxiliary, a, arithmetic);</span>
         };
     }
 
     private static String exactFactor(Polynomial source, Polynomial factor, String factorText, Work work) {
-<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (factor.termCount() != 1) return null;</span>
-<span class="fc" id="L136">        var divisor = factor.terms().entrySet().iterator().next();</span>
-<span class="fc" id="L137">        Polynomial quotient = Polynomial.zero();</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">        for (var term : source.terms().entrySet()) {</span>
-<span class="fc" id="L139">            work.add(1);</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (!divisor.getKey().divides(term.getKey())) return null;</span>
-<span class="fc" id="L141">            quotient = quotient.addTerm(term.getKey().divideBy(divisor.getKey()), term.getValue().divide(divisor.getValue()));</span>
-<span class="fc" id="L142">        }</span>
-<span class="fc" id="L143">        return factorText + &quot;*(&quot; + quotient.toCanonicalString() + &quot;)&quot;;</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (factor.termCount() != 1) return null;</span>
+<span class="fc" id="L258">        var divisor = factor.terms().entrySet().iterator().next();</span>
+<span class="fc" id="L259">        Polynomial quotient = Polynomial.zero();</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (var term : source.terms().entrySet()) {</span>
+<span class="fc" id="L261">            work.add(1);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (!divisor.getKey().divides(term.getKey())) return null;</span>
+<span class="fc" id="L263">            quotient = quotient.addTerm(term.getKey().divideBy(divisor.getKey()), term.getValue().divide(divisor.getValue()));</span>
+<span class="fc" id="L264">        }</span>
+<span class="fc" id="L265">        return factorText + &quot;*(&quot; + quotient.toCanonicalString() + &quot;)&quot;;</span>
     }
 
     private static String transfer(Request request, Polynomial auxiliary, String a, ExactResidualPolynomialArithmetic arithmetic) {
-<span class="fc" id="L147">        var parsed = arithmetic.exactTerm(request.source());</span>
-<span class="pc bpc" id="L148" title="2 of 4 branches missed.">        if (auxiliary.isZero() || !(parsed.expression() instanceof BinaryExpr product)</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                || product.operator() != BinaryOperator.MUL) return null;</span>
-<span class="fc" id="L150">        String left = ExactExpressionFormatter.format(product.left(), parsed);</span>
-<span class="fc" id="L151">        String right = ExactExpressionFormatter.format(product.right(), parsed);</span>
-<span class="fc" id="L152">        return &quot;((&quot; + left + &quot;)*&quot; + a + &quot;)*((&quot; + right + &quot;)/&quot; + a + &quot;)&quot;;</span>
+<span class="fc" id="L269">        var parsed = arithmetic.exactTerm(request.source());</span>
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        if (auxiliary.isZero() || !(parsed.expression() instanceof BinaryExpr product)</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                || product.operator() != BinaryOperator.MUL) return null;</span>
+<span class="fc" id="L272">        String left = ExactExpressionFormatter.format(product.left(), parsed);</span>
+<span class="fc" id="L273">        String right = ExactExpressionFormatter.format(product.right(), parsed);</span>
+<span class="fc" id="L274">        return &quot;((&quot; + left + &quot;)*&quot; + a + &quot;)*((&quot; + right + &quot;)/&quot; + a + &quot;)&quot;;</span>
     }
 
     private static Polynomial boundedPolynomial(Polynomial value) {
-<span class="pc bpc" id="L156" title="3 of 6 branches missed.">        if (value.termCount() &gt; 32 || value.totalDegree() &gt; 12 || value.variables().size() &gt; 4)</span>
-<span class="nc" id="L157">            throw new IllegalArgumentException(&quot;construction polynomial bound exceeded&quot;);</span>
-<span class="fc" id="L158">        return value;</span>
+<span class="pc bpc" id="L278" title="3 of 6 branches missed.">        if (value.termCount() &gt; 32 || value.totalDegree() &gt; 12 || value.variables().size() &gt; 4)</span>
+<span class="nc" id="L279">            throw new IllegalArgumentException(&quot;construction polynomial bound exceeded&quot;);</span>
+<span class="fc" id="L280">        return value;</span>
     }
     private static void boundedText(String value) {
-<span class="pc bpc" id="L161" title="3 of 6 branches missed.">        if (value == null || value.isBlank() || value.length() &gt; 4096)</span>
-<span class="nc" id="L162">            throw new IllegalArgumentException(&quot;bounded scalar expression required&quot;);</span>
-<span class="fc" id="L163">    }</span>
+<span class="pc bpc" id="L283" title="3 of 6 branches missed.">        if (value == null || value.isBlank() || value.length() &gt; 4096)</span>
+<span class="nc" id="L284">            throw new IllegalArgumentException(&quot;bounded scalar expression required&quot;);</span>
+<span class="fc" id="L285">    }</span>
     private static Result rejected(Status status, Work work, String detail) {
-<span class="fc" id="L165">        return new Result(status, Optional.empty(), work.units, detail);</span>
+<span class="fc" id="L287">        return new Result(status, Optional.empty(), work.units, detail);</span>
     }
     private static final class Work {
         private final long maximum;
         private long units;
-<span class="fc" id="L170">        private Work(long maximum) { this.maximum = maximum; }</span>
+<span class="fc" id="L292">        private Work(long maximum) { this.maximum = maximum; }</span>
         private void add(long value) {
-<span class="fc" id="L172">            units = Math.addExact(units, value);</span>
-<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (units &gt; maximum) throw new WorkLimit();</span>
-<span class="fc" id="L174">        }</span>
+<span class="fc" id="L294">            units = Math.addExact(units, value);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (units &gt; maximum) throw new WorkLimit();</span>
+<span class="fc" id="L296">        }</span>
     }
     private static final class WorkLimit extends RuntimeException { }
 }

@@ -206,11 +206,11 @@ import java.util.Optional;
 <span class="fc bfc" id="L206" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.DIV) {</span>
 <span class="fc" id="L207">                return nonZeroValueFactors(binary.left());</span>
             }
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if (binary.operator() == BinaryOperator.POW) {</span>
-<span class="nc" id="L210">                int exponent = integralExponent(binary.right());</span>
-<span class="nc bnc" id="L211" title="All 2 branches missed.">                return exponent == 0</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L210">                int exponent = integralExponent(binary.right());</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                return exponent == 0</span>
 <span class="nc" id="L212">                    ? List.of()</span>
-<span class="nc" id="L213">                    : nonZeroValueFactors(binary.left());</span>
+<span class="fc" id="L213">                    : nonZeroValueFactors(binary.left());</span>
             }
         }
 <span class="fc" id="L216">        RationalFunction value = convert(expression);</span>

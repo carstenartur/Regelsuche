@@ -19,39 +19,49 @@ import de.regelsuche.search.moves.TypedSourceOnlySearch;
 <span class="fc" id="L19">    public CheckedSchemaTaskSolver.Goal goal() { return new CheckedSchemaTaskSolver.Goal(this, 0); }</span>
 
     @Override public TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state) {
-<span class="fc" id="L22">        var work = new CheckedSchemaSupport.Work();</span>
+<span class="fc" id="L22">        return evaluate(state, false);</span>
+    }
+
+    /** Opt-in costing for profiles which account for polynomial term products. */
+    TypedSourceOnlySearch.Score evaluateWithProductWork(TypedMoveSearch.State state) {
+<span class="fc" id="L27">        return evaluate(state, true);</span>
+    }
+
+    private TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state, boolean includeProductWork) {
+<span class="fc" id="L31">        var work = new CheckedSchemaSupport.Work();</span>
         try {
-<span class="fc" id="L24">            CheckedSchemaSupport.domain(state.expression(), CheckedLearnedSchemaModel.Bounds.defaults(), work);</span>
-<span class="fc" id="L25">            var exact = new ExactPolynomialAnalysis(work::add);</span>
-<span class="fc" id="L26">            long score = score(state.expression(), exact, work);</span>
-<span class="fc" id="L27">            return new TypedSourceOnlySearch.Score(score, Math.addExact(work.units, 1));</span>
-<span class="nc" id="L28">        } catch (IllegalArgumentException unsupported) {</span>
-<span class="nc" id="L29">            return new TypedSourceOnlySearch.Score(8, Math.addExact(work.units, 1));</span>
+<span class="fc" id="L33">            CheckedSchemaSupport.domain(state.expression(), CheckedLearnedSchemaModel.Bounds.defaults(), work);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            var exact = includeProductWork ? ExactPolynomialAnalysis.withProductWork(work::add)</span>
+<span class="fc" id="L35">                : new ExactPolynomialAnalysis(work::add);</span>
+<span class="fc" id="L36">            long score = score(state.expression(), exact, work);</span>
+<span class="fc" id="L37">            return new TypedSourceOnlySearch.Score(score, Math.addExact(work.units, 1));</span>
+<span class="nc" id="L38">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L39">            return new TypedSourceOnlySearch.Score(8, Math.addExact(work.units, 1));</span>
         }
     }
 
     private long score(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr root)) return 6;</span>
-<span class="fc bfc" id="L35" title="All 4 branches covered.">        if (this == FACTORIZATION &amp;&amp; root.operator() == BinaryOperator.MUL</span>
-<span class="pc bpc" id="L36" title="1 of 4 branches missed.">                &amp;&amp; nonconstant(root.left(), exact, work) &amp;&amp; nonconstant(root.right(), exact, work)) return 0;</span>
-<span class="fc bfc" id="L37" title="All 4 branches covered.">        if (this == SUM_OF_TWO_SQUARES &amp;&amp; root.operator() == BinaryOperator.ADD</span>
-<span class="fc bfc" id="L38" title="All 4 branches covered.">                &amp;&amp; nonconstantSquare(root.left(), exact, work) &amp;&amp; nonconstantSquare(root.right(), exact, work)) return 0;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr root)) return 6;</span>
+<span class="fc bfc" id="L45" title="All 4 branches covered.">        if (this == FACTORIZATION &amp;&amp; root.operator() == BinaryOperator.MUL</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">                &amp;&amp; nonconstant(root.left(), exact, work) &amp;&amp; nonconstant(root.right(), exact, work)) return 0;</span>
+<span class="fc bfc" id="L47" title="All 4 branches covered.">        if (this == SUM_OF_TWO_SQUARES &amp;&amp; root.operator() == BinaryOperator.ADD</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">                &amp;&amp; nonconstantSquare(root.left(), exact, work) &amp;&amp; nonconstantSquare(root.right(), exact, work)) return 0;</span>
         // Generic preparation landmarks, not comparison with a stored historical answer.
-<span class="pc bpc" id="L40" title="1 of 6 branches missed.">        if (root.operator() == BinaryOperator.SUB &amp;&amp; isSquare(root.left())) return isSquare(root.right()) ? 1 : 2;</span>
-<span class="fc bfc" id="L41" title="All 6 branches covered.">        if (root.operator() == BinaryOperator.ADD) return 5 - (isSquare(root.left()) ? 1 : 0) - (isSquare(root.right()) ? 1 : 0);</span>
-<span class="fc" id="L42">        return 6;</span>
+<span class="fc bfc" id="L50" title="All 6 branches covered.">        if (root.operator() == BinaryOperator.SUB &amp;&amp; isSquare(root.left())) return isSquare(root.right()) ? 1 : 2;</span>
+<span class="fc bfc" id="L51" title="All 6 branches covered.">        if (root.operator() == BinaryOperator.ADD) return 5 - (isSquare(root.left()) ? 1 : 0) - (isSquare(root.right()) ? 1 : 0);</span>
+<span class="fc" id="L52">        return 6;</span>
     }
 
     private static boolean nonconstantSquare(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
-<span class="fc bfc" id="L46" title="All 4 branches covered.">        return isSquare(expression) &amp;&amp; nonconstant(((BinaryExpr) expression).left(), exact, work);</span>
+<span class="fc bfc" id="L56" title="All 4 branches covered.">        return isSquare(expression) &amp;&amp; nonconstant(((BinaryExpr) expression).left(), exact, work);</span>
     }
     private static boolean nonconstant(Expr expression, ExactPolynomialAnalysis exact, CheckedSchemaSupport.Work work) {
-<span class="fc" id="L49">        String text = ExpressionFormatter.format(expression); work.add(text.length());</span>
-<span class="fc bfc" id="L50" title="All 2 branches covered.">        return exact.normalForm(text).totalDegree() &gt; 0;</span>
+<span class="fc" id="L59">        String text = ExpressionFormatter.format(expression); work.add(text.length());</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        return exact.normalForm(text).totalDegree() &gt; 0;</span>
     }
     static boolean isSquare(Expr expression) {
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        return expression instanceof BinaryExpr power &amp;&amp; power.operator() == BinaryOperator.POW</span>
-<span class="pc bpc" id="L54" title="1 of 6 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent &amp;&amp; exponent.value().equalsInteger(2);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        return expression instanceof BinaryExpr power &amp;&amp; power.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L64" title="1 of 6 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent &amp;&amp; exponent.value().equalsInteger(2);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
