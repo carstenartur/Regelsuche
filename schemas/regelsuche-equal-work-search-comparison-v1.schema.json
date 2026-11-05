@@ -33,7 +33,7 @@
       "$ref": "#/$defs/rawSha256"
     },
     "atlasSchema": {
-      "const": "regelsuche.historical-rediscovery-atlas/v1"
+      "enum": ["regelsuche.historical-rediscovery-atlas/v1", "regelsuche.historical-rediscovery-atlas/v2"]
     },
     "atlasSha256": {
       "$ref": "#/$defs/prefixedSha256"
@@ -94,6 +94,7 @@
     "caseStatus": {
       "enum": [
         "NO_PRODUCTION_WITNESS",
+        "SOURCE_ALREADY_REPRESENTED",
         "SCALAR_ALREADY_REACHED",
         "EXECUTED_ORACLE_WITNESS_SCALAR_MISS"
       ]
@@ -236,7 +237,7 @@
           "if": {
             "properties": {
               "status": {
-                "const": "NO_PRODUCTION_WITNESS"
+                "enum": ["NO_PRODUCTION_WITNESS", "SOURCE_ALREADY_REPRESENTED"]
               }
             }
           },

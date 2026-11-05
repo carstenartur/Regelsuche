@@ -225,6 +225,7 @@ public interface DiscoveryExperimentRunner {
         static final String ORACLE_BUDGET_INCONCLUSIVE =
             &quot;ORACLE_BUDGET_INCONCLUSIVE&quot;;
         static final String SCALAR_ALREADY_FOUND = &quot;SCALAR_ALREADY_FOUND&quot;;
+        static final String SOURCE_ALREADY_REPRESENTED = &quot;SOURCE_ALREADY_REPRESENTED&quot;;
         static final String WITNESS_PREFIX_LOST = &quot;WITNESS_PREFIX_LOST&quot;;
         static final String WITNESS_COMPLETELY_EXPLORED =
             &quot;WITNESS_COMPLETELY_EXPLORED&quot;;
@@ -252,15 +253,16 @@ public interface DiscoveryExperimentRunner {
             &quot;PARENT_ENQUEUED_BUT_NOT_EXPLORED&quot;;
         static final String PARENT_NOT_REACHED = &quot;PARENT_NOT_REACHED&quot;;
 
-<span class="fc" id="L255">        private static final Set&lt;String&gt; CASE_STATUSES = Set.of(</span>
+<span class="fc" id="L256">        private static final Set&lt;String&gt; CASE_STATUSES = Set.of(</span>
             ORACLE_NOT_EVALUATED,
             ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS,
             ORACLE_BUDGET_INCONCLUSIVE,
             SCALAR_ALREADY_FOUND,
+            SOURCE_ALREADY_REPRESENTED,
             WITNESS_PREFIX_LOST,
             WITNESS_COMPLETELY_EXPLORED,
             CORRECTNESS_REGRESSION_WITNESS);
-<span class="fc" id="L263">        private static final Set&lt;String&gt; LOSS_REASONS = Set.of(</span>
+<span class="fc" id="L265">        private static final Set&lt;String&gt; LOSS_REASONS = Set.of(</span>
             TRANSFORMATION_SKIPPED,
             STATE_PRUNED_DUPLICATE,
             STATE_PRUNED_TRANSPOSITION,
@@ -273,7 +275,7 @@ public interface DiscoveryExperimentRunner {
             TRANSFORMATION_NOT_GENERATED,
             PARENT_ENQUEUED_BUT_NOT_EXPLORED,
             PARENT_NOT_REACHED);
-<span class="fc" id="L276">        private static final Set&lt;String&gt; TERMINAL_STATUSES = Set.of(</span>
+<span class="fc" id="L278">        private static final Set&lt;String&gt; TERMINAL_STATUSES = Set.of(</span>
             &quot;NOT_EVALUATED&quot;,
             &quot;SCALAR_FOUND&quot;,
             &quot;STATE_BUDGET&quot;,
@@ -282,24 +284,24 @@ public interface DiscoveryExperimentRunner {
             &quot;NO_TRANSFORMATIONS&quot;,
             &quot;FRONTIER_EXHAUSTED&quot;);
 
-<span class="fc" id="L285">        private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L287">        private final ExpressionParser parser = new ExpressionParser();</span>
 
         List&lt;CaseDiagnostic&gt; run(Corpus corpus, AtlasReport atlas) {
-<span class="fc" id="L288">            Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
-<span class="fc" id="L289">            Objects.requireNonNull(atlas, &quot;atlas&quot;);</span>
-<span class="fc" id="L290">            requireAtlasBinding(corpus, atlas);</span>
-<span class="fc" id="L291">            Map&lt;String, CaseResult&gt; atlasCases = atlas.cases().stream()</span>
-<span class="fc" id="L292">                .collect(Collectors.toUnmodifiableMap(</span>
-<span class="fc" id="L293">                    value -&gt; value.benchmarkCase().id(),</span>
-<span class="fc" id="L294">                    Function.identity()));</span>
-<span class="fc" id="L295">            return corpus.cases().stream()</span>
-<span class="fc" id="L296">                .sorted(Comparator.comparing(Case::id))</span>
-<span class="fc" id="L297">                .map(value -&gt; diagnose(</span>
+<span class="fc" id="L290">            Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
+<span class="fc" id="L291">            Objects.requireNonNull(atlas, &quot;atlas&quot;);</span>
+<span class="fc" id="L292">            requireAtlasBinding(corpus, atlas);</span>
+<span class="fc" id="L293">            Map&lt;String, CaseResult&gt; atlasCases = atlas.cases().stream()</span>
+<span class="fc" id="L294">                .collect(Collectors.toUnmodifiableMap(</span>
+<span class="fc" id="L295">                    value -&gt; value.benchmarkCase().id(),</span>
+<span class="fc" id="L296">                    Function.identity()));</span>
+<span class="fc" id="L297">            return corpus.cases().stream()</span>
+<span class="fc" id="L298">                .sorted(Comparator.comparing(Case::id))</span>
+<span class="fc" id="L299">                .map(value -&gt; diagnose(</span>
                     value,
-<span class="fc" id="L299">                    Objects.requireNonNull(</span>
-<span class="fc" id="L300">                        atlasCases.get(value.id()),</span>
-<span class="nc" id="L301">                        () -&gt; &quot;missing atlas case &quot; + value.id())))</span>
-<span class="fc" id="L302">                .toList();</span>
+<span class="fc" id="L301">                    Objects.requireNonNull(</span>
+<span class="fc" id="L302">                        atlasCases.get(value.id()),</span>
+<span class="nc" id="L303">                        () -&gt; &quot;missing atlas case &quot; + value.id())))</span>
+<span class="fc" id="L304">                .toList();</span>
         }
 
         Path write(
@@ -308,20 +310,20 @@ public interface DiscoveryExperimentRunner {
             AtlasReport atlas,
             List&lt;CaseDiagnostic&gt; cases
         ) {
-<span class="fc" id="L311">            Path outputDirectory = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
-<span class="fc" id="L312">                .toAbsolutePath().normalize();</span>
-<span class="fc" id="L313">            String json = toCanonicalJson(corpus, atlas, cases);</span>
-<span class="fc" id="L314">            Path output = outputDirectory.resolve(FILE_NAME);</span>
+<span class="fc" id="L313">            Path outputDirectory = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L314">                .toAbsolutePath().normalize();</span>
+<span class="fc" id="L315">            String json = toCanonicalJson(corpus, atlas, cases);</span>
+<span class="fc" id="L316">            Path output = outputDirectory.resolve(FILE_NAME);</span>
             try {
-<span class="fc" id="L316">                Files.createDirectories(outputDirectory);</span>
-<span class="fc" id="L317">                AtomicJsonFile.writeUtf8(output, json);</span>
-<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                if (!json.equals(Files.readString(output, StandardCharsets.UTF_8))) {</span>
-<span class="nc" id="L319">                    throw new IllegalStateException(</span>
+<span class="fc" id="L318">                Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L319">                AtomicJsonFile.writeUtf8(output, json);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                if (!json.equals(Files.readString(output, StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L321">                    throw new IllegalStateException(</span>
                         &quot;written witness-pruning diagnostic differs from report&quot;);
                 }
-<span class="fc" id="L322">                return output;</span>
-<span class="nc" id="L323">            } catch (IOException exception) {</span>
-<span class="nc" id="L324">                throw new UncheckedIOException(</span>
+<span class="fc" id="L324">                return output;</span>
+<span class="nc" id="L325">            } catch (IOException exception) {</span>
+<span class="nc" id="L326">                throw new UncheckedIOException(</span>
                     &quot;Could not write witness-pruning diagnostic&quot;, exception);
             }
         }
@@ -331,8 +333,8 @@ public interface DiscoveryExperimentRunner {
             AtlasReport atlas,
             List&lt;CaseDiagnostic&gt; cases
         ) {
-<span class="fc" id="L334">            validateReportBinding(corpus, atlas, cases);</span>
-<span class="fc" id="L335">            return reportHash(corpus, atlas, cases);</span>
+<span class="fc" id="L336">            validateReportBinding(corpus, atlas, cases);</span>
+<span class="fc" id="L337">            return reportHash(corpus, atlas, cases);</span>
         }
 
         String toCanonicalJson(
@@ -340,68 +342,74 @@ public interface DiscoveryExperimentRunner {
             AtlasReport atlas,
             List&lt;CaseDiagnostic&gt; cases
         ) {
-<span class="fc" id="L343">            validateReportBinding(corpus, atlas, cases);</span>
-<span class="fc" id="L344">            return renderReport(</span>
-<span class="fc" id="L345">                corpus, atlas, cases, reportHash(corpus, atlas, cases));</span>
+<span class="fc" id="L345">            validateReportBinding(corpus, atlas, cases);</span>
+<span class="fc" id="L346">            return renderReport(</span>
+<span class="fc" id="L347">                corpus, atlas, cases, reportHash(corpus, atlas, cases));</span>
         }
 
         private CaseDiagnostic diagnose(Case benchmarkCase, CaseResult atlasCase) {
-<span class="fc" id="L349">            OracleEvidence oracle = atlasCase.production().oracle();</span>
-<span class="fc" id="L350">            SearchEvidence scalar = atlasCase.production().scalar();</span>
-<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (!oracle.reachable()) {</span>
-<span class="fc" id="L352">                return CaseDiagnostic.notApplicable(</span>
-<span class="fc" id="L353">                    benchmarkCase.id(), unavailableStatus(oracle),</span>
-<span class="fc" id="L354">                    oracle.status(), scalar);</span>
+<span class="fc" id="L351">            OracleEvidence oracle = atlasCase.production().oracle();</span>
+<span class="fc" id="L352">            SearchEvidence scalar = atlasCase.production().scalar();</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">            if (!oracle.reachable()) {</span>
+<span class="fc" id="L354">                return CaseDiagnostic.notApplicable(</span>
+<span class="fc" id="L355">                    benchmarkCase.id(), unavailableStatus(oracle),</span>
+<span class="fc" id="L356">                    oracle.status(), scalar);</span>
             }
-<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {</span>
-<span class="nc" id="L357">                return CaseDiagnostic.withoutLoss(</span>
-<span class="nc" id="L358">                    benchmarkCase.id(),</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {</span>
+<span class="nc" id="L359">                return CaseDiagnostic.withoutLoss(</span>
+<span class="nc" id="L360">                    benchmarkCase.id(),</span>
                     CORRECTNESS_REGRESSION_WITNESS,
-<span class="nc" id="L360">                    oracle.status(),</span>
-<span class="nc" id="L361">                    oracle.witnessExpressions().size(),</span>
+<span class="nc" id="L362">                    oracle.status(),</span>
+<span class="nc" id="L363">                    oracle.witnessExpressions().size(),</span>
                     0,
                     &quot;NOT_EVALUATED&quot;,
-<span class="nc" id="L364">                    scalar.exploredStates(),</span>
-<span class="nc" id="L365">                    scalar.engineCalls(),</span>
-<span class="nc" id="L366">                    scalar.generatedTransformations(),</span>
+<span class="nc" id="L366">                    scalar.exploredStates(),</span>
+<span class="nc" id="L367">                    scalar.engineCalls(),</span>
+<span class="nc" id="L368">                    scalar.generatedTransformations(),</span>
                     &quot;production oracle reached a target declared non-equivalent&quot;);
             }
-<span class="fc bfc" id="L369" title="All 2 branches covered.">            if (scalar.reached()) {</span>
-<span class="fc" id="L370">                return CaseDiagnostic.withoutLoss(</span>
-<span class="fc" id="L371">                    benchmarkCase.id(),</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            if (oracle.witnessExpressions().isEmpty()) {</span>
+<span class="fc" id="L372">                return CaseDiagnostic.withoutLoss(</span>
+<span class="fc" id="L373">                    benchmarkCase.id(), SOURCE_ALREADY_REPRESENTED, oracle.status(), 0, 0,</span>
+<span class="fc" id="L374">                    &quot;NOT_EVALUATED&quot;, scalar.exploredStates(), scalar.engineCalls(),</span>
+<span class="fc" id="L375">                    scalar.generatedTransformations(), &quot;the source already satisfies the target relation&quot;);</span>
+            }
+<span class="fc bfc" id="L377" title="All 2 branches covered.">            if (scalar.reached()) {</span>
+<span class="fc" id="L378">                return CaseDiagnostic.withoutLoss(</span>
+<span class="fc" id="L379">                    benchmarkCase.id(),</span>
                     SCALAR_ALREADY_FOUND,
-<span class="fc" id="L373">                    oracle.status(),</span>
-<span class="fc" id="L374">                    oracle.witnessExpressions().size(),</span>
+<span class="fc" id="L381">                    oracle.status(),</span>
+<span class="fc" id="L382">                    oracle.witnessExpressions().size(),</span>
                     0,
                     &quot;SCALAR_FOUND&quot;,
-<span class="fc" id="L377">                    scalar.exploredStates(),</span>
-<span class="fc" id="L378">                    scalar.engineCalls(),</span>
-<span class="fc" id="L379">                    scalar.generatedTransformations(),</span>
+<span class="fc" id="L385">                    scalar.exploredStates(),</span>
+<span class="fc" id="L386">                    scalar.engineCalls(),</span>
+<span class="fc" id="L387">                    scalar.generatedTransformations(),</span>
                     &quot;the retained scalar search already reached the relation&quot;);
             }
-<span class="fc" id="L382">            validateWitness(benchmarkCase, oracle);</span>
-<span class="fc" id="L383">            CountingEngine counting = new CountingEngine(</span>
-<span class="fc" id="L384">                productionEngine(benchmarkCase));</span>
-<span class="fc" id="L385">            List&lt;SearchEvent&gt; events = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L386">            SearchProblem problem = searchProblem(</span>
+<span class="fc" id="L390">            validateWitness(benchmarkCase, oracle);</span>
+<span class="fc" id="L391">            CountingEngine counting = new CountingEngine(</span>
+<span class="fc" id="L392">                productionEngine(benchmarkCase));</span>
+<span class="fc" id="L393">            List&lt;SearchEvent&gt; events = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L394">            SearchProblem problem = searchProblem(</span>
                 benchmarkCase,
-<span class="fc" id="L388">                atlasCase.representation().formattedSource(),</span>
-<span class="fc" id="L389">                counting).withObserver(events::add);</span>
-<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            if (problem.target() != null) {</span>
-<span class="nc" id="L391">                throw new IllegalStateException(</span>
+<span class="fc" id="L396">                atlasCase.representation().formattedSource(),</span>
+<span class="fc" id="L397">                counting).withObserver(events::add);</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            if (problem.target() != null) {</span>
+<span class="nc" id="L399">                throw new IllegalStateException(</span>
                     &quot;witness comparison search must remain target-blind&quot;);
             }
-<span class="fc" id="L394">            GoalSearchResult rerun = new BestFirstSearchStrategy()</span>
-<span class="fc" id="L395">                .searchWithDiagnostics(problem);</span>
-<span class="fc" id="L396">            requireSameScalarRun(</span>
-<span class="fc" id="L397">                scalar, rerun, counting.calls(), counting.generated());</span>
-<span class="fc" id="L398">            return analyzeWitness(</span>
+<span class="fc" id="L402">            GoalSearchResult rerun = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L403">                .searchWithDiagnostics(problem);</span>
+<span class="fc" id="L404">            requireSameScalarRun(</span>
+<span class="fc" id="L405">                scalar, rerun, counting.calls(), counting.generated());</span>
+<span class="fc" id="L406">            return analyzeWitness(</span>
                 benchmarkCase,
                 oracle,
                 rerun,
                 events,
-<span class="fc" id="L403">                counting.calls(),</span>
-<span class="fc" id="L404">                counting.generated());</span>
+<span class="fc" id="L411">                counting.calls(),</span>
+<span class="fc" id="L412">                counting.generated());</span>
         }
 
         CaseDiagnostic analyzeWitness(
@@ -412,22 +420,22 @@ public interface DiscoveryExperimentRunner {
             int engineCalls,
             long generatedTransformations
         ) {
-<span class="fc" id="L415">            Set&lt;String&gt; explored = search.states().stream()</span>
-<span class="fc" id="L416">                .map(SearchState::expression)</span>
-<span class="fc" id="L417">                .map(this::expressionKey)</span>
-<span class="fc" id="L418">                .collect(Collectors.toCollection(LinkedHashSet::new));</span>
-<span class="fc" id="L419">            String before = format(benchmarkCase.source());</span>
-<span class="fc" id="L420">            int prefixLength = 0;</span>
-<span class="fc" id="L421">            for (int index = 0;</span>
-<span class="fc bfc" id="L422" title="All 2 branches covered.">                    index &lt; oracle.witnessExpressions().size();</span>
-<span class="fc" id="L423">                    index++) {</span>
-<span class="fc" id="L424">                String after = format(oracle.witnessExpressions().get(index));</span>
-<span class="fc" id="L425">                String rule = oracle.witnessRuleIds().get(index);</span>
-<span class="fc bfc" id="L426" title="All 2 branches covered.">                if (explored.contains(expressionKey(after))) {</span>
-<span class="fc" id="L427">                    prefixLength++;</span>
-<span class="fc" id="L428">                    before = after;</span>
+<span class="fc" id="L423">            Set&lt;String&gt; explored = search.states().stream()</span>
+<span class="fc" id="L424">                .map(SearchState::expression)</span>
+<span class="fc" id="L425">                .map(this::expressionKey)</span>
+<span class="fc" id="L426">                .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L427">            String before = format(benchmarkCase.source());</span>
+<span class="fc" id="L428">            int prefixLength = 0;</span>
+<span class="fc" id="L429">            for (int index = 0;</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">                    index &lt; oracle.witnessExpressions().size();</span>
+<span class="fc" id="L431">                    index++) {</span>
+<span class="fc" id="L432">                String after = format(oracle.witnessExpressions().get(index));</span>
+<span class="fc" id="L433">                String rule = oracle.witnessRuleIds().get(index);</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">                if (explored.contains(expressionKey(after))) {</span>
+<span class="fc" id="L435">                    prefixLength++;</span>
+<span class="fc" id="L436">                    before = after;</span>
                 } else {
-<span class="fc" id="L430">                    return diagnoseLoss(</span>
+<span class="fc" id="L438">                    return diagnoseLoss(</span>
                         benchmarkCase,
                         oracle,
                         search,
@@ -441,14 +449,14 @@ public interface DiscoveryExperimentRunner {
                         events);
                 }
             }
-<span class="fc" id="L444">            return CaseDiagnostic.withoutLoss(</span>
-<span class="fc" id="L445">                benchmarkCase.id(),</span>
+<span class="fc" id="L452">            return CaseDiagnostic.withoutLoss(</span>
+<span class="fc" id="L453">                benchmarkCase.id(),</span>
                 WITNESS_COMPLETELY_EXPLORED,
-<span class="fc" id="L447">                oracle.status(),</span>
-<span class="fc" id="L448">                oracle.witnessExpressions().size(),</span>
+<span class="fc" id="L455">                oracle.status(),</span>
+<span class="fc" id="L456">                oracle.witnessExpressions().size(),</span>
                 prefixLength,
-<span class="fc" id="L450">                terminalStatus(benchmarkCase, search.metrics()),</span>
-<span class="fc" id="L451">                search.states().size(),</span>
+<span class="fc" id="L458">                terminalStatus(benchmarkCase, search.metrics()),</span>
+<span class="fc" id="L459">                search.states().size(),</span>
                 engineCalls,
                 generatedTransformations,
                 &quot;all oracle witness states were explored; relation matching &quot;
@@ -468,59 +476,59 @@ public interface DiscoveryExperimentRunner {
             String rule,
             List&lt;SearchEvent&gt; events
         ) {
-<span class="fc" id="L471">            Optional&lt;SearchEvent&gt; transition = firstTransition(</span>
+<span class="fc" id="L479">            Optional&lt;SearchEvent&gt; transition = firstTransition(</span>
                 events, before, after, rule);
-<span class="fc bfc" id="L473" title="All 2 branches covered.">            if (transition.isEmpty()) {</span>
-<span class="fc" id="L474">                return parentLoss(</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            if (transition.isEmpty()) {</span>
+<span class="fc" id="L482">                return parentLoss(</span>
                     benchmarkCase, oracle, search, engineCalls,
                     generatedTransformations, prefixLength, index,
                     before, after, rule, events);
             }
-<span class="fc" id="L479">            SearchEvent generated = transition.orElseThrow();</span>
-<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (!generated.pruningReason().isBlank()) {</span>
-<span class="nc" id="L481">                return lossCase(</span>
+<span class="fc" id="L487">            SearchEvent generated = transition.orElseThrow();</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">            if (!generated.pruningReason().isBlank()) {</span>
+<span class="nc" id="L489">                return lossCase(</span>
                     benchmarkCase, oracle, search, engineCalls,
                     generatedTransformations, prefixLength, index,
                     before, after, rule, TRANSFORMATION_SKIPPED, generated,
                     &quot;witness transformation was offered but rejected&quot;);
             }
-<span class="fc" id="L487">            Optional&lt;SearchEvent&gt; transposition = firstEdgeEvent(</span>
+<span class="fc" id="L495">            Optional&lt;SearchEvent&gt; transposition = firstEdgeEvent(</span>
                 events,
                 SearchEventType.STATE_PRUNED_TRANSPOSITION,
-<span class="fc" id="L490">                before, after, rule, generated.sequence());</span>
-<span class="pc bpc" id="L491" title="1 of 2 branches missed.">            if (transposition.isPresent()) {</span>
-<span class="nc" id="L492">                return lossCase(</span>
+<span class="fc" id="L498">                before, after, rule, generated.sequence());</span>
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">            if (transposition.isPresent()) {</span>
+<span class="nc" id="L500">                return lossCase(</span>
                     benchmarkCase, oracle, search, engineCalls,
                     generatedTransformations, prefixLength, index,
                     before, after, rule, STATE_PRUNED_TRANSPOSITION,
-<span class="nc" id="L496">                    transposition.orElseThrow(),</span>
+<span class="nc" id="L504">                    transposition.orElseThrow(),</span>
                     &quot;witness state was removed by transposition memory&quot;);
             }
-<span class="fc" id="L499">            Optional&lt;SearchEvent&gt; duplicate = firstEdgeEvent(</span>
+<span class="fc" id="L507">            Optional&lt;SearchEvent&gt; duplicate = firstEdgeEvent(</span>
                 events,
                 SearchEventType.STATE_PRUNED_DUPLICATE,
-<span class="fc" id="L502">                before, after, rule, generated.sequence());</span>
-<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            if (duplicate.isPresent()) {</span>
-<span class="nc" id="L504">                return lossCase(</span>
+<span class="fc" id="L510">                before, after, rule, generated.sequence());</span>
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">            if (duplicate.isPresent()) {</span>
+<span class="nc" id="L512">                return lossCase(</span>
                     benchmarkCase, oracle, search, engineCalls,
                     generatedTransformations, prefixLength, index,
                     before, after, rule, STATE_PRUNED_DUPLICATE,
-<span class="nc" id="L508">                    duplicate.orElseThrow(),</span>
+<span class="nc" id="L516">                    duplicate.orElseThrow(),</span>
                     &quot;witness state was removed by visited-state identity&quot;);
             }
-<span class="fc" id="L511">            Optional&lt;SearchEvent&gt; enqueued = firstEdgeEvent(</span>
+<span class="fc" id="L519">            Optional&lt;SearchEvent&gt; enqueued = firstEdgeEvent(</span>
                 events,
                 SearchEventType.STATE_ENQUEUED,
-<span class="fc" id="L514">                before, after, rule, generated.sequence());</span>
-<span class="pc bpc" id="L515" title="1 of 2 branches missed.">            if (enqueued.isPresent()) {</span>
-<span class="fc" id="L516">                return lossCase(</span>
+<span class="fc" id="L522">                before, after, rule, generated.sequence());</span>
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">            if (enqueued.isPresent()) {</span>
+<span class="fc" id="L524">                return lossCase(</span>
                     benchmarkCase, oracle, search, engineCalls,
                     generatedTransformations, prefixLength, index,
                     before, after, rule, STATE_ENQUEUED_BUT_NOT_EXPLORED,
-<span class="fc" id="L520">                    enqueued.orElseThrow(),</span>
+<span class="fc" id="L528">                    enqueued.orElseThrow(),</span>
                     &quot;witness state remained outside the explored prefix&quot;);
             }
-<span class="nc" id="L523">            return lossCase(</span>
+<span class="nc" id="L531">            return lossCase(</span>
                 benchmarkCase, oracle, search, engineCalls,
                 generatedTransformations, prefixLength, index,
                 before, after, rule, TRANSFORMATION_GENERATED_NOT_ENQUEUED,
@@ -541,7 +549,7 @@ public interface DiscoveryExperimentRunner {
             String rule,
             List&lt;SearchEvent&gt; events
         ) {
-<span class="fc" id="L544">            List&lt;ParentOutcome&gt; outcomes = List.of(</span>
+<span class="fc" id="L552">            List&lt;ParentOutcome&gt; outcomes = List.of(</span>
                 new ParentOutcome(
                     SearchEventType.STATE_PRUNED_BUDGET,
                     CANDIDATE_BUDGET_BEFORE_WITNESS_EDGE,
@@ -566,18 +574,18 @@ public interface DiscoveryExperimentRunner {
                     SearchEventType.STATE_ENQUEUED,
                     PARENT_ENQUEUED_BUT_NOT_EXPLORED,
                     &quot;witness parent remained in the frontier&quot;));
-<span class="pc bpc" id="L569" title="1 of 2 branches missed.">            for (ParentOutcome outcome : outcomes) {</span>
-<span class="fc" id="L570">                Optional&lt;SearchEvent&gt; event = firstStateEvent(</span>
-<span class="fc" id="L571">                    events, outcome.type(), before);</span>
-<span class="pc bpc" id="L572" title="1 of 2 branches missed.">                if (event.isPresent()) {</span>
-<span class="fc" id="L573">                    return lossCase(</span>
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">            for (ParentOutcome outcome : outcomes) {</span>
+<span class="fc" id="L578">                Optional&lt;SearchEvent&gt; event = firstStateEvent(</span>
+<span class="fc" id="L579">                    events, outcome.type(), before);</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">                if (event.isPresent()) {</span>
+<span class="fc" id="L581">                    return lossCase(</span>
                         benchmarkCase, oracle, search, engineCalls,
                         generatedTransformations, prefixLength, index,
-<span class="fc" id="L576">                        before, after, rule, outcome.reason(),</span>
-<span class="fc" id="L577">                        event.orElseThrow(), outcome.detail());</span>
+<span class="fc" id="L584">                        before, after, rule, outcome.reason(),</span>
+<span class="fc" id="L585">                        event.orElseThrow(), outcome.detail());</span>
                 }
-<span class="nc" id="L579">            }</span>
-<span class="nc" id="L580">            return lossCase(</span>
+<span class="nc" id="L587">            }</span>
+<span class="nc" id="L588">            return lossCase(</span>
                 benchmarkCase, oracle, search, engineCalls,
                 generatedTransformations, prefixLength, index,
                 before, after, rule, PARENT_NOT_REACHED, null,
@@ -599,17 +607,17 @@ public interface DiscoveryExperimentRunner {
             SearchEvent event,
             String lossDetail
         ) {
-<span class="fc" id="L602">            return new CaseDiagnostic(</span>
-<span class="fc" id="L603">                benchmarkCase.id(),</span>
+<span class="fc" id="L610">            return new CaseDiagnostic(</span>
+<span class="fc" id="L611">                benchmarkCase.id(),</span>
                 WITNESS_PREFIX_LOST,
-<span class="fc" id="L605">                oracle.status(),</span>
-<span class="fc" id="L606">                oracle.witnessExpressions().size(),</span>
+<span class="fc" id="L613">                oracle.status(),</span>
+<span class="fc" id="L614">                oracle.witnessExpressions().size(),</span>
                 prefixLength,
-<span class="fc" id="L608">                terminalStatus(benchmarkCase, search.metrics()),</span>
-<span class="fc" id="L609">                search.states().size(),</span>
+<span class="fc" id="L616">                terminalStatus(benchmarkCase, search.metrics()),</span>
+<span class="fc" id="L617">                search.states().size(),</span>
                 engineCalls,
                 generatedTransformations,
-<span class="fc" id="L612">                index,</span>
+<span class="fc" id="L620">                index,</span>
                 before,
                 after,
                 rule,
@@ -626,16 +634,16 @@ public interface DiscoveryExperimentRunner {
             String after,
             String rule
         ) {
-<span class="fc" id="L629">            return events.stream()</span>
-<span class="fc" id="L630">                .filter(event -&gt;</span>
-<span class="fc bfc" id="L631" title="All 2 branches covered.">                    event.type() == SearchEventType.TRANSFORMATION_GENERATED)</span>
-<span class="fc" id="L632">                .filter(event -&gt; sameExpression(event.parentExpression(), before))</span>
-<span class="fc" id="L633">                .filter(event -&gt; sameExpression(event.expression(), after))</span>
-<span class="fc" id="L634">                .filter(event -&gt; event.ruleId().equals(rule))</span>
-<span class="fc" id="L635">                .min(Comparator</span>
-<span class="fc" id="L636">                    .comparing((SearchEvent event) -&gt;</span>
-<span class="nc bnc" id="L637" title="All 2 branches missed.">                        !event.pruningReason().isBlank())</span>
-<span class="fc" id="L638">                    .thenComparingLong(SearchEvent::sequence));</span>
+<span class="fc" id="L637">            return events.stream()</span>
+<span class="fc" id="L638">                .filter(event -&gt;</span>
+<span class="fc bfc" id="L639" title="All 2 branches covered.">                    event.type() == SearchEventType.TRANSFORMATION_GENERATED)</span>
+<span class="fc" id="L640">                .filter(event -&gt; sameExpression(event.parentExpression(), before))</span>
+<span class="fc" id="L641">                .filter(event -&gt; sameExpression(event.expression(), after))</span>
+<span class="fc" id="L642">                .filter(event -&gt; event.ruleId().equals(rule))</span>
+<span class="fc" id="L643">                .min(Comparator</span>
+<span class="fc" id="L644">                    .comparing((SearchEvent event) -&gt;</span>
+<span class="nc bnc" id="L645" title="All 2 branches missed.">                        !event.pruningReason().isBlank())</span>
+<span class="fc" id="L646">                    .thenComparingLong(SearchEvent::sequence));</span>
         }
 
         private Optional&lt;SearchEvent&gt; firstEdgeEvent(
@@ -646,13 +654,13 @@ public interface DiscoveryExperimentRunner {
             String rule,
             long afterSequence
         ) {
-<span class="fc" id="L649">            return events.stream()</span>
-<span class="fc bfc" id="L650" title="All 2 branches covered.">                .filter(event -&gt; event.sequence() &gt; afterSequence)</span>
-<span class="fc bfc" id="L651" title="All 2 branches covered.">                .filter(event -&gt; event.type() == type)</span>
-<span class="fc" id="L652">                .filter(event -&gt; sameExpression(event.parentExpression(), before))</span>
-<span class="fc" id="L653">                .filter(event -&gt; sameExpression(event.expression(), after))</span>
-<span class="fc" id="L654">                .filter(event -&gt; event.ruleId().equals(rule))</span>
-<span class="fc" id="L655">                .min(Comparator.comparingLong(SearchEvent::sequence));</span>
+<span class="fc" id="L657">            return events.stream()</span>
+<span class="fc bfc" id="L658" title="All 2 branches covered.">                .filter(event -&gt; event.sequence() &gt; afterSequence)</span>
+<span class="fc bfc" id="L659" title="All 2 branches covered.">                .filter(event -&gt; event.type() == type)</span>
+<span class="fc" id="L660">                .filter(event -&gt; sameExpression(event.parentExpression(), before))</span>
+<span class="fc" id="L661">                .filter(event -&gt; sameExpression(event.expression(), after))</span>
+<span class="fc" id="L662">                .filter(event -&gt; event.ruleId().equals(rule))</span>
+<span class="fc" id="L663">                .min(Comparator.comparingLong(SearchEvent::sequence));</span>
         }
 
         private Optional&lt;SearchEvent&gt; firstStateEvent(
@@ -660,41 +668,41 @@ public interface DiscoveryExperimentRunner {
             SearchEventType type,
             String expression
         ) {
-<span class="fc" id="L663">            return events.stream()</span>
-<span class="pc bpc" id="L664" title="1 of 2 branches missed.">                .filter(event -&gt; event.type() == type)</span>
-<span class="fc" id="L665">                .filter(event -&gt; sameExpression(event.expression(), expression))</span>
-<span class="fc" id="L666">                .min(Comparator.comparingLong(SearchEvent::sequence));</span>
+<span class="fc" id="L671">            return events.stream()</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                .filter(event -&gt; event.type() == type)</span>
+<span class="fc" id="L673">                .filter(event -&gt; sameExpression(event.expression(), expression))</span>
+<span class="fc" id="L674">                .min(Comparator.comparingLong(SearchEvent::sequence));</span>
         }
 
         private static String unavailableStatus(OracleEvidence oracle) {
-<span class="pc bpc" id="L670" title="1 of 2 branches missed.">            if (oracle.inconclusive()) {</span>
-<span class="nc" id="L671">                return ORACLE_BUDGET_INCONCLUSIVE;</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">            if (oracle.inconclusive()) {</span>
+<span class="nc" id="L679">                return ORACLE_BUDGET_INCONCLUSIVE;</span>
             }
-<span class="pc bpc" id="L673" title="1 of 2 branches missed.">            if (oracle.completeClosureExhausted()) {</span>
-<span class="fc" id="L674">                return ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS;</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">            if (oracle.completeClosureExhausted()) {</span>
+<span class="fc" id="L682">                return ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS;</span>
             }
-<span class="nc" id="L676">            return ORACLE_NOT_EVALUATED;</span>
+<span class="nc" id="L684">            return ORACLE_NOT_EVALUATED;</span>
         }
 
         private static String terminalStatus(
             Case benchmarkCase,
             GoalMetrics metrics
         ) {
-<span class="fc" id="L683">            if (metrics.exploredStates()</span>
-<span class="fc bfc" id="L684" title="All 2 branches covered.">                    &gt;= benchmarkCase.searchMaxVisitedStates()) {</span>
-<span class="fc" id="L685">                return &quot;STATE_BUDGET&quot;;</span>
+<span class="fc" id="L691">            if (metrics.exploredStates()</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">                    &gt;= benchmarkCase.searchMaxVisitedStates()) {</span>
+<span class="fc" id="L693">                return &quot;STATE_BUDGET&quot;;</span>
             }
-<span class="fc bfc" id="L687" title="All 2 branches covered.">            if (metrics.candidateBudgetPrunes() &gt; 0) {</span>
-<span class="fc" id="L688">                return &quot;CANDIDATE_BUDGET&quot;;</span>
+<span class="fc bfc" id="L695" title="All 2 branches covered.">            if (metrics.candidateBudgetPrunes() &gt; 0) {</span>
+<span class="fc" id="L696">                return &quot;CANDIDATE_BUDGET&quot;;</span>
             }
-<span class="pc bpc" id="L690" title="1 of 2 branches missed.">            if (metrics.depthPrunes() &gt; 0) {</span>
-<span class="nc" id="L691">                return &quot;DEPTH_BUDGET&quot;;</span>
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">            if (metrics.depthPrunes() &gt; 0) {</span>
+<span class="nc" id="L699">                return &quot;DEPTH_BUDGET&quot;;</span>
             }
-<span class="pc bpc" id="L693" title="1 of 2 branches missed.">            if (metrics.expandedStates() &gt; 0</span>
-<span class="pc bpc" id="L694" title="1 of 2 branches missed.">                    &amp;&amp; metrics.generatedTransformations() == 0) {</span>
-<span class="nc" id="L695">                return &quot;NO_TRANSFORMATIONS&quot;;</span>
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">            if (metrics.expandedStates() &gt; 0</span>
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">                    &amp;&amp; metrics.generatedTransformations() == 0) {</span>
+<span class="nc" id="L703">                return &quot;NO_TRANSFORMATIONS&quot;;</span>
             }
-<span class="fc" id="L697">            return &quot;FRONTIER_EXHAUSTED&quot;;</span>
+<span class="fc" id="L705">            return &quot;FRONTIER_EXHAUSTED&quot;;</span>
         }
 
         private static SearchProblem searchProblem(
@@ -702,27 +710,27 @@ public interface DiscoveryExperimentRunner {
             String source,
             TransformationEngine engine
         ) {
-<span class="fc" id="L705">            return new SearchProblem(</span>
+<span class="fc" id="L713">            return new SearchProblem(</span>
                 source,
                 engine,
                 new ExpressionScorer(),
                 new ExpressionCanonicalizer(),
                 new SearchHeuristic(
-<span class="fc" id="L711">                    benchmarkCase.searchMaxDepth(),</span>
-<span class="fc" id="L712">                    benchmarkCase.searchMaxVisitedStates(),</span>
+<span class="fc" id="L719">                    benchmarkCase.searchMaxDepth(),</span>
+<span class="fc" id="L720">                    benchmarkCase.searchMaxVisitedStates(),</span>
                     1,
-<span class="fc" id="L714">                    benchmarkCase.maxExpandingSteps(),</span>
-<span class="fc" id="L715">                    benchmarkCase.maxCandidatesPerState(),</span>
-<span class="fc" id="L716">                    benchmarkCase.beamWidth()));</span>
+<span class="fc" id="L722">                    benchmarkCase.maxExpandingSteps(),</span>
+<span class="fc" id="L723">                    benchmarkCase.maxCandidatesPerState(),</span>
+<span class="fc" id="L724">                    benchmarkCase.beamWidth()));</span>
         }
 
         private static TransformationEngine productionEngine(
             Case benchmarkCase
         ) {
-<span class="fc" id="L722">            return AstRewriteTransformationEngines.production(</span>
-<span class="fc" id="L723">                AstRewriteTransformationEngine.defaultRules(),</span>
+<span class="fc" id="L730">            return AstRewriteTransformationEngines.production(</span>
+<span class="fc" id="L731">                AstRewriteTransformationEngine.defaultRules(),</span>
                 128,
-<span class="fc" id="L725">                Math.max(200, benchmarkCase.maxCandidatesPerState() * 2));</span>
+<span class="fc" id="L733">                Math.max(200, benchmarkCase.maxCandidatesPerState() * 2));</span>
         }
 
         private static void requireSameScalarRun(
@@ -731,106 +739,107 @@ public interface DiscoveryExperimentRunner {
             int engineCalls,
             long generatedTransformations
         ) {
-<span class="fc" id="L734">            List&lt;Object&gt; retainedWork = List.of(</span>
-<span class="fc" id="L735">                retained.exploredStates(),</span>
-<span class="fc" id="L736">                retained.engineCalls(),</span>
-<span class="fc" id="L737">                retained.generatedTransformations(),</span>
-<span class="fc" id="L738">                Objects.requireNonNull(retained.metrics(), &quot;retained.metrics&quot;));</span>
-<span class="fc" id="L739">            List&lt;Object&gt; rerunWork = List.of(</span>
-<span class="fc" id="L740">                rerun.states().size(),</span>
-<span class="fc" id="L741">                engineCalls,</span>
-<span class="fc" id="L742">                generatedTransformations,</span>
-<span class="fc" id="L743">                rerun.metrics());</span>
-<span class="pc bpc" id="L744" title="1 of 2 branches missed.">            if (!retainedWork.equals(rerunWork)) {</span>
-<span class="nc" id="L745">                throw new IllegalStateException(</span>
+<span class="fc" id="L742">            List&lt;Object&gt; retainedWork = List.of(</span>
+<span class="fc" id="L743">                retained.exploredStates(),</span>
+<span class="fc" id="L744">                retained.engineCalls(),</span>
+<span class="fc" id="L745">                retained.generatedTransformations(),</span>
+<span class="fc" id="L746">                Objects.requireNonNull(retained.metrics(), &quot;retained.metrics&quot;));</span>
+<span class="fc" id="L747">            List&lt;Object&gt; rerunWork = List.of(</span>
+<span class="fc" id="L748">                rerun.states().size(),</span>
+<span class="fc" id="L749">                engineCalls,</span>
+<span class="fc" id="L750">                generatedTransformations,</span>
+<span class="fc" id="L751">                rerun.metrics());</span>
+<span class="pc bpc" id="L752" title="1 of 2 branches missed.">            if (!retainedWork.equals(rerunWork)) {</span>
+<span class="nc" id="L753">                throw new IllegalStateException(</span>
                     &quot;observer rerun differs from retained target-blind scalar evidence&quot;);
             }
-<span class="fc" id="L748">        }</span>
+<span class="fc" id="L756">        }</span>
 
         private static void validateWitness(
             Case benchmarkCase,
             OracleEvidence oracle
         ) {
-<span class="pc bpc" id="L754" title="1 of 2 branches missed.">            if (oracle.witnessExpressions().isEmpty()</span>
-<span class="fc" id="L755">                    || oracle.witnessExpressions().size()</span>
-<span class="pc bpc" id="L756" title="1 of 2 branches missed.">                        != oracle.witnessRuleIds().size()) {</span>
-<span class="nc" id="L757">                throw new IllegalStateException(</span>
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">            if (oracle.witnessExpressions().isEmpty()</span>
+<span class="fc" id="L763">                    || oracle.witnessExpressions().size()</span>
+<span class="pc bpc" id="L764" title="1 of 2 branches missed.">                        != oracle.witnessRuleIds().size()) {</span>
+<span class="nc" id="L765">                throw new IllegalStateException(</span>
                     &quot;reachable oracle witness is incomplete for &quot;
-<span class="nc" id="L759">                        + benchmarkCase.id());</span>
+<span class="nc" id="L767">                        + benchmarkCase.id());</span>
             }
-<span class="fc" id="L761">        }</span>
+<span class="fc" id="L769">        }</span>
 
         private static void requireAtlasBinding(
             Corpus corpus,
             AtlasReport atlas
         ) {
-<span class="fc" id="L767">            List&lt;Object&gt; corpusBinding = List.of(</span>
-<span class="fc" id="L768">                corpus.schema(),</span>
-<span class="fc" id="L769">                corpus.contentSha256(),</span>
-<span class="fc" id="L770">                corpus.inventoryRevision(),</span>
-<span class="fc" id="L771">                corpus.claimBoundary(),</span>
-<span class="fc" id="L772">                corpus.cases().size());</span>
-<span class="fc" id="L773">            List&lt;Object&gt; atlasBinding = List.of(</span>
-<span class="fc" id="L774">                atlas.corpusSchema(),</span>
-<span class="fc" id="L775">                atlas.corpusSha256(),</span>
-<span class="fc" id="L776">                atlas.inventoryRevision(),</span>
-<span class="fc" id="L777">                atlas.claimBoundary(),</span>
-<span class="fc" id="L778">                atlas.cases().size());</span>
-<span class="pc bpc" id="L779" title="1 of 2 branches missed.">            if (!corpusBinding.equals(atlasBinding)) {</span>
-<span class="nc" id="L780">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L775">            List&lt;Object&gt; corpusBinding = List.of(</span>
+<span class="fc" id="L776">                corpus.schema(),</span>
+<span class="fc" id="L777">                corpus.contentSha256(),</span>
+<span class="fc" id="L778">                corpus.inventoryRevision(),</span>
+<span class="fc" id="L779">                corpus.claimBoundary(),</span>
+<span class="fc" id="L780">                corpus.cases().size());</span>
+<span class="fc" id="L781">            List&lt;Object&gt; atlasBinding = List.of(</span>
+<span class="fc" id="L782">                atlas.corpusSchema(),</span>
+<span class="fc" id="L783">                atlas.corpusSha256(),</span>
+<span class="fc" id="L784">                atlas.inventoryRevision(),</span>
+<span class="fc" id="L785">                atlas.claimBoundary(),</span>
+<span class="fc" id="L786">                atlas.cases().size());</span>
+<span class="fc bfc" id="L787" title="All 2 branches covered.">            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlas.schema())</span>
+<span class="pc bpc" id="L788" title="1 of 2 branches missed.">                    || !corpusBinding.equals(atlasBinding)) {</span>
+<span class="fc" id="L789">                throw new IllegalArgumentException(</span>
                     &quot;witness-pruning diagnostic requires the matching atlas&quot;);
             }
-<span class="fc" id="L783">            Set&lt;String&gt; corpusIds = corpus.cases().stream()</span>
-<span class="fc" id="L784">                .map(Case::id)</span>
-<span class="fc" id="L785">                .collect(Collectors.toSet());</span>
-<span class="fc" id="L786">            Set&lt;String&gt; atlasIds = atlas.cases().stream()</span>
-<span class="fc" id="L787">                .map(result -&gt; result.benchmarkCase().id())</span>
-<span class="fc" id="L788">                .collect(Collectors.toSet());</span>
-<span class="pc bpc" id="L789" title="1 of 2 branches missed.">            if (!corpusIds.equals(atlasIds)) {</span>
-<span class="nc" id="L790">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L792">            Set&lt;String&gt; corpusIds = corpus.cases().stream()</span>
+<span class="fc" id="L793">                .map(Case::id)</span>
+<span class="fc" id="L794">                .collect(Collectors.toSet());</span>
+<span class="fc" id="L795">            Set&lt;String&gt; atlasIds = atlas.cases().stream()</span>
+<span class="fc" id="L796">                .map(result -&gt; result.benchmarkCase().id())</span>
+<span class="fc" id="L797">                .collect(Collectors.toSet());</span>
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">            if (!corpusIds.equals(atlasIds)) {</span>
+<span class="nc" id="L799">                throw new IllegalArgumentException(</span>
                     &quot;witness-pruning atlas case membership differs from corpus&quot;);
             }
-<span class="fc" id="L793">        }</span>
+<span class="fc" id="L802">        }</span>
 
         private static void validateReportBinding(
             Corpus corpus,
             AtlasReport atlas,
             List&lt;CaseDiagnostic&gt; cases
         ) {
-<span class="fc" id="L800">            Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
-<span class="fc" id="L801">            Objects.requireNonNull(atlas, &quot;atlas&quot;);</span>
-<span class="fc" id="L802">            requireAtlasBinding(corpus, atlas);</span>
-<span class="fc" id="L803">            List&lt;CaseDiagnostic&gt; retained = List.copyOf(</span>
-<span class="fc" id="L804">                Objects.requireNonNull(cases, &quot;cases&quot;));</span>
-<span class="fc" id="L805">            List&lt;String&gt; ids = retained.stream()</span>
-<span class="fc" id="L806">                .map(CaseDiagnostic::id)</span>
-<span class="fc" id="L807">                .toList();</span>
-<span class="fc" id="L808">            List&lt;String&gt; corpusIds = corpus.cases().stream()</span>
-<span class="fc" id="L809">                .map(Case::id)</span>
-<span class="fc" id="L810">                .sorted()</span>
-<span class="fc" id="L811">                .toList();</span>
-<span class="pc bpc" id="L812" title="1 of 2 branches missed.">            if (!ids.equals(corpusIds)</span>
-<span class="pc bpc" id="L813" title="1 of 2 branches missed.">                    || new LinkedHashSet&lt;&gt;(ids).size() != ids.size()) {</span>
-<span class="nc" id="L814">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L809">            Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
+<span class="fc" id="L810">            Objects.requireNonNull(atlas, &quot;atlas&quot;);</span>
+<span class="fc" id="L811">            requireAtlasBinding(corpus, atlas);</span>
+<span class="fc" id="L812">            List&lt;CaseDiagnostic&gt; retained = List.copyOf(</span>
+<span class="fc" id="L813">                Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L814">            List&lt;String&gt; ids = retained.stream()</span>
+<span class="fc" id="L815">                .map(CaseDiagnostic::id)</span>
+<span class="fc" id="L816">                .toList();</span>
+<span class="fc" id="L817">            List&lt;String&gt; corpusIds = corpus.cases().stream()</span>
+<span class="fc" id="L818">                .map(Case::id)</span>
+<span class="fc" id="L819">                .sorted()</span>
+<span class="fc" id="L820">                .toList();</span>
+<span class="pc bpc" id="L821" title="1 of 2 branches missed.">            if (!ids.equals(corpusIds)</span>
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">                    || new LinkedHashSet&lt;&gt;(ids).size() != ids.size()) {</span>
+<span class="nc" id="L823">                throw new IllegalArgumentException(</span>
                     &quot;diagnostic cases must balance the corpus in canonical order&quot;);
             }
-<span class="fc" id="L817">        }</span>
+<span class="fc" id="L826">        }</span>
 
         private boolean sameExpression(String left, String right) {
-<span class="fc" id="L820">            return expressionKey(left).equals(expressionKey(right));</span>
+<span class="fc" id="L829">            return expressionKey(left).equals(expressionKey(right));</span>
         }
 
         private String expressionKey(String expression) {
             try {
-<span class="fc" id="L825">                return format(expression);</span>
-<span class="nc" id="L826">            } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L827">                return Objects.requireNonNull(expression, &quot;expression&quot;)</span>
-<span class="nc" id="L828">                    .trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L834">                return format(expression);</span>
+<span class="nc" id="L835">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L836">                return Objects.requireNonNull(expression, &quot;expression&quot;)</span>
+<span class="nc" id="L837">                    .trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
             }
         }
 
         private String format(String expression) {
-<span class="fc" id="L833">            return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+<span class="fc" id="L842">            return ExpressionFormatter.format(parser.parseTerm(expression));</span>
         }
 
         record CaseDiagnostic(
@@ -852,45 +861,45 @@ public interface DiscoveryExperimentRunner {
             String firstLossDetail,
             String detail
         ) {
-<span class="fc" id="L855">            CaseDiagnostic {</span>
-<span class="fc" id="L856">                id = requireText(id, &quot;id&quot;);</span>
-<span class="fc" id="L857">                status = requireMember(status, CASE_STATUSES, &quot;status&quot;);</span>
-<span class="fc" id="L858">                oracleStatus = requireText(oracleStatus, &quot;oracleStatus&quot;);</span>
-<span class="fc" id="L859">                searchTerminalStatus = requireMember(</span>
+<span class="fc" id="L864">            CaseDiagnostic {</span>
+<span class="fc" id="L865">                id = requireText(id, &quot;id&quot;);</span>
+<span class="fc" id="L866">                status = requireMember(status, CASE_STATUSES, &quot;status&quot;);</span>
+<span class="fc" id="L867">                oracleStatus = requireText(oracleStatus, &quot;oracleStatus&quot;);</span>
+<span class="fc" id="L868">                searchTerminalStatus = requireMember(</span>
                     searchTerminalStatus,
                     TERMINAL_STATUSES,
                     &quot;searchTerminalStatus&quot;);
-<span class="pc bpc" id="L863" title="1 of 2 branches missed.">                firstLossDetail = firstLossDetail == null</span>
-<span class="pc" id="L864">                    ? &quot;&quot; : firstLossDetail;</span>
-<span class="pc bpc" id="L865" title="1 of 2 branches missed.">                detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="pc bpc" id="L866" title="6 of 12 branches missed.">                if (witnessStepCount &lt; 0 || exploredPrefixLength &lt; 0</span>
+<span class="pc bpc" id="L872" title="1 of 2 branches missed.">                firstLossDetail = firstLossDetail == null</span>
+<span class="pc" id="L873">                    ? &quot;&quot; : firstLossDetail;</span>
+<span class="pc bpc" id="L874" title="1 of 2 branches missed.">                detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="pc bpc" id="L875" title="6 of 12 branches missed.">                if (witnessStepCount &lt; 0 || exploredPrefixLength &lt; 0</span>
                         || exploredPrefixLength &gt; witnessStepCount
                         || searchExploredStates &lt; 0 || engineCalls &lt; 0
                         || generatedTransformations &lt; 0) {
-<span class="nc" id="L870">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L879">                    throw new IllegalArgumentException(</span>
                         &quot;case diagnostic counters are outside their ranges&quot;);
                 }
-<span class="fc bfc" id="L873" title="All 2 branches covered.">                boolean hasLoss = firstLossIndex != null;</span>
-<span class="pc bpc" id="L874" title="1 of 2 branches missed.">                if (WITNESS_PREFIX_LOST.equals(status) != hasLoss) {</span>
-<span class="nc" id="L875">                    throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">                boolean hasLoss = firstLossIndex != null;</span>
+<span class="pc bpc" id="L883" title="1 of 2 branches missed.">                if (WITNESS_PREFIX_LOST.equals(status) != hasLoss) {</span>
+<span class="nc" id="L884">                    throw new IllegalArgumentException(</span>
                         &quot;first loss must exist exactly for WITNESS_PREFIX_LOST&quot;);
                 }
-<span class="fc bfc" id="L878" title="All 2 branches covered.">                if (hasLoss) {</span>
-<span class="pc bpc" id="L879" title="1 of 2 branches missed.">                    if (firstLossIndex &lt; 0) {</span>
-<span class="nc" id="L880">                        throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L887" title="All 2 branches covered.">                if (hasLoss) {</span>
+<span class="pc bpc" id="L888" title="1 of 2 branches missed.">                    if (firstLossIndex &lt; 0) {</span>
+<span class="nc" id="L889">                        throw new IllegalArgumentException(</span>
                             &quot;loss index must not be negative&quot;);
                     }
-<span class="fc" id="L883">                    requireText(</span>
+<span class="fc" id="L892">                    requireText(</span>
                         firstLossExpressionBefore,
                         &quot;firstLossExpressionBefore&quot;);
-<span class="fc" id="L886">                    requireText(</span>
+<span class="fc" id="L895">                    requireText(</span>
                         firstLossExpressionAfter,
                         &quot;firstLossExpressionAfter&quot;);
-<span class="fc" id="L889">                    requireText(firstLossRuleId, &quot;firstLossRuleId&quot;);</span>
-<span class="fc" id="L890">                    requireMember(</span>
+<span class="fc" id="L898">                    requireText(firstLossRuleId, &quot;firstLossRuleId&quot;);</span>
+<span class="fc" id="L899">                    requireMember(</span>
                         firstLossReason, LOSS_REASONS, &quot;firstLossReason&quot;);
                 }
-<span class="fc" id="L893">            }</span>
+<span class="fc" id="L902">            }</span>
 
             static CaseDiagnostic withoutLoss(
                 String id,
@@ -904,7 +913,7 @@ public interface DiscoveryExperimentRunner {
                 long generatedTransformations,
                 String detail
             ) {
-<span class="fc" id="L907">                return new CaseDiagnostic(</span>
+<span class="fc" id="L916">                return new CaseDiagnostic(</span>
                     id, status, oracleStatus, witnessStepCount,
                     exploredPrefixLength, terminalStatus, exploredStates,
                     engineCalls, generatedTransformations, null, null, null,
@@ -917,10 +926,10 @@ public interface DiscoveryExperimentRunner {
                 String oracleStatus,
                 SearchEvidence scalar
             ) {
-<span class="fc" id="L920">                return withoutLoss(</span>
+<span class="fc" id="L929">                return withoutLoss(</span>
                     id, status, oracleStatus, 0, 0, &quot;NOT_EVALUATED&quot;,
-<span class="fc" id="L922">                    scalar.exploredStates(), scalar.engineCalls(),</span>
-<span class="fc" id="L923">                    scalar.generatedTransformations(),</span>
+<span class="fc" id="L931">                    scalar.exploredStates(), scalar.engineCalls(),</span>
+<span class="fc" id="L932">                    scalar.generatedTransformations(),</span>
                     &quot;no target-aware production witness is available for &quot;
                         + &quot;prefix diagnosis&quot;);
             }
@@ -931,7 +940,7 @@ public interface DiscoveryExperimentRunner {
             AtlasReport atlas,
             List&lt;CaseDiagnostic&gt; cases
         ) {
-<span class="fc" id="L934">            return sha256(renderReport(corpus, atlas, cases, null));</span>
+<span class="fc" id="L943">            return sha256(renderReport(corpus, atlas, cases, null));</span>
         }
 
         private static String renderReport(
@@ -940,115 +949,115 @@ public interface DiscoveryExperimentRunner {
             List&lt;CaseDiagnostic&gt; cases,
             String contentHash
         ) {
-<span class="fc" id="L943">            Map&lt;String, Integer&gt; statusCounts = countValues(</span>
-<span class="fc" id="L944">                cases.stream().map(CaseDiagnostic::status).toList());</span>
-<span class="fc" id="L945">            Map&lt;String, Integer&gt; firstLossCounts = countValues(cases.stream()</span>
-<span class="fc" id="L946">                .map(CaseDiagnostic::firstLossReason)</span>
-<span class="fc" id="L947">                .filter(Objects::nonNull)</span>
-<span class="fc" id="L948">                .toList());</span>
-<span class="fc" id="L949">            JsonWriter writer = new JsonWriter().beginObject();</span>
-<span class="fc" id="L950">            writer.property(&quot;schema&quot;, SCHEMA);</span>
-<span class="fc" id="L951">            writer.property(&quot;evidenceStatus&quot;, EVIDENCE_STATUS);</span>
-<span class="fc" id="L952">            writer.property(&quot;corpusSchema&quot;, HistoricalRediscoveryCorpus.SCHEMA);</span>
-<span class="fc" id="L953">            writer.property(&quot;corpusSha256&quot;, corpus.contentSha256());</span>
-<span class="fc" id="L954">            writer.property(&quot;atlasSchema&quot;, HistoricalRediscoveryAtlas.SCHEMA);</span>
-<span class="fc" id="L955">            writer.property(&quot;atlasSha256&quot;, sha256(atlas.toJson()));</span>
-<span class="fc" id="L956">            writer.property(&quot;inventoryRevision&quot;, corpus.inventoryRevision());</span>
-<span class="fc" id="L957">            writer.property(&quot;searchPolicy&quot;, SEARCH_POLICY);</span>
-<span class="fc" id="L958">            writer.property(&quot;claimBoundary&quot;, CLAIM_BOUNDARY);</span>
-<span class="fc" id="L959">            writer.array(&quot;cases&quot;, array -&gt; cases.forEach(value -&gt;</span>
-<span class="fc" id="L960">                array.objectValue(object -&gt; writeCase(object, value))));</span>
-<span class="fc" id="L961">            writer.object(&quot;summary&quot;, summary -&gt; {</span>
-<span class="fc" id="L962">                summary.property(&quot;caseCount&quot;, cases.size());</span>
-<span class="fc" id="L963">                summary.object(&quot;statusCounts&quot;, counts -&gt;</span>
-<span class="fc" id="L964">                    writeCounts(counts, statusCounts));</span>
-<span class="fc" id="L965">                summary.object(&quot;firstLossCounts&quot;, counts -&gt;</span>
-<span class="fc" id="L966">                    writeCounts(counts, firstLossCounts));</span>
-<span class="fc" id="L967">            });</span>
-<span class="fc bfc" id="L968" title="All 2 branches covered.">            if (contentHash != null) {</span>
-<span class="fc" id="L969">                writer.property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L952">            Map&lt;String, Integer&gt; statusCounts = countValues(</span>
+<span class="fc" id="L953">                cases.stream().map(CaseDiagnostic::status).toList());</span>
+<span class="fc" id="L954">            Map&lt;String, Integer&gt; firstLossCounts = countValues(cases.stream()</span>
+<span class="fc" id="L955">                .map(CaseDiagnostic::firstLossReason)</span>
+<span class="fc" id="L956">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L957">                .toList());</span>
+<span class="fc" id="L958">            JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L959">            writer.property(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L960">            writer.property(&quot;evidenceStatus&quot;, EVIDENCE_STATUS);</span>
+<span class="fc" id="L961">            writer.property(&quot;corpusSchema&quot;, HistoricalRediscoveryCorpus.SCHEMA);</span>
+<span class="fc" id="L962">            writer.property(&quot;corpusSha256&quot;, corpus.contentSha256());</span>
+<span class="fc" id="L963">            writer.property(&quot;atlasSchema&quot;, HistoricalRediscoveryAtlas.SCHEMA);</span>
+<span class="fc" id="L964">            writer.property(&quot;atlasSha256&quot;, sha256(atlas.toJson()));</span>
+<span class="fc" id="L965">            writer.property(&quot;inventoryRevision&quot;, corpus.inventoryRevision());</span>
+<span class="fc" id="L966">            writer.property(&quot;searchPolicy&quot;, SEARCH_POLICY);</span>
+<span class="fc" id="L967">            writer.property(&quot;claimBoundary&quot;, CLAIM_BOUNDARY);</span>
+<span class="fc" id="L968">            writer.array(&quot;cases&quot;, array -&gt; cases.forEach(value -&gt;</span>
+<span class="fc" id="L969">                array.objectValue(object -&gt; writeCase(object, value))));</span>
+<span class="fc" id="L970">            writer.object(&quot;summary&quot;, summary -&gt; {</span>
+<span class="fc" id="L971">                summary.property(&quot;caseCount&quot;, cases.size());</span>
+<span class="fc" id="L972">                summary.object(&quot;statusCounts&quot;, counts -&gt;</span>
+<span class="fc" id="L973">                    writeCounts(counts, statusCounts));</span>
+<span class="fc" id="L974">                summary.object(&quot;firstLossCounts&quot;, counts -&gt;</span>
+<span class="fc" id="L975">                    writeCounts(counts, firstLossCounts));</span>
+<span class="fc" id="L976">            });</span>
+<span class="fc bfc" id="L977" title="All 2 branches covered.">            if (contentHash != null) {</span>
+<span class="fc" id="L978">                writer.property(&quot;contentHash&quot;, contentHash);</span>
             }
-<span class="fc" id="L971">            return writer.endObject().toString();</span>
+<span class="fc" id="L980">            return writer.endObject().toString();</span>
         }
 
         private static void writeCase(
             JsonWriter writer,
             CaseDiagnostic value
         ) {
-<span class="fc" id="L978">            writer.property(&quot;id&quot;, value.id());</span>
-<span class="fc" id="L979">            writer.property(&quot;status&quot;, value.status());</span>
-<span class="fc" id="L980">            writer.property(&quot;oracleStatus&quot;, value.oracleStatus());</span>
-<span class="fc" id="L981">            writer.property(&quot;witnessStepCount&quot;, value.witnessStepCount());</span>
-<span class="fc" id="L982">            writer.property(</span>
-<span class="fc" id="L983">                &quot;exploredPrefixLength&quot;, value.exploredPrefixLength());</span>
-<span class="fc" id="L984">            writer.property(</span>
-<span class="fc" id="L985">                &quot;searchTerminalStatus&quot;, value.searchTerminalStatus());</span>
-<span class="fc" id="L986">            writer.property(</span>
-<span class="fc" id="L987">                &quot;searchExploredStates&quot;, value.searchExploredStates());</span>
-<span class="fc" id="L988">            writer.property(&quot;engineCalls&quot;, value.engineCalls());</span>
-<span class="fc" id="L989">            writer.property(</span>
-<span class="fc" id="L990">                &quot;generatedTransformations&quot;, value.generatedTransformations());</span>
-<span class="fc bfc" id="L991" title="All 2 branches covered.">            if (value.firstLossIndex() == null) {</span>
-<span class="fc" id="L992">                writer.nullProperty(&quot;firstLoss&quot;);</span>
+<span class="fc" id="L987">            writer.property(&quot;id&quot;, value.id());</span>
+<span class="fc" id="L988">            writer.property(&quot;status&quot;, value.status());</span>
+<span class="fc" id="L989">            writer.property(&quot;oracleStatus&quot;, value.oracleStatus());</span>
+<span class="fc" id="L990">            writer.property(&quot;witnessStepCount&quot;, value.witnessStepCount());</span>
+<span class="fc" id="L991">            writer.property(</span>
+<span class="fc" id="L992">                &quot;exploredPrefixLength&quot;, value.exploredPrefixLength());</span>
+<span class="fc" id="L993">            writer.property(</span>
+<span class="fc" id="L994">                &quot;searchTerminalStatus&quot;, value.searchTerminalStatus());</span>
+<span class="fc" id="L995">            writer.property(</span>
+<span class="fc" id="L996">                &quot;searchExploredStates&quot;, value.searchExploredStates());</span>
+<span class="fc" id="L997">            writer.property(&quot;engineCalls&quot;, value.engineCalls());</span>
+<span class="fc" id="L998">            writer.property(</span>
+<span class="fc" id="L999">                &quot;generatedTransformations&quot;, value.generatedTransformations());</span>
+<span class="fc bfc" id="L1000" title="All 2 branches covered.">            if (value.firstLossIndex() == null) {</span>
+<span class="fc" id="L1001">                writer.nullProperty(&quot;firstLoss&quot;);</span>
             } else {
-<span class="fc" id="L994">                writer.object(&quot;firstLoss&quot;, object -&gt; writeLoss(object, value));</span>
+<span class="fc" id="L1003">                writer.object(&quot;firstLoss&quot;, object -&gt; writeLoss(object, value));</span>
             }
-<span class="fc" id="L996">            writer.property(&quot;detail&quot;, value.detail());</span>
-<span class="fc" id="L997">        }</span>
+<span class="fc" id="L1005">            writer.property(&quot;detail&quot;, value.detail());</span>
+<span class="fc" id="L1006">        }</span>
 
         private static void writeLoss(
             JsonWriter writer,
             CaseDiagnostic value
         ) {
-<span class="fc" id="L1003">            writer.property(&quot;index&quot;, value.firstLossIndex());</span>
-<span class="fc" id="L1004">            writer.property(</span>
-<span class="fc" id="L1005">                &quot;expressionBefore&quot;, value.firstLossExpressionBefore());</span>
-<span class="fc" id="L1006">            writer.property(</span>
-<span class="fc" id="L1007">                &quot;expressionAfter&quot;, value.firstLossExpressionAfter());</span>
-<span class="fc" id="L1008">            writer.property(&quot;ruleId&quot;, value.firstLossRuleId());</span>
-<span class="fc" id="L1009">            writer.property(&quot;reason&quot;, value.firstLossReason());</span>
-<span class="pc bpc" id="L1010" title="1 of 2 branches missed.">            if (value.firstLossEvent() == null) {</span>
-<span class="nc" id="L1011">                writer.nullProperty(&quot;event&quot;);</span>
+<span class="fc" id="L1012">            writer.property(&quot;index&quot;, value.firstLossIndex());</span>
+<span class="fc" id="L1013">            writer.property(</span>
+<span class="fc" id="L1014">                &quot;expressionBefore&quot;, value.firstLossExpressionBefore());</span>
+<span class="fc" id="L1015">            writer.property(</span>
+<span class="fc" id="L1016">                &quot;expressionAfter&quot;, value.firstLossExpressionAfter());</span>
+<span class="fc" id="L1017">            writer.property(&quot;ruleId&quot;, value.firstLossRuleId());</span>
+<span class="fc" id="L1018">            writer.property(&quot;reason&quot;, value.firstLossReason());</span>
+<span class="pc bpc" id="L1019" title="1 of 2 branches missed.">            if (value.firstLossEvent() == null) {</span>
+<span class="nc" id="L1020">                writer.nullProperty(&quot;event&quot;);</span>
             } else {
-<span class="fc" id="L1013">                writer.object(&quot;event&quot;, object -&gt;</span>
-<span class="fc" id="L1014">                    writeEvent(object, value.firstLossEvent()));</span>
+<span class="fc" id="L1022">                writer.object(&quot;event&quot;, object -&gt;</span>
+<span class="fc" id="L1023">                    writeEvent(object, value.firstLossEvent()));</span>
             }
-<span class="fc" id="L1016">            writer.property(&quot;detail&quot;, value.firstLossDetail());</span>
-<span class="fc" id="L1017">        }</span>
+<span class="fc" id="L1025">            writer.property(&quot;detail&quot;, value.firstLossDetail());</span>
+<span class="fc" id="L1026">        }</span>
 
         private static void writeEvent(JsonWriter writer, SearchEvent value) {
-<span class="fc" id="L1020">            writer.property(&quot;type&quot;, value.type().name());</span>
-<span class="fc" id="L1021">            writer.property(&quot;sequence&quot;, value.sequence());</span>
-<span class="fc" id="L1022">            writer.property(&quot;depth&quot;, value.depth());</span>
-<span class="fc" id="L1023">            writer.property(&quot;score&quot;, value.score());</span>
-<span class="fc" id="L1024">            writer.property(&quot;frontierSize&quot;, value.frontierSize());</span>
-<span class="fc" id="L1025">            writer.property(&quot;visitedCount&quot;, value.visitedCount());</span>
-<span class="fc" id="L1026">            writer.property(&quot;generatedCount&quot;, value.generatedCount());</span>
-<span class="fc" id="L1027">            writer.property(&quot;pruningReason&quot;, value.pruningReason());</span>
-<span class="fc" id="L1028">        }</span>
+<span class="fc" id="L1029">            writer.property(&quot;type&quot;, value.type().name());</span>
+<span class="fc" id="L1030">            writer.property(&quot;sequence&quot;, value.sequence());</span>
+<span class="fc" id="L1031">            writer.property(&quot;depth&quot;, value.depth());</span>
+<span class="fc" id="L1032">            writer.property(&quot;score&quot;, value.score());</span>
+<span class="fc" id="L1033">            writer.property(&quot;frontierSize&quot;, value.frontierSize());</span>
+<span class="fc" id="L1034">            writer.property(&quot;visitedCount&quot;, value.visitedCount());</span>
+<span class="fc" id="L1035">            writer.property(&quot;generatedCount&quot;, value.generatedCount());</span>
+<span class="fc" id="L1036">            writer.property(&quot;pruningReason&quot;, value.pruningReason());</span>
+<span class="fc" id="L1037">        }</span>
 
         private static Map&lt;String, Integer&gt; countValues(List&lt;String&gt; values) {
-<span class="fc" id="L1031">            Map&lt;String, Integer&gt; counts = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L1032">            values.forEach(value -&gt; counts.merge(value, 1, Integer::sum));</span>
-<span class="fc" id="L1033">            return Map.copyOf(counts);</span>
+<span class="fc" id="L1040">            Map&lt;String, Integer&gt; counts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L1041">            values.forEach(value -&gt; counts.merge(value, 1, Integer::sum));</span>
+<span class="fc" id="L1042">            return Map.copyOf(counts);</span>
         }
 
         private static void writeCounts(
             JsonWriter writer,
             Map&lt;String, Integer&gt; counts
         ) {
-<span class="fc" id="L1040">            counts.entrySet().stream()</span>
-<span class="fc" id="L1041">                .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L1042">                .forEach(entry -&gt; writer.property(</span>
-<span class="fc" id="L1043">                    entry.getKey(), entry.getValue()));</span>
-<span class="fc" id="L1044">        }</span>
+<span class="fc" id="L1049">            counts.entrySet().stream()</span>
+<span class="fc" id="L1050">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L1051">                .forEach(entry -&gt; writer.property(</span>
+<span class="fc" id="L1052">                    entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L1053">        }</span>
 
         private static String requireText(String value, String label) {
-<span class="pc bpc" id="L1047" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L1048">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L1056" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L1057">                throw new IllegalArgumentException(</span>
                     label + &quot; must not be blank&quot;);
             }
-<span class="fc" id="L1051">            return value;</span>
+<span class="fc" id="L1060">            return value;</span>
         }
 
         private static String requireMember(
@@ -1056,23 +1065,23 @@ public interface DiscoveryExperimentRunner {
             Set&lt;String&gt; allowed,
             String label
         ) {
-<span class="pc bpc" id="L1059" title="1 of 2 branches missed.">            if (!allowed.contains(value)) {</span>
-<span class="nc" id="L1060">                throw new IllegalArgumentException(label + &quot; is unsupported&quot;);</span>
+<span class="pc bpc" id="L1068" title="1 of 2 branches missed.">            if (!allowed.contains(value)) {</span>
+<span class="nc" id="L1069">                throw new IllegalArgumentException(label + &quot; is unsupported&quot;);</span>
             }
-<span class="fc" id="L1062">            return value;</span>
+<span class="fc" id="L1071">            return value;</span>
         }
 
         private static String sha256(String value) {
             try {
-<span class="fc" id="L1067">                return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
-<span class="fc" id="L1068">                    MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
-<span class="fc" id="L1069">                        value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L1070">            } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L1071">                throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L1076">                return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L1077">                    MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L1078">                        value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L1079">            } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L1080">                throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
             }
         }
 
-<span class="fc" id="L1075">        private record ParentOutcome(</span>
+<span class="fc" id="L1084">        private record ParentOutcome(</span>
             SearchEventType type,
             String reason,
             String detail
@@ -1085,24 +1094,24 @@ public interface DiscoveryExperimentRunner {
             private int calls;
             private long generated;
 
-<span class="fc" id="L1088">            private CountingEngine(TransformationEngine delegate) {</span>
-<span class="fc" id="L1089">                this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
-<span class="fc" id="L1090">            }</span>
+<span class="fc" id="L1097">            private CountingEngine(TransformationEngine delegate) {</span>
+<span class="fc" id="L1098">                this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L1099">            }</span>
 
             @Override
             public List&lt;Transformation&gt; transform(String expression) {
-<span class="fc" id="L1094">                calls++;</span>
-<span class="fc" id="L1095">                List&lt;Transformation&gt; result = delegate.transform(expression);</span>
-<span class="fc" id="L1096">                generated += result.size();</span>
-<span class="fc" id="L1097">                return result;</span>
+<span class="fc" id="L1103">                calls++;</span>
+<span class="fc" id="L1104">                List&lt;Transformation&gt; result = delegate.transform(expression);</span>
+<span class="fc" id="L1105">                generated += result.size();</span>
+<span class="fc" id="L1106">                return result;</span>
             }
 
             private int calls() {
-<span class="fc" id="L1101">                return calls;</span>
+<span class="fc" id="L1110">                return calls;</span>
             }
 
             private long generated() {
-<span class="fc" id="L1105">                return generated;</span>
+<span class="fc" id="L1114">                return generated;</span>
             }
         }
     }

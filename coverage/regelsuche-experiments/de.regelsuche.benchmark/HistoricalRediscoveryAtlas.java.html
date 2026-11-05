@@ -59,111 +59,117 @@ import java.util.function.Supplier;
  */
 <span class="fc" id="L60">public final class HistoricalRediscoveryAtlas {</span>
     public static final String SCHEMA =
+        &quot;regelsuche.historical-rediscovery-atlas/v2&quot;;
+    public static final String LEGACY_SCHEMA =
         &quot;regelsuche.historical-rediscovery-atlas/v1&quot;;
 
-<span class="fc" id="L64">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L65">    private final ExpressionCanonicalizer canonicalizer =</span>
+<span class="fc" id="L66">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L67">    private final ExpressionCanonicalizer canonicalizer =</span>
         new ExpressionCanonicalizer();
-<span class="fc" id="L67">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
-<span class="fc" id="L68">    private final SymPyEquivalenceService equivalence =</span>
+<span class="fc" id="L69">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L70">    private final SymPyEquivalenceService equivalence =</span>
         new SymPyEquivalenceService();
+<span class="fc" id="L72">    private final HistoricalRediscoveryMatch matcher = new HistoricalRediscoveryMatch();</span>
 
     public AtlasReport run(Corpus corpus) {
-<span class="fc" id="L72">        Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
-<span class="fc" id="L73">        List&lt;CaseResult&gt; results = corpus.cases().stream()</span>
-<span class="fc" id="L74">            .sorted(Comparator.comparing(Case::id))</span>
-<span class="fc" id="L75">            .map(this::runCase)</span>
-<span class="fc" id="L76">            .toList();</span>
-<span class="fc" id="L77">        return new AtlasReport(</span>
+<span class="fc" id="L75">        Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
+<span class="fc" id="L76">        List&lt;CaseResult&gt; results = corpus.cases().stream()</span>
+<span class="fc" id="L77">            .sorted(Comparator.comparing(Case::id))</span>
+<span class="fc" id="L78">            .map(this::runCase)</span>
+<span class="fc" id="L79">            .toList();</span>
+<span class="fc" id="L80">        return new AtlasReport(</span>
             SCHEMA,
-<span class="fc" id="L79">            corpus.schema(),</span>
-<span class="fc" id="L80">            corpus.contentSha256(),</span>
-<span class="fc" id="L81">            corpus.inventoryRevision(),</span>
-<span class="fc" id="L82">            corpus.claimBoundary(),</span>
+<span class="fc" id="L82">            corpus.schema(),</span>
+<span class="fc" id="L83">            corpus.contentSha256(),</span>
+<span class="fc" id="L84">            corpus.inventoryRevision(),</span>
+<span class="fc" id="L85">            corpus.claimBoundary(),</span>
             results,
-<span class="fc" id="L84">            directionality(results),</span>
-<span class="fc" id="L85">            Assessment.derive(results)</span>
+<span class="fc" id="L87">            directionality(results),</span>
+<span class="fc" id="L88">            Assessment.derive(results)</span>
         );
     }
 
     public WrittenArtifacts write(Path directory, AtlasReport report) {
-<span class="fc" id="L90">        Objects.requireNonNull(directory, &quot;directory&quot;);</span>
-<span class="fc" id="L91">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L93">        Objects.requireNonNull(directory, &quot;directory&quot;);</span>
+<span class="fc" id="L94">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!SCHEMA.equals(report.schema())) {</span>
+<span class="fc" id="L96">            throw new IllegalArgumentException(&quot;historical atlas evaluation revision differs&quot;);</span>
+        }
         try {
-<span class="fc" id="L93">            Files.createDirectories(directory);</span>
-<span class="fc" id="L94">            Path json = directory.resolve(&quot;historical-rediscovery-atlas.json&quot;);</span>
-<span class="fc" id="L95">            Path markdown = directory.resolve(&quot;historical-rediscovery-atlas.md&quot;);</span>
-<span class="fc" id="L96">            Files.writeString(json, report.toJson(), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L97">            Files.writeString(markdown, report.toMarkdown(), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L98">            return new WrittenArtifacts(json, markdown);</span>
-<span class="nc" id="L99">        } catch (IOException exception) {</span>
-<span class="nc" id="L100">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L99">            Files.createDirectories(directory);</span>
+<span class="fc" id="L100">            Path json = directory.resolve(&quot;historical-rediscovery-atlas.json&quot;);</span>
+<span class="fc" id="L101">            Path markdown = directory.resolve(&quot;historical-rediscovery-atlas.md&quot;);</span>
+<span class="fc" id="L102">            Files.writeString(json, report.toJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L103">            Files.writeString(markdown, report.toMarkdown(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L104">            return new WrittenArtifacts(json, markdown);</span>
+<span class="nc" id="L105">        } catch (IOException exception) {</span>
+<span class="nc" id="L106">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     private CaseResult runCase(Case benchmarkCase) {
-<span class="fc" id="L105">        RepresentationEvidence representation = represent(benchmarkCase);</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!representation.supported()) {</span>
-<span class="nc" id="L107">            String detail = &quot;representation unsupported&quot;;</span>
-<span class="nc" id="L108">            return new CaseResult(</span>
+<span class="fc" id="L111">        RepresentationEvidence representation = represent(benchmarkCase);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (!representation.supported()) {</span>
+<span class="nc" id="L113">            String detail = &quot;representation unsupported&quot;;</span>
+<span class="nc" id="L114">            return new CaseResult(</span>
                 benchmarkCase,
                 representation,
-<span class="nc" id="L111">                EquivalenceEvidence.notEvaluated(),</span>
-<span class="nc" id="L112">                EngineEvidence.notEvaluated(</span>
+<span class="nc" id="L117">                EquivalenceEvidence.notEvaluated(),</span>
+<span class="nc" id="L118">                EngineEvidence.notEvaluated(</span>
                     EngineProfile.PRODUCTION_PRIMITIVES, detail),
-<span class="nc" id="L114">                EngineEvidence.notEvaluated(</span>
+<span class="nc" id="L120">                EngineEvidence.notEvaluated(</span>
                     EngineProfile.GENERIC_HYPOTHESIS_BRIDGE, detail),
-<span class="nc" id="L116">                EngineEvidence.notEvaluated(</span>
+<span class="nc" id="L122">                EngineEvidence.notEvaluated(</span>
                     EngineProfile.CURATED_RECOGNITION_CONTROL, detail),
                 PrimaryStatus.REPRESENTATION_UNSUPPORTED
             );
         }
 
-<span class="fc" id="L122">        EquivalenceEvidence equivalenceEvidence = new EquivalenceEvidence(</span>
+<span class="fc" id="L128">        EquivalenceEvidence equivalenceEvidence = new EquivalenceEvidence(</span>
             true,
-<span class="fc" id="L124">            equivalence.areEquivalent(</span>
-<span class="fc" id="L125">                representation.formattedSource(),</span>
-<span class="fc" id="L126">                representation.formattedTarget()),</span>
-<span class="fc" id="L127">            equivalence.evidence(</span>
-<span class="fc" id="L128">                representation.formattedSource(),</span>
-<span class="fc" id="L129">                representation.formattedTarget())</span>
+<span class="fc" id="L130">            equivalence.areEquivalent(</span>
+<span class="fc" id="L131">                representation.formattedSource(),</span>
+<span class="fc" id="L132">                representation.formattedTarget()),</span>
+<span class="fc" id="L133">            equivalence.evidence(</span>
+<span class="fc" id="L134">                representation.formattedSource(),</span>
+<span class="fc" id="L135">                representation.formattedTarget())</span>
         );
-<span class="fc" id="L131">        EngineEvidence production = runEngine(</span>
+<span class="fc" id="L137">        EngineEvidence production = runEngine(</span>
             benchmarkCase,
             representation,
             EngineProfile.PRODUCTION_PRIMITIVES,
-<span class="fc" id="L135">            () -&gt; productionEngine(benchmarkCase),</span>
+<span class="fc" id="L141">            () -&gt; productionEngine(benchmarkCase),</span>
             true
         );
-<span class="fc" id="L138">        EngineEvidence genericBridge = benchmarkCase.diagnosticPurpose()</span>
-<span class="fc bfc" id="L139" title="All 2 branches covered.">                .equals(&quot;GENERIC_HYPOTHESIS_BRIDGE&quot;)</span>
-<span class="fc" id="L140">            ? runEngine(</span>
+<span class="fc" id="L144">        EngineEvidence genericBridge = benchmarkCase.diagnosticPurpose()</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                .equals(&quot;GENERIC_HYPOTHESIS_BRIDGE&quot;)</span>
+<span class="fc" id="L146">            ? runEngine(</span>
                 benchmarkCase,
                 representation,
                 EngineProfile.GENERIC_HYPOTHESIS_BRIDGE,
-<span class="fc" id="L144">                () -&gt; hypothesisEngine(benchmarkCase),</span>
+<span class="fc" id="L150">                () -&gt; hypothesisEngine(benchmarkCase),</span>
                 true)
-<span class="fc" id="L146">            : EngineEvidence.notApplicable(</span>
+<span class="fc" id="L152">            : EngineEvidence.notApplicable(</span>
                 EngineProfile.GENERIC_HYPOTHESIS_BRIDGE);
-<span class="fc" id="L148">        EngineEvidence curatedControl = benchmarkCase.family()</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">                .equals(&quot;COMPLETING_THE_SQUARE&quot;)</span>
-<span class="fc" id="L150">            ? runEngine(</span>
+<span class="fc" id="L154">        EngineEvidence curatedControl = benchmarkCase.family()</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                .equals(&quot;COMPLETING_THE_SQUARE&quot;)</span>
+<span class="fc" id="L156">            ? runEngine(</span>
                 benchmarkCase,
                 representation,
                 EngineProfile.CURATED_RECOGNITION_CONTROL,
-<span class="fc" id="L154">                () -&gt; curatedControlEngine(benchmarkCase),</span>
+<span class="fc" id="L160">                () -&gt; curatedControlEngine(benchmarkCase),</span>
                 false)
-<span class="fc" id="L156">            : EngineEvidence.notApplicable(</span>
+<span class="fc" id="L162">            : EngineEvidence.notApplicable(</span>
                 EngineProfile.CURATED_RECOGNITION_CONTROL);
 
-<span class="fc" id="L159">        return new CaseResult(</span>
+<span class="fc" id="L165">        return new CaseResult(</span>
             benchmarkCase,
             representation,
             equivalenceEvidence,
             production,
             genericBridge,
             curatedControl,
-<span class="fc" id="L166">            classify(</span>
+<span class="fc" id="L172">            classify(</span>
                 benchmarkCase,
                 equivalenceEvidence,
                 production,
@@ -174,18 +180,18 @@ import java.util.function.Supplier;
 
     private RepresentationEvidence represent(Case benchmarkCase) {
         try {
-<span class="fc" id="L177">            return new RepresentationEvidence(</span>
+<span class="fc" id="L183">            return new RepresentationEvidence(</span>
                 true,
-<span class="fc" id="L179">                format(benchmarkCase.source()),</span>
-<span class="fc" id="L180">                format(benchmarkCase.target()),</span>
+<span class="fc" id="L185">                format(benchmarkCase.source()),</span>
+<span class="fc" id="L186">                format(benchmarkCase.target()),</span>
                 &quot;&quot;
             );
-<span class="nc" id="L183">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L184">            return new RepresentationEvidence(</span>
+<span class="nc" id="L189">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L190">            return new RepresentationEvidence(</span>
                 false,
                 &quot;&quot;,
                 &quot;&quot;,
-<span class="nc" id="L188">                safeMessage(exception)</span>
+<span class="nc" id="L194">                safeMessage(exception)</span>
             );
         }
     }
@@ -197,14 +203,14 @@ import java.util.function.Supplier;
         Supplier&lt;TransformationEngine&gt; engineFactory,
         boolean runSearchControls
     ) {
-<span class="fc" id="L200">        OracleEvidence oracle = runOracle(</span>
+<span class="fc" id="L206">        OracleEvidence oracle = runOracle(</span>
             benchmarkCase,
             representation,
-<span class="fc" id="L203">            engineFactory.get());</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (!runSearchControls) {</span>
-<span class="fc" id="L205">            SearchEvidence omitted = SearchEvidence.notEvaluated(</span>
+<span class="fc" id="L209">            engineFactory.get());</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (!runSearchControls) {</span>
+<span class="fc" id="L211">            SearchEvidence omitted = SearchEvidence.notEvaluated(</span>
                 &quot;curated oracle control only&quot;);
-<span class="fc" id="L207">            return new EngineEvidence(</span>
+<span class="fc" id="L213">            return new EngineEvidence(</span>
                 profile,
                 EvidenceExecution.EXECUTED,
                 &quot;&quot;,
@@ -214,23 +220,23 @@ import java.util.function.Supplier;
                 omitted
             );
         }
-<span class="fc" id="L217">        return new EngineEvidence(</span>
+<span class="fc" id="L223">        return new EngineEvidence(</span>
             profile,
             EvidenceExecution.EXECUTED,
             &quot;&quot;,
             oracle,
-<span class="fc" id="L222">            runScalarSearch(</span>
+<span class="fc" id="L228">            runScalarSearch(</span>
                 benchmarkCase,
                 representation,
-<span class="fc" id="L225">                engineFactory.get()),</span>
-<span class="fc" id="L226">            runGuidedSearch(</span>
+<span class="fc" id="L231">                engineFactory.get()),</span>
+<span class="fc" id="L232">            runGuidedSearch(</span>
                 benchmarkCase,
                 representation,
-<span class="fc" id="L229">                engineFactory.get()),</span>
-<span class="fc" id="L230">            runDiversitySearch(</span>
+<span class="fc" id="L235">                engineFactory.get()),</span>
+<span class="fc" id="L236">            runDiversitySearch(</span>
                 benchmarkCase,
                 representation,
-<span class="fc" id="L233">                engineFactory.get())</span>
+<span class="fc" id="L239">                engineFactory.get())</span>
         );
     }
 
@@ -239,31 +245,33 @@ import java.util.function.Supplier;
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
-<span class="fc" id="L242">        BoundedRewriteReachabilityOracle.Result result =</span>
-            new BoundedRewriteReachabilityOracle(engine, this::format)
-<span class="fc" id="L244">                .search(</span>
-<span class="fc" id="L245">                    representation.formattedSource(),</span>
-<span class="fc" id="L246">                    representation.formattedTarget(),</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        var oracle = benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT</span>
+<span class="fc" id="L249">            ? new BoundedRewriteReachabilityOracle(engine, this::format, matcher::sameRepresentation)</span>
+<span class="fc" id="L250">            : new BoundedRewriteReachabilityOracle(engine, this::format);</span>
+<span class="fc" id="L251">        BoundedRewriteReachabilityOracle.Result result =</span>
+<span class="fc" id="L252">            oracle.search(</span>
+<span class="fc" id="L253">                    representation.formattedSource(),</span>
+<span class="fc" id="L254">                    representation.formattedTarget(),</span>
                     new BoundedRewriteReachabilityOracle.Budget(
-<span class="fc" id="L248">                        benchmarkCase.oracleMaxDepth(),</span>
-<span class="fc" id="L249">                        benchmarkCase.oracleMaxVisitedStates()));</span>
-<span class="fc" id="L250">        return new OracleEvidence(</span>
+<span class="fc" id="L256">                        benchmarkCase.oracleMaxDepth(),</span>
+<span class="fc" id="L257">                        benchmarkCase.oracleMaxVisitedStates()));</span>
+<span class="fc" id="L258">        return new OracleEvidence(</span>
             EvidenceExecution.EXECUTED,
-<span class="fc" id="L252">            result.status().name(),</span>
-<span class="fc" id="L253">            result.witness().stream()</span>
-<span class="fc" id="L254">                .map(BoundedRewriteReachabilityOracle.Step::expressionAfter)</span>
-<span class="fc" id="L255">                .toList(),</span>
-<span class="fc" id="L256">            result.witness().stream()</span>
-<span class="fc" id="L257">                .map(BoundedRewriteReachabilityOracle.Step::rule)</span>
-<span class="fc" id="L258">                .toList(),</span>
-<span class="fc" id="L259">            result.witness().stream()</span>
-<span class="fc" id="L260">                .mapToInt(BoundedRewriteReachabilityOracle.Step::primitiveStepCount)</span>
-<span class="fc" id="L261">                .sum(),</span>
-<span class="fc" id="L262">            result.visitedStates(),</span>
-<span class="fc" id="L263">            result.generatedTransitions(),</span>
-<span class="fc" id="L264">            result.maximumDepthReached(),</span>
-<span class="fc" id="L265">            result.depthLimitReached(),</span>
-<span class="fc" id="L266">            result.stateLimitReached(),</span>
+<span class="fc" id="L260">            result.status().name(),</span>
+<span class="fc" id="L261">            result.witness().stream()</span>
+<span class="fc" id="L262">                .map(BoundedRewriteReachabilityOracle.Step::expressionAfter)</span>
+<span class="fc" id="L263">                .toList(),</span>
+<span class="fc" id="L264">            result.witness().stream()</span>
+<span class="fc" id="L265">                .map(BoundedRewriteReachabilityOracle.Step::rule)</span>
+<span class="fc" id="L266">                .toList(),</span>
+<span class="fc" id="L267">            result.witness().stream()</span>
+<span class="fc" id="L268">                .mapToInt(BoundedRewriteReachabilityOracle.Step::primitiveStepCount)</span>
+<span class="fc" id="L269">                .sum(),</span>
+<span class="fc" id="L270">            result.visitedStates(),</span>
+<span class="fc" id="L271">            result.generatedTransitions(),</span>
+<span class="fc" id="L272">            result.maximumDepthReached(),</span>
+<span class="fc" id="L273">            result.depthLimitReached(),</span>
+<span class="fc" id="L274">            result.stateLimitReached(),</span>
             &quot;&quot;
         );
     }
@@ -273,21 +281,23 @@ import java.util.function.Supplier;
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
-<span class="fc" id="L276">        CountingEngine counting = new CountingEngine(engine);</span>
-<span class="fc" id="L277">        GoalSearchResult result = new BestFirstSearchStrategy()</span>
-<span class="fc" id="L278">            .searchWithDiagnostics(searchProblem(</span>
+<span class="fc" id="L284">        CountingEngine counting = new CountingEngine(engine);</span>
+<span class="fc" id="L285">        GoalSearchResult result = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L286">            .searchWithDiagnostics(searchProblem(</span>
                 benchmarkCase,
-<span class="fc" id="L280">                representation.formattedSource(),</span>
+<span class="fc" id="L288">                representation.formattedSource(),</span>
                 counting));
-<span class="fc" id="L282">        Optional&lt;SearchState&gt; match = findMatch(</span>
+<span class="fc" id="L290">        Optional&lt;SearchState&gt; match = matcher.find(</span>
             benchmarkCase,
-<span class="fc" id="L284">            representation.formattedTarget(),</span>
-<span class="fc" id="L285">            result.states());</span>
-<span class="fc" id="L286">        return SearchEvidence.fromGoalResult(</span>
+<span class="fc" id="L292">            representation.formattedTarget(),</span>
+<span class="fc" id="L293">            result.states());</span>
+<span class="fc" id="L294">        return SearchEvidence.fromGoalResult(</span>
             &quot;SCALAR_BEST_FIRST_TARGET_BLIND&quot;,
             match,
             result,
-            counting
+            counting,
+<span class="fc" id="L299">            matchCriterion(benchmarkCase),</span>
+<span class="fc" id="L300">            result.status().name()</span>
         );
     }
 
@@ -296,19 +306,31 @@ import java.util.function.Supplier;
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
-<span class="fc" id="L299">        CountingEngine counting = new CountingEngine(engine);</span>
-<span class="fc" id="L300">        GoalSearchResult result = new BestFirstSearchStrategy()</span>
-<span class="fc" id="L301">            .searchWithDiagnostics(searchProblem(</span>
+<span class="fc" id="L309">        CountingEngine counting = new CountingEngine(engine);</span>
+<span class="fc" id="L310">        GoalSearchResult result = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L311">            .searchWithDiagnostics(searchProblem(</span>
                 benchmarkCase,
-<span class="fc" id="L303">                representation.formattedSource(),</span>
-<span class="fc" id="L304">                counting).withTarget(searchTarget(</span>
+<span class="fc" id="L313">                representation.formattedSource(),</span>
+<span class="fc" id="L314">                counting).withTarget(searchTarget(</span>
                     benchmarkCase,
-<span class="fc" id="L306">                    representation.formattedTarget())));</span>
-<span class="fc" id="L307">        return SearchEvidence.fromGoalResult(</span>
+<span class="fc" id="L316">                    representation.formattedTarget())));</span>
+<span class="fc" id="L317">        Optional&lt;SearchState&gt; match = Optional.ofNullable(result.reachedState())</span>
+<span class="fc" id="L318">            .flatMap(state -&gt; matcher.find(benchmarkCase, representation.formattedTarget(), List.of(state)));</span>
+<span class="fc" id="L319">        String terminal = result.status().name();</span>
+<span class="fc bfc" id="L320" title="All 4 branches covered.">        if (result.reachedState() != null &amp;&amp; match.isEmpty()) {</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            if (matcher.sourceAlreadyMatches(benchmarkCase, representation.formattedTarget())) {</span>
+<span class="fc" id="L322">                terminal = &quot;SOURCE_ALREADY_REPRESENTED&quot;;</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            } else if (benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT) {</span>
+<span class="nc" id="L324">                terminal = &quot;VALUE_REACHED_REPRESENTATION_MISMATCH&quot;;</span>
+            }
+        }
+<span class="fc" id="L327">        return SearchEvidence.fromGoalResult(</span>
             &quot;TARGET_GUIDED_BEST_FIRST_DIAGNOSTIC&quot;,
-<span class="fc" id="L309">            Optional.ofNullable(result.reachedState()),</span>
+            match,
             result,
-            counting
+            counting,
+<span class="fc" id="L332">            matchCriterion(benchmarkCase),</span>
+            terminal
         );
     }
 
@@ -317,20 +339,21 @@ import java.util.function.Supplier;
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
-<span class="fc" id="L320">        CountingEngine counting = new CountingEngine(engine);</span>
-<span class="fc" id="L321">        List&lt;SearchState&gt; states = new StructuralDiversitySearchStrategy()</span>
-<span class="fc" id="L322">            .search(searchProblem(</span>
+<span class="fc" id="L342">        CountingEngine counting = new CountingEngine(engine);</span>
+<span class="fc" id="L343">        List&lt;SearchState&gt; states = new StructuralDiversitySearchStrategy()</span>
+<span class="fc" id="L344">            .search(searchProblem(</span>
                 benchmarkCase,
-<span class="fc" id="L324">                representation.formattedSource(),</span>
+<span class="fc" id="L346">                representation.formattedSource(),</span>
                 counting));
-<span class="fc" id="L326">        return SearchEvidence.fromStates(</span>
+<span class="fc" id="L348">        return SearchEvidence.fromStates(</span>
             &quot;STRUCTURAL_DIVERSITY_TARGET_BLIND&quot;,
-<span class="fc" id="L328">            findMatch(</span>
+<span class="fc" id="L350">            matcher.find(</span>
                 benchmarkCase,
-<span class="fc" id="L330">                representation.formattedTarget(),</span>
+<span class="fc" id="L352">                representation.formattedTarget(),</span>
                 states),
             states,
-            counting
+            counting,
+<span class="fc" id="L356">            matchCriterion(benchmarkCase)</span>
         );
     }
 
@@ -339,53 +362,30 @@ import java.util.function.Supplier;
         String source,
         TransformationEngine engine
     ) {
-<span class="fc" id="L342">        return new SearchProblem(</span>
+<span class="fc" id="L365">        return new SearchProblem(</span>
             source,
             engine,
             scorer,
             canonicalizer,
             new SearchHeuristic(
-<span class="fc" id="L348">                benchmarkCase.searchMaxDepth(),</span>
-<span class="fc" id="L349">                benchmarkCase.searchMaxVisitedStates(),</span>
+<span class="fc" id="L371">                benchmarkCase.searchMaxDepth(),</span>
+<span class="fc" id="L372">                benchmarkCase.searchMaxVisitedStates(),</span>
                 1,
-<span class="fc" id="L351">                benchmarkCase.maxExpandingSteps(),</span>
-<span class="fc" id="L352">                benchmarkCase.maxCandidatesPerState(),</span>
-<span class="fc" id="L353">                benchmarkCase.beamWidth())</span>
+<span class="fc" id="L374">                benchmarkCase.maxExpandingSteps(),</span>
+<span class="fc" id="L375">                benchmarkCase.maxCandidatesPerState(),</span>
+<span class="fc" id="L376">                benchmarkCase.beamWidth())</span>
         );
     }
 
     private SearchTarget searchTarget(Case benchmarkCase, String target) {
-<span class="fc bfc" id="L358" title="All 2 branches covered.">        return benchmarkCase.targetRelation() == TargetRelation.SYNTAX_EXACT</span>
-<span class="fc" id="L359">            ? SearchTarget.syntaxExact(target)</span>
-<span class="fc" id="L360">            : SearchTarget.valueEquivalent(target);</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        return benchmarkCase.targetRelation() == TargetRelation.SYNTAX_EXACT</span>
+<span class="fc" id="L382">            ? SearchTarget.syntaxExact(target)</span>
+<span class="fc" id="L383">            : SearchTarget.valueEquivalent(target);</span>
     }
 
-    private Optional&lt;SearchState&gt; findMatch(
-        Case benchmarkCase,
-        String target,
-        List&lt;SearchState&gt; states
-    ) {
-<span class="fc" id="L368">        return states.stream()</span>
-<span class="fc" id="L369">            .filter(state -&gt; matches(</span>
-                benchmarkCase,
-<span class="fc" id="L371">                state.expression(),</span>
-                target))
-<span class="fc" id="L373">            .min(Comparator</span>
-<span class="fc" id="L374">                .comparingInt(SearchState::depth)</span>
-<span class="fc" id="L375">                .thenComparing(SearchState::expression)</span>
-<span class="fc" id="L376">                .thenComparing(state -&gt;</span>
-<span class="fc" id="L377">                    String.join(&quot;-&gt;&quot;, state.appliedRuleIds())));</span>
-    }
-
-    private boolean matches(Case benchmarkCase, String expression, String target) {
-<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (benchmarkCase.targetRelation() == TargetRelation.SYNTAX_EXACT) {</span>
-            try {
-<span class="fc" id="L383">                return format(expression).equals(target);</span>
-<span class="nc" id="L384">            } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L385">                return false;</span>
-            }
-        }
-<span class="fc" id="L388">        return equivalence.areEquivalent(expression, target);</span>
+    private static String matchCriterion(Case benchmarkCase) {
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        return benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT</span>
+<span class="fc" id="L388">            ? HistoricalRediscoveryMatch.REPRESENTATION_CRITERION : &quot;&quot;;</span>
     }
 
     private TransformationEngine productionEngine(Case benchmarkCase) {
@@ -456,73 +456,76 @@ import java.util.function.Supplier;
 <span class="nc" id="L456">                ? PrimaryStatus.CORRECTNESS_REGRESSION</span>
 <span class="fc" id="L457">                : PrimaryStatus.NEGATIVE_CONTROL_CONFIRMED;</span>
         }
-<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (!equivalenceEvidence.equivalent()) {</span>
-<span class="nc" id="L460">            return PrimaryStatus.EQUIVALENCE_NOT_CONFIRMED;</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        if (matcher.sourceAlreadyMatches(benchmarkCase, benchmarkCase.target())) {</span>
+<span class="fc" id="L460">            return PrimaryStatus.SOURCE_ALREADY_TARGET_REPRESENTATION;</span>
         }
-<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (production.oracle().reachable()) {</span>
-<span class="fc bfc" id="L463" title="All 2 branches covered.">            if (production.scalar().reached()) {</span>
-<span class="fc" id="L464">                return PrimaryStatus.REACHABLE_AND_SCALAR_FOUND;</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (!equivalenceEvidence.equivalent()) {</span>
+<span class="fc" id="L463">            return PrimaryStatus.EQUIVALENCE_NOT_CONFIRMED;</span>
+        }
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (production.oracle().reachable()) {</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            if (production.scalar().reached()) {</span>
+<span class="fc" id="L467">                return PrimaryStatus.REACHABLE_AND_SCALAR_FOUND;</span>
             }
-<span class="pc bpc" id="L466" title="1 of 2 branches missed.">            if (production.diversity().reached()) {</span>
-<span class="fc" id="L467">                return PrimaryStatus</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">            if (production.diversity().reached()) {</span>
+<span class="fc" id="L470">                return PrimaryStatus</span>
                     .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND;
             }
-<span class="nc bnc" id="L470" title="All 2 branches missed.">            if (production.guided().reached()) {</span>
-<span class="nc" id="L471">                return PrimaryStatus</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">            if (production.guided().reached()) {</span>
+<span class="nc" id="L474">                return PrimaryStatus</span>
                     .REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND;
             }
-<span class="nc" id="L474">            return PrimaryStatus.REACHABLE_BUT_PRODUCTION_SEARCH_MISSED;</span>
+<span class="nc" id="L477">            return PrimaryStatus.REACHABLE_BUT_PRODUCTION_SEARCH_MISSED;</span>
         }
         // A bridge or curated-control hit identifies a missing production
         // capability only after the frozen production closure was exhausted.
-<span class="fc bfc" id="L478" title="All 2 branches covered.">        if (!production.oracle().completeClosureExhausted()) {</span>
-<span class="fc" id="L479">            return PrimaryStatus.BUDGET_INCONCLUSIVE;</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (!production.oracle().completeClosureExhausted()) {</span>
+<span class="fc" id="L482">            return PrimaryStatus.BUDGET_INCONCLUSIVE;</span>
         }
-<span class="pc bpc" id="L481" title="1 of 4 branches missed.">        if (genericBridge.executed() &amp;&amp; anyReached(genericBridge)) {</span>
-<span class="fc" id="L482">            return PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND;</span>
+<span class="pc bpc" id="L484" title="1 of 4 branches missed.">        if (genericBridge.executed() &amp;&amp; anyReached(genericBridge)) {</span>
+<span class="fc" id="L485">            return PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND;</span>
         }
-<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (curatedControl.executed()</span>
-<span class="pc bpc" id="L485" title="1 of 2 branches missed.">                &amp;&amp; curatedControl.oracle().reachable()) {</span>
-<span class="fc" id="L486">            return PrimaryStatus</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (curatedControl.executed()</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">                &amp;&amp; curatedControl.oracle().reachable()) {</span>
+<span class="fc" id="L489">            return PrimaryStatus</span>
                 .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE;
         }
-<span class="nc" id="L489">        return PrimaryStatus.UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE;</span>
+<span class="nc" id="L492">        return PrimaryStatus.UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE;</span>
     }
 
     private boolean anyReached(EngineEvidence... evidence) {
-<span class="fc bfc" id="L493" title="All 2 branches covered.">        for (EngineEvidence item : evidence) {</span>
-<span class="pc bpc" id="L494" title="1 of 4 branches missed.">            if (item.executed() &amp;&amp; anyReached(item)) {</span>
-<span class="nc" id="L495">                return true;</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        for (EngineEvidence item : evidence) {</span>
+<span class="pc bpc" id="L497" title="1 of 4 branches missed.">            if (item.executed() &amp;&amp; anyReached(item)) {</span>
+<span class="nc" id="L498">                return true;</span>
             }
         }
-<span class="fc" id="L498">        return false;</span>
+<span class="fc" id="L501">        return false;</span>
     }
 
     private boolean anyReached(EngineEvidence evidence) {
-<span class="fc bfc" id="L502" title="All 2 branches covered.">        return evidence.oracle().reachable()</span>
-<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            || evidence.scalar().reached()</span>
-<span class="pc bpc" id="L504" title="1 of 2 branches missed.">            || evidence.guided().reached()</span>
-<span class="pc bpc" id="L505" title="1 of 2 branches missed.">            || evidence.diversity().reached();</span>
+<span class="fc bfc" id="L505" title="All 2 branches covered.">        return evidence.oracle().reachable()</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">            || evidence.scalar().reached()</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">            || evidence.guided().reached()</span>
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">            || evidence.diversity().reached();</span>
     }
 
     private List&lt;DirectionalityResult&gt; directionality(List&lt;CaseResult&gt; results) {
-<span class="fc" id="L509">        Map&lt;String, CaseResult&gt; byId = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L510">        results.forEach(result -&gt;</span>
-<span class="fc" id="L511">            byId.put(result.benchmarkCase().id(), result));</span>
-<span class="fc" id="L512">        List&lt;DirectionalityResult&gt; pairs = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L513">        addDirectionality(</span>
+<span class="fc" id="L512">        Map&lt;String, CaseResult&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L513">        results.forEach(result -&gt;</span>
+<span class="fc" id="L514">            byId.put(result.benchmarkCase().id(), result));</span>
+<span class="fc" id="L515">        List&lt;DirectionalityResult&gt; pairs = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L516">        addDirectionality(</span>
             pairs,
             byId,
             &quot;binomial-square&quot;,
             &quot;complete-square&quot;,
             &quot;expand-binomial-square&quot;);
-<span class="fc" id="L519">        addDirectionality(</span>
+<span class="fc" id="L522">        addDirectionality(</span>
             pairs,
             byId,
             &quot;difference-of-squares&quot;,
             &quot;difference-of-squares&quot;,
             &quot;reverse-difference-of-squares&quot;);
-<span class="fc" id="L525">        return List.copyOf(pairs);</span>
+<span class="fc" id="L528">        return List.copyOf(pairs);</span>
     }
 
     private void addDirectionality(
@@ -532,28 +535,28 @@ import java.util.function.Supplier;
         String forwardId,
         String reverseId
     ) {
-<span class="fc" id="L535">        CaseResult forward = byId.get(forwardId);</span>
-<span class="fc" id="L536">        CaseResult reverse = byId.get(reverseId);</span>
-<span class="pc bpc" id="L537" title="1 of 4 branches missed.">        if (forward == null || reverse == null) {</span>
-<span class="fc" id="L538">            return;</span>
+<span class="fc" id="L538">        CaseResult forward = byId.get(forwardId);</span>
+<span class="fc" id="L539">        CaseResult reverse = byId.get(reverseId);</span>
+<span class="pc bpc" id="L540" title="1 of 4 branches missed.">        if (forward == null || reverse == null) {</span>
+<span class="fc" id="L541">            return;</span>
         }
-<span class="fc" id="L540">        boolean forwardReachable = forward.production().oracle().reachable();</span>
-<span class="fc" id="L541">        boolean reverseReachable = reverse.production().oracle().reachable();</span>
-<span class="pc bpc" id="L542" title="1 of 2 branches missed.">        boolean inconclusive = forward.production().oracle().inconclusive()</span>
-<span class="pc bpc" id="L543" title="1 of 2 branches missed.">            || reverse.production().oracle().inconclusive();</span>
+<span class="fc" id="L543">        boolean forwardReachable = forward.production().oracle().reachable();</span>
+<span class="fc" id="L544">        boolean reverseReachable = reverse.production().oracle().reachable();</span>
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        boolean inconclusive = forward.production().oracle().inconclusive()</span>
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">            || reverse.production().oracle().inconclusive();</span>
         DirectionalityStatus status;
-<span class="pc bpc" id="L545" title="1 of 4 branches missed.">        if (forwardReachable &amp;&amp; reverseReachable) {</span>
-<span class="fc" id="L546">            status = DirectionalityStatus.BIDIRECTIONAL;</span>
-<span class="pc bpc" id="L547" title="1 of 2 branches missed.">        } else if (inconclusive) {</span>
-<span class="nc" id="L548">            status = DirectionalityStatus.INCONCLUSIVE;</span>
-<span class="pc bpc" id="L549" title="1 of 2 branches missed.">        } else if (forwardReachable) {</span>
-<span class="nc" id="L550">            status = DirectionalityStatus.FORWARD_ONLY;</span>
-<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        } else if (reverseReachable) {</span>
-<span class="fc" id="L552">            status = DirectionalityStatus.REVERSE_ONLY;</span>
+<span class="pc bpc" id="L548" title="1 of 4 branches missed.">        if (forwardReachable &amp;&amp; reverseReachable) {</span>
+<span class="fc" id="L549">            status = DirectionalityStatus.BIDIRECTIONAL;</span>
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">        } else if (inconclusive) {</span>
+<span class="nc" id="L551">            status = DirectionalityStatus.INCONCLUSIVE;</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">        } else if (forwardReachable) {</span>
+<span class="nc" id="L553">            status = DirectionalityStatus.FORWARD_ONLY;</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">        } else if (reverseReachable) {</span>
+<span class="fc" id="L555">            status = DirectionalityStatus.REVERSE_ONLY;</span>
         } else {
-<span class="nc" id="L554">            status = DirectionalityStatus.NEITHER_REACHABLE;</span>
+<span class="nc" id="L557">            status = DirectionalityStatus.NEITHER_REACHABLE;</span>
         }
-<span class="fc" id="L556">        pairs.add(new DirectionalityResult(</span>
+<span class="fc" id="L559">        pairs.add(new DirectionalityResult(</span>
             id,
             forwardId,
             reverseId,
@@ -561,58 +564,59 @@ import java.util.function.Supplier;
             forwardReachable,
             reverseReachable
         ));
-<span class="fc" id="L564">    }</span>
+<span class="fc" id="L567">    }</span>
 
     private String format(String expression) {
-<span class="fc" id="L567">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+<span class="fc" id="L570">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
     }
 
     private static String safeMessage(Throwable throwable) {
-<span class="nc" id="L571">        String message = throwable.getMessage();</span>
-<span class="nc bnc" id="L572" title="All 4 branches missed.">        return message == null || message.isBlank()</span>
-<span class="nc" id="L573">            ? throwable.getClass().getSimpleName()</span>
-<span class="nc" id="L574">            : message.replace('\n', ' ').replace('\r', ' ');</span>
+<span class="nc" id="L574">        String message = throwable.getMessage();</span>
+<span class="nc bnc" id="L575" title="All 4 branches missed.">        return message == null || message.isBlank()</span>
+<span class="nc" id="L576">            ? throwable.getClass().getSimpleName()</span>
+<span class="nc" id="L577">            : message.replace('\n', ' ').replace('\r', ' ');</span>
     }
 
-<span class="fc" id="L577">    public enum EngineProfile {</span>
-<span class="fc" id="L578">        PRODUCTION_PRIMITIVES,</span>
-<span class="fc" id="L579">        GENERIC_HYPOTHESIS_BRIDGE,</span>
-<span class="fc" id="L580">        CURATED_RECOGNITION_CONTROL</span>
+<span class="fc" id="L580">    public enum EngineProfile {</span>
+<span class="fc" id="L581">        PRODUCTION_PRIMITIVES,</span>
+<span class="fc" id="L582">        GENERIC_HYPOTHESIS_BRIDGE,</span>
+<span class="fc" id="L583">        CURATED_RECOGNITION_CONTROL</span>
     }
 
-<span class="fc" id="L583">    public enum EvidenceExecution {</span>
-<span class="fc" id="L584">        EXECUTED,</span>
-<span class="fc" id="L585">        NOT_APPLICABLE,</span>
-<span class="fc" id="L586">        NOT_EVALUATED</span>
+<span class="fc" id="L586">    public enum EvidenceExecution {</span>
+<span class="fc" id="L587">        EXECUTED,</span>
+<span class="fc" id="L588">        NOT_APPLICABLE,</span>
+<span class="fc" id="L589">        NOT_EVALUATED</span>
     }
 
-<span class="fc" id="L589">    public enum PrimaryStatus {</span>
-<span class="fc" id="L590">        REPRESENTATION_UNSUPPORTED,</span>
-<span class="fc" id="L591">        EQUIVALENCE_NOT_CONFIRMED,</span>
-<span class="fc" id="L592">        REACHABLE_AND_SCALAR_FOUND,</span>
-<span class="fc" id="L593">        REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,</span>
-<span class="fc" id="L594">        REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,</span>
-<span class="fc" id="L595">        REACHABLE_BUT_PRODUCTION_SEARCH_MISSED,</span>
-<span class="fc" id="L596">        GENERIC_BRIDGE_REQUIRED_AND_FOUND,</span>
-<span class="fc" id="L597">        CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,</span>
-<span class="fc" id="L598">        UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE,</span>
-<span class="fc" id="L599">        BUDGET_INCONCLUSIVE,</span>
-<span class="fc" id="L600">        NEGATIVE_CONTROL_CONFIRMED,</span>
-<span class="fc" id="L601">        CORRECTNESS_REGRESSION</span>
+<span class="fc" id="L592">    public enum PrimaryStatus {</span>
+<span class="fc" id="L593">        SOURCE_ALREADY_TARGET_REPRESENTATION,</span>
+<span class="fc" id="L594">        REPRESENTATION_UNSUPPORTED,</span>
+<span class="fc" id="L595">        EQUIVALENCE_NOT_CONFIRMED,</span>
+<span class="fc" id="L596">        REACHABLE_AND_SCALAR_FOUND,</span>
+<span class="fc" id="L597">        REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,</span>
+<span class="fc" id="L598">        REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,</span>
+<span class="fc" id="L599">        REACHABLE_BUT_PRODUCTION_SEARCH_MISSED,</span>
+<span class="fc" id="L600">        GENERIC_BRIDGE_REQUIRED_AND_FOUND,</span>
+<span class="fc" id="L601">        CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,</span>
+<span class="fc" id="L602">        UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE,</span>
+<span class="fc" id="L603">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L604">        NEGATIVE_CONTROL_CONFIRMED,</span>
+<span class="fc" id="L605">        CORRECTNESS_REGRESSION</span>
     }
 
-<span class="fc" id="L604">    public enum DirectionalityStatus {</span>
-<span class="fc" id="L605">        BIDIRECTIONAL,</span>
-<span class="fc" id="L606">        FORWARD_ONLY,</span>
-<span class="fc" id="L607">        REVERSE_ONLY,</span>
-<span class="fc" id="L608">        NEITHER_REACHABLE,</span>
-<span class="fc" id="L609">        INCONCLUSIVE</span>
+<span class="fc" id="L608">    public enum DirectionalityStatus {</span>
+<span class="fc" id="L609">        BIDIRECTIONAL,</span>
+<span class="fc" id="L610">        FORWARD_ONLY,</span>
+<span class="fc" id="L611">        REVERSE_ONLY,</span>
+<span class="fc" id="L612">        NEITHER_REACHABLE,</span>
+<span class="fc" id="L613">        INCONCLUSIVE</span>
     }
 
-<span class="fc" id="L612">    public enum AssessmentDecision {</span>
-<span class="fc" id="L613">        USEFUL_DIAGNOSTIC_STEP,</span>
-<span class="fc" id="L614">        USEFUL_BUT_INCOMPLETE,</span>
-<span class="fc" id="L615">        INSUFFICIENT_SIGNAL</span>
+<span class="fc" id="L616">    public enum AssessmentDecision {</span>
+<span class="fc" id="L617">        USEFUL_DIAGNOSTIC_STEP,</span>
+<span class="fc" id="L618">        USEFUL_BUT_INCOMPLETE,</span>
+<span class="fc" id="L619">        INSUFFICIENT_SIGNAL</span>
     }
 
     public record RepresentationEvidence(
@@ -621,11 +625,11 @@ import java.util.function.Supplier;
         String formattedTarget,
         String detail
     ) {
-<span class="fc" id="L624">        public RepresentationEvidence {</span>
-<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            formattedSource = formattedSource == null ? &quot;&quot; : formattedSource;</span>
-<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            formattedTarget = formattedTarget == null ? &quot;&quot; : formattedTarget;</span>
-<span class="pc bpc" id="L627" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="fc" id="L628">        }</span>
+<span class="fc" id="L628">        public RepresentationEvidence {</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            formattedSource = formattedSource == null ? &quot;&quot; : formattedSource;</span>
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">            formattedTarget = formattedTarget == null ? &quot;&quot; : formattedTarget;</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L632">        }</span>
     }
 
     public record EquivalenceEvidence(
@@ -633,12 +637,12 @@ import java.util.function.Supplier;
         boolean equivalent,
         String detail
     ) {
-<span class="fc" id="L636">        public EquivalenceEvidence {</span>
-<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="fc" id="L638">        }</span>
+<span class="fc" id="L640">        public EquivalenceEvidence {</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L642">        }</span>
 
         private static EquivalenceEvidence notEvaluated() {
-<span class="nc" id="L641">            return new EquivalenceEvidence(false, false, &quot;not evaluated&quot;);</span>
+<span class="nc" id="L645">            return new EquivalenceEvidence(false, false, &quot;not evaluated&quot;);</span>
         }
     }
 
@@ -655,20 +659,20 @@ import java.util.function.Supplier;
         boolean stateLimitReached,
         String detail
     ) {
-<span class="fc" id="L658">        public OracleEvidence {</span>
-<span class="fc" id="L659">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
-<span class="pc bpc" id="L660" title="1 of 2 branches missed.">            status = status == null ? &quot;&quot; : status;</span>
-<span class="fc" id="L661">            witnessExpressions = List.copyOf(witnessExpressions);</span>
-<span class="fc" id="L662">            witnessRuleIds = List.copyOf(witnessRuleIds);</span>
-<span class="pc bpc" id="L663" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="fc" id="L664">        }</span>
+<span class="fc" id="L662">        public OracleEvidence {</span>
+<span class="fc" id="L663">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">            status = status == null ? &quot;&quot; : status;</span>
+<span class="fc" id="L665">            witnessExpressions = List.copyOf(witnessExpressions);</span>
+<span class="fc" id="L666">            witnessRuleIds = List.copyOf(witnessRuleIds);</span>
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L668">        }</span>
 
         private static OracleEvidence notEvaluated(String detail) {
-<span class="nc" id="L667">            return new OracleEvidence(</span>
+<span class="nc" id="L671">            return new OracleEvidence(</span>
                 EvidenceExecution.NOT_EVALUATED,
                 &quot;NOT_EVALUATED&quot;,
-<span class="nc" id="L670">                List.of(),</span>
-<span class="nc" id="L671">                List.of(),</span>
+<span class="nc" id="L674">                List.of(),</span>
+<span class="nc" id="L675">                List.of(),</span>
                 0,
                 0,
                 0,
@@ -680,11 +684,11 @@ import java.util.function.Supplier;
         }
 
         private static OracleEvidence notApplicable() {
-<span class="fc" id="L683">            return new OracleEvidence(</span>
+<span class="fc" id="L687">            return new OracleEvidence(</span>
                 EvidenceExecution.NOT_APPLICABLE,
                 &quot;NOT_APPLICABLE&quot;,
-<span class="fc" id="L686">                List.of(),</span>
-<span class="fc" id="L687">                List.of(),</span>
+<span class="fc" id="L690">                List.of(),</span>
+<span class="fc" id="L691">                List.of(),</span>
                 0,
                 0,
                 0,
@@ -696,18 +700,18 @@ import java.util.function.Supplier;
         }
 
         public boolean reachable() {
-<span class="pc bpc" id="L699" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
-<span class="fc bfc" id="L700" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;REACHABLE&quot;);</span>
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
+<span class="fc bfc" id="L704" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;REACHABLE&quot;);</span>
         }
 
         public boolean completeClosureExhausted() {
-<span class="pc bpc" id="L704" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
-<span class="fc bfc" id="L705" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE&quot;);</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
+<span class="fc bfc" id="L709" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;UNREACHABLE_IN_COMPLETE_FROZEN_CLOSURE&quot;);</span>
         }
 
         public boolean inconclusive() {
-<span class="pc bpc" id="L709" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
-<span class="fc bfc" id="L710" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;BUDGET_INCONCLUSIVE&quot;);</span>
+<span class="pc bpc" id="L713" title="1 of 2 branches missed.">            return execution == EvidenceExecution.EXECUTED</span>
+<span class="fc bfc" id="L714" title="All 2 branches covered.">                &amp;&amp; status.equals(&quot;BUDGET_INCONCLUSIVE&quot;);</span>
         }
     }
 
@@ -725,35 +729,37 @@ import java.util.function.Supplier;
         GoalMetrics metrics,
         String detail
     ) {
-<span class="fc" id="L728">        public SearchEvidence {</span>
-<span class="fc" id="L729">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
-<span class="pc bpc" id="L730" title="1 of 2 branches missed.">            policy = policy == null ? &quot;&quot; : policy;</span>
-<span class="pc bpc" id="L731" title="1 of 2 branches missed.">            terminalStatus = terminalStatus == null ? &quot;&quot; : terminalStatus;</span>
-<span class="fc" id="L732">            path = List.copyOf(path);</span>
-<span class="fc" id="L733">            ruleIds = List.copyOf(ruleIds);</span>
-<span class="pc bpc" id="L734" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="fc" id="L735">        }</span>
+<span class="fc" id="L732">        public SearchEvidence {</span>
+<span class="fc" id="L733">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">            policy = policy == null ? &quot;&quot; : policy;</span>
+<span class="pc bpc" id="L735" title="1 of 2 branches missed.">            terminalStatus = terminalStatus == null ? &quot;&quot; : terminalStatus;</span>
+<span class="fc" id="L736">            path = List.copyOf(path);</span>
+<span class="fc" id="L737">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="pc bpc" id="L738" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L739">        }</span>
 
         private static SearchEvidence fromGoalResult(
             String policy,
             Optional&lt;SearchState&gt; match,
             GoalSearchResult result,
-            CountingEngine counting
+            CountingEngine counting,
+            String detail,
+            String terminalStatus
         ) {
-<span class="fc" id="L743">            SearchState state = match.orElse(null);</span>
-<span class="fc bfc" id="L744" title="All 2 branches covered.">            return new SearchEvidence(</span>
+<span class="fc" id="L749">            SearchState state = match.orElse(null);</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">            return new SearchEvidence(</span>
                 EvidenceExecution.EXECUTED,
                 policy,
                 state != null,
-<span class="fc" id="L748">                result.status().name(),</span>
-<span class="fc" id="L749">                result.states().size(),</span>
-<span class="fc" id="L750">                counting.calls(),</span>
-<span class="fc" id="L751">                counting.generated(),</span>
-<span class="fc bfc" id="L752" title="All 2 branches covered.">                state == null ? -1 : state.depth(),</span>
-<span class="fc bfc" id="L753" title="All 2 branches covered.">                state == null ? List.of() : state.path(),</span>
-<span class="fc bfc" id="L754" title="All 2 branches covered.">                state == null ? List.of() : state.appliedRuleIds(),</span>
-<span class="fc" id="L755">                result.metrics(),</span>
-                &quot;&quot;
+                terminalStatus,
+<span class="fc" id="L755">                result.states().size(),</span>
+<span class="fc" id="L756">                counting.calls(),</span>
+<span class="fc" id="L757">                counting.generated(),</span>
+<span class="fc bfc" id="L758" title="All 2 branches covered.">                state == null ? -1 : state.depth(),</span>
+<span class="fc bfc" id="L759" title="All 2 branches covered.">                state == null ? List.of() : state.path(),</span>
+<span class="fc bfc" id="L760" title="All 2 branches covered.">                state == null ? List.of() : state.appliedRuleIds(),</span>
+<span class="fc" id="L761">                result.metrics(),</span>
+                detail
             );
         }
 
@@ -761,27 +767,28 @@ import java.util.function.Supplier;
             String policy,
             Optional&lt;SearchState&gt; match,
             List&lt;SearchState&gt; states,
-            CountingEngine counting
+            CountingEngine counting,
+            String detail
         ) {
-<span class="fc" id="L766">            SearchState state = match.orElse(null);</span>
-<span class="fc bfc" id="L767" title="All 2 branches covered.">            return new SearchEvidence(</span>
+<span class="fc" id="L773">            SearchState state = match.orElse(null);</span>
+<span class="fc bfc" id="L774" title="All 2 branches covered.">            return new SearchEvidence(</span>
                 EvidenceExecution.EXECUTED,
                 policy,
                 state != null,
-<span class="pc bpc" id="L771" title="1 of 2 branches missed.">                states.isEmpty() ? &quot;NO_STATES&quot; : &quot;COMPLETED_BOUNDED_SEARCH&quot;,</span>
-<span class="fc" id="L772">                states.size(),</span>
-<span class="fc" id="L773">                counting.calls(),</span>
-<span class="fc" id="L774">                counting.generated(),</span>
-<span class="fc bfc" id="L775" title="All 2 branches covered.">                state == null ? -1 : state.depth(),</span>
-<span class="fc bfc" id="L776" title="All 2 branches covered.">                state == null ? List.of() : state.path(),</span>
-<span class="fc bfc" id="L777" title="All 2 branches covered.">                state == null ? List.of() : state.appliedRuleIds(),</span>
+<span class="pc bpc" id="L778" title="1 of 2 branches missed.">                states.isEmpty() ? &quot;NO_STATES&quot; : &quot;COMPLETED_BOUNDED_SEARCH&quot;,</span>
+<span class="fc" id="L779">                states.size(),</span>
+<span class="fc" id="L780">                counting.calls(),</span>
+<span class="fc" id="L781">                counting.generated(),</span>
+<span class="fc bfc" id="L782" title="All 2 branches covered.">                state == null ? -1 : state.depth(),</span>
+<span class="fc bfc" id="L783" title="All 2 branches covered.">                state == null ? List.of() : state.path(),</span>
+<span class="fc bfc" id="L784" title="All 2 branches covered.">                state == null ? List.of() : state.appliedRuleIds(),</span>
                 null,
-                &quot;&quot;
+                detail
             );
         }
 
         private static SearchEvidence notEvaluated(String detail) {
-<span class="fc" id="L784">            return new SearchEvidence(</span>
+<span class="fc" id="L791">            return new SearchEvidence(</span>
                 EvidenceExecution.NOT_EVALUATED,
                 &quot;&quot;,
                 false,
@@ -790,15 +797,15 @@ import java.util.function.Supplier;
                 0,
                 0,
                 -1,
-<span class="fc" id="L793">                List.of(),</span>
-<span class="fc" id="L794">                List.of(),</span>
+<span class="fc" id="L800">                List.of(),</span>
+<span class="fc" id="L801">                List.of(),</span>
                 null,
                 detail
             );
         }
 
         private static SearchEvidence notApplicable() {
-<span class="fc" id="L801">            return new SearchEvidence(</span>
+<span class="fc" id="L808">            return new SearchEvidence(</span>
                 EvidenceExecution.NOT_APPLICABLE,
                 &quot;&quot;,
                 false,
@@ -807,8 +814,8 @@ import java.util.function.Supplier;
                 0,
                 0,
                 -1,
-<span class="fc" id="L810">                List.of(),</span>
-<span class="fc" id="L811">                List.of(),</span>
+<span class="fc" id="L817">                List.of(),</span>
+<span class="fc" id="L818">                List.of(),</span>
                 null,
                 &quot;&quot;
             );
@@ -824,25 +831,25 @@ import java.util.function.Supplier;
         SearchEvidence guided,
         SearchEvidence diversity
     ) {
-<span class="fc" id="L827">        public EngineEvidence {</span>
-<span class="fc" id="L828">            Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L829">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
-<span class="pc bpc" id="L830" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="fc" id="L831">            Objects.requireNonNull(oracle, &quot;oracle&quot;);</span>
-<span class="fc" id="L832">            Objects.requireNonNull(scalar, &quot;scalar&quot;);</span>
-<span class="fc" id="L833">            Objects.requireNonNull(guided, &quot;guided&quot;);</span>
-<span class="fc" id="L834">            Objects.requireNonNull(diversity, &quot;diversity&quot;);</span>
-<span class="fc" id="L835">        }</span>
+<span class="fc" id="L834">        public EngineEvidence {</span>
+<span class="fc" id="L835">            Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L836">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="pc bpc" id="L837" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L838">            Objects.requireNonNull(oracle, &quot;oracle&quot;);</span>
+<span class="fc" id="L839">            Objects.requireNonNull(scalar, &quot;scalar&quot;);</span>
+<span class="fc" id="L840">            Objects.requireNonNull(guided, &quot;guided&quot;);</span>
+<span class="fc" id="L841">            Objects.requireNonNull(diversity, &quot;diversity&quot;);</span>
+<span class="fc" id="L842">        }</span>
 
         private static EngineEvidence notApplicable(EngineProfile profile) {
-<span class="fc" id="L838">            return new EngineEvidence(</span>
+<span class="fc" id="L845">            return new EngineEvidence(</span>
                 profile,
                 EvidenceExecution.NOT_APPLICABLE,
                 &quot;&quot;,
-<span class="fc" id="L842">                OracleEvidence.notApplicable(),</span>
-<span class="fc" id="L843">                SearchEvidence.notApplicable(),</span>
-<span class="fc" id="L844">                SearchEvidence.notApplicable(),</span>
-<span class="fc" id="L845">                SearchEvidence.notApplicable()</span>
+<span class="fc" id="L849">                OracleEvidence.notApplicable(),</span>
+<span class="fc" id="L850">                SearchEvidence.notApplicable(),</span>
+<span class="fc" id="L851">                SearchEvidence.notApplicable(),</span>
+<span class="fc" id="L852">                SearchEvidence.notApplicable()</span>
             );
         }
 
@@ -850,19 +857,19 @@ import java.util.function.Supplier;
             EngineProfile profile,
             String detail
         ) {
-<span class="nc" id="L853">            return new EngineEvidence(</span>
+<span class="nc" id="L860">            return new EngineEvidence(</span>
                 profile,
                 EvidenceExecution.NOT_EVALUATED,
                 detail,
-<span class="nc" id="L857">                OracleEvidence.notEvaluated(detail),</span>
-<span class="nc" id="L858">                SearchEvidence.notEvaluated(detail),</span>
-<span class="nc" id="L859">                SearchEvidence.notEvaluated(detail),</span>
-<span class="nc" id="L860">                SearchEvidence.notEvaluated(detail)</span>
+<span class="nc" id="L864">                OracleEvidence.notEvaluated(detail),</span>
+<span class="nc" id="L865">                SearchEvidence.notEvaluated(detail),</span>
+<span class="nc" id="L866">                SearchEvidence.notEvaluated(detail),</span>
+<span class="nc" id="L867">                SearchEvidence.notEvaluated(detail)</span>
             );
         }
 
         public boolean executed() {
-<span class="fc bfc" id="L865" title="All 2 branches covered.">            return execution == EvidenceExecution.EXECUTED;</span>
+<span class="fc bfc" id="L872" title="All 2 branches covered.">            return execution == EvidenceExecution.EXECUTED;</span>
         }
     }
 
@@ -875,18 +882,18 @@ import java.util.function.Supplier;
         EngineEvidence curatedControl,
         PrimaryStatus status
     ) {
-<span class="fc" id="L878">        public CaseResult {</span>
-<span class="fc" id="L879">            Objects.requireNonNull(benchmarkCase, &quot;benchmarkCase&quot;);</span>
-<span class="fc" id="L880">            Objects.requireNonNull(representation, &quot;representation&quot;);</span>
-<span class="fc" id="L881">            Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
-<span class="fc" id="L882">            Objects.requireNonNull(production, &quot;production&quot;);</span>
-<span class="fc" id="L883">            Objects.requireNonNull(genericBridge, &quot;genericBridge&quot;);</span>
-<span class="fc" id="L884">            Objects.requireNonNull(curatedControl, &quot;curatedControl&quot;);</span>
-<span class="fc" id="L885">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L886">        }</span>
+<span class="fc" id="L885">        public CaseResult {</span>
+<span class="fc" id="L886">            Objects.requireNonNull(benchmarkCase, &quot;benchmarkCase&quot;);</span>
+<span class="fc" id="L887">            Objects.requireNonNull(representation, &quot;representation&quot;);</span>
+<span class="fc" id="L888">            Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
+<span class="fc" id="L889">            Objects.requireNonNull(production, &quot;production&quot;);</span>
+<span class="fc" id="L890">            Objects.requireNonNull(genericBridge, &quot;genericBridge&quot;);</span>
+<span class="fc" id="L891">            Objects.requireNonNull(curatedControl, &quot;curatedControl&quot;);</span>
+<span class="fc" id="L892">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L893">        }</span>
     }
 
-<span class="fc" id="L889">    public record DirectionalityResult(</span>
+<span class="fc" id="L896">    public record DirectionalityResult(</span>
         String id,
         String forwardCaseId,
         String reverseCaseId,
@@ -909,91 +916,94 @@ import java.util.function.Supplier;
         Map&lt;PrimaryStatus, Integer&gt; statusCounts,
         List&lt;String&gt; reasons
     ) {
-<span class="fc" id="L912">        public Assessment {</span>
-<span class="fc" id="L913">            Objects.requireNonNull(decision, &quot;decision&quot;);</span>
-<span class="fc" id="L914">            statusCounts = Map.copyOf(statusCounts);</span>
-<span class="fc" id="L915">            reasons = List.copyOf(reasons);</span>
-<span class="fc" id="L916">        }</span>
+<span class="fc" id="L919">        public Assessment {</span>
+<span class="fc" id="L920">            Objects.requireNonNull(decision, &quot;decision&quot;);</span>
+<span class="fc" id="L921">            statusCounts = Map.copyOf(statusCounts);</span>
+<span class="fc" id="L922">            reasons = List.copyOf(reasons);</span>
+<span class="fc" id="L923">        }</span>
 
         private static Assessment derive(List&lt;CaseResult&gt; results) {
-<span class="fc" id="L919">            Map&lt;PrimaryStatus, Integer&gt; counts =</span>
+<span class="fc" id="L926">            Map&lt;PrimaryStatus, Integer&gt; counts =</span>
                 new EnumMap&lt;&gt;(PrimaryStatus.class);
-<span class="fc" id="L921">            results.forEach(result -&gt;</span>
-<span class="fc" id="L922">                counts.merge(result.status(), 1, Integer::sum));</span>
-<span class="fc" id="L923">            boolean representation = results.stream()</span>
-<span class="fc" id="L924">                .allMatch(result -&gt; result.representation().supported());</span>
-<span class="fc" id="L925">            boolean hasNegativeEquivalenceControl = results.stream()</span>
-<span class="fc" id="L926">                .anyMatch(result -&gt;</span>
-<span class="fc bfc" id="L927" title="All 2 branches covered.">                    result.benchmarkCase().role()</span>
+<span class="fc" id="L928">            results.forEach(result -&gt;</span>
+<span class="fc" id="L929">                counts.merge(result.status(), 1, Integer::sum));</span>
+<span class="fc" id="L930">            boolean representation = results.stream()</span>
+<span class="fc" id="L931">                .allMatch(result -&gt; result.representation().supported());</span>
+<span class="fc" id="L932">            boolean hasNegativeEquivalenceControl = results.stream()</span>
+<span class="fc" id="L933">                .anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L934" title="All 2 branches covered.">                    result.benchmarkCase().role()</span>
                         == Role.NEGATIVE_CONTROL);
-<span class="fc bfc" id="L929" title="All 2 branches covered.">            boolean equivalence = hasNegativeEquivalenceControl</span>
-<span class="fc" id="L930">                &amp;&amp; results.stream()</span>
-<span class="fc" id="L931">                    .filter(result -&gt;</span>
-<span class="fc bfc" id="L932" title="All 2 branches covered.">                        result.benchmarkCase().role()</span>
-                            == Role.NEGATIVE_CONTROL)
-<span class="pc bpc" id="L934" title="1 of 2 branches missed.">                    .allMatch(result -&gt;</span>
-<span class="pc bpc" id="L935" title="1 of 2 branches missed.">                        result.equivalence().evaluated()</span>
-<span class="pc bpc" id="L936" title="1 of 2 branches missed.">                            &amp;&amp; !result.equivalence().equivalent())</span>
+<span class="fc bfc" id="L936" title="All 2 branches covered.">            boolean equivalence = hasNegativeEquivalenceControl</span>
 <span class="fc" id="L937">                &amp;&amp; results.stream()</span>
 <span class="fc" id="L938">                    .filter(result -&gt;</span>
-<span class="pc bpc" id="L939" title="1 of 2 branches missed.">                        result.benchmarkCase().relation()</span>
+<span class="fc bfc" id="L939" title="All 2 branches covered.">                        result.benchmarkCase().role()</span>
+                            == Role.NEGATIVE_CONTROL)
+<span class="pc bpc" id="L941" title="1 of 2 branches missed.">                    .allMatch(result -&gt;</span>
+<span class="pc bpc" id="L942" title="1 of 2 branches missed.">                        result.equivalence().evaluated()</span>
+<span class="pc bpc" id="L943" title="1 of 2 branches missed.">                            &amp;&amp; !result.equivalence().equivalent())</span>
+<span class="fc" id="L944">                &amp;&amp; results.stream()</span>
+<span class="fc" id="L945">                    .filter(result -&gt;</span>
+<span class="fc bfc" id="L946" title="All 2 branches covered.">                        result.benchmarkCase().relation()</span>
                             == Relation.EQUIVALENT)
-<span class="pc bpc" id="L941" title="1 of 2 branches missed.">                    .anyMatch(result -&gt;</span>
-<span class="fc" id="L942">                        result.equivalence().equivalent());</span>
-<span class="fc" id="L943">            boolean productionPositive = results.stream()</span>
-<span class="fc" id="L944">                .anyMatch(result -&gt; result.production().oracle().reachable());</span>
-<span class="fc bfc" id="L945" title="All 2 branches covered.">            boolean missingInventory = counts.getOrDefault(</span>
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">                    .anyMatch(result -&gt;</span>
+<span class="fc" id="L949">                        result.equivalence().equivalent());</span>
+<span class="fc" id="L950">            boolean productionPositive = results.stream()</span>
+<span class="fc bfc" id="L951" title="All 2 branches covered.">                .anyMatch(result -&gt; result.benchmarkCase().role() == Role.HISTORICAL_POSITIVE</span>
+<span class="fc bfc" id="L952" title="All 2 branches covered.">                    &amp;&amp; result.production().oracle().reachable()</span>
+<span class="pc bpc" id="L953" title="1 of 4 branches missed.">                    &amp;&amp; result.equivalence().evaluated() &amp;&amp; result.equivalence().equivalent()</span>
+<span class="fc bfc" id="L954" title="All 2 branches covered.">                    &amp;&amp; !result.production().oracle().witnessExpressions().isEmpty());</span>
+<span class="fc bfc" id="L955" title="All 2 branches covered.">            boolean missingInventory = counts.getOrDefault(</span>
                 PrimaryStatus
                     .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,
-<span class="fc" id="L948">                0) &gt; 0;</span>
-<span class="fc bfc" id="L949" title="All 2 branches covered.">            boolean searchPolicy = counts.getOrDefault(</span>
+<span class="fc" id="L958">                0) &gt; 0;</span>
+<span class="fc bfc" id="L959" title="All 2 branches covered.">            boolean searchPolicy = counts.getOrDefault(</span>
                 PrimaryStatus
                     .REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
-<span class="fc" id="L952">                0) &gt; 0;</span>
-<span class="fc bfc" id="L953" title="All 2 branches covered.">            boolean genericBridge = counts.getOrDefault(</span>
+<span class="fc" id="L962">                0) &gt; 0;</span>
+<span class="fc bfc" id="L963" title="All 2 branches covered.">            boolean genericBridge = counts.getOrDefault(</span>
                 PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND,
-<span class="fc" id="L955">                0) &gt; 0;</span>
-<span class="fc bfc" id="L956" title="All 2 branches covered.">            boolean negative = counts.getOrDefault(</span>
+<span class="fc" id="L965">                0) &gt; 0;</span>
+<span class="fc bfc" id="L966" title="All 2 branches covered.">            boolean negative = counts.getOrDefault(</span>
                 PrimaryStatus.NEGATIVE_CONTROL_CONFIRMED,
-<span class="fc" id="L958">                0) &gt; 0</span>
-<span class="pc bpc" id="L959" title="1 of 2 branches missed.">                &amp;&amp; counts.getOrDefault(</span>
+<span class="fc" id="L968">                0) &gt; 0</span>
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">                &amp;&amp; counts.getOrDefault(</span>
                     PrimaryStatus.CORRECTNESS_REGRESSION,
-<span class="fc" id="L961">                    0) == 0;</span>
-<span class="fc" id="L962">            int distinct = counts.size();</span>
-<span class="fc bfc" id="L963" title="All 2 branches covered.">            int strongSignals = (missingInventory ? 1 : 0)</span>
-<span class="fc bfc" id="L964" title="All 2 branches covered.">                + (searchPolicy ? 1 : 0)</span>
-<span class="fc bfc" id="L965" title="All 2 branches covered.">                + (genericBridge ? 1 : 0);</span>
+<span class="fc" id="L971">                    0) == 0;</span>
+<span class="fc" id="L972">            int distinct = counts.size();</span>
+<span class="fc bfc" id="L973" title="All 2 branches covered.">            int strongSignals = (missingInventory ? 1 : 0)</span>
+<span class="fc bfc" id="L974" title="All 2 branches covered.">                + (searchPolicy ? 1 : 0)</span>
+<span class="fc bfc" id="L975" title="All 2 branches covered.">                + (genericBridge ? 1 : 0);</span>
             AssessmentDecision decision;
-<span class="pc bpc" id="L967" title="5 of 12 branches missed.">            if (representation &amp;&amp; equivalence &amp;&amp; productionPositive &amp;&amp; negative</span>
+<span class="pc bpc" id="L977" title="4 of 12 branches missed.">            if (representation &amp;&amp; equivalence &amp;&amp; productionPositive &amp;&amp; negative</span>
                     &amp;&amp; strongSignals &gt;= 2 &amp;&amp; distinct &gt;= 4) {
-<span class="fc" id="L969">                decision = AssessmentDecision.USEFUL_DIAGNOSTIC_STEP;</span>
-<span class="pc bpc" id="L970" title="8 of 10 branches missed.">            } else if (representation &amp;&amp; equivalence &amp;&amp; productionPositive</span>
+<span class="fc" id="L979">                decision = AssessmentDecision.USEFUL_DIAGNOSTIC_STEP;</span>
+<span class="pc bpc" id="L980" title="6 of 10 branches missed.">            } else if (representation &amp;&amp; equivalence &amp;&amp; productionPositive</span>
                     &amp;&amp; negative &amp;&amp; distinct &gt;= 3) {
-<span class="nc" id="L972">                decision = AssessmentDecision.USEFUL_BUT_INCOMPLETE;</span>
+<span class="nc" id="L982">                decision = AssessmentDecision.USEFUL_BUT_INCOMPLETE;</span>
             } else {
-<span class="fc" id="L974">                decision = AssessmentDecision.INSUFFICIENT_SIGNAL;</span>
+<span class="fc" id="L984">                decision = AssessmentDecision.INSUFFICIENT_SIGNAL;</span>
             }
-<span class="fc" id="L976">            List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L977" title="All 2 branches covered.">            if (productionPositive) {</span>
-<span class="fc" id="L978">                reasons.add(</span>
-                    &quot;production primitives recover at least one frozen identity&quot;);
+<span class="fc" id="L986">            List&lt;String&gt; reasons = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L987" title="All 2 branches covered.">            if (productionPositive) {</span>
+<span class="fc" id="L988">                reasons.add(</span>
+                    &quot;production primitives reach a frozen positive target with separate equivalence evidence&quot;);
             }
-<span class="fc bfc" id="L981" title="All 2 branches covered.">            if (missingInventory) {</span>
-<span class="fc" id="L982">                reasons.add(</span>
+<span class="fc bfc" id="L991" title="All 2 branches covered.">            if (missingInventory) {</span>
+<span class="fc" id="L992">                reasons.add(</span>
                     &quot;curated control separates a missing production primitive from representation failure&quot;);
             }
-<span class="fc bfc" id="L985" title="All 2 branches covered.">            if (searchPolicy) {</span>
-<span class="fc" id="L986">                reasons.add(</span>
+<span class="fc bfc" id="L995" title="All 2 branches covered.">            if (searchPolicy) {</span>
+<span class="fc" id="L996">                reasons.add(</span>
                     &quot;target-blind scalar and structural-diversity searches differ under the same declared heuristic budget&quot;);
             }
-<span class="fc bfc" id="L989" title="All 2 branches covered.">            if (genericBridge) {</span>
-<span class="fc" id="L990">                reasons.add(</span>
+<span class="fc bfc" id="L999" title="All 2 branches covered.">            if (genericBridge) {</span>
+<span class="fc" id="L1000">                reasons.add(</span>
                     &quot;a generic hypothesis bridge moves the reachable capability frontier&quot;);
             }
-<span class="fc bfc" id="L993" title="All 2 branches covered.">            if (negative) {</span>
-<span class="fc" id="L994">                reasons.add(&quot;the false near-miss remains rejected&quot;);</span>
+<span class="fc bfc" id="L1003" title="All 2 branches covered.">            if (negative) {</span>
+<span class="fc" id="L1004">                reasons.add(&quot;the false near-miss remains rejected&quot;);</span>
             }
-<span class="fc" id="L996">            return new Assessment(</span>
+<span class="fc" id="L1006">            return new Assessment(</span>
                 decision,
                 representation,
                 equivalence,
@@ -1019,265 +1029,268 @@ import java.util.function.Supplier;
         List&lt;DirectionalityResult&gt; directionality,
         Assessment assessment
     ) {
-<span class="fc" id="L1022">        public AtlasReport {</span>
-<span class="fc" id="L1023">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
-<span class="fc" id="L1024">            Objects.requireNonNull(corpusSchema, &quot;corpusSchema&quot;);</span>
-<span class="fc" id="L1025">            Objects.requireNonNull(corpusSha256, &quot;corpusSha256&quot;);</span>
-<span class="fc" id="L1026">            Objects.requireNonNull(inventoryRevision, &quot;inventoryRevision&quot;);</span>
-<span class="fc" id="L1027">            Objects.requireNonNull(claimBoundary, &quot;claimBoundary&quot;);</span>
-<span class="fc" id="L1028">            cases = List.copyOf(cases);</span>
-<span class="fc" id="L1029">            directionality = List.copyOf(directionality);</span>
-<span class="fc" id="L1030">            Objects.requireNonNull(assessment, &quot;assessment&quot;);</span>
-<span class="fc" id="L1031">        }</span>
+<span class="fc" id="L1032">        public AtlasReport {</span>
+<span class="fc" id="L1033">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L1034">            Objects.requireNonNull(corpusSchema, &quot;corpusSchema&quot;);</span>
+<span class="fc" id="L1035">            Objects.requireNonNull(corpusSha256, &quot;corpusSha256&quot;);</span>
+<span class="fc" id="L1036">            Objects.requireNonNull(inventoryRevision, &quot;inventoryRevision&quot;);</span>
+<span class="fc" id="L1037">            Objects.requireNonNull(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L1038">            cases = List.copyOf(cases);</span>
+<span class="fc" id="L1039">            directionality = List.copyOf(directionality);</span>
+<span class="fc" id="L1040">            Objects.requireNonNull(assessment, &quot;assessment&quot;);</span>
+<span class="fc" id="L1041">        }</span>
 
         public String toJson() {
-<span class="fc" id="L1034">            JsonWriter writer = new JsonWriter().beginObject();</span>
-<span class="fc" id="L1035">            writer.property(&quot;schema&quot;, schema);</span>
-<span class="fc" id="L1036">            writer.property(&quot;corpusSchema&quot;, corpusSchema);</span>
-<span class="fc" id="L1037">            writer.property(&quot;corpusSha256&quot;, corpusSha256);</span>
-<span class="fc" id="L1038">            writer.property(&quot;inventoryRevision&quot;, inventoryRevision);</span>
-<span class="fc" id="L1039">            writer.property(&quot;claimBoundary&quot;, claimBoundary);</span>
-<span class="fc" id="L1040">            writer.array(&quot;cases&quot;, array -&gt; cases.forEach(result -&gt;</span>
-<span class="fc" id="L1041">                array.objectValue(object -&gt; writeCase(object, result))));</span>
-<span class="fc" id="L1042">            writer.array(&quot;directionality&quot;, array -&gt; directionality.forEach(result -&gt;</span>
-<span class="fc" id="L1043">                array.objectValue(object -&gt; writeDirectionality(</span>
+<span class="fc" id="L1044">            JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L1045">            writer.property(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L1046">            writer.property(&quot;corpusSchema&quot;, corpusSchema);</span>
+<span class="fc" id="L1047">            writer.property(&quot;corpusSha256&quot;, corpusSha256);</span>
+<span class="fc" id="L1048">            writer.property(&quot;inventoryRevision&quot;, inventoryRevision);</span>
+<span class="fc" id="L1049">            writer.property(&quot;claimBoundary&quot;, claimBoundary);</span>
+<span class="fc" id="L1050">            writer.array(&quot;cases&quot;, array -&gt; cases.forEach(result -&gt;</span>
+<span class="fc" id="L1051">                array.objectValue(object -&gt; writeCase(object, result))));</span>
+<span class="fc" id="L1052">            writer.array(&quot;directionality&quot;, array -&gt; directionality.forEach(result -&gt;</span>
+<span class="fc" id="L1053">                array.objectValue(object -&gt; writeDirectionality(</span>
                     object,
                     result))));
-<span class="fc" id="L1046">            writer.object(&quot;assessment&quot;, object -&gt;</span>
-<span class="fc" id="L1047">                writeAssessment(object, assessment));</span>
-<span class="fc" id="L1048">            return writer.endObject().toString();</span>
+<span class="fc" id="L1056">            writer.object(&quot;assessment&quot;, object -&gt;</span>
+<span class="fc" id="L1057">                writeAssessment(object, assessment));</span>
+<span class="fc" id="L1058">            return writer.endObject().toString();</span>
         }
 
         public String toMarkdown() {
-<span class="fc" id="L1052">            StringBuilder markdown = new StringBuilder();</span>
-<span class="fc" id="L1053">            markdown.append(&quot;# Historical rediscovery and reachability atlas\n\n&quot;);</span>
-<span class="fc" id="L1054">            markdown.append(&quot;- **Corpus SHA-256:** `&quot;)</span>
-<span class="fc" id="L1055">                .append(corpusSha256)</span>
-<span class="fc" id="L1056">                .append(&quot;`\n&quot;);</span>
-<span class="fc" id="L1057">            markdown.append(&quot;- **Inventory revision:** `&quot;)</span>
-<span class="fc" id="L1058">                .append(inventoryRevision)</span>
-<span class="fc" id="L1059">                .append(&quot;`\n&quot;);</span>
-<span class="fc" id="L1060">            markdown.append(&quot;- **Assessment:** `&quot;)</span>
-<span class="fc" id="L1061">                .append(assessment.decision())</span>
-<span class="fc" id="L1062">                .append(&quot;`\n\n&quot;);</span>
-<span class="fc" id="L1063">            markdown.append(&quot;&gt; &quot;)</span>
-<span class="fc" id="L1064">                .append(claimBoundary)</span>
-<span class="fc" id="L1065">                .append(&quot;\n\n&quot;);</span>
-<span class="fc" id="L1066">            markdown.append(</span>
-                &quot;| Case | Family | Primary diagnosis | Production oracle | Scalar | Diversity | Guided |\n&quot;);
-<span class="fc" id="L1068">            markdown.append(&quot;|---|---|---|---|---:|---:|---:|\n&quot;);</span>
-<span class="fc bfc" id="L1069" title="All 2 branches covered.">            for (CaseResult result : cases) {</span>
-<span class="fc" id="L1070">                markdown.append(&quot;| &quot;)</span>
-<span class="fc" id="L1071">                    .append(result.benchmarkCase().id()).append(&quot; | &quot;)</span>
-<span class="fc" id="L1072">                    .append(result.benchmarkCase().family()).append(&quot; | &quot;)</span>
-<span class="fc" id="L1073">                    .append(result.status()).append(&quot; | &quot;)</span>
-<span class="fc" id="L1074">                    .append(result.production().oracle().status()).append(&quot; | &quot;)</span>
-<span class="fc" id="L1075">                    .append(mark(result.production().scalar().reached()))</span>
-<span class="fc" id="L1076">                    .append(&quot; | &quot;)</span>
-<span class="fc" id="L1077">                    .append(mark(result.production().diversity().reached()))</span>
-<span class="fc" id="L1078">                    .append(&quot; | &quot;)</span>
-<span class="fc" id="L1079">                    .append(mark(result.production().guided().reached()))</span>
-<span class="fc" id="L1080">                    .append(&quot; |\n&quot;);</span>
-<span class="fc" id="L1081">            }</span>
-<span class="fc" id="L1082">            markdown.append(&quot;\n## Directionality\n\n&quot;);</span>
-<span class="fc bfc" id="L1083" title="All 2 branches covered.">            for (DirectionalityResult result : directionality) {</span>
-<span class="fc" id="L1084">                markdown.append(&quot;- **&quot;)</span>
-<span class="fc" id="L1085">                    .append(result.id())</span>
-<span class="fc" id="L1086">                    .append(&quot;:** `&quot;)</span>
-<span class="fc" id="L1087">                    .append(result.status())</span>
-<span class="fc" id="L1088">                    .append(&quot;`\n&quot;);</span>
-<span class="fc" id="L1089">            }</span>
-<span class="fc" id="L1090">            markdown.append(&quot;\n## Assessment reasons\n\n&quot;);</span>
-<span class="fc bfc" id="L1091" title="All 2 branches covered.">            for (String reason : assessment.reasons()) {</span>
-<span class="fc" id="L1092">                markdown.append(&quot;- &quot;).append(reason).append('\n');</span>
-<span class="fc" id="L1093">            }</span>
-<span class="fc" id="L1094">            return markdown.toString();</span>
+<span class="fc" id="L1062">            StringBuilder markdown = new StringBuilder();</span>
+<span class="fc" id="L1063">            markdown.append(&quot;# Historical rediscovery and reachability atlas\n\n&quot;);</span>
+<span class="fc" id="L1064">            markdown.append(&quot;- **Evaluation schema:** `&quot;)</span>
+<span class="fc" id="L1065">                .append(schema)</span>
+<span class="fc" id="L1066">                .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L1067">            markdown.append(&quot;- **Corpus SHA-256:** `&quot;)</span>
+<span class="fc" id="L1068">                .append(corpusSha256)</span>
+<span class="fc" id="L1069">                .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L1070">            markdown.append(&quot;- **Inventory revision:** `&quot;)</span>
+<span class="fc" id="L1071">                .append(inventoryRevision)</span>
+<span class="fc" id="L1072">                .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L1073">            markdown.append(&quot;- **Assessment:** `&quot;)</span>
+<span class="fc" id="L1074">                .append(assessment.decision())</span>
+<span class="fc" id="L1075">                .append(&quot;`\n\n&quot;);</span>
+<span class="fc" id="L1076">            markdown.append(&quot;&gt; &quot;)</span>
+<span class="fc" id="L1077">                .append(claimBoundary)</span>
+<span class="fc" id="L1078">                .append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L1079">            markdown.append(</span>
+                &quot;| Case | Family | Primary diagnosis | Production oracle | Scalar | Diversity | Guided (target-aware) |\n&quot;);
+<span class="fc" id="L1081">            markdown.append(&quot;|---|---|---|---|---:|---:|---:|\n&quot;);</span>
+<span class="fc bfc" id="L1082" title="All 2 branches covered.">            for (CaseResult result : cases) {</span>
+<span class="fc" id="L1083">                markdown.append(&quot;| &quot;)</span>
+<span class="fc" id="L1084">                    .append(result.benchmarkCase().id()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1085">                    .append(result.benchmarkCase().family()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1086">                    .append(result.status()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1087">                    .append(result.production().oracle().status()).append(&quot; | &quot;)</span>
+<span class="fc" id="L1088">                    .append(mark(result.production().scalar().reached()))</span>
+<span class="fc" id="L1089">                    .append(&quot; | &quot;)</span>
+<span class="fc" id="L1090">                    .append(mark(result.production().diversity().reached()))</span>
+<span class="fc" id="L1091">                    .append(&quot; | &quot;)</span>
+<span class="fc" id="L1092">                    .append(mark(result.production().guided().reached()))</span>
+<span class="fc" id="L1093">                    .append(&quot; |\n&quot;);</span>
+<span class="fc" id="L1094">            }</span>
+<span class="fc" id="L1095">            markdown.append(&quot;\n## Directionality\n\n&quot;);</span>
+<span class="fc bfc" id="L1096" title="All 2 branches covered.">            for (DirectionalityResult result : directionality) {</span>
+<span class="fc" id="L1097">                markdown.append(&quot;- **&quot;)</span>
+<span class="fc" id="L1098">                    .append(result.id())</span>
+<span class="fc" id="L1099">                    .append(&quot;:** `&quot;)</span>
+<span class="fc" id="L1100">                    .append(result.status())</span>
+<span class="fc" id="L1101">                    .append(&quot;`\n&quot;);</span>
+<span class="fc" id="L1102">            }</span>
+<span class="fc" id="L1103">            markdown.append(&quot;\n## Assessment reasons\n\n&quot;);</span>
+<span class="fc bfc" id="L1104" title="All 2 branches covered.">            for (String reason : assessment.reasons()) {</span>
+<span class="fc" id="L1105">                markdown.append(&quot;- &quot;).append(reason).append('\n');</span>
+<span class="fc" id="L1106">            }</span>
+<span class="fc" id="L1107">            return markdown.toString();</span>
         }
 
         private static String mark(boolean value) {
-<span class="fc bfc" id="L1098" title="All 2 branches covered.">            return value ? &quot;yes&quot; : &quot;no&quot;;</span>
+<span class="fc bfc" id="L1111" title="All 2 branches covered.">            return value ? &quot;yes&quot; : &quot;no&quot;;</span>
         }
 
         private static void writeDirectionality(
             JsonWriter writer,
             DirectionalityResult result
         ) {
-<span class="fc" id="L1105">            writer.property(&quot;id&quot;, result.id());</span>
-<span class="fc" id="L1106">            writer.property(&quot;forwardCaseId&quot;, result.forwardCaseId());</span>
-<span class="fc" id="L1107">            writer.property(&quot;reverseCaseId&quot;, result.reverseCaseId());</span>
-<span class="fc" id="L1108">            writer.property(&quot;status&quot;, result.status().name());</span>
-<span class="fc" id="L1109">            writer.property(&quot;forwardReachable&quot;, result.forwardReachable());</span>
-<span class="fc" id="L1110">            writer.property(&quot;reverseReachable&quot;, result.reverseReachable());</span>
-<span class="fc" id="L1111">        }</span>
+<span class="fc" id="L1118">            writer.property(&quot;id&quot;, result.id());</span>
+<span class="fc" id="L1119">            writer.property(&quot;forwardCaseId&quot;, result.forwardCaseId());</span>
+<span class="fc" id="L1120">            writer.property(&quot;reverseCaseId&quot;, result.reverseCaseId());</span>
+<span class="fc" id="L1121">            writer.property(&quot;status&quot;, result.status().name());</span>
+<span class="fc" id="L1122">            writer.property(&quot;forwardReachable&quot;, result.forwardReachable());</span>
+<span class="fc" id="L1123">            writer.property(&quot;reverseReachable&quot;, result.reverseReachable());</span>
+<span class="fc" id="L1124">        }</span>
 
         private static void writeCase(JsonWriter writer, CaseResult result) {
-<span class="fc" id="L1114">            Case benchmarkCase = result.benchmarkCase();</span>
-<span class="fc" id="L1115">            writer.property(&quot;id&quot;, benchmarkCase.id());</span>
-<span class="fc" id="L1116">            writer.property(&quot;family&quot;, benchmarkCase.family());</span>
-<span class="fc" id="L1117">            writer.property(&quot;role&quot;, benchmarkCase.role().name());</span>
-<span class="fc" id="L1118">            writer.property(&quot;relation&quot;, benchmarkCase.relation().name());</span>
-<span class="fc" id="L1119">            writer.property(</span>
-<span class="fc" id="L1120">                &quot;diagnosticPurpose&quot;, benchmarkCase.diagnosticPurpose());</span>
-<span class="fc" id="L1121">            writer.property(&quot;provenance&quot;, benchmarkCase.provenance());</span>
-<span class="fc" id="L1122">            writer.property(&quot;source&quot;, benchmarkCase.source());</span>
-<span class="fc" id="L1123">            writer.property(&quot;target&quot;, benchmarkCase.target());</span>
-<span class="fc" id="L1124">            writer.property(</span>
-<span class="fc" id="L1125">                &quot;targetRelation&quot;, benchmarkCase.targetRelation().name());</span>
-<span class="fc" id="L1126">            writer.property(&quot;primaryStatus&quot;, result.status().name());</span>
-<span class="fc" id="L1127">            writer.object(&quot;representation&quot;, object -&gt; {</span>
-<span class="fc" id="L1128">                object.property(&quot;supported&quot;, result.representation().supported());</span>
-<span class="fc" id="L1129">                object.property(</span>
+<span class="fc" id="L1127">            Case benchmarkCase = result.benchmarkCase();</span>
+<span class="fc" id="L1128">            writer.property(&quot;id&quot;, benchmarkCase.id());</span>
+<span class="fc" id="L1129">            writer.property(&quot;family&quot;, benchmarkCase.family());</span>
+<span class="fc" id="L1130">            writer.property(&quot;role&quot;, benchmarkCase.role().name());</span>
+<span class="fc" id="L1131">            writer.property(&quot;relation&quot;, benchmarkCase.relation().name());</span>
+<span class="fc" id="L1132">            writer.property(</span>
+<span class="fc" id="L1133">                &quot;diagnosticPurpose&quot;, benchmarkCase.diagnosticPurpose());</span>
+<span class="fc" id="L1134">            writer.property(&quot;provenance&quot;, benchmarkCase.provenance());</span>
+<span class="fc" id="L1135">            writer.property(&quot;source&quot;, benchmarkCase.source());</span>
+<span class="fc" id="L1136">            writer.property(&quot;target&quot;, benchmarkCase.target());</span>
+<span class="fc" id="L1137">            writer.property(</span>
+<span class="fc" id="L1138">                &quot;targetRelation&quot;, benchmarkCase.targetRelation().name());</span>
+<span class="fc" id="L1139">            writer.property(&quot;primaryStatus&quot;, result.status().name());</span>
+<span class="fc" id="L1140">            writer.object(&quot;representation&quot;, object -&gt; {</span>
+<span class="fc" id="L1141">                object.property(&quot;supported&quot;, result.representation().supported());</span>
+<span class="fc" id="L1142">                object.property(</span>
                     &quot;formattedSource&quot;,
-<span class="fc" id="L1131">                    result.representation().formattedSource());</span>
-<span class="fc" id="L1132">                object.property(</span>
+<span class="fc" id="L1144">                    result.representation().formattedSource());</span>
+<span class="fc" id="L1145">                object.property(</span>
                     &quot;formattedTarget&quot;,
-<span class="fc" id="L1134">                    result.representation().formattedTarget());</span>
-<span class="fc" id="L1135">                object.property(&quot;detail&quot;, result.representation().detail());</span>
-<span class="fc" id="L1136">            });</span>
-<span class="fc" id="L1137">            writer.object(&quot;equivalence&quot;, object -&gt; {</span>
-<span class="fc" id="L1138">                object.property(&quot;evaluated&quot;, result.equivalence().evaluated());</span>
-<span class="fc" id="L1139">                object.property(&quot;equivalent&quot;, result.equivalence().equivalent());</span>
-<span class="fc" id="L1140">                object.property(&quot;detail&quot;, result.equivalence().detail());</span>
-<span class="fc" id="L1141">            });</span>
-<span class="fc" id="L1142">            writer.object(&quot;production&quot;, object -&gt;</span>
-<span class="fc" id="L1143">                writeEngine(object, result.production()));</span>
-<span class="fc" id="L1144">            writer.object(&quot;genericBridge&quot;, object -&gt;</span>
-<span class="fc" id="L1145">                writeEngine(object, result.genericBridge()));</span>
-<span class="fc" id="L1146">            writer.object(&quot;curatedControl&quot;, object -&gt;</span>
-<span class="fc" id="L1147">                writeEngine(object, result.curatedControl()));</span>
-<span class="fc" id="L1148">        }</span>
+<span class="fc" id="L1147">                    result.representation().formattedTarget());</span>
+<span class="fc" id="L1148">                object.property(&quot;detail&quot;, result.representation().detail());</span>
+<span class="fc" id="L1149">            });</span>
+<span class="fc" id="L1150">            writer.object(&quot;equivalence&quot;, object -&gt; {</span>
+<span class="fc" id="L1151">                object.property(&quot;evaluated&quot;, result.equivalence().evaluated());</span>
+<span class="fc" id="L1152">                object.property(&quot;equivalent&quot;, result.equivalence().equivalent());</span>
+<span class="fc" id="L1153">                object.property(&quot;detail&quot;, result.equivalence().detail());</span>
+<span class="fc" id="L1154">            });</span>
+<span class="fc" id="L1155">            writer.object(&quot;production&quot;, object -&gt;</span>
+<span class="fc" id="L1156">                writeEngine(object, result.production()));</span>
+<span class="fc" id="L1157">            writer.object(&quot;genericBridge&quot;, object -&gt;</span>
+<span class="fc" id="L1158">                writeEngine(object, result.genericBridge()));</span>
+<span class="fc" id="L1159">            writer.object(&quot;curatedControl&quot;, object -&gt;</span>
+<span class="fc" id="L1160">                writeEngine(object, result.curatedControl()));</span>
+<span class="fc" id="L1161">        }</span>
 
         private static void writeEngine(
             JsonWriter writer,
             EngineEvidence evidence
         ) {
-<span class="fc" id="L1154">            writer.property(&quot;profile&quot;, evidence.profile().name());</span>
-<span class="fc" id="L1155">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
-<span class="fc" id="L1156">            writer.property(&quot;detail&quot;, evidence.detail());</span>
-<span class="fc" id="L1157">            writer.object(&quot;oracle&quot;, object -&gt;</span>
-<span class="fc" id="L1158">                writeOracle(object, evidence.oracle()));</span>
-<span class="fc" id="L1159">            writer.object(&quot;scalar&quot;, object -&gt;</span>
-<span class="fc" id="L1160">                writeSearch(object, evidence.scalar()));</span>
-<span class="fc" id="L1161">            writer.object(&quot;guided&quot;, object -&gt;</span>
-<span class="fc" id="L1162">                writeSearch(object, evidence.guided()));</span>
-<span class="fc" id="L1163">            writer.object(&quot;diversity&quot;, object -&gt;</span>
-<span class="fc" id="L1164">                writeSearch(object, evidence.diversity()));</span>
-<span class="fc" id="L1165">        }</span>
+<span class="fc" id="L1167">            writer.property(&quot;profile&quot;, evidence.profile().name());</span>
+<span class="fc" id="L1168">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
+<span class="fc" id="L1169">            writer.property(&quot;detail&quot;, evidence.detail());</span>
+<span class="fc" id="L1170">            writer.object(&quot;oracle&quot;, object -&gt;</span>
+<span class="fc" id="L1171">                writeOracle(object, evidence.oracle()));</span>
+<span class="fc" id="L1172">            writer.object(&quot;scalar&quot;, object -&gt;</span>
+<span class="fc" id="L1173">                writeSearch(object, evidence.scalar()));</span>
+<span class="fc" id="L1174">            writer.object(&quot;guided&quot;, object -&gt;</span>
+<span class="fc" id="L1175">                writeSearch(object, evidence.guided()));</span>
+<span class="fc" id="L1176">            writer.object(&quot;diversity&quot;, object -&gt;</span>
+<span class="fc" id="L1177">                writeSearch(object, evidence.diversity()));</span>
+<span class="fc" id="L1178">        }</span>
 
         private static void writeOracle(
             JsonWriter writer,
             OracleEvidence evidence
         ) {
-<span class="fc" id="L1171">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
-<span class="fc" id="L1172">            writer.property(&quot;status&quot;, evidence.status());</span>
-<span class="fc" id="L1173">            writer.stringArray(</span>
-<span class="fc" id="L1174">                &quot;witnessExpressions&quot;, evidence.witnessExpressions());</span>
-<span class="fc" id="L1175">            writer.stringArray(&quot;witnessRuleIds&quot;, evidence.witnessRuleIds());</span>
-<span class="fc" id="L1176">            writer.property(&quot;primitiveSteps&quot;, evidence.primitiveSteps());</span>
-<span class="fc" id="L1177">            writer.property(&quot;visitedStates&quot;, evidence.visitedStates());</span>
-<span class="fc" id="L1178">            writer.property(</span>
-<span class="fc" id="L1179">                &quot;generatedTransitions&quot;, evidence.generatedTransitions());</span>
-<span class="fc" id="L1180">            writer.property(</span>
-<span class="fc" id="L1181">                &quot;maximumDepthReached&quot;, evidence.maximumDepthReached());</span>
-<span class="fc" id="L1182">            writer.property(&quot;depthLimitReached&quot;, evidence.depthLimitReached());</span>
-<span class="fc" id="L1183">            writer.property(&quot;stateLimitReached&quot;, evidence.stateLimitReached());</span>
-<span class="fc" id="L1184">            writer.property(&quot;detail&quot;, evidence.detail());</span>
-<span class="fc" id="L1185">        }</span>
+<span class="fc" id="L1184">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
+<span class="fc" id="L1185">            writer.property(&quot;status&quot;, evidence.status());</span>
+<span class="fc" id="L1186">            writer.stringArray(</span>
+<span class="fc" id="L1187">                &quot;witnessExpressions&quot;, evidence.witnessExpressions());</span>
+<span class="fc" id="L1188">            writer.stringArray(&quot;witnessRuleIds&quot;, evidence.witnessRuleIds());</span>
+<span class="fc" id="L1189">            writer.property(&quot;primitiveSteps&quot;, evidence.primitiveSteps());</span>
+<span class="fc" id="L1190">            writer.property(&quot;visitedStates&quot;, evidence.visitedStates());</span>
+<span class="fc" id="L1191">            writer.property(</span>
+<span class="fc" id="L1192">                &quot;generatedTransitions&quot;, evidence.generatedTransitions());</span>
+<span class="fc" id="L1193">            writer.property(</span>
+<span class="fc" id="L1194">                &quot;maximumDepthReached&quot;, evidence.maximumDepthReached());</span>
+<span class="fc" id="L1195">            writer.property(&quot;depthLimitReached&quot;, evidence.depthLimitReached());</span>
+<span class="fc" id="L1196">            writer.property(&quot;stateLimitReached&quot;, evidence.stateLimitReached());</span>
+<span class="fc" id="L1197">            writer.property(&quot;detail&quot;, evidence.detail());</span>
+<span class="fc" id="L1198">        }</span>
 
         private static void writeSearch(
             JsonWriter writer,
             SearchEvidence evidence
         ) {
-<span class="fc" id="L1191">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
-<span class="fc" id="L1192">            writer.property(&quot;policy&quot;, evidence.policy());</span>
-<span class="fc" id="L1193">            writer.property(&quot;reached&quot;, evidence.reached());</span>
-<span class="fc" id="L1194">            writer.property(&quot;terminalStatus&quot;, evidence.terminalStatus());</span>
-<span class="fc" id="L1195">            writer.property(&quot;exploredStates&quot;, evidence.exploredStates());</span>
-<span class="fc" id="L1196">            writer.property(&quot;engineCalls&quot;, evidence.engineCalls());</span>
-<span class="fc" id="L1197">            writer.property(</span>
+<span class="fc" id="L1204">            writer.property(&quot;execution&quot;, evidence.execution().name());</span>
+<span class="fc" id="L1205">            writer.property(&quot;policy&quot;, evidence.policy());</span>
+<span class="fc" id="L1206">            writer.property(&quot;reached&quot;, evidence.reached());</span>
+<span class="fc" id="L1207">            writer.property(&quot;terminalStatus&quot;, evidence.terminalStatus());</span>
+<span class="fc" id="L1208">            writer.property(&quot;exploredStates&quot;, evidence.exploredStates());</span>
+<span class="fc" id="L1209">            writer.property(&quot;engineCalls&quot;, evidence.engineCalls());</span>
+<span class="fc" id="L1210">            writer.property(</span>
                 &quot;generatedTransformations&quot;,
-<span class="fc" id="L1199">                evidence.generatedTransformations());</span>
-<span class="fc" id="L1200">            writer.property(&quot;depth&quot;, evidence.depth());</span>
-<span class="fc" id="L1201">            writer.stringArray(&quot;path&quot;, evidence.path());</span>
-<span class="fc" id="L1202">            writer.stringArray(&quot;ruleIds&quot;, evidence.ruleIds());</span>
-<span class="fc bfc" id="L1203" title="All 2 branches covered.">            if (evidence.metrics() == null) {</span>
-<span class="fc" id="L1204">                writer.nullProperty(&quot;goalMetrics&quot;);</span>
+<span class="fc" id="L1212">                evidence.generatedTransformations());</span>
+<span class="fc" id="L1213">            writer.property(&quot;depth&quot;, evidence.depth());</span>
+<span class="fc" id="L1214">            writer.stringArray(&quot;path&quot;, evidence.path());</span>
+<span class="fc" id="L1215">            writer.stringArray(&quot;ruleIds&quot;, evidence.ruleIds());</span>
+<span class="fc bfc" id="L1216" title="All 2 branches covered.">            if (evidence.metrics() == null) {</span>
+<span class="fc" id="L1217">                writer.nullProperty(&quot;goalMetrics&quot;);</span>
             } else {
-<span class="fc" id="L1206">                writer.object(&quot;goalMetrics&quot;, object -&gt;</span>
-<span class="fc" id="L1207">                    writeGoalMetrics(object, evidence.metrics()));</span>
+<span class="fc" id="L1219">                writer.object(&quot;goalMetrics&quot;, object -&gt;</span>
+<span class="fc" id="L1220">                    writeGoalMetrics(object, evidence.metrics()));</span>
             }
-<span class="fc" id="L1209">            writer.property(&quot;detail&quot;, evidence.detail());</span>
-<span class="fc" id="L1210">        }</span>
+<span class="fc" id="L1222">            writer.property(&quot;detail&quot;, evidence.detail());</span>
+<span class="fc" id="L1223">        }</span>
 
         private static void writeGoalMetrics(
             JsonWriter writer,
             GoalMetrics metrics
         ) {
-<span class="fc" id="L1216">            writer.property(&quot;exploredStates&quot;, metrics.exploredStates());</span>
-<span class="fc" id="L1217">            writer.property(&quot;expandedStates&quot;, metrics.expandedStates());</span>
-<span class="fc" id="L1218">            writer.property(</span>
-                &quot;generatedTransformations&quot;,
-<span class="fc" id="L1220">                metrics.generatedTransformations());</span>
-<span class="fc" id="L1221">            writer.property(&quot;enqueuedStates&quot;, metrics.enqueuedStates());</span>
-<span class="fc" id="L1222">            writer.property(</span>
-                &quot;skippedTransformations&quot;,
-<span class="fc" id="L1224">                metrics.skippedTransformations());</span>
-<span class="fc" id="L1225">            writer.property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes());</span>
-<span class="fc" id="L1226">            writer.property(</span>
-<span class="fc" id="L1227">                &quot;transpositionPrunes&quot;, metrics.transpositionPrunes());</span>
-<span class="fc" id="L1228">            writer.property(&quot;depthPrunes&quot;, metrics.depthPrunes());</span>
-<span class="fc" id="L1229">            writer.property(</span>
-<span class="fc" id="L1230">                &quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes());</span>
+<span class="fc" id="L1229">            writer.property(&quot;exploredStates&quot;, metrics.exploredStates());</span>
+<span class="fc" id="L1230">            writer.property(&quot;expandedStates&quot;, metrics.expandedStates());</span>
 <span class="fc" id="L1231">            writer.property(</span>
-                &quot;statesWithoutTransformations&quot;,
-<span class="fc" id="L1233">                metrics.statesWithoutTransformations());</span>
-<span class="fc" id="L1234">            writer.property(&quot;identityCacheHits&quot;, metrics.identityCacheHits());</span>
+                &quot;generatedTransformations&quot;,
+<span class="fc" id="L1233">                metrics.generatedTransformations());</span>
+<span class="fc" id="L1234">            writer.property(&quot;enqueuedStates&quot;, metrics.enqueuedStates());</span>
 <span class="fc" id="L1235">            writer.property(</span>
-<span class="fc" id="L1236">                &quot;identityCacheMisses&quot;, metrics.identityCacheMisses());</span>
-<span class="fc" id="L1237">            writer.property(&quot;cachedExpressions&quot;, metrics.cachedExpressions());</span>
-<span class="fc" id="L1238">            writer.property(&quot;internedValues&quot;, metrics.internedValues());</span>
-<span class="fc" id="L1239">        }</span>
+                &quot;skippedTransformations&quot;,
+<span class="fc" id="L1237">                metrics.skippedTransformations());</span>
+<span class="fc" id="L1238">            writer.property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes());</span>
+<span class="fc" id="L1239">            writer.property(</span>
+<span class="fc" id="L1240">                &quot;transpositionPrunes&quot;, metrics.transpositionPrunes());</span>
+<span class="fc" id="L1241">            writer.property(&quot;depthPrunes&quot;, metrics.depthPrunes());</span>
+<span class="fc" id="L1242">            writer.property(</span>
+<span class="fc" id="L1243">                &quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes());</span>
+<span class="fc" id="L1244">            writer.property(</span>
+                &quot;statesWithoutTransformations&quot;,
+<span class="fc" id="L1246">                metrics.statesWithoutTransformations());</span>
+<span class="fc" id="L1247">            writer.property(&quot;identityCacheHits&quot;, metrics.identityCacheHits());</span>
+<span class="fc" id="L1248">            writer.property(</span>
+<span class="fc" id="L1249">                &quot;identityCacheMisses&quot;, metrics.identityCacheMisses());</span>
+<span class="fc" id="L1250">            writer.property(&quot;cachedExpressions&quot;, metrics.cachedExpressions());</span>
+<span class="fc" id="L1251">            writer.property(&quot;internedValues&quot;, metrics.internedValues());</span>
+<span class="fc" id="L1252">        }</span>
 
         private static void writeAssessment(
             JsonWriter writer,
             Assessment assessment
         ) {
-<span class="fc" id="L1245">            writer.property(&quot;decision&quot;, assessment.decision().name());</span>
-<span class="fc" id="L1246">            writer.property(</span>
+<span class="fc" id="L1258">            writer.property(&quot;decision&quot;, assessment.decision().name());</span>
+<span class="fc" id="L1259">            writer.property(</span>
                 &quot;representationLayerWorks&quot;,
-<span class="fc" id="L1248">                assessment.representationLayerWorks());</span>
-<span class="fc" id="L1249">            writer.property(</span>
+<span class="fc" id="L1261">                assessment.representationLayerWorks());</span>
+<span class="fc" id="L1262">            writer.property(</span>
                 &quot;equivalenceLayerDiscriminates&quot;,
-<span class="fc" id="L1251">                assessment.equivalenceLayerDiscriminates());</span>
-<span class="fc" id="L1252">            writer.property(</span>
+<span class="fc" id="L1264">                assessment.equivalenceLayerDiscriminates());</span>
+<span class="fc" id="L1265">            writer.property(</span>
                 &quot;productionPositiveControlWorks&quot;,
-<span class="fc" id="L1254">                assessment.productionPositiveControlWorks());</span>
-<span class="fc" id="L1255">            writer.property(</span>
+<span class="fc" id="L1267">                assessment.productionPositiveControlWorks());</span>
+<span class="fc" id="L1268">            writer.property(</span>
                 &quot;missingInventoryLayerIdentified&quot;,
-<span class="fc" id="L1257">                assessment.missingInventoryLayerIdentified());</span>
-<span class="fc" id="L1258">            writer.property(</span>
+<span class="fc" id="L1270">                assessment.missingInventoryLayerIdentified());</span>
+<span class="fc" id="L1271">            writer.property(</span>
                 &quot;searchPolicyDifferenceIdentified&quot;,
-<span class="fc" id="L1260">                assessment.searchPolicyDifferenceIdentified());</span>
-<span class="fc" id="L1261">            writer.property(</span>
+<span class="fc" id="L1273">                assessment.searchPolicyDifferenceIdentified());</span>
+<span class="fc" id="L1274">            writer.property(</span>
                 &quot;genericBridgeDifferenceIdentified&quot;,
-<span class="fc" id="L1263">                assessment.genericBridgeDifferenceIdentified());</span>
-<span class="fc" id="L1264">            writer.property(</span>
+<span class="fc" id="L1276">                assessment.genericBridgeDifferenceIdentified());</span>
+<span class="fc" id="L1277">            writer.property(</span>
                 &quot;negativeControlPassed&quot;,
-<span class="fc" id="L1266">                assessment.negativeControlPassed());</span>
-<span class="fc" id="L1267">            writer.property(</span>
+<span class="fc" id="L1279">                assessment.negativeControlPassed());</span>
+<span class="fc" id="L1280">            writer.property(</span>
                 &quot;distinctPrimaryStatuses&quot;,
-<span class="fc" id="L1269">                assessment.distinctPrimaryStatuses());</span>
-<span class="fc" id="L1270">            writer.object(&quot;statusCounts&quot;, object -&gt;</span>
-<span class="fc" id="L1271">                assessment.statusCounts().entrySet().stream()</span>
-<span class="fc" id="L1272">                    .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L1273">                    .forEach(entry -&gt; object.property(</span>
-<span class="fc" id="L1274">                        entry.getKey().name(),</span>
-<span class="fc" id="L1275">                        entry.getValue())));</span>
-<span class="fc" id="L1276">            writer.stringArray(&quot;reasons&quot;, assessment.reasons());</span>
-<span class="fc" id="L1277">        }</span>
+<span class="fc" id="L1282">                assessment.distinctPrimaryStatuses());</span>
+<span class="fc" id="L1283">            writer.object(&quot;statusCounts&quot;, object -&gt;</span>
+<span class="fc" id="L1284">                assessment.statusCounts().entrySet().stream()</span>
+<span class="fc" id="L1285">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L1286">                    .forEach(entry -&gt; object.property(</span>
+<span class="fc" id="L1287">                        entry.getKey().name(),</span>
+<span class="fc" id="L1288">                        entry.getValue())));</span>
+<span class="fc" id="L1289">            writer.stringArray(&quot;reasons&quot;, assessment.reasons());</span>
+<span class="fc" id="L1290">        }</span>
     }
 
-<span class="fc" id="L1280">    public record WrittenArtifacts(Path json, Path markdown) {</span>
+<span class="fc" id="L1293">    public record WrittenArtifacts(Path json, Path markdown) {</span>
     }
 
     private static final class CountingEngine implements TransformationEngine {
@@ -1285,24 +1298,24 @@ import java.util.function.Supplier;
         private int calls;
         private long generated;
 
-<span class="fc" id="L1288">        private CountingEngine(TransformationEngine delegate) {</span>
-<span class="fc" id="L1289">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
-<span class="fc" id="L1290">        }</span>
+<span class="fc" id="L1301">        private CountingEngine(TransformationEngine delegate) {</span>
+<span class="fc" id="L1302">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L1303">        }</span>
 
         @Override
         public List&lt;Transformation&gt; transform(String expression) {
-<span class="fc" id="L1294">            calls++;</span>
-<span class="fc" id="L1295">            List&lt;Transformation&gt; result = delegate.transform(expression);</span>
-<span class="fc" id="L1296">            generated += result.size();</span>
-<span class="fc" id="L1297">            return result;</span>
+<span class="fc" id="L1307">            calls++;</span>
+<span class="fc" id="L1308">            List&lt;Transformation&gt; result = delegate.transform(expression);</span>
+<span class="fc" id="L1309">            generated += result.size();</span>
+<span class="fc" id="L1310">            return result;</span>
         }
 
         private int calls() {
-<span class="fc" id="L1301">            return calls;</span>
+<span class="fc" id="L1314">            return calls;</span>
         }
 
         private long generated() {
-<span class="fc" id="L1305">            return generated;</span>
+<span class="fc" id="L1318">            return generated;</span>
         }
     }
 }

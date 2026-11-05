@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalRediscoveryMatch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">HistoricalRediscoveryMatch.java</span></div><h1>HistoricalRediscoveryMatch.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Case;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
+import de.regelsuche.discovery.representation.RepresentationCorrespondenceClassifier;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.strategy.SearchState;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+
+/** Shared post-search representation criterion for the existing historical reports. */
+<span class="fc" id="L14">final class HistoricalRediscoveryMatch {</span>
+    static final String REPRESENTATION_CRITERION = &quot;POST_SEARCH_AC_REPRESENTATION_V1&quot;;
+<span class="fc" id="L16">    private final RepresentationCorrespondenceClassifier representations =</span>
+        new RepresentationCorrespondenceClassifier();
+<span class="fc" id="L18">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    Optional&lt;SearchState&gt; find(Case benchmarkCase, String target, List&lt;SearchState&gt; states) {
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (sourceAlreadyMatches(benchmarkCase, target)) return Optional.empty();</span>
+<span class="fc" id="L22">        return states.stream()</span>
+<span class="fc" id="L23">            .filter(state -&gt; matches(benchmarkCase, state, target))</span>
+<span class="fc" id="L24">            .min(Comparator.comparingInt(SearchState::depth)</span>
+<span class="fc" id="L25">                .thenComparing(SearchState::expression)</span>
+<span class="fc" id="L26">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds())));</span>
+    }
+
+    boolean sourceAlreadyMatches(Case benchmarkCase, String target) {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT) {</span>
+<span class="fc" id="L31">            return sameRepresentation(benchmarkCase.source(), target);</span>
+        }
+        try {
+<span class="fc" id="L34">            return ExpressionFormatter.format(parser.parseTerm(benchmarkCase.source()))</span>
+<span class="fc" id="L35">                .equals(ExpressionFormatter.format(parser.parseTerm(target)));</span>
+<span class="nc" id="L36">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L37">            return false;</span>
+        }
+    }
+
+    boolean sameRepresentation(String expression, String target) {
+        try {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            return representations.classify(expression, target)</span>
+                    == RepresentationCorrespondenceClassifier.Correspondence.SAME_REPRESENTATION_CLASS;
+<span class="nc" id="L45">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L46">            return false;</span>
+        }
+    }
+
+    private boolean matches(Case benchmarkCase, SearchState state, String target) {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (state.depth() == 0) return false;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT) {</span>
+<span class="fc" id="L53">            return sameRepresentation(state.expression(), target);</span>
+        }
+        try {
+<span class="fc" id="L56">            return ExpressionFormatter.format(parser.parseTerm(state.expression())).equals(target);</span>
+<span class="nc" id="L57">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L58">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

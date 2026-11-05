@@ -179,57 +179,58 @@ public final class HistoricalRediscoveryRunArtifact {
         AtlasReport report,
         WrittenArtifacts writtenArtifacts
     ) {
-<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (!corpus.schema().equals(report.corpusSchema())</span>
-<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                || !corpus.contentSha256().equals(report.corpusSha256())</span>
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                || !corpus.inventoryRevision().equals(report.inventoryRevision())</span>
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                || !corpus.claimBoundary().equals(report.claimBoundary())</span>
-<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                || corpus.cases().size() != report.cases().size()) {</span>
-<span class="nc" id="L187">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(report.schema())</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                || !corpus.schema().equals(report.corpusSchema())</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                || !corpus.contentSha256().equals(report.corpusSha256())</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                || !corpus.inventoryRevision().equals(report.inventoryRevision())</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                || !corpus.claimBoundary().equals(report.claimBoundary())</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                || corpus.cases().size() != report.cases().size()) {</span>
+<span class="fc" id="L188">            throw new IllegalArgumentException(</span>
                 &quot;atlas report does not bind the supplied frozen corpus&quot;);
         }
-<span class="fc" id="L190">        requireCanonicalPath(</span>
+<span class="fc" id="L191">        requireCanonicalPath(</span>
             directory,
-<span class="fc" id="L192">            writtenArtifacts.json(),</span>
+<span class="fc" id="L193">            writtenArtifacts.json(),</span>
             ArtifactRole.ATLAS_JSON);
-<span class="fc" id="L194">        requireCanonicalPath(</span>
+<span class="fc" id="L195">        requireCanonicalPath(</span>
             directory,
-<span class="fc" id="L196">            writtenArtifacts.markdown(),</span>
+<span class="fc" id="L197">            writtenArtifacts.markdown(),</span>
             ArtifactRole.ATLAS_MARKDOWN);
-<span class="fc" id="L198">        requireExactText(writtenArtifacts.json(), report.toJson());</span>
-<span class="fc" id="L199">        requireExactText(writtenArtifacts.markdown(), report.toMarkdown());</span>
-<span class="fc" id="L200">    }</span>
+<span class="fc" id="L199">        requireExactText(writtenArtifacts.json(), report.toJson());</span>
+<span class="fc" id="L200">        requireExactText(writtenArtifacts.markdown(), report.toMarkdown());</span>
+<span class="fc" id="L201">    }</span>
 
     private static void requireCanonicalPath(
         Path directory,
         Path actual,
         ArtifactRole role
     ) {
-<span class="fc" id="L207">        Path normalized = Objects.requireNonNull(actual, &quot;artifact path&quot;)</span>
-<span class="fc" id="L208">            .toAbsolutePath().normalize();</span>
-<span class="fc" id="L209">        Path expected = directory.resolve(role.fileName());</span>
-<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (!expected.equals(normalized)) {</span>
-<span class="nc" id="L211">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L208">        Path normalized = Objects.requireNonNull(actual, &quot;artifact path&quot;)</span>
+<span class="fc" id="L209">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L210">        Path expected = directory.resolve(role.fileName());</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (!expected.equals(normalized)) {</span>
+<span class="nc" id="L212">            throw new IllegalArgumentException(</span>
                 role + &quot; must use canonical path &quot; + expected);
         }
-<span class="fc" id="L214">    }</span>
+<span class="fc" id="L215">    }</span>
 
     private static void requireExactText(Path path, String expected) {
-<span class="fc" id="L217">        String actual = readUtf8(path, MAX_PAYLOAD_BYTES, &quot;atlas payload&quot;);</span>
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
-<span class="nc" id="L219">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L218">        String actual = readUtf8(path, MAX_PAYLOAD_BYTES, &quot;atlas payload&quot;);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
+<span class="nc" id="L220">            throw new IllegalArgumentException(</span>
                 &quot;written atlas payload differs from the in-memory report: &quot;
-<span class="nc" id="L221">                    + path.getFileName());</span>
+<span class="nc" id="L222">                    + path.getFileName());</span>
         }
-<span class="fc" id="L223">    }</span>
+<span class="fc" id="L224">    }</span>
 
     private static Artifact describe(ArtifactRole role, Path path) {
-<span class="fc" id="L226">        Objects.requireNonNull(role, &quot;role&quot;);</span>
-<span class="fc" id="L227">        byte[] bytes = readBytes(path, MAX_PAYLOAD_BYTES, role.name());</span>
-<span class="fc" id="L228">        return new Artifact(</span>
-<span class="fc" id="L229">            role.fileName(),</span>
+<span class="fc" id="L227">        Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L228">        byte[] bytes = readBytes(path, MAX_PAYLOAD_BYTES, role.name());</span>
+<span class="fc" id="L229">        return new Artifact(</span>
+<span class="fc" id="L230">            role.fileName(),</span>
             role,
-<span class="fc" id="L231">            role.mediaType(),</span>
-<span class="fc" id="L232">            sha256(bytes),</span>
+<span class="fc" id="L232">            role.mediaType(),</span>
+<span class="fc" id="L233">            sha256(bytes),</span>
             bytes.length
         );
     }
@@ -238,216 +239,216 @@ public final class HistoricalRediscoveryRunArtifact {
         Path directory,
         Manifest manifest
     ) {
-<span class="fc" id="L241">        Path atlasPath = directory.resolve(ArtifactRole.ATLAS_JSON.fileName());</span>
-<span class="fc" id="L242">        Map&lt;String, Object&gt; atlas = new JsonReader(readUtf8(</span>
+<span class="fc" id="L242">        Path atlasPath = directory.resolve(ArtifactRole.ATLAS_JSON.fileName());</span>
+<span class="fc" id="L243">        Map&lt;String, Object&gt; atlas = new JsonReader(readUtf8(</span>
             atlasPath,
             MAX_PAYLOAD_BYTES,
-<span class="fc" id="L245">            &quot;historical rediscovery atlas&quot;)).readObject();</span>
-<span class="fc" id="L246">        requireEqual(</span>
-<span class="fc" id="L247">            manifest.atlasSchema(),</span>
-<span class="fc" id="L248">            string(atlas, &quot;schema&quot;),</span>
+<span class="fc" id="L246">            &quot;historical rediscovery atlas&quot;)).readObject();</span>
+<span class="fc" id="L247">        requireEqual(</span>
+<span class="fc" id="L248">            manifest.atlasSchema(),</span>
+<span class="fc" id="L249">            string(atlas, &quot;schema&quot;),</span>
             &quot;atlas schema&quot;);
-<span class="fc" id="L250">        requireEqual(</span>
-<span class="fc" id="L251">            manifest.corpusSchema(),</span>
-<span class="fc" id="L252">            string(atlas, &quot;corpusSchema&quot;),</span>
+<span class="fc" id="L251">        requireEqual(</span>
+<span class="fc" id="L252">            manifest.corpusSchema(),</span>
+<span class="fc" id="L253">            string(atlas, &quot;corpusSchema&quot;),</span>
             &quot;corpus schema&quot;);
-<span class="fc" id="L254">        requireEqual(</span>
-<span class="fc" id="L255">            manifest.corpusSha256(),</span>
-<span class="fc" id="L256">            string(atlas, &quot;corpusSha256&quot;),</span>
+<span class="fc" id="L255">        requireEqual(</span>
+<span class="fc" id="L256">            manifest.corpusSha256(),</span>
+<span class="fc" id="L257">            string(atlas, &quot;corpusSha256&quot;),</span>
             &quot;corpus SHA-256&quot;);
-<span class="fc" id="L258">        requireEqual(</span>
-<span class="fc" id="L259">            manifest.inventoryRevision(),</span>
-<span class="fc" id="L260">            string(atlas, &quot;inventoryRevision&quot;),</span>
+<span class="fc" id="L259">        requireEqual(</span>
+<span class="fc" id="L260">            manifest.inventoryRevision(),</span>
+<span class="fc" id="L261">            string(atlas, &quot;inventoryRevision&quot;),</span>
             &quot;inventory revision&quot;);
-<span class="fc" id="L262">        requireEqual(</span>
-<span class="fc" id="L263">            manifest.claimBoundary(),</span>
-<span class="fc" id="L264">            string(atlas, &quot;claimBoundary&quot;),</span>
+<span class="fc" id="L263">        requireEqual(</span>
+<span class="fc" id="L264">            manifest.claimBoundary(),</span>
+<span class="fc" id="L265">            string(atlas, &quot;claimBoundary&quot;),</span>
             &quot;claim boundary&quot;);
-<span class="fc" id="L266">        List&lt;?&gt; cases = list(atlas, &quot;cases&quot;);</span>
-<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (cases.size() != manifest.caseCount()) {</span>
-<span class="nc" id="L268">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L267">        List&lt;?&gt; cases = list(atlas, &quot;cases&quot;);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (cases.size() != manifest.caseCount()) {</span>
+<span class="nc" id="L269">            throw new IllegalArgumentException(</span>
                 &quot;atlas case count differs from manifest&quot;);
         }
-<span class="fc" id="L271">        Map&lt;String, Object&gt; assessment = object(atlas, &quot;assessment&quot;);</span>
-<span class="fc" id="L272">        requireEqual(</span>
-<span class="fc" id="L273">            manifest.assessmentDecision(),</span>
-<span class="fc" id="L274">            string(assessment, &quot;decision&quot;),</span>
+<span class="fc" id="L272">        Map&lt;String, Object&gt; assessment = object(atlas, &quot;assessment&quot;);</span>
+<span class="fc" id="L273">        requireEqual(</span>
+<span class="fc" id="L274">            manifest.assessmentDecision(),</span>
+<span class="fc" id="L275">            string(assessment, &quot;decision&quot;),</span>
             &quot;assessment decision&quot;);
-<span class="fc" id="L276">    }</span>
+<span class="fc" id="L277">    }</span>
 
     private static void verifyDirectoryMembership(Path directory) {
-<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)</span>
-<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                || Files.isSymbolicLink(directory)) {</span>
-<span class="nc" id="L281">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                || Files.isSymbolicLink(directory)) {</span>
+<span class="nc" id="L282">            throw new IllegalArgumentException(</span>
                 &quot;missing historical rediscovery run directory: &quot; + directory);
         }
-<span class="fc" id="L284">        try (var paths = Files.list(directory)) {</span>
-<span class="fc" id="L285">            List&lt;String&gt; names = paths.map(path -&gt; {</span>
-<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                if (Files.isSymbolicLink(path)</span>
-<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                        || !Files.isRegularFile(</span>
+<span class="fc" id="L285">        try (var paths = Files.list(directory)) {</span>
+<span class="fc" id="L286">            List&lt;String&gt; names = paths.map(path -&gt; {</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                if (Files.isSymbolicLink(path)</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                        || !Files.isRegularFile(</span>
                             path,
                             LinkOption.NOFOLLOW_LINKS)) {
-<span class="nc" id="L290">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L291">                    throw new IllegalArgumentException(</span>
                         &quot;run artifacts must be regular files: &quot; + path);
                 }
-<span class="fc" id="L293">                return path.getFileName().toString();</span>
-<span class="fc" id="L294">            }).sorted().toList();</span>
-<span class="fc" id="L295">            List&lt;String&gt; expected = EXPECTED_FILES.stream().sorted().toList();</span>
-<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (!expected.equals(names)) {</span>
-<span class="fc" id="L297">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L294">                return path.getFileName().toString();</span>
+<span class="fc" id="L295">            }).sorted().toList();</span>
+<span class="fc" id="L296">            List&lt;String&gt; expected = EXPECTED_FILES.stream().sorted().toList();</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            if (!expected.equals(names)) {</span>
+<span class="fc" id="L298">                throw new IllegalArgumentException(</span>
                     &quot;historical rediscovery run membership differs: expected=&quot;
                         + expected + &quot;, actual=&quot; + names);
             }
-<span class="nc" id="L301">        } catch (IOException exception) {</span>
-<span class="nc" id="L302">            throw new UncheckedIOException(</span>
+<span class="nc" id="L302">        } catch (IOException exception) {</span>
+<span class="nc" id="L303">            throw new UncheckedIOException(</span>
                 &quot;Could not inspect historical rediscovery run&quot;, exception);
-<span class="fc" id="L304">        }</span>
-<span class="fc" id="L305">    }</span>
+<span class="fc" id="L305">        }</span>
+<span class="fc" id="L306">    }</span>
 
     private static void requireManifestAbsent(Path directory) {
-<span class="fc" id="L308">        Path manifest = directory.resolve(MANIFEST_FILE_NAME);</span>
-<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (Files.exists(manifest, LinkOption.NOFOLLOW_LINKS)) {</span>
-<span class="fc" id="L310">            throw new IllegalStateException(</span>
+<span class="fc" id="L309">        Path manifest = directory.resolve(MANIFEST_FILE_NAME);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (Files.exists(manifest, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L311">            throw new IllegalStateException(</span>
                 &quot;begin must invalidate the previous run manifest before commit&quot;);
         }
-<span class="fc" id="L313">    }</span>
+<span class="fc" id="L314">    }</span>
 
     private static byte[] readBytes(Path path, long maximum, String label) {
-<span class="fc" id="L316">        Path normalized = Objects.requireNonNull(path, &quot;path&quot;)</span>
-<span class="fc" id="L317">            .toAbsolutePath().normalize();</span>
-<span class="fc" id="L318">        rejectSymbolicAncestry(normalized);</span>
-<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(normalized)</span>
-<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                || !Files.isRegularFile(</span>
+<span class="fc" id="L317">        Path normalized = Objects.requireNonNull(path, &quot;path&quot;)</span>
+<span class="fc" id="L318">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L319">        rejectSymbolicAncestry(normalized);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(normalized)</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                || !Files.isRegularFile(</span>
                     normalized,
                     LinkOption.NOFOLLOW_LINKS)) {
-<span class="nc" id="L323">            throw new IllegalArgumentException(label + &quot; must be a regular file&quot;);</span>
+<span class="nc" id="L324">            throw new IllegalArgumentException(label + &quot; must be a regular file&quot;);</span>
         }
         try {
-<span class="fc" id="L326">            long declaredLength = Files.size(normalized);</span>
-<span class="pc bpc" id="L327" title="2 of 4 branches missed.">            if (declaredLength &lt; 1L || declaredLength &gt; maximum) {</span>
-<span class="nc" id="L328">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L327">            long declaredLength = Files.size(normalized);</span>
+<span class="pc bpc" id="L328" title="2 of 4 branches missed.">            if (declaredLength &lt; 1L || declaredLength &gt; maximum) {</span>
+<span class="nc" id="L329">                throw new IllegalArgumentException(</span>
                     label + &quot; size is outside the bounded range: &quot;
                         + declaredLength);
             }
-<span class="fc" id="L332">            byte[] bytes = Files.readAllBytes(normalized);</span>
-<span class="pc bpc" id="L333" title="1 of 2 branches missed.">            if (bytes.length != declaredLength) {</span>
-<span class="nc" id="L334">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L333">            byte[] bytes = Files.readAllBytes(normalized);</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">            if (bytes.length != declaredLength) {</span>
+<span class="nc" id="L335">                throw new IllegalArgumentException(</span>
                     label + &quot; changed while being read&quot;);
             }
-<span class="fc" id="L337">            return bytes;</span>
-<span class="nc" id="L338">        } catch (IOException exception) {</span>
-<span class="nc" id="L339">            throw new UncheckedIOException(&quot;Could not read &quot; + label, exception);</span>
+<span class="fc" id="L338">            return bytes;</span>
+<span class="nc" id="L339">        } catch (IOException exception) {</span>
+<span class="nc" id="L340">            throw new UncheckedIOException(&quot;Could not read &quot; + label, exception);</span>
         }
     }
 
     private static String readUtf8(Path path, long maximum, String label) {
-<span class="fc" id="L344">        byte[] bytes = readBytes(path, maximum, label);</span>
+<span class="fc" id="L345">        byte[] bytes = readBytes(path, maximum, label);</span>
         try {
-<span class="fc" id="L346">            return StandardCharsets.UTF_8.newDecoder()</span>
-<span class="fc" id="L347">                .onMalformedInput(CodingErrorAction.REPORT)</span>
-<span class="fc" id="L348">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
-<span class="fc" id="L349">                .decode(ByteBuffer.wrap(bytes))</span>
-<span class="fc" id="L350">                .toString();</span>
-<span class="fc" id="L351">        } catch (CharacterCodingException exception) {</span>
-<span class="fc" id="L352">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L347">            return StandardCharsets.UTF_8.newDecoder()</span>
+<span class="fc" id="L348">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L349">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L350">                .decode(ByteBuffer.wrap(bytes))</span>
+<span class="fc" id="L351">                .toString();</span>
+<span class="fc" id="L352">        } catch (CharacterCodingException exception) {</span>
+<span class="fc" id="L353">            throw new IllegalArgumentException(</span>
                 label + &quot; is not valid UTF-8&quot;, exception);
         }
     }
 
     private static Path normalizedDirectory(Path directory) {
-<span class="fc" id="L358">        return Objects.requireNonNull(directory, &quot;outputDirectory&quot;)</span>
-<span class="fc" id="L359">            .toAbsolutePath().normalize();</span>
+<span class="fc" id="L359">        return Objects.requireNonNull(directory, &quot;outputDirectory&quot;)</span>
+<span class="fc" id="L360">            .toAbsolutePath().normalize();</span>
     }
 
     private static void rejectSymbolicAncestry(Path path) {
-<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (Path current = path; current != null; current = current.getParent()) {</span>
-<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            if (Files.isSymbolicLink(current)) {</span>
-<span class="nc" id="L365">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        for (Path current = path; current != null; current = current.getParent()) {</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (Files.isSymbolicLink(current)) {</span>
+<span class="nc" id="L366">                throw new IllegalArgumentException(</span>
                     &quot;symbolic path ancestry is not accepted: &quot; + current);
             }
         }
-<span class="fc" id="L369">    }</span>
+<span class="fc" id="L370">    }</span>
 
     private static void requireEqual(
         String expected,
         String actual,
         String label
     ) {
-<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
-<span class="nc" id="L377">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
+<span class="nc" id="L378">            throw new IllegalArgumentException(</span>
                 label + &quot; differs: expected=&quot; + expected + &quot;, actual=&quot; + actual);
         }
-<span class="fc" id="L380">    }</span>
+<span class="fc" id="L381">    }</span>
 
     private static Map&lt;String, Object&gt; stringKeyed(Map&lt;?, ?&gt; raw) {
-<span class="fc" id="L383">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L384">        raw.forEach((key, value) -&gt; {</span>
-<span class="pc bpc" id="L385" title="1 of 2 branches missed.">            if (!(key instanceof String text)) {</span>
-<span class="nc" id="L386">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L384">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L385">        raw.forEach((key, value) -&gt; {</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">            if (!(key instanceof String text)) {</span>
+<span class="nc" id="L387">                throw new IllegalArgumentException(</span>
                     &quot;JSON object key must be a string&quot;);
             }
-<span class="pc bpc" id="L389" title="1 of 2 branches missed.">            if (result.put(text, value) != null) {</span>
-<span class="nc" id="L390">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            if (result.put(text, value) != null) {</span>
+<span class="nc" id="L391">                throw new IllegalArgumentException(</span>
                     &quot;duplicate JSON object key: &quot; + text);
             }
-<span class="fc" id="L393">        });</span>
-<span class="fc" id="L394">        return result;</span>
+<span class="fc" id="L394">        });</span>
+<span class="fc" id="L395">        return result;</span>
     }
 
     private static Map&lt;String, Object&gt; object(
         Map&lt;String, Object&gt; values,
         String key
     ) {
-<span class="fc" id="L401">        Object value = values.get(key);</span>
-<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        if (!(value instanceof Map&lt;?, ?&gt; map)) {</span>
-<span class="nc" id="L403">            throw new IllegalArgumentException(key + &quot; must be a JSON object&quot;);</span>
+<span class="fc" id="L402">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (!(value instanceof Map&lt;?, ?&gt; map)) {</span>
+<span class="nc" id="L404">            throw new IllegalArgumentException(key + &quot; must be a JSON object&quot;);</span>
         }
-<span class="fc" id="L405">        return stringKeyed(map);</span>
+<span class="fc" id="L406">        return stringKeyed(map);</span>
     }
 
     private static List&lt;?&gt; list(Map&lt;String, Object&gt; values, String key) {
-<span class="fc" id="L409">        Object value = values.get(key);</span>
-<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        if (!(value instanceof List&lt;?&gt; items)) {</span>
-<span class="nc" id="L411">            throw new IllegalArgumentException(key + &quot; must be a JSON array&quot;);</span>
+<span class="fc" id="L410">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        if (!(value instanceof List&lt;?&gt; items)) {</span>
+<span class="nc" id="L412">            throw new IllegalArgumentException(key + &quot; must be a JSON array&quot;);</span>
         }
-<span class="fc" id="L413">        return items;</span>
+<span class="fc" id="L414">        return items;</span>
     }
 
     private static String string(Map&lt;String, Object&gt; values, String key) {
-<span class="fc" id="L417">        Object value = values.get(key);</span>
-<span class="pc bpc" id="L418" title="2 of 4 branches missed.">        if (!(value instanceof String text) || text.isBlank()) {</span>
-<span class="nc" id="L419">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L418">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L419" title="2 of 4 branches missed.">        if (!(value instanceof String text) || text.isBlank()) {</span>
+<span class="nc" id="L420">            throw new IllegalArgumentException(</span>
                 key + &quot; must be a non-blank string&quot;);
         }
-<span class="fc" id="L422">        return text;</span>
+<span class="fc" id="L423">        return text;</span>
     }
 
     private static int positiveInt(Map&lt;String, Object&gt; values, String key) {
-<span class="fc" id="L426">        Object value = values.get(key);</span>
-<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (!(value instanceof Number number)) {</span>
-<span class="nc" id="L428">            throw new IllegalArgumentException(key + &quot; must be numeric&quot;);</span>
+<span class="fc" id="L427">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        if (!(value instanceof Number number)) {</span>
+<span class="nc" id="L429">            throw new IllegalArgumentException(key + &quot; must be numeric&quot;);</span>
         }
-<span class="fc" id="L430">        double decimal = number.doubleValue();</span>
-<span class="fc" id="L431">        int integer = number.intValue();</span>
-<span class="pc bpc" id="L432" title="3 of 6 branches missed.">        if (!Double.isFinite(decimal) || decimal != integer || integer &lt; 1) {</span>
-<span class="nc" id="L433">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L431">        double decimal = number.doubleValue();</span>
+<span class="fc" id="L432">        int integer = number.intValue();</span>
+<span class="pc bpc" id="L433" title="3 of 6 branches missed.">        if (!Double.isFinite(decimal) || decimal != integer || integer &lt; 1) {</span>
+<span class="nc" id="L434">            throw new IllegalArgumentException(</span>
                 key + &quot; must be a positive integer&quot;);
         }
-<span class="fc" id="L436">        return integer;</span>
+<span class="fc" id="L437">        return integer;</span>
     }
 
     private static long positiveLong(Map&lt;String, Object&gt; values, String key) {
-<span class="fc" id="L440">        Object value = values.get(key);</span>
-<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        if (!(value instanceof Number number)) {</span>
-<span class="nc" id="L442">            throw new IllegalArgumentException(key + &quot; must be numeric&quot;);</span>
+<span class="fc" id="L441">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">        if (!(value instanceof Number number)) {</span>
+<span class="nc" id="L443">            throw new IllegalArgumentException(key + &quot; must be numeric&quot;);</span>
         }
-<span class="fc" id="L444">        double decimal = number.doubleValue();</span>
-<span class="fc" id="L445">        long integer = number.longValue();</span>
-<span class="pc bpc" id="L446" title="3 of 6 branches missed.">        if (!Double.isFinite(decimal) || decimal != integer || integer &lt; 1L) {</span>
-<span class="nc" id="L447">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L445">        double decimal = number.doubleValue();</span>
+<span class="fc" id="L446">        long integer = number.longValue();</span>
+<span class="pc bpc" id="L447" title="3 of 6 branches missed.">        if (!Double.isFinite(decimal) || decimal != integer || integer &lt; 1L) {</span>
+<span class="nc" id="L448">            throw new IllegalArgumentException(</span>
                 key + &quot; must be a positive integer&quot;);
         }
-<span class="fc" id="L450">        return integer;</span>
+<span class="fc" id="L451">        return integer;</span>
     }
 
     private static void requireKeys(
@@ -455,56 +456,56 @@ public final class HistoricalRediscoveryRunArtifact {
         Set&lt;String&gt; expected,
         String label
     ) {
-<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (!values.keySet().equals(expected)) {</span>
-<span class="fc" id="L459">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        if (!values.keySet().equals(expected)) {</span>
+<span class="fc" id="L460">            throw new IllegalArgumentException(</span>
                 label + &quot; keys differ: expected=&quot; + expected
-<span class="fc" id="L461">                    + &quot;, actual=&quot; + values.keySet());</span>
+<span class="fc" id="L462">                    + &quot;, actual=&quot; + values.keySet());</span>
         }
-<span class="fc" id="L463">    }</span>
+<span class="fc" id="L464">    }</span>
 
     private static String requireText(String value, String label) {
-<span class="pc bpc" id="L466" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L467">            throw new IllegalArgumentException(label + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L467" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L468">            throw new IllegalArgumentException(label + &quot; must not be blank&quot;);</span>
         }
-<span class="pc bpc" id="L469" title="1 of 2 branches missed.">        if (value.length() &gt; MAX_TEXT_LENGTH) {</span>
-<span class="nc" id="L470">            throw new IllegalArgumentException(label + &quot; is too long&quot;);</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        if (value.length() &gt; MAX_TEXT_LENGTH) {</span>
+<span class="nc" id="L471">            throw new IllegalArgumentException(label + &quot; is too long&quot;);</span>
         }
-<span class="fc" id="L472">        return value;</span>
+<span class="fc" id="L473">        return value;</span>
     }
 
     private static String requireRawSha256(String value, String label) {
-<span class="fc" id="L476">        String text = requireText(value, label);</span>
-<span class="pc bpc" id="L477" title="1 of 2 branches missed.">        if (!text.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L478">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L477">        String text = requireText(value, label);</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">        if (!text.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L479">            throw new IllegalArgumentException(</span>
                 label + &quot; must be lowercase hexadecimal SHA-256&quot;);
         }
-<span class="fc" id="L481">        return text;</span>
+<span class="fc" id="L482">        return text;</span>
     }
 
     private static String requirePrefixedSha256(String value, String label) {
-<span class="fc" id="L485">        String text = requireText(value, label);</span>
-<span class="pc bpc" id="L486" title="1 of 2 branches missed.">        if (!text.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L487">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L486">        String text = requireText(value, label);</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (!text.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L488">            throw new IllegalArgumentException(</span>
                 label + &quot; must be prefixed SHA-256&quot;);
         }
-<span class="fc" id="L490">        return text;</span>
+<span class="fc" id="L491">        return text;</span>
     }
 
     private static String requireAssessmentDecision(String value) {
-<span class="fc" id="L494">        String decision = requireText(value, &quot;assessmentDecision&quot;);</span>
-<span class="fc bfc" id="L495" title="All 2 branches covered.">        if (!ASSESSMENT_DECISIONS.contains(decision)) {</span>
-<span class="fc" id="L496">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L495">        String decision = requireText(value, &quot;assessmentDecision&quot;);</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        if (!ASSESSMENT_DECISIONS.contains(decision)) {</span>
+<span class="fc" id="L497">            throw new IllegalArgumentException(</span>
                 &quot;unsupported historical rediscovery assessment decision&quot;);
         }
-<span class="fc" id="L499">        return decision;</span>
+<span class="fc" id="L500">        return decision;</span>
     }
 
     private static String sha256(byte[] bytes) {
         try {
-<span class="fc" id="L504">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
-<span class="fc" id="L505">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
-<span class="nc" id="L506">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L507">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L505">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L506">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L507">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L508">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
@@ -518,7 +519,7 @@ public final class HistoricalRediscoveryRunArtifact {
         int caseCount,
         List&lt;Artifact&gt; artifacts
     ) {
-<span class="fc" id="L521">        String canonicalWithoutHash = renderManifest(</span>
+<span class="fc" id="L522">        String canonicalWithoutHash = renderManifest(</span>
             corpusSchema,
             corpusSha256,
             atlasSchema,
@@ -528,7 +529,7 @@ public final class HistoricalRediscoveryRunArtifact {
             caseCount,
             artifacts,
             null);
-<span class="fc" id="L531">        return sha256(canonicalWithoutHash.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L532">        return sha256(canonicalWithoutHash.getBytes(StandardCharsets.UTF_8));</span>
     }
 
     private static String renderManifest(
@@ -542,73 +543,73 @@ public final class HistoricalRediscoveryRunArtifact {
         List&lt;Artifact&gt; artifacts,
         String contentHash
     ) {
-<span class="fc" id="L545">        JsonWriter writer = new JsonWriter().beginObject();</span>
-<span class="fc" id="L546">        writer.property(&quot;schema&quot;, SCHEMA);</span>
-<span class="fc" id="L547">        writer.property(&quot;evidenceStatus&quot;, EVIDENCE_STATUS);</span>
-<span class="fc" id="L548">        writer.property(&quot;corpusSchema&quot;, corpusSchema);</span>
-<span class="fc" id="L549">        writer.property(&quot;corpusSha256&quot;, corpusSha256);</span>
-<span class="fc" id="L550">        writer.property(&quot;atlasSchema&quot;, atlasSchema);</span>
-<span class="fc" id="L551">        writer.property(&quot;inventoryRevision&quot;, inventoryRevision);</span>
-<span class="fc" id="L552">        writer.property(&quot;claimBoundary&quot;, claimBoundary);</span>
-<span class="fc" id="L553">        writer.property(&quot;assessmentDecision&quot;, assessmentDecision);</span>
-<span class="fc" id="L554">        writer.property(&quot;caseCount&quot;, caseCount);</span>
-<span class="fc" id="L555">        writer.array(&quot;artifacts&quot;, array -&gt; artifacts.forEach(artifact -&gt;</span>
-<span class="fc" id="L556">            array.objectValue(object -&gt; {</span>
-<span class="fc" id="L557">                object.property(&quot;fileName&quot;, artifact.fileName());</span>
-<span class="fc" id="L558">                object.property(&quot;role&quot;, artifact.role().name());</span>
-<span class="fc" id="L559">                object.property(&quot;mediaType&quot;, artifact.mediaType());</span>
-<span class="fc" id="L560">                object.property(&quot;byteHash&quot;, artifact.byteHash());</span>
-<span class="fc" id="L561">                object.property(&quot;byteLength&quot;, artifact.byteLength());</span>
-<span class="fc" id="L562">            })));</span>
-<span class="fc" id="L563">        writer.property(&quot;commitProtocol&quot;, COMMIT_PROTOCOL);</span>
-<span class="fc bfc" id="L564" title="All 2 branches covered.">        if (contentHash != null) {</span>
-<span class="fc" id="L565">            writer.property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L546">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L547">        writer.property(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L548">        writer.property(&quot;evidenceStatus&quot;, EVIDENCE_STATUS);</span>
+<span class="fc" id="L549">        writer.property(&quot;corpusSchema&quot;, corpusSchema);</span>
+<span class="fc" id="L550">        writer.property(&quot;corpusSha256&quot;, corpusSha256);</span>
+<span class="fc" id="L551">        writer.property(&quot;atlasSchema&quot;, atlasSchema);</span>
+<span class="fc" id="L552">        writer.property(&quot;inventoryRevision&quot;, inventoryRevision);</span>
+<span class="fc" id="L553">        writer.property(&quot;claimBoundary&quot;, claimBoundary);</span>
+<span class="fc" id="L554">        writer.property(&quot;assessmentDecision&quot;, assessmentDecision);</span>
+<span class="fc" id="L555">        writer.property(&quot;caseCount&quot;, caseCount);</span>
+<span class="fc" id="L556">        writer.array(&quot;artifacts&quot;, array -&gt; artifacts.forEach(artifact -&gt;</span>
+<span class="fc" id="L557">            array.objectValue(object -&gt; {</span>
+<span class="fc" id="L558">                object.property(&quot;fileName&quot;, artifact.fileName());</span>
+<span class="fc" id="L559">                object.property(&quot;role&quot;, artifact.role().name());</span>
+<span class="fc" id="L560">                object.property(&quot;mediaType&quot;, artifact.mediaType());</span>
+<span class="fc" id="L561">                object.property(&quot;byteHash&quot;, artifact.byteHash());</span>
+<span class="fc" id="L562">                object.property(&quot;byteLength&quot;, artifact.byteLength());</span>
+<span class="fc" id="L563">            })));</span>
+<span class="fc" id="L564">        writer.property(&quot;commitProtocol&quot;, COMMIT_PROTOCOL);</span>
+<span class="fc bfc" id="L565" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L566">            writer.property(&quot;contentHash&quot;, contentHash);</span>
         }
-<span class="fc" id="L567">        return writer.endObject().toString();</span>
+<span class="fc" id="L568">        return writer.endObject().toString();</span>
     }
 
     private static List&lt;Artifact&gt; normalizeArtifacts(List&lt;Artifact&gt; values) {
-<span class="pc bpc" id="L571" title="2 of 4 branches missed.">        if (values == null || values.size() != ArtifactRole.values().length) {</span>
-<span class="nc" id="L572">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L572" title="2 of 4 branches missed.">        if (values == null || values.size() != ArtifactRole.values().length) {</span>
+<span class="nc" id="L573">            throw new IllegalArgumentException(</span>
                 &quot;historical rediscovery run requires exactly two artifacts&quot;);
         }
-<span class="fc" id="L575">        List&lt;Artifact&gt; normalized = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L576">        EnumSet&lt;ArtifactRole&gt; roles = EnumSet.noneOf(ArtifactRole.class);</span>
-<span class="fc bfc" id="L577" title="All 2 branches covered.">        for (Artifact value : values) {</span>
-<span class="fc" id="L578">            Artifact artifact = Objects.requireNonNull(value, &quot;artifact&quot;);</span>
-<span class="pc bpc" id="L579" title="1 of 2 branches missed.">            if (!roles.add(artifact.role())) {</span>
-<span class="nc" id="L580">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L576">        List&lt;Artifact&gt; normalized = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L577">        EnumSet&lt;ArtifactRole&gt; roles = EnumSet.noneOf(ArtifactRole.class);</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">        for (Artifact value : values) {</span>
+<span class="fc" id="L579">            Artifact artifact = Objects.requireNonNull(value, &quot;artifact&quot;);</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">            if (!roles.add(artifact.role())) {</span>
+<span class="nc" id="L581">                throw new IllegalArgumentException(</span>
                     &quot;duplicate historical rediscovery artifact role: &quot;
-<span class="nc" id="L582">                        + artifact.role());</span>
+<span class="nc" id="L583">                        + artifact.role());</span>
             }
-<span class="fc" id="L584">            normalized.add(artifact);</span>
-<span class="fc" id="L585">        }</span>
-<span class="pc bpc" id="L586" title="1 of 2 branches missed.">        if (!roles.equals(EnumSet.allOf(ArtifactRole.class))) {</span>
-<span class="nc" id="L587">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L585">            normalized.add(artifact);</span>
+<span class="fc" id="L586">        }</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (!roles.equals(EnumSet.allOf(ArtifactRole.class))) {</span>
+<span class="nc" id="L588">            throw new IllegalArgumentException(</span>
                 &quot;historical rediscovery run is missing an artifact role&quot;);
         }
-<span class="fc" id="L590">        normalized.sort(Comparator.comparing(Artifact::fileName));</span>
-<span class="fc" id="L591">        return List.copyOf(normalized);</span>
+<span class="fc" id="L591">        normalized.sort(Comparator.comparing(Artifact::fileName));</span>
+<span class="fc" id="L592">        return List.copyOf(normalized);</span>
     }
 
-<span class="fc" id="L594">    public enum ArtifactRole {</span>
-<span class="fc" id="L595">        ATLAS_JSON(&quot;historical-rediscovery-atlas.json&quot;, &quot;application/json&quot;),</span>
-<span class="fc" id="L596">        ATLAS_MARKDOWN(&quot;historical-rediscovery-atlas.md&quot;, &quot;text/markdown&quot;);</span>
+<span class="fc" id="L595">    public enum ArtifactRole {</span>
+<span class="fc" id="L596">        ATLAS_JSON(&quot;historical-rediscovery-atlas.json&quot;, &quot;application/json&quot;),</span>
+<span class="fc" id="L597">        ATLAS_MARKDOWN(&quot;historical-rediscovery-atlas.md&quot;, &quot;text/markdown&quot;);</span>
 
         private final String fileName;
         private final String mediaType;
 
-<span class="fc" id="L601">        ArtifactRole(String fileName, String mediaType) {</span>
-<span class="fc" id="L602">            this.fileName = fileName;</span>
-<span class="fc" id="L603">            this.mediaType = mediaType;</span>
-<span class="fc" id="L604">        }</span>
+<span class="fc" id="L602">        ArtifactRole(String fileName, String mediaType) {</span>
+<span class="fc" id="L603">            this.fileName = fileName;</span>
+<span class="fc" id="L604">            this.mediaType = mediaType;</span>
+<span class="fc" id="L605">        }</span>
 
         public String fileName() {
-<span class="fc" id="L607">            return fileName;</span>
+<span class="fc" id="L608">            return fileName;</span>
         }
 
         public String mediaType() {
-<span class="fc" id="L611">            return mediaType;</span>
+<span class="fc" id="L612">            return mediaType;</span>
         }
     }
 
@@ -619,41 +620,41 @@ public final class HistoricalRediscoveryRunArtifact {
         String byteHash,
         long byteLength
     ) {
-<span class="fc" id="L622">        public Artifact {</span>
-<span class="fc" id="L623">            Objects.requireNonNull(role, &quot;role&quot;);</span>
-<span class="pc bpc" id="L624" title="1 of 2 branches missed.">            if (!role.fileName().equals(fileName)</span>
-<span class="pc bpc" id="L625" title="1 of 2 branches missed.">                    || !role.mediaType().equals(mediaType)) {</span>
-<span class="nc" id="L626">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L623">        public Artifact {</span>
+<span class="fc" id="L624">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (!role.fileName().equals(fileName)</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">                    || !role.mediaType().equals(mediaType)) {</span>
+<span class="nc" id="L627">                throw new IllegalArgumentException(</span>
                     &quot;artifact name and media type must match its role&quot;);
             }
-<span class="fc" id="L629">            byteHash = requirePrefixedSha256(byteHash, &quot;byteHash&quot;);</span>
-<span class="pc bpc" id="L630" title="2 of 4 branches missed.">            if (byteLength &lt; 1L || byteLength &gt; MAX_PAYLOAD_BYTES) {</span>
-<span class="nc" id="L631">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L630">            byteHash = requirePrefixedSha256(byteHash, &quot;byteHash&quot;);</span>
+<span class="pc bpc" id="L631" title="2 of 4 branches missed.">            if (byteLength &lt; 1L || byteLength &gt; MAX_PAYLOAD_BYTES) {</span>
+<span class="nc" id="L632">                throw new IllegalArgumentException(</span>
                     &quot;artifact byteLength is outside the bounded range&quot;);
             }
-<span class="fc" id="L634">        }</span>
+<span class="fc" id="L635">        }</span>
 
         private static Artifact parse(Object raw) {
-<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            if (!(raw instanceof Map&lt;?, ?&gt; map)) {</span>
-<span class="nc" id="L638">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">            if (!(raw instanceof Map&lt;?, ?&gt; map)) {</span>
+<span class="nc" id="L639">                throw new IllegalArgumentException(</span>
                     &quot;run artifact entry must be a JSON object&quot;);
             }
-<span class="fc" id="L641">            Map&lt;String, Object&gt; values = stringKeyed(map);</span>
-<span class="fc" id="L642">            requireKeys(values, ARTIFACT_KEYS, &quot;run artifact&quot;);</span>
+<span class="fc" id="L642">            Map&lt;String, Object&gt; values = stringKeyed(map);</span>
+<span class="fc" id="L643">            requireKeys(values, ARTIFACT_KEYS, &quot;run artifact&quot;);</span>
             ArtifactRole role;
             try {
-<span class="fc" id="L645">                role = ArtifactRole.valueOf(string(values, &quot;role&quot;));</span>
-<span class="nc" id="L646">            } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L647">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L646">                role = ArtifactRole.valueOf(string(values, &quot;role&quot;));</span>
+<span class="nc" id="L647">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L648">                throw new IllegalArgumentException(</span>
                     &quot;unsupported historical rediscovery artifact role&quot;,
                     exception);
-<span class="fc" id="L650">            }</span>
-<span class="fc" id="L651">            return new Artifact(</span>
-<span class="fc" id="L652">                string(values, &quot;fileName&quot;),</span>
+<span class="fc" id="L651">            }</span>
+<span class="fc" id="L652">            return new Artifact(</span>
+<span class="fc" id="L653">                string(values, &quot;fileName&quot;),</span>
                 role,
-<span class="fc" id="L654">                string(values, &quot;mediaType&quot;),</span>
-<span class="fc" id="L655">                string(values, &quot;byteHash&quot;),</span>
-<span class="fc" id="L656">                positiveLong(values, &quot;byteLength&quot;)</span>
+<span class="fc" id="L655">                string(values, &quot;mediaType&quot;),</span>
+<span class="fc" id="L656">                string(values, &quot;byteHash&quot;),</span>
+<span class="fc" id="L657">                positiveLong(values, &quot;byteLength&quot;)</span>
             );
         }
     }
@@ -672,45 +673,46 @@ public final class HistoricalRediscoveryRunArtifact {
         String commitProtocol,
         String contentHash
     ) {
-<span class="fc" id="L675">        public Manifest {</span>
-<span class="pc bpc" id="L676" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L677">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L676">        public Manifest {</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L678">                throw new IllegalArgumentException(</span>
                     &quot;unsupported historical rediscovery run schema&quot;);
             }
-<span class="pc bpc" id="L680" title="1 of 2 branches missed.">            if (!EVIDENCE_STATUS.equals(evidenceStatus)) {</span>
-<span class="nc" id="L681">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">            if (!EVIDENCE_STATUS.equals(evidenceStatus)) {</span>
+<span class="nc" id="L682">                throw new IllegalArgumentException(</span>
                     &quot;unexpected historical rediscovery evidence status&quot;);
             }
-<span class="fc bfc" id="L684" title="All 2 branches covered.">            if (!HistoricalRediscoveryCorpus.SCHEMA.equals(corpusSchema)) {</span>
-<span class="fc" id="L685">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L685" title="All 2 branches covered.">            if (!HistoricalRediscoveryCorpus.SCHEMA.equals(corpusSchema)) {</span>
+<span class="fc" id="L686">                throw new IllegalArgumentException(</span>
                     &quot;unsupported historical rediscovery corpus schema&quot;);
             }
-<span class="fc" id="L688">            corpusSha256 = requireRawSha256(</span>
+<span class="fc" id="L689">            corpusSha256 = requireRawSha256(</span>
                 corpusSha256,
                 &quot;corpusSha256&quot;);
-<span class="fc bfc" id="L691" title="All 2 branches covered.">            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)) {</span>
-<span class="fc" id="L692">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)</span>
+<span class="fc bfc" id="L693" title="All 2 branches covered.">                    &amp;&amp; !HistoricalRediscoveryAtlas.LEGACY_SCHEMA.equals(atlasSchema)) {</span>
+<span class="fc" id="L694">                throw new IllegalArgumentException(</span>
                     &quot;unsupported historical rediscovery atlas schema&quot;);
             }
-<span class="fc" id="L695">            inventoryRevision = requireText(</span>
+<span class="fc" id="L697">            inventoryRevision = requireText(</span>
                 inventoryRevision,
                 &quot;inventoryRevision&quot;);
-<span class="fc" id="L698">            claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
-<span class="fc" id="L699">            assessmentDecision = requireAssessmentDecision(</span>
+<span class="fc" id="L700">            claimBoundary = requireText(claimBoundary, &quot;claimBoundary&quot;);</span>
+<span class="fc" id="L701">            assessmentDecision = requireAssessmentDecision(</span>
                 assessmentDecision);
-<span class="pc bpc" id="L701" title="1 of 2 branches missed.">            if (caseCount &lt; 1) {</span>
-<span class="nc" id="L702">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">            if (caseCount &lt; 1) {</span>
+<span class="nc" id="L704">                throw new IllegalArgumentException(</span>
                     &quot;caseCount must be positive&quot;);
             }
-<span class="fc" id="L705">            artifacts = normalizeArtifacts(artifacts);</span>
-<span class="pc bpc" id="L706" title="1 of 2 branches missed.">            if (!COMMIT_PROTOCOL.equals(commitProtocol)) {</span>
-<span class="nc" id="L707">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L707">            artifacts = normalizeArtifacts(artifacts);</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">            if (!COMMIT_PROTOCOL.equals(commitProtocol)) {</span>
+<span class="nc" id="L709">                throw new IllegalArgumentException(</span>
                     &quot;historical rediscovery run must use manifest-last commit&quot;);
             }
-<span class="fc" id="L710">            contentHash = requirePrefixedSha256(</span>
+<span class="fc" id="L712">            contentHash = requirePrefixedSha256(</span>
                 contentHash,
                 &quot;contentHash&quot;);
-<span class="fc" id="L713">            String expected = manifestHash(</span>
+<span class="fc" id="L715">            String expected = manifestHash(</span>
                 corpusSchema,
                 corpusSha256,
                 atlasSchema,
@@ -719,38 +721,41 @@ public final class HistoricalRediscoveryRunArtifact {
                 assessmentDecision,
                 caseCount,
                 artifacts);
-<span class="pc bpc" id="L722" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
-<span class="nc" id="L723">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L724" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L725">                throw new IllegalArgumentException(</span>
                     &quot;historical rediscovery run contentHash mismatch&quot;);
             }
-<span class="fc" id="L726">        }</span>
+<span class="fc" id="L728">        }</span>
 
         public static Manifest create(
             Corpus corpus,
             AtlasReport report,
             List&lt;Artifact&gt; artifacts
         ) {
-<span class="fc" id="L733">            List&lt;Artifact&gt; normalized = normalizeArtifacts(artifacts);</span>
-<span class="fc" id="L734">            String decision = report.assessment().decision().name();</span>
-<span class="fc" id="L735">            String hash = manifestHash(</span>
-<span class="fc" id="L736">                corpus.schema(),</span>
-<span class="fc" id="L737">                corpus.contentSha256(),</span>
-<span class="fc" id="L738">                report.schema(),</span>
-<span class="fc" id="L739">                corpus.inventoryRevision(),</span>
-<span class="fc" id="L740">                corpus.claimBoundary(),</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(report.schema())) {</span>
+<span class="fc" id="L736">                throw new IllegalArgumentException(&quot;historical atlas evaluation revision differs&quot;);</span>
+            }
+<span class="fc" id="L738">            List&lt;Artifact&gt; normalized = normalizeArtifacts(artifacts);</span>
+<span class="fc" id="L739">            String decision = report.assessment().decision().name();</span>
+<span class="fc" id="L740">            String hash = manifestHash(</span>
+<span class="fc" id="L741">                corpus.schema(),</span>
+<span class="fc" id="L742">                corpus.contentSha256(),</span>
+<span class="fc" id="L743">                report.schema(),</span>
+<span class="fc" id="L744">                corpus.inventoryRevision(),</span>
+<span class="fc" id="L745">                corpus.claimBoundary(),</span>
                 decision,
-<span class="fc" id="L742">                corpus.cases().size(),</span>
+<span class="fc" id="L747">                corpus.cases().size(),</span>
                 normalized);
-<span class="fc" id="L744">            return new Manifest(</span>
+<span class="fc" id="L749">            return new Manifest(</span>
                 SCHEMA,
                 EVIDENCE_STATUS,
-<span class="fc" id="L747">                corpus.schema(),</span>
-<span class="fc" id="L748">                corpus.contentSha256(),</span>
-<span class="fc" id="L749">                report.schema(),</span>
-<span class="fc" id="L750">                corpus.inventoryRevision(),</span>
-<span class="fc" id="L751">                corpus.claimBoundary(),</span>
+<span class="fc" id="L752">                corpus.schema(),</span>
+<span class="fc" id="L753">                corpus.contentSha256(),</span>
+<span class="fc" id="L754">                report.schema(),</span>
+<span class="fc" id="L755">                corpus.inventoryRevision(),</span>
+<span class="fc" id="L756">                corpus.claimBoundary(),</span>
                 decision,
-<span class="fc" id="L753">                corpus.cases().size(),</span>
+<span class="fc" id="L758">                corpus.cases().size(),</span>
                 normalized,
                 COMMIT_PROTOCOL,
                 hash
@@ -758,32 +763,32 @@ public final class HistoricalRediscoveryRunArtifact {
         }
 
         public static Manifest parse(String json) {
-<span class="fc" id="L761">            Map&lt;String, Object&gt; values = new JsonReader(json).readObject();</span>
-<span class="fc" id="L762">            requireKeys(</span>
+<span class="fc" id="L766">            Map&lt;String, Object&gt; values = new JsonReader(json).readObject();</span>
+<span class="fc" id="L767">            requireKeys(</span>
                 values,
                 ROOT_KEYS,
                 &quot;historical rediscovery run&quot;);
-<span class="fc" id="L766">            List&lt;Artifact&gt; parsedArtifacts = list(values, &quot;artifacts&quot;).stream()</span>
-<span class="fc" id="L767">                .map(Artifact::parse)</span>
-<span class="fc" id="L768">                .toList();</span>
-<span class="fc" id="L769">            return new Manifest(</span>
-<span class="fc" id="L770">                string(values, &quot;schema&quot;),</span>
-<span class="fc" id="L771">                string(values, &quot;evidenceStatus&quot;),</span>
-<span class="fc" id="L772">                string(values, &quot;corpusSchema&quot;),</span>
-<span class="fc" id="L773">                string(values, &quot;corpusSha256&quot;),</span>
-<span class="fc" id="L774">                string(values, &quot;atlasSchema&quot;),</span>
-<span class="fc" id="L775">                string(values, &quot;inventoryRevision&quot;),</span>
-<span class="fc" id="L776">                string(values, &quot;claimBoundary&quot;),</span>
-<span class="fc" id="L777">                string(values, &quot;assessmentDecision&quot;),</span>
-<span class="fc" id="L778">                positiveInt(values, &quot;caseCount&quot;),</span>
+<span class="fc" id="L771">            List&lt;Artifact&gt; parsedArtifacts = list(values, &quot;artifacts&quot;).stream()</span>
+<span class="fc" id="L772">                .map(Artifact::parse)</span>
+<span class="fc" id="L773">                .toList();</span>
+<span class="fc" id="L774">            return new Manifest(</span>
+<span class="fc" id="L775">                string(values, &quot;schema&quot;),</span>
+<span class="fc" id="L776">                string(values, &quot;evidenceStatus&quot;),</span>
+<span class="fc" id="L777">                string(values, &quot;corpusSchema&quot;),</span>
+<span class="fc" id="L778">                string(values, &quot;corpusSha256&quot;),</span>
+<span class="fc" id="L779">                string(values, &quot;atlasSchema&quot;),</span>
+<span class="fc" id="L780">                string(values, &quot;inventoryRevision&quot;),</span>
+<span class="fc" id="L781">                string(values, &quot;claimBoundary&quot;),</span>
+<span class="fc" id="L782">                string(values, &quot;assessmentDecision&quot;),</span>
+<span class="fc" id="L783">                positiveInt(values, &quot;caseCount&quot;),</span>
                 parsedArtifacts,
-<span class="fc" id="L780">                string(values, &quot;commitProtocol&quot;),</span>
-<span class="fc" id="L781">                string(values, &quot;contentHash&quot;)</span>
+<span class="fc" id="L785">                string(values, &quot;commitProtocol&quot;),</span>
+<span class="fc" id="L786">                string(values, &quot;contentHash&quot;)</span>
             );
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L786">            return renderManifest(</span>
+<span class="fc" id="L791">            return renderManifest(</span>
                 corpusSchema,
                 corpusSha256,
                 atlasSchema,
@@ -801,17 +806,17 @@ public final class HistoricalRediscoveryRunArtifact {
         Path manifestPath,
         Manifest manifest
     ) {
-<span class="fc" id="L804">        public VerifiedRun {</span>
-<span class="fc" id="L805">            directory = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
-<span class="fc" id="L806">                .toAbsolutePath().normalize();</span>
-<span class="fc" id="L807">            manifestPath = Objects.requireNonNull(manifestPath, &quot;manifestPath&quot;)</span>
-<span class="fc" id="L808">                .toAbsolutePath().normalize();</span>
-<span class="fc" id="L809">            Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
-<span class="pc bpc" id="L810" title="1 of 2 branches missed.">            if (!directory.resolve(MANIFEST_FILE_NAME).equals(manifestPath)) {</span>
-<span class="nc" id="L811">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L809">        public VerifiedRun {</span>
+<span class="fc" id="L810">            directory = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L811">                .toAbsolutePath().normalize();</span>
+<span class="fc" id="L812">            manifestPath = Objects.requireNonNull(manifestPath, &quot;manifestPath&quot;)</span>
+<span class="fc" id="L813">                .toAbsolutePath().normalize();</span>
+<span class="fc" id="L814">            Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">            if (!directory.resolve(MANIFEST_FILE_NAME).equals(manifestPath)) {</span>
+<span class="nc" id="L816">                throw new IllegalArgumentException(</span>
                     &quot;manifestPath must use the canonical run location&quot;);
             }
-<span class="fc" id="L814">        }</span>
+<span class="fc" id="L819">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
