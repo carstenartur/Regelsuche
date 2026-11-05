@@ -3,6 +3,7 @@ package de.regelsuche.evolution;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.MoveContext;
 import de.regelsuche.search.moves.MoveSearch;
@@ -161,5 +162,48 @@ class StructuralQuarticConstructionTest {
         assertTrue(QuarticConstruction.generate(QUARTIC, 2, two::addAndGet).isEmpty());
         assertTrue(one.get() > 2, "the exact projection already consumed both allowances");
         assertEquals(one.get(), two.get(), "no additional coefficient search should run after that projection");
+    }
+
+    @Test
+    void solvesDistinctGeneratedCoefficientSystemsThroughTheRealFrontier() {
+        int[][] factors = {{1,2,3,2,-1,1}, {1,1,1,1,1,2}, {2,1,3,1,2,1}, {1,-2,1,1,1,3},
+            {1,3,2,2,1,3}, {2,-1,1,1,2,2}, {1,2,1,1,-1,3}, {2,3,1,1,1,2},
+            {1,-1,2,2,3,1}, {1,1,3,1,-2,2}, {2,1,2,1,3,1}, {1,3,1,1,-2,3},
+            {2,-2,3,1,1,1}, {1,1,2,2,1,3}, {1,-2,3,1,3,2}, {2,1,1,2,3,1}};
+        var knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory(), TaskConstructionProfile.STRUCTURAL_V2);
+        var previous = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory(), TaskConstructionProfile.STRUCTURAL_V1);
+        var exact = new ExactPolynomialAnalysis();
+        var unique = new java.util.HashSet<String>();
+        int previousSolved = 0;
+        long previousWork = 0, currentWork = 0;
+        for (int[] pair : factors) {
+            String source = expandedQuartic(pair);
+            assertTrue(unique.add(exact.normalForm(source).toCanonicalString()), "each coefficient system is distinct");
+            var task = new CheckedSchemaTaskSolver.Task(parse(source), List.of(),
+                StructuralTaskObjective.FACTORIZATION.goal(), new MoveSearch.Budget(24, 1, 1_000_000, 128, 2_000_000));
+            var result = knowledge.solve(task, CumulativeTaskKnowledge.Strategy.BASELINE);
+            var prior = previous.solve(task, CumulativeTaskKnowledge.Strategy.BASELINE);
+            assertTrue(result.solved(), source);
+            exact.requireEquivalent(source, ExpressionFormatter.format(result.solution().orElseThrow().evidence().incumbent().expression()));
+            if (prior.solved()) {
+                previousSolved++;
+                exact.requireEquivalent(source, ExpressionFormatter.format(prior.solution().orElseThrow().evidence().incumbent().expression()));
+            }
+            previousWork += prior.totalWork();
+            currentWork += result.totalWork();
+        }
+        System.out.println("QUARTIC_BREADTH cases=" + factors.length + " v1Solved=" + previousSolved
+            + " v2Solved=" + unique.size() + " v1Work=" + previousWork + " v2Work=" + currentWork + " maxDepth=1");
+    }
+
+    private static String expandedQuartic(int[] f) {
+        int a=f[0], b=f[1], c=f[2], d=f[3], e=f[4], g=f[5];
+        int[] coefficients = {a*d, a*e+b*d, a*g+b*e+c*d, b*g+c*e, c*g};
+        String[] monomials = {"x^4", "x^3*y", "x^2*y^2", "x*y^3", "y^4"};
+        var terms = new java.util.ArrayList<String>();
+        for (int i = 0; i < coefficients.length; i++) {
+            if (coefficients[i] != 0) terms.add("(" + coefficients[i] + ")*" + monomials[i]);
+        }
+        return String.join("+", terms);
     }
 }

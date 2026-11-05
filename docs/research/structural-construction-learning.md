@@ -36,6 +36,14 @@ of one quartic and applies it after restore to a composite substitution. This
 is evidence for reuse of that schema, not autonomous invention of a general
 coefficient-solving plan or a broad performance study.
 
+An additional deterministic regression generates 16 distinct coefficient
+systems by expanding products of small quadratics, supplies only the expanded
+sources to the task solver, and independently checks every returned product.
+With one search step, V1 solved 0/16 and V2 solved 16/16 in the recorded run.
+These are related generated cases within one bounded family, and the arms
+have different supplied capabilities; the observation is a capability
+comparison, not a learned-speed or elapsed-time comparison.
+
 Source baseline: `459293be659a4adf3fd30f5e9576c934ea00ca21` (30 October 2026).
 This is an opt-in extension of the existing task solver and checked-schema learner,
 not a replacement search kernel, CAS, or a set of hard-coded historical answers.
