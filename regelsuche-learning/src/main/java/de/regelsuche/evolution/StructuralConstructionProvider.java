@@ -43,6 +43,9 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
                 || operation == StructuralConstructionPrograms.Operation.AUXILIARY_COMPLEMENT
                 || operation == StructuralConstructionPrograms.Operation.AUXILIARY_FACTOR
                 || operation == StructuralConstructionPrograms.Operation.RECOGNIZE_SQUARE
+                || operation == StructuralConstructionPrograms.Operation.RECOGNIZE_METERED_SQUARE
+                || operation == StructuralConstructionPrograms.Operation.RECOGNIZE_RATIONAL_SQUARE
+                || operation == StructuralConstructionPrograms.Operation.RATIONAL_EXPOSE_SQUARE
             ? ExactPolynomialAnalysis.withProductWork(account) : new ExactPolynomialAnalysis(account);
         String input = ExpressionFormatter.format(source); work[0] = Math.addExact(work[0], input.length());
         var proofs = new ArrayList<Transformation>();

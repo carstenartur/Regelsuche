@@ -31,6 +31,8 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final int maxCandidates;
     private final boolean matchProductFactors;
+    private final boolean matchRationalFactors;
+    private final java.util.function.LongConsumer arithmeticWork;
 
     public ConservativeCompleteSquareHypothesisOperator() {
         this(DEFAULT_MAX_CANDIDATES);
@@ -42,8 +44,18 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
 
     /** Opt in to scalar product-factor matching while preserving the original matching profile. */
     public ConservativeCompleteSquareHypothesisOperator(int maxCandidates, boolean matchProductFactors) {
+        this(maxCandidates, matchProductFactors, false, null);
+    }
+
+    /** Optionally match exact rational factors and meter scalar arithmetic. */
+    public ConservativeCompleteSquareHypothesisOperator(int maxCandidates, boolean matchProductFactors,
+            boolean matchRationalFactors, java.util.function.LongConsumer work) {
+        if (matchRationalFactors && (!matchProductFactors || work == null))
+            throw new IllegalArgumentException("rational factor matching needs product matching and a work observer");
         this.maxCandidates = Math.max(0, maxCandidates);
         this.matchProductFactors = matchProductFactors;
+        this.matchRationalFactors = matchRationalFactors;
+        this.arithmeticWork = work;
     }
 
     @Override
@@ -62,8 +74,12 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         }
 
         Map<String, ScoredCandidate> candidates = new LinkedHashMap<>();
-        addUnivariateCandidate(terms, formattedInput, originalSize, candidates);
-        addBivariatePerfectSquareCandidate(terms, formattedInput, originalSize, candidates);
+        try {
+            addUnivariateCandidate(terms, formattedInput, originalSize, candidates);
+            addBivariatePerfectSquareCandidate(terms, formattedInput, originalSize, candidates);
+        } catch (RationalLimit excessive) {
+            return List.of();
+        }
         return candidates.values().stream()
             .sorted(Comparator.comparingInt(ScoredCandidate::score)
                 .thenComparing(candidate -> candidate.transformation().transformedExpression()))
@@ -83,36 +99,44 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         }
         for (int squareIndex = 0; squareIndex < terms.size(); squareIndex++) {
             Expr base = squareBase(terms.get(squareIndex));
-            if (base == null) {
-                continue;
-            }
-            LinearTerm linear = null;
-            ExactRational constant = null;
-            for (int index = 0; index < terms.size(); index++) {
-                if (index == squareIndex) {
-                    continue;
-                }
-                Expr term = terms.get(index);
-                if (term instanceof NumberExpr numberExpr) {
-                    constant = numberExpr.value();
-                } else {
-                    linear = linearTermForBase(term, base);
-                }
-            }
-            if (linear == null || constant == null || !isEvenInteger(linear.coefficient())) {
-                continue;
-            }
-            ExactRational offset = linear.coefficient().divide(ExactRational.integer(2));
-            ExactRational remainder = constant.subtract(offset.multiply(offset));
-            if (remainder.signum() > 0 || !isPerfectSquare(remainder.abs())) {
-                continue;
-            }
-            Expr completed = squared(new BinaryExpr(base, BinaryOperator.ADD, new NumberExpr(offset)));
-            Expr candidate = remainder.isZero()
-                ? completed
-                : new BinaryExpr(completed, BinaryOperator.SUB, squared(new NumberExpr(remainder.abs().sqrtExact().orElseThrow())));
-            addCandidate(candidate, formattedInput, originalSize, candidates);
+            if (base == null) continue;
+            UnivariateTerms selected = selectUnivariateTerms(terms, squareIndex, base);
+            if (selected == null) continue;
+            Expr candidate = completeUnivariateSquare(base, selected);
+            if (candidate != null) addCandidate(candidate, formattedInput, originalSize, candidates);
         }
+    }
+
+    private UnivariateTerms selectUnivariateTerms(List<Expr> terms, int squareIndex, Expr base) {
+        LinearTerm linear = null;
+        ExactRational constant = null;
+        for (int index = 0; index < terms.size(); index++) {
+            if (index == squareIndex) continue;
+            Expr term = terms.get(index);
+            ExactRational scalar = matchRationalFactors ? scalarFactor(term)
+                : term instanceof NumberExpr number ? number.value() : null;
+            if (scalar != null) constant = scalar;
+            else linear = linearTermForBase(term, base);
+        }
+        if (linear == null || constant == null || (!matchRationalFactors && !isEvenInteger(linear.coefficient()))) return null;
+        return new UnivariateTerms(linear, constant);
+    }
+
+    private Expr completeUnivariateSquare(Expr base, UnivariateTerms selected) {
+        ExactRational coefficient = selected.linear().coefficient();
+        if (arithmeticWork != null) chargeScalarOperation(coefficient, ExactRational.integer(2));
+        ExactRational offset = coefficient.divide(ExactRational.integer(2));
+        if (arithmeticWork != null) chargeScalarOperation(offset, offset);
+        ExactRational square = offset.multiply(offset);
+        if (arithmeticWork != null) chargeScalarOperation(selected.constant(), square);
+        ExactRational remainder = selected.constant().subtract(square);
+        if (remainder.signum() > 0) return null;
+        if (arithmeticWork != null) chargeSquareRoot(remainder.abs());
+        if (!isPerfectSquare(remainder.abs())) return null;
+        Expr completed = squared(new BinaryExpr(base, BinaryOperator.ADD, new NumberExpr(offset)));
+        if (arithmeticWork != null && !remainder.isZero()) chargeSquareRoot(remainder.abs());
+        return remainder.isZero() ? completed
+            : new BinaryExpr(completed, BinaryOperator.SUB, squared(new NumberExpr(remainder.abs().sqrtExact().orElseThrow())));
     }
 
     private void addBivariatePerfectSquareCandidate(
@@ -190,8 +214,11 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         ExactRational coefficient = ExactRational.ONE;
         List<Expr> symbolic = new ArrayList<>();
         for (Expr factor : factors) {
-            if (factor instanceof NumberExpr numberExpr) {
-                coefficient = coefficient.multiply(numberExpr.value());
+            ExactRational scalar = matchRationalFactors ? scalarFactor(factor)
+                : factor instanceof NumberExpr number ? number.value() : null;
+            if (scalar != null) {
+                if (arithmeticWork != null) chargeScalarOperation(coefficient, scalar);
+                coefficient = coefficient.multiply(scalar);
             } else {
                 symbolic.add(factor);
             }
@@ -214,6 +241,7 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         List<Expr> symbolic = new ArrayList<>();
         for (Expr factor : factors) {
             if (factor instanceof NumberExpr numberExpr) {
+                if (arithmeticWork != null) chargeScalarOperation(coefficient, numberExpr.value());
                 coefficient = coefficient.multiply(numberExpr.value());
             } else {
                 symbolic.add(factor);
@@ -229,14 +257,45 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         ExactRational coefficient = ExactRational.ONE;
         List<String> symbols = new ArrayList<>();
         for (Expr factor : factors) {
-            if (factor instanceof NumberExpr number) {
-                coefficient = coefficient.multiply(number.value());
+            ExactRational scalar = scalarFactor(factor);
+            if (scalar != null) {
+                if (arithmeticWork != null) chargeScalarOperation(coefficient, scalar);
+                coefficient = coefficient.multiply(scalar);
             } else {
                 symbols.add(ExpressionFormatter.format(factor));
             }
         }
         symbols.sort(String::compareTo);
         return new ProductSignature(coefficient, List.copyOf(symbols));
+    }
+
+    private ExactRational scalarFactor(Expr factor) {
+        if (factor instanceof NumberExpr number) return number.value();
+        if (matchRationalFactors && factor instanceof BinaryExpr division && division.operator() == BinaryOperator.DIV
+                && division.left() instanceof NumberExpr numerator && division.right() instanceof NumberExpr denominator
+                && !denominator.value().isZero()) {
+            chargeScalarOperation(numerator.value(), denominator.value());
+            return numerator.value().divide(denominator.value());
+        }
+        return null;
+    }
+
+    private void chargeScalarOperation(ExactRational left, ExactRational right) {
+        long leftBits = Math.max(left.numerator().abs().bitLength(), left.denominator().bitLength());
+        long rightBits = Math.max(right.numerator().abs().bitLength(), right.denominator().bitLength());
+        long resultBits = leftBits + rightBits + 1;
+        arithmeticWork.accept(1 + (2 * resultBits + 63) / 64);
+        if (matchRationalFactors && resultBits > 1_024) throw new RationalLimit();
+    }
+
+    private void chargeSquareRoot(ExactRational value) {
+        long bits = Math.max(value.numerator().abs().bitLength(), value.denominator().bitLength());
+        arithmeticWork.accept(1 + (bits + 63) / 64);
+        if (matchRationalFactors && bits > 1_024) throw new RationalLimit();
+    }
+
+    private static final class RationalLimit extends RuntimeException {
+        private static final long serialVersionUID = 1L;
     }
 
     private record ProductSignature(ExactRational coefficient, List<String> factors) { }
@@ -266,11 +325,13 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
     }
 
     private boolean isPerfectSquare(ExactRational value) {
-        return value.isInteger() && value.sqrtExact().isPresent();
+        return (matchRationalFactors || value.isInteger()) && value.sqrtExact().isPresent();
     }
 
     private record LinearTerm(ExactRational coefficient) {
     }
+
+    private record UnivariateTerms(LinearTerm linear, ExactRational constant) { }
 
     private record ScoredCandidate(int score, Transformation transformation) {
     }

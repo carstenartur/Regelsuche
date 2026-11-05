@@ -24,7 +24,8 @@ import java.util.List;
 /** Declared finite procedures, not a learned strategy or a second search algorithm. */
 final class StructuralConstructionPrograms {
     enum Operation { EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE,
-        BINARY_QUARTIC, RESIDUAL_EXPANDED, AUXILIARY_COMPLEMENT, AUXILIARY_FACTOR, RECOGNIZE_SQUARE }
+        BINARY_QUARTIC, RESIDUAL_EXPANDED, AUXILIARY_COMPLEMENT, AUXILIARY_FACTOR, RECOGNIZE_SQUARE,
+        RATIONAL_EXPOSE_SQUARE, RECOGNIZE_RATIONAL_SQUARE, RECOGNIZE_METERED_SQUARE }
     record Report(List<String> candidates, long work) { Report { candidates = List.copyOf(candidates); } }
     private static final long LIMIT = 100_000;
     private StructuralConstructionPrograms() { }
@@ -49,7 +50,10 @@ final class StructuralConstructionPrograms {
                 case RESIDUAL_EXPANDED -> residualBalance(source, text, work, true);
                 case AUXILIARY_COMPLEMENT -> explorePolynomial(AlgebraicConstruction.Operation.ADDITIVE_COMPLEMENT, text, work);
                 case AUXILIARY_FACTOR -> explorePolynomial(AlgebraicConstruction.Operation.EXACT_FACTOR_SPLIT, text, work);
-                case RECOGNIZE_SQUARE -> recognizeSquare(text, work);
+                case RECOGNIZE_SQUARE -> recognizeSquare(text, work, false, false);
+                case RATIONAL_EXPOSE_SQUARE -> apply(new ExactMonomialSquareExposureOperator(8, work::add), text, work);
+                case RECOGNIZE_RATIONAL_SQUARE -> recognizeSquare(text, work, true, true);
+                case RECOGNIZE_METERED_SQUARE -> recognizeSquare(text, work, false, true);
             };
             return new Report(candidates, work.units);
         } catch (Limit | IllegalArgumentException unsupported) {
@@ -82,8 +86,9 @@ final class StructuralConstructionPrograms {
             .flatMap(result -> result.expression().stream()).toList();
     }
 
-    private static List<String> recognizeSquare(String source, Work work) {
-        var delegate = new ConservativeCompleteSquareHypothesisOperator(6, true);
+    private static List<String> recognizeSquare(String source, Work work, boolean rational, boolean metered) {
+        var delegate = metered ? new ConservativeCompleteSquareHypothesisOperator(6, true, rational, work::add)
+            : new ConservativeCompleteSquareHypothesisOperator(6, true);
         HypothesisOperator measured = subtree -> {
             work.add(subtree.length() + 1L);
             var candidates = delegate.generateCandidates(subtree);

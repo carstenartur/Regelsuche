@@ -454,3 +454,91 @@ paths still do not count polynomial products separately, so this is not a
 complete total-work comparison. Serialization, external test checks, JVM time
 and memory are not covered by the logical work model. Autonomous plan
 invention, full historical coverage, Euclid and Ferrari remain open.
+
+## Source-only perfect-square tasks
+
+The opt-in `STRUCTURAL_SQUARE_V1` profile adds exact rational square exposure
+and recognition to the existing task frontier. Its `PERFECT_SQUARE` objective
+asks for an explicit square with a nonconstant polynomial base. It receives no
+expected expression or ordered proof. Each generated step is checked against
+the source with exact polynomial arithmetic, and the selected path is replayed
+before a result is reported. The supported task domain permits literal,
+nonzero denominators; symbolic denominators are not admitted.
+
+The original square recognizer remains available with its previous matching
+behavior, with a work observer enabled only in this new profile. The rational
+recognizer additionally accepts exact fractions and bounds its scalar
+intermediates to 1,024 bits. Rational monomial exposure does not discard a
+quotient merely because its normalized value is an integer: it first checks,
+with an accounted applicability test, whether the existing integer provider
+already covers the source syntax. Existing profiles and stored profile names
+keep their original meaning. Both recognizers may inspect the same expression,
+so the new profile can do additional work on cases it already solved.
+
+The five square-completion inputs of the frozen historical atlas are solved by
+the cumulative task solver below. These are development examples, not an
+independent held-out benchmark. The atlas's frozen production-policy report has
+not been rerun with this separate profile and must not be labelled 12/12 on the
+strength of these results.
+
+| Source | New-profile work | Witness steps |
+| --- | ---: | ---: |
+| `x*x+2*x*y+y*y` | 6,439 | 3 |
+| `x*x+y*y+2*y*x` | 6,413 | 3 |
+| `y*y+(2*x)*y+x*x` | 9,591 | 3 |
+| `x*x+3*x*a+2.25*a*a` | 12,200 | 3 |
+| `x*x+(4/3)*x*y+(4/9)*y*y` | 15,298 | 3 |
+
+The regrouped input produces `(y+x)^2`: this is the requested square up to
+commutativity, but is not a syntax-exact match for the atlas target `(x+y)^2`.
+The task goal accepts either representation.
+
+The earlier AUX profile already solves the first three development inputs.
+For the last two, a regression compares AUX and the square profile with the
+same fixed per-task budget: AUX finds no square, while the new profile does.
+The new path also handles the univariate input `x^2+(4/3)*x+(4/9)`; a nearby
+non-square and a tiny budget are negative controls. These comparisons establish
+bounded outcomes, not impossibility outside the budget or a speedup between
+profiles with different accounting.
+
+The existing learner was also exercised with two lessons, a distinct
+validation expression and eight later inputs from the same shifted-square
+family. The retained schema is symbolically checked, restored from canonical
+JSON in the same JVM and actually applied to all eight queries. An already
+square input and an inconclusive input are included in both arms with matching
+outcomes and quality. With both arms using the square profile, the development
+stream records 148,047 baseline work units and 97,025 learned work units,
+including 65,626 for acquisition and 726 for restoration in the learned arm.
+The figures do not include file I/O, process restart, JVM time or memory, and
+some existing learning and proof paths do not separately count polynomial
+products. This is therefore evidence for reuse on one related family, not a
+complete total-cost or cross-family learning claim.
+
+The new square profile validates the source and each replayed intermediate in
+the bounded total rational-polynomial domain and checks each edge by exact
+polynomial projection. Selecting the direct `PERFECT_SQUARE` objective without
+a construction profile uses the same domain, step checks and product-work
+accounting. The square evaluator also reports product work when supplied as a
+callback; arbitrary custom objectives remain responsible for their own work
+reports. A callback does not retain the enum identity: callers must select the
+strict square profile for its domain and per-step checks. Without that profile,
+legacy custom-objective behavior does not establish those checks. This matters
+for user-configurable rewrite rules: a
+replayed rule is not automatically an identity. Symbol names must also follow
+the parser's identifier grammar, so formatting an AST cannot reinterpret a
+single symbol as an expression. As in the checked-schema polynomial domain,
+zero powers use the explicit convention `0^0 = 1`; this differs from other
+project components that treat that expression as undefined. The source inspection and both initial and
+independent final step checks are charged; an unsupported source raises an
+exception carrying the observed inspection and routing work, with incomplete
+accounting for a solve invocation. Source inspection is an atomic operation; if it together with the
+root node assessment exhausts the budget, the supplied objective is not evaluated.
+This experimental checked path does not
+support an already active native retention-observation scope; solving and
+learning reject that scope before routing or split checks. Legacy construction profiles retain their
+original behavior; they do not gain this new checking contract implicitly.
+
+The set and priority of general construction providers were supplied by the
+implementation. The system did not invent that strategy or receive the
+historical target. The larger historical catalog, including Euclid and the
+general Ferrari method, remains open.

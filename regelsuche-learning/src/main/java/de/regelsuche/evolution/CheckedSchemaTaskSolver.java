@@ -28,6 +28,24 @@ public final class CheckedSchemaTaskSolver {
     private static final int CODEC_ENTRIES = 256;
     private static final long CODEC_CHARACTERS = 2_000_000;
 
+    /** No search starts when its input is outside the checked polynomial fragment. */
+    public static final class UnsupportedTaskException extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+        private final long inspectionWork;
+        private final long routingWork;
+        private UnsupportedTaskException(long inspectionWork, long routingWork, Throwable cause) {
+            super("task source is outside the checked polynomial domain", cause);
+            this.inspectionWork = inspectionWork;
+            this.routingWork = routingWork;
+        }
+        public long inspectionWork() { return inspectionWork; }
+        public long routingWork() { return routingWork; }
+        public boolean accountingComplete() { return false; }
+        UnsupportedTaskException withRoutingWork(long extra) {
+            return extra == 0 ? this : new UnsupportedTaskException(inspectionWork, Math.addExact(routingWork, extra), getCause());
+        }
+    }
+
     /** The caller fixes this measured criterion before solving, not from the observed answer. */
     public record Goal(TypedSourceOnlySearch.Objective objective, long maximumOutputScore) {
         public Goal { Objects.requireNonNull(objective, "objective"); }
@@ -50,14 +68,18 @@ public final class CheckedSchemaTaskSolver {
     public static final class Solution {
         private final Task task;
         private final TypedSourceOnlySearch.Result evidence;
-        private Solution(Task task, TypedSourceOnlySearch.Result evidence) {
+        private final boolean exactPolynomialSteps;
+        private Solution(Task task, TypedSourceOnlySearch.Result evidence, boolean exactPolynomialSteps) {
             this.task = task;
             this.evidence = evidence;
+            this.exactPolynomialSteps = exactPolynomialSteps;
         }
         public Task task() { return task; }
         public TypedSourceOnlySearch.Result evidence() { return evidence; }
         public boolean solved() {
-            return evidence.search().outcome() == MoveSearch.Outcome.QUALITY_REACHED
+            return (!exactPolynomialSteps || !(task.goal().objective() instanceof StructuralTaskObjective)
+                    || evidence.inputScore() != StructuralTaskObjective.UNSUPPORTED_SCORE)
+                && evidence.search().outcome() == MoveSearch.Outcome.QUALITY_REACHED
                 && evidence.outputScore() <= task.goal().maximumOutputScore()
                 && evidence.withinBudget();
         }
@@ -73,17 +95,19 @@ public final class CheckedSchemaTaskSolver {
     private final TypedLearnedMoveInventory.SearchSession session;
     private final CheckedSchemaMatcherPlan.Compilation preparation;
     private final boolean breadthFirstPriority;
+    private final boolean exactPolynomialSteps;
 
     CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation) {
-        this(session, preparation, false);
+        this(session, preparation, false, false);
     }
 
     private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
-            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority) {
+            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps) {
         this.session = Objects.requireNonNull(session, "session");
         this.preparation = preparation;
         this.breadthFirstPriority = breadthFirstPriority;
+        this.exactPolynomialSteps = exactPolynomialSteps;
     }
 
     CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations,
@@ -97,7 +121,11 @@ public final class CheckedSchemaTaskSolver {
         }
         var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),
             (source, move, context) -> verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));
-        return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth);
+        return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth, exactPolynomialSteps);
+    }
+
+    CheckedSchemaTaskSolver withExactPolynomialSteps() {
+        return new CheckedSchemaTaskSolver(session, preparation, breadthFirstPriority, true);
     }
 
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
@@ -110,12 +138,42 @@ public final class CheckedSchemaTaskSolver {
     public Solution solve(Task task) {
         Objects.requireNonNull(task, "task");
         var original = task.goal().objective();
-        TypedSourceOnlySearch.Objective objective = breadthFirstPriority && original instanceof StructuralTaskObjective structural
+        boolean checkedSteps = exactPolynomialSteps || original == StructuralTaskObjective.PERFECT_SQUARE;
+        if (checkedSteps) StructuralCheckedDomain.requireUnobserved();
+        var sourceInspection = checkedSteps ? inspectSource(task) : new SourceInspection(0, 0);
+        long inspection = sourceInspection.work();
+        TypedSourceOnlySearch.Objective objective = (breadthFirstPriority || original == StructuralTaskObjective.PERFECT_SQUARE)
+            && original instanceof StructuralTaskObjective structural
             ? structural::evaluateWithProductWork : original;
+        if (inspection > 0) {
+            var delegate = objective;
+            objective = state -> {
+                if (state.searchDepth() == 0 && Math.addExact(inspection, sourceInspection.nodes()) >= task.budget().totalWork()) {
+                    // Source and the existing root node-count assessment precede the objective.
+                    return new TypedSourceOnlySearch.Score(Long.MAX_VALUE, Math.addExact(inspection, 1));
+                }
+                var score = delegate.evaluate(state);
+                return state.searchDepth() == 0
+                    ? new TypedSourceOnlySearch.Score(score.value(), Math.addExact(score.work(), inspection)) : score;
+            };
+        }
+        var selectedObjective = objective;
         var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
-            () -> new TypedSourceOnlySearch().searchUntil(problem(task), objective,
+            () -> new TypedSourceOnlySearch().searchUntil(problem(task), selectedObjective,
                 task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));
-        return new Solution(task, result);
+        return new Solution(task, result, checkedSteps);
+    }
+
+    private record SourceInspection(long work, int nodes) { }
+
+    private static SourceInspection inspectSource(Task task) {
+        var work = new CheckedSchemaSupport.Work();
+        try {
+            int nodes = StructuralCheckedDomain.inspect(task.source(), work);
+            return new SourceInspection(work.units, nodes);
+        } catch (CheckedSchemaSupport.DomainRejected unsupported) {
+            throw new UnsupportedTaskException(work.units, 0, unsupported);
+        }
     }
 
     // The primitive control uses its cheaper batch scheduler; it is not handicapped by unused cursor machinery.
@@ -123,7 +181,8 @@ public final class CheckedSchemaTaskSolver {
         return new TypedMoveSearch.Problem(task.source(),
             TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),
             session.providers(), breadthFirstPriority ? KnowledgeFirst.STRUCTURAL_EXPLORATION : KnowledgeFirst.INSTANCE,
-            session.verifier(), state -> 0,
+            exactPolynomialSteps || task.goal().objective() == StructuralTaskObjective.PERFECT_SQUARE
+                ? StructuralStepVerifier.checked(session.verifier()) : session.verifier(), state -> 0,
             MoveSearch.Mode.FAST, preparation == null ? MoveSearch.Scheduling.STAGED
                 : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),
             (state, context) -> {
@@ -143,7 +202,10 @@ public final class CheckedSchemaTaskSolver {
             if (id.endsWith(":AUXILIARY_FACTOR")) return 4;
             if (id.endsWith(":FACTOR_DIFFERENCE")) return 3;
             if (id.endsWith(":RECOGNIZE_SQUARE")) return 2;
+            if (id.endsWith(":RECOGNIZE_METERED_SQUARE")) return 2;
+            if (id.endsWith(":RECOGNIZE_RATIONAL_SQUARE")) return 2;
             if (id.endsWith(":EXPOSE_SQUARE")) return 1;
+            if (id.endsWith(":RATIONAL_EXPOSE_SQUARE")) return 1;
             return 0;
         }
         @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
