@@ -30,13 +30,20 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
     private final ExpressionParser parser = new ExpressionParser();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final int maxCandidates;
+    private final boolean matchProductFactors;
 
     public ConservativeCompleteSquareHypothesisOperator() {
         this(DEFAULT_MAX_CANDIDATES);
     }
 
     public ConservativeCompleteSquareHypothesisOperator(int maxCandidates) {
+        this(maxCandidates, false);
+    }
+
+    /** Opt in to scalar product-factor matching while preserving the original matching profile. */
+    public ConservativeCompleteSquareHypothesisOperator(int maxCandidates, boolean matchProductFactors) {
         this.maxCandidates = Math.max(0, maxCandidates);
+        this.matchProductFactors = matchProductFactors;
     }
 
     @Override
@@ -48,7 +55,7 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
             return List.of();
         }
         String formattedInput = ExpressionFormatter.format(root);
-        int originalSize = canonicalizer.astNodeCount(formattedInput);
+        int originalSize = matchProductFactors ? formattedInput.length() : canonicalizer.astNodeCount(formattedInput);
         List<Expr> terms = flattenPositiveAddends(root);
         if (terms.size() < 2 || terms.size() > 3) {
             return List.of();
@@ -145,9 +152,9 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         if (formatted.equals(formattedInput)) {
             return;
         }
-        int candidateSize = canonicalizer.astNodeCount(formatted);
+        int candidateSize = matchProductFactors ? formatted.length() : canonicalizer.astNodeCount(formatted);
         int growth = candidateSize - originalSize;
-        String key = canonicalizer.stableHash(formatted);
+        String key = matchProductFactors ? formatted : canonicalizer.stableHash(formatted);
         candidates.putIfAbsent(key, new ScoredCandidate(growth * 2 + candidateSize, new Transformation(
             RULE_ID,
             formatted,
@@ -155,7 +162,7 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
             true,
             Math.max(1, growth),
             true,
-            RULE_ID + ":" + canonicalizer.stableHash(formattedInput) + "->" + key
+            RULE_ID + ":" + (matchProductFactors ? formattedInput : canonicalizer.stableHash(formattedInput)) + "->" + key
         )));
     }
 
@@ -196,6 +203,12 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
     }
 
     private boolean crossTermMatches(Expr expression, Expr left, Expr right) {
+        if (matchProductFactors) {
+            List<Expr> expected = new ArrayList<>(flattenMultiplication(left));
+            expected.addAll(flattenMultiplication(right));
+            expected.add(new NumberExpr(2));
+            return productSignature(flattenMultiplication(expression)).equals(productSignature(expected));
+        }
         List<Expr> factors = flattenMultiplication(expression);
         ExactRational coefficient = ExactRational.ONE;
         List<Expr> symbolic = new ArrayList<>();
@@ -212,6 +225,22 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
             || (sameExpression(symbolic.get(0), right) && sameExpression(symbolic.get(1), left)));
     }
 
+    private ProductSignature productSignature(List<Expr> factors) {
+        ExactRational coefficient = ExactRational.ONE;
+        List<String> symbols = new ArrayList<>();
+        for (Expr factor : factors) {
+            if (factor instanceof NumberExpr number) {
+                coefficient = coefficient.multiply(number.value());
+            } else {
+                symbols.add(ExpressionFormatter.format(factor));
+            }
+        }
+        symbols.sort(String::compareTo);
+        return new ProductSignature(coefficient, List.copyOf(symbols));
+    }
+
+    private record ProductSignature(ExactRational coefficient, List<String> factors) { }
+
     private List<Expr> flattenMultiplication(Expr expression) {
         if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.MUL) {
             List<Expr> result = new ArrayList<>();
@@ -223,6 +252,7 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
     }
 
     private boolean sameExpression(Expr left, Expr right) {
+        if (matchProductFactors) return left.equals(right);
         return canonicalizer.stableHash(ExpressionFormatter.format(left))
             .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));
     }

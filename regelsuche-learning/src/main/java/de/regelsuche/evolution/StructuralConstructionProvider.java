@@ -40,6 +40,9 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
         java.util.function.LongConsumer account = units -> work[0] = Math.addExact(work[0], units);
         var exact = operation == StructuralConstructionPrograms.Operation.BINARY_QUARTIC
                 || operation == StructuralConstructionPrograms.Operation.RESIDUAL_EXPANDED
+                || operation == StructuralConstructionPrograms.Operation.AUXILIARY_COMPLEMENT
+                || operation == StructuralConstructionPrograms.Operation.AUXILIARY_FACTOR
+                || operation == StructuralConstructionPrograms.Operation.RECOGNIZE_SQUARE
             ? ExactPolynomialAnalysis.withProductWork(account) : new ExactPolynomialAnalysis(account);
         String input = ExpressionFormatter.format(source); work[0] = Math.addExact(work[0], input.length());
         var proofs = new ArrayList<Transformation>();

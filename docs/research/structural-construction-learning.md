@@ -373,3 +373,62 @@ No second search kernel or CAS; no named historical solution rules; unchanged le
   pending PR. Keep draft until the full project verification and review finish.
 
 - Quality-gate repair: consolidate duplicate test entry types and documentation, preserving production bytes and all behavioral assertions. Full hosted verification remains authoritative.
+
+## Source-derived auxiliaries in the shared frontier
+
+The opt-in `STRUCTURAL_AUX_V1` profile extends `STRUCTURAL_V2` with bounded
+additive-complement and exact-factor proposals and square recognition in the
+existing typed task frontier. It does not change the persisted meaning or
+scheduling of `STRUCTURAL_V1` or `STRUCTURAL_V2`. The same profile is
+attached to baseline and learned solvers; no extra learner or frontier is used.
+The selection of general operations is supplied, not learned. The profile favors
+shorter search paths and ranks square recognition and factoring ahead of further
+construction. This is a development policy, not an invented proof strategy.
+
+The existing `AlgebraicConstruction.explore` retains its original order and
+conditional rational behavior. The separate `explorePolynomial` opt-in counts
+bounded monomial products and accepts only unconditional polynomial operations.
+For additive complements it proposes cross-products of pairs of visible square
+bases, not unrestricted neutral insertions. For exact factor splits it considers
+proper subpowers and source fragments whose exact polynomial value is
+nonconstant; the current quotient operation supports monomial divisors. A
+candidate can still have a constant quotient and serve as an intermediate step;
+the factorization goal itself requires two nonconstant factors. No historical
+result, formula, or unbound symbol is an input. Candidate formation and the existing source-bound construction provider
+charge polynomial products during creation, admission and replay; the new
+profile also counts products in the built-in structural objective. Square
+recognition uses the existing
+subtree adapter and an explicitly enabled product-factor matching mode of the
+existing conservative operator. Its default mode remains unchanged.
+
+A source-only development test gives the frontier only the input expression,
+the general goal of nontrivial factorization, a fixed budget and four generic
+providers: square exposure, additive complements, square recognition, and
+difference-of-squares factoring. It does not pass a target expression or an
+ordered path. After the run, an exact polynomial checker verifies the resulting
+product and the retained witness identifies the operations actually used.
+
+| Source | Result | Search and replay work | Witness steps |
+| --- | --- | ---: | ---: |
+| `x^4+4*y^4` | nontrivial product | 52,894 | 6 |
+| `16*x^4+4*y^4` | nontrivial product | 1,279,621 | 7 |
+
+These are two related development examples, not independent held-out
+mathematical families. Removing the auxiliary provider leaves the same
+restricted comparison inconclusive; it does not prove global impossibility.
+The full solver also retains the existing direct construction, so these two
+tests do not establish a new success over the full V2 solver. A separate full
+solver comparison uses the same per-task budget in both profiles:
+
+| Input | V2 | AUX profile | Declared work V2 / AUX |
+| --- | --- | --- | ---: |
+| `12*x^4` | inconclusive | nontrivial factorization | 1,562 / 6,513 |
+| `x^4+4*y^4` | solved | solved | 28,002 / 31,839 |
+| `u^2+2` | no solution found | no solution found | 280 / 601 |
+
+The new profile adds a bounded capability in the first development example but
+does more work in the two controls. These numbers use the profiles' respective
+work contracts: only the new path includes the new product-work accounting.
+They are not an equal-accounting speed comparison, learning benefit, JVM time or
+memory measurement. Autonomous plan invention, full historical coverage,
+Euclid and Ferrari remain open.
