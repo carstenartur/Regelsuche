@@ -19,10 +19,20 @@ public enum StructuralTaskObjective implements TypedSourceOnlySearch.Objective {
     public CheckedSchemaTaskSolver.Goal goal() { return new CheckedSchemaTaskSolver.Goal(this, 0); }
 
     @Override public TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state) {
+        return evaluate(state, false);
+    }
+
+    /** Opt-in costing for profiles which account for polynomial term products. */
+    TypedSourceOnlySearch.Score evaluateWithProductWork(TypedMoveSearch.State state) {
+        return evaluate(state, true);
+    }
+
+    private TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state, boolean includeProductWork) {
         var work = new CheckedSchemaSupport.Work();
         try {
             CheckedSchemaSupport.domain(state.expression(), CheckedLearnedSchemaModel.Bounds.defaults(), work);
-            var exact = new ExactPolynomialAnalysis(work::add);
+            var exact = includeProductWork ? ExactPolynomialAnalysis.withProductWork(work::add)
+                : new ExactPolynomialAnalysis(work::add);
             long score = score(state.expression(), exact, work);
             return new TypedSourceOnlySearch.Score(score, Math.addExact(work.units, 1));
         } catch (IllegalArgumentException unsupported) {

@@ -42,6 +42,18 @@ class ConservativeCompleteSquareHypothesisOperatorTest {
     }
 
     @Test
+    void optInFactorMatchingRecognizesSquareBasesContainingProducts() throws Exception {
+        var constructor = ConservativeCompleteSquareHypothesisOperator.class.getConstructor(int.class, boolean.class);
+        var extended = constructor.newInstance(6, true);
+        String input = "(x^2)^2+(2*y^2)^2+2*(x^2)*(2*y^2)";
+        assertTrue(operator.generateCandidates(input).isEmpty(), "legacy matching stays unchanged");
+        assertFalse(extended.generateCandidates(input).isEmpty(), "factorized square bases form a perfect square");
+        assertFalse(extended.generateCandidates("(a+1)^2+(3*b)^2+6*b*(a+1)").isEmpty());
+        assertTrue(extended.generateCandidates("(a+1)^2+(3*b)^2+6*b*(a-1)").isEmpty());
+        assertTrue(extended.generateCandidates("(a+1)^2+(3*b)^2+5*b*(a+1)").isEmpty());
+    }
+
+    @Test
     void negativeCasesProduceNoFalsePositive() {
         assertTrue(operator.generateCandidates("x^2 + 6*x + 6").isEmpty());
         assertTrue(operator.generateCandidates("x^2 + 6*x + y").isEmpty());

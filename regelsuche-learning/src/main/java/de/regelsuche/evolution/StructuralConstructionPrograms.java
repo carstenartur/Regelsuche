@@ -10,10 +10,12 @@ import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.ExactMonomialSquareExposureOperator;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.SquareBaseSignSymmetryOperator;
 import de.regelsuche.transform.SumOfSquaresCompletionOperator;
+import de.regelsuche.transform.SubtreeHypothesisOperator;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -21,7 +23,8 @@ import java.util.List;
 
 /** Declared finite procedures, not a learned strategy or a second search algorithm. */
 final class StructuralConstructionPrograms {
-    enum Operation { EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE, BINARY_QUARTIC, RESIDUAL_EXPANDED }
+    enum Operation { EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE,
+        BINARY_QUARTIC, RESIDUAL_EXPANDED, AUXILIARY_COMPLEMENT, AUXILIARY_FACTOR, RECOGNIZE_SQUARE }
     record Report(List<String> candidates, long work) { Report { candidates = List.copyOf(candidates); } }
     private static final long LIMIT = 100_000;
     private StructuralConstructionPrograms() { }
@@ -44,6 +47,9 @@ final class StructuralConstructionPrograms {
                 case RESIDUAL_BALANCE -> residualBalance(source, text, work, false);
                 case BINARY_QUARTIC -> QuarticConstruction.generate(text, LIMIT - work.units, work::add);
                 case RESIDUAL_EXPANDED -> residualBalance(source, text, work, true);
+                case AUXILIARY_COMPLEMENT -> explorePolynomial(AlgebraicConstruction.Operation.ADDITIVE_COMPLEMENT, text, work);
+                case AUXILIARY_FACTOR -> explorePolynomial(AlgebraicConstruction.Operation.EXACT_FACTOR_SPLIT, text, work);
+                case RECOGNIZE_SQUARE -> recognizeSquare(text, work);
             };
             return new Report(candidates, work.units);
         } catch (Limit | IllegalArgumentException unsupported) {
@@ -65,6 +71,26 @@ final class StructuralConstructionPrograms {
         var rules = AstRewriteTransformationEngine.allBuiltInRules().stream()
             .filter(rule -> rule.id().equals("ast_square_difference_factor")).toList();
         return apply(new AstRewriteTransformationEngine(rules)::transform, source, work);
+    }
+
+    private static List<String> explorePolynomial(AlgebraicConstruction.Operation operation, String source, Work work) {
+        long remaining = LIMIT - work.units;
+        if (remaining <= 0) throw new Limit();
+        var exploration = new AlgebraicConstruction().explorePolynomial(operation, source, List.of(), 4, remaining);
+        work.add(exploration.work());
+        return exploration.results().stream().filter(AlgebraicConstruction.Result::generated)
+            .flatMap(result -> result.expression().stream()).toList();
+    }
+
+    private static List<String> recognizeSquare(String source, Work work) {
+        var delegate = new ConservativeCompleteSquareHypothesisOperator(6, true);
+        HypothesisOperator measured = subtree -> {
+            work.add(subtree.length() + 1L);
+            var candidates = delegate.generateCandidates(subtree);
+            for (var candidate : candidates) work.add(candidate.transformedExpression().length() + 1L);
+            return candidates;
+        };
+        return apply(new SubtreeHypothesisOperator(measured, 8), source, work);
     }
 
     /** Construct exact monomial factors instead of introducing a potentially zero denominator. */

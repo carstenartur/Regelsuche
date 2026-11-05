@@ -72,14 +72,22 @@ public final class CheckedSchemaTaskSolver {
 
     private final TypedLearnedMoveInventory.SearchSession session;
     private final CheckedSchemaMatcherPlan.Compilation preparation;
+    private final boolean breadthFirstPriority;
 
     CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation) {
-        this.session = Objects.requireNonNull(session, "session");
-        this.preparation = preparation;
+        this(session, preparation, false);
     }
 
-    CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations) {
+    private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
+            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority) {
+        this.session = Objects.requireNonNull(session, "session");
+        this.preparation = preparation;
+        this.breadthFirstPriority = breadthFirstPriority;
+    }
+
+    CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations,
+            boolean prioritizeBreadth) {
         var providers = new java.util.ArrayList<>(session.providers());
         var verifiers = new java.util.HashMap<String, TypedMoveSearch.Verifier>();
         for (var operation : operations) {
@@ -89,7 +97,7 @@ public final class CheckedSchemaTaskSolver {
         }
         var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),
             (source, move, context) -> verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));
-        return new CheckedSchemaTaskSolver(augmented, preparation);
+        return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth);
     }
 
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
@@ -101,8 +109,11 @@ public final class CheckedSchemaTaskSolver {
     /** Fresh cursors, scoped codec reuse, one budget, and final replay for every invocation. */
     public Solution solve(Task task) {
         Objects.requireNonNull(task, "task");
+        var original = task.goal().objective();
+        TypedSourceOnlySearch.Objective objective = breadthFirstPriority && original instanceof StructuralTaskObjective structural
+            ? structural::evaluateWithProductWork : original;
         var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
-            () -> new TypedSourceOnlySearch().searchUntil(problem(task), task.goal().objective(),
+            () -> new TypedSourceOnlySearch().searchUntil(problem(task), objective,
                 task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));
         return new Solution(task, result);
     }
@@ -111,19 +122,30 @@ public final class CheckedSchemaTaskSolver {
     TypedMoveSearch.Problem problem(Task task) {
         return new TypedMoveSearch.Problem(task.source(),
             TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),
-            session.providers(), KnowledgeFirst.INSTANCE, session.verifier(), state -> 0,
+            session.providers(), breadthFirstPriority ? KnowledgeFirst.STRUCTURAL_EXPLORATION : KnowledgeFirst.INSTANCE,
+            session.verifier(), state -> 0,
             MoveSearch.Mode.FAST, preparation == null ? MoveSearch.Scheduling.STAGED
                 : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),
             (state, context) -> {
                 var size = NativeNodeCountObjective.INSTANCE.evaluate(state);
-                return new StateValue.Assessment(Math.toIntExact(size.value()), -size.value(), size.work(), 0, Map.of());
+                double priority = breadthFirstPriority ? -state.searchDepth() : -size.value();
+                return new StateValue.Assessment(Math.toIntExact(size.value()), priority, size.work(), 0, Map.of());
             });
     }
 
     /** Ordering alone grants no mathematical authority; the normal verifier still admits each edge. */
     private enum KnowledgeFirst implements TypedMoveSearch.TypedPolicy {
-        INSTANCE;
+        INSTANCE, STRUCTURAL_EXPLORATION;
         @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }
+        @Override public double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+            if (this != STRUCTURAL_EXPLORATION) return 0;
+            String id = provider.id();
+            if (id.endsWith(":AUXILIARY_FACTOR")) return 4;
+            if (id.endsWith(":FACTOR_DIFFERENCE")) return 3;
+            if (id.endsWith(":RECOGNIZE_SQUARE")) return 2;
+            if (id.endsWith(":EXPOSE_SQUARE")) return 1;
+            return 0;
+        }
         @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
             return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED
                 : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);
