@@ -102,7 +102,8 @@ def audit_task(task, response):
             output = response['output']
             require(polynomial(task['source']) == polynomial(output), 'false polynomial identity')
             audit_witness(task['source'], output, response)
-            require(shape(task['kind'], output) == solved, 'reported success does not match requested structural shape')
+            require((shape(task['kind'], output) and response['withinBudget']) == solved,
+                    'reported success does not match requested structural shape and budget')
         else:
             require(not solved, 'successful structural result omitted output')
     return dict(valid=True, solved=solved, outcome='VERIFIED' if solved else response.get('outcome', 'INCONCLUSIVE'))

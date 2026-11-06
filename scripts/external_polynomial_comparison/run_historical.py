@@ -111,8 +111,12 @@ def run_sequence(p, profile, length, repetition, command, output):
 
     def launch(stage, record):
         worker = ReceiptSession.__new__(ReceiptSession); owned.append((stage, worker))
-        worker.__init__(command, output/f'{name}.{stage}.stderr.txt', p['setupTimeoutSeconds'], seq['processes'], stage)
-        record.update(pid=worker.process.pid, ready=worker.ready)
+        try:
+            worker.__init__(command, output/f'{name}.{stage}.stderr.txt', p['setupTimeoutSeconds'], seq['processes'], stage)
+        finally:
+            record['processSpawned'] = hasattr(worker, 'process')
+            if record['processSpawned']: record['pid'] = worker.process.pid
+        record['ready'] = worker.ready
         require(worker.ready.get('status') == 'READY', 'missing READY')
         if profile == 'SYMPY':
             require(worker.ready.get('sympy') == p['sympyVersion'], 'wrong SymPy version')
@@ -177,10 +181,19 @@ def account_sequence(p, seq):
     require(len(observed) == len(set(observed)) and all(name in expected for name in observed), 'unexpected lifecycle operation')
     completed = observed == expected and all(o['status'] == 'COMPLETE' for o in seq['operations'])
     require(completed or seq['errors'], 'incomplete lifecycle has no retained failure')
-    process_count = 2 if seq['profile'] == 'NATIVE_LEARNED' else 1
-    require(len(seq['processes']) <= process_count and (not completed or len(seq['processes']) == process_count), 'missing/surplus process receipts')
-    stages = ['producer', 'query'] if seq['profile'] == 'NATIVE_LEARNED' else ['query']
-    require([r['stage'] for r in seq['processes']] == stages[:len(seq['processes'])], 'process ownership stage mismatch')
+    spawned = []
+    for op in seq['operations']:
+        if not op['name'].startswith('startup-'): continue
+        # Older successful READY records already carry a PID. Failed startups
+        # must explicitly distinguish spawn failure from failure after spawning.
+        did_spawn = op.get('processSpawned', True if op['status'] == 'COMPLETE' else None)
+        require(type(did_spawn) is bool and (did_spawn or op['status'] == 'ERROR'), 'missing startup ownership state')
+        if did_spawn:
+            require(natural(op['pid']) > 0, 'spawned process has no identity')
+            spawned.append((op['name'].split('-')[1], op['pid']))
+        else:
+            require('pid' not in op, 'unspawned operation claims a process')
+    require([(r['stage'], r['pid']) for r in seq['processes']] == spawned, 'missing/surplus or misbound process receipts')
     stage_pids = {r['stage']: r['pid'] for r in seq['processes']}
     pids, resources, total_cpu, peaks = set(), True, 0, []
     for receipt in seq['processes']:
@@ -279,6 +292,30 @@ def verify_metadata(metadata, python, java):
             and metadata['runtimeBytesHash'] == java['runtimeBytesHash'], 'metadata/runtime binding mismatch')
 
 
+def verify_snapshot(output, sequence):
+    initial = [op for op in sequence['operations'] if op['name'] == 'initialize' and op['status'] == 'COMPLETE']
+    if sequence['profile'] == 'NATIVE_LEARNED' and initial:
+        require('snapshot' in sequence, 'saved learned setup omitted retained snapshot binding')
+    if 'snapshot' not in sequence:
+        return
+    require(sequence['profile'] == 'NATIVE_LEARNED' and len(initial) == 1, 'snapshot without learned save')
+    path = Path(sequence['snapshot']['file'])
+    require(not path.is_absolute() and '..' not in path.parts and path.parts[:1] == ('models',), 'snapshot path outside evidence')
+    saved = Path(initial[0]['response']['snapshot'])
+    directory = Path(initial[0]['request']['directory'])
+    name = f"{sequence['profile']}.n{sequence['length']}.r{sequence['repetition']}"
+    require(directory.is_absolute() and '..' not in directory.parts and saved.is_absolute()
+            and saved.parent == directory and directory.parts[-2:] == ('models', name)
+            and path == Path('models')/name/saved.name, 'saved model path differs from owned retained snapshot')
+    expected_hash = digest((output/path).read_bytes())
+    require(expected_hash == sequence['snapshot']['sha256'], 'persisted model bytes changed')
+    for op in sequence['operations']:
+        if op['name'] in ('initialize', 'restore') and op['status'] == 'COMPLETE':
+            require(op['response']['snapshotHash'] == expected_hash == op['response']['generationId'], 'model/generation not bound to retained bytes')
+            if op['name'] == 'restore':
+                require(op['request']['snapshot'] == str(saved), 'restore input differs from saved retained model')
+
+
 def verify(output):
     output = Path(output)
     inventory = _file_inventory(output); inventory.pop('manifest.json')
@@ -295,14 +332,7 @@ def verify(output):
     require(len(actual) == len(set(actual)) and set(actual) == set(schedule(p)), 'incomplete/duplicated lifecycle matrix')
     for s in sequences:
         require(s['accounting'] == account_sequence(p, s), 'lifecycle accounting summary mismatch')
-        if 'snapshot' in s:
-            path = Path(s['snapshot']['file'])
-            require(not path.is_absolute() and '..' not in path.parts and path.parts[:1] == ('models',), 'snapshot path outside evidence')
-            expected_hash = digest((output/path).read_bytes())
-            require(expected_hash == s['snapshot']['sha256'], 'persisted model bytes changed')
-            for op in s['operations']:
-                if op['name'] in ('initialize', 'restore') and op['status'] == 'COMPLETE':
-                    require(op['response']['snapshotHash'] == expected_hash == op['response']['generationId'], 'model/generation not bound to retained bytes')
+        verify_snapshot(output, s)
     summary = summarize(p, sequences)
     require(summary == json.loads((output/'summary.json').read_text()), 'retained comparison summary mismatch')
     verify_metadata(metadata, python, java)

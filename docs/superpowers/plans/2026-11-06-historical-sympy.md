@@ -42,5 +42,5 @@
 **Files:** `docs/research/historical-sympy-comparison-2026-11-06.md`, numeric summary and source/evidence links.
 
 - [x] Independently reverify original evidence, derive per-case quality and matched-quality resource summaries without retuning inputs or algorithms.
-- [ ] Obtain a fresh whole-change review, reproduce/fix substantive findings, and rerun affected tests.
-- [ ] Publish one focused PR and complete evidence; distinguish classical tasks, development variants and NOT_MEASURED gaps in the German result.
+- [x] Obtain a fresh whole-change review, reproduce/fix substantive findings, and rerun affected tests.
+- [x] Publish one focused PR and complete evidence; distinguish classical tasks, development variants and NOT_MEASURED gaps in the German result.

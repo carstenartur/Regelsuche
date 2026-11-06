@@ -191,6 +191,27 @@ Validation: the final exact Java-25 Maven learning reactor passes 3,592 tests
 with zero failures/errors/skips; the complete Python comparison suite passes
 96 tests. The focused wire-contract suite passes 6/6 after a clean build.
 
+A fresh final review independently confirmed both original attempts, the numeric
+summary and all twelve canonical latency medians. It found three observer defects:
+failed READY startup could lose its process receipt, saved/restored snapshot paths
+were not mandatory and fully bound, and an exact over-budget diagnostic output
+was rejected instead of retained as a bounded miss. These were corrected after
+measurement with regressions observed failing before the fixes. The focused
+Python suite then passes 19 tests, and the complete suite passes 99 tests with
+the Java 25 toolchain. Both untouched originals still verify with the hardened
+observer (`complete=false` for run1; `complete=true` for run2). A relocated copy
+also verifies; removing model binding or changing its restore input is rejected
+even after refreshing its file-integrity manifest. No measured runtime, input,
+result or timing was replaced by these observer corrections.
+
+Review boundaries remain explicit: this finite public experiment establishes no
+general CAS superiority, novel discovery, sealed-holdout generalization, or result
+for NOT_MEASURED tasks. Shared-host timings do not establish a precision ranking.
+The author ran the full Java reactor; the independent reviewer did not repeat
+that entire reactor. Retained runtime/package hashes check the declared bytes,
+not a whole-OS image or adversarial proof of authorship. Normal library caches
+remain enabled to avoid imposing extra cache-clearing work on the CAS.
+
 With Java 25, Maven and Python venv support, reproduce a new observation using:
 
 ```sh

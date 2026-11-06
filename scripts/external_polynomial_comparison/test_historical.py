@@ -52,6 +52,18 @@ class HistoricalJudgeTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit_task(task, dict(status='RESULT', task=task, solved=True, withinBudget=False, output='(x+1)*(x-1)'))
 
+    def test_exact_over_budget_diagnostic_is_a_valid_bounded_miss(self):
+        task = dict(kind='FACTOR', source='x^2-y^2')
+        response = dict(status='RESULT', task=task, solved=False, withinBudget=False,
+                        output='(x-y)*(x+y)', outcome='INCONCLUSIVE')
+        self.assertEqual(dict(valid=True, solved=False, outcome='INCONCLUSIVE'), audit_task(task, response))
+        with self.assertRaises(ValueError):
+            audit_task(task, dict(response, withinBudget=True))
+        with self.assertRaises(ValueError):
+            audit_task(task, dict(response, output='(x-y)*(x+y)+1'))
+        with self.assertRaises(ValueError):
+            audit_task(task, dict(response, normalizedInput=task['source'], witness=[]))
+
     def test_native_selected_path_cannot_be_rebound_or_disconnected(self):
         task = dict(kind='FACTOR', source='x^2-y^2')
         output = '(x-y)*(x+y)'
@@ -161,6 +173,23 @@ class HistoricalRunnerTest(unittest.TestCase):
             self.assertIsNotNone(seq['processes'][0]['cpu'])
             self.assertNotEqual(0, seq['processes'][0]['exitCode'])
             self.assertFalse(seq['accounting']['complete'])
+            changed = copy.deepcopy(seq); changed['processes'] = []
+            with self.assertRaises(ValueError): self.runner.account_sequence(p, changed)
+            startup = seq['operations'][0]
+            self.assertTrue(startup['processSpawned'])
+            self.assertEqual(seq['processes'][0]['pid'], startup['pid'])
+
+    def test_actual_spawn_failure_explicitly_owns_no_process(self):
+        p, _ = self.fixture()
+        with tempfile.TemporaryDirectory() as directory:
+            seq = self.runner.run_sequence(p, 'NATIVE_BASE', 2, 0,
+                [str(Path(directory)/'nonexistent-executable')], Path(directory))
+            self.assertEqual([], seq['processes'])
+            self.assertIs(False, seq['operations'][0]['processSpawned'])
+            self.assertNotIn('pid', seq['operations'][0])
+            self.assertFalse(seq['accounting']['complete'])
+            changed = copy.deepcopy(seq); del changed['operations'][0]['processSpawned']
+            with self.assertRaises(ValueError): self.runner.account_sequence(p, changed)
 
     def test_unavailable_resources_and_unequal_quality_withhold_performance_ratio(self):
         p, seq = self.fixture()
@@ -221,6 +250,35 @@ class HistoricalRunnerTest(unittest.TestCase):
             self.assertEqual(2, len({r['pid'] for r in seq['processes']}))
             self.assertTrue(all(r['cpu'] is not None for r in seq['processes']))
             self.assertFalse(seq['accounting']['complete'])
+            changed = copy.deepcopy(seq); changed['processes'].pop()
+            with self.assertRaises(ValueError): self.runner.account_sequence(p, changed)
+
+    def test_learned_snapshot_is_required_and_restore_is_bound_after_relocation(self):
+        name = 'NATIVE_LEARNED.n18.r0'
+        relative = Path('models')/name/'model.json'
+        original = Path('/original/measurement')/relative
+        content = b'{}'; model_hash = self.runner.digest(content)
+        response = dict(generationId=model_hash, snapshotHash=model_hash)
+        seq = dict(profile='NATIVE_LEARNED', length=18, repetition=0,
+            operations=[dict(name='initialize', status='COMPLETE',
+                request=dict(directory=str(original.parent)), response=dict(response, snapshot=str(original))),
+                dict(name='restore', status='COMPLETE', request=dict(snapshot=str(original)), response=response)],
+            snapshot=dict(file=relative.as_posix(), sha256=model_hash))
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/'relocated-archive'
+            (output/relative).parent.mkdir(parents=True)
+            (output/relative).write_bytes(content)
+            self.runner.verify_snapshot(output, seq)
+            mutations = [lambda q:q.pop('snapshot'),
+                lambda q:q['operations'][1]['request'].update(snapshot='/foreign/model.json'),
+                lambda q:q['operations'][0]['request'].update(directory='/foreign/models/'+name),
+                lambda q:q['operations'][0]['response'].update(snapshot='/foreign/model.json'),
+                lambda q:q['operations'][1]['response'].update(snapshotHash='sha256:WRONG'),
+                lambda q:q['snapshot'].update(file='/foreign/model.json')]
+            for index, mutate in enumerate(mutations):
+                changed = copy.deepcopy(seq); mutate(changed)
+                with self.subTest(mutation=index), self.assertRaises(ValueError):
+                    self.runner.verify_snapshot(output, changed)
 
 
 if __name__ == '__main__':
