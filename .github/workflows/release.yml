@@ -487,6 +487,24 @@ jobs:
             python3 -B scripts/package-student-sdk.py \
               --repository "$SDK_REPOSITORY" --version "$VERSION" \
               --output "app/target/regelsuche-sdk-${VERSION}.zip"
+
+            # Publish the existing qualified standalone runtime closure as well.
+            # Eclipse consumers can then copy released bytes instead of rebuilding
+            # a source-bound development artifact after publication.
+            SDK_DEPENDENCIES="${RUNNER_TEMP}/regelsuche-optimization-release-dependencies"
+            SDK_STANDALONE="${RUNNER_TEMP}/regelsuche-optimization-release"
+            mvn --batch-mode --no-transfer-progress \
+              -Dmaven.repo.local="$SDK_REPOSITORY" \
+              -pl regelsuche-optimization-sdk dependency:copy-dependencies \
+              -DincludeScope=runtime -DexcludeGroupIds=de.regelsuche \
+              -DoutputDirectory="$SDK_DEPENDENCIES"
+            python3 -B scripts/package-optimization-sdk.py \
+              --external-dependencies "$SDK_DEPENDENCIES" \
+              --output "$SDK_STANDALONE" --java-home "$JAVA_HOME"
+            source_revision=$(git rev-parse HEAD)
+            standalone_version="${VERSION}-issue1657-${source_revision:0:12}"
+            cp "$SDK_STANDALONE/regelsuche-optimization-sdk-${standalone_version}.zip" \
+              "app/target/regelsuche-optimization-sdk-${VERSION}.zip"
           fi
 
       - name: Collect and inspect release artifacts
@@ -549,6 +567,10 @@ jobs:
             test -s "$SDK"
             validate_archive_root zip "$SDK" "regelsuche-sdk-${VERSION}/"
             cp "$SDK" release-artifacts/
+            OPTIMIZATION_SDK="app/target/regelsuche-optimization-sdk-${VERSION}.zip"
+            test -s "$OPTIMIZATION_SDK"
+            unzip -tq "$OPTIMIZATION_SDK"
+            cp "$OPTIMIZATION_SDK" release-artifacts/
           fi
           {
             echo "version=${VERSION}"
@@ -572,6 +594,7 @@ jobs:
               > SHA256SUMS.txt
             if [[ -f "regelsuche-sdk-${VERSION}.zip" ]]; then
               sha256sum -- "regelsuche-sdk-${VERSION}.zip" >> SHA256SUMS.txt
+              sha256sum -- "regelsuche-optimization-sdk-${VERSION}.zip" >> SHA256SUMS.txt
             fi
           )
           echo "name=regelsuche-${VERSION}-artifacts" >> "$GITHUB_OUTPUT"
@@ -660,7 +683,9 @@ jobs:
             "regelsuche-${VERSION}.zip" | sort)
 
           if [[ -f config/sdk/public-api.json ]]; then
-            EXPECTED=$(printf '%s\n' "$EXPECTED" "regelsuche-sdk-${VERSION}.zip" | sort)
+            EXPECTED=$(printf '%s\n' "$EXPECTED" \
+              "regelsuche-sdk-${VERSION}.zip" \
+              "regelsuche-optimization-sdk-${VERSION}.zip" | sort)
           fi
 
           ACTUAL=''
