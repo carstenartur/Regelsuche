@@ -1,0 +1,396 @@
+{
+  "schema": "regelsuche.native-polynomial-comparison/v1",
+  "claim": "PUBLIC_DEVELOPMENT;HISTORICAL_INPUTS_AND_WITHHELD_VARIANTS;NO_GENERAL_CAS_OR_SPEED_CLAIM",
+  "profiles": [
+    "NATIVE_BASE",
+    "NATIVE_LEARNED",
+    "SYMPY_PORTFOLIO"
+  ],
+  "repetitions": 3,
+  "workBudget": 1000000,
+  "primitiveDepth": 8,
+  "searchDepth": 8,
+  "maxStates": 32,
+  "complexityDebt": 64,
+  "queryTimeoutSeconds": 2,
+  "setupTimeoutSeconds": 120,
+  "sympyVersion": "1.14.0",
+  "training": "UNCHANGED_TraceStrategyTransferExample_TRAIN;SAVE_AND_REPROVE_SCHEMAS",
+  "cases": [
+    {
+      "id": "offset",
+      "source": "(a+b)*(a-b)+b*b+11",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "outer-product",
+      "source": "((a+b)*(a-b)+b*b)*(a+7)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "sum-composition",
+      "source": "((a+b)*(a-b)+b*b)+a*a+13",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "two-sites",
+      "source": "((a+b)*(a-b)+b*b)+((c+d)*(c-d)+d*d)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "compound-base",
+      "source": "((a*b+c)*(a*b-c)+c*c)*(d+7)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "scaled-site",
+      "source": "11*((a+b)*(a-b)+b*b)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "four-term-factor",
+      "source": "3*a*b+3*a*c+5*d*b+5*d*c",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "common-left",
+      "source": "7*a*b+7*a*c",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "common-right",
+      "source": "(a+3)*c+(b+5)*c",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "nested-factor",
+      "source": "(a*a+a*b)*(c+7)+0",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "double-factor",
+      "source": "(a*b+a*c)+(a*b+a*c)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "near-miss",
+      "source": "(a+b)*(a-b)+b*(b+2)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "two-near-misses",
+      "source": "((a+b)*(a-b)+b*(b+2))+((c+d)*(c-d)+d*(d+3))",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "zero-one",
+      "source": "((a+4)+0)*1",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "simple-control",
+      "source": "a+23",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "square-control",
+      "source": "a*a+19",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "already-factored",
+      "source": "(a+2)*(b+3)*(c+5)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "binomial-cube",
+      "source": "a*a*a+3*a*a+3*a+1",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "quartic",
+      "source": "(2*a)^4+4*(3*b)^4",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "rational-coefficients",
+      "source": "(1/3)*a+(2/3)*a",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "separate-zeros",
+      "source": "(a+0)+(b+0)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "negative-site",
+      "source": "-((a+b)*(a-b)+b*b)+17",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "rational-context",
+      "source": "((a+b)*(a-b)+b*b)*(1/7)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "nonlinear-residual",
+      "source": "(a+b)*(a-b)+b*b*b+2",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "unsupported-function",
+      "source": "sin(a)+1",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "unsupported-denominator",
+      "source": "1/(a+1)",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "unsupported-negative-power",
+      "source": "a^(-1)+1",
+      "cohort": "HISTORICAL"
+    },
+    {
+      "id": "variant-00-0",
+      "source": "(x+2*y)*(x-2*y)+(2*y)*(2*y+4)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-00-1",
+      "source": "2*z*x+4*w*y+2*z*y+4*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-00-2",
+      "source": "x*x*x+6*x*x+12*x+8",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-00-3",
+      "source": "(2/6)*z+(4/6)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-00-4",
+      "source": "((x+2*y)*(x-2*y)+4*y*y)*(6/3)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-00-5",
+      "source": "(2*x+4)*z+(6*y+3)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-01-0",
+      "source": "(x+3*y)*(x-3*y)+(3*y)*(3*y+2)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-01-1",
+      "source": "3*z*x+2*w*y+3*z*y+2*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-01-2",
+      "source": "x*x*x+9*x*x+27*x+27",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-01-3",
+      "source": "(3/5)*z+(2/5)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-01-4",
+      "source": "((x+3*y)*(x-3*y)+9*y*y)*(5/3)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-01-5",
+      "source": "(3*x+2)*z+(5*y+3)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-02-0",
+      "source": "(x+6*y)*(x-6*y)+(6*y)*(6*y+9)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-02-1",
+      "source": "6*z*x+9*w*y+6*z*y+9*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-02-2",
+      "source": "x*x*x+18*x*x+108*x+216",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-02-3",
+      "source": "(6/15)*z+(9/15)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-02-4",
+      "source": "((x+6*y)*(x-6*y)+36*y*y)*(7/9)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-02-5",
+      "source": "(6*x+9)*z+(7*y+9)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-03-0",
+      "source": "(x+9*y)*(x-9*y)+(9*y)*(9*y+9)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-03-1",
+      "source": "9*z*x+9*w*y+9*z*y+9*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-03-2",
+      "source": "x*x*x+27*x*x+243*x+729",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-03-3",
+      "source": "(9/18)*z+(9/18)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-03-4",
+      "source": "((x+9*y)*(x-9*y)+81*y*y)*(8/3)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-03-5",
+      "source": "(9*x+9)*z+(8*y+3)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-04-0",
+      "source": "(x+2*y)*(x-2*y)+(2*y)*(2*y+7)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-04-1",
+      "source": "2*z*x+7*w*y+2*z*y+7*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-04-2",
+      "source": "x*x*x+6*x*x+12*x+8",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-04-3",
+      "source": "(2/9)*z+(7/9)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-04-4",
+      "source": "((x+2*y)*(x-2*y)+4*y*y)*(3/7)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-04-5",
+      "source": "(2*x+7)*z+(3*y+7)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-05-0",
+      "source": "(x+5*y)*(x-5*y)+(5*y)*(5*y+2)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-05-1",
+      "source": "5*z*x+2*w*y+5*z*y+2*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-05-2",
+      "source": "x*x*x+15*x*x+75*x+125",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-05-3",
+      "source": "(5/7)*z+(2/7)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-05-4",
+      "source": "((x+5*y)*(x-5*y)+25*y*y)*(5/8)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-05-5",
+      "source": "(5*x+2)*z+(5*y+8)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-06-0",
+      "source": "(x+4*y)*(x-4*y)+(4*y)*(4*y+3)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-06-1",
+      "source": "4*z*x+3*w*y+4*z*y+3*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-06-2",
+      "source": "x*x*x+12*x*x+48*x+64",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-06-3",
+      "source": "(4/7)*z+(3/7)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-06-4",
+      "source": "((x+4*y)*(x-4*y)+16*y*y)*(7/7)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-06-5",
+      "source": "(4*x+3)*z+(7*y+7)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-07-0",
+      "source": "(x+6*y)*(x-6*y)+(6*y)*(6*y+2)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-07-1",
+      "source": "6*z*x+2*w*y+6*z*y+2*w*x",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-07-2",
+      "source": "x*x*x+18*x*x+108*x+216",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-07-3",
+      "source": "(6/8)*z+(2/8)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-07-4",
+      "source": "((x+6*y)*(x-6*y)+36*y*y)*(6/9)",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    },
+    {
+      "id": "variant-07-5",
+      "source": "(6*x+2)*z+(6*y+9)*z",
+      "cohort": "WITHHELD_PUBLIC_VARIANT"
+    }
+  ]
+}
