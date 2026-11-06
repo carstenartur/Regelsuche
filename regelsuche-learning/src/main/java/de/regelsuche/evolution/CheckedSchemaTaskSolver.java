@@ -11,6 +11,7 @@ import de.regelsuche.search.moves.SearchContinuationContract;
 import de.regelsuche.search.moves.SearchMove;
 import de.regelsuche.search.moves.StateValue;
 import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.moves.TypedSearchAlternatives;
 import de.regelsuche.search.moves.TypedSourceOnlySearch;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import java.util.List;
@@ -161,6 +162,25 @@ public final class CheckedSchemaTaskSolver {
 
     /** Fresh cursors, scoped codec reuse, one budget, and final replay for every invocation. */
     public Solution solve(Task task) {
+        var prepared = prepare(task);
+        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
+            () -> new TypedSourceOnlySearch().searchUntil(problem(task), prepared.objective(),
+                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));
+        return new Solution(task, result, prepared.checkedSteps());
+    }
+
+    /** Continue the same checked frontier and independently replay a bounded set of alternatives. */
+    public TypedSearchAlternatives.Result explore(Task task, long reserveWork, int maximumAlternatives) {
+        var prepared = prepare(task);
+        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
+            () -> new TypedSourceOnlySearch().searchAlternatives(problem(task), prepared.objective(),
+                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE,
+                reserveWork, maximumAlternatives));
+    }
+
+    private record Prepared(TypedSourceOnlySearch.Objective objective, boolean checkedSteps) { }
+
+    private Prepared prepare(Task task) {
         Objects.requireNonNull(task, "task");
         var original = task.goal().objective();
         boolean checkedSteps = exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(original);
@@ -182,11 +202,7 @@ public final class CheckedSchemaTaskSolver {
                     ? new TypedSourceOnlySearch.Score(score.value(), Math.addExact(score.work(), inspection)) : score;
             };
         }
-        var selectedObjective = objective;
-        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
-            () -> new TypedSourceOnlySearch().searchUntil(problem(task), selectedObjective,
-                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));
-        return new Solution(task, result, checkedSteps);
+        return new Prepared(objective, checkedSteps);
     }
 
     private record SourceInspection(long work, int nodes) { }

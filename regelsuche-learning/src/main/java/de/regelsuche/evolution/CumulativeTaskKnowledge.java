@@ -3,6 +3,7 @@ package de.regelsuche.evolution;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.TypedSearchAlternatives;
 import java.util.Set;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -75,6 +76,29 @@ public final class CumulativeTaskKnowledge {
             List<Validation> validation, Costs work, List<CheckedLearnedSchemaModel.Attempt> attempts) {
         public Update { training = List.copyOf(training); validation = List.copyOf(validation); attempts = List.copyOf(attempts); }
         public boolean promoted() { return reason == Decision.PROMOTED; }
+    }
+
+    /** One source-only exploration of this immutable generation; no learning or promotion side effect. */
+    public static final class Exploration {
+        private final String generationId;
+        private final CheckedSchemaTaskSolver.Task task;
+        private final Strategy selected;
+        private final long selectionWork;
+        private final TypedSearchAlternatives.Result evidence;
+        private Exploration(String generationId, CheckedSchemaTaskSolver.Task task, Strategy selected,
+                long selectionWork, TypedSearchAlternatives.Result evidence) {
+            this.generationId = generationId; this.task = task; this.selected = selected;
+            this.selectionWork = selectionWork; this.evidence = evidence;
+        }
+        public String generationId() { return generationId; }
+        public CheckedSchemaTaskSolver.Task task() { return task; }
+        public Strategy selectedStrategy() { return selected; }
+        public long selectionWork() { return selectionWork; }
+        public Optional<TypedSearchAlternatives.Result> evidence() { return Optional.ofNullable(evidence); }
+        public long totalWork() { return sum(selectionWork, evidence == null ? 0 : evidence.totalWork()); }
+        public boolean withinBudget() {
+            return evidence != null && evidence.withinBudget() && totalWork() <= task.budget().totalWork();
+        }
     }
 
     /** A technical failure never hides completed lessons or authorizes a new knowledge state. */
@@ -206,6 +230,30 @@ public final class CumulativeTaskKnowledge {
         return automatic(id, task, routes, knowledgeGoals, baseline, learned);
     }
 
+    /** Bounded alternative output uses the same frozen library, routing and strict task checks as solve. */
+    public Exploration explore(CheckedSchemaTaskSolver.Task task, Strategy strategy,
+            long reserveWork, int maximumAlternatives) {
+        Objects.requireNonNull(task, "task"); Objects.requireNonNull(strategy, "strategy");
+        if (reserveWork < 1 || reserveWork >= task.budget().totalWork() || maximumAlternatives < 1)
+            throw new IllegalArgumentException("a positive in-budget reserve and alternative limit are required");
+        if (constructionProfile.requiresExactPolynomialSteps() || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
+            StructuralCheckedDomain.requireUnobserved();
+        var route = strategy == Strategy.AUTOMATIC ? route(task, routes, knowledgeGoals) : new Routing(strategy, 0);
+        if (route.work() >= task.budget().totalWork() - reserveWork)
+            return new Exploration(id, task, route.strategy(), route.work(), null);
+        var budget = task.budget();
+        var remaining = new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),
+            budget.maxStates(), budget.totalWork() - route.work(), budget.maxComplexityDebt());
+        var actual = new CheckedSchemaTaskSolver.Task(task.source(), task.assumptions(), task.goal(), remaining);
+        try {
+            var evidence = (route.strategy() == Strategy.BASELINE ? baseline : learned)
+                .explore(actual, reserveWork, maximumAlternatives);
+            return new Exploration(id, task, route.strategy(), route.work(), evidence);
+        } catch (CheckedSchemaTaskSolver.UnsupportedTaskException unsupported) {
+            throw unsupported.withRoutingWork(route.work());
+        }
+    }
+
     private static Set<String> knowledgeGoals(Map<String, Strategy> routes) {
         var goals = new HashSet<String>();
         routes.forEach((key, strategy) -> {
@@ -218,12 +266,17 @@ public final class CumulativeTaskKnowledge {
     }
     private static Execution automatic(String id, CheckedSchemaTaskSolver.Task task, Map<String, Strategy> routes,
             Set<String> goals, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned) {
+        var route = route(task, routes, goals);
+        return run(id, task, route.strategy(), route.work(), baseline, learned);
+    }
+    private record Routing(Strategy strategy, long work) { }
+    private static Routing route(CheckedSchemaTaskSolver.Task task, Map<String, Strategy> routes, Set<String> goals) {
         // A constant baseline policy does not inspect the source at all.
-        if (goals.isEmpty()) return run(id, task, Strategy.BASELINE, 0, baseline, learned);
+        if (goals.isEmpty()) return new Routing(Strategy.BASELINE, 0);
         if (!goals.contains(TaskKnowledgeProfile.goalKey(task)))
-            return run(id, task, Strategy.BASELINE, 2, baseline, learned);
+            return new Routing(Strategy.BASELINE, 2);
         var profile = TaskKnowledgeProfile.inspect(task);
-        return run(id, task, routes.getOrDefault(profile.key(), Strategy.BASELINE), profile.work() + 2, baseline, learned);
+        return new Routing(routes.getOrDefault(profile.key(), Strategy.BASELINE), profile.work() + 2);
     }
 
     private static Execution run(String generationId, CheckedSchemaTaskSolver.Task task, Strategy selected,
