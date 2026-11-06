@@ -51,7 +51,7 @@ public final class HistoricalComparisonWorker {
         if (!Set.of("NATIVE_BASE", "NATIVE_LEARNED").contains(profile)) throw new IllegalArgumentException("native profile required");
         var prelude = request.get("prelude");
         CheckedSchemaSupport.fields(prelude, "expressionBlocks", "recurrenceBlocks", "recurrenceFamilyValidation");
-        preludeHash = SchematicProofPlan.hash(LearnedSchedulingArtifacts.json(CheckedSchemaSupport.JSON.convertValue(prelude, Map.class)));
+        preludeHash = SchematicProofPlan.hash(LearnedSchedulingArtifacts.json(CheckedSchemaSupport.JSON.convertValue(prelude, Map.class)) + "\n");
     }
 
     private Map<String, Object> initialize(JsonNode request) throws Exception {

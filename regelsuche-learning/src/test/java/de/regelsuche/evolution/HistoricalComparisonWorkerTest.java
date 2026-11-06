@@ -83,6 +83,16 @@ class HistoricalComparisonWorkerTest {
         reversed.put("expressionBlocks", List.of());
         var response = call(new HistoricalComparisonWorker(), Map.of("op", "initialize", "profile", "NATIVE_BASE",
             "prelude", reversed, "directory", directory.toString()));
-        assertEquals(SchematicProofPlan.hash(LearnedSchedulingArtifacts.json(EMPTY)), response.get("preludeHash"));
+        var ordered = call(new HistoricalComparisonWorker(), Map.of("op", "initialize", "profile", "NATIVE_BASE",
+            "prelude", new java.util.TreeMap<>(EMPTY), "directory", directory.toString()));
+        assertEquals(ordered.get("preludeHash"), response.get("preludeHash"));
+    }
+
+    @Test void teachingHashUsesTheSharedCanonicalJsonLineContract(@TempDir Path directory) throws Exception {
+        var response = call(new HistoricalComparisonWorker(), Map.of("op", "initialize", "profile", "NATIVE_BASE",
+            "prelude", EMPTY, "directory", directory.toString()));
+        // Same UTF-8 canonical JSON line (including LF) that the Python supervisor sends/audits.
+        assertEquals(SchematicProofPlan.hash("{\"expressionBlocks\":[],\"recurrenceBlocks\":[],\"recurrenceFamilyValidation\":[]}\n"),
+            response.get("preludeHash"));
     }
 }
