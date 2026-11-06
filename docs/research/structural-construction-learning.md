@@ -520,10 +520,10 @@ polynomial projection. Selecting the direct `PERFECT_SQUARE` objective without
 a construction profile uses the same domain, step checks and product-work
 accounting. The square evaluator also reports product work when supplied as a
 callback; arbitrary custom objectives remain responsible for their own work
-reports. A callback does not retain the enum identity: callers must select the
-strict square profile for its domain and per-step checks. Without that profile,
-legacy custom-objective behavior does not establish those checks. This matters
-for user-configurable rewrite rules: a
+reports. A callback does not retain the enum identity: callers must select a
+strict profile for its domain and per-step checks. Without that profile, legacy
+custom-objective behavior does not establish those checks. This matters for
+user-configurable rewrite rules: a
 replayed rule is not automatically an identity. Symbol names must also follow
 the parser's identifier grammar, so formatting an AST cannot reinterpret a
 single symbol as an expression. As in the checked-schema polynomial domain,
@@ -542,3 +542,100 @@ The set and priority of general construction providers were supplied by the
 implementation. The system did not invent that strategy or receive the
 historical target. The larger historical catalog, including Euclid and the
 general Ferrari method, remains open.
+
+## The frozen catalog through one source-only task solver
+
+The existing 14-case historical corpus is also exercised by
+`HistoricalCatalogTaskCoverageTest` through one cumulative task solver and the
+opt-in `STRUCTURAL_EXPANSION_V1` profile. The test gives each task its source,
+empty assumptions and one of the general goals **perfect square**,
+**nontrivial factorization**, or **expanded and collected polynomial**. It does
+not give the solver a target expression, corpus witness, or ordered path. The
+target is inspected only after the search. The selected general providers and
+their scheduling were supplied by the implementation, not invented by the
+search.
+
+All 12 historical positive inputs reach their declared structural goal with a
+nonempty replayed witness and an exact polynomial equivalence recheck. Nine
+results happen to be syntax-equal to the stored target. The remaining three
+are equivalent representations: `(y+x)^2` instead of `(x+y)^2`, and two
+expanded results which use powers instead of repeated products. One of the
+nine matches is Sophie Germain, whose corpus relation is value-equivalence;
+therefore eight of the eleven cases labelled `SYNTAX_EXACT` meet that exact
+spelling in this run. **This is 12/12 under the new task contract, not 12/12
+under every original atlas relation and budget.**
+
+| Frozen input | Declared work | Witness steps | Exact target syntax |
+| --- | ---: | ---: | --- |
+| complete square | 6,439 | 3 | yes |
+| reordered square | 6,413 | 3 | yes |
+| regrouped square | 9,591 | 3 | no |
+| scaled square | 12,200 | 3 | yes |
+| fractional square | 15,298 | 3 | yes |
+| difference of squares | 4,595 | 3 | yes |
+| difference of squares with powers | 2,734 | 1 | yes |
+| common left factor | 782 | 1 | yes |
+| common right factor | 784 | 1 | yes |
+| expand binomial square | 2,331,979 | 7 | no |
+| expand difference-of-squares product | 125,405 | 2 | no |
+| Sophie Germain | 43,722 | 5 | yes |
+
+The positive cases use the same task budget: 32 primitive steps, search depth
+8, 10,000,000 theory units, 512 states and 10,000,000 total work units. The
+negative control is independently confirmed unequal to its stored target and
+does not reach the square goal with its smaller 200,000-unit budget. The policy
+control also reaches the general expansion goal, but its result and budget do
+not reproduce the original syntax-exact, three-state policy diagnostic; that
+original control is still evaluated separately by the atlas.
+
+For example, the source-only Sophie-Germain task retains the following five
+individually replayed steps. The last three lines are displayed in ordinary
+algebra notation; the test also prints each actual source, rule and target:
+
+```text
+x^4 + 4*y^4
+  -> (x^2)^2 + 4*y^4
+  -> (x^2)^2 + (2*y^2)^2
+  -> (x^2 + 2*y^2)^2 - 2*x^2*2*y^2
+  -> (x^2 + 2*y^2)^2 - (2*x*y)^2
+  -> (x^2 + 2*y^2 - 2*x*y)*(x^2 + 2*y^2 + 2*x*y)
+```
+
+All steps, including configurable primitive rules and the final independent
+replay, pass the checked square profile's per-edge domain and exact identity
+validation. Source-bound replay alone does not prove an arbitrary rule.
+The construction steps carry source-bound replay and exact identity checks;
+their internal algorithms are not expanded into a complete textbook proof.
+The expansion steps use the existing distributive and normalization rules.
+Their observed `RetainedOperation` execution and validation events are added
+to generation and replay work. A failed provider exposes its locally observed
+work while marking the unfinished search accounting incomplete. Nested
+`RetainedOperation` scopes are rejected before these providers run because
+their current accounting cannot safely preserve the enclosing retention scope.
+
+The default expansion profile selects these providers only when the goal is the
+declared `StructuralTaskObjective.EXPANDED_POLYNOMIAL` enum instance. A custom
+or wrapped objective does not carry that goal identity.
+`STRUCTURAL_EXPANSION_BRIDGE_V1` also makes them available later in the
+search for other goals. The latter is an explicitly different policy and its
+extra lanes can change work and bounded outcomes. The default profile was
+checked against the square profile on square and factorization tasks with
+identical query results and declared search work. Profile construction itself
+is not included in those figures. As elsewhere in this experimental path,
+some existing learning/proof operations and actual memory, file I/O and JVM
+time remain outside the declared work model.
+
+The existing learner can also retain a checked expansion schema: two lessons
+and a separate validation input promoted one schema. On one further related
+development expression, the baseline exceeded the 10,000,000-unit task budget
+while the restored learner solved it in 8,220,946 units using two learned
+applications. Acquisition cost 39,934,791 units before that query; no
+break-even or cross-family advantage is established by this example.
+
+To reproduce the shared catalog test and its step log with the checkout's Java
+25 Maven toolchain:
+
+```sh
+mvn -pl regelsuche-autopilot -am -Dtest=HistoricalCatalogTaskCoverageTest \
+    -Dsurefire.failIfNoSpecifiedTests=false test
+```

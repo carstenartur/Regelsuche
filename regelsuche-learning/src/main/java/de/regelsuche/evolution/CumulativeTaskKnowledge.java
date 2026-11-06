@@ -131,7 +131,7 @@ public final class CumulativeTaskKnowledge {
         if (generation < 0 || generation > 100_000 || (generation == 0) != parentId.isEmpty()
                 || generation > 0 && !parentId.matches("sha256:[0-9a-f]{64}")) throw new IllegalArgumentException("invalid generation parent");
         if (routes.size() > MAX_ROUTES || routes.entrySet().stream().anyMatch(e -> e.getKey().length() > 512
-                || !e.getKey().matches("(?:nodes|factor-v1|two-squares-v1|square-v1):-?[0-9]{1,19}:[A-Z(),]+") || e.getValue() == null || e.getValue() == Strategy.AUTOMATIC))
+                || !e.getKey().matches("(?:nodes|factor-v1|two-squares-v1|square-v1|expanded-v1):-?[0-9]{1,19}:[A-Z(),]+") || e.getValue() == null || e.getValue() == Strategy.AUTOMATIC))
             throw new IllegalArgumentException("invalid routing policy");
         this.baseline = baseline; this.learned = learned; this.generation = generation; this.parentId = parentId;
         this.routes = java.util.Collections.unmodifiableMap(new TreeMap<>(routes));
@@ -199,7 +199,7 @@ public final class CumulativeTaskKnowledge {
     /** Fresh query state, fixed library, paid routing, and no training side effect. */
     public Execution solve(CheckedSchemaTaskSolver.Task task, Strategy strategy) {
         Objects.requireNonNull(task, "task"); Objects.requireNonNull(strategy, "strategy");
-        if (constructionProfile.requiresExactPolynomialSteps() || task.goal().objective() == StructuralTaskObjective.PERFECT_SQUARE) {
+        if (constructionProfile.requiresExactPolynomialSteps() || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective())) {
             StructuralCheckedDomain.requireUnobserved();
         }
         if (strategy != Strategy.AUTOMATIC) return run(id, task, strategy, 0, baseline, learned);
@@ -256,8 +256,8 @@ public final class CumulativeTaskKnowledge {
             long maximumAcquisitionWork) {
         if (de.regelsuche.retention.RetainedOperation.isObserved()
                 && (constructionProfile.requiresExactPolynomialSteps()
-                    || lessons.stream().anyMatch(task -> task.goal().objective() == StructuralTaskObjective.PERFECT_SQUARE)
-                    || validationTasks.stream().anyMatch(task -> task.goal().objective() == StructuralTaskObjective.PERFECT_SQUARE))) {
+                    || lessons.stream().anyMatch(task -> StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
+                    || validationTasks.stream().anyMatch(task -> StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective())))) {
             StructuralCheckedDomain.requireUnobserved();
         }
         if (maximumAcquisitionWork < 1) throw new IllegalArgumentException("positive learning budget required");

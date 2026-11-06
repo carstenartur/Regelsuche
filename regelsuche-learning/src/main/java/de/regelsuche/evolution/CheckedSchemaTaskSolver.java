@@ -46,6 +46,18 @@ public final class CheckedSchemaTaskSolver {
         }
     }
 
+    /** A failed provider reports its measured local work; the unfinished search prefix remains unknown. */
+    public static final class ProviderFailure extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+        private final long observedProviderWork;
+        ProviderFailure(long work, RuntimeException cause) {
+            super("task provider failed; unfinished search work is unknown", cause);
+            this.observedProviderWork = work;
+        }
+        public long observedProviderWork() { return observedProviderWork; }
+        public boolean accountingComplete() { return false; }
+    }
+
     /** The caller fixes this measured criterion before solving, not from the observed answer. */
     public record Goal(TypedSourceOnlySearch.Objective objective, long maximumOutputScore) {
         public Goal { Objects.requireNonNull(objective, "objective"); }
@@ -96,18 +108,24 @@ public final class CheckedSchemaTaskSolver {
     private final CheckedSchemaMatcherPlan.Compilation preparation;
     private final boolean breadthFirstPriority;
     private final boolean exactPolynomialSteps;
+    private final boolean expansionRulesAttached;
+    private final boolean expansionBridgesForOtherGoals;
 
     CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation) {
-        this(session, preparation, false, false);
+        this(session, preparation, false, false, false, false);
     }
 
     private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
-            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps) {
+            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
+            boolean expansionRulesAttached,
+            boolean expansionBridgesForOtherGoals) {
         this.session = Objects.requireNonNull(session, "session");
         this.preparation = preparation;
         this.breadthFirstPriority = breadthFirstPriority;
         this.exactPolynomialSteps = exactPolynomialSteps;
+        this.expansionRulesAttached = expansionRulesAttached;
+        this.expansionBridgesForOtherGoals = expansionBridgesForOtherGoals;
     }
 
     CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations,
@@ -121,11 +139,18 @@ public final class CheckedSchemaTaskSolver {
         }
         var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),
             (source, move, context) -> verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));
-        return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth, exactPolynomialSteps);
+        return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth, exactPolynomialSteps,
+            expansionRulesAttached, expansionBridgesForOtherGoals);
     }
 
     CheckedSchemaTaskSolver withExactPolynomialSteps() {
-        return new CheckedSchemaTaskSolver(session, preparation, breadthFirstPriority, true);
+        return new CheckedSchemaTaskSolver(session, preparation, breadthFirstPriority, true,
+            expansionRulesAttached, expansionBridgesForOtherGoals);
+    }
+
+    CheckedSchemaTaskSolver withExpansionRules(boolean bridgesForOtherGoals) {
+        return new CheckedSchemaTaskSolver(StructuralExpansionRules.attach(session, preparation != null), preparation,
+            breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals);
     }
 
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
@@ -138,11 +163,11 @@ public final class CheckedSchemaTaskSolver {
     public Solution solve(Task task) {
         Objects.requireNonNull(task, "task");
         var original = task.goal().objective();
-        boolean checkedSteps = exactPolynomialSteps || original == StructuralTaskObjective.PERFECT_SQUARE;
+        boolean checkedSteps = exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(original);
         if (checkedSteps) StructuralCheckedDomain.requireUnobserved();
         var sourceInspection = checkedSteps ? inspectSource(task) : new SourceInspection(0, 0);
         long inspection = sourceInspection.work();
-        TypedSourceOnlySearch.Objective objective = (breadthFirstPriority || original == StructuralTaskObjective.PERFECT_SQUARE)
+        TypedSourceOnlySearch.Objective objective = (breadthFirstPriority || StructuralTaskObjective.requiresExactPolynomialSteps(original))
             && original instanceof StructuralTaskObjective structural
             ? structural::evaluateWithProductWork : original;
         if (inspection > 0) {
@@ -180,8 +205,8 @@ public final class CheckedSchemaTaskSolver {
     TypedMoveSearch.Problem problem(Task task) {
         return new TypedMoveSearch.Problem(task.source(),
             TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),
-            session.providers(), breadthFirstPriority ? KnowledgeFirst.STRUCTURAL_EXPLORATION : KnowledgeFirst.INSTANCE,
-            exactPolynomialSteps || task.goal().objective() == StructuralTaskObjective.PERFECT_SQUARE
+            providersFor(task), policyFor(task),
+            exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective())
                 ? StructuralStepVerifier.checked(session.verifier()) : session.verifier(), state -> 0,
             MoveSearch.Mode.FAST, preparation == null ? MoveSearch.Scheduling.STAGED
                 : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),
@@ -192,12 +217,24 @@ public final class CheckedSchemaTaskSolver {
             });
     }
 
+    private List<MoveProvider> providersFor(Task task) {
+        if (!expansionRulesAttached || expansionBridgesForOtherGoals
+                || task.goal().objective() == StructuralTaskObjective.EXPANDED_POLYNOMIAL) return session.providers();
+        return session.providers().stream().filter(provider -> !StructuralExpansionRules.isExpansionProvider(provider.descriptor())).toList();
+    }
+
+    private KnowledgeFirst policyFor(Task task) {
+        if (!breadthFirstPriority) return KnowledgeFirst.INSTANCE;
+        return expansionRulesAttached && task.goal().objective() != StructuralTaskObjective.EXPANDED_POLYNOMIAL
+            ? KnowledgeFirst.STRUCTURAL_DEFER_EXPANSION : KnowledgeFirst.STRUCTURAL_EXPLORATION;
+    }
+
     /** Ordering alone grants no mathematical authority; the normal verifier still admits each edge. */
     private enum KnowledgeFirst implements TypedMoveSearch.TypedPolicy {
-        INSTANCE, STRUCTURAL_EXPLORATION;
+        INSTANCE, STRUCTURAL_EXPLORATION, STRUCTURAL_DEFER_EXPANSION;
         @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }
         @Override public double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
-            if (this != STRUCTURAL_EXPLORATION) return 0;
+            if (this == INSTANCE) return 0;
             String id = provider.id();
             if (id.endsWith(":AUXILIARY_FACTOR")) return 4;
             if (id.endsWith(":FACTOR_DIFFERENCE")) return 3;
@@ -209,6 +246,8 @@ public final class CheckedSchemaTaskSolver {
             return 0;
         }
         @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+            if (StructuralExpansionRules.isExpansionProvider(provider))
+                return this == STRUCTURAL_DEFER_EXPANSION ? Stage.EXPENSIVE : Stage.NORMAL_PRIMITIVE;
             return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED
                 : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);
         }

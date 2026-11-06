@@ -24,6 +24,29 @@ class TypedSourceOnlyBudgetBoundaryTest {
     private static final TypedSourceOnlySearch.Objective OBJECTIVE = state ->
         new TypedSourceOnlySearch.Score(state.expression() instanceof BinaryExpr ? 3 : 1, 1);
 
+    @Test void exactVerificationBudgetDoesNotInvokeChildObjective() {
+        for (var contract : SearchContinuationContract.values()) {
+            long budget = contract == SearchContinuationContract.PATH_SENSITIVE ? 12 : 16;
+            var childCalls = new java.util.concurrent.atomic.AtomicInteger();
+            var result = new TypedSourceOnlySearch().searchUntil(problem(budget), state -> {
+                if (state.expression() instanceof BinaryExpr) return new TypedSourceOnlySearch.Score(3, 1);
+                childCalls.incrementAndGet();
+                return new TypedSourceOnlySearch.Score(1, 100);
+            }, 1, contract);
+            assertTrue(result.search().events().stream()
+                .anyMatch(event -> event.verification() != null && event.verification().accepted()),
+                "the accepted verification must actually reach the budget boundary: " + contract);
+            var expectedDecision = contract == SearchContinuationContract.PATH_SENSITIVE
+                ? MoveSearch.Decision.WORK_LIMIT : MoveSearch.Decision.ENQUEUED;
+            assertTrue(result.search().events().stream().anyMatch(event -> event.decision() == expectedDecision
+                && event.verification() != null && event.verification().accepted()), "keep the paid edge receipt");
+            assertEquals(0, childCalls.get(), "an exhausted budget must not invoke the child objective: " + contract);
+            assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED, result.search().outcome());
+            assertEquals(INPUT, result.incumbent().expression());
+            assertTrue(result.witness().isEmpty());
+        }
+    }
+
     @Test void overBudgetChildObjectiveRetainsReplayableIncumbentButNoSuccessWitness() {
         for (var contract : SearchContinuationContract.values()) {
             var result = new TypedSourceOnlySearch().searchUntil(problem(100), state ->
