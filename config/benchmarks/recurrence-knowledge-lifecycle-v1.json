@@ -1,0 +1,1717 @@
+{
+  "revision": "regelsuche.recurrence-knowledge-lifecycle/v1",
+  "informationRegime": "PUBLIC_DEVELOPMENT",
+  "profiles": [
+    "BASELINE",
+    "EXACT_FROZEN",
+    "FAMILY"
+  ],
+  "sequenceLengths": [
+    1,
+    8,
+    64
+  ],
+  "repetitions": 3,
+  "setupTimeoutSeconds": 120,
+  "queryTimeoutSeconds": 30,
+  "acquisitionBudget": 500000,
+  "queryBudget": 100000,
+  "javaOptions": [
+    "-Xmx512m"
+  ],
+  "warmups": [],
+  "lessons": [
+    {
+      "training": [
+        {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "1"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "0",
+            "1"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      ],
+      "validation": [
+        {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "1"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "2",
+            "3"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      ]
+    },
+    {
+      "training": [
+        {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "2"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "0",
+            "1"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      ],
+      "validation": [
+        {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "2"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "2",
+            "3"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      ]
+    }
+  ],
+  "familyValidation": [
+    {
+      "linear": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "1",
+          "3"
+        ]
+      ],
+      "offset": [
+        "0",
+        "0"
+      ],
+      "initial": [
+        "2",
+        "3"
+      ],
+      "degree": 2,
+      "workBudget": 100000
+    },
+    {
+      "linear": [
+        [
+          "0",
+          "1"
+        ],
+        [
+          "1",
+          "5"
+        ]
+      ],
+      "offset": [
+        "0",
+        "0"
+      ],
+      "initial": [
+        "3",
+        "4"
+      ],
+      "degree": 2,
+      "workBudget": 100000
+    }
+  ],
+  "queries": [
+    {
+      "id": "round-1-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-1-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-1-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-1-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-1-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-1-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-1-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-1-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "1"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-2-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "2"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "4",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "4",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "4",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "4",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "4",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "4",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "4",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-3-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "3"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "5",
+          "9"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "5",
+          "9"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "5",
+          "9"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "5",
+          "9"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "5",
+          "9"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "5",
+          "9"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "5",
+          "9"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-4-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "4"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "6",
+          "11"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "6",
+          "11"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "6",
+          "11"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "6",
+          "11"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "6",
+          "11"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "6",
+          "11"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "6",
+          "11"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-5-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "7",
+          "13"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "7",
+          "13"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "7",
+          "13"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "7",
+          "13"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "7",
+          "13"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "7",
+          "13"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "7",
+          "13"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-6-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "6"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "8",
+          "15"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "8",
+          "15"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "8",
+          "15"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "8",
+          "15"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "8",
+          "15"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "8",
+          "15"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "8",
+          "15"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-7-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-parameter-1",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "4"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "9",
+          "17"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-parameter-2",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "9",
+          "17"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-parameter-3",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "9",
+          "17"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-parameter-4",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "0"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "9",
+          "17"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-parameter-5",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "11"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "9",
+          "17"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-parameter-6",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "-7"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "9",
+          "17"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-parameter-7",
+      "task": {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "1/2"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "9",
+          "17"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    },
+    {
+      "id": "round-8-negative",
+      "task": {
+        "linear": [
+          [
+            "2"
+          ]
+        ],
+        "offset": [
+          "0"
+        ],
+        "initial": [
+          "8"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    }
+  ]
+}

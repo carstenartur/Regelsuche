@@ -317,7 +317,7 @@ def _bind_surfaces(source, response):
              'reported cost differs from the bound typed surface')
 
 
-def audit_response(source: str, response: dict) -> dict:
+def audit_response(source: str, response: dict, *, allowed_source_kinds=('PRIMITIVE', 'LEARNED')) -> dict:
     """Check exact polynomial identities and selected lineage, not Java authority.
 
     Checked schema edges are statements of the polynomial theory; they need not
@@ -359,7 +359,7 @@ def audit_response(source: str, response: dict) -> dict:
                  and bool(receipt['receipts']) and all(isinstance(item, str) and item for item in receipt['receipts']),
                  'accepted Java verification receipt missing')
         replay_work += natural(receipt['work'])
-        _require(move.get('sourceKind') in ('PRIMITIVE', 'LEARNED'), 'unsupported move source')
+        _require(move.get('sourceKind') in allowed_source_kinds, 'unsupported move source')
         transformation = move['transformation']
         _require(move['assumptions'] == transformation['assumptions'] == [], 'unproved dynamic premises')
         _require(transformation['transformedExpression'] == step['target'], 'move endpoint mismatch')

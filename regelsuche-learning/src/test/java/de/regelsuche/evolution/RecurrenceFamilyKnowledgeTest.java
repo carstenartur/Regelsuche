@@ -32,6 +32,21 @@ class RecurrenceFamilyKnowledgeTest {
         }
         return k;
     }
+    @Test void reusesTheUniversalStepInsteadOfReprovingItForEveryInitialState() {
+        var known=family();
+        var task=request(7,3,4);
+        var run=known.solve(task,CumulativeTaskKnowledge.Strategy.AUTOMATIC);
+        require(run.solved() && run.reused(), "actual acquired family application required");
+        var audit=new de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier().verify(
+            task.transition(),run.law().orElseThrow().proposal(),task.initialState(),task.budget());
+        require(audit.law().isPresent(), "original full verifier independently accepts the instance");
+        require(audit.law().get().initialValue().equals(run.law().get().initialValue()), "new initial value is independently recomputed");
+        System.out.println("proofReuseApplication="+run.totalWork()+" fullStepReplay="+audit.work().consumedWorkUnits());
+        require(run.totalWork()<audit.work().consumedWorkUnits(),
+            "the acquired universal proof must replace repeated step expansion: application="+run.totalWork()
+                +", full-step-audit="+audit.work().consumedWorkUnits());
+    }
+
     @Test void transfersAnAcquiredRelationshipToAnUnseenTransition() {
         var exact=seed();
         var update=exact.generalizeRecurrences(List.of(request(3,2,3)),ACQUISITION);
@@ -185,6 +200,7 @@ class RecurrenceFamilyKnowledgeTest {
     public static void main(String[] args) throws Exception {
         if(args.length==2) { process(args[0],Path.of(args[1]));return; }
         var t=new RecurrenceFamilyKnowledgeTest();
+        t.reusesTheUniversalStepInsteadOfReprovingItForEveryInitialState();
         t.transfersAnAcquiredRelationshipToAnUnseenTransition();
         t.requiresNewTransitionValidationAndKeepsFailedAttemptsPaid();
         t.preservesV3AndRechecksUntrustedV4Snapshots();

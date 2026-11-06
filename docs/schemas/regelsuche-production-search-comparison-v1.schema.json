@@ -9,7 +9,7 @@
     "evidenceStatus": {"const": "EXECUTED_MATCHED_DECLARED_BUDGET_COMPARISON"},
     "corpusSchema": {"const": "regelsuche.historical-rediscovery-corpus/v1"},
     "corpusSha256": {"$ref": "#/$defs/rawSha256"},
-    "atlasSchema": {"const": "regelsuche.historical-rediscovery-atlas/v1"},
+    "atlasSchema": {"enum": ["regelsuche.historical-rediscovery-atlas/v1", "regelsuche.historical-rediscovery-atlas/v2"]},
     "atlasSha256": {"$ref": "#/$defs/prefixedSha256"},
     "witnessDiagnosticSchema": {"const": "regelsuche.witness-pruning-diagnostic/v1"},
     "witnessDiagnosticSha256": {"$ref": "#/$defs/prefixedSha256"},
@@ -27,7 +27,7 @@
     "text": {"type": "string", "minLength": 1, "maxLength": 4096},
     "rawSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "prefixedSha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-    "comparisonStatus": {"enum": ["NOT_APPLICABLE_NO_PRODUCTION_WITNESS", "SCALAR_ALREADY_FOUND", "DIVERSITY_RECOVERS_COMPLETE_WITNESS", "DIVERSITY_FINDS_RELATION_VIA_ALTERNATE_PATH", "DIVERSITY_EXTENDS_SCALAR_PREFIX", "DIVERSITY_MATCHES_SCALAR_PREFIX", "DIVERSITY_RETAINS_SHORTER_PREFIX"]},
+    "comparisonStatus": {"enum": ["NOT_APPLICABLE_NO_PRODUCTION_WITNESS", "SOURCE_ALREADY_REPRESENTED", "SCALAR_ALREADY_FOUND", "DIVERSITY_RECOVERS_COMPLETE_WITNESS", "DIVERSITY_FINDS_RELATION_VIA_ALTERNATE_PATH", "DIVERSITY_EXTENDS_SCALAR_PREFIX", "DIVERSITY_MATCHES_SCALAR_PREFIX", "DIVERSITY_RETAINS_SHORTER_PREFIX"]},
     "declaredBudget": {
       "type": "object",
       "required": ["maxDepth", "maxVisitedStates", "maxCandidatesPerState", "maxExpandingSteps", "beamWidth"],

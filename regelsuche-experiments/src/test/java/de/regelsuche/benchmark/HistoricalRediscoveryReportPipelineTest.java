@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -93,6 +94,39 @@ class HistoricalRediscoveryReportPipelineTest {
         assertTrue(execution.equalWorkReport().contentHash().matches(
             "sha256:[0-9a-f]{64}"
         ));
+    }
+
+    @Test
+    @Timeout(240)
+    void pipelineKeepsValueEquivalentSourceOutOfAllRediscoveryReports(@TempDir Path directory) {
+        Corpus corpus = singleCase("sophie-germain");
+        var atlas = new HistoricalRediscoveryAtlas();
+        var report = atlas.run(corpus);
+        var execution = HistoricalRediscoveryReportPipeline.execute(
+            directory.resolve("historical-rediscovery"), corpus, atlas, report);
+        var comparison = execution.productionReport().cases().getFirst();
+        assertFalse(report.cases().getFirst().production().scalar().reached());
+        assertFalse(report.cases().getFirst().production().diversity().reached());
+        assertFalse(comparison.scalar().reachedRelation());
+        assertFalse(comparison.diversity().reachedRelation());
+    }
+
+    @Test
+    void legacyEvidenceIsNotRelabeledAsTheCurrentEvaluation(@TempDir Path directory) {
+        Corpus corpus = singleCase("difference-of-squares-powers");
+        var atlas = new HistoricalRediscoveryAtlas();
+        var current = atlas.run(corpus);
+        var legacy = new AtlasReport(HistoricalRediscoveryAtlas.LEGACY_SCHEMA,
+            current.corpusSchema(), current.corpusSha256(), current.inventoryRevision(),
+            current.claimBoundary(), current.cases(), current.directionality(), current.assessment());
+        assertThrows(IllegalArgumentException.class, () -> HistoricalRediscoveryReportPipeline.execute(
+            directory.resolve("legacy"), corpus, atlas, legacy));
+        assertThrows(IllegalArgumentException.class,
+            () -> new HistoricalWitnessPruningDiagnostic().run(corpus, legacy));
+        assertThrows(IllegalArgumentException.class,
+            () -> new HistoricalProductionSearchComparison().run(corpus, legacy, List.of()));
+        assertThrows(IllegalArgumentException.class,
+            () -> new HistoricalEqualWorkSearchComparison().run(corpus, legacy));
     }
 
     @Test

@@ -64,10 +64,7 @@ public final class RecurrenceKnowledge {
                 for (var entry : catalog) {
                     paid.add(2L + task.transition().linear().columns() * task.transition().linear().columns());
                     if (!entry.applies(task)) continue;
-                    var proposal = proposalFor(entry, task, paid);
-                    if (proposal.isEmpty()) continue;
-                    var proof = new RecurrenceInvariantVerifier().verify(task.transition(), proposal.get(),
-                        task.initialState(), new Budget(paid.remaining()));
+                    var proof = verifyEntry(entry, task, new Budget(paid.remaining()));
                     paid.add(proof.work().consumedWorkUnits());
                     if (proof.law().isPresent()) return receipt(id, Outcome.VERIFIED, proof.law(), paid, true);
                     if (proof.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();
@@ -81,12 +78,13 @@ public final class RecurrenceKnowledge {
             return receipt(id, Outcome.BUDGET_INCONCLUSIVE, Optional.empty(), paid, false);
         }
     }
-    private static Optional<Proposal> proposalFor(Entry entry, Request task, Meter paid) {
-        if (entry.family().isEmpty()) return Optional.of(entry.proposal());
-        var specialized=entry.family().get().specialize(task.transition(),new Budget(paid.remaining()));
-        paid.add(specialized.work().consumedWorkUnits());
-        if (specialized.outcome()==RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();
-        return specialized.proposal();
+    private static RecurrenceInvariantVerifier.Verification verifyEntry(Entry entry, Request task, Budget budget) {
+        var verifier=new RecurrenceInvariantVerifier();
+        // A family already carries its independently checked universal step.
+        // Source specialization and the new base case remain paid and checked.
+        if (entry.family().isPresent())
+            return verifier.verifyFamily(entry.family().get(),task.transition(),task.initialState(),budget);
+        return verifier.verify(task.transition(),entry.proposal(),task.initialState(),budget);
     }
 
     /** One bounded, symbolically proved family per generation; validation never enters its formation. */

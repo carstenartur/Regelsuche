@@ -35,8 +35,6 @@ public final class HistoricalRewriteArchitectureDecision {
     private static final long MAX_INPUT_BYTES = 32L * 1024L * 1024L;
     private static final String CORPUS_SCHEMA =
         "regelsuche.historical-rediscovery-corpus/v1";
-    private static final String ATLAS_SCHEMA =
-        "regelsuche.historical-rediscovery-atlas/v1";
 
     public static void main(String[] args) {
         if (args.length != 8
@@ -69,10 +67,12 @@ public final class HistoricalRewriteArchitectureDecision {
             "atlas run",
             "regelsuche.historical-rediscovery-run/v1",
             "EXECUTED_DIAGNOSTIC");
-        Document atlas = Document.plain(
-            atlasPath,
-            "atlas",
-            ATLAS_SCHEMA);
+        String atlasSchema = run.root().text("atlasSchema");
+        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)
+                && !HistoricalRediscoveryAtlas.LEGACY_SCHEMA.equals(atlasSchema)) {
+            throw new IllegalArgumentException("unsupported historical rediscovery atlas schema");
+        }
+        Document atlas = Document.plain(atlasPath, "atlas", atlasSchema);
         Document witness = Document.hashed(
             witnessPath,
             "witness diagnostic",
@@ -88,6 +88,9 @@ public final class HistoricalRewriteArchitectureDecision {
             "equal-work comparison",
             "regelsuche.equal-work-search-comparison/v1",
             "EXECUTED_TARGET_BLIND_FIXED_ADMITTED_WORK_CHECKPOINTS");
+        requireEqual(atlasSchema, witness.root().text("atlasSchema"), "witness atlas schema");
+        requireEqual(atlasSchema, production.root().text("atlasSchema"), "production atlas schema");
+        requireEqual(atlasSchema, equalWork.root().text("atlasSchema"), "equal-work atlas schema");
 
         String corpusHash = same(
             "corpusSha256", run, atlas, witness, production, equalWork);
