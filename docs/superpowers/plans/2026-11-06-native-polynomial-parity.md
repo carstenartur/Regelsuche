@@ -30,7 +30,7 @@
 
 **Files:** new `PolynomialSimplificationPrograms.java` and `PolynomialSimplificationTest.java` in `regelsuche-learning`; modify `StructuralConstructionPrograms`, `StructuralConstructionProvider`, `TaskConstructionProfile`, `TypedLearnedMoveInventory`, `CheckedSchemaTaskSolver`.
 
-**Interfaces:** `TypedLearnedMoveInventory.newTaskSolver(TaskConstructionProfile)` and `newTaskSolver(CheckedLearnedSchemaModel, TaskConstructionProfile)` prepare the existing solver; `CheckedSchemaTaskSolver.simplify(Expr, List<String>, MoveSearch.Budget)` returns the existing `TypedSourceOnlySearch.Result`. `POLYNOMIAL_SIMPLIFICATION_V1` attaches general candidate procedures with exact step checking.
+**Interfaces:** `TypedLearnedMoveInventory.newTaskSolverWithProfile(TaskConstructionProfile)` and `newTaskSolverWithProfile(CheckedLearnedSchemaModel, TaskConstructionProfile)` prepare the existing solver; `CheckedSchemaTaskSolver.simplify(Expr, List<String>, MoveSearch.Budget)` returns the existing `TypedSourceOnlySearch.Result`. `POLYNOMIAL_SIMPLIFICATION_V1` attaches general candidate procedures with exact step checking. The distinct factory name preserves existing `newTaskSolver(null)` source compatibility.
 
 - [ ] Write literal regression cases for fraction arithmetic, near-miss expansion, four-term grouping, binomial cube, negative context and rational scaling; assert exact equivalence and arithmetic cost bounds.
 - [ ] Run the tests before implementation and retain the failing result.
