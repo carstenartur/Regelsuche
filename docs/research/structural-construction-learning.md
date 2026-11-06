@@ -1,5 +1,49 @@
 # Structural construction and checked task learning
 
+## V2: coefficient-derived factors and expanded square sums
+
+`TaskConstructionProfile.STRUCTURAL_V2` adds two bounded capabilities to the
+unchanged V1 provider set. The first projects a source-exact polynomial into
+the existing `BinaryQuarticFactorizationEngine`, obtains only decompositions
+accepted by `FactorizationVerifier`, and subjects the rendered expression to
+the same source-bound construction replay and exact polynomial checking used
+by the task solver. Engine, verification, projection and rendering work enter
+the construction receipt. V2 projection and replay additionally charge bounded
+monomial-product attempts even when later cancellation or a limit stops the
+projection; a rejected multiplication may be charged conservatively before it
+is performed. These remain declared logical units, not a complete runtime or
+bit-operation measurement. No completeness or irreducibility claim is made.
+
+For example, the engine can derive a nontrivial product for
+`x^4+4*x^3*y+6*x^2*y^2+7*x*y^3+2*y^4` from coefficient constraints. This is
+not the general Ferrari procedure: the adapter supports two variables, integer
+coefficients, homogeneous degree four, nonzero extreme coefficients and two
+quadratic factors within the existing engine's coefficient and work bounds.
+Other domains and bounded misses remain inconclusive. In particular, rational
+coefficients, nonhomogeneous quartics and arbitrary symbolic coefficients are
+not supplied by this adapter.
+
+The second capability exposes the already present residual composer to an
+additive-root source, so an expanded four-term sum can be processed without
+first recovering its original product syntax. The existing limits of four or
+six exact square components and bounded composition still apply. Both V2
+capabilities use the existing frontier and are available to both baseline and
+learned arms. V1 and older snapshot semantics remain unchanged; V2 is persisted
+under its explicit profile identity.
+
+The integration test also learns a checked schema from two renamed instances
+of one quartic and applies it after restore to a composite substitution. This
+is evidence for reuse of that schema, not autonomous invention of a general
+coefficient-solving plan or a broad performance study.
+
+An additional deterministic regression generates 16 distinct coefficient
+systems by expanding products of small quadratics, supplies only the expanded
+sources to the task solver, and independently checks every returned product.
+With one search step, V1 solved 0/16 and V2 solved 16/16 in the recorded run.
+These are related generated cases within one bounded family, and the arms
+have different supplied capabilities; the observation is a capability
+comparison, not a learned-speed or elapsed-time comparison.
+
 Source baseline: `459293be659a4adf3fd30f5e9576c934ea00ca21` (30 October 2026).
 This is an opt-in extension of the existing task solver and checked-schema learner,
 not a replacement search kernel, CAS, or a set of hard-coded historical answers.
@@ -329,3 +373,269 @@ No second search kernel or CAS; no named historical solution rules; unchanged le
   pending PR. Keep draft until the full project verification and review finish.
 
 - Quality-gate repair: consolidate duplicate test entry types and documentation, preserving production bytes and all behavioral assertions. Full hosted verification remains authoritative.
+
+## Source-derived auxiliaries in the shared frontier
+
+The opt-in `STRUCTURAL_AUX_V1` profile extends `STRUCTURAL_V2` with bounded
+additive-complement and exact-factor proposals and square recognition in the
+existing typed task frontier. It does not change the persisted meaning or
+scheduling of `STRUCTURAL_V1` or `STRUCTURAL_V2`. The same profile is
+attached to baseline and learned solvers; no extra learner or frontier is used.
+The selection of general operations is supplied, not learned. The profile favors
+shorter search paths and ranks square recognition and factoring ahead of further
+construction. This is a development policy, not an invented proof strategy.
+
+The existing `AlgebraicConstruction.explore` retains its original order and
+conditional rational behavior. The separate `explorePolynomial` opt-in counts
+bounded monomial products and accepts only unconditional polynomial operations.
+For additive complements it proposes cross-products of pairs of visible square
+bases, not unrestricted neutral insertions. For exact factor splits it considers
+proper subpowers and source fragments whose exact polynomial value is
+nonconstant; the current quotient operation supports monomial divisors. A
+candidate can still have a constant quotient and serve as an intermediate step;
+the factorization goal itself requires two nonconstant factors. No historical
+result, formula, or unbound symbol is an input. Candidate formation and the existing source-bound construction provider
+charge polynomial products during creation, admission and replay; the new
+profile also counts products in the built-in structural objective. Square
+recognition uses the existing
+subtree adapter and an explicitly enabled product-factor matching mode of the
+existing conservative operator. Its default mode remains unchanged.
+
+A source-only development test gives the frontier only the input expression,
+the general goal of nontrivial factorization, a fixed budget and four generic
+providers: square exposure, additive complements, square recognition, and
+difference-of-squares factoring. It does not pass a target expression or an
+ordered path. After the run, an exact polynomial checker verifies the resulting
+product and the retained witness identifies the operations actually used.
+
+| Source | Result | Search and replay work | Witness steps |
+| --- | --- | ---: | ---: |
+| `x^4+4*y^4` | nontrivial product | 52,894 | 6 |
+| `16*x^4+4*y^4` | nontrivial product | 1,279,621 | 7 |
+
+These are two related development examples, not independent held-out
+mathematical families. Removing the auxiliary provider leaves the same
+restricted comparison inconclusive; it does not prove global impossibility.
+The full solver also retains the existing direct construction, so these two
+tests do not establish a new success over the full V2 solver. A separate full
+solver comparison uses the same per-task budget in both profiles:
+
+| Input | V2 | AUX profile | Declared work V2 / AUX |
+| --- | --- | --- | ---: |
+| `12*x^4` | inconclusive | nontrivial factorization | 1,562 / 6,513 |
+| `x^4+4*y^4` | solved | solved | 28,002 / 31,839 |
+| `u^2+2` | no solution found | no solution found | 280 / 601 |
+
+The new profile adds a bounded capability in the first development example but
+does more work in the two controls. These numbers use the profiles' respective
+work contracts: only the new path includes the new product-work accounting.
+They are not an equal-accounting speed comparison, JVM time or memory measurement.
+
+The new factor construction can also supply a checked lesson to the existing
+learner. A development run learns from `12*x^4` and `20*y^4`, validates on
+`28*z^4`, restores the promoted knowledge and then handles eight further
+coefficients of the same `k^4` template. Restoration here is in the same JVM
+from canonical JSON; file I/O and process restart are not measured. Both arms use the **same** auxiliary
+profile and the same per-task budgets. The stream also includes an already
+factored input and a bounded unsuccessful input, with identical outcomes in both
+arms. On the eight `c*k^4` queries both arms reach the nontrivial goal and the
+learned arm applies its checked schema. The already-factored control needs no
+learned step.
+
+| Stream work | Baseline | Learned |
+| --- | ---: | ---: |
+| Declared work including acquisition and restore | 52,719 | 30,074 |
+
+The learned total includes 27,197 units for lessons, formation, preparation,
+validation, selection and split checks, 616 for restore, and all ten query costs. This is
+about 43% less declared work for this specific development stream, not a result
+across independent mathematical families. Some existing acquisition and proof
+paths still do not count polynomial products separately, so this is not a
+complete total-work comparison. Serialization, external test checks, JVM time
+and memory are not covered by the logical work model. Autonomous plan
+invention, full historical coverage, Euclid and Ferrari remain open.
+
+## Source-only perfect-square tasks
+
+The opt-in `STRUCTURAL_SQUARE_V1` profile adds exact rational square exposure
+and recognition to the existing task frontier. Its `PERFECT_SQUARE` objective
+asks for an explicit square with a nonconstant polynomial base. It receives no
+expected expression or ordered proof. Each generated step is checked against
+the source with exact polynomial arithmetic, and the selected path is replayed
+before a result is reported. The supported task domain permits literal,
+nonzero denominators; symbolic denominators are not admitted.
+
+The original square recognizer remains available with its previous matching
+behavior, with a work observer enabled only in this new profile. The rational
+recognizer additionally accepts exact fractions and bounds its scalar
+intermediates to 1,024 bits. Rational monomial exposure does not discard a
+quotient merely because its normalized value is an integer: it first checks,
+with an accounted applicability test, whether the existing integer provider
+already covers the source syntax. Existing profiles and stored profile names
+keep their original meaning. Both recognizers may inspect the same expression,
+so the new profile can do additional work on cases it already solved.
+
+The five square-completion inputs of the frozen historical atlas are solved by
+the cumulative task solver below. These are development examples, not an
+independent held-out benchmark. The atlas's frozen production-policy report has
+not been rerun with this separate profile and must not be labelled 12/12 on the
+strength of these results.
+
+| Source | New-profile work | Witness steps |
+| --- | ---: | ---: |
+| `x*x+2*x*y+y*y` | 6,439 | 3 |
+| `x*x+y*y+2*y*x` | 6,413 | 3 |
+| `y*y+(2*x)*y+x*x` | 9,591 | 3 |
+| `x*x+3*x*a+2.25*a*a` | 12,200 | 3 |
+| `x*x+(4/3)*x*y+(4/9)*y*y` | 15,298 | 3 |
+
+The regrouped input produces `(y+x)^2`: this is the requested square up to
+commutativity, but is not a syntax-exact match for the atlas target `(x+y)^2`.
+The task goal accepts either representation.
+
+The earlier AUX profile already solves the first three development inputs.
+For the last two, a regression compares AUX and the square profile with the
+same fixed per-task budget: AUX finds no square, while the new profile does.
+The new path also handles the univariate input `x^2+(4/3)*x+(4/9)`; a nearby
+non-square and a tiny budget are negative controls. These comparisons establish
+bounded outcomes, not impossibility outside the budget or a speedup between
+profiles with different accounting.
+
+The existing learner was also exercised with two lessons, a distinct
+validation expression and eight later inputs from the same shifted-square
+family. The retained schema is symbolically checked, restored from canonical
+JSON in the same JVM and actually applied to all eight queries. An already
+square input and an inconclusive input are included in both arms with matching
+outcomes and quality. With both arms using the square profile, the development
+stream records 148,047 baseline work units and 97,025 learned work units,
+including 65,626 for acquisition and 726 for restoration in the learned arm.
+The figures do not include file I/O, process restart, JVM time or memory, and
+some existing learning and proof paths do not separately count polynomial
+products. This is therefore evidence for reuse on one related family, not a
+complete total-cost or cross-family learning claim.
+
+The new square profile validates the source and each replayed intermediate in
+the bounded total rational-polynomial domain and checks each edge by exact
+polynomial projection. Selecting the direct `PERFECT_SQUARE` objective without
+a construction profile uses the same domain, step checks and product-work
+accounting. The square evaluator also reports product work when supplied as a
+callback; arbitrary custom objectives remain responsible for their own work
+reports. A callback does not retain the enum identity: callers must select a
+strict profile for its domain and per-step checks. Without that profile, legacy
+custom-objective behavior does not establish those checks. This matters for
+user-configurable rewrite rules: a
+replayed rule is not automatically an identity. Symbol names must also follow
+the parser's identifier grammar, so formatting an AST cannot reinterpret a
+single symbol as an expression. As in the checked-schema polynomial domain,
+zero powers use the explicit convention `0^0 = 1`; this differs from other
+project components that treat that expression as undefined. The source inspection and both initial and
+independent final step checks are charged; an unsupported source raises an
+exception carrying the observed inspection and routing work, with incomplete
+accounting for a solve invocation. Source inspection is an atomic operation; if it together with the
+root node assessment exhausts the budget, the supplied objective is not evaluated.
+This experimental checked path does not
+support an already active native retention-observation scope; solving and
+learning reject that scope before routing or split checks. Legacy construction profiles retain their
+original behavior; they do not gain this new checking contract implicitly.
+
+The set and priority of general construction providers were supplied by the
+implementation. The system did not invent that strategy or receive the
+historical target. The larger historical catalog, including Euclid and the
+general Ferrari method, remains open.
+
+## The frozen catalog through one source-only task solver
+
+The existing 14-case historical corpus is also exercised by
+`HistoricalCatalogTaskCoverageTest` through one cumulative task solver and the
+opt-in `STRUCTURAL_EXPANSION_V1` profile. The test gives each task its source,
+empty assumptions and one of the general goals **perfect square**,
+**nontrivial factorization**, or **expanded and collected polynomial**. It does
+not give the solver a target expression, corpus witness, or ordered path. The
+target is inspected only after the search. The selected general providers and
+their scheduling were supplied by the implementation, not invented by the
+search.
+
+All 12 historical positive inputs reach their declared structural goal with a
+nonempty replayed witness and an exact polynomial equivalence recheck. Nine
+results happen to be syntax-equal to the stored target. The remaining three
+are equivalent representations: `(y+x)^2` instead of `(x+y)^2`, and two
+expanded results which use powers instead of repeated products. One of the
+nine matches is Sophie Germain, whose corpus relation is value-equivalence;
+therefore eight of the eleven cases labelled `SYNTAX_EXACT` meet that exact
+spelling in this run. **This is 12/12 under the new task contract, not 12/12
+under every original atlas relation and budget.**
+
+| Frozen input | Declared work | Witness steps | Exact target syntax |
+| --- | ---: | ---: | --- |
+| complete square | 6,439 | 3 | yes |
+| reordered square | 6,413 | 3 | yes |
+| regrouped square | 9,591 | 3 | no |
+| scaled square | 12,200 | 3 | yes |
+| fractional square | 15,298 | 3 | yes |
+| difference of squares | 4,595 | 3 | yes |
+| difference of squares with powers | 2,734 | 1 | yes |
+| common left factor | 782 | 1 | yes |
+| common right factor | 784 | 1 | yes |
+| expand binomial square | 2,331,979 | 7 | no |
+| expand difference-of-squares product | 125,405 | 2 | no |
+| Sophie Germain | 43,722 | 5 | yes |
+
+The positive cases use the same task budget: 32 primitive steps, search depth
+8, 10,000,000 theory units, 512 states and 10,000,000 total work units. The
+negative control is independently confirmed unequal to its stored target and
+does not reach the square goal with its smaller 200,000-unit budget. The policy
+control also reaches the general expansion goal, but its result and budget do
+not reproduce the original syntax-exact, three-state policy diagnostic; that
+original control is still evaluated separately by the atlas.
+
+For example, the source-only Sophie-Germain task retains the following five
+individually replayed steps. The last three lines are displayed in ordinary
+algebra notation; the test also prints each actual source, rule and target:
+
+```text
+x^4 + 4*y^4
+  -> (x^2)^2 + 4*y^4
+  -> (x^2)^2 + (2*y^2)^2
+  -> (x^2 + 2*y^2)^2 - 2*x^2*2*y^2
+  -> (x^2 + 2*y^2)^2 - (2*x*y)^2
+  -> (x^2 + 2*y^2 - 2*x*y)*(x^2 + 2*y^2 + 2*x*y)
+```
+
+All steps, including configurable primitive rules and the final independent
+replay, pass the checked square profile's per-edge domain and exact identity
+validation. Source-bound replay alone does not prove an arbitrary rule.
+The construction steps carry source-bound replay and exact identity checks;
+their internal algorithms are not expanded into a complete textbook proof.
+The expansion steps use the existing distributive and normalization rules.
+Their observed `RetainedOperation` execution and validation events are added
+to generation and replay work. A failed provider exposes its locally observed
+work while marking the unfinished search accounting incomplete. Nested
+`RetainedOperation` scopes are rejected before these providers run because
+their current accounting cannot safely preserve the enclosing retention scope.
+
+The default expansion profile selects these providers only when the goal is the
+declared `StructuralTaskObjective.EXPANDED_POLYNOMIAL` enum instance. A custom
+or wrapped objective does not carry that goal identity.
+`STRUCTURAL_EXPANSION_BRIDGE_V1` also makes them available later in the
+search for other goals. The latter is an explicitly different policy and its
+extra lanes can change work and bounded outcomes. The default profile was
+checked against the square profile on square and factorization tasks with
+identical query results and declared search work. Profile construction itself
+is not included in those figures. As elsewhere in this experimental path,
+some existing learning/proof operations and actual memory, file I/O and JVM
+time remain outside the declared work model.
+
+The existing learner can also retain a checked expansion schema: two lessons
+and a separate validation input promoted one schema. On one further related
+development expression, the baseline exceeded the 10,000,000-unit task budget
+while the restored learner solved it in 8,220,946 units using two learned
+applications. Acquisition cost 39,934,791 units before that query; no
+break-even or cross-family advantage is established by this example.
+
+To reproduce the shared catalog test and its step log with the checkout's Java
+25 Maven toolchain:
+
+```sh
+mvn -pl regelsuche-autopilot -am -Dtest=HistoricalCatalogTaskCoverageTest \
+    -Dsurefire.failIfNoSpecifiedTests=false test
+```

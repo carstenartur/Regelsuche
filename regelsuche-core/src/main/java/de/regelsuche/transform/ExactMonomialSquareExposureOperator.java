@@ -5,6 +5,7 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -39,6 +40,7 @@ public final class ExactMonomialSquareExposureOperator
     private final ExpressionParser parser = new ExpressionParser();
     private final PerfectSquareStructurePreparationSolver.Budget budget;
     private final int maxCandidates;
+    private final java.util.function.LongConsumer rationalWork;
 
     public ExactMonomialSquareExposureOperator() {
         this(
@@ -56,8 +58,23 @@ public final class ExactMonomialSquareExposureOperator
         PerfectSquareStructurePreparationSolver.Budget budget,
         int maxCandidates
     ) {
+        this(budget, maxCandidates, null);
+    }
+
+    /** Opt in to rational-coefficient monomials, charging each bounded root search. */
+    public ExactMonomialSquareExposureOperator(int maxCandidates, java.util.function.LongConsumer work) {
+        this(PerfectSquareStructurePreparationSolver.Budget.DEFAULT, maxCandidates,
+            Objects.requireNonNull(work, "work"));
+    }
+
+    private ExactMonomialSquareExposureOperator(
+        PerfectSquareStructurePreparationSolver.Budget budget,
+        int maxCandidates,
+        java.util.function.LongConsumer rationalWork
+    ) {
         this.budget = Objects.requireNonNull(budget, "budget");
         this.maxCandidates = Math.max(0, maxCandidates);
+        this.rationalWork = rationalWork;
     }
 
     @Override
@@ -89,7 +106,7 @@ public final class ExactMonomialSquareExposureOperator
                     root,
                     positioned.path(),
                     0,
-                    square(candidate.root().toExpression()));
+                    square(candidate.root()));
                 String transformed = ExpressionFormatter.format(rewritten);
                 String position = positionKey(positioned.path());
                 retained.putIfAbsent(
@@ -102,8 +119,8 @@ public final class ExactMonomialSquareExposureOperator
                         1,
                         true,
                         RULE_ID + ":" + sourceHash + ":" + position + ":"
-                            + candidate.original().descriptor() + "->"
-                            + candidate.root().descriptor()));
+                            + candidate.originalDescriptor() + "->"
+                            + candidate.rootDescriptor()));
             }
             if (retained.size() < maxCandidates) {
                 pushChildren(pending, positioned);
@@ -116,19 +133,49 @@ public final class ExactMonomialSquareExposureOperator
         if (expression instanceof NumberExpr || isExplicitSquare(expression)) {
             return null;
         }
+        return rationalWork != null ? rationalCandidate(expression) : legacyCandidate(expression);
+    }
+
+    private Candidate legacyCandidate(Expr expression) {
         ExactPositiveMonomial.Parser monomialParser =
             new ExactPositiveMonomial.Parser(new ExactPositiveMonomial.Limits(
                 budget.maxFactors(),
                 budget.maxExponent(),
                 budget.maxCoefficient()));
-        ExactPositiveMonomial.ParseResult parsed =
-            monomialParser.parse(expression);
-        if (!parsed.supported()) {
-            return null;
+        try {
+            ExactPositiveMonomial.ParseResult parsed = monomialParser.parse(expression);
+            if (!parsed.supported()) return null;
+            ExactPositiveMonomial original = parsed.monomial();
+            ExactPositiveMonomial root = exactSquareRoot(original);
+            return root == null ? null : new Candidate(root.toExpression(), original.descriptor(), root.descriptor());
+        } finally {
+            if (rationalWork != null) rationalWork.accept(1L + monomialParser.inspectedFactors());
         }
-        ExactPositiveMonomial original = parsed.monomial();
-        ExactPositiveMonomial root = exactSquareRoot(original);
-        return root == null ? null : new Candidate(original, root);
+    }
+
+    private Candidate rationalCandidate(Expr expression) {
+        var exactBudget = new BoundedExactMonomial.Budget();
+        try {
+            var value = BoundedExactMonomial.from(expression, exactBudget);
+            if (value.isEmpty()) return null;
+            if (value.orElseThrow().coefficient().denominator().equals(java.math.BigInteger.ONE)
+                    && legacyCandidate(expression) != null) return null;
+            var root = value.orElseThrow().exactRoot(2, exactBudget);
+            if (root.isEmpty()) return null;
+            Expr rootExpression = root.orElseThrow().toExpr();
+            if (!containsVariable(rootExpression)) return null;
+            return new Candidate(rootExpression, ExpressionFormatter.format(expression), ExpressionFormatter.format(rootExpression));
+        } catch (BoundedExactMonomial.LimitExceeded limited) {
+            return null;
+        } finally {
+            rationalWork.accept(Math.addExact(1, exactBudget.workUsed()));
+        }
+    }
+
+    private static boolean containsVariable(Expr expression) {
+        if (expression instanceof VariableExpr) return true;
+        return expression instanceof BinaryExpr binary
+            && (containsVariable(binary.left()) || containsVariable(binary.right()));
     }
 
     private static ExactPositiveMonomial exactSquareRoot(
@@ -270,13 +317,11 @@ public final class ExactMonomialSquareExposureOperator
         }
     }
 
-    private record Candidate(
-        ExactPositiveMonomial original,
-        ExactPositiveMonomial root
-    ) {
+    private record Candidate(Expr root, String originalDescriptor, String rootDescriptor) {
         private Candidate {
-            original = Objects.requireNonNull(original, "original");
             root = Objects.requireNonNull(root, "root");
+            Objects.requireNonNull(originalDescriptor, "originalDescriptor");
+            Objects.requireNonNull(rootDescriptor, "rootDescriptor");
         }
     }
 }

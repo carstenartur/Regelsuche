@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiPredicate;
 import java.util.function.UnaryOperator;
 
 /**
@@ -29,6 +30,7 @@ public final class BoundedRewriteReachabilityOracle {
 
     private final TransformationEngine engine;
     private final UnaryOperator<String> canonicalizer;
+    private final BiPredicate<String, String> targetRelation;
 
     public BoundedRewriteReachabilityOracle(TransformationEngine engine) {
         this(engine, String::trim);
@@ -38,8 +40,21 @@ public final class BoundedRewriteReachabilityOracle {
         TransformationEngine engine,
         UnaryOperator<String> canonicalizer
     ) {
+        this(engine, canonicalizer, String::equals);
+    }
+
+    /**
+     * Tests the caller's target relation on canonical keys without merging distinct state keys.
+     * Reachability is relative to that relation; the caller is responsible for its soundness.
+     */
+    public BoundedRewriteReachabilityOracle(
+        TransformationEngine engine,
+        UnaryOperator<String> canonicalizer,
+        BiPredicate<String, String> targetRelation
+    ) {
         this.engine = Objects.requireNonNull(engine, "engine");
         this.canonicalizer = Objects.requireNonNull(canonicalizer, "canonicalizer");
+        this.targetRelation = Objects.requireNonNull(targetRelation, "targetRelation");
     }
 
     public Result search(String sourceExpression, String targetExpression, Budget budget) {
@@ -51,7 +66,7 @@ public final class BoundedRewriteReachabilityOracle {
 
         Map<String, Node> visited = new LinkedHashMap<>();
         visited.put(sourceKey, new Node(source, sourceKey, 0, null, null));
-        if (sourceKey.equals(targetKey)) {
+        if (targetRelation.test(sourceKey, targetKey)) {
             return Result.reachable(List.of(), 1, 0, 0);
         }
 
@@ -99,7 +114,7 @@ public final class BoundedRewriteReachabilityOracle {
                     step);
                 visited.put(nextKey, next);
                 maximumDepthReached = Math.max(maximumDepthReached, next.depth());
-                if (nextKey.equals(targetKey)) {
+                if (targetRelation.test(nextKey, targetKey)) {
                     return Result.reachable(
                         reconstructWitness(visited, next),
                         visited.size(),

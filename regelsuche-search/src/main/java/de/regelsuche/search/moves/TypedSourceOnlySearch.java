@@ -58,6 +58,21 @@ public final class TypedSourceOnlySearch {
         return finish(problem, online.incumbent(), online.inputScore(), online.outputScore(), online.witness(), online.search(), 0);
     }
 
+    /** Continue through the bounded frontier; the best incumbent still receives a paid independent replay. */
+    public Result searchBest(TypedMoveSearch.Problem problem, Objective objective, SearchContinuationContract contract) {
+        var online = new TypedMoveSearch().searchBest(problem, objective, contract);
+        return finish(problem, online.incumbent(), online.inputScore(), online.outputScore(), online.witness(), online.search(), 0);
+    }
+
+    /**
+     * Return distinct nontrivial qualifying states in admission order, with separately replayed
+     * paths. The reserve belongs to the same total budget; it is not extra search work.
+     */
+    public TypedSearchAlternatives.Result searchAlternatives(TypedMoveSearch.Problem problem, Objective objective,
+            long maximumOutputScore, SearchContinuationContract contract, long reserveWork, int maximumAlternatives) {
+        return TypedSearchAlternatives.collect(problem, objective, maximumOutputScore, contract, reserveWork, maximumAlternatives);
+    }
+
     public Result search(TypedMoveSearch.Problem problem, Objective objective) {
         Objects.requireNonNull(problem, "problem");
         Objects.requireNonNull(objective, "objective");

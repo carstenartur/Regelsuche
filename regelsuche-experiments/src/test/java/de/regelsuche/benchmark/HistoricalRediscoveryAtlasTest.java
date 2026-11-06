@@ -48,6 +48,111 @@ class HistoricalRediscoveryAtlasTest {
     private static final String TEST_SHA256 = "0".repeat(64);
 
     @Test
+    @Timeout(240)
+    void equivalentSourceIsNotCreditedAsARepresentationRediscovery() {
+        var result = new HistoricalRediscoveryAtlas().run(singleCase("sophie-germain")).cases().getFirst();
+        assertFalse(result.production().scalar().reached(),
+            "the unchanged source is value-equivalent but is not the discovered factorization");
+        assertFalse(result.production().diversity().reached(),
+            "a depth-zero identity must not count as a representation discovery");
+        var classifier = new de.regelsuche.discovery.representation.RepresentationCorrespondenceClassifier();
+        for (var search : List.of(result.genericBridge().scalar(), result.genericBridge().diversity())) {
+            assertTrue(search.reached(), "the generic bridge can generate the factorized representation");
+            assertTrue(search.depth() > 0);
+            assertEquals(de.regelsuche.discovery.representation.RepresentationCorrespondenceClassifier.Correspondence.SAME_REPRESENTATION_CLASS,
+                classifier.classify(search.path().getLast(), result.benchmarkCase().target()));
+        }
+    }
+
+    @Test
+    void oracleAndTargetBlindSearchAgreeOnReorderedFactors() {
+        var corpus = valueCorpus("a^2-b^2", "(a+b)*(a-b)");
+        var result = new HistoricalRediscoveryAtlas().run(corpus).cases().getFirst();
+        assertTrue(result.production().oracle().reachable(),
+            "the oracle must recognize the same AC representation as the searches");
+        assertFalse(result.production().oracle().witnessExpressions().isEmpty());
+        assertTrue(result.production().scalar().reached());
+        assertEquals(PrimaryStatus.REACHABLE_AND_SCALAR_FOUND, result.status());
+    }
+
+    @Test
+    void singularSampleDoesNotMakeAnIdenticalRepresentationUnreachable() {
+        var result = new HistoricalRediscoveryAtlas()
+            .run(valueCorpus("1/(x-2)", "1/(x-2)")).cases().getFirst();
+        assertTrue(result.production().oracle().reachable(),
+            "an undefined numeric sample cannot refute an identical representation");
+        assertTrue(result.production().oracle().witnessExpressions().isEmpty());
+        assertEquals(PrimaryStatus.SOURCE_ALREADY_TARGET_REPRESENTATION, result.status());
+    }
+
+    @Test
+    void unconfirmedValueDoesNotBecomeAPositiveIdentityClaim() {
+        var exact = new HistoricalRediscoveryCorpus.Case(
+            "singular-control", "SYNTHETIC", "1/(x-2)+0", "1/(x-2)", Relation.EQUIVALENT,
+            Role.HISTORICAL_POSITIVE, "TEST", "TEST_FIXTURE", TargetRelation.SYNTAX_EXACT,
+            4, 100, 4, 100, 40, 4, 16);
+        var corpus = new Corpus(HistoricalRediscoveryCorpus.SCHEMA, "FROZEN_DIAGNOSTIC_CORPUS",
+            "test/v1", "bounded test", TEST_SHA256, List.of(exact));
+        var report = new HistoricalRediscoveryAtlas().run(corpus);
+        assertTrue(report.cases().getFirst().production().oracle().reachable());
+        assertFalse(report.cases().getFirst().equivalence().equivalent());
+        assertFalse(report.assessment().productionPositiveControlWorks(),
+            "an unconfirmed value relation cannot support a positive identity claim");
+    }
+
+    @Test
+    void sourceAlreadyInTargetClassIsNotRediscovery(@TempDir Path directory) {
+        var corpus = valueCorpus("a*b", "b*a");
+        var atlas = new HistoricalRediscoveryAtlas();
+        var report = atlas.run(corpus);
+        var result = report.cases().getFirst();
+        assertEquals(PrimaryStatus.SOURCE_ALREADY_TARGET_REPRESENTATION, result.status());
+        assertTrue(result.production().oracle().reachable());
+        assertTrue(result.production().oracle().witnessExpressions().isEmpty());
+        assertFalse(result.production().scalar().reached());
+        assertFalse(result.production().diversity().reached());
+        assertFalse(report.assessment().productionPositiveControlWorks(),
+            "a zero-step source must not count as a production rewrite capability");
+        var execution = HistoricalRediscoveryReportPipeline.execute(
+            directory.resolve("already-represented"), corpus, atlas, report);
+        assertEquals(HistoricalEqualWorkSearchComparison.CaseStatus.SOURCE_ALREADY_REPRESENTED,
+            execution.equalWorkReport().cases().getFirst().status());
+        assertEquals(HistoricalProductionSearchComparison.ComparisonStatus.SOURCE_ALREADY_REPRESENTED,
+            execution.productionReport().cases().getFirst().status());
+        var negative = HistoricalRediscoveryCorpus.load().cases().stream()
+            .filter(item -> item.id().equals("inconsistent-near-miss")).findFirst().orElseThrow();
+        var combined = new Corpus(corpus.schema(), corpus.evidenceStatus(), corpus.inventoryRevision(),
+            corpus.claimBoundary(), corpus.contentSha256(), List.of(corpus.cases().getFirst(), negative));
+        var assessment = atlas.run(combined).assessment();
+        assertTrue(assessment.negativeControlPassed());
+        assertFalse(assessment.productionPositiveControlWorks());
+        assertEquals(HistoricalRediscoveryAtlas.AssessmentDecision.INSUFFICIENT_SIGNAL, assessment.decision());
+    }
+
+    @Test
+    void syntaxExactSourceAlreadyAtTargetIsAlsoNotRediscovery(@TempDir Path directory) {
+        var value = new HistoricalRediscoveryCorpus.Case(
+            "exact-source", "SYNTHETIC", "a*b", "a * b", Relation.EQUIVALENT,
+            Role.HISTORICAL_POSITIVE, "TEST", "TEST_FIXTURE", TargetRelation.SYNTAX_EXACT,
+            2, 20, 2, 20, 8, 2, 2);
+        var corpus = new Corpus(HistoricalRediscoveryCorpus.SCHEMA, "FROZEN_DIAGNOSTIC_CORPUS",
+            "test/v1", "bounded test", TEST_SHA256, List.of(value));
+        var atlas = new HistoricalRediscoveryAtlas();
+        var report = atlas.run(corpus);
+        var result = report.cases().getFirst();
+        assertEquals(PrimaryStatus.SOURCE_ALREADY_TARGET_REPRESENTATION, result.status());
+        assertFalse(result.production().scalar().reached());
+        assertFalse(result.production().diversity().reached());
+        assertFalse(report.assessment().productionPositiveControlWorks());
+        var execution = HistoricalRediscoveryReportPipeline.execute(
+            directory.resolve("already-exact"), corpus, atlas, report);
+        assertEquals(HistoricalProductionSearchComparison.ComparisonStatus.SOURCE_ALREADY_REPRESENTED,
+            execution.productionReport().cases().getFirst().status());
+        assertEquals(HistoricalEqualWorkSearchComparison.CaseStatus.SOURCE_ALREADY_REPRESENTED,
+            execution.equalWorkReport().cases().getFirst().status());
+    }
+
+    @Test
     void targetBlindStructuralCellsRetainAStarvedExpansion() {
         String root = "x + 0";
         String target = "x + y - y";
@@ -148,7 +253,7 @@ class HistoricalRediscoveryAtlasTest {
         assertNotNull(report.assessment().decision());
         assertEquals(report.toJson(), report.toJson());
         assertTrue(report.toJson().startsWith(
-            "{\"schema\":\"regelsuche.historical-rediscovery-atlas/v1\""));
+            "{\"schema\":\"regelsuche.historical-rediscovery-atlas/v2\""));
         assertTrue(report.toMarkdown().contains(
             "Historical rediscovery and reachability atlas"));
 
@@ -567,6 +672,15 @@ class HistoricalRediscoveryAtlasTest {
             full.claimBoundary(),
             full.contentSha256(),
             List.of(selected));
+    }
+
+    private static Corpus valueCorpus(String source, String target) {
+        var value = new HistoricalRediscoveryCorpus.Case(
+            "value-case", "SYNTHETIC", source, target, Relation.EQUIVALENT,
+            Role.HISTORICAL_POSITIVE, "TEST", "TEST_FIXTURE", TargetRelation.VALUE_EQUIVALENT,
+            4, 100, 4, 100, 40, 4, 16);
+        return new Corpus(HistoricalRediscoveryCorpus.SCHEMA, "FROZEN_DIAGNOSTIC_CORPUS",
+            "test/v1", "bounded test", TEST_SHA256, List.of(value));
     }
 
     private static Map<String, HistoricalRediscoveryAtlas.CaseResult> byId(
