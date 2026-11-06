@@ -1,6 +1,6 @@
 # Native Polynomial Parity Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make the native shared task solver reach at least the fixed SymPy portfolio's expression quality on the historical polynomial inputs.
 
@@ -32,11 +32,11 @@
 
 **Interfaces:** `TypedLearnedMoveInventory.newTaskSolverWithProfile(TaskConstructionProfile)` and `newTaskSolverWithProfile(CheckedLearnedSchemaModel, TaskConstructionProfile)` prepare the existing solver; `CheckedSchemaTaskSolver.simplify(Expr, List<String>, MoveSearch.Budget)` returns the existing `TypedSourceOnlySearch.Result`. `POLYNOMIAL_SIMPLIFICATION_V1` attaches general candidate procedures with exact step checking. The distinct factory name preserves existing `newTaskSolver(null)` source compatibility.
 
-- [ ] Write literal regression cases for fraction arithmetic, near-miss expansion, four-term grouping, binomial cube, negative context and rational scaling; assert exact equivalence and arithmetic cost bounds.
-- [ ] Run the tests before implementation and retain the failing result.
-- [ ] Implement general candidates using existing arithmetic/normalization/native factorization; add the profile and source-only shared-frontier API.
-- [ ] Add domain, false-rule, tiny-budget, replay tampering, repeat-call and source-preservation guards.
-- [ ] Run focused and affected module tests, inspect output and commit the implementation.
+- [x] Write literal regression cases for fraction arithmetic, near-miss expansion, four-term grouping, binomial cube, negative context and rational scaling; assert exact equivalence and arithmetic cost bounds.
+- [x] Run the tests before implementation and retain the failing result.
+- [x] Implement general candidates using existing arithmetic/normalization/native factorization; add the profile and source-only shared-frontier API.
+- [x] Add domain, false-rule, tiny-budget, replay tampering, repeat-call and source-preservation guards.
+- [x] Run focused and affected module tests, inspect output and commit the implementation.
 
 ### Task 2: Execute a source-only comparison
 
@@ -44,17 +44,17 @@
 
 **Interfaces:** worker receives source-only JSONL requests and a fixed native baseline/learned configuration; runner retains every response, training/restoration, process costs, independent judgments and per-expression comparisons.
 
-- [ ] Freeze the new protocol, budgets, historical inputs and withheld variants before executing the new implementation.
-- [ ] Test response binding, invalid outputs, budget failures and incomplete matrix rejection using the existing judge.
-- [ ] Implement and execute native baseline/learned versus the paid pinned SymPy portfolio, with three rotated repetitions.
-- [ ] Independently verify retained evidence and require no worse output cost on every supported historical input; retain all variant failures if any.
-- [ ] Commit the executable comparison and factual report with exact limitations.
+- [x] Freeze the new protocol, budgets, historical inputs and withheld variants before executing the new implementation.
+- [x] Test response binding, invalid outputs, budget failures and incomplete matrix rejection using the existing judge.
+- [x] Implement and execute native baseline/learned versus the paid pinned SymPy portfolio, with three rotated repetitions.
+- [x] Independently verify retained evidence and require no worse output cost on every supported historical input; retain all variant failures if any.
+- [x] Commit the executable comparison and factual report with exact limitations.
 
 ### Task 3: Qualify and publish reviewable work
 
 **Files:** documentation and API example; existing build/CI paths only if the new checks require wiring.
 
-- [ ] Run the relevant full Java and Python suites plus repository gates supported by the environment.
-- [ ] Obtain a fresh whole-branch review, reproduce and fix substantive findings with regressions.
+- [x] Run the relevant full Java and Python suites plus repository gates supported by the environment.
+- [x] Obtain a fresh whole-branch review, reproduce and fix substantive findings with regressions.
 - [ ] Commit all work and publish one PR; inspect required hosted checks and address failures on the final head.
-- [ ] Report measured quality, resources, validation and any remaining limitations without claiming an unmeasured speed advantage.
+- [x] Report measured quality, resources, validation and any remaining limitations without claiming an unmeasured speed advantage.

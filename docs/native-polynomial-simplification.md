@@ -27,7 +27,7 @@ the same native fallback. Existing `CumulativeTaskKnowledge.empty(genome, profil
 also stores and restores the profile and can use it for declared task goals and
 learning. Default and historical profiles keep their previous behavior.
 
-Every native proposal and supplied inventory edge is checked in the existing
+Every admitted native proposal and supplied inventory edge is checked in the existing
 total rational-polynomial domain, with the existing formal convention `0^0 = 1`.
 Variable denominators, undefined intermediate divisions and malformed symbol
 identities remain unsupported. A theorem for another source does not authorize
@@ -68,3 +68,7 @@ persistence, queries, audits and shutdown. Controller CPU is separate; RSS is th
 maximum process peak. Shared runtime retention and final evidence export are
 outside those per-profile sequence boundaries. These are public development
 observations, not a sealed family holdout or a universal CAS speed ranking.
+
+The [2026-11-06 observation](research/native-polynomial-parity-2026-11-06.md)
+reports per-case quality, complete sequence resources and exact source/runtime
+bindings, including the remaining runtime gap.
