@@ -169,6 +169,15 @@ public final class CheckedSchemaTaskSolver {
         return new Solution(task, result, prepared.checkedSteps());
     }
 
+    /** Source-only arithmetic minimization with the same frontier, paid objective and final replay. */
+    public TypedSourceOnlySearch.Result simplify(Expr source, List<String> assumptions, MoveSearch.Budget budget) {
+        var task = new Task(source, assumptions,
+            new Goal(state -> TypedPolynomialSurfaceCost.evaluate(state.expression()), Long.MIN_VALUE), budget);
+        var prepared = prepare(task);
+        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
+            () -> new TypedSourceOnlySearch().search(problem(task), prepared.objective()));
+    }
+
     /** Continue the same checked frontier and independently replay a bounded set of alternatives. */
     public TypedSearchAlternatives.Result explore(Task task, long reserveWork, int maximumAlternatives) {
         var prepared = prepare(task);

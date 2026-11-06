@@ -14,14 +14,22 @@ public enum TaskConstructionProfile {
     /** Square-capable construction plus existing distributive and normalization rules. */
     STRUCTURAL_EXPANSION_V1,
     /** Also permits deferred expansion as a bridge for other structural goals. */
-    STRUCTURAL_EXPANSION_BRIDGE_V1;
+    STRUCTURAL_EXPANSION_BRIDGE_V1,
+    /** Exact rational-polynomial simplification through the shared typed frontier. */
+    POLYNOMIAL_SIMPLIFICATION_V1;
 
     boolean requiresExactPolynomialSteps() {
-        return this == STRUCTURAL_SQUARE_V1 || this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1;
+        return this == STRUCTURAL_SQUARE_V1 || this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1
+            || this == POLYNOMIAL_SIMPLIFICATION_V1;
     }
 
     CheckedSchemaTaskSolver attach(CheckedSchemaTaskSolver solver) {
         if (this == NONE) return solver;
+        if (this == POLYNOMIAL_SIMPLIFICATION_V1) return solver.withConstructions(java.util.List.of(
+            StructuralConstructionPrograms.Operation.POLYNOMIAL_CANONICAL,
+            StructuralConstructionPrograms.Operation.POLYNOMIAL_EXPANDED,
+            StructuralConstructionPrograms.Operation.POLYNOMIAL_COMMON_FACTOR,
+            StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR), false).withExactPolynomialSteps();
         boolean expansion = this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1;
         boolean square = this == STRUCTURAL_SQUARE_V1 || expansion;
         boolean auxiliary = this == STRUCTURAL_AUX_V1 || square;
