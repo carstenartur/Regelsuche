@@ -153,7 +153,7 @@ public final class TypedSearchAlternatives {
         }
         private boolean collect(MoveSearch.Event edge, MoveState root,
                 HashMap<MoveState, Lineage> parents, HashSet<Expr> seen) {
-            if (!spend(edge.target().expression().length())) return false;
+            if (!spend(edge.target().expression().length()) || total() >= budget) return false;
             var state = TypedMoveSearch.State.decode(edge.target());
             if (seen.contains(state.expression())) return true;
             var score = Objects.requireNonNull(objective.evaluate(state), "objective assessment");
@@ -189,7 +189,7 @@ public final class TypedSearchAlternatives {
             var result = new ArrayList<TypedMoveSearch.WitnessStep>();
             for (var edge : path) {
                 long decodeWork = Math.addExact((long) edge.source().expression().length(), edge.target().expression().length());
-                if (!spend(Math.addExact(decodeWork, 1))) return null;
+                if (!spend(Math.addExact(decodeWork, 1)) || total() >= budget) return null;
                 var source = TypedMoveSearch.State.decode(edge.source());
                 var target = TypedMoveSearch.State.decode(edge.target());
                 var receipt = Objects.requireNonNull(problem.verifier().verify(source, edge.move(), problem.context()), "verification");

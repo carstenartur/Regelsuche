@@ -175,6 +175,74 @@ class TypedSourceOnlyBestTest {
         assertFalse(failure.accountingComplete());
     }
 
+    @Test void exhaustedExpressionDebitPreservesCheckedCandidatesWithoutStartingTheObjective() {
+        for (var contract : SearchContinuationContract.values()) {
+            var engine = new TypedSourceOnlySearch();
+            long allowance = searchAllowance(contract);
+            var marker = new IllegalStateException("objective started at boundary");
+            var observed = assertThrows(TypedSearchAlternatives.Failure.class,
+                () -> engine.searchAlternatives(problem(10000, MoveSearch.Mode.FAST),
+                    selectionBoundaryObjective(new AtomicInteger(), marker), 0, contract, 10000 - allowance, 8));
+            assertSame(marker, observed.getCause());
+            // The failed callback reports its actually paid prefix, before its own unknown work.
+            long budget = observed.knownWork();
+            assertTrue(budget > allowance);
+            var calls = new AtomicInteger();
+            var result = assertDoesNotThrow(() -> engine.searchAlternatives(problem(budget, MoveSearch.Mode.FAST),
+                selectionBoundaryObjective(calls, marker), 0, contract, budget - allowance, 8));
+            assertEquals(1, calls.get(), "only the search inspection, no unfunded selection callback");
+            assertTruncatedFirstCandidate(result, budget);
+        }
+    }
+
+    @Test void exhaustedReplayDispatchPreservesCheckedCandidatesWithoutStartingTheVerifier() {
+        for (var contract : SearchContinuationContract.values()) {
+            var engine = new TypedSourceOnlySearch();
+            long allowance = searchAllowance(contract);
+            var marker = new IllegalStateException("verifier started at boundary");
+            var observed = assertThrows(TypedSearchAlternatives.Failure.class,
+                () -> engine.searchAlternatives(replayBoundaryProblem(10000, new AtomicInteger(), marker),
+                    objective(new AtomicInteger()), 0, contract, 10000 - allowance, 8));
+            assertSame(marker, observed.getCause());
+            long budget = observed.knownWork();
+            assertTrue(budget > allowance);
+            var calls = new AtomicInteger();
+            var result = assertDoesNotThrow(() -> engine.searchAlternatives(replayBoundaryProblem(budget, calls, marker),
+                objective(new AtomicInteger()), 0, contract, budget - allowance, 8));
+            assertEquals(1, calls.get(), "only admission verification, no unfunded independent replay");
+            assertTruncatedFirstCandidate(result, budget);
+        }
+    }
+
+    private static void assertTruncatedFirstCandidate(TypedSearchAlternatives.Result result, long budget) {
+        assertTrue(result.withinBudget());
+        assertEquals(budget, result.totalWork());
+        assertTrue(result.truncated());
+        assertEquals(List.of(X), result.candidates().stream().map(c -> c.state().expression()).toList());
+        assertTrue(result.candidates().getFirst().witness().getFirst().verification().accepted());
+    }
+
+    private static long searchAllowance(SearchContinuationContract contract) {
+        return new TypedSourceOnlySearch().searchBest(problem(10000, MoveSearch.Mode.FAST),
+            objective(new AtomicInteger()), contract).totalWork() + 1;
+    }
+
+    private static TypedSourceOnlySearch.Objective selectionBoundaryObjective(AtomicInteger calls, RuntimeException failure) {
+        return state -> {
+            if (state.expression().equals(OTHER) && calls.incrementAndGet() > 1) throw failure;
+            return new TypedSourceOnlySearch.Score(state.searchDepth() == 0 ? 1 : 0, 1);
+        };
+    }
+
+    private static TypedMoveSearch.Problem replayBoundaryProblem(long budget, AtomicInteger calls, RuntimeException failure) {
+        var base = problem(budget, MoveSearch.Mode.FAST);
+        return new TypedMoveSearch.Problem(base.source(), base.context(), base.providers(), base.policy(),
+            (source, move, context) -> {
+                if (move.ruleId().equals("commute") && calls.incrementAndGet() > 1) throw failure;
+                return base.verifier().verify(source, move, context);
+            }, base.stateScore(), base.mode(), base.scheduling(), base.budget(), base.stateValue());
+    }
+
     private static TypedSourceOnlySearch.Objective objective(AtomicInteger inspections) {
         return state -> {
             inspections.incrementAndGet();
