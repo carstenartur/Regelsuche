@@ -5,6 +5,7 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -36,63 +37,79 @@ public final class ExactMonomialSquareExposureOperator
     public static final String RULE_ID = &quot;expose_exact_monomial_square&quot;;
     private static final int DEFAULT_MAX_CANDIDATES = 16;
 
-<span class="fc" id="L39">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L40">    private final ExpressionParser parser = new ExpressionParser();</span>
     private final PerfectSquareStructurePreparationSolver.Budget budget;
     private final int maxCandidates;
+    private final java.util.function.LongConsumer rationalWork;
 
     public ExactMonomialSquareExposureOperator() {
-<span class="fc" id="L44">        this(</span>
+<span class="fc" id="L46">        this(</span>
             PerfectSquareStructurePreparationSolver.Budget.DEFAULT,
             DEFAULT_MAX_CANDIDATES);
-<span class="fc" id="L47">    }</span>
+<span class="fc" id="L49">    }</span>
 
     public ExactMonomialSquareExposureOperator(int maxCandidates) {
-<span class="fc" id="L50">        this(</span>
+<span class="fc" id="L52">        this(</span>
             PerfectSquareStructurePreparationSolver.Budget.DEFAULT,
             maxCandidates);
-<span class="fc" id="L53">    }</span>
+<span class="fc" id="L55">    }</span>
 
     public ExactMonomialSquareExposureOperator(
         PerfectSquareStructurePreparationSolver.Budget budget,
         int maxCandidates
-<span class="fc" id="L58">    ) {</span>
-<span class="fc" id="L59">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
-<span class="fc" id="L60">        this.maxCandidates = Math.max(0, maxCandidates);</span>
-<span class="fc" id="L61">    }</span>
+    ) {
+<span class="fc" id="L61">        this(budget, maxCandidates, null);</span>
+<span class="fc" id="L62">    }</span>
+
+    /** Opt in to rational-coefficient monomials, charging each bounded root search. */
+    public ExactMonomialSquareExposureOperator(int maxCandidates, java.util.function.LongConsumer work) {
+<span class="fc" id="L66">        this(PerfectSquareStructurePreparationSolver.Budget.DEFAULT, maxCandidates,</span>
+<span class="fc" id="L67">            Objects.requireNonNull(work, &quot;work&quot;));</span>
+<span class="fc" id="L68">    }</span>
+
+    private ExactMonomialSquareExposureOperator(
+        PerfectSquareStructurePreparationSolver.Budget budget,
+        int maxCandidates,
+        java.util.function.LongConsumer rationalWork
+<span class="fc" id="L74">    ) {</span>
+<span class="fc" id="L75">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L76">        this.maxCandidates = Math.max(0, maxCandidates);</span>
+<span class="fc" id="L77">        this.rationalWork = rationalWork;</span>
+<span class="fc" id="L78">    }</span>
 
     @Override
     public List&lt;Transformation&gt; generateCandidates(String expression) {
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (expression == null</span>
-<span class="pc bpc" id="L66" title="2 of 4 branches missed.">                || expression.isBlank()</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (expression == null</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">                || expression.isBlank()</span>
                 || maxCandidates == 0) {
-<span class="nc" id="L68">            return List.of();</span>
+<span class="nc" id="L85">            return List.of();</span>
         }
         Expr root;
         try {
-<span class="fc" id="L72">            root = parser.parse(new InputRequest(InputType.TERM, expression))</span>
-<span class="fc" id="L73">                .terms()</span>
-<span class="fc" id="L74">                .getFirst();</span>
-<span class="nc" id="L75">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L76">            return List.of();</span>
-<span class="fc" id="L77">        }</span>
+<span class="fc" id="L89">            root = parser.parse(new InputRequest(InputType.TERM, expression))</span>
+<span class="fc" id="L90">                .terms()</span>
+<span class="fc" id="L91">                .getFirst();</span>
+<span class="nc" id="L92">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L93">            return List.of();</span>
+<span class="fc" id="L94">        }</span>
 
-<span class="fc" id="L79">        String source = ExpressionFormatter.format(root);</span>
-<span class="fc" id="L80">        String sourceHash = syntaxHash(source);</span>
-<span class="fc" id="L81">        Map&lt;String, Transformation&gt; retained = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L82">        Deque&lt;PositionedNode&gt; pending = new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L83">        pending.push(new PositionedNode(root, List.of()));</span>
-<span class="fc bfc" id="L84" title="All 4 branches covered.">        while (!pending.isEmpty() &amp;&amp; retained.size() &lt; maxCandidates) {</span>
-<span class="fc" id="L85">            PositionedNode positioned = pending.pop();</span>
-<span class="fc" id="L86">            Candidate candidate = candidate(positioned.expression());</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (candidate != null) {</span>
-<span class="fc" id="L88">                Expr rewritten = replaceAt(</span>
+<span class="fc" id="L96">        String source = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L97">        String sourceHash = syntaxHash(source);</span>
+<span class="fc" id="L98">        Map&lt;String, Transformation&gt; retained = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L99">        Deque&lt;PositionedNode&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L100">        pending.push(new PositionedNode(root, List.of()));</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        while (!pending.isEmpty() &amp;&amp; retained.size() &lt; maxCandidates) {</span>
+<span class="fc" id="L102">            PositionedNode positioned = pending.pop();</span>
+<span class="fc" id="L103">            Candidate candidate = candidate(positioned.expression());</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (candidate != null) {</span>
+<span class="fc" id="L105">                Expr rewritten = replaceAt(</span>
                     root,
-<span class="fc" id="L90">                    positioned.path(),</span>
+<span class="fc" id="L107">                    positioned.path(),</span>
                     0,
-<span class="fc" id="L92">                    square(candidate.root().toExpression()));</span>
-<span class="fc" id="L93">                String transformed = ExpressionFormatter.format(rewritten);</span>
-<span class="fc" id="L94">                String position = positionKey(positioned.path());</span>
-<span class="fc" id="L95">                retained.putIfAbsent(</span>
+<span class="fc" id="L109">                    square(candidate.root()));</span>
+<span class="fc" id="L110">                String transformed = ExpressionFormatter.format(rewritten);</span>
+<span class="fc" id="L111">                String position = positionKey(positioned.path());</span>
+<span class="fc" id="L112">                retained.putIfAbsent(</span>
                     transformed,
                     new Transformation(
                         RULE_ID,
@@ -102,107 +119,137 @@ public final class ExactMonomialSquareExposureOperator
                         1,
                         true,
                         RULE_ID + &quot;:&quot; + sourceHash + &quot;:&quot; + position + &quot;:&quot;
-<span class="fc" id="L105">                            + candidate.original().descriptor() + &quot;-&gt;&quot;</span>
-<span class="fc" id="L106">                            + candidate.root().descriptor()));</span>
+<span class="fc" id="L122">                            + candidate.originalDescriptor() + &quot;-&gt;&quot;</span>
+<span class="fc" id="L123">                            + candidate.rootDescriptor()));</span>
             }
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (retained.size() &lt; maxCandidates) {</span>
-<span class="fc" id="L109">                pushChildren(pending, positioned);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (retained.size() &lt; maxCandidates) {</span>
+<span class="fc" id="L126">                pushChildren(pending, positioned);</span>
             }
-<span class="fc" id="L111">        }</span>
-<span class="fc" id="L112">        return List.copyOf(retained.values());</span>
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">        return List.copyOf(retained.values());</span>
     }
 
     private Candidate candidate(Expr expression) {
-<span class="fc bfc" id="L116" title="All 4 branches covered.">        if (expression instanceof NumberExpr || isExplicitSquare(expression)) {</span>
-<span class="fc" id="L117">            return null;</span>
+<span class="fc bfc" id="L133" title="All 4 branches covered.">        if (expression instanceof NumberExpr || isExplicitSquare(expression)) {</span>
+<span class="fc" id="L134">            return null;</span>
         }
-<span class="fc" id="L119">        ExactPositiveMonomial.Parser monomialParser =</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        return rationalWork != null ? rationalCandidate(expression) : legacyCandidate(expression);</span>
+    }
+
+    private Candidate legacyCandidate(Expr expression) {
+<span class="fc" id="L140">        ExactPositiveMonomial.Parser monomialParser =</span>
             new ExactPositiveMonomial.Parser(new ExactPositiveMonomial.Limits(
-<span class="fc" id="L121">                budget.maxFactors(),</span>
-<span class="fc" id="L122">                budget.maxExponent(),</span>
-<span class="fc" id="L123">                budget.maxCoefficient()));</span>
-<span class="fc" id="L124">        ExactPositiveMonomial.ParseResult parsed =</span>
-<span class="fc" id="L125">            monomialParser.parse(expression);</span>
-<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!parsed.supported()) {</span>
-<span class="fc" id="L127">            return null;</span>
+<span class="fc" id="L142">                budget.maxFactors(),</span>
+<span class="fc" id="L143">                budget.maxExponent(),</span>
+<span class="fc" id="L144">                budget.maxCoefficient()));</span>
+        try {
+<span class="fc" id="L146">            ExactPositiveMonomial.ParseResult parsed = monomialParser.parse(expression);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (!parsed.supported()) return null;</span>
+<span class="fc" id="L148">            ExactPositiveMonomial original = parsed.monomial();</span>
+<span class="fc" id="L149">            ExactPositiveMonomial root = exactSquareRoot(original);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            return root == null ? null : new Candidate(root.toExpression(), original.descriptor(), root.descriptor());</span>
+        } finally {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (rationalWork != null) rationalWork.accept(1L + monomialParser.inspectedFactors());</span>
         }
-<span class="fc" id="L129">        ExactPositiveMonomial original = parsed.monomial();</span>
-<span class="fc" id="L130">        ExactPositiveMonomial root = exactSquareRoot(original);</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        return root == null ? null : new Candidate(original, root);</span>
+    }
+
+    private Candidate rationalCandidate(Expr expression) {
+<span class="fc" id="L157">        var exactBudget = new BoundedExactMonomial.Budget();</span>
+        try {
+<span class="fc" id="L159">            var value = BoundedExactMonomial.from(expression, exactBudget);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (value.isEmpty()) return null;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (value.orElseThrow().coefficient().denominator().equals(java.math.BigInteger.ONE)</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                    &amp;&amp; legacyCandidate(expression) != null) return null;</span>
+<span class="fc" id="L163">            var root = value.orElseThrow().exactRoot(2, exactBudget);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            if (root.isEmpty()) return null;</span>
+<span class="fc" id="L165">            Expr rootExpression = root.orElseThrow().toExpr();</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (!containsVariable(rootExpression)) return null;</span>
+<span class="fc" id="L167">            return new Candidate(rootExpression, ExpressionFormatter.format(expression), ExpressionFormatter.format(rootExpression));</span>
+<span class="nc" id="L168">        } catch (BoundedExactMonomial.LimitExceeded limited) {</span>
+<span class="nc" id="L169">            return null;</span>
+        } finally {
+<span class="fc" id="L171">            rationalWork.accept(Math.addExact(1, exactBudget.workUsed()));</span>
+        }
+    }
+
+    private static boolean containsVariable(Expr expression) {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (expression instanceof VariableExpr) return true;</span>
+<span class="fc" id="L177">        return expression instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L178" title="2 of 6 branches missed.">            &amp;&amp; (containsVariable(binary.left()) || containsVariable(binary.right()));</span>
     }
 
     private static ExactPositiveMonomial exactSquareRoot(
         ExactPositiveMonomial monomial
     ) {
-<span class="fc" id="L137">        long coefficientRoot = perfectSquareRoot(monomial.coefficient());</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (coefficientRoot &lt; 1</span>
-<span class="fc" id="L139">                || monomial.powers().values().stream()</span>
-<span class="fc bfc" id="L140" title="All 4 branches covered.">                    .anyMatch(exponent -&gt; exponent % 2 != 0)) {</span>
-<span class="fc" id="L141">            return null;</span>
+<span class="fc" id="L184">        long coefficientRoot = perfectSquareRoot(monomial.coefficient());</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (coefficientRoot &lt; 1</span>
+<span class="fc" id="L186">                || monomial.powers().values().stream()</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">                    .anyMatch(exponent -&gt; exponent % 2 != 0)) {</span>
+<span class="fc" id="L188">            return null;</span>
         }
-<span class="fc" id="L143">        TreeMap&lt;String, Integer&gt; powers = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L144">        monomial.powers().forEach((name, exponent) -&gt; {</span>
-<span class="fc" id="L145">            int rootExponent = exponent / 2;</span>
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (rootExponent &gt; 0) {</span>
-<span class="fc" id="L147">                powers.put(name, rootExponent);</span>
+<span class="fc" id="L190">        TreeMap&lt;String, Integer&gt; powers = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L191">        monomial.powers().forEach((name, exponent) -&gt; {</span>
+<span class="fc" id="L192">            int rootExponent = exponent / 2;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            if (rootExponent &gt; 0) {</span>
+<span class="fc" id="L194">                powers.put(name, rootExponent);</span>
             }
-<span class="fc" id="L149">        });</span>
-<span class="fc" id="L150">        return new ExactPositiveMonomial(coefficientRoot, powers);</span>
+<span class="fc" id="L196">        });</span>
+<span class="fc" id="L197">        return new ExactPositiveMonomial(coefficientRoot, powers);</span>
     }
 
     private static long perfectSquareRoot(long value) {
-<span class="fc" id="L154">        long root = (long) Math.sqrt(value);</span>
-<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        while ((root + 1) * (root + 1) &lt;= value) {</span>
-<span class="nc" id="L156">            root++;</span>
+<span class="fc" id="L201">        long root = (long) Math.sqrt(value);</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        while ((root + 1) * (root + 1) &lt;= value) {</span>
+<span class="nc" id="L203">            root++;</span>
         }
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        while (root * root &gt; value) {</span>
-<span class="nc" id="L159">            root--;</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        while (root * root &gt; value) {</span>
+<span class="nc" id="L206">            root--;</span>
         }
-<span class="fc bfc" id="L161" title="All 2 branches covered.">        return root * root == value ? root : -1;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        return root * root == value ? root : -1;</span>
     }
 
     private static Expr square(Expr expression) {
-<span class="fc" id="L165">        return new BinaryExpr(</span>
+<span class="fc" id="L212">        return new BinaryExpr(</span>
             expression,
             BinaryOperator.POW,
             new NumberExpr(2));
     }
 
     private static boolean isExplicitSquare(Expr expression) {
-<span class="fc" id="L172">        return expression instanceof BinaryExpr power</span>
-<span class="fc bfc" id="L173" title="All 2 branches covered.">            &amp;&amp; power.operator() == BinaryOperator.POW</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent</span>
-<span class="fc bfc" id="L175" title="All 4 branches covered.">            &amp;&amp; exponent.value().equalsInteger(2);</span>
+<span class="fc" id="L219">        return expression instanceof BinaryExpr power</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            &amp;&amp; power.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent</span>
+<span class="fc bfc" id="L222" title="All 4 branches covered.">            &amp;&amp; exponent.value().equalsInteger(2);</span>
     }
 
     private static void pushChildren(
         Deque&lt;PositionedNode&gt; pending,
         PositionedNode positioned
     ) {
-<span class="fc" id="L182">        Expr expression = positioned.expression();</span>
-<span class="fc" id="L183">        List&lt;Integer&gt; path = positioned.path();</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L185">            pending.push(new PositionedNode(</span>
-<span class="fc" id="L186">                binary.right(),</span>
-<span class="fc" id="L187">                append(path, 1)));</span>
-<span class="fc" id="L188">            pending.push(new PositionedNode(</span>
-<span class="fc" id="L189">                binary.left(),</span>
-<span class="fc" id="L190">                append(path, 0)));</span>
-<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
-<span class="nc" id="L192">            for (int index = function.arguments().size() - 1;</span>
-<span class="nc bnc" id="L193" title="All 2 branches missed.">                    index &gt;= 0;</span>
-<span class="nc" id="L194">                    index--) {</span>
-<span class="nc" id="L195">                pending.push(new PositionedNode(</span>
-<span class="nc" id="L196">                    function.arguments().get(index),</span>
-<span class="nc" id="L197">                    append(path, index)));</span>
+<span class="fc" id="L229">        Expr expression = positioned.expression();</span>
+<span class="fc" id="L230">        List&lt;Integer&gt; path = positioned.path();</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L232">            pending.push(new PositionedNode(</span>
+<span class="fc" id="L233">                binary.right(),</span>
+<span class="fc" id="L234">                append(path, 1)));</span>
+<span class="fc" id="L235">            pending.push(new PositionedNode(</span>
+<span class="fc" id="L236">                binary.left(),</span>
+<span class="fc" id="L237">                append(path, 0)));</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L239">            for (int index = function.arguments().size() - 1;</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">                    index &gt;= 0;</span>
+<span class="nc" id="L241">                    index--) {</span>
+<span class="nc" id="L242">                pending.push(new PositionedNode(</span>
+<span class="nc" id="L243">                    function.arguments().get(index),</span>
+<span class="nc" id="L244">                    append(path, index)));</span>
             }
         }
-<span class="fc" id="L200">    }</span>
+<span class="fc" id="L247">    }</span>
 
     private static List&lt;Integer&gt; append(List&lt;Integer&gt; path, int value) {
-<span class="fc" id="L203">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L204">        result.add(value);</span>
-<span class="fc" id="L205">        return List.copyOf(result);</span>
+<span class="fc" id="L250">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L251">        result.add(value);</span>
+<span class="fc" id="L252">        return List.copyOf(result);</span>
     }
 
     private static Expr replaceAt(
@@ -211,73 +258,71 @@ public final class ExactMonomialSquareExposureOperator
         int index,
         Expr replacement
     ) {
-<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (index == path.size()) {</span>
-<span class="fc" id="L215">            return replacement;</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (index == path.size()) {</span>
+<span class="fc" id="L262">            return replacement;</span>
         }
-<span class="fc" id="L217">        int child = path.get(index);</span>
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (child == 0) {</span>
-<span class="fc" id="L220">                return new BinaryExpr(</span>
-<span class="fc" id="L221">                    replaceAt(binary.left(), path, index + 1, replacement),</span>
-<span class="fc" id="L222">                    binary.operator(),</span>
-<span class="fc" id="L223">                    binary.right());</span>
+<span class="fc" id="L264">        int child = path.get(index);</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (child == 0) {</span>
+<span class="fc" id="L267">                return new BinaryExpr(</span>
+<span class="fc" id="L268">                    replaceAt(binary.left(), path, index + 1, replacement),</span>
+<span class="fc" id="L269">                    binary.operator(),</span>
+<span class="fc" id="L270">                    binary.right());</span>
             }
-<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (child == 1) {</span>
-<span class="fc" id="L226">                return new BinaryExpr(</span>
-<span class="fc" id="L227">                    binary.left(),</span>
-<span class="fc" id="L228">                    binary.operator(),</span>
-<span class="fc" id="L229">                    replaceAt(binary.right(), path, index + 1, replacement));</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            if (child == 1) {</span>
+<span class="fc" id="L273">                return new BinaryExpr(</span>
+<span class="fc" id="L274">                    binary.left(),</span>
+<span class="fc" id="L275">                    binary.operator(),</span>
+<span class="fc" id="L276">                    replaceAt(binary.right(), path, index + 1, replacement));</span>
             }
-<span class="nc bnc" id="L231" title="All 4 branches missed.">        } else if (expression instanceof FunctionExpr function</span>
+<span class="nc bnc" id="L278" title="All 4 branches missed.">        } else if (expression instanceof FunctionExpr function</span>
                 &amp;&amp; child &gt;= 0
-<span class="nc bnc" id="L233" title="All 2 branches missed.">                &amp;&amp; child &lt; function.arguments().size()) {</span>
-<span class="nc" id="L234">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
-<span class="nc" id="L235">            arguments.set(</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                &amp;&amp; child &lt; function.arguments().size()) {</span>
+<span class="nc" id="L281">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="nc" id="L282">            arguments.set(</span>
                 child,
-<span class="nc" id="L237">                replaceAt(</span>
-<span class="nc" id="L238">                    arguments.get(child),</span>
+<span class="nc" id="L284">                replaceAt(</span>
+<span class="nc" id="L285">                    arguments.get(child),</span>
                     path,
                     index + 1,
                     replacement));
-<span class="nc" id="L242">            return new FunctionExpr(function.name(), arguments);</span>
+<span class="nc" id="L289">            return new FunctionExpr(function.name(), arguments);</span>
         }
-<span class="nc" id="L244">        throw new IllegalArgumentException(&quot;invalid AST occurrence path&quot;);</span>
+<span class="nc" id="L291">        throw new IllegalArgumentException(&quot;invalid AST occurrence path&quot;);</span>
     }
 
     private static String positionKey(List&lt;Integer&gt; path) {
-<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
-<span class="fc" id="L249">            return &quot;root&quot;;</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L296">            return &quot;root&quot;;</span>
         }
-<span class="fc" id="L251">        return path.stream()</span>
-<span class="fc" id="L252">            .map(String::valueOf)</span>
-<span class="fc" id="L253">            .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
+<span class="fc" id="L298">        return path.stream()</span>
+<span class="fc" id="L299">            .map(String::valueOf)</span>
+<span class="fc" id="L300">            .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
     }
 
     private static String syntaxHash(String expression) {
         try {
-<span class="fc" id="L258">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L259">                .digest(expression.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L260">            return &quot;syntax-v1:&quot; + HexFormat.of().formatHex(digest, 0, 12);</span>
-<span class="nc" id="L261">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L262">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L305">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L306">                .digest(expression.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L307">            return &quot;syntax-v1:&quot; + HexFormat.of().formatHex(digest, 0, 12);</span>
+<span class="nc" id="L308">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L309">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
     private record PositionedNode(Expr expression, List&lt;Integer&gt; path) {
-<span class="fc" id="L267">        private PositionedNode {</span>
-<span class="fc" id="L268">            expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L269">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
-<span class="fc" id="L270">        }</span>
+<span class="fc" id="L314">        private PositionedNode {</span>
+<span class="fc" id="L315">            expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L316">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L317">        }</span>
     }
 
-    private record Candidate(
-        ExactPositiveMonomial original,
-        ExactPositiveMonomial root
-    ) {
-<span class="fc" id="L277">        private Candidate {</span>
-<span class="fc" id="L278">            original = Objects.requireNonNull(original, &quot;original&quot;);</span>
-<span class="fc" id="L279">            root = Objects.requireNonNull(root, &quot;root&quot;);</span>
-<span class="fc" id="L280">        }</span>
+    private record Candidate(Expr root, String originalDescriptor, String rootDescriptor) {
+<span class="fc" id="L321">        private Candidate {</span>
+<span class="fc" id="L322">            root = Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L323">            Objects.requireNonNull(originalDescriptor, &quot;originalDescriptor&quot;);</span>
+<span class="fc" id="L324">            Objects.requireNonNull(rootDescriptor, &quot;rootDescriptor&quot;);</span>
+<span class="fc" id="L325">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

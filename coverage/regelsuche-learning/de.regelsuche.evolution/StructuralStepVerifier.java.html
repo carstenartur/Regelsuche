@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StructuralStepVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">StructuralStepVerifier.java</span></div><h1>StructuralStepVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.search.moves.MoveVerifier;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Replay alone binds a move to a rule; this additional check establishes each polynomial identity. */
+final class StructuralStepVerifier {
+<span class="fc" id="L13">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    private StructuralStepVerifier() { }
+
+    static TypedMoveSearch.Verifier checked(TypedMoveSearch.Verifier delegate) {
+<span class="fc" id="L17">        return (source, move, context) -&gt; {</span>
+<span class="fc" id="L18">            StructuralCheckedDomain.requireUnobserved();</span>
+<span class="fc" id="L19">            var replay = delegate.verify(source, move, context);</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">            if (!replay.accepted()) return replay;</span>
+<span class="fc" id="L21">            var work = new CheckedSchemaSupport.Work();</span>
+            try {
+<span class="fc" id="L23">                StructuralCheckedDomain.inspect(source.expression(), work);</span>
+<span class="fc" id="L24">                String encodedTarget = move.transformation().transformedExpression();</span>
+<span class="fc" id="L25">                work.add(encodedTarget.length());</span>
+<span class="fc" id="L26">                var target = CODEC.decodeExpression(encodedTarget);</span>
+<span class="fc" id="L27">                StructuralCheckedDomain.inspect(target, work);</span>
+<span class="fc" id="L28">                String before = ExpressionFormatter.format(source.expression());</span>
+<span class="fc" id="L29">                String after = ExpressionFormatter.format(target);</span>
+<span class="fc" id="L30">                work.add((long) before.length() + after.length());</span>
+<span class="fc" id="L31">                ExactPolynomialAnalysis.withProductWork(work::add).requireEquivalent(before, after);</span>
+<span class="fc" id="L32">                var receipts = new ArrayList&lt;&gt;(replay.receipts());</span>
+<span class="fc" id="L33">                receipts.add(&quot;exact-polynomial-step/v1&quot;);</span>
+<span class="fc" id="L34">                return new MoveVerifier.Verification(true, Math.addExact(replay.work(), work.units), receipts,</span>
+                    &quot;REPLAY_AND_EXACT_POLYNOMIAL_STEP_VERIFIED&quot;);
+<span class="fc" id="L36">            } catch (IllegalArgumentException unsupportedOrUnequal) {</span>
+<span class="fc" id="L37">                return new MoveVerifier.Verification(false, Math.addExact(replay.work(), Math.max(1, work.units)),</span>
+<span class="fc" id="L38">                    List.of(), &quot;STRUCTURAL_STEP_NOT_EXACT_OR_OUTSIDE_DOMAIN&quot;);</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

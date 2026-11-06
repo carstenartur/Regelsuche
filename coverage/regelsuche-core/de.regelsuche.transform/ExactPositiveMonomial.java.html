@@ -277,7 +277,7 @@ record ExactPositiveMonomial(
         }
 
         private static long exactPositiveInteger(ExactRational value) {
-<span class="pc bpc" id="L280" title="2 of 4 branches missed.">            return value.isInteger() &amp;&amp; value.signum() &gt; 0</span>
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">            return value.isInteger() &amp;&amp; value.signum() &gt; 0</span>
 <span class="fc bfc" id="L281" title="All 2 branches covered.">                    &amp;&amp; value.numerator().compareTo(java.math.BigInteger.valueOf(MAX_EXACT_DOUBLE_INTEGER)) &lt;= 0</span>
 <span class="fc" id="L282">                ? value.longValueExact() : -1;</span>
         }

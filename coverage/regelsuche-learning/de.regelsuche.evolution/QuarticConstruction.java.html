@@ -34,7 +34,7 @@ final class QuarticConstruction {
 <span class="fc" id="L34">        var input = ExactPolynomialAnalysis.withProductWork(chargeProjection).normalForm(source);</span>
 <span class="fc" id="L35">        var variables = input.variables().stream().sorted().toList();</span>
 <span class="fc" id="L36">        chargeProjection.accept(input.termCount() + variables.size());</span>
-<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (variables.size() != 2 || input.totalDegree() != 4) return List.of();</span>
+<span class="fc bfc" id="L37" title="All 4 branches covered.">        if (variables.size() != 2 || input.totalDegree() != 4) return List.of();</span>
 <span class="fc" id="L38">        var ring = new PolynomialRing&lt;&gt;(BigIntegerDomain.INSTANCE,</span>
 <span class="fc" id="L39">            variables.stream().map(PolynomialVariable::new).toList(),</span>
             PolynomialRing.MonomialOrder.GRADED_LEXICOGRAPHIC);

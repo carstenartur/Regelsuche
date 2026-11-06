@@ -79,10 +79,10 @@ final class BoundedExactMonomial implements RetainedGraph.View {
 <span class="fc bfc" id="L79" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
 <span class="fc" id="L80">            return Optional.empty();</span>
         }
-<span class="pc bpc" id="L82" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc bfc" id="L82" title="All 3 branches covered.">        return switch (binary.operator()) {</span>
 <span class="fc" id="L83">            case MUL, DIV -&gt; product(binary, budget, depth);</span>
 <span class="fc" id="L84">            case POW -&gt; power(binary, budget, depth);</span>
-<span class="nc" id="L85">            default -&gt; Optional.empty();</span>
+<span class="fc" id="L85">            default -&gt; Optional.empty();</span>
         };
     }
 
@@ -534,22 +534,23 @@ final class BoundedExactMonomial implements RetainedGraph.View {
         private static final int MAX_COEFFICIENT_BITS = 4_096;
 <span class="fc" id="L535">        private int remaining = MAX_VISITS;</span>
 <span class="fc" id="L536">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
+<span class="fc" id="L537">        long workUsed() { return (long) MAX_VISITS - remaining; }</span>
 
         private void visit(int depth) {
-<span class="fc bfc" id="L539" title="All 4 branches covered.">            if (depth &gt; MAX_DEPTH || remaining-- &lt;= 0) {</span>
-<span class="fc" id="L540">                throw new LimitExceeded(&quot;ALGEBRAIC_WORK_LIMIT&quot;);</span>
+<span class="fc bfc" id="L540" title="All 4 branches covered.">            if (depth &gt; MAX_DEPTH || remaining-- &lt;= 0) {</span>
+<span class="fc" id="L541">                throw new LimitExceeded(&quot;ALGEBRAIC_WORK_LIMIT&quot;);</span>
             }
             // This visit is consumed before its debit can fail. It is never
             // delegated through MatchAttempt.visitedBranches or settled again.
-<span class="fc" id="L544">            RetainedOperation.work(1);</span>
-<span class="fc" id="L545">        }</span>
+<span class="fc" id="L545">            RetainedOperation.work(1);</span>
+<span class="fc" id="L546">        }</span>
 
         private void coefficientBits(long numerator, long denominator) {
-<span class="fc" id="L548">            visit(0);</span>
-<span class="fc bfc" id="L549" title="All 4 branches covered.">            if (numerator &gt; MAX_COEFFICIENT_BITS || denominator &gt; MAX_COEFFICIENT_BITS) {</span>
-<span class="fc" id="L550">                throw new LimitExceeded(&quot;ALGEBRAIC_COEFFICIENT_LIMIT&quot;);</span>
+<span class="fc" id="L549">            visit(0);</span>
+<span class="fc bfc" id="L550" title="All 4 branches covered.">            if (numerator &gt; MAX_COEFFICIENT_BITS || denominator &gt; MAX_COEFFICIENT_BITS) {</span>
+<span class="fc" id="L551">                throw new LimitExceeded(&quot;ALGEBRAIC_COEFFICIENT_LIMIT&quot;);</span>
             }
-<span class="fc" id="L552">        }</span>
+<span class="fc" id="L553">        }</span>
     }
 
     static final class LimitExceeded extends RuntimeException {
@@ -557,9 +558,9 @@ final class BoundedExactMonomial implements RetainedGraph.View {
         final String code;
 
         private LimitExceeded(String code) {
-<span class="fc" id="L560">            super(code, null, false, false);</span>
-<span class="fc" id="L561">            this.code = code;</span>
-<span class="fc" id="L562">        }</span>
+<span class="fc" id="L561">            super(code, null, false, false);</span>
+<span class="fc" id="L562">            this.code = code;</span>
+<span class="fc" id="L563">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
