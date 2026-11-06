@@ -63,6 +63,43 @@ class HistoricalRediscoveryRunArtifactTest {
     }
 
     @Test
+    void legacyAtlasManifestsRemainReadable(@TempDir Path directory) throws Exception {
+        for (String name : List.of("historical-rediscovery-atlas.json",
+                "historical-rediscovery-atlas.md", "historical-rediscovery-run.json")) {
+            try (var input = HistoricalRediscoveryRunArtifactTest.class.getResourceAsStream(
+                    "/de/regelsuche/benchmark/legacy-atlas-v1/" + name)) {
+                assertTrue(input != null, "missing original v1 fixture: " + name);
+                Files.copy(input, directory.resolve(name));
+            }
+        }
+        var verified = HistoricalRediscoveryRunArtifact.verify(directory);
+        assertEquals(HistoricalRediscoveryAtlas.LEGACY_SCHEMA, verified.manifest().atlasSchema());
+        assertEquals(HistoricalRediscoveryCorpus.load().contentSha256(), verified.manifest().corpusSha256());
+        assertEquals(14, verified.manifest().caseCount());
+    }
+
+    @Test
+    void newResultsCannotBeCommittedAsLegacyAtlas(@TempDir Path directory) {
+        var fixture = fixture();
+        var current = fixture.report();
+        var legacy = new HistoricalRediscoveryAtlas.AtlasReport(
+            HistoricalRediscoveryAtlas.LEGACY_SCHEMA, current.corpusSchema(), current.corpusSha256(),
+            current.inventoryRevision(), current.claimBoundary(), current.cases(),
+            current.directionality(), current.assessment());
+        HistoricalRediscoveryRunArtifact.begin(directory);
+        assertThrows(IllegalArgumentException.class, () -> new HistoricalRediscoveryAtlas().write(directory, legacy));
+        var artifacts = new HistoricalRediscoveryAtlas.WrittenArtifacts(
+            directory.resolve("historical-rediscovery-atlas.json"),
+            directory.resolve("historical-rediscovery-atlas.md"));
+        assertThrows(IllegalArgumentException.class,
+            () -> HistoricalRediscoveryRunArtifact.commit(directory, fixture.corpus(), legacy, artifacts));
+        var failure = assertThrows(IllegalArgumentException.class,
+            () -> HistoricalRediscoveryRunArtifact.Manifest.create(fixture.corpus(), legacy, List.of()));
+        assertTrue(failure.getMessage().contains("evaluation revision"));
+        assertFalse(Files.exists(directory.resolve(HistoricalRediscoveryRunArtifact.MANIFEST_FILE_NAME)));
+    }
+
+    @Test
     void manifestRejectsUnsupportedNestedSchemaIdentities(
             @TempDir Path directory) {
         HistoricalRediscoveryRunArtifact.Manifest manifest =

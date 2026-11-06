@@ -380,6 +380,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         pending[1] = move;
         SearchExecution.completed(1);
         boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;
+        boolean objectiveWorkLimited = false;
         if (decision == Decision.ENQUEUED) {
             visited.add(child, admission.theoryWork()); node.enqueued++; recordAssessment(assessments,child,admission.value());
             var path = node.path.append(new SearchExecution.Step<>(node.state, child, move, verification));
@@ -388,11 +389,14 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             pending[3] = successor;
             frontier.add(new Ticket(successor,
                 child.expression().equals(problem.goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial[0]++));
-            ledger.observe(child, path);
+            // State-local admission can itself spend the last available unit.
+            // The accepted edge remains recorded even when its objective cannot run.
+            if (ledger.objective != null && ledger.total() >= problem.budget().totalWork()) objectiveWorkLimited = true;
+            else ledger.observe(child, path);
         }
         if (decision != Decision.ENQUEUED) ledger.discarded++;
         events.add(new SearchExecution.Event<>(node.state, child, move, decision, verification));
-        if (decision == Decision.WORK_LIMIT) return Expansion.WORK_LIMIT;
+        if (decision == Decision.WORK_LIMIT || objectiveWorkLimited) return Expansion.WORK_LIMIT;
         if (ledger.qualityReached()) return Expansion.MORE;
         int stage = node.picker.nextStage();
         // Parent widening stays on the frontier, so promising children can finish before later stages open.
@@ -463,7 +467,11 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         ledger.verification = Math.addExact(ledger.verification, verification.work());
         pending[3] = verification;
         SearchExecution.completed(1);
-        decision = ledger.total() > problem.budget().totalWork() ? Decision.WORK_LIMIT
+        // An admitted child needs a separate objective evaluation. Do not start that
+        // callback after verification has already spent its entire allowance.
+        decision = ledger.total() > problem.budget().totalWork()
+                || (verification.accepted() && ledger.objective != null && ledger.total() == problem.budget().totalWork())
+            ? Decision.WORK_LIMIT
             : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;
         return admission(pending, child, theory, decision, verification, value);
     }

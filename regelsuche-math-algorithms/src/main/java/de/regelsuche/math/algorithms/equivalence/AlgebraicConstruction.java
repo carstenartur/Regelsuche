@@ -3,7 +3,10 @@ package de.regelsuche.math.algorithms.equivalence;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -48,16 +51,24 @@ public final class AlgebraicConstruction {
 
     /** Failed and atomically over-budget attempts keep their work, but issue no candidate. */
     public Result construct(Request request) {
+        return construct(request, false);
+    }
+
+    private Result construct(Request request, boolean polynomialAudit) {
         Objects.requireNonNull(request, "request");
         var work = new Work(request.maximumWork());
         try {
-            var arithmetic = new ExactResidualPolynomialArithmetic(work::add);
+            var arithmetic = new ExactResidualPolynomialArithmetic(work::add, polynomialAudit);
             work.add(1);
             Polynomial source = boundedPolynomial(arithmetic.parse(request.source()));
             Polynomial auxiliary = boundedPolynomial(arithmetic.parse(request.auxiliary()));
             String candidate = candidate(request, source, auxiliary, arithmetic, work);
             if (candidate == null) return rejected(Status.NO_MATCH, work, "NO_EXACT_CONSTRUCTION");
             work.add(candidate.length());
+            if (polynomialAudit) {
+                ExactPolynomialAnalysis.withProductWork(work::add).requireEquivalent(request.source(), candidate);
+                return new Result(Status.GENERATED, Optional.of(candidate), work.units, "EXACT_POLYNOMIAL_CONSTRUCTION");
+            }
             // Conservative declared charge for this bounded rational audit. This is not a CPU/heap receipt.
             long terms = source.termCount() + (long) auxiliary.termCount() + 1;
             work.add(Math.multiplyExact(16, Math.multiplyExact(terms, terms)));
@@ -77,15 +88,32 @@ public final class AlgebraicConstruction {
     /** Source subexpressions and bounded cross-products; no target expression or historical name. */
     public Exploration explore(Operation operation, String source, List<String> assumptions,
             int maximumAttempts, long maximumWork) {
+        return explore(operation, source, assumptions, maximumAttempts, maximumWork, false);
+    }
+
+    /** Opt-in polynomial-only exploration with prioritized source-derived candidates and paid products. */
+    public Exploration explorePolynomial(Operation operation, String source, List<String> assumptions,
+            int maximumAttempts, long maximumWork) {
+        if (operation != Operation.ADDITIVE_COMPLEMENT && operation != Operation.ADDITIVE_SPLIT
+                && operation != Operation.EXACT_FACTOR_SPLIT) {
+            throw new IllegalArgumentException("polynomial exploration cannot introduce symbolic division");
+        }
+        return explore(operation, source, assumptions, maximumAttempts, maximumWork, true);
+    }
+
+    private Exploration explore(Operation operation, String source, List<String> assumptions,
+            int maximumAttempts, long maximumWork, boolean polynomialAudit) {
         if (maximumAttempts < 1 || maximumAttempts > 32 || maximumWork < 1)
             throw new IllegalArgumentException("finite positive construction limits required");
         boundedText(source);
         var results = new ArrayList<Result>();
         var work = new Work(maximumWork);
         try {
-            for (String auxiliary : auxiliaries(source, maximumAttempts, work)) {
+            var candidates = polynomialAudit ? auxiliaries(operation, source, maximumAttempts, work)
+                : legacyAuxiliaries(source, maximumAttempts, work);
+            for (String auxiliary : candidates) {
                 if (work.units >= maximumWork) break;
-                var result = construct(new Request(operation, source, auxiliary, assumptions, maximumWork - work.units));
+                var result = construct(new Request(operation, source, auxiliary, assumptions, maximumWork - work.units), polynomialAudit);
                 results.add(result); work.add(result.work());
             }
         } catch (WorkLimit limited) {
@@ -96,7 +124,90 @@ public final class AlgebraicConstruction {
         return new Exploration(results, work.units);
     }
 
-    private static List<String> auxiliaries(String source, int limit, Work work) {
+    private static List<String> auxiliaries(Operation operation, String source, int limit, Work work) {
+        var arithmetic = new ExactResidualPolynomialArithmetic(work::add, true);
+        boundedPolynomial(arithmetic.parse(source));
+        var parsed = arithmetic.exactTerm(source);
+        var parts = collectAuxiliaryParts(operation, parsed, limit, work, arithmetic);
+        var terms = new LinkedHashSet<String>();
+        if (operation != Operation.ADDITIVE_COMPLEMENT && operation != Operation.EXACT_FACTOR_SPLIT) terms.add("2");
+        appendWithinLimit(terms, parts.powerFactors(), limit);
+        appendSquareCrossProducts(terms, parts.squareBases(), operation, limit, work, arithmetic);
+        if (operation == Operation.ADDITIVE_COMPLEMENT) return List.copyOf(terms);
+        appendWithinLimit(terms, parts.fragments(), limit);
+        if (operation != Operation.EXACT_FACTOR_SPLIT) appendCrossProducts(terms, limit, work);
+        return List.copyOf(terms);
+    }
+
+    private record AuxiliaryParts(LinkedHashSet<String> fragments, LinkedHashSet<String> powerFactors,
+            List<String> squareBases) { }
+
+    private static AuxiliaryParts collectAuxiliaryParts(Operation operation, ExactParsedTerm parsed,
+            int limit, Work work, ExactResidualPolynomialArithmetic arithmetic) {
+        var parts = new AuxiliaryParts(new LinkedHashSet<>(), new LinkedHashSet<>(), new ArrayList<>());
+        var pending = new ArrayDeque<Expr>(); pending.add(parsed.expression());
+        int inspected = 0;
+        int maxInspections = Math.min(256, Math.max(16, limit * 8));
+        while (!pending.isEmpty() && inspected++ < maxInspections) {
+            Expr term = pending.removeFirst(); work.add(1);
+            String text = ExactExpressionFormatter.format(term, parsed); work.add(text.length());
+            if (parts.fragments().size() < limit && (operation != Operation.EXACT_FACTOR_SPLIT
+                    || (term != parsed.expression() && isNonconstant(term, text, arithmetic)))) parts.fragments().add(text);
+            if (term instanceof BinaryExpr binary) {
+                collectSquareBase(binary, parsed, limit, work, parts.squareBases());
+                collectPowerFactors(operation, binary, parsed, limit, work, arithmetic, parts.powerFactors());
+                pending.addLast(binary.left()); pending.addLast(binary.right());
+            }
+        }
+        return parts;
+    }
+
+    private static void collectSquareBase(BinaryExpr binary, ExactParsedTerm parsed, int limit, Work work,
+            List<String> squareBases) {
+        if (binary.operator() == BinaryOperator.POW && binary.right() instanceof NumberExpr exponent
+                && exponent.value().equalsInteger(2) && squareBases.size() < limit) {
+            String base = ExactExpressionFormatter.format(binary.left(), parsed);
+            work.add(base.length()); squareBases.add(base);
+        }
+    }
+
+    private static void collectPowerFactors(Operation operation, BinaryExpr binary, ExactParsedTerm parsed,
+            int limit, Work work, ExactResidualPolynomialArithmetic arithmetic, LinkedHashSet<String> powerFactors) {
+        if (operation != Operation.EXACT_FACTOR_SPLIT || binary.operator() != BinaryOperator.POW
+                || !(binary.right() instanceof NumberExpr exponent) || !exponent.value().isInteger()
+                || exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(2)) < 0
+                || exponent.value().numerator().compareTo(java.math.BigInteger.valueOf(12)) > 0) return;
+        String base = ExactExpressionFormatter.format(binary.left(), parsed);
+        int power = exponent.value().numerator().intValueExact();
+        if (!isNonconstant(binary.left(), base, arithmetic)) return;
+        addPowerFactor(powerFactors, base, power / 2, limit, work);
+        for (int split = 1; split < power && powerFactors.size() < limit; split++) {
+            addPowerFactor(powerFactors, base, split, limit, work);
+        }
+    }
+
+    private static void appendWithinLimit(LinkedHashSet<String> terms, Iterable<String> candidates, int limit) {
+        for (String candidate : candidates) { if (terms.size() == limit) break; terms.add(candidate); }
+    }
+
+    private static void appendSquareCrossProducts(LinkedHashSet<String> terms, List<String> squareBases,
+            Operation operation, int limit, Work work, ExactResidualPolynomialArithmetic arithmetic) {
+        for (int left = 0; left < squareBases.size() && terms.size() < limit; left++) {
+            for (int right = left + 1; right < squareBases.size() && terms.size() < limit; right++) {
+                String cross = "2*(" + squareBases.get(left) + ")*(" + squareBases.get(right) + ")";
+                work.add(cross.length() + 1L);
+                if (operation != Operation.EXACT_FACTOR_SPLIT || arithmetic.parse(cross).totalDegree() > 0) terms.add(cross);
+            }
+        }
+    }
+
+    private static boolean isNonconstant(Expr term, String text, ExactResidualPolynomialArithmetic arithmetic) {
+        if (term instanceof NumberExpr) return false;
+        if (term instanceof VariableExpr) return true;
+        return arithmetic.parse(text).totalDegree() > 0;
+    }
+
+    private static List<String> legacyAuxiliaries(String source, int limit, Work work) {
         var arithmetic = new ExactResidualPolynomialArithmetic(work::add);
         boundedPolynomial(arithmetic.parse(source));
         var parsed = arithmetic.exactTerm(source);
@@ -107,13 +218,24 @@ public final class AlgebraicConstruction {
             String text = ExactExpressionFormatter.format(term, parsed); work.add(text.length()); terms.add(text);
             if (term instanceof BinaryExpr binary) { pending.addLast(binary.left()); pending.addLast(binary.right()); }
         }
+        appendCrossProducts(terms, limit, work);
+        return List.copyOf(terms);
+    }
+
+    private static void appendCrossProducts(LinkedHashSet<String> terms, int limit, Work work) {
         var atoms = List.copyOf(terms);
         for (int left = 0; left < atoms.size() && terms.size() < limit; left++) {
             for (int right = left; right < atoms.size() && terms.size() < limit; right++) {
                 work.add(1); terms.add("2*(" + atoms.get(left) + ")*(" + atoms.get(right) + ")");
             }
         }
-        return List.copyOf(terms);
+    }
+
+    private static void addPowerFactor(LinkedHashSet<String> factors, String base, int power, int limit, Work work) {
+        if (factors.size() >= limit) return;
+        String factor = "(" + base + ")^" + power;
+        work.add(factor.length() + 1L);
+        factors.add(factor);
     }
 
     private static String candidate(Request request, Polynomial source, Polynomial auxiliary,

@@ -145,6 +145,22 @@ class BoundedRewriteReachabilityOracleTest {
     }
 
     @Test
+    void targetRelationDoesNotCollapseDistinctIntermediateStates() {
+        TransformationEngine engine = graph(Map.of(
+            "A", List.of(edge("a_to_b", "B")),
+            "B", List.of(edge("b_to_lower", "b")),
+            "b", List.of(edge("lower_to_c", "C"))));
+        var oracle = new BoundedRewriteReachabilityOracle(engine, String::trim, String::equalsIgnoreCase);
+        var result = oracle.search("A", "c", new BoundedRewriteReachabilityOracle.Budget(3, 8));
+        assertEquals(BoundedRewriteReachabilityOracle.Status.REACHABLE, result.status());
+        assertEquals(List.of("B", "b", "C"),
+            result.witness().stream().map(BoundedRewriteReachabilityOracle.Step::expressionAfter).toList());
+        assertEquals(4, result.visitedStates());
+        assertTrue(oracle.search("C", "c", new BoundedRewriteReachabilityOracle.Budget(0, 1))
+            .witness().isEmpty());
+    }
+
+    @Test
     void sourceEqualToTargetIsAZeroStepWitness() {
         BoundedRewriteReachabilityOracle oracle =
             new BoundedRewriteReachabilityOracle(expression -> List.of());
