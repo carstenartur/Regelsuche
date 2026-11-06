@@ -42,7 +42,9 @@ planned requests, not 819 independent mathematical families. The four canonical
 historical tasks are reported individually, separately from variants/controls.
 All are public development tasks; there is no sealed holdout or novelty claim.
 
-Query timeout 30 seconds, setup timeout 120 seconds, no warmup or answer cache.
+Query timeout 30 seconds, setup timeout 120 seconds, no warmup or added query
+answer cache. Normal library expression caches and native JIT/internal caches
+remain enabled; SymPy caches are not forcibly cleared between queries.
 Java uses `-Xmx512m`; process RSS is observed, not falsely equated with a common
 512 MiB address-space limit. Native intrinsic logical budgets are reported but
 are not comparable to SymPy CPU instructions. Native structural limits are
