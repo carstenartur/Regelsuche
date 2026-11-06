@@ -72,7 +72,10 @@ def audit_law(task, law):
 
 
 def audit_witness(source, output, response):
-    if 'witness' not in response:
+    if response.get('profile') != 'SYMPY':
+        require('normalizedInput' in response and 'witness' in response,
+                'native structural output omitted normalized input or witness')
+    elif 'witness' not in response:
         return
     require(isinstance(response['witness'], list), 'witness must be a list')
     normalized = response['normalizedInput']

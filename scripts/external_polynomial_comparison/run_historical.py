@@ -134,20 +134,31 @@ def run_sequence(p, profile, length, repetition, command, output):
         worker = phase('startup-'+stage, lambda r: launch(stage, r))
         directory = (output/'models'/name).resolve()
         if profile == 'NATIVE_LEARNED': directory.mkdir(parents=True)
-        initial = phase('initialize', lambda r: request(worker, dict(op='initialize', profile=profile,
-            prelude=p['prelude'], directory=str(directory)), r, 'SAVED' if profile == 'NATIVE_LEARNED' else 'INITIALIZED'))
+        if profile == 'NATIVE_LEARNED':
+            def initialize(r):
+                response = request(worker, dict(op='initialize', profile=profile,
+                    prelude=p['prelude'], directory=str(directory)), r, 'SAVED')
+                path = Path(response['snapshot']).resolve()
+                require(path.parent == directory and path.is_file(), 'snapshot outside owned directory')
+                snapshot_hash = digest(path.read_bytes())
+                require(response['snapshotHash'] == snapshot_hash == response['generationId'], 'saved model binding mismatch')
+                seq['snapshot'] = dict(file=path.relative_to(output.resolve()).as_posix(), sha256=snapshot_hash)
+                return response
+        else:
+            initialize = lambda r: request(worker, dict(op='initialize', profile=profile,
+                prelude=p['prelude'], directory=str(directory)), r, 'INITIALIZED')
+        initial = phase('initialize', initialize)
         generation = initial['generationId']
         if profile == 'NATIVE_LEARNED':
-            path = Path(initial['snapshot']).resolve()
-            require(path.parent == directory and path.is_file(), 'snapshot outside owned directory')
-            snapshot_hash = digest(path.read_bytes())
-            require(initial['snapshotHash'] == snapshot_hash == generation, 'saved model binding mismatch')
-            seq['snapshot'] = dict(file=path.relative_to(output.resolve()).as_posix(), sha256=snapshot_hash)
+            snapshot_hash = seq['snapshot']['sha256']
             phase('shutdown-producer', lambda r: worker.close(graceful=True))
             query_worker = phase('startup-query', lambda r: launch('query', r))
-            restored = phase('restore', lambda r: request(query_worker, dict(op='restore', profile=profile,
-                prelude=p['prelude'], snapshot=str(path)), r, 'RESTORED', generation))
-            require(restored['snapshotHash'] == snapshot_hash, 'fresh consumer changed snapshot bytes')
+            def restore(r):
+                response = request(query_worker, dict(op='restore', profile=profile,
+                    prelude=p['prelude'], snapshot=str(output.resolve()/seq['snapshot']['file'])), r, 'RESTORED', generation)
+                require(response['snapshotHash'] == snapshot_hash, 'fresh consumer changed snapshot bytes')
+                return response
+            phase('restore', restore)
         else:
             query_worker = worker
     except Exception as error:

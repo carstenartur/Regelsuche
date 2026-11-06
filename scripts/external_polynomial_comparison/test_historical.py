@@ -31,10 +31,12 @@ class HistoricalJudgeTest(unittest.TestCase):
     def test_identity_is_insufficient_without_the_requested_output_shape(self):
         task = dict(kind='TWO_SQUARES', source='(a^2+b^2)*(c^2+d^2)')
         good = '(a*c+b*d)^2+(b*c-a*d)^2'
-        self.assertTrue(audit_task(task, dict(status='RESULT', task=task, solved=True, withinBudget=True, output=good))['solved'])
+        self.assertTrue(audit_task(task, dict(status='RESULT', task=task, profile='SYMPY',
+            solved=True, withinBudget=True, output=good))['solved'])
         for output in [task['source'], good+'+1', '0^2+('+task['source']+')^2']:
             with self.subTest(output=output), self.assertRaises(ValueError):
-                audit_task(task, dict(status='RESULT', task=task, solved=True, withinBudget=True, output=output))
+                audit_task(task, dict(status='RESULT', task=task, profile='SYMPY',
+                    solved=True, withinBudget=True, output=output))
 
     def test_constant_factors_and_out_of_domain_sources_do_not_become_success(self):
         task = dict(kind='FACTOR', source='x^4+4*y^4')
@@ -55,7 +57,9 @@ class HistoricalJudgeTest(unittest.TestCase):
     def test_exact_over_budget_diagnostic_is_a_valid_bounded_miss(self):
         task = dict(kind='FACTOR', source='x^2-y^2')
         response = dict(status='RESULT', task=task, solved=False, withinBudget=False,
-                        output='(x-y)*(x+y)', outcome='INCONCLUSIVE')
+                        output='(x-y)*(x+y)', outcome='INCONCLUSIVE',
+                        normalizedInput=task['source'],
+                        witness=[dict(source=task['source'], target='(x-y)*(x+y)')])
         self.assertEqual(dict(valid=True, solved=False, outcome='INCONCLUSIVE'), audit_task(task, response))
         with self.assertRaises(ValueError):
             audit_task(task, dict(response, withinBudget=True))
@@ -75,6 +79,19 @@ class HistoricalJudgeTest(unittest.TestCase):
         changed = copy.deepcopy(response); changed['witness'] = []
         with self.assertRaises(ValueError): audit_task(task, changed)
 
+    def test_native_structural_output_requires_auditable_input_and_witness(self):
+        task = dict(kind='FACTOR', source='(x-y)*(x+y)')
+        response = dict(status='RESULT', task=task, profile='NATIVE_BASE', solved=True, withinBudget=True,
+                        output=task['source'], normalizedInput=task['source'], witness=[])
+        self.assertTrue(audit_task(task, response)['solved'])
+        for field in ('normalizedInput', 'witness'):
+            changed = copy.deepcopy(response)
+            changed.pop(field)
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                audit_task(task, changed)
+        changed = copy.deepcopy(response); changed['witness'] = {}
+        with self.assertRaises(ValueError): audit_task(task, changed)
+
 
 class HistoricalSympyTest(unittest.TestCase):
     def test_general_procedures_form_all_three_kinds_without_targets(self):
@@ -83,20 +100,20 @@ class HistoricalSympyTest(unittest.TestCase):
         for task in tasks:
             with self.subTest(task=task):
                 response = competitor.evaluate(task)
-                self.assertTrue(audit_task(task, response)['solved'])
+                self.assertTrue(audit_task(task, dict(response, profile='SYMPY'))['solved'])
 
     def test_two_square_formation_handles_units_and_rational_scalars(self):
         for source in ['((2*a)^2+(3*b)^2)*(c^2+d^2)', '((a/3)^2+b^2)*(c^2+d^2)']:
             task = dict(kind='TWO_SQUARES', source=source)
             with self.subTest(source=source):
-                self.assertTrue(audit_task(task, competitor.evaluate(task))['solved'])
+                self.assertTrue(audit_task(task, dict(competitor.evaluate(task), profile='SYMPY'))['solved'])
 
     def test_missing_law_and_indefinite_form_remain_inconclusive(self):
         task = copy.deepcopy(RECURRENCE)
         task['recurrence'].update(linear=[['2']], offset=['0'], initial=['1'])
         for value in [task, dict(kind='TWO_SQUARES', source='(a^2+b^2)*(c^2-d^2)')]:
             with self.subTest(task=value):
-                self.assertFalse(audit_task(value, competitor.evaluate(value))['solved'])
+                self.assertFalse(audit_task(value, dict(competitor.evaluate(value), profile='SYMPY'))['solved'])
 
 
 class HistoricalRunnerTest(unittest.TestCase):
@@ -279,6 +296,52 @@ class HistoricalRunnerTest(unittest.TestCase):
                 changed = copy.deepcopy(seq); mutate(changed)
                 with self.subTest(mutation=index), self.assertRaises(ValueError):
                     self.runner.verify_snapshot(output, changed)
+
+    def test_snapshot_binding_failures_remain_inside_lifecycle_phases(self):
+        from external_polynomial_comparison.run import canonical
+        p, _ = self.fixture()
+        p.update(setupTimeoutSeconds=.3, nativeStructuralBudget=[24, 12, 1000000, 128, 2000000])
+        model_bytes = b'{}'
+        model_hash = self.runner.digest(model_bytes)
+        prelude_hash = self.runner.digest(canonical(p['prelude']))
+        saved = dict(status='SAVED', profile='NATIVE_LEARNED', generationId=model_hash,
+            snapshotHash=model_hash, preludeHash=prelude_hash, structuralBudget=p['nativeStructuralBudget'],
+            acquisitionApiWork=7, restorationApiWork=0, schemaCount=1, recurrenceCount=0,
+            recurrenceFamilyCount=0)
+        restored = dict(saved, status='RESTORED')
+        wrong_restore = dict(restored, snapshotHash='sha256:wrong')
+
+        def run(mode):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                marker = root/'producer-started'
+                script = ('import json,pathlib,sys\n'
+                    f'marker=pathlib.Path({str(marker)!r})\n'
+                    'producer=not marker.exists()\n'
+                    'if producer: marker.write_text("started")\n'
+                    'print(json.dumps({"status":"READY"}),flush=True)\n'
+                    'request=json.loads(sys.stdin.readline())\n'
+                    'if request["op"]=="initialize":\n'
+                    f' response={saved!r}\n'
+                    ' snapshot=pathlib.Path(request["directory"])/"model.json"\n'
+                    f' if {mode!r} != "missing": snapshot.write_bytes({model_bytes!r} if {mode!r} != "hash" else b\'{"x":1}\')\n'
+                    ' response["snapshot"]=str(snapshot)\n'
+                    'else:\n'
+                    f' response={wrong_restore!r} if {mode!r}=="restore" else {restored!r}\n'
+                    'print(json.dumps(response),flush=True)\n'
+                    'for line in sys.stdin: pass\n')
+                sequence = self.runner.run_sequence(p, 'NATIVE_LEARNED', 2, 0,
+                    [sys.executable, '-u', '-c', script], root)
+                return sequence
+
+        for mode, phase in [('missing', 'initialize'), ('hash', 'initialize'), ('restore', 'restore')]:
+            with self.subTest(mode=mode):
+                sequence = run(mode)
+                operation = next(op for op in sequence['operations'] if op['name'] == phase)
+                self.assertEqual('ERROR', operation['status'])
+                self.assertIn('request', operation)
+                self.assertIn('response', operation)
+                self.assertFalse(sequence['accounting']['complete'])
 
 
 if __name__ == '__main__':
