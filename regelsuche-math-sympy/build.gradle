@@ -74,6 +74,8 @@ tasks.named('test') { task ->
 }
 
 jmh {
+    // Keep the frozen measurement runtime independent of the Gradle plugin version.
+    jmhVersion = '1.36'
     resultFormat = 'JSON'
     resultsFile = layout.buildDirectory.file(
         'reports/jmh/sympy-factorization.json')

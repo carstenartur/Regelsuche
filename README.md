@@ -115,6 +115,14 @@ Weitere sichtbare Abläufe: [Pfade, Graph und Replay](docs/web-ui-user-guide.md)
 
 ## Lernen muss sich auf unbekannten Fällen auszahlen
 
+Das optionale [native Polynomprofil](docs/native-polynomial-simplification.md)
+ergänzt exakte Bruchrechnung, Normalisierung, Ausklammern und Faktorisierung im
+gemeinsamen Suchkern. Im [Vergleich vom 6. November 2026](docs/research/native-polynomial-parity-2026-11-06.md)
+erreichen beide nativen Varianten bei allen 72 unterstützten Fall-IDs mindestens
+die Ergebnisqualität des festen SymPy-Portfolios, bei drei eine kürzere Form.
+Die native Basis benötigt dabei rund 9,2 statt 2,1 Sekunden pro vollständiger
+Aufgabenfolge. Ein zusätzlicher Lernvorteil ist in diesem Vergleich nicht belegt.
+
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
 misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier

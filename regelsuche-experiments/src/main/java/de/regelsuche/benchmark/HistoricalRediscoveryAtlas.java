@@ -59,6 +59,8 @@ import java.util.function.Supplier;
  */
 public final class HistoricalRediscoveryAtlas {
     public static final String SCHEMA =
+        "regelsuche.historical-rediscovery-atlas/v2";
+    public static final String LEGACY_SCHEMA =
         "regelsuche.historical-rediscovery-atlas/v1";
 
     private final ExpressionParser parser = new ExpressionParser();
@@ -67,6 +69,7 @@ public final class HistoricalRediscoveryAtlas {
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final SymPyEquivalenceService equivalence =
         new SymPyEquivalenceService();
+    private final HistoricalRediscoveryMatch matcher = new HistoricalRediscoveryMatch();
 
     public AtlasReport run(Corpus corpus) {
         Objects.requireNonNull(corpus, "corpus");
@@ -89,6 +92,9 @@ public final class HistoricalRediscoveryAtlas {
     public WrittenArtifacts write(Path directory, AtlasReport report) {
         Objects.requireNonNull(directory, "directory");
         Objects.requireNonNull(report, "report");
+        if (!SCHEMA.equals(report.schema())) {
+            throw new IllegalArgumentException("historical atlas evaluation revision differs");
+        }
         try {
             Files.createDirectories(directory);
             Path json = directory.resolve("historical-rediscovery-atlas.json");
@@ -239,9 +245,11 @@ public final class HistoricalRediscoveryAtlas {
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
+        var oracle = benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT
+            ? new BoundedRewriteReachabilityOracle(engine, this::format, matcher::sameRepresentation)
+            : new BoundedRewriteReachabilityOracle(engine, this::format);
         BoundedRewriteReachabilityOracle.Result result =
-            new BoundedRewriteReachabilityOracle(engine, this::format)
-                .search(
+            oracle.search(
                     representation.formattedSource(),
                     representation.formattedTarget(),
                     new BoundedRewriteReachabilityOracle.Budget(
@@ -279,7 +287,7 @@ public final class HistoricalRediscoveryAtlas {
                 benchmarkCase,
                 representation.formattedSource(),
                 counting));
-        Optional<SearchState> match = findMatch(
+        Optional<SearchState> match = matcher.find(
             benchmarkCase,
             representation.formattedTarget(),
             result.states());
@@ -287,7 +295,9 @@ public final class HistoricalRediscoveryAtlas {
             "SCALAR_BEST_FIRST_TARGET_BLIND",
             match,
             result,
-            counting
+            counting,
+            matchCriterion(benchmarkCase),
+            result.status().name()
         );
     }
 
@@ -304,11 +314,23 @@ public final class HistoricalRediscoveryAtlas {
                 counting).withTarget(searchTarget(
                     benchmarkCase,
                     representation.formattedTarget())));
+        Optional<SearchState> match = Optional.ofNullable(result.reachedState())
+            .flatMap(state -> matcher.find(benchmarkCase, representation.formattedTarget(), List.of(state)));
+        String terminal = result.status().name();
+        if (result.reachedState() != null && match.isEmpty()) {
+            if (matcher.sourceAlreadyMatches(benchmarkCase, representation.formattedTarget())) {
+                terminal = "SOURCE_ALREADY_REPRESENTED";
+            } else if (benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT) {
+                terminal = "VALUE_REACHED_REPRESENTATION_MISMATCH";
+            }
+        }
         return SearchEvidence.fromGoalResult(
             "TARGET_GUIDED_BEST_FIRST_DIAGNOSTIC",
-            Optional.ofNullable(result.reachedState()),
+            match,
             result,
-            counting
+            counting,
+            matchCriterion(benchmarkCase),
+            terminal
         );
     }
 
@@ -325,12 +347,13 @@ public final class HistoricalRediscoveryAtlas {
                 counting));
         return SearchEvidence.fromStates(
             "STRUCTURAL_DIVERSITY_TARGET_BLIND",
-            findMatch(
+            matcher.find(
                 benchmarkCase,
                 representation.formattedTarget(),
                 states),
             states,
-            counting
+            counting,
+            matchCriterion(benchmarkCase)
         );
     }
 
@@ -360,32 +383,9 @@ public final class HistoricalRediscoveryAtlas {
             : SearchTarget.valueEquivalent(target);
     }
 
-    private Optional<SearchState> findMatch(
-        Case benchmarkCase,
-        String target,
-        List<SearchState> states
-    ) {
-        return states.stream()
-            .filter(state -> matches(
-                benchmarkCase,
-                state.expression(),
-                target))
-            .min(Comparator
-                .comparingInt(SearchState::depth)
-                .thenComparing(SearchState::expression)
-                .thenComparing(state ->
-                    String.join("->", state.appliedRuleIds())));
-    }
-
-    private boolean matches(Case benchmarkCase, String expression, String target) {
-        if (benchmarkCase.targetRelation() == TargetRelation.SYNTAX_EXACT) {
-            try {
-                return format(expression).equals(target);
-            } catch (IllegalArgumentException exception) {
-                return false;
-            }
-        }
-        return equivalence.areEquivalent(expression, target);
+    private static String matchCriterion(Case benchmarkCase) {
+        return benchmarkCase.targetRelation() == TargetRelation.VALUE_EQUIVALENT
+            ? HistoricalRediscoveryMatch.REPRESENTATION_CRITERION : "";
     }
 
     private TransformationEngine productionEngine(Case benchmarkCase) {
@@ -455,6 +455,9 @@ public final class HistoricalRediscoveryAtlas {
                     || anyReached(production, genericBridge, curatedControl)
                 ? PrimaryStatus.CORRECTNESS_REGRESSION
                 : PrimaryStatus.NEGATIVE_CONTROL_CONFIRMED;
+        }
+        if (matcher.sourceAlreadyMatches(benchmarkCase, benchmarkCase.target())) {
+            return PrimaryStatus.SOURCE_ALREADY_TARGET_REPRESENTATION;
         }
         if (!equivalenceEvidence.equivalent()) {
             return PrimaryStatus.EQUIVALENCE_NOT_CONFIRMED;
@@ -587,6 +590,7 @@ public final class HistoricalRediscoveryAtlas {
     }
 
     public enum PrimaryStatus {
+        SOURCE_ALREADY_TARGET_REPRESENTATION,
         REPRESENTATION_UNSUPPORTED,
         EQUIVALENCE_NOT_CONFIRMED,
         REACHABLE_AND_SCALAR_FOUND,
@@ -738,14 +742,16 @@ public final class HistoricalRediscoveryAtlas {
             String policy,
             Optional<SearchState> match,
             GoalSearchResult result,
-            CountingEngine counting
+            CountingEngine counting,
+            String detail,
+            String terminalStatus
         ) {
             SearchState state = match.orElse(null);
             return new SearchEvidence(
                 EvidenceExecution.EXECUTED,
                 policy,
                 state != null,
-                result.status().name(),
+                terminalStatus,
                 result.states().size(),
                 counting.calls(),
                 counting.generated(),
@@ -753,7 +759,7 @@ public final class HistoricalRediscoveryAtlas {
                 state == null ? List.of() : state.path(),
                 state == null ? List.of() : state.appliedRuleIds(),
                 result.metrics(),
-                ""
+                detail
             );
         }
 
@@ -761,7 +767,8 @@ public final class HistoricalRediscoveryAtlas {
             String policy,
             Optional<SearchState> match,
             List<SearchState> states,
-            CountingEngine counting
+            CountingEngine counting,
+            String detail
         ) {
             SearchState state = match.orElse(null);
             return new SearchEvidence(
@@ -776,7 +783,7 @@ public final class HistoricalRediscoveryAtlas {
                 state == null ? List.of() : state.path(),
                 state == null ? List.of() : state.appliedRuleIds(),
                 null,
-                ""
+                detail
             );
         }
 
@@ -941,7 +948,10 @@ public final class HistoricalRediscoveryAtlas {
                     .anyMatch(result ->
                         result.equivalence().equivalent());
             boolean productionPositive = results.stream()
-                .anyMatch(result -> result.production().oracle().reachable());
+                .anyMatch(result -> result.benchmarkCase().role() == Role.HISTORICAL_POSITIVE
+                    && result.production().oracle().reachable()
+                    && result.equivalence().evaluated() && result.equivalence().equivalent()
+                    && !result.production().oracle().witnessExpressions().isEmpty());
             boolean missingInventory = counts.getOrDefault(
                 PrimaryStatus
                     .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,
@@ -976,7 +986,7 @@ public final class HistoricalRediscoveryAtlas {
             List<String> reasons = new ArrayList<>();
             if (productionPositive) {
                 reasons.add(
-                    "production primitives recover at least one frozen identity");
+                    "production primitives reach a frozen positive target with separate equivalence evidence");
             }
             if (missingInventory) {
                 reasons.add(
@@ -1051,6 +1061,9 @@ public final class HistoricalRediscoveryAtlas {
         public String toMarkdown() {
             StringBuilder markdown = new StringBuilder();
             markdown.append("# Historical rediscovery and reachability atlas\n\n");
+            markdown.append("- **Evaluation schema:** `")
+                .append(schema)
+                .append("`\n");
             markdown.append("- **Corpus SHA-256:** `")
                 .append(corpusSha256)
                 .append("`\n");
@@ -1064,7 +1077,7 @@ public final class HistoricalRediscoveryAtlas {
                 .append(claimBoundary)
                 .append("\n\n");
             markdown.append(
-                "| Case | Family | Primary diagnosis | Production oracle | Scalar | Diversity | Guided |\n");
+                "| Case | Family | Primary diagnosis | Production oracle | Scalar | Diversity | Guided (target-aware) |\n");
             markdown.append("|---|---|---|---|---:|---:|---:|\n");
             for (CaseResult result : cases) {
                 markdown.append("| ")

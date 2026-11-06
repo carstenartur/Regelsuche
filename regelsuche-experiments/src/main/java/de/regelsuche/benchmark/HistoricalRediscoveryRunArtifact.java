@@ -179,7 +179,8 @@ public final class HistoricalRediscoveryRunArtifact {
         AtlasReport report,
         WrittenArtifacts writtenArtifacts
     ) {
-        if (!corpus.schema().equals(report.corpusSchema())
+        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(report.schema())
+                || !corpus.schema().equals(report.corpusSchema())
                 || !corpus.contentSha256().equals(report.corpusSha256())
                 || !corpus.inventoryRevision().equals(report.inventoryRevision())
                 || !corpus.claimBoundary().equals(report.claimBoundary())
@@ -688,7 +689,8 @@ public final class HistoricalRediscoveryRunArtifact {
             corpusSha256 = requireRawSha256(
                 corpusSha256,
                 "corpusSha256");
-            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)) {
+            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)
+                    && !HistoricalRediscoveryAtlas.LEGACY_SCHEMA.equals(atlasSchema)) {
                 throw new IllegalArgumentException(
                     "unsupported historical rediscovery atlas schema");
             }
@@ -730,6 +732,9 @@ public final class HistoricalRediscoveryRunArtifact {
             AtlasReport report,
             List<Artifact> artifacts
         ) {
+            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(report.schema())) {
+                throw new IllegalArgumentException("historical atlas evaluation revision differs");
+            }
             List<Artifact> normalized = normalizeArtifacts(artifacts);
             String decision = report.assessment().decision().name();
             String hash = manifestHash(

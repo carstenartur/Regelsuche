@@ -1,0 +1,87 @@
+{
+  "schema": "regelsuche.native-polynomial-observation-summary/v1",
+  "observationDate": "2026-11-06",
+  "protocolSha256": "c35902e09c4c6e0b49e7b1c5257bf5f696ca867ae8c6a1880a071f29ad758f3e",
+  "measuredLocalCommit": "972beee2e1af329e3ca91f2067714a6bb2b30cf9",
+  "publishedContentIdenticalCommit": "5eb2aea3147854e9859adc4cbd3c2f7427579985",
+  "sourceTreeHash": "git:dc0aa3960f8e8c836b754cae72d4f8c5c8cd31e8",
+  "runtimeBytesHash": "sha256:bd78e256db76b855b8fc07c24f47793cfcf6cc512ecaf569c21708adf3a65e9f",
+  "archive": {
+    "name": "Regelsuche-Native-Polynomvergleich-2026-11-06.zip",
+    "bytes": 15417091,
+    "sha256": "0bb6d2bdaf71899507cd66d56c8093515ce8c85fa204d112cc888af30b3bb106"
+  },
+  "repetitions": 3,
+  "supportedCaseIds": 72,
+  "distinctSupportedInputStrings": 70,
+  "unsupportedControlsPerRepetition": 3,
+  "retainedRows": 675,
+  "quality": {
+    "NATIVE_BASE": {
+      "allRepeatedRows": {
+        "accepted": true,
+        "better": 9,
+        "incomplete": 0,
+        "tie": 207,
+        "unsupported": 9,
+        "worse": 0
+      },
+      "perRepetitionByCohort": {
+        "HISTORICAL": {
+          "TIE": 23,
+          "BETTER": 1,
+          "UNSUPPORTED": 3
+        },
+        "WITHHELD_PUBLIC_VARIANT": {
+          "TIE": 46,
+          "BETTER": 2
+        }
+      }
+    },
+    "NATIVE_LEARNED": {
+      "allRepeatedRows": {
+        "accepted": true,
+        "better": 9,
+        "incomplete": 0,
+        "tie": 207,
+        "unsupported": 9,
+        "worse": 0
+      },
+      "perRepetitionByCohort": {
+        "HISTORICAL": {
+          "TIE": 23,
+          "BETTER": 1,
+          "UNSUPPORTED": 3
+        },
+        "WITHHELD_PUBLIC_VARIANT": {
+          "TIE": 46,
+          "BETTER": 2
+        }
+      }
+    }
+  },
+  "medianSequenceResources": {
+    "NATIVE_BASE": {
+      "wallSeconds": 9.20060528,
+      "workerCpuSeconds": 23.293949,
+      "controllerCpuSeconds": 0.558905598,
+      "combinedCpuSeconds": 23.844794126,
+      "workerPeakRssMiB": 269.65234375
+    },
+    "NATIVE_LEARNED": {
+      "wallSeconds": 11.228419582,
+      "workerCpuSeconds": 28.818226,
+      "controllerCpuSeconds": 0.945149297,
+      "combinedCpuSeconds": 29.746273327,
+      "workerPeakRssMiB": 277.66796875
+    },
+    "SYMPY_PORTFOLIO": {
+      "wallSeconds": 2.062539853,
+      "workerCpuSeconds": 1.914896,
+      "controllerCpuSeconds": 0.056862786,
+      "combinedCpuSeconds": 1.974111434,
+      "workerPeakRssMiB": 111.30078125
+    }
+  },
+  "scope": "PUBLIC_DEVELOPMENT;KNOWN_FAMILY_VARIANTS;NO_GENERAL_CAS_OR_SPEED_OR_LEARNING_BENEFIT_CLAIM"
+}

@@ -534,6 +534,7 @@ final class BoundedExactMonomial implements RetainedGraph.View {
         private static final int MAX_COEFFICIENT_BITS = 4_096;
         private int remaining = MAX_VISITS;
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+        long workUsed() { return (long) MAX_VISITS - remaining; }
 
         private void visit(int depth) {
             if (depth > MAX_DEPTH || remaining-- <= 0) {

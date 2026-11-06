@@ -225,6 +225,7 @@ public interface DiscoveryExperimentRunner {
         static final String ORACLE_BUDGET_INCONCLUSIVE =
             "ORACLE_BUDGET_INCONCLUSIVE";
         static final String SCALAR_ALREADY_FOUND = "SCALAR_ALREADY_FOUND";
+        static final String SOURCE_ALREADY_REPRESENTED = "SOURCE_ALREADY_REPRESENTED";
         static final String WITNESS_PREFIX_LOST = "WITNESS_PREFIX_LOST";
         static final String WITNESS_COMPLETELY_EXPLORED =
             "WITNESS_COMPLETELY_EXPLORED";
@@ -257,6 +258,7 @@ public interface DiscoveryExperimentRunner {
             ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS,
             ORACLE_BUDGET_INCONCLUSIVE,
             SCALAR_ALREADY_FOUND,
+            SOURCE_ALREADY_REPRESENTED,
             WITNESS_PREFIX_LOST,
             WITNESS_COMPLETELY_EXPLORED,
             CORRECTNESS_REGRESSION_WITNESS);
@@ -365,6 +367,12 @@ public interface DiscoveryExperimentRunner {
                     scalar.engineCalls(),
                     scalar.generatedTransformations(),
                     "production oracle reached a target declared non-equivalent");
+            }
+            if (oracle.witnessExpressions().isEmpty()) {
+                return CaseDiagnostic.withoutLoss(
+                    benchmarkCase.id(), SOURCE_ALREADY_REPRESENTED, oracle.status(), 0, 0,
+                    "NOT_EVALUATED", scalar.exploredStates(), scalar.engineCalls(),
+                    scalar.generatedTransformations(), "the source already satisfies the target relation");
             }
             if (scalar.reached()) {
                 return CaseDiagnostic.withoutLoss(
@@ -776,7 +784,8 @@ public interface DiscoveryExperimentRunner {
                 atlas.inventoryRevision(),
                 atlas.claimBoundary(),
                 atlas.cases().size());
-            if (!corpusBinding.equals(atlasBinding)) {
+            if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlas.schema())
+                    || !corpusBinding.equals(atlasBinding)) {
                 throw new IllegalArgumentException(
                     "witness-pruning diagnostic requires the matching atlas");
             }

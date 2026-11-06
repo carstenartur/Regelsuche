@@ -2,6 +2,10 @@ package de.regelsuche.math.algorithms.equivalence;
 
 import org.junit.jupiter.api.Test;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
 
 /** Real-kernel tests; main runs the same assertions without a separate contract class. */
@@ -45,10 +49,122 @@ public final class AlgebraicConstructionTest {
         require(!candidates.results().isEmpty() && candidates.results().size() <= 8, "source-only finite auxiliary generation");
         require(candidates.work() > 0 && candidates.results().stream().allMatch(r -> r.work() > 0), "all attempts are paid");
     }
+
+    @Test
+    public void explorationFindsCrossTermsFromCompositeSquareBasesWithinSmallAttemptLimit() {
+        assertAuxiliarySelected("x^2+y^2", "2*x*y");
+        assertAuxiliarySelected("(3*x)^2+(y+1)^2", "2*(3*x)*(y+1)");
+    }
+
+    @Test
+    public void explorationFindsAnExactPowerFactorInsideAProduct() {
+        String source = "12*x^4";
+        var results = construction.explorePolynomial(AlgebraicConstruction.Operation.EXACT_FACTOR_SPLIT,
+            source, List.of(), 4, 100_000);
+        var exact = new ExactPolynomialAnalysis();
+        var parser = new ExpressionParser();
+        boolean found = results.results().stream().filter(AlgebraicConstruction.Result::generated)
+            .map(result -> result.expression().orElseThrow())
+            .filter(candidate -> {
+                exact.requireEquivalent(source, candidate);
+                return true;
+            })
+            .map(candidate -> parser.parseExactTerm(candidate).expression())
+            .filter(BinaryExpr.class::isInstance).map(BinaryExpr.class::cast)
+            .filter(root -> root.operator() == BinaryOperator.MUL)
+            .anyMatch(root -> exact.normalForm(ExpressionFormatter.format(root.left())).equals(exact.normalForm("x^2")));
+        require(found, "a bounded scan should propose a proper split of an internal power");
+        var commonFactor = construction.explorePolynomial(AlgebraicConstruction.Operation.EXACT_FACTOR_SPLIT,
+            "x+x*y", List.of(), 4, 100_000);
+        require(commonFactor.results().stream().filter(AlgebraicConstruction.Result::generated)
+            .map(result -> parser.parseExactTerm(result.expression().orElseThrow()).expression())
+            .filter(BinaryExpr.class::isInstance).map(BinaryExpr.class::cast)
+            .filter(root -> root.operator() == BinaryOperator.MUL)
+            .anyMatch(root -> exact.normalForm(ExpressionFormatter.format(root.left())).equals(exact.normalForm("x"))
+                && exact.normalForm(ExpressionFormatter.format(root.right())).equals(exact.normalForm("1+y"))),
+            "nonconstant source fragments remain eligible as common factors");
+    }
+
+    @Test
+    public void polynomialFactorExplorationRejectsAlgebraicallyConstantAuxiliaries() {
+        var operation = AlgebraicConstruction.Operation.EXACT_FACTOR_SPLIT;
+        for (String source : List.of("u+(2-2+1)", "u+(v-v+1)")) {
+            var neutralFragment = construction.explorePolynomial(operation, source, List.of(), 8, 100_000);
+            require(neutralFragment.results().stream().noneMatch(AlgebraicConstruction.Result::generated),
+                "a compound constant must not insert a neutral factor: " + source);
+        }
+        var powerBase = construction.explorePolynomial(operation, "u*(2-2+1)^4", List.of(), 8, 100_000);
+        var parser = new ExpressionParser();
+        var exact = new ExactPolynomialAnalysis();
+        require(powerBase.results().stream().anyMatch(AlgebraicConstruction.Result::generated),
+            "a nonconstant source factor remains eligible");
+        boolean onlyNonconstantFactors = powerBase.results().stream().filter(AlgebraicConstruction.Result::generated)
+            .map(result -> (BinaryExpr) parser.parseExactTerm(result.expression().orElseThrow()).expression())
+            .allMatch(root -> exact.normalForm(ExpressionFormatter.format(root.left())).totalDegree() > 0);
+        require(onlyNonconstantFactors, "powers of compound constants must not become factor candidates");
+    }
+
+    @Test
+    public void legacyExplorationKeepsSourceFragmentsForConditionalFactorTransfer() {
+        var results = construction.explore(AlgebraicConstruction.Operation.FACTOR_TRANSFER,
+            "x^2*y^2", List.of("y != 0"), 4, 100_000);
+        var parser = new ExpressionParser();
+        var exact = new ExactPolynomialAnalysis();
+        boolean found = results.results().stream().filter(AlgebraicConstruction.Result::generated)
+            .map(result -> parser.parseExactTerm(result.expression().orElseThrow()).expression())
+            .filter(BinaryExpr.class::isInstance).map(BinaryExpr.class::cast)
+            .filter(root -> root.operator() == BinaryOperator.MUL && root.right() instanceof BinaryExpr)
+            .map(root -> (BinaryExpr) root.right())
+            .filter(division -> division.operator() == BinaryOperator.DIV)
+            .anyMatch(division -> exact.normalForm(ExpressionFormatter.format(division.right())).equals(exact.normalForm("y^2")));
+        require(found, "legacy source-first exploration must still consider the y^2 factor");
+    }
+
+    @Test
+    public void polynomialExplorationChargesExpansionsBeforeCancellation() {
+        String source = "(x+y+z+w)^10-(x+y+z+w)^10+x^2+y^2";
+        var limited = construction.explorePolynomial(AlgebraicConstruction.Operation.ADDITIVE_COMPLEMENT,
+            source, List.of(), 4, 1_000);
+        require(limited.results().stream().noneMatch(AlgebraicConstruction.Result::generated),
+            "work spent expanding cancelled terms cannot authorize an over-budget candidate");
+        require(limited.work() > 1_000, "the atomic projection overrun remains visible");
+        boolean rejected = false;
+        try {
+            construction.explorePolynomial(AlgebraicConstruction.Operation.FACTOR_TRANSFER,
+                "x*y", List.of("y != 0"), 4, 100_000);
+        } catch (IllegalArgumentException expected) { rejected = true; }
+        require(rejected, "the polynomial exploration path cannot bypass rational-domain checks");
+    }
+
+    private void assertAuxiliarySelected(String source, String expectedAuxiliary) {
+        var results = construction.explorePolynomial(AlgebraicConstruction.Operation.ADDITIVE_COMPLEMENT,
+            source, List.of(), 4, 100_000);
+        var exact = new ExactPolynomialAnalysis();
+        var parser = new ExpressionParser();
+        var expected = exact.normalForm(expectedAuxiliary);
+        boolean selected = false;
+        for (var result : results.results()) {
+            if (!result.generated()) continue;
+            String candidate = result.expression().orElseThrow();
+            exact.requireEquivalent(source, candidate);
+            var root = parser.parseExactTerm(candidate).expression();
+            if (root instanceof BinaryExpr binary && binary.operator() == BinaryOperator.SUB
+                    && exact.normalForm(ExpressionFormatter.format(binary.right())).equals(expected)) {
+                selected = true;
+            }
+        }
+        require(results.results().size() <= 4 && results.work() > 0, "bounded exploration reports its work");
+        require(selected, "source-derived cross term should not be crowded out by source fragments: " + source);
+    }
     public static void require(boolean value, String message) { if (!value) throw new AssertionError(message); }
     public static void main(String[] args) {
         var c = new AlgebraicConstructionTest();
         c.exactAdditiveAndMultiplicativeSplits(); c.multiplicativeDomainIsPreserved(); c.enumerationAndFailuresAreBoundedAndPaid();
+        c.explorationFindsCrossTermsFromCompositeSquareBasesWithinSmallAttemptLimit();
+        c.explorationFindsAnExactPowerFactorInsideAProduct();
+        c.polynomialFactorExplorationRejectsAlgebraicallyConstantAuxiliaries();
+        c.legacyExplorationKeepsSourceFragmentsForConditionalFactorTransfer();
+        c.polynomialExplorationChargesExpansionsBeforeCancellation();
         System.out.println("PASS additive/product constructions, zero/domain guards and paid limits");
     }
 }

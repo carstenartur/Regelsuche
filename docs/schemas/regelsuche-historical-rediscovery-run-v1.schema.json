@@ -31,7 +31,7 @@
       "$ref": "#/$defs/rawSha256"
     },
     "atlasSchema": {
-      "const": "regelsuche.historical-rediscovery-atlas/v1"
+      "enum": ["regelsuche.historical-rediscovery-atlas/v1", "regelsuche.historical-rediscovery-atlas/v2"]
     },
     "inventoryRevision": {
       "$ref": "#/$defs/text"
