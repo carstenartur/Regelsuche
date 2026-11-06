@@ -101,47 +101,68 @@ final class StructuralExpansionRules {
     }
 
     static &lt;T&gt; Observation&lt;T&gt; observe(Supplier&lt;T&gt; operation) {
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (RetainedOperation.isObserved())</span>
-<span class="fc" id="L105">            throw new IllegalStateException(&quot;nested retained-operation accounting is not supported&quot;);</span>
-<span class="fc" id="L106">        var meter = new Meter();</span>
-<span class="fc" id="L107">        try (var scope = RetainedOperation.open(meter)) {</span>
-<span class="fc" id="L108">            return new Observation&lt;&gt;(operation.get(), meter);</span>
-<span class="fc" id="L109">        } catch (RuntimeException failure) {</span>
-<span class="fc" id="L110">            throw new CheckedSchemaTaskSolver.ProviderFailure(meter.total(), failure);</span>
+<span class="fc" id="L104">        return observe(operation, Long.MAX_VALUE);</span>
+    }
+
+    static &lt;T&gt; Observation&lt;T&gt; observe(Supplier&lt;T&gt; operation, long maximumWork) {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (maximumWork &lt; 0) throw new IllegalArgumentException(&quot;negative observation work limit&quot;);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (RetainedOperation.isObserved())</span>
+<span class="fc" id="L110">            throw new IllegalStateException(&quot;nested retained-operation accounting is not supported&quot;);</span>
+<span class="fc" id="L111">        var meter = new Meter(maximumWork);</span>
+<span class="fc" id="L112">        try (var scope = RetainedOperation.open(meter)) {</span>
+<span class="fc" id="L113">            return new Observation&lt;&gt;(operation.get(), meter, false);</span>
+<span class="fc" id="L114">        } catch (ProcedureWorkLimitExceeded exhausted) {</span>
+<span class="fc" id="L115">            return new Observation&lt;&gt;(null, meter, true);</span>
+<span class="fc" id="L116">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L117">            throw new CheckedSchemaTaskSolver.ProviderFailure(meter.total(), failure);</span>
         }
     }
 
     /** Carries the mutable meter until the observation scope has charged its close. */
-<span class="fc" id="L115">    record Observation&lt;T&gt;(T value, Meter meter) {</span>
-<span class="fc" id="L116">        long work() { return meter.total(); }</span>
+<span class="fc" id="L122">    record Observation&lt;T&gt;(T value, Meter meter, boolean exhausted) {</span>
+<span class="fc" id="L123">        long work() { return meter.total(); }</span>
     }
 
     private static final class Meter implements RetainedOperation.Sink {
+        private final long maximumWork;
         private long total;
-<span class="fc" id="L121">        @Override public void executionWork(long units) { add(units); }</span>
-<span class="fc" id="L122">        @Override public void validationWork(long units) { add(units); }</span>
-<span class="fc" id="L123">        @Override public void checkpoint() { }</span>
-<span class="nc" id="L124">        @Override public long observedWork() { return total; }</span>
-<span class="nc" id="L125">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
-<span class="fc" id="L126">        long total() { return total; }</span>
+        private boolean limitSignalled;
+<span class="fc" id="L130">        private Meter(long maximumWork) { this.maximumWork = maximumWork; }</span>
+<span class="fc" id="L131">        @Override public void executionWork(long units) { add(units); }</span>
+<span class="fc" id="L132">        @Override public void validationWork(long units) { add(units); }</span>
+<span class="fc" id="L133">        @Override public void checkpoint() { checkLimit(); }</span>
+<span class="nc" id="L134">        @Override public long observedWork() { return total; }</span>
+<span class="nc" id="L135">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
+<span class="fc" id="L136">        long total() { return total; }</span>
         private void add(long units) {
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative observed work&quot;);</span>
-<span class="fc" id="L129">            total = Math.addExact(total, units);</span>
-<span class="fc" id="L130">        }</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative observed work&quot;);</span>
+<span class="fc" id="L139">            total = Math.addExact(total, units);</span>
+<span class="fc" id="L140">            checkLimit();</span>
+<span class="fc" id="L141">        }</span>
+        private void checkLimit() {
+<span class="fc bfc" id="L143" title="All 4 branches covered.">            if (total &gt; maximumWork &amp;&amp; !limitSignalled) {</span>
+<span class="fc" id="L144">                limitSignalled = true;</span>
+<span class="fc" id="L145">                throw new ProcedureWorkLimitExceeded();</span>
+            }
+<span class="fc" id="L147">        }</span>
+    }
+
+    private static final class ProcedureWorkLimitExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
     }
 
     /** A private namespace keeps external inventory identifiers from granting authority to another rule. */
-<span class="fc" id="L134">    private record Alias(RewriteRule delegate) implements RewriteRule {</span>
-<span class="fc" id="L135">        @Override public String id() { return REVISION + delegate.id(); }</span>
-<span class="fc" id="L136">        @Override public RewriteKind kind() { return delegate.kind(); }</span>
-<span class="fc" id="L137">        @Override public boolean mayIncreaseComplexity() { return delegate.mayIncreaseComplexity(); }</span>
-<span class="fc" id="L138">        @Override public int estimatedCostDelta() { return delegate.estimatedCostDelta(); }</span>
-<span class="fc" id="L139">        @Override public boolean isEquivalencePreservingByConstruction() { return delegate.isEquivalencePreservingByConstruction(); }</span>
-<span class="fc" id="L140">        @Override public boolean matches(Expr subtree) { return delegate.matches(subtree); }</span>
-<span class="fc" id="L141">        @Override public Expr apply(Expr subtree) { return delegate.apply(subtree); }</span>
-<span class="fc" id="L142">        @Override public List&lt;Assumption&gt; assumptions(Expr subtree) { return delegate.assumptions(subtree); }</span>
-<span class="nc" id="L143">        @Override public boolean mayEmitAssumptions() { return delegate.mayEmitAssumptions(); }</span>
-<span class="fc" id="L144">        @Override public RuleDescriptor descriptor() { return delegate.descriptor(); }</span>
+<span class="fc" id="L155">    private record Alias(RewriteRule delegate) implements RewriteRule {</span>
+<span class="fc" id="L156">        @Override public String id() { return REVISION + delegate.id(); }</span>
+<span class="fc" id="L157">        @Override public RewriteKind kind() { return delegate.kind(); }</span>
+<span class="fc" id="L158">        @Override public boolean mayIncreaseComplexity() { return delegate.mayIncreaseComplexity(); }</span>
+<span class="fc" id="L159">        @Override public int estimatedCostDelta() { return delegate.estimatedCostDelta(); }</span>
+<span class="fc" id="L160">        @Override public boolean isEquivalencePreservingByConstruction() { return delegate.isEquivalencePreservingByConstruction(); }</span>
+<span class="fc" id="L161">        @Override public boolean matches(Expr subtree) { return delegate.matches(subtree); }</span>
+<span class="fc" id="L162">        @Override public Expr apply(Expr subtree) { return delegate.apply(subtree); }</span>
+<span class="fc" id="L163">        @Override public List&lt;Assumption&gt; assumptions(Expr subtree) { return delegate.assumptions(subtree); }</span>
+<span class="nc" id="L164">        @Override public boolean mayEmitAssumptions() { return delegate.mayEmitAssumptions(); }</span>
+<span class="fc" id="L165">        @Override public RuleDescriptor descriptor() { return delegate.descriptor(); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

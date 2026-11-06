@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSimplificationPrograms.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">PolynomialSimplificationPrograms.java</span></div><h1>PolynomialSimplificationPrograms.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.canonical.PolynomialNormalizer;
+import de.regelsuche.math.algorithms.polynomial.NativeUnivariateFactorizationEngine;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.ExactFactorizationTransformationPipeline;
+import de.regelsuche.polynomial.ExactFactorizationExpressionRenderer;
+import de.regelsuche.polynomial.ExactParsedFactorizationPipeline;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.retention.RetainedOperation;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.LongConsumer;
+
+/** General native algebra proposals; candidate selection belongs to the existing frontier. */
+final class PolynomialSimplificationPrograms {
+    private PolynomialSimplificationPrograms() { }
+
+    static List&lt;String&gt; generate(StructuralConstructionPrograms.Operation operation, Expr source, long maximumWork,
+            LongConsumer work) {
+<span class="fc" id="L30">        var accounting = new ProcedureWork(maximumWork, work);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR) {</span>
+<span class="fc" id="L32">            var results = new LinkedHashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L33">            subtrees(source, subtree -&gt; factor(subtree, accounting), results, accounting);</span>
+<span class="fc" id="L34">            return render(results, accounting);</span>
+        }
+<span class="fc" id="L36">        var measured = StructuralExpansionRules.observe(() -&gt; {</span>
+<span class="fc" id="L37">            var results = new LinkedHashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L38">            var canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L39">            Expr canonical = canonicalizer.canonicalize(source);</span>
+<span class="pc bpc" id="L40" title="1 of 4 branches missed.">            switch (operation) {</span>
+<span class="fc" id="L41">                case POLYNOMIAL_CANONICAL -&gt; results.add(compact(canonical));</span>
+                case POLYNOMIAL_EXPANDED -&gt; {
+                    // Canonicalization first resolves exact constant denominators into rational leaves.
+<span class="fc" id="L44">                    var normal = new PolynomialNormalizer().normalize(canonical);</span>
+<span class="fc" id="L45">                    normal.ifPresent(value -&gt; results.add(compact(canonicalizer.canonicalize(value))));</span>
+<span class="fc" id="L46">                }</span>
+<span class="fc" id="L47">                case POLYNOMIAL_COMMON_FACTOR -&gt; subtrees(canonical, PolynomialFactorGrouping::candidates, results, RetainedOperation::work);</span>
+<span class="nc" id="L48">                default -&gt; throw new IllegalArgumentException(&quot;not a polynomial simplification operation&quot;);</span>
+            }
+<span class="fc" id="L50">            return results;</span>
+<span class="fc" id="L51">        }, accounting.remaining());</span>
+<span class="fc" id="L52">        accounting.accept(measured.work());</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (measured.exhausted()) return List.of();</span>
+<span class="fc" id="L54">        return render(measured.value(), accounting);</span>
+    }
+
+    private static List&lt;String&gt; render(Iterable&lt;Expr&gt; candidates, ProcedureWork work) {
+<span class="fc" id="L58">        var observed = StructuralExpansionRules.observe(() -&gt; {</span>
+<span class="fc" id="L59">            var output = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            for (Expr candidate : candidates) output.add(ExpressionFormatter.format(compact(candidate)));</span>
+<span class="fc" id="L61">            return List.copyOf(output);</span>
+<span class="fc" id="L62">        }, work.remaining());</span>
+<span class="fc" id="L63">        work.accept(observed.work());</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (observed.exhausted()) return List.of();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (String output : observed.value()) work.accept(output.length());</span>
+<span class="fc" id="L66">        return observed.value();</span>
+    }
+
+    private static void subtrees(Expr source, Function&lt;Expr, List&lt;Expr&gt;&gt; procedure, LinkedHashSet&lt;Expr&gt; output, LongConsumer work) {
+<span class="fc" id="L70">        work.accept(1);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var candidate : procedure.apply(source)) {</span>
+<span class="fc" id="L72">            work.accept(1);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (!candidate.equals(source)) output.add(candidate);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (output.size() &gt;= 16) return;</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!(source instanceof BinaryExpr binary)) return;</span>
+<span class="fc" id="L77">        var left = new LinkedHashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L78">        subtrees(binary.left(), procedure, left, work);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Expr candidate : left) {</span>
+<span class="fc" id="L80">            work.accept(1);</span>
+<span class="fc" id="L81">            output.add(new BinaryExpr(candidate, binary.operator(), binary.right()));</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (output.size() &gt;= 16) return;</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        var right = new LinkedHashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L85">        subtrees(binary.right(), procedure, right, work);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (Expr candidate : right) {</span>
+<span class="fc" id="L87">            work.accept(1);</span>
+<span class="fc" id="L88">            output.add(new BinaryExpr(binary.left(), binary.operator(), candidate));</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (output.size() &gt;= 16) return;</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">    }</span>
+
+    private static List&lt;Expr&gt; factor(Expr source, ProcedureWork work) {
+<span class="fc" id="L94">        work.accept(1);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!(source instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L96" title="All 4 branches covered.">                || binary.operator() != BinaryOperator.ADD &amp;&amp; binary.operator() != BinaryOperator.SUB) return List.of();</span>
+<span class="fc" id="L97">        var formatted = StructuralExpansionRules.observe(() -&gt; ExpressionFormatter.format(source), work.remaining());</span>
+<span class="fc" id="L98">        work.accept(formatted.work());</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (formatted.exhausted()) return List.of();</span>
+<span class="fc" id="L100">        String text = formatted.value();</span>
+<span class="fc" id="L101">        work.accept(text.length());</span>
+<span class="fc" id="L102">        var parsed = new ExpressionParser().parseExactTerm(text);</span>
+<span class="fc" id="L103">        var view = new ExactParsedUnivariatePolynomialView(new ExactParsedUnivariatePolynomialView.Budget(16, 256, 512, 10_000));</span>
+<span class="fc" id="L104">        var policy = new ExactParsedFactorizationPipeline.Policy(new FactorizationRequest.StructuralLimits(1, 16, 64, 256),</span>
+            64, 75_000, FactorizationRequest.EvidenceRequirement.VERIFIED_DECOMPOSITION);
+<span class="fc" id="L106">        var factored = new ExactParsedFactorizationPipeline(view, policy)</span>
+<span class="fc" id="L107">            .factor(parsed, NativeUnivariateFactorizationEngine.boundedRationals());</span>
+<span class="fc bfc" id="L108" title="All 4 branches covered.">        if (!factored.executed() || !factored.report().orElseThrow().successful()) {</span>
+<span class="fc" id="L109">            work.accept(factored.totalWork().totalWorkUnits());</span>
+<span class="fc" id="L110">            return List.of();</span>
+        }
+<span class="fc" id="L112">        var renderer = new ExactFactorizationExpressionRenderer(new ExactFactorizationExpressionRenderer.Policy(</span>
+            16, 64, 16, 256, 4096, 20_000));
+<span class="fc" id="L114">        var transformed = new ExactFactorizationTransformationPipeline(renderer, new ExpressionParser(), view)</span>
+<span class="fc" id="L115">            .transformRoot(parsed, factored);</span>
+<span class="fc" id="L116">        work.accept(transformed.totalWork().totalWorkUnits());</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (!transformed.transformed()) return List.of();</span>
+<span class="fc" id="L118">        String result = transformed.transformedExpression().orElseThrow();</span>
+<span class="fc" id="L119">        work.accept(result.length());</span>
+<span class="fc" id="L120">        return List.of(new ExpressionParser().parseExactTerm(result).expression());</span>
+    }
+
+    /** Shorter exact scalar placement, without creating any variable denominator. */
+    private static Expr compact(Expr expression) {
+<span class="fc" id="L125">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) return expression;</span>
+<span class="fc" id="L127">        Expr left = compact(binary.left()), right = compact(binary.right());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">            if (left instanceof NumberExpr number &amp;&amp; !number.value().isInteger()) return rationalProduct(number, right);</span>
+<span class="pc bpc" id="L130" title="3 of 4 branches missed.">            if (right instanceof NumberExpr number &amp;&amp; !number.value().isInteger()) return rationalProduct(number, left);</span>
+        }
+<span class="fc bfc" id="L132" title="All 4 branches covered.">        if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB) {</span>
+<span class="fc" id="L133">            var positive = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L134">            var negative = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L135">            signedTerms(new BinaryExpr(left, binary.operator(), right), false, positive, negative);</span>
+<span class="fc" id="L136">            Expr result = null;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (Expr term : positive) {</span>
+<span class="fc" id="L138">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                result = result == null ? term : new BinaryExpr(result, BinaryOperator.ADD, term);</span>
+<span class="fc" id="L140">            }</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (result == null) result = new NumberExpr(0);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (Expr term : negative) {</span>
+<span class="fc" id="L143">                RetainedOperation.work(1);</span>
+<span class="fc" id="L144">                result = new BinaryExpr(result, BinaryOperator.SUB, term);</span>
+<span class="fc" id="L145">            }</span>
+<span class="fc" id="L146">            return result;</span>
+        }
+<span class="fc bfc" id="L148" title="All 4 branches covered.">        return left == binary.left() &amp;&amp; right == binary.right() ? expression : new BinaryExpr(left, binary.operator(), right);</span>
+    }
+
+    private static void signedTerms(Expr expression, boolean negate, List&lt;Expr&gt; positive, List&lt;Expr&gt; negative) {
+<span class="fc" id="L152">        RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L153" title="All 6 branches covered.">        if (expression instanceof BinaryExpr binary &amp;&amp; (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB)) {</span>
+<span class="fc" id="L154">            signedTerms(binary.left(), negate, positive, negative);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            signedTerms(binary.right(), negate ^ binary.operator() == BinaryOperator.SUB, positive, negative);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        } else if (expression instanceof NumberExpr number) {</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (!number.value().isZero()) {</span>
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">                (negate ^ number.value().signum() &lt; 0 ? negative : positive).add(new NumberExpr(number.value().abs()));</span>
+            }
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        } else (negate ? negative : positive).add(expression);</span>
+<span class="fc" id="L161">    }</span>
+
+    private static Expr rationalProduct(NumberExpr number, Expr term) {
+<span class="fc" id="L164">        var value = number.value();</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        Expr numerator = value.numerator().equals(java.math.BigInteger.ONE) ? term</span>
+<span class="pc" id="L166">            : new BinaryExpr(new NumberExpr(de.regelsuche.scalar.ExactRational.integer(value.numerator())), BinaryOperator.MUL, term);</span>
+<span class="fc" id="L167">        return new BinaryExpr(numerator, BinaryOperator.DIV,</span>
+<span class="fc" id="L168">            new NumberExpr(de.regelsuche.scalar.ExactRational.integer(value.denominator())));</span>
+    }
+
+    private static final class ProcedureWork implements LongConsumer {
+        private final long maximumWork;
+        private final LongConsumer delegate;
+        private long consumed;
+<span class="fc" id="L175">        private ProcedureWork(long maximumWork, LongConsumer delegate) {</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (maximumWork &lt; 0) throw new IllegalArgumentException(&quot;negative procedure work limit&quot;);</span>
+<span class="fc" id="L177">            this.maximumWork = maximumWork;</span>
+<span class="fc" id="L178">            this.delegate = delegate;</span>
+<span class="fc" id="L179">        }</span>
+        @Override public void accept(long units) {
+<span class="fc" id="L181">            delegate.accept(units);</span>
+<span class="fc" id="L182">            consumed = Math.addExact(consumed, units);</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        private long remaining() { return maximumWork - consumed; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

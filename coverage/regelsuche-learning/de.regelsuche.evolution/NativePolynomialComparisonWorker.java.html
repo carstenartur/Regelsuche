@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NativePolynomialComparisonWorker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">NativePolynomialComparisonWorker.java</span></div><h1>NativePolynomialComparisonWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Thin source-only adapter. A learned producer must exit before a fresh consumer restores its snapshot. */
+<span class="fc" id="L19">public final class NativePolynomialComparisonWorker {</span>
+<span class="fc" id="L20">    private static final TaskConstructionProfile CAPABILITIES = TaskConstructionProfile.POLYNOMIAL_SIMPLIFICATION_V1;</span>
+<span class="fc" id="L21">    private static final Map&lt;String, Integer&gt; SETTINGS = Map.of(&quot;workBudget&quot;, 1_000_000, &quot;maxTheoryWork&quot;, 1_000_000,</span>
+<span class="fc" id="L22">        &quot;primitiveDepth&quot;, 8, &quot;searchDepth&quot;, 8, &quot;maxStates&quot;, 32, &quot;complexityDebt&quot;, 64);</span>
+<span class="fc" id="L23">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L24">    private final Set&lt;String&gt; excluded = new HashSet&lt;&gt;();</span>
+    private String profile;
+    private String frozen;
+    private CheckedSchemaTaskSolver solver;
+
+    public Map&lt;String, Object&gt; initialize(String requested) {
+<span class="fc" id="L30">        requireFresh(requested);</span>
+<span class="fc" id="L31">        long start = System.nanoTime(), cpu = cpu();</span>
+<span class="fc" id="L32">        var genome = TraceStrategyTransferExample.inventory();</span>
+<span class="fc" id="L33">        var inventory = TypedLearnedMoveInventory.primitives(genome);</span>
+<span class="fc" id="L34">        CheckedLearnedSchemaModel model = null;</span>
+<span class="fc" id="L35">        long training = 0;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (requested.equals(&quot;NATIVE_LEARNED&quot;)) {</span>
+<span class="fc" id="L37">            var formation = new TraceRewriteStrategyLearner().learn(genome,</span>
+<span class="fc" id="L38">                TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());</span>
+<span class="fc" id="L39">            model = formation.typedMoves().checkedSchemas();</span>
+<span class="fc" id="L40">            training = Math.addExact(formation.typedMoves().formationWork(), model.formationWork());</span>
+<span class="fc" id="L41">        } else solver = inventory.newTaskSolverWithProfile(CAPABILITIES);</span>
+<span class="fc" id="L42">        profile = requested;</span>
+<span class="fc" id="L43">        var snapshot = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L44">        snapshot.put(&quot;schema&quot;, &quot;regelsuche.native-polynomial-snapshot/v1&quot;);</span>
+<span class="fc" id="L45">        snapshot.put(&quot;profile&quot;, profile); snapshot.put(&quot;capabilityProfile&quot;, CAPABILITIES.name());</span>
+<span class="fc" id="L46">        snapshot.put(&quot;inventoryHash&quot;, genome.contentHash()); snapshot.put(&quot;settings&quot;, SETTINGS);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        snapshot.put(&quot;schemas&quot;, model == null ? &quot;&quot; : model.toCanonicalJson());</span>
+<span class="fc" id="L48">        frozen = LearnedSchedulingArtifacts.json(snapshot);</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        return setup(model == null ? &quot;INITIALIZED&quot; : &quot;ACQUIRED&quot;, training, 0, model == null ? 0 : model.schemas().size(), start, cpu);</span>
+    }
+
+    public Map&lt;String, Object&gt; restore(String requested, String snapshot) {
+<span class="fc" id="L53">        requireFresh(requested);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!requested.equals(&quot;NATIVE_LEARNED&quot;)) throw new IllegalArgumentException(&quot;only the learned profile restores knowledge&quot;);</span>
+<span class="fc" id="L55">        long start = System.nanoTime(), cpu = cpu();</span>
+<span class="fc" id="L56">        var value = CheckedSchemaSupport.read(snapshot);</span>
+<span class="fc" id="L57">        CheckedSchemaSupport.fields(value, &quot;schema&quot;, &quot;profile&quot;, &quot;capabilityProfile&quot;, &quot;inventoryHash&quot;, &quot;settings&quot;, &quot;schemas&quot;);</span>
+<span class="fc" id="L58">        var genome = TraceStrategyTransferExample.inventory();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (!value.path(&quot;schema&quot;).asText().equals(&quot;regelsuche.native-polynomial-snapshot/v1&quot;)</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                || !value.path(&quot;profile&quot;).asText().equals(requested)</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                || !value.path(&quot;capabilityProfile&quot;).asText().equals(CAPABILITIES.name())</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                || !value.path(&quot;inventoryHash&quot;).asText().equals(genome.contentHash())</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                || !value.path(&quot;settings&quot;).equals(CheckedSchemaSupport.JSON.valueToTree(SETTINGS)))</span>
+<span class="fc" id="L64">            throw new IllegalArgumentException(&quot;snapshot profile, settings or inventory mismatch&quot;);</span>
+<span class="fc" id="L65">        var model = CheckedLearnedSchemaModel.load(CheckedSchemaSupport.text(value, &quot;schemas&quot;), genome.contentHash());</span>
+<span class="fc" id="L66">        solver = TypedLearnedMoveInventory.primitives(genome).newTaskSolverWithProfile(model, CAPABILITIES);</span>
+<span class="fc" id="L67">        profile = requested;</span>
+<span class="fc" id="L68">        frozen = snapshot;</span>
+<span class="fc" id="L69">        return setup(&quot;INITIALIZED&quot;, 0, Math.addExact(model.loadWork(), solver.preparationWork()), model.schemas().size(), start, cpu);</span>
+    }
+
+    private Map&lt;String, Object&gt; setup(String status, long training, long restore, int schemas, long start, long beforeCpu) {
+<span class="fc" id="L73">        var exact = new ExactPolynomialAnalysis();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (var input : TraceStrategyTransferExample.trainingInputs()) excluded.add(exact.alphaIdentity(input.expression()));</span>
+<span class="fc" id="L75">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L76">        result.put(&quot;status&quot;, status); result.put(&quot;profile&quot;, profile); result.put(&quot;model&quot;, frozen);</span>
+<span class="fc" id="L77">        result.put(&quot;modelHash&quot;, SchematicProofPlan.hash(frozen)); result.put(&quot;settings&quot;, SETTINGS);</span>
+<span class="fc" id="L78">        result.put(&quot;trainingWork&quot;, training); result.put(&quot;restorationWork&quot;, restore); result.put(&quot;schemas&quot;, schemas);</span>
+<span class="fc" id="L79">        result.put(&quot;nativeWallNanos&quot;, System.nanoTime() - start); result.put(&quot;nativeCpuNanos&quot;, elapsedCpu(beforeCpu));</span>
+<span class="fc" id="L80">        return result;</span>
+    }
+
+    public Map&lt;String, Object&gt; run(String requested, String source) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (solver == null) throw new IllegalStateException(&quot;initialize or restore a query consumer first&quot;);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!profile.equals(requested)) throw new IllegalArgumentException(&quot;cannot switch profile&quot;);</span>
+<span class="pc bpc" id="L86" title="3 of 6 branches missed.">        if (source == null || source.isBlank() || source.length() &gt; 2048) throw new IllegalArgumentException(&quot;source limit&quot;);</span>
+<span class="fc" id="L87">        long start = System.nanoTime(), beforeCpu = cpu();</span>
+<span class="fc" id="L88">        long[] adapter = {source.length()};</span>
+<span class="fc" id="L89">        var exact = ExactPolynomialAnalysis.withProductWork(units -&gt; adapter[0] = Math.addExact(adapter[0], units));</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (excluded.contains(exact.alphaIdentity(source))) throw new IllegalArgumentException(&quot;TRAIN overlap&quot;);</span>
+<span class="fc" id="L91">        var parsed = StructuralExpansionRules.observe(() -&gt; new ExpressionParser().parseExactTerm(source).expression());</span>
+<span class="fc" id="L92">        adapter[0] = Math.addExact(adapter[0], parsed.work());</span>
+<span class="fc" id="L93">        var budget = new MoveSearch.Budget(8, 8, 1_000_000, 32, Math.max(1, 1_000_000 - adapter[0]), 64);</span>
+<span class="fc" id="L94">        var selected = solver.simplify(parsed.value(), List.of(), budget);</span>
+<span class="fc" id="L95">        var rendered = StructuralExpansionRules.observe(() -&gt; ExpressionFormatter.format(selected.incumbent().expression()));</span>
+<span class="fc" id="L96">        adapter[0] = Math.addExact(adapter[0], Math.addExact(rendered.work(), rendered.value().length()));</span>
+<span class="fc" id="L97">        long total = Math.addExact(adapter[0], selected.totalWork());</span>
+<span class="fc" id="L98">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L99">        result.put(&quot;status&quot;, &quot;CANDIDATE&quot;); result.put(&quot;profile&quot;, profile); result.put(&quot;input&quot;, source);</span>
+<span class="fc" id="L100">        result.put(&quot;output&quot;, rendered.value()); result.put(&quot;modelHash&quot;, SchematicProofPlan.hash(frozen));</span>
+<span class="fc" id="L101">        result.put(&quot;typedInput&quot;, CODEC.encodeExpression(parsed.value()));</span>
+<span class="fc" id="L102">        result.put(&quot;typedOutput&quot;, CODEC.encodeExpression(selected.incumbent().expression()));</span>
+<span class="fc" id="L103">        result.put(&quot;target&quot;, &quot;&quot;); result.put(&quot;targetReached&quot;, selected.search().reached());</span>
+<span class="fc" id="L104">        result.put(&quot;inputCost&quot;, selected.inputScore()); result.put(&quot;outputCost&quot;, selected.outputScore());</span>
+<span class="fc" id="L105">        result.put(&quot;search&quot;, LearnedSchedulingArtifacts.resultJson(selected.search().encodedResult()));</span>
+<span class="fc" id="L106">        result.put(&quot;witness&quot;, selected.witness().stream().map(edge -&gt; Map.of(&quot;source&quot;, CODEC.encodeExpression(edge.source().expression()),</span>
+<span class="fc" id="L107">            &quot;target&quot;, CODEC.encodeExpression(edge.target().expression()), &quot;move&quot;, edge.move(), &quot;verification&quot;, edge.verification())).toList());</span>
+<span class="fc" id="L108">        result.put(&quot;adapterWork&quot;, adapter[0]); result.put(&quot;selectionWork&quot;, selected.selectionWork());</span>
+<span class="fc" id="L109">        result.put(&quot;selectedReplayWork&quot;, selected.replayWork()); result.put(&quot;totalWork&quot;, total);</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        result.put(&quot;internalWorkWithinBudget&quot;, selected.withinBudget() &amp;&amp; total &lt;= 1_000_000);</span>
+<span class="fc" id="L111">        result.put(&quot;nativeWallNanos&quot;, System.nanoTime() - start); result.put(&quot;nativeCpuNanos&quot;, elapsedCpu(beforeCpu));</span>
+<span class="fc" id="L112">        return result;</span>
+    }
+
+    private void requireFresh(String requested) {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (profile != null) throw new IllegalStateException(&quot;worker already configured&quot;);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (!Set.of(&quot;NATIVE_BASE&quot;, &quot;NATIVE_LEARNED&quot;).contains(requested)) throw new IllegalArgumentException(&quot;unknown native profile&quot;);</span>
+<span class="fc" id="L118">    }</span>
+
+    public Map&lt;String, Object&gt; handle(String line) {
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">        if (line == null || line.length() &gt; CheckedSchemaSupport.MAXIMUM_JSON_CHARACTERS) throw new IllegalArgumentException(&quot;request limit&quot;);</span>
+<span class="fc" id="L122">        var request = CheckedSchemaSupport.read(line);</span>
+<span class="fc" id="L123">        String op = CheckedSchemaSupport.text(request, &quot;op&quot;), requested = CheckedSchemaSupport.text(request, &quot;profile&quot;);</span>
+<span class="pc bnc" id="L124" title="All 4 branches missed.">        return switch (op) {</span>
+<span class="nc" id="L125">            case &quot;initialize&quot; -&gt; { CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;); yield initialize(requested); }</span>
+<span class="nc" id="L126">            case &quot;restore&quot; -&gt; { CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;, &quot;model&quot;); yield restore(requested, CheckedSchemaSupport.text(request, &quot;model&quot;)); }</span>
+<span class="nc" id="L127">            case &quot;run&quot; -&gt; { CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;, &quot;source&quot;); yield run(requested, CheckedSchemaSupport.text(request, &quot;source&quot;)); }</span>
+<span class="nc" id="L128">            default -&gt; throw new IllegalArgumentException(&quot;unknown operation&quot;);</span>
+        };
+    }
+
+    private static long cpu() {
+<span class="fc" id="L133">        var bean = ManagementFactory.getOperatingSystemMXBean();</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        return bean instanceof com.sun.management.OperatingSystemMXBean process ? process.getProcessCpuTime() : -1;</span>
+    }
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">    private static Long elapsedCpu(long before) { long after = cpu(); return before &lt; 0 || after &lt; 0 ? null : after - before; }</span>
+
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (args.length != 0) throw new IllegalArgumentException(&quot;worker accepts source-only JSONL stdin&quot;);</span>
+<span class="nc" id="L140">        var worker = new NativePolynomialComparisonWorker();</span>
+<span class="nc" id="L141">        System.out.println(&quot;{\&quot;status\&quot;:\&quot;READY\&quot;,\&quot;java\&quot;:\&quot;&quot; + Runtime.version() + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L142">        try (var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            for (String line; (line = reader.readLine()) != null;) {</span>
+<span class="nc" id="L144">                try { System.out.println(LearnedSchedulingArtifacts.json(worker.handle(line))); }</span>
+<span class="nc" id="L145">                catch (RuntimeException failure) {</span>
+<span class="nc" id="L146">                    System.out.println(LearnedSchedulingArtifacts.json(Map.of(&quot;status&quot;, &quot;ERROR&quot;, &quot;error&quot;, failure.toString())));</span>
+<span class="nc" id="L147">                }</span>
+<span class="nc" id="L148">                System.out.flush();</span>
+            }
+        }
+<span class="nc" id="L151">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

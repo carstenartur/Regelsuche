@@ -58,7 +58,7 @@ final class CheckedSchemaSupport {
 <span class="pc bpc" id="L58" title="2 of 4 branches missed.">        if (value == null || !value.isObject()) throw new IllegalArgumentException(&quot;checked schema object required&quot;);</span>
 <span class="fc" id="L59">        var found = new HashSet&lt;String&gt;();</span>
 <span class="fc" id="L60">        value.fieldNames().forEachRemaining(found::add);</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (!found.equals(Set.of(expected))) throw new IllegalArgumentException(&quot;unknown or missing checked schema fields&quot;);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (!found.equals(Set.of(expected))) throw new IllegalArgumentException(&quot;unknown or missing checked schema fields&quot;);</span>
 <span class="fc" id="L62">    }</span>
 
     static String text(JsonNode value, String name) {
