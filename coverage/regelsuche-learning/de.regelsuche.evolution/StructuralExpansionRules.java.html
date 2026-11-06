@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StructuralExpansionRules.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">StructuralExpansionRules.java</span></div><h1>StructuralExpansionRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleDescriptor;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveVerifier;
+import de.regelsuche.search.moves.IncrementalProviderContract;
+import de.regelsuche.search.moves.RegisteredIncrementalMoveProvider;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransport;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
+
+/** Existing general AST rules, bound to the normal typed frontier and source-bound primitive replay. */
+final class StructuralExpansionRules {
+    private static final String REVISION = &quot;structural-expansion/v1:&quot;;
+<span class="fc" id="L27">    private static final Set&lt;String&gt; RULE_IDS = Set.of(&quot;ast_power_two_to_product&quot;, &quot;ast_distribute_left_add&quot;,</span>
+        &quot;ast_distribute_right_add&quot;, &quot;ast_distribute_left_subtract&quot;, &quot;ast_distribute_right_subtract&quot;,
+        &quot;ast_canonical_normalize&quot;, &quot;ast_signed_additive_normalize&quot;, &quot;ast_double_term&quot;);
+
+    private StructuralExpansionRules() { }
+
+    static boolean isExpansionProvider(MoveProvider.Descriptor provider) {
+<span class="fc" id="L34">        String id = provider.id();</span>
+<span class="pc bpc" id="L35" title="1 of 4 branches missed.">        return id.startsWith(REVISION) &amp;&amp; RULE_IDS.contains(id.substring(REVISION.length()));</span>
+    }
+
+    static TypedLearnedMoveInventory.SearchSession attach(TypedLearnedMoveInventory.SearchSession session) {
+<span class="fc" id="L39">        return attach(session, false);</span>
+    }
+
+    static TypedLearnedMoveInventory.SearchSession attach(TypedLearnedMoveInventory.SearchSession session, boolean incremental) {
+<span class="fc" id="L43">        var providers = new ArrayList&lt;&gt;(session.providers());</span>
+<span class="fc" id="L44">        var verifiers = new HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var builtin : AstRewriteTransformationEngine.allBuiltInRules()) {</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (!RULE_IDS.contains(builtin.id())) continue;</span>
+<span class="fc" id="L47">            var rule = new Alias(builtin);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (providers.stream().anyMatch(provider -&gt; provider.descriptor().id().equals(rule.id())))</span>
+<span class="nc" id="L49">                throw new IllegalArgumentException(&quot;reserved expansion rule identifier: &quot; + rule.id());</span>
+<span class="fc" id="L50">            var transport = new AstRewriteTransport(List.of(rule), 64, 64);</span>
+<span class="fc" id="L51">            var descriptor = new MoveProvider.Descriptor(rule.id(), &quot;structural-expansion&quot;, SearchMove.SourceKind.BRIDGE,</span>
+<span class="fc" id="L52">                SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN,</span>
+<span class="fc" id="L53">                SchematicProofPlan.hash(REVISION + builtin.id()));</span>
+<span class="fc" id="L54">            var provider = meteredProvider(descriptor, transport);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            providers.add(incremental ? incremental(provider) : provider);</span>
+<span class="fc" id="L56">            verifiers.put(rule.id(), meteredReplay(transport));</span>
+<span class="fc" id="L57">        }</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (verifiers.size() != RULE_IDS.size()) throw new IllegalStateException(&quot;built-in expansion inventory changed&quot;);</span>
+<span class="fc" id="L59">        return new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),</span>
+<span class="fc" id="L60">            (source, move, context) -&gt; verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));</span>
+    }
+
+    private static TypedMoveSearch.TypedProvider meteredProvider(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) {
+<span class="fc" id="L64">        var primitive = new MoveProvider.Descriptor(descriptor.id(), descriptor.ruleFamily(), SearchMove.SourceKind.PRIMITIVE,</span>
+<span class="fc" id="L65">            descriptor.proofStrength(), descriptor.requiredAssumptions(), descriptor.valueEvidence(), descriptor.provenanceId());</span>
+<span class="fc" id="L66">        var delegate = TypedMoveSearch.primitiveProvider(primitive, transport);</span>
+<span class="fc" id="L67">        return new TypedMoveSearch.TypedProvider() {</span>
+<span class="fc" id="L68">            @Override public Descriptor descriptor() { return descriptor; }</span>
+            @Override public Batch candidates(de.regelsuche.search.moves.MoveState state, de.regelsuche.search.moves.MoveContext context) {
+<span class="fc" id="L70">                var measured = observe(() -&gt; delegate.candidates(state, context));</span>
+<span class="fc" id="L71">                var batch = measured.value();</span>
+<span class="fc" id="L72">                var metrics = batch.work().withDelegatedMechanicalWork(</span>
+<span class="fc" id="L73">                    Math.addExact(batch.work().delegatedMechanicalWorkUnits(), measured.work()));</span>
+<span class="fc" id="L74">                var moves = batch.moves().stream().map(move -&gt; SearchMove.from(move.transformation(), descriptor, metrics.totalWorkUnits())).toList();</span>
+<span class="fc" id="L75">                return new Batch(moves, metrics, batch.complete());</span>
+            }
+        };
+    }
+
+    private static TypedMoveSearch.Verifier meteredReplay(AstRewriteTransport transport) {
+<span class="fc" id="L81">        var delegate = TypedMoveSearch.primitiveReplay(transport);</span>
+<span class="fc" id="L82">        return (source, move, context) -&gt; {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (move.sourceKind() != SearchMove.SourceKind.BRIDGE)</span>
+<span class="nc" id="L84">                return new MoveVerifier.Verification(false, 1, List.of(), &quot;EXPANSION_SOURCE_KIND_REJECTED&quot;);</span>
+<span class="fc" id="L85">            var measured = observe(() -&gt; delegate.verify(source, move, context));</span>
+<span class="fc" id="L86">            var result = measured.value();</span>
+<span class="fc" id="L87">            return new MoveVerifier.Verification(result.accepted(), Math.addExact(result.work(), measured.work()),</span>
+<span class="fc" id="L88">                result.receipts(), result.reason());</span>
+        };
+    }
+
+    private static MoveProvider incremental(TypedMoveSearch.TypedProvider provider) {
+<span class="fc" id="L93">        var descriptor = provider.descriptor();</span>
+<span class="fc" id="L94">        var definition = new IncrementalProviderContract.Definition(IncrementalProviderContract.REVISION, descriptor.id(),</span>
+<span class="fc" id="L95">            IncrementalProviderContract.Kind.REGISTERED_SCHEMA, descriptor.provenanceId(), REVISION,</span>
+            IncrementalProviderContract.Transport.TYPED_AST_JSON, IncrementalProviderContract.Mathematics.PRIMITIVE, null);
+<span class="fc" id="L97">        var registration = new IncrementalProviderContract.Registration(definition,</span>
+<span class="fc" id="L98">            (state, context, meter) -&gt; new AtomicTypedBatchCursor(provider, state, context, meter));</span>
+<span class="fc" id="L99">        return new RegisteredIncrementalMoveProvider(descriptor, definition,</span>
+<span class="fc" id="L100">            new IncrementalProviderContract.Registry(List.of(registration)));</span>
+    }
+
+    static &lt;T&gt; Observation&lt;T&gt; observe(Supplier&lt;T&gt; operation) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (RetainedOperation.isObserved())</span>
+<span class="fc" id="L105">            throw new IllegalStateException(&quot;nested retained-operation accounting is not supported&quot;);</span>
+<span class="fc" id="L106">        var meter = new Meter();</span>
+<span class="fc" id="L107">        try (var scope = RetainedOperation.open(meter)) {</span>
+<span class="fc" id="L108">            return new Observation&lt;&gt;(operation.get(), meter);</span>
+<span class="fc" id="L109">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L110">            throw new CheckedSchemaTaskSolver.ProviderFailure(meter.total(), failure);</span>
+        }
+    }
+
+    /** Carries the mutable meter until the observation scope has charged its close. */
+<span class="fc" id="L115">    record Observation&lt;T&gt;(T value, Meter meter) {</span>
+<span class="fc" id="L116">        long work() { return meter.total(); }</span>
+    }
+
+    private static final class Meter implements RetainedOperation.Sink {
+        private long total;
+<span class="fc" id="L121">        @Override public void executionWork(long units) { add(units); }</span>
+<span class="fc" id="L122">        @Override public void validationWork(long units) { add(units); }</span>
+<span class="fc" id="L123">        @Override public void checkpoint() { }</span>
+<span class="nc" id="L124">        @Override public long observedWork() { return total; }</span>
+<span class="nc" id="L125">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }</span>
+<span class="fc" id="L126">        long total() { return total; }</span>
+        private void add(long units) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative observed work&quot;);</span>
+<span class="fc" id="L129">            total = Math.addExact(total, units);</span>
+<span class="fc" id="L130">        }</span>
+    }
+
+    /** A private namespace keeps external inventory identifiers from granting authority to another rule. */
+<span class="fc" id="L134">    private record Alias(RewriteRule delegate) implements RewriteRule {</span>
+<span class="fc" id="L135">        @Override public String id() { return REVISION + delegate.id(); }</span>
+<span class="fc" id="L136">        @Override public RewriteKind kind() { return delegate.kind(); }</span>
+<span class="fc" id="L137">        @Override public boolean mayIncreaseComplexity() { return delegate.mayIncreaseComplexity(); }</span>
+<span class="fc" id="L138">        @Override public int estimatedCostDelta() { return delegate.estimatedCostDelta(); }</span>
+<span class="fc" id="L139">        @Override public boolean isEquivalencePreservingByConstruction() { return delegate.isEquivalencePreservingByConstruction(); }</span>
+<span class="fc" id="L140">        @Override public boolean matches(Expr subtree) { return delegate.matches(subtree); }</span>
+<span class="fc" id="L141">        @Override public Expr apply(Expr subtree) { return delegate.apply(subtree); }</span>
+<span class="fc" id="L142">        @Override public List&lt;Assumption&gt; assumptions(Expr subtree) { return delegate.assumptions(subtree); }</span>
+<span class="nc" id="L143">        @Override public boolean mayEmitAssumptions() { return delegate.mayEmitAssumptions(); }</span>
+<span class="fc" id="L144">        @Override public RuleDescriptor descriptor() { return delegate.descriptor(); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TypedSearchAlternatives.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">TypedSearchAlternatives.java</span></div><h1>TypedSearchAlternatives.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.ast.Expr;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/** Materializes alternative, independently replayed paths from one existing source-only search. */
+public final class TypedSearchAlternatives {
+    private TypedSearchAlternatives() { }
+
+    /** Created only for an admitted state with a complete independent replay. */
+    public static final class Candidate {
+        private final TypedMoveSearch.State state;
+        private final long score;
+        private final List&lt;TypedMoveSearch.WitnessStep&gt; witness;
+<span class="fc" id="L20">        private Candidate(TypedMoveSearch.State state, long score, List&lt;TypedMoveSearch.WitnessStep&gt; witness) {</span>
+<span class="fc" id="L21">            this.state = state; this.score = score; this.witness = List.copyOf(witness);</span>
+<span class="fc" id="L22">        }</span>
+<span class="fc" id="L23">        public TypedMoveSearch.State state() { return state; }</span>
+<span class="nc" id="L24">        public long score() { return score; }</span>
+<span class="fc" id="L25">        public List&lt;TypedMoveSearch.WitnessStep&gt; witness() { return witness; }</span>
+    }
+
+    /** Search, selection and every additional replay share the original task's budget. */
+    public static final class Result {
+        private final TypedSourceOnlySearch.Result search;
+        private final List&lt;Candidate&gt; candidates;
+        private final long selectionWork, replayWork, workBudget;
+        private final boolean truncated;
+        private Result(TypedSourceOnlySearch.Result search, List&lt;Candidate&gt; candidates, long selectionWork,
+<span class="fc" id="L35">                long replayWork, long workBudget, boolean truncated) {</span>
+<span class="fc" id="L36">            this.search = search; this.candidates = List.copyOf(candidates); this.selectionWork = selectionWork;</span>
+<span class="fc" id="L37">            this.replayWork = replayWork; this.workBudget = workBudget; this.truncated = truncated;</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        public TypedSourceOnlySearch.Result search() { return search; }</span>
+<span class="fc" id="L40">        public List&lt;Candidate&gt; candidates() { return candidates; }</span>
+<span class="fc" id="L41">        public long selectionWork() { return selectionWork; }</span>
+<span class="fc" id="L42">        public long replayWork() { return replayWork; }</span>
+<span class="nc" id="L43">        public long workBudget() { return workBudget; }</span>
+<span class="fc" id="L44">        public boolean truncated() { return truncated; }</span>
+<span class="fc" id="L45">        public long totalWork() { return Math.addExact(Math.addExact(search.totalWork(), selectionWork), replayWork); }</span>
+<span class="fc" id="L46">        public boolean accountingComplete() { return search.accountingComplete(); }</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        public boolean withinBudget() { return accountingComplete() &amp;&amp; totalWork() &lt;= workBudget; }</span>
+    }
+
+    /** A failing callback does not authorize a result or claim that its unfinished work is known. */
+    public static final class Failure extends IllegalStateException {
+        private final long knownWork;
+        private Failure(long knownWork, RuntimeException cause) {
+<span class="fc" id="L54">            super(&quot;alternative selection or independent replay failed; unfinished work may be unknown&quot;, cause);</span>
+<span class="fc" id="L55">            this.knownWork = knownWork;</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        public long knownWork() { return knownWork; }</span>
+<span class="fc" id="L58">        public boolean accountingComplete() { return false; }</span>
+    }
+
+    static Result collect(TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective,
+            long threshold, SearchContinuationContract contract, long reserve, int maximum) {
+<span class="fc" id="L63">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="fc" id="L64">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L65">        Objects.requireNonNull(contract, &quot;contract&quot;);</span>
+<span class="fc" id="L66">        long budget = problem.budget().totalWork();</span>
+<span class="pc bpc" id="L67" title="1 of 6 branches missed.">        if (reserve &lt; 1 || reserve &gt;= budget || maximum &lt; 1)</span>
+<span class="fc" id="L68">            throw new IllegalArgumentException(&quot;a positive in-budget reserve and alternative limit are required&quot;);</span>
+<span class="fc" id="L69">        var b = problem.budget();</span>
+<span class="fc" id="L70">        var searchBudget = new MoveSearch.Budget(b.maxPrimitiveSteps(), b.maxSearchDepth(), b.maxTheoryWork(),</span>
+<span class="fc" id="L71">            b.maxStates(), budget - reserve, b.maxComplexityDebt());</span>
+<span class="fc" id="L72">        var bounded = new TypedMoveSearch.Problem(problem.source(), problem.context(), problem.providers(), problem.policy(),</span>
+<span class="fc" id="L73">            problem.verifier(), problem.stateScore(), problem.mode(), problem.scheduling(), searchBudget, problem.stateValue());</span>
+<span class="fc" id="L74">        var search = new TypedSourceOnlySearch().searchBest(bounded, objective, contract);</span>
+<span class="fc" id="L75">        return new Collector(problem, objective, threshold, maximum, search).run();</span>
+    }
+
+    private static final class Collector {
+        /** Immutable admitted prefixes preserve the path resource omitted from MoveState. */
+<span class="fc" id="L80">        private record Lineage(MoveSearch.Event edge, Lineage parent, long theoryWork) { }</span>
+        private final TypedMoveSearch.Problem problem;
+        private final TypedSourceOnlySearch.Objective objective;
+        private final long threshold, budget;
+        private final int maximum;
+        private final TypedSourceOnlySearch.Result search;
+<span class="fc" id="L86">        private final List&lt;Candidate&gt; candidates = new ArrayList&lt;&gt;();</span>
+        private long selectionWork, replayWork;
+        private Collector(TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective, long threshold,
+<span class="fc" id="L89">                int maximum, TypedSourceOnlySearch.Result search) {</span>
+<span class="fc" id="L90">            this.problem = problem; this.objective = objective; this.threshold = threshold; this.maximum = maximum;</span>
+<span class="fc" id="L91">            this.search = search; this.budget = problem.budget().totalWork();</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        private long total() { return Math.addExact(Math.addExact(search.totalWork(), selectionWork), replayWork); }</span>
+        private boolean spend(long work) {
+<span class="pc bpc" id="L95" title="3 of 6 branches missed.">            if (work &lt; 0 || total() &gt; budget || work &gt; budget - total()) return false;</span>
+<span class="fc" id="L96">            selectionWork = Math.addExact(selectionWork, work);</span>
+<span class="fc" id="L97">            return true;</span>
+        }
+        private Result result(boolean truncated) {
+<span class="fc" id="L100">            return new Result(search, candidates, selectionWork, replayWork, budget, truncated);</span>
+        }
+        private Result run() {
+            try {
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">                if (!search.accountingComplete() || total() &gt; budget) return result(true);</span>
+<span class="fc" id="L105">                var root = root();</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                if (root == null) return result(true);</span>
+<span class="fc" id="L107">                var parents = parents(root);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                if (parents == null) return result(true);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                return result(!collect(root, parents));</span>
+<span class="fc" id="L110">            } catch (RuntimeException failure) {</span>
+<span class="fc" id="L111">                throw new Failure(total(), failure);</span>
+            }
+        }
+        private MoveState root() {
+<span class="fc" id="L115">            MoveState root = null;</span>
+            // Inspect the full map: iteration order must not change charged work across JVMs.
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (var state : search.search().encodedResult().stateAssessments().keySet()) {</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                if (!spend(1)) return null;</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (state.searchDepth() == 0) root = state;</span>
+<span class="fc" id="L120">            }</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (root == null) throw new IllegalStateException(&quot;search has no root state&quot;);</span>
+<span class="fc" id="L122">            return root;</span>
+        }
+        private HashMap&lt;MoveState, Lineage&gt; parents(MoveState root) {
+<span class="fc" id="L125">            var parents = new HashMap&lt;MoveState, Lineage&gt;();</span>
+<span class="fc" id="L126">            parents.put(root, new Lineage(null, null, 0));</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (var edge : search.search().encodedResult().events()) {</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                if (!spend(1)) return null;</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                if (edge.decision() != MoveSearch.Decision.ENQUEUED) continue;</span>
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">                if (edge.verification() == null || !edge.verification().accepted())</span>
+<span class="nc" id="L131">                    throw new IllegalStateException(&quot;unverified state admitted to frontier&quot;);</span>
+<span class="fc" id="L132">                index(parents, edge);</span>
+<span class="fc" id="L133">            }</span>
+<span class="fc" id="L134">            return parents;</span>
+        }
+        private void index(HashMap&lt;MoveState, Lineage&gt; parents, MoveSearch.Event edge) {
+<span class="fc" id="L137">            var prefix = Objects.requireNonNull(parents.get(edge.source()), &quot;admitted source lineage&quot;);</span>
+<span class="fc" id="L138">            long theory = Math.addExact(prefix.theoryWork(), edge.move().executionWork().exactTheoryWorkUnits());</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (theory &gt; problem.budget().maxTheoryWork())</span>
+<span class="nc" id="L140">                throw new IllegalStateException(&quot;admitted lineage exceeds the theory bound&quot;);</span>
+<span class="fc" id="L141">            var previous = parents.get(edge.target());</span>
+<span class="pc bpc" id="L142" title="3 of 4 branches missed.">            if (previous == null || theory &lt; previous.theoryWork())</span>
+<span class="fc" id="L143">                parents.put(edge.target(), new Lineage(edge, prefix, theory));</span>
+<span class="fc" id="L144">        }</span>
+        private boolean collect(MoveState root, HashMap&lt;MoveState, Lineage&gt; parents) {
+<span class="fc" id="L146">            var seen = new HashSet&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            for (var edge : search.search().encodedResult().events()) {</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (!spend(1)) return false;</span>
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">                if (edge.decision() != MoveSearch.Decision.ENQUEUED || edge.target().expression().equals(root.expression())) continue;</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">                if (!collect(edge, root, parents, seen) || candidates.size() == maximum) return false;</span>
+<span class="fc" id="L151">            }</span>
+<span class="fc" id="L152">            return true;</span>
+        }
+        private boolean collect(MoveSearch.Event edge, MoveState root,
+                HashMap&lt;MoveState, Lineage&gt; parents, HashSet&lt;Expr&gt; seen) {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">            if (!spend(edge.target().expression().length()) || total() &gt;= budget) return false;</span>
+<span class="fc" id="L157">            var state = TypedMoveSearch.State.decode(edge.target());</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (seen.contains(state.expression())) return true;</span>
+<span class="fc" id="L159">            var score = Objects.requireNonNull(objective.evaluate(state), &quot;objective assessment&quot;);</span>
+<span class="fc" id="L160">            selectionWork = Math.addExact(selectionWork, score.work());</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (total() &gt; budget) return false;</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (score.value() &gt; threshold) return true;</span>
+<span class="fc" id="L163">            var path = path(root, edge.target(), parents);</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (path == null) return false;</span>
+<span class="fc" id="L165">            var witness = replay(path);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (witness == null) return false;</span>
+<span class="fc" id="L167">            seen.add(state.expression());</span>
+<span class="fc" id="L168">            candidates.add(new Candidate(state, score.value(), witness));</span>
+<span class="fc" id="L169">            return true;</span>
+        }
+        private List&lt;MoveSearch.Event&gt; path(MoveState root, MoveState target, HashMap&lt;MoveState, Lineage&gt; parents) {
+<span class="fc" id="L172">            var result = new ArrayList&lt;MoveSearch.Event&gt;();</span>
+<span class="fc" id="L173">            var cursor = target;</span>
+<span class="fc" id="L174">            var lineage = Objects.requireNonNull(parents.get(target), &quot;candidate lineage&quot;);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            while (lineage.edge() != null) {</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                if (!spend(1)) return null;</span>
+<span class="fc" id="L177">                var edge = lineage.edge();</span>
+<span class="pc bpc" id="L178" title="3 of 6 branches missed.">                if (edge == null || !edge.target().equals(cursor) || edge.source().searchDepth() &gt;= cursor.searchDepth())</span>
+<span class="nc" id="L179">                    throw new IllegalStateException(&quot;candidate has no acyclic admitted lineage&quot;);</span>
+<span class="fc" id="L180">                result.add(edge);</span>
+<span class="fc" id="L181">                cursor = edge.source();</span>
+<span class="fc" id="L182">                lineage = lineage.parent();</span>
+<span class="fc" id="L183">            }</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (!cursor.equals(root)) throw new IllegalStateException(&quot;candidate lineage does not start at input&quot;);</span>
+<span class="fc" id="L185">            Collections.reverse(result);</span>
+<span class="fc" id="L186">            return result;</span>
+        }
+        private List&lt;TypedMoveSearch.WitnessStep&gt; replay(List&lt;MoveSearch.Event&gt; path) {
+<span class="fc" id="L189">            var result = new ArrayList&lt;TypedMoveSearch.WitnessStep&gt;();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            for (var edge : path) {</span>
+<span class="fc" id="L191">                long decodeWork = Math.addExact((long) edge.source().expression().length(), edge.target().expression().length());</span>
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">                if (!spend(Math.addExact(decodeWork, 1)) || total() &gt;= budget) return null;</span>
+<span class="fc" id="L193">                var source = TypedMoveSearch.State.decode(edge.source());</span>
+<span class="fc" id="L194">                var target = TypedMoveSearch.State.decode(edge.target());</span>
+<span class="fc" id="L195">                var receipt = Objects.requireNonNull(problem.verifier().verify(source, edge.move(), problem.context()), &quot;verification&quot;);</span>
+<span class="fc" id="L196">                replayWork = Math.addExact(replayWork, receipt.work());</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                if (total() &gt; budget) return null;</span>
+<span class="fc" id="L198">                var original = edge.verification();</span>
+<span class="pc bpc" id="L199" title="2 of 6 branches missed.">                if (!receipt.accepted() || !receipt.receipts().equals(original.receipts()) || !receipt.reason().equals(original.reason()))</span>
+<span class="fc" id="L200">                    throw new IllegalStateException(&quot;independent alternative replay differs&quot;);</span>
+<span class="fc" id="L201">                result.add(new TypedMoveSearch.WitnessStep(source, target, edge.move(), receipt));</span>
+<span class="fc" id="L202">            }</span>
+<span class="fc" id="L203">            return result;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

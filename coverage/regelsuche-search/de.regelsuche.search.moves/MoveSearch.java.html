@@ -118,13 +118,22 @@ import java.util.function.ToDoubleFunction;
 <span class="fc" id="L118">        return LegacySearchExecution.project(problem,raw);</span>
     }
     public QualityResult searchUntil(Problem problem,Objective objective,long maximumOutputScore,SearchContinuationContract contract) {
-<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        if (!problem.context().goal().isEmpty() || problem.mode()!=Mode.FAST)</span>
-<span class="fc" id="L122">            throw new IllegalArgumentException(&quot;quality stopping requires source-only FAST search&quot;);</span>
-<span class="fc" id="L123">        var online = new MoveSearchObjective&lt;MoveState,SearchMove,MoveVerifier.Verification&gt;(objective::evaluate,maximumOutputScore);</span>
-<span class="fc" id="L124">        var raw = new MoveSearchKernel&lt;String,MoveState,SearchMove,StateValue.Assessment,MoveVerifier.Verification&gt;()</span>
-<span class="fc" id="L125">            .search(new LegacySearchExecution(problem),contract,online);</span>
-<span class="fc" id="L126">        return new QualityResult(LegacySearchExecution.project(problem,raw),online.incumbent(),online.inputScore(),online.outputScore(),</span>
-<span class="fc" id="L127">            online.witness().stream().map(LegacySearchExecution::step).toList(),online.objectiveWork());</span>
+<span class="fc" id="L121">        return searchQuality(problem, objective, maximumOutputScore, contract, true);</span>
+    }
+    /** Explore the bounded frontier after the first acceptable state while retaining its best verified incumbent. */
+    public QualityResult searchBest(Problem problem, Objective objective, SearchContinuationContract contract) {
+<span class="fc" id="L125">        return searchQuality(problem, objective, 0, contract, false);</span>
+    }
+    private QualityResult searchQuality(Problem problem, Objective objective, long maximumOutputScore,
+            SearchContinuationContract contract, boolean stopAtQuality) {
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        if (!problem.context().goal().isEmpty() || problem.mode()!=Mode.FAST)</span>
+<span class="fc" id="L130">            throw new IllegalArgumentException(&quot;quality stopping requires source-only FAST search&quot;);</span>
+<span class="fc" id="L131">        java.util.Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L132">        var online = new MoveSearchObjective&lt;MoveState,SearchMove,MoveVerifier.Verification&gt;(objective::evaluate,maximumOutputScore,stopAtQuality);</span>
+<span class="fc" id="L133">        var raw = new MoveSearchKernel&lt;String,MoveState,SearchMove,StateValue.Assessment,MoveVerifier.Verification&gt;()</span>
+<span class="fc" id="L134">            .search(new LegacySearchExecution(problem),contract,online);</span>
+<span class="fc" id="L135">        return new QualityResult(LegacySearchExecution.project(problem,raw),online.incumbent(),online.inputScore(),online.outputScore(),</span>
+<span class="fc" id="L136">            online.witness().stream().map(LegacySearchExecution::step).toList(),online.objectiveWork());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -100,18 +100,18 @@ final class StructuralConstructionPrograms {
 
     /** Construct exact monomial factors instead of introducing a potentially zero denominator. */
     private static List&lt;String&gt; partitionFactors(Expr expression, String source, Work work) {
-<span class="pc bpc" id="L103" title="2 of 4 branches missed.">        if (!(expression instanceof BinaryExpr power) || power.operator() != BinaryOperator.POW</span>
-<span class="pc bnc" id="L104" title="All 2 branches missed.">                || !(power.right() instanceof NumberExpr exponent)) return List.of();</span>
-<span class="nc" id="L105">        var value = exponent.value();</span>
-<span class="nc bnc" id="L106" title="All 4 branches missed.">        if (!value.denominator().equals(java.math.BigInteger.ONE) || value.numerator().signum() &lt; 1</span>
-<span class="nc bnc" id="L107" title="All 2 branches missed.">                || value.numerator().compareTo(java.math.BigInteger.valueOf(12)) &gt; 0) return List.of();</span>
-<span class="nc" id="L108">        int n = value.numerator().intValueExact();</span>
-<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (n &lt; 2) return List.of();</span>
-<span class="nc" id="L110">        String auxiliary = &quot;(&quot; + ExpressionFormatter.format(power.left()) + &quot;)^&quot; + (n / 2);</span>
-<span class="nc" id="L111">        var result = new AlgebraicConstruction().construct(new AlgebraicConstruction.Request(</span>
-<span class="nc" id="L112">            AlgebraicConstruction.Operation.EXACT_FACTOR_SPLIT, source, auxiliary, List.of(), LIMIT - work.units));</span>
-<span class="nc" id="L113">        work.add(result.work());</span>
-<span class="nc" id="L114">        return result.expression().stream().toList();</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        if (!(expression instanceof BinaryExpr power) || power.operator() != BinaryOperator.POW</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                || !(power.right() instanceof NumberExpr exponent)) return List.of();</span>
+<span class="fc" id="L105">        var value = exponent.value();</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        if (!value.denominator().equals(java.math.BigInteger.ONE) || value.numerator().signum() &lt; 1</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                || value.numerator().compareTo(java.math.BigInteger.valueOf(12)) &gt; 0) return List.of();</span>
+<span class="fc" id="L108">        int n = value.numerator().intValueExact();</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (n &lt; 2) return List.of();</span>
+<span class="fc" id="L110">        String auxiliary = &quot;(&quot; + ExpressionFormatter.format(power.left()) + &quot;)^&quot; + (n / 2);</span>
+<span class="fc" id="L111">        var result = new AlgebraicConstruction().construct(new AlgebraicConstruction.Request(</span>
+<span class="fc" id="L112">            AlgebraicConstruction.Operation.EXACT_FACTOR_SPLIT, source, auxiliary, List.of(), LIMIT - work.units));</span>
+<span class="fc" id="L113">        work.add(result.work());</span>
+<span class="fc" id="L114">        return result.expression().stream().toList();</span>
     }
 
     private static List&lt;String&gt; residualBalance(Expr expression, String source, Work work, boolean expanded) {
@@ -124,7 +124,7 @@ final class StructuralConstructionPrograms {
 <span class="fc" id="L124">        String prepared = exposeAll(polynomial.toCanonicalString(), work, expanded);</span>
 <span class="fc bfc" id="L125" title="All 2 branches covered.">        var composer = expanded ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);</span>
 <span class="fc" id="L126">        var parts = composer.additiveComponents(prepared);</span>
-<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        if (parts.size() != count || !allSquares(parts, work)) return List.of();</span>
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        if (parts.size() != count || !allSquares(parts, work)) return List.of();</span>
 <span class="fc" id="L128">        var effects = pairedEffects(parts, composer, work);</span>
 <span class="fc" id="L129">        var results = composer.compose(prepared, parts, effects, count / 2, 8);</span>
 <span class="fc" id="L130">        work.add(results.size());</span>
@@ -145,7 +145,7 @@ final class StructuralConstructionPrograms {
 <span class="fc" id="L145">        var parser = new ExpressionParser();</span>
 <span class="fc bfc" id="L146" title="All 2 branches covered.">        for (var part : parts) {</span>
 <span class="fc" id="L147">            work.add(part.expression().length());</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (!StructuralTaskObjective.isSquare(parser.parseExactTerm(part.expression()).expression())) return false;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (!StructuralTaskObjective.isSquare(parser.parseExactTerm(part.expression()).expression())) return false;</span>
 <span class="fc" id="L149">        }</span>
 <span class="fc" id="L150">        return true;</span>
     }

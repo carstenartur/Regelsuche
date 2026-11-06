@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - coversAllFrozenHistoricalInputsAtADeclaredStructuralGoal()</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<div class="breadcrumbs">
+<a class="breadcrumb" href="../index.html">all</a> &gt; 
+<a class="breadcrumb" href="index.html">de.regelsuche.experiments.autopilot.HistoricalCatalogTaskCoverageTest</a> &gt; 
+<span class="breadcrumb">coversAllFrozenHistoricalInputsAtADeclaredStructuralGoal()</span>
+</div>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a class="successGroup" href="#">Gradle Test Run :regelsuche-autopilot:test</a>
+</li>
+</ul>
+<div class="tab">
+<h2>Gradle Test Run :regelsuche-autopilot:test</h2>
+<h1>coversAllFrozenHistoricalInputsAtADeclaredStructuralGoal()</h1>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a class="" href="#">summary</a>
+</li>
+<li>
+<a class="" href="#">standard output</a>
+</li>
+</ul>
+<div class="tab">
+<h2>summary</h2>
+<div>
+<div class="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox">
+<div class="counter">1</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox">
+<div class="counter">0</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox">
+<div class="counter">0</div>
+<p>skipped</p>
+</div>
+</td>
+<td>
+<div class="infoBox duration">
+<div class="counter">5.299s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox success successRate">
+<div class="percent">100%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="tab">
+<h2>standard output</h2>
+<span class="code">
+<pre id="root-0-test-stdout-coversAllFrozenHistoricalInputsAtADeclaredStructuralGoal()">CATALOG_TASK id=complete-square work=6439 steps=3 syntaxMatch=true output=(x + y) ^ 2
+CATALOG_STEP id=complete-square source=x * x + 2 * x * y + y * y rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=x ^ 2 + 2 * x * y + y * y
+CATALOG_STEP id=complete-square source=x ^ 2 + 2 * x * y + y * y rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=x ^ 2 + 2 * x * y + y ^ 2
+CATALOG_STEP id=complete-square source=x ^ 2 + 2 * x * y + y ^ 2 rule=regelsuche.structural-construction/v1:RECOGNIZE_METERED_SQUARE kind=PREPARATION target=(x + y) ^ 2
+CATALOG_TASK id=reordered-square work=6413 steps=3 syntaxMatch=true output=(x + y) ^ 2
+CATALOG_STEP id=reordered-square source=x * x + y * y + 2 * y * x rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=x ^ 2 + y * y + 2 * y * x
+CATALOG_STEP id=reordered-square source=x ^ 2 + y * y + 2 * y * x rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=x ^ 2 + y ^ 2 + 2 * y * x
+CATALOG_STEP id=reordered-square source=x ^ 2 + y ^ 2 + 2 * y * x rule=regelsuche.structural-construction/v1:RECOGNIZE_METERED_SQUARE kind=PREPARATION target=(x + y) ^ 2
+CATALOG_TASK id=regrouped-square work=9591 steps=3 syntaxMatch=false output=(y + x) ^ 2
+CATALOG_STEP id=regrouped-square source=y * y + 2 * x * y + x * x rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=y ^ 2 + 2 * x * y + x * x
+CATALOG_STEP id=regrouped-square source=y ^ 2 + 2 * x * y + x * x rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=y ^ 2 + 2 * x * y + x ^ 2
+CATALOG_STEP id=regrouped-square source=y ^ 2 + 2 * x * y + x ^ 2 rule=regelsuche.structural-construction/v1:RECOGNIZE_METERED_SQUARE kind=PREPARATION target=(y + x) ^ 2
+CATALOG_TASK id=scaled-square work=12200 steps=3 syntaxMatch=true output=(x + 1.5 * a) ^ 2
+CATALOG_STEP id=scaled-square source=x * x + 3 * x * a + 2.25 * a * a rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=x ^ 2 + 3 * x * a + 2.25 * a * a
+CATALOG_STEP id=scaled-square source=x ^ 2 + 3 * x * a + 2.25 * a * a rule=regelsuche.structural-construction/v1:RATIONAL_EXPOSE_SQUARE kind=PREPARATION target=x ^ 2 + 3 * x * a + (1.5 * a) ^ 2
+CATALOG_STEP id=scaled-square source=x ^ 2 + 3 * x * a + (1.5 * a) ^ 2 rule=regelsuche.structural-construction/v1:RECOGNIZE_METERED_SQUARE kind=PREPARATION target=(x + 1.5 * a) ^ 2
+CATALOG_TASK id=fractional-square work=15298 steps=3 syntaxMatch=true output=(x + 2 / 3 * y) ^ 2
+CATALOG_STEP id=fractional-square source=x * x + 4 / 3 * x * y + 4 / 9 * y * y rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=x ^ 2 + 4 / 3 * x * y + 4 / 9 * y * y
+CATALOG_STEP id=fractional-square source=x ^ 2 + 4 / 3 * x * y + 4 / 9 * y * y rule=regelsuche.structural-construction/v1:RATIONAL_EXPOSE_SQUARE kind=PREPARATION target=x ^ 2 + 4 / 3 * x * y + (2 / 3 * y) ^ 2
+CATALOG_STEP id=fractional-square source=x ^ 2 + 4 / 3 * x * y + (2 / 3 * y) ^ 2 rule=regelsuche.structural-construction/v1:RECOGNIZE_RATIONAL_SQUARE kind=PREPARATION target=(x + 2 / 3 * y) ^ 2
+CATALOG_TASK id=difference-of-squares work=4595 steps=3 syntaxMatch=true output=(a - b) * (a + b)
+CATALOG_STEP id=difference-of-squares source=a * a - b * b rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=a ^ 2 - b * b
+CATALOG_STEP id=difference-of-squares source=a ^ 2 - b * b rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=a ^ 2 - b ^ 2
+CATALOG_STEP id=difference-of-squares source=a ^ 2 - b ^ 2 rule=regelsuche.structural-construction/v1:FACTOR_DIFFERENCE kind=PREPARATION target=(a - b) * (a + b)
+CATALOG_TASK id=difference-of-squares-powers work=2734 steps=1 syntaxMatch=true output=(m - n) * (m + n)
+CATALOG_STEP id=difference-of-squares-powers source=m ^ 2 - n ^ 2 rule=regelsuche.structural-construction/v1:FACTOR_DIFFERENCE kind=PREPARATION target=(m - n) * (m + n)
+CATALOG_TASK id=factor-common-left work=782 steps=1 syntaxMatch=true output=a * (x + y)
+CATALOG_STEP id=factor-common-left source=a * x + a * y rule=evo_3601297f9f7d_factor-left kind=PRIMITIVE target=a * (x + y)
+CATALOG_TASK id=factor-common-right work=784 steps=1 syntaxMatch=true output=(x + y) * a
+CATALOG_STEP id=factor-common-right source=x * a + y * a rule=evo_3601297f9f7d_factor-right kind=PRIMITIVE target=(x + y) * a
+CATALOG_TASK id=expand-binomial-square work=2331979 steps=7 syntaxMatch=false output=x ^ 2 + y ^ 2 + 2 * x * y
+CATALOG_STEP id=expand-binomial-square source=(x + y) ^ 2 rule=structural-expansion/v1:ast_power_two_to_product kind=BRIDGE target=(x + y) * (x + y)
+CATALOG_STEP id=expand-binomial-square source=(x + y) * (x + y) rule=structural-expansion/v1:ast_distribute_left_add kind=BRIDGE target=(x + y) * x + (x + y) * y
+CATALOG_STEP id=expand-binomial-square source=(x + y) * x + (x + y) * y rule=structural-expansion/v1:ast_distribute_right_add kind=BRIDGE target=x * x + y * x + (x + y) * y
+CATALOG_STEP id=expand-binomial-square source=x * x + y * x + (x + y) * y rule=structural-expansion/v1:ast_canonical_normalize kind=BRIDGE target=x * y + x ^ 2 + (x + y) * y
+CATALOG_STEP id=expand-binomial-square source=x * y + x ^ 2 + (x + y) * y rule=structural-expansion/v1:ast_distribute_right_add kind=BRIDGE target=x * y + x ^ 2 + x * y + y * y
+CATALOG_STEP id=expand-binomial-square source=x * y + x ^ 2 + x * y + y * y rule=evo_3601297f9f7d_square-product kind=PRIMITIVE target=x * y + x ^ 2 + x * y + y ^ 2
+CATALOG_STEP id=expand-binomial-square source=x * y + x ^ 2 + x * y + y ^ 2 rule=structural-expansion/v1:ast_double_term kind=BRIDGE target=x ^ 2 + y ^ 2 + 2 * x * y
+CATALOG_TASK id=reverse-difference-of-squares work=125405 steps=2 syntaxMatch=false output=a ^ 2 - b ^ 2
+CATALOG_STEP id=reverse-difference-of-squares source=(a - b) * (a + b) rule=structural-expansion/v1:ast_canonical_normalize kind=BRIDGE target=(a + b) * (a - b)
+CATALOG_STEP id=reverse-difference-of-squares source=(a + b) * (a - b) rule=evo_3601297f9f7d_difference-product kind=PRIMITIVE target=a ^ 2 - b ^ 2
+CATALOG_TASK id=sophie-germain work=43722 steps=5 syntaxMatch=true output=(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)
+CATALOG_STEP id=sophie-germain source=x ^ 4 + 4 * y ^ 4 rule=regelsuche.structural-construction/v1:EXPOSE_SQUARE kind=PREPARATION target=(x ^ 2) ^ 2 + 4 * y ^ 4
+CATALOG_STEP id=sophie-germain source=(x ^ 2) ^ 2 + 4 * y ^ 4 rule=regelsuche.structural-construction/v1:EXPOSE_SQUARE kind=PREPARATION target=(x ^ 2) ^ 2 + (2 * y ^ 2) ^ 2
+CATALOG_STEP id=sophie-germain source=(x ^ 2) ^ 2 + (2 * y ^ 2) ^ 2 rule=regelsuche.structural-construction/v1:COMPLETE_SQUARE kind=PREPARATION target=(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x ^ 2 * 2 * y ^ 2
+CATALOG_STEP id=sophie-germain source=(x ^ 2 + 2 * y ^ 2) ^ 2 - 2 * x ^ 2 * 2 * y ^ 2 rule=regelsuche.structural-construction/v1:EXPOSE_SQUARE kind=PREPARATION target=(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2
+CATALOG_STEP id=sophie-germain source=(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2 rule=regelsuche.structural-construction/v1:FACTOR_DIFFERENCE kind=PREPARATION target=(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)
+CATALOG_TASK_TOTAL positives=12 syntaxMatches=9 exactRequired=11 exactRequiredMatches=8
+CATALOG_CONTROL id=distribution-fitness-valley-control work=9668 output=x * a + x * b
+</pre>
+<button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="root-0-test-stdout-coversAllFrozenHistoricalInputsAtADeclaredStructuralGoal()">Copy</button>
+</span>
+</div>
+</div>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="https://www.gradle.org">Gradle 9.7.1</a> at Nov 6, 2026, 2:20:37 PM</p>
+</div>
+</div>
+</body>
+</html>

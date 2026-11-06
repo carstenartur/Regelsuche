@@ -79,65 +79,36 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
             de.regelsuche.search.moves.IncrementalProviderContract.Transport.TYPED_AST_JSON,
             de.regelsuche.search.moves.IncrementalProviderContract.Mathematics.EXACT, null);
 <span class="fc" id="L81">        var registration = new de.regelsuche.search.moves.IncrementalProviderContract.Registration(definition,</span>
-<span class="fc" id="L82">            (state, context, meter) -&gt; new ConstructionCursor(this, state, context, meter));</span>
+<span class="fc" id="L82">            (state, context, meter) -&gt; new AtomicTypedBatchCursor(this, state, context, meter));</span>
 <span class="fc" id="L83">        return new de.regelsuche.search.moves.RegisteredIncrementalMoveProvider(descriptor, definition,</span>
 <span class="fc" id="L84">            new de.regelsuche.search.moves.IncrementalProviderContract.Registry(List.of(registration)));</span>
     }
 
-    /** A batch is one bounded atomic load. Every candidate, including unconsumed ones, stays paid. */
-    private static final class ConstructionCursor implements de.regelsuche.search.moves.IncrementalProviderContract.Source {
-        private final StructuralConstructionProvider provider;
-        private final MoveState state;
-        private final MoveContext context;
-        private final de.regelsuche.search.moves.IncrementalProviderContract.Meter meter;
-        private Batch batch;
-        private int index;
-        ConstructionCursor(StructuralConstructionProvider provider, MoveState state, MoveContext context,
-<span class="fc" id="L96">                de.regelsuche.search.moves.IncrementalProviderContract.Meter meter) {</span>
-<span class="fc" id="L97">            this.provider = provider; this.state = state; this.context = context; this.meter = meter;</span>
-<span class="fc" id="L98">        }</span>
-        @Override public java.util.Optional&lt;Transformation&gt; next(long allowance) {
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative construction allowance&quot;);</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (allowance == 0) return java.util.Optional.empty();</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (batch == null) {</span>
-<span class="fc" id="L103">                batch = provider.candidates(state, context);</span>
-<span class="fc" id="L104">                meter.charge(de.regelsuche.search.moves.IncrementalProviderContract.Operation.LOAD, batch.work().totalWorkUnits());</span>
-<span class="fc" id="L105">                meter.charge(batch.work().candidateWork());</span>
-            }
-<span class="fc bfc" id="L107" title="All 2 branches covered.">            return index &lt; batch.moves().size() ? java.util.Optional.of(batch.moves().get(index++).transformation()) : java.util.Optional.empty();</span>
-        }
-        @Override public de.regelsuche.search.moves.IncrementalProviderContract.Status status() {
-<span class="pc bpc" id="L110" title="1 of 4 branches missed.">            return batch == null || index &lt; batch.moves().size()</span>
-<span class="fc" id="L111">                ? de.regelsuche.search.moves.IncrementalProviderContract.Status.READY</span>
-<span class="fc" id="L112">                : de.regelsuche.search.moves.IncrementalProviderContract.Status.INCONCLUSIVE;</span>
-        }
-    }
-
     TypedMoveSearch.Verifier verifier() {
-<span class="fc" id="L117">        return (source, move, context) -&gt; {</span>
-<span class="fc" id="L118">            var encoded = new MoveState(CODEC.encodeExpression(source.expression()), source.searchDepth(), source.primitiveDepth(),</span>
-<span class="fc" id="L119">                source.previousRule(), source.assumptions(), source.capabilities(), source.complexityDebt());</span>
-<span class="fc" id="L120">            var batch = candidates(encoded, new MoveContext(&quot;&quot;, context.initialAssumptions(), context.phase()));</span>
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            boolean accepted = move.sourceKind() == descriptor.sourceKind() &amp;&amp; batch.moves().stream()</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">                .anyMatch(expected -&gt; SearchMove.from(expected.transformation(), descriptor, move.generationCost()).equals(move));</span>
-<span class="fc" id="L123">            return new MoveVerifier.Verification(accepted, batch.work().totalWorkUnitsV2(),</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">                accepted ? List.of(&quot;construction-replayed:&quot; + move.provenance().contentHash()) : List.of(),</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">                accepted ? &quot;EXACT_CONSTRUCTION_REPLAYED&quot; : &quot;CONSTRUCTION_REPLAY_REJECTED&quot;);</span>
+<span class="fc" id="L88">        return (source, move, context) -&gt; {</span>
+<span class="fc" id="L89">            var encoded = new MoveState(CODEC.encodeExpression(source.expression()), source.searchDepth(), source.primitiveDepth(),</span>
+<span class="fc" id="L90">                source.previousRule(), source.assumptions(), source.capabilities(), source.complexityDebt());</span>
+<span class="fc" id="L91">            var batch = candidates(encoded, new MoveContext(&quot;&quot;, context.initialAssumptions(), context.phase()));</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            boolean accepted = move.sourceKind() == descriptor.sourceKind() &amp;&amp; batch.moves().stream()</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                .anyMatch(expected -&gt; SearchMove.from(expected.transformation(), descriptor, move.generationCost()).equals(move));</span>
+<span class="fc" id="L94">            return new MoveVerifier.Verification(accepted, batch.work().totalWorkUnitsV2(),</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                accepted ? List.of(&quot;construction-replayed:&quot; + move.provenance().contentHash()) : List.of(),</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                accepted ? &quot;EXACT_CONSTRUCTION_REPLAYED&quot; : &quot;CONSTRUCTION_REPLAY_REJECTED&quot;);</span>
         };
     }
 
     static final class VerifiedConstruction {
         private final ExactTheoryEvidence.Binding binding;
-<span class="fc" id="L131">        private VerifiedConstruction(String source, String target, String procedure, long work) {</span>
-<span class="fc" id="L132">            var content = new TreeMap&lt;String, Object&gt;();</span>
-<span class="fc" id="L133">            content.put(&quot;revision&quot;, REVISION); content.put(&quot;source&quot;, source); content.put(&quot;target&quot;, target);</span>
-<span class="fc" id="L134">            content.put(&quot;procedure&quot;, procedure); content.put(&quot;work&quot;, work);</span>
-<span class="fc" id="L135">            String json = CheckedSchemaSupport.JSON.valueToTree(content).toString();</span>
-<span class="fc" id="L136">            String hash = SchematicProofPlan.hash(json);</span>
-<span class="fc" id="L137">            binding = new ExactTheoryEvidence.Binding(source, target, procedure, hash, hash,</span>
-<span class="fc" id="L138">                SchematicProofPlan.hash(REVISION + source), work, json);</span>
-<span class="fc" id="L139">        }</span>
-<span class="fc" id="L140">        ExactTheoryEvidence.Binding binding() { return binding; }</span>
+<span class="fc" id="L102">        private VerifiedConstruction(String source, String target, String procedure, long work) {</span>
+<span class="fc" id="L103">            var content = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L104">            content.put(&quot;revision&quot;, REVISION); content.put(&quot;source&quot;, source); content.put(&quot;target&quot;, target);</span>
+<span class="fc" id="L105">            content.put(&quot;procedure&quot;, procedure); content.put(&quot;work&quot;, work);</span>
+<span class="fc" id="L106">            String json = CheckedSchemaSupport.JSON.valueToTree(content).toString();</span>
+<span class="fc" id="L107">            String hash = SchematicProofPlan.hash(json);</span>
+<span class="fc" id="L108">            binding = new ExactTheoryEvidence.Binding(source, target, procedure, hash, hash,</span>
+<span class="fc" id="L109">                SchematicProofPlan.hash(REVISION + source), work, json);</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        ExactTheoryEvidence.Binding binding() { return binding; }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
