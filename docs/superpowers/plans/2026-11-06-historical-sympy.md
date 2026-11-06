@@ -32,15 +32,15 @@
 
 **Interfaces:** Java accepts `initialize`/`restore`/`run` JSONL operations over existing public task APIs. Python workers receive only task payloads; `audit_task(task, response)` validates any reported result independently. `run_historical --protocol --classpath --output` retains the full experiment; `--verify --output` verifies without executing competitors.
 
-- [ ] Freeze protocol and write literal negative tests for shape, identity, recurrence binding, relabeling, incomplete matrices and failed startup ownership.
-- [ ] Run and retain the failing tests before implementation.
-- [ ] Implement the adapters, independent auditor, complete lifecycle runner and strict verifier; run targeted Java and Python tests.
-- [ ] Commit the runnable source before the first full measurement; execute the exact frozen protocol and retain every outcome.
+- [x] Freeze protocol and write literal negative tests for shape, identity, recurrence binding, relabeling, incomplete matrices and failed startup ownership.
+- [x] Run and retain the failing tests before implementation.
+- [x] Implement the adapters, independent auditor, complete lifecycle runner and strict verifier; run targeted Java and Python tests.
+- [x] Commit the runnable source before the first full measurement; execute the exact frozen protocol and retain every outcome.
 
 ### Task 2: Qualification and report
 
 **Files:** `docs/research/historical-sympy-comparison-2026-11-06.md`, numeric summary and source/evidence links.
 
-- [ ] Independently reverify original evidence, derive per-case quality and matched-quality resource summaries without retuning inputs or algorithms.
+- [x] Independently reverify original evidence, derive per-case quality and matched-quality resource summaries without retuning inputs or algorithms.
 - [ ] Obtain a fresh whole-change review, reproduce/fix substantive findings, and rerun affected tests.
 - [ ] Publish one focused PR and complete evidence; distinguish classical tasks, development variants and NOT_MEASURED gaps in the German result.

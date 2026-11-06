@@ -639,3 +639,7 @@ To reproduce the shared catalog test and its step log with the checkout's Java
 mvn -pl regelsuche-autopilot -am -Dtest=HistoricalCatalogTaskCoverageTest \
     -Dsurefire.failIfNoSpecifiedTests=false test
 ```
+
+The [2026-11-06 direct historical comparison](historical-sympy-comparison-2026-11-06.md)
+tests the factorization and two-square goals against SymPy, with independent exact
+audits and measured acquisition/persistence/fresh-process costs.
