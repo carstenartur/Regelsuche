@@ -58,11 +58,8 @@ public final class RecurrenceInvariantFamily {
             Objects.requireNonNull(source); Objects.requireNonNull(budget);
             var work=new Work(budget.maxWorkUnits());
             try {
-                work.add(2L+source.linear().columns()*(source.linear().columns()+1));
-                if (!matches(source)) return specialized(Outcome.REJECTED, Optional.empty(),work);
-                work.add(1L+intercept.termCount()+slope.termCount());
-                var polynomial=intercept.add(slope.multiply(cell(source,coordinate)));
-                if (polynomial.totalDegree()==0) return specialized(Outcome.REJECTED,Optional.empty(),work);
+                var polynomial=checkedSpecialization(source,work);
+                if (polynomial==null) return specialized(Outcome.REJECTED,Optional.empty(),work);
                 var text=polynomial.toCanonicalString(); work.add(text.length());
                 if (text.length()>RecurrenceInvariantSynthesis.MAX_PROPOSAL_LENGTH)
                     return specialized(Outcome.UNSUPPORTED,Optional.empty(),work);
@@ -70,6 +67,19 @@ public final class RecurrenceInvariantFamily {
             } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
                 return specialized(Outcome.BUDGET_INCONCLUSIVE,Optional.empty(),work);
             }
+        }
+
+        /**
+         * Instantiation of this issuer-owned universal proof, not a supplied proposal.
+         * The verifier consumes the exact polynomial directly, so a serialized or
+         * caller-constructed Specialization cannot become proof authority.
+         */
+        Polynomial checkedSpecialization(Transition source, Work work) {
+            work.add(2L+source.linear().columns()*(source.linear().columns()+1));
+            if (!matches(source)) return null;
+            work.add(1L+intercept.termCount()+slope.termCount());
+            var polynomial=intercept.add(slope.multiply(cell(source,coordinate)));
+            return polynomial.totalDegree()==0 ? null : polynomial;
         }
     }
 

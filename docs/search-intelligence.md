@@ -256,6 +256,27 @@ rediscovery, mathematical novelty or general search superiority. Results
 establish only bounded reachability and search-policy behavior for the frozen
 representation, inventory and budgets.
 
+For a `VALUE_EQUIVALENT` case, semantic equality to the known target alone
+does not count as rediscovery: the unchanged source is already equivalent for
+every valid identity. After the search has finished, the atlas additionally
+uses the existing representation correspondence classifier. It requires a
+positive-depth occurrence in the target's associative/commutative structural
+class, and rejects a source that already belongs to that class. This is a
+conservative post-search diagnostic, not an unrestricted test for all useful
+factorizations or a mathematical proof; the target is not supplied to either
+target-blind search. The existing value-equivalence check remains separate.
+The search evidence records `POST_SEARCH_AC_REPRESENTATION_V1` in
+`detail` for this criterion. The target-aware oracle uses the same target
+relation while retaining separate search-state identities; it does not merge
+states simply because their representations correspond. A source already in the
+target representation is reported separately from a rediscovery. A guided run
+can terminate upon value equivalence before reaching the requested representation;
+its terminal status records that mismatch. New atlas outputs use schema `v2`,
+and older `v1` runs remain readable. Compare counts only after rerunning the
+same evaluation revision. Previously distributed v1 validators reject reports
+that reference the v2 atlas or use the added status values; update those
+validators before consuming new output.
+
 ## Universal patterns
 
 `GlobalMemoryService` scores canonical states by visit count, distinct rule

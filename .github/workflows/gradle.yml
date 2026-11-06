@@ -32,7 +32,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Install checkout prerequisites
         run: |
@@ -92,7 +92,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Install isolated benchmark prerequisites
         run: |
@@ -132,7 +132,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Install isolated SymPy runtime prerequisites
         run: |
@@ -217,7 +217,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Run the checkout-owned polynomial pilot and independent verification
         run: bash gradle/run-external-polynomial-comparison.sh
@@ -245,12 +245,14 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Run typed comparison and independent verification
         run: bash gradle/run-typed-external-polynomial-comparison.sh
       - name: Run checked-schema fresh-process lifecycle comparison
         run: bash gradle/run-checked-schema-comparison.sh
+      - name: Run native polynomial quality comparison
+        run: bash gradle/run-native-polynomial-comparison.sh
       - name: Retain every outcome and test receipt
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -259,6 +261,7 @@ jobs:
           path: |
             build/reports/typed-external-polynomial-comparison/**
             build/reports/learned-schema-efficiency-v2/**
+            build/reports/native-polynomial-comparison/**
             regelsuche-search/build/test-results/**
             regelsuche-learning/build/test-results/**
           if-no-files-found: error
@@ -433,7 +436,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         timeout-minutes: 5
         with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         timeout-minutes: 5
         with: { cache-cleanup: on-success }
       - name: Install the same isolated benchmark prerequisites
@@ -518,7 +521,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         timeout-minutes: 5
         with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         timeout-minutes: 5
         with: { cache-cleanup: on-success }
       - name: Install the same isolated benchmark prerequisites

@@ -37,7 +37,20 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
         var source = CODEC.decodeExpression(state.expression());
         var generated = StructuralConstructionPrograms.generate(operation, source);
         long[] work = {generated.work()};
-        var exact = new ExactPolynomialAnalysis(units -> work[0] = Math.addExact(work[0], units));
+        java.util.function.LongConsumer account = units -> work[0] = Math.addExact(work[0], units);
+        var exact = operation == StructuralConstructionPrograms.Operation.BINARY_QUARTIC
+                || operation == StructuralConstructionPrograms.Operation.RESIDUAL_EXPANDED
+                || operation == StructuralConstructionPrograms.Operation.AUXILIARY_COMPLEMENT
+                || operation == StructuralConstructionPrograms.Operation.AUXILIARY_FACTOR
+                || operation == StructuralConstructionPrograms.Operation.RECOGNIZE_SQUARE
+                || operation == StructuralConstructionPrograms.Operation.RECOGNIZE_METERED_SQUARE
+                || operation == StructuralConstructionPrograms.Operation.RECOGNIZE_RATIONAL_SQUARE
+                || operation == StructuralConstructionPrograms.Operation.RATIONAL_EXPOSE_SQUARE
+                || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_CANONICAL
+                || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_EXPANDED
+                || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_COMMON_FACTOR
+                || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR
+            ? ExactPolynomialAnalysis.withProductWork(account) : new ExactPolynomialAnalysis(account);
         String input = ExpressionFormatter.format(source); work[0] = Math.addExact(work[0], input.length());
         var proofs = new ArrayList<Transformation>();
         var seen = new java.util.HashSet<String>();
@@ -70,38 +83,9 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
             de.regelsuche.search.moves.IncrementalProviderContract.Transport.TYPED_AST_JSON,
             de.regelsuche.search.moves.IncrementalProviderContract.Mathematics.EXACT, null);
         var registration = new de.regelsuche.search.moves.IncrementalProviderContract.Registration(definition,
-            (state, context, meter) -> new ConstructionCursor(this, state, context, meter));
+            (state, context, meter) -> new AtomicTypedBatchCursor(this, state, context, meter));
         return new de.regelsuche.search.moves.RegisteredIncrementalMoveProvider(descriptor, definition,
             new de.regelsuche.search.moves.IncrementalProviderContract.Registry(List.of(registration)));
-    }
-
-    /** A batch is one bounded atomic load. Every candidate, including unconsumed ones, stays paid. */
-    private static final class ConstructionCursor implements de.regelsuche.search.moves.IncrementalProviderContract.Source {
-        private final StructuralConstructionProvider provider;
-        private final MoveState state;
-        private final MoveContext context;
-        private final de.regelsuche.search.moves.IncrementalProviderContract.Meter meter;
-        private Batch batch;
-        private int index;
-        ConstructionCursor(StructuralConstructionProvider provider, MoveState state, MoveContext context,
-                de.regelsuche.search.moves.IncrementalProviderContract.Meter meter) {
-            this.provider = provider; this.state = state; this.context = context; this.meter = meter;
-        }
-        @Override public java.util.Optional<Transformation> next(long allowance) {
-            if (allowance < 0) throw new IllegalArgumentException("negative construction allowance");
-            if (allowance == 0) return java.util.Optional.empty();
-            if (batch == null) {
-                batch = provider.candidates(state, context);
-                meter.charge(de.regelsuche.search.moves.IncrementalProviderContract.Operation.LOAD, batch.work().totalWorkUnits());
-                meter.charge(batch.work().candidateWork());
-            }
-            return index < batch.moves().size() ? java.util.Optional.of(batch.moves().get(index++).transformation()) : java.util.Optional.empty();
-        }
-        @Override public de.regelsuche.search.moves.IncrementalProviderContract.Status status() {
-            return batch == null || index < batch.moves().size()
-                ? de.regelsuche.search.moves.IncrementalProviderContract.Status.READY
-                : de.regelsuche.search.moves.IncrementalProviderContract.Status.INCONCLUSIVE;
-        }
     }
 
     TypedMoveSearch.Verifier verifier() {

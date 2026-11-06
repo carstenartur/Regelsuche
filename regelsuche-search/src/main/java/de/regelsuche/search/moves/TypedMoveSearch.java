@@ -74,7 +74,7 @@ public final class TypedMoveSearch {
             assumptions = List.copyOf(assumptions);
             capabilities = Set.copyOf(capabilities);
         }
-        private static State decode(MoveState state) {
+        static State decode(MoveState state) {
             return new State(CODEC.decodeExpression(state.expression()), state.searchDepth(), state.primitiveDepth(),
                 state.previousRule(), state.assumptions(), state.capabilities(), state.complexityDebt());
         }
@@ -165,12 +165,27 @@ public final class TypedMoveSearch {
 
     public QualityResult searchUntil(Problem problem, TypedSourceOnlySearch.Objective objective,
             long maximumOutputScore, SearchContinuationContract contract) {
+        return searchQuality(problem, objective, maximumOutputScore, contract, true);
+    }
+
+    /** Continue the existing quality search through the bounded frontier without a target expression. */
+    public QualityResult searchBest(Problem problem, TypedSourceOnlySearch.Objective objective,
+            SearchContinuationContract contract) {
+        return searchQuality(problem, objective, 0, contract, false);
+    }
+
+    private QualityResult searchQuality(Problem problem, TypedSourceOnlySearch.Objective objective,
+            long maximumOutputScore, SearchContinuationContract contract, boolean stopAtQuality) {
+        Objects.requireNonNull(problem, "problem");
         Objects.requireNonNull(objective, "objective");
         if (!problem.context().sourceOnly()) throw new IllegalArgumentException("source-only context required");
-        var result = new MoveSearch().searchUntil(encode(problem), state -> {
+        MoveSearch.Objective encodedObjective = state -> {
             var score = Objects.requireNonNull(objective.evaluate(State.decode(state)), "objective assessment");
             return new MoveSearch.ObjectiveScore(score.value(), score.work());
-        }, maximumOutputScore, contract);
+        };
+        var search = new MoveSearch();
+        var result = stopAtQuality ? search.searchUntil(encode(problem), encodedObjective, maximumOutputScore, contract)
+            : search.searchBest(encode(problem), encodedObjective, contract);
         return new QualityResult(decode(result.search()), State.decode(result.incumbent()), result.inputScore(),
             result.outputScore(), result.witness().stream().map(TypedMoveSearch::decode).toList(), result.objectiveWork());
     }

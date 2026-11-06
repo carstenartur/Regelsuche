@@ -38,6 +38,9 @@ public final class HistoricalRediscoveryReportPipeline {
         HistoricalRediscoveryAtlas atlas,
         AtlasReport report
     ) {
+        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(report.schema())) {
+            throw new IllegalArgumentException("historical atlas evaluation revision differs");
+        }
         verifyRetainedClaims(report);
 
         HistoricalWitnessPruningDiagnostic pruning =

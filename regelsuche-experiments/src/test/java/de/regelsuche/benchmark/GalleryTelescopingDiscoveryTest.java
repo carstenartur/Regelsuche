@@ -94,7 +94,7 @@ class HistoricalProductionSearchComparisonTest {
     }
 
     @Test
-    void semanticScalarMatchDoesNotRequireAnOracleWitness() throws Exception {
+    void equivalentSourceWithoutAProductionWitnessIsNotRediscovery() throws Exception {
         ComparisonFixture fixture = compareCase("sophie-germain");
         var result = fixture.primary().cases().get(0);
         var equalWork = fixture.equalWork().cases().get(0);
@@ -102,7 +102,8 @@ class HistoricalProductionSearchComparisonTest {
         assertEquals(
             ComparisonStatus.NOT_APPLICABLE_NO_PRODUCTION_WITNESS,
             result.status());
-        assertTrue(result.scalar().reachedRelation());
+        assertFalse(result.scalar().reachedRelation());
+        assertFalse(result.diversity().reachedRelation());
         assertEquals(0, result.oracleWitnessStepCount());
         assertEquals(CaseStatus.NO_PRODUCTION_WITNESS, equalWork.status());
         assertTrue(equalWork.checkpoints().isEmpty());

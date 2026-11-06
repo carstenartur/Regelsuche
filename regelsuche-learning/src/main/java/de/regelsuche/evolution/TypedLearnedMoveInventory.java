@@ -88,6 +88,16 @@ public final class TypedLearnedMoveInventory {
         return new CheckedSchemaTaskSolver(newSearchSession(false, 0, 0), null);
     }
 
+    /** Apply one explicitly selected capability profile to the same primitive frontier. */
+    public CheckedSchemaTaskSolver newTaskSolverWithProfile(TaskConstructionProfile profile) {
+        return java.util.Objects.requireNonNull(profile, "profile").attach(newTaskSolver());
+    }
+
+    /** Primitive and learned solving use the same selected native capabilities. */
+    public CheckedSchemaTaskSolver newTaskSolverWithProfile(CheckedLearnedSchemaModel model, TaskConstructionProfile profile) {
+        return java.util.Objects.requireNonNull(profile, "profile").attach(newTaskSolver(model));
+    }
+
     /**
      * Prepare all independently proved schemata once. Each solve opens fresh lazy cursors and
      * keeps the primitive fallback; this does not change the historical exploration sessions.

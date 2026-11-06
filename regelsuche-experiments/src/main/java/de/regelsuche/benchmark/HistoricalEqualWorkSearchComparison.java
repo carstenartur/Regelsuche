@@ -5,9 +5,7 @@ import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.CaseResult;
 import de.regelsuche.benchmark.HistoricalRediscoveryAtlas.OracleEvidence;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Case;
 import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Corpus;
-import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
@@ -65,8 +63,7 @@ public final class HistoricalEqualWorkSearchComparison {
     private final ExpressionCanonicalizer canonicalizer =
         new ExpressionCanonicalizer();
     private final ExpressionScorer scorer = new ExpressionScorer();
-    private final SymPyEquivalenceService equivalence =
-        new SymPyEquivalenceService();
+    private final HistoricalRediscoveryMatch matcher = new HistoricalRediscoveryMatch();
 
     public static void main(String[] args) {
         if (args.length == 0
@@ -131,6 +128,14 @@ public final class HistoricalEqualWorkSearchComparison {
                 oracle.status(),
                 0);
         }
+        if (oracle.witnessExpressions().isEmpty()) {
+            return EqualWorkCase.skipped(
+                benchmarkCase.id(),
+                CaseStatus.SOURCE_ALREADY_REPRESENTED,
+                atlasCase.status().name(),
+                oracle.status(),
+                0);
+        }
         if (atlasCase.production().scalar().reached()) {
             return EqualWorkCase.skipped(
                 benchmarkCase.id(),
@@ -138,10 +143,6 @@ public final class HistoricalEqualWorkSearchComparison {
                 atlasCase.status().name(),
                 oracle.status(),
                 oracle.witnessExpressions().size());
-        }
-        if (oracle.witnessExpressions().isEmpty()) {
-            throw new IllegalStateException(
-                "reachable oracle witness is empty for " + benchmarkCase.id());
         }
         List<Checkpoint> checkpoints = CHECKPOINTS.stream()
             .map(budget -> checkpoint(benchmarkCase, atlasCase, budget))
@@ -233,7 +234,7 @@ public final class HistoricalEqualWorkSearchComparison {
         String terminal
     ) {
         return new Policy(
-            findMatch(benchmarkCase, target, states) != null,
+            matcher.find(benchmarkCase, target, states).isPresent(),
             prefix(witness, states),
             states.size(),
             engine.calls(),
@@ -285,30 +286,6 @@ public final class HistoricalEqualWorkSearchComparison {
         return result;
     }
 
-    private SearchState findMatch(
-        Case benchmarkCase,
-        String target,
-        List<SearchState> states
-    ) {
-        return states.stream()
-            .filter(state -> matches(benchmarkCase, state.expression(), target))
-            .min(Comparator.comparingInt(SearchState::depth)
-                .thenComparing(SearchState::expression)
-                .thenComparing(state -> String.join("->", state.appliedRuleIds())))
-            .orElse(null);
-    }
-
-    private boolean matches(Case value, String expression, String target) {
-        if (value.targetRelation() == TargetRelation.SYNTAX_EXACT) {
-            try {
-                return format(expression).equals(target);
-            } catch (IllegalArgumentException exception) {
-                return false;
-            }
-        }
-        return equivalence.areEquivalent(expression, target);
-    }
-
     private String key(String expression) {
         try {
             return format(expression);
@@ -333,7 +310,8 @@ public final class HistoricalEqualWorkSearchComparison {
             .map(Case::id).collect(Collectors.toSet());
         Set<String> atlasIds = atlas.cases().stream()
             .map(value -> value.benchmarkCase().id()).collect(Collectors.toSet());
-        if (!corpus.schema().equals(atlas.corpusSchema())
+        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlas.schema())
+                || !corpus.schema().equals(atlas.corpusSchema())
                 || !corpus.contentSha256().equals(atlas.corpusSha256())
                 || !corpus.inventoryRevision().equals(atlas.inventoryRevision())
                 || !corpus.claimBoundary().equals(atlas.claimBoundary())
@@ -345,6 +323,7 @@ public final class HistoricalEqualWorkSearchComparison {
 
     public enum CaseStatus {
         NO_PRODUCTION_WITNESS,
+        SOURCE_ALREADY_REPRESENTED,
         SCALAR_ALREADY_REACHED,
         EXECUTED_ORACLE_WITNESS_SCALAR_MISS
     }
@@ -497,7 +476,8 @@ public final class HistoricalEqualWorkSearchComparison {
             }
             boolean executed = status
                 == CaseStatus.EXECUTED_ORACLE_WITNESS_SCALAR_MISS;
-            boolean witnessRequired = status != CaseStatus.NO_PRODUCTION_WITNESS;
+            boolean witnessRequired = status != CaseStatus.NO_PRODUCTION_WITNESS
+                && status != CaseStatus.SOURCE_ALREADY_REPRESENTED;
             if (executed != !checkpoints.isEmpty()
                     || executed && checkpoints.size() != CHECKPOINTS.size()
                     || witnessRequired && oracleWitnessStepCount < 1

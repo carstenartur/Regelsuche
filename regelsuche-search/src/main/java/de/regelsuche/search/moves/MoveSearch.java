@@ -118,9 +118,18 @@ public final class MoveSearch {
         return LegacySearchExecution.project(problem,raw);
     }
     public QualityResult searchUntil(Problem problem,Objective objective,long maximumOutputScore,SearchContinuationContract contract) {
+        return searchQuality(problem, objective, maximumOutputScore, contract, true);
+    }
+    /** Explore the bounded frontier after the first acceptable state while retaining its best verified incumbent. */
+    public QualityResult searchBest(Problem problem, Objective objective, SearchContinuationContract contract) {
+        return searchQuality(problem, objective, 0, contract, false);
+    }
+    private QualityResult searchQuality(Problem problem, Objective objective, long maximumOutputScore,
+            SearchContinuationContract contract, boolean stopAtQuality) {
         if (!problem.context().goal().isEmpty() || problem.mode()!=Mode.FAST)
             throw new IllegalArgumentException("quality stopping requires source-only FAST search");
-        var online = new MoveSearchObjective<MoveState,SearchMove,MoveVerifier.Verification>(objective::evaluate,maximumOutputScore);
+        java.util.Objects.requireNonNull(objective, "objective");
+        var online = new MoveSearchObjective<MoveState,SearchMove,MoveVerifier.Verification>(objective::evaluate,maximumOutputScore,stopAtQuality);
         var raw = new MoveSearchKernel<String,MoveState,SearchMove,StateValue.Assessment,MoveVerifier.Verification>()
             .search(new LegacySearchExecution(problem),contract,online);
         return new QualityResult(LegacySearchExecution.project(problem,raw),online.incumbent(),online.inputScore(),online.outputScore(),

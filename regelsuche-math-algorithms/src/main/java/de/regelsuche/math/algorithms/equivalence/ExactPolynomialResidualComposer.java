@@ -44,9 +44,16 @@ public final class ExactPolynomialResidualComposer {
     public ExactPolynomialResidualComposer() { this(null); }
 
     /** Optional logical node/term and combination accounting; the mathematical contract is unchanged. */
-    public ExactPolynomialResidualComposer(java.util.function.LongConsumer workObserver) {
+    public ExactPolynomialResidualComposer(java.util.function.LongConsumer workObserver) { this(workObserver, false); }
+
+    private ExactPolynomialResidualComposer(java.util.function.LongConsumer workObserver, boolean includeProductWork) {
         this.workObserver = workObserver;
-        arithmetic = new ExactResidualPolynomialArithmetic(workObserver);
+        arithmetic = new ExactResidualPolynomialArithmetic(workObserver, includeProductWork);
+    }
+
+    /** Include bounded monomial-product work in the supplied logical-work receipt. */
+    public static ExactPolynomialResidualComposer withProductWork(java.util.function.LongConsumer workObserver) {
+        return new ExactPolynomialResidualComposer(Objects.requireNonNull(workObserver), true);
     }
 
     private void work(long count) { if (workObserver != null) workObserver.accept(count); }
