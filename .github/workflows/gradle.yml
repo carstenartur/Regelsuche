@@ -251,6 +251,8 @@ jobs:
         run: bash gradle/run-typed-external-polynomial-comparison.sh
       - name: Run checked-schema fresh-process lifecycle comparison
         run: bash gradle/run-checked-schema-comparison.sh
+      - name: Run native polynomial quality comparison
+        run: bash gradle/run-native-polynomial-comparison.sh
       - name: Retain every outcome and test receipt
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -259,6 +261,7 @@ jobs:
           path: |
             build/reports/typed-external-polynomial-comparison/**
             build/reports/learned-schema-efficiency-v2/**
+            build/reports/native-polynomial-comparison/**
             regelsuche-search/build/test-results/**
             regelsuche-learning/build/test-results/**
           if-no-files-found: error
