@@ -101,33 +101,54 @@ final class StructuralExpansionRules {
     }
 
     static <T> Observation<T> observe(Supplier<T> operation) {
+        return observe(operation, Long.MAX_VALUE);
+    }
+
+    static <T> Observation<T> observe(Supplier<T> operation, long maximumWork) {
+        if (maximumWork < 0) throw new IllegalArgumentException("negative observation work limit");
         if (RetainedOperation.isObserved())
             throw new IllegalStateException("nested retained-operation accounting is not supported");
-        var meter = new Meter();
+        var meter = new Meter(maximumWork);
         try (var scope = RetainedOperation.open(meter)) {
-            return new Observation<>(operation.get(), meter);
+            return new Observation<>(operation.get(), meter, false);
+        } catch (ProcedureWorkLimitExceeded exhausted) {
+            return new Observation<>(null, meter, true);
         } catch (RuntimeException failure) {
             throw new CheckedSchemaTaskSolver.ProviderFailure(meter.total(), failure);
         }
     }
 
     /** Carries the mutable meter until the observation scope has charged its close. */
-    record Observation<T>(T value, Meter meter) {
+    record Observation<T>(T value, Meter meter, boolean exhausted) {
         long work() { return meter.total(); }
     }
 
     private static final class Meter implements RetainedOperation.Sink {
+        private final long maximumWork;
         private long total;
+        private boolean limitSignalled;
+        private Meter(long maximumWork) { this.maximumWork = maximumWork; }
         @Override public void executionWork(long units) { add(units); }
         @Override public void validationWork(long units) { add(units); }
-        @Override public void checkpoint() { }
+        @Override public void checkpoint() { checkLimit(); }
         @Override public long observedWork() { return total; }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
         long total() { return total; }
         private void add(long units) {
             if (units < 0) throw new IllegalArgumentException("negative observed work");
             total = Math.addExact(total, units);
+            checkLimit();
         }
+        private void checkLimit() {
+            if (total > maximumWork && !limitSignalled) {
+                limitSignalled = true;
+                throw new ProcedureWorkLimitExceeded();
+            }
+        }
+    }
+
+    private static final class ProcedureWorkLimitExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
     }
 
     /** A private namespace keeps external inventory identifiers from granting authority to another rule. */

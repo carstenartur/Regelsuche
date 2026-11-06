@@ -259,9 +259,10 @@ class MavenParallelVerificationWorkflowContractTest {
     List<JsonNode> commands = steps.stream().filter(step -> step.has("run")).toList();
     assertEquals(List.of(
         "bash gradle/run-typed-external-polynomial-comparison.sh",
-        "bash gradle/run-checked-schema-comparison.sh"),
+        "bash gradle/run-checked-schema-comparison.sh",
+        "bash gradle/run-native-polynomial-comparison.sh"),
         commands.stream().map(command -> command.path("run").asText()).toList(),
-        "both versioned checkout-owned comparisons must run, in prerequisite order");
+        "all three versioned checkout-owned comparisons must run, in prerequisite order");
     for (JsonNode command : commands) {
       assertFalse(command.has("if"));
       assertFalse(command.has("continue-on-error"));
@@ -282,6 +283,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertEquals(List.of(
         "build/reports/typed-external-polynomial-comparison/**",
         "build/reports/learned-schema-efficiency-v2/**",
+        "build/reports/native-polynomial-comparison/**",
         "regelsuche-search/build/test-results/**",
         "regelsuche-learning/build/test-results/**"),
         upload.path("with").path("path").asText().lines().toList());

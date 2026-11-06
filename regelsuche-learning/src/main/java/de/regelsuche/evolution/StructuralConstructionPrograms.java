@@ -25,7 +25,8 @@ import java.util.List;
 final class StructuralConstructionPrograms {
     enum Operation { EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE,
         BINARY_QUARTIC, RESIDUAL_EXPANDED, AUXILIARY_COMPLEMENT, AUXILIARY_FACTOR, RECOGNIZE_SQUARE,
-        RATIONAL_EXPOSE_SQUARE, RECOGNIZE_RATIONAL_SQUARE, RECOGNIZE_METERED_SQUARE }
+        RATIONAL_EXPOSE_SQUARE, RECOGNIZE_RATIONAL_SQUARE, RECOGNIZE_METERED_SQUARE,
+        POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR }
     record Report(List<String> candidates, long work) { Report { candidates = List.copyOf(candidates); } }
     private static final long LIMIT = 100_000;
     private StructuralConstructionPrograms() { }
@@ -54,6 +55,8 @@ final class StructuralConstructionPrograms {
                 case RATIONAL_EXPOSE_SQUARE -> apply(new ExactMonomialSquareExposureOperator(8, work::add), text, work);
                 case RECOGNIZE_RATIONAL_SQUARE -> recognizeSquare(text, work, true, true);
                 case RECOGNIZE_METERED_SQUARE -> recognizeSquare(text, work, false, true);
+                case POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR ->
+                    PolynomialSimplificationPrograms.generate(operation, source, LIMIT - work.units, work::add);
             };
             return new Report(candidates, work.units);
         } catch (Limit | IllegalArgumentException unsupported) {
