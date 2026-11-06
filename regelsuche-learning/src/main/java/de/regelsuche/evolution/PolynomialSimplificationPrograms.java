@@ -25,11 +25,13 @@ import java.util.function.LongConsumer;
 final class PolynomialSimplificationPrograms {
     private PolynomialSimplificationPrograms() { }
 
-    static List<String> generate(StructuralConstructionPrograms.Operation operation, Expr source, LongConsumer work) {
+    static List<String> generate(StructuralConstructionPrograms.Operation operation, Expr source, long maximumWork,
+            LongConsumer work) {
+        var accounting = new ProcedureWork(maximumWork, work);
         if (operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR) {
             var results = new LinkedHashSet<Expr>();
-            subtrees(source, subtree -> factor(subtree, work), results, work);
-            return render(results, work);
+            subtrees(source, subtree -> factor(subtree, accounting), results, accounting);
+            return render(results, accounting);
         }
         var measured = StructuralExpansionRules.observe(() -> {
             var results = new LinkedHashSet<Expr>();
@@ -46,18 +48,20 @@ final class PolynomialSimplificationPrograms {
                 default -> throw new IllegalArgumentException("not a polynomial simplification operation");
             }
             return results;
-        });
-        work.accept(measured.work());
-        return render(measured.value(), work);
+        }, accounting.remaining());
+        accounting.accept(measured.work());
+        if (measured.exhausted()) return List.of();
+        return render(measured.value(), accounting);
     }
 
-    private static List<String> render(Iterable<Expr> candidates, LongConsumer work) {
+    private static List<String> render(Iterable<Expr> candidates, ProcedureWork work) {
         var observed = StructuralExpansionRules.observe(() -> {
             var output = new ArrayList<String>();
             for (Expr candidate : candidates) output.add(ExpressionFormatter.format(compact(candidate)));
             return List.copyOf(output);
-        });
+        }, work.remaining());
         work.accept(observed.work());
+        if (observed.exhausted()) return List.of();
         for (String output : observed.value()) work.accept(output.length());
         return observed.value();
     }
@@ -86,12 +90,13 @@ final class PolynomialSimplificationPrograms {
         }
     }
 
-    private static List<Expr> factor(Expr source, LongConsumer work) {
+    private static List<Expr> factor(Expr source, ProcedureWork work) {
         work.accept(1);
         if (!(source instanceof BinaryExpr binary)
                 || binary.operator() != BinaryOperator.ADD && binary.operator() != BinaryOperator.SUB) return List.of();
-        var formatted = StructuralExpansionRules.observe(() -> ExpressionFormatter.format(source));
+        var formatted = StructuralExpansionRules.observe(() -> ExpressionFormatter.format(source), work.remaining());
         work.accept(formatted.work());
+        if (formatted.exhausted()) return List.of();
         String text = formatted.value();
         work.accept(text.length());
         var parsed = new ExpressionParser().parseExactTerm(text);
@@ -161,5 +166,21 @@ final class PolynomialSimplificationPrograms {
             : new BinaryExpr(new NumberExpr(de.regelsuche.scalar.ExactRational.integer(value.numerator())), BinaryOperator.MUL, term);
         return new BinaryExpr(numerator, BinaryOperator.DIV,
             new NumberExpr(de.regelsuche.scalar.ExactRational.integer(value.denominator())));
+    }
+
+    private static final class ProcedureWork implements LongConsumer {
+        private final long maximumWork;
+        private final LongConsumer delegate;
+        private long consumed;
+        private ProcedureWork(long maximumWork, LongConsumer delegate) {
+            if (maximumWork < 0) throw new IllegalArgumentException("negative procedure work limit");
+            this.maximumWork = maximumWork;
+            this.delegate = delegate;
+        }
+        @Override public void accept(long units) {
+            delegate.accept(units);
+            consumed = Math.addExact(consumed, units);
+        }
+        private long remaining() { return maximumWork - consumed; }
     }
 }

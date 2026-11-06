@@ -56,7 +56,7 @@ final class StructuralConstructionPrograms {
                 case RECOGNIZE_RATIONAL_SQUARE -> recognizeSquare(text, work, true, true);
                 case RECOGNIZE_METERED_SQUARE -> recognizeSquare(text, work, false, true);
                 case POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR ->
-                    PolynomialSimplificationPrograms.generate(operation, source, work::add);
+                    PolynomialSimplificationPrograms.generate(operation, source, LIMIT - work.units, work::add);
             };
             return new Report(candidates, work.units);
         } catch (Limit | IllegalArgumentException unsupported) {

@@ -106,16 +106,19 @@ class NativeComparisonTest(unittest.TestCase):
 
     def test_initial_ready_timeout_retains_its_actual_process_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
-            protocol = dict(cases=[dict(id='a', source='x')], setupTimeoutSeconds=.08, queryTimeoutSeconds=1)
+            protocol = dict(cases=[dict(id='a', source='x')], profiles=['NATIVE_BASE'], repetitions=1,
+                            setupTimeoutSeconds=.08, queryTimeoutSeconds=1)
             command = [sys.executable, '-u', '-c', 'import time; time.sleep(10)']
             sequence, rows = native._sequence(protocol, 'NATIVE_BASE', 0, command, Path(directory))
             self.assertFalse(sequence['complete'])
+            self.assertIn('Empty', sequence['error'])
             self.assertEqual(1, len(sequence['workers']))
             receipt = sequence['workers'][0]
             self.assertGreater(receipt['pid'], 0)
             self.assertIsNotNone(receipt['cpu'])
             self.assertNotEqual(0, receipt['exitCode'])
             self.assertEqual('BLOCKED_WORKER_UNAVAILABLE', rows[0]['response']['status'])
+            native.validate_sequences(protocol, dict(sequences=[sequence]), rows)
 
     def test_unavailable_measurements_are_explicitly_incomplete(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -131,7 +134,8 @@ class NativeComparisonTest(unittest.TestCase):
 
     def test_consumer_ready_timeout_does_not_repeat_the_producer_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
-            protocol = dict(cases=[dict(id='a', source='x')], setupTimeoutSeconds=.3, queryTimeoutSeconds=1)
+            protocol = dict(cases=[dict(id='a', source='x')], profiles=['NATIVE_LEARNED'], repetitions=1,
+                            setupTimeoutSeconds=.3, queryTimeoutSeconds=1)
             protocol.update(dict.fromkeys(native.SETTINGS, 1))
             model = '{}'
             acquired = dict(status='ACQUIRED', profile='NATIVE_LEARNED', settings={k: protocol[k] for k in native.SETTINGS},
@@ -146,10 +150,12 @@ class NativeComparisonTest(unittest.TestCase):
                       'sys.stdin.readline()\n'
                       f'print({json.dumps(acquired)!r},flush=True)\n'
                       'sys.stdin.read()\n')
-            sequence, _ = native._sequence(protocol, 'NATIVE_LEARNED', 0,
+            sequence, rows = native._sequence(protocol, 'NATIVE_LEARNED', 0,
                 [sys.executable, '-u', '-c', script], Path(directory))
             self.assertFalse(sequence['complete'])
+            self.assertIn('Empty', sequence['error'])
             self.assertEqual(2, len(sequence['workers']))
             self.assertEqual(2, len({receipt['pid'] for receipt in sequence['workers']}))
             self.assertEqual(0, sequence['workers'][0]['exitCode'])
             self.assertNotEqual(0, sequence['workers'][1]['exitCode'])
+            native.validate_sequences(protocol, dict(sequences=[sequence]), rows)

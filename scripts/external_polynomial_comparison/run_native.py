@@ -220,7 +220,7 @@ def _sequence(protocol, profile, repetition, command, output):
                              requestWallNanos=elapsed + binding, bindingWallNanos=binding, judgment=judgment))
         sequence['complete'] = True
     except Exception as error:
-        sequence['error'] = str(error)
+        sequence['error'] = f'{type(error).__name__}: {error}'
     finally:
         if worker is not None:
             worker.close(graceful=True)

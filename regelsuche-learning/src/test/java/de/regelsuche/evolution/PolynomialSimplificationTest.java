@@ -70,6 +70,16 @@ class PolynomialSimplificationTest {
     }
 
     @Test
+    void polynomialProcedureExhaustionRetainsObservedWork() {
+        long[] observed = {0};
+        var candidates = PolynomialSimplificationPrograms.generate(
+            StructuralConstructionPrograms.Operation.POLYNOMIAL_CANONICAL, parse("x+x"), 1,
+            units -> observed[0] = Math.addExact(observed[0], units));
+        assertTrue(candidates.isEmpty());
+        assertTrue(observed[0] > 1);
+    }
+
+    @Test
     void persistedKnowledgeUsesTheSameNativeProfile() {
         var genome = TraceStrategyTransferExample.inventory();
         var knowledge = CumulativeTaskKnowledge.empty(genome, TaskConstructionProfile.POLYNOMIAL_SIMPLIFICATION_V1);
