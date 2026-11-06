@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from external_polynomial_comparison.historical_judge import audit_task
@@ -178,6 +179,17 @@ class HistoricalRunnerTest(unittest.TestCase):
         self.runner.verify_metadata(metadata, {'runtimeBytesHash':'python'}, {'runtimeBytesHash':'java'})
         with self.assertRaises(ValueError):
             self.runner.verify_metadata(dict(metadata, runtimeBytesHash='other'), {'runtimeBytesHash':'python'}, {'runtimeBytesHash':'java'})
+
+    def test_retained_python_runtime_has_readable_bytecode_and_stays_immutable(self):
+        from external_polynomial_comparison.run_schema import _file_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            receipt = self.runner.snapshot_python(output)
+            self.assertTrue(any(name.endswith('.pyc') for name in receipt['files']),
+                            'normal installed bytecode caches must not be denied to the CAS')
+            code = 'import sys;sys.path.insert(0,'+repr(str(output/'python-runtime'))+');import sympy;print(sympy.__version__)'
+            subprocess.run([sys.executable,'-I','-B','-c',code], check=True, capture_output=True, timeout=30)
+            self.assertEqual(receipt['files'], _file_inventory(output/'python-runtime'))
 
     def test_consumer_ready_failure_retains_both_distinct_process_receipts(self):
         # Deliberately fake setup bytes test OS ownership, never mathematical/performance evidence.

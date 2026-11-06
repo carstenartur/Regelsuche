@@ -1,11 +1,13 @@
 """Frozen historical goals, fresh native/SymPy lifecycles and independently verified evidence."""
 import argparse
+import compileall
 import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import platform
+import py_compile
 import shutil
 import statistics
 import subprocess
@@ -259,10 +261,15 @@ def snapshot_python(output):
         shutil.copytree(Path(spec.origin).parent, destination/name, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     shutil.copytree(Path(__file__).parent, destination/'external_polynomial_comparison',
                     ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    # Prepare ordinary readable bytecode once, like the prebuilt Java class files.
+    # Workers use -B to prevent changing retained bytes, not to deny cache reads.
+    require(compileall.compile_dir(destination, quiet=2, force=True,
+        invalidation_mode=py_compile.PycInvalidationMode.CHECKED_HASH), 'Python runtime bytecode preparation failed')
     files = _file_inventory(destination)
     interpreter = Path(sys.executable).resolve()
     receipt = dict(files=files, runtimeBytesHash=digest(canonical(files)), interpreter=str(interpreter),
-                   interpreterSha256=digest(interpreter.read_bytes()), version=sys.version)
+                   interpreterSha256=digest(interpreter.read_bytes()), version=sys.version,
+                   bytecodePolicy='PRECOMPILED_CHECKED_HASH;READ_ENABLED_WRITE_DISABLED_IN_WORKERS')
     (output/'python-inventory.json').write_bytes(canonical(receipt))
     return receipt
 
