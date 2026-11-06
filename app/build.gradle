@@ -1,7 +1,7 @@
 plugins {
     id 'application'
     id 'jacoco'
-    id 'me.champeau.jmh' version '0.7.3'
+    id 'me.champeau.jmh' version '0.7.4'
 }
 
 repositories {
@@ -84,6 +84,8 @@ tasks.named('check') {
 def latencyExecution = new groovy.json.JsonSlurper().parse(
     rootProject.file('config/quality/jmh-regression-policy-more-warmup-v1.json')).execution
 jmh {
+    // Keep the frozen measurement runtime independent of the Gradle plugin version.
+    jmhVersion = '1.36'
     resultFormat = 'JSON'
     resultsFile = layout.buildDirectory.file('reports/jmh/result.json')
     fork = latencyExecution.forks
