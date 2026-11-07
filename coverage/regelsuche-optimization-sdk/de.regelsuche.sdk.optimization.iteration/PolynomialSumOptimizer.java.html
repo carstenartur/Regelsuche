@@ -4,15 +4,15 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.sdk.optimization.*;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Newton forward differences, bounded by polynomial degree, independent of runtime count. */
 <span class="fc" id="L10">public final class PolynomialSumOptimizer {</span>
 <span class="fc" id="L11">    public record SearchResult(Optional&lt;PolynomialSumPlan&gt; plan,String reason,long work) {}</span>
     public SearchResult search(PolynomialSum source,OptimizationBudget budget,CancellationToken cancellation) {
-<span class="fc" id="L13">        Objects.requireNonNull(source); var w=new Work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);</span>
-<span class="fc" id="L14">        try { return new SearchResult(Optional.of(create(source,w)),&quot;CANDIDATE&quot;,w.used); }</span>
-<span class="fc" id="L15">        catch(Unavailable e) { return new SearchResult(Optional.empty(),e.getMessage(),w.used); }</span>
+<span class="fc" id="L13">        Objects.requireNonNull(source); var w=SeriesSupport.work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);</span>
+<span class="fc" id="L14">        try { return new SearchResult(Optional.of(create(source,w)),&quot;CANDIDATE&quot;,w.used()); }</span>
+<span class="fc" id="L15">        catch(Unavailable e) { return new SearchResult(Optional.empty(),e.getMessage(),w.used()); }</span>
     }
     static PolynomialSumPlan create(PolynomialSum source,Work w) {
 <span class="fc" id="L18">            var difference=SeriesSupport.source(source,w); int d=SeriesSupport.degree(difference,source.index());</span>

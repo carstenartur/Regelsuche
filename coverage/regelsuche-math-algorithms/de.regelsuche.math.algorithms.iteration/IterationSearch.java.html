@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IterationSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">IterationSearch.java</span></div><h1>IterationSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.SearchExecution;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+/** Adapts bounded iteration procedures to the shared move frontier. */
+final class IterationSearch {
+    private static final String WORK_LIMIT = &quot;WORK_LIMIT&quot;;
+
+    private IterationSearch() {}
+
+    interface Domain&lt;E, V&gt; {
+        String family();
+        String noPlanReason();
+        int maximumDepth();
+        boolean finished(E state);
+        Proposal&lt;E&gt; propose(E source, IterationLimits limits, BooleanSupplier cancellation);
+        Check&lt;V&gt; verify(E source, E target, IterationLimits limits, BooleanSupplier cancellation);
+    }
+
+<span class="fc" id="L30">    record Proposal&lt;E&gt;(String ruleId, Optional&lt;E&gt; target, String reason, long work) {}</span>
+
+<span class="fc" id="L32">    record Check&lt;V&gt;(boolean accepted, Optional&lt;V&gt; verified, String reason, long work)</span>
+            implements SearchExecution.Verification {}
+
+<span class="fc" id="L35">    record CheckedMove(String ruleId, long synthesisWork, long verificationWork) {}</span>
+
+<span class="fc" id="L37">    record Result&lt;V&gt;(Optional&lt;V&gt; verified, String reason, List&lt;CheckedMove&gt; witness, MoveSearch.Metrics metrics) {}</span>
+
+    static &lt;E, V&gt; Result&lt;V&gt; search(E source, Domain&lt;E, V&gt; domain, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L41">        var run = new Run&lt;&gt;(source, domain, limits, maximumStates, cancellation);</span>
+<span class="fc" id="L42">        var path = SearchExecution.searchUntil(run,</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            state -&gt; new MoveSearch.ObjectiveScore(domain.finished(state.expression()) ? 0 : 1, 1), 0);</span>
+<span class="fc" id="L44">        return run.result(path);</span>
+    }
+
+<span class="fc" id="L47">    private record State&lt;E&gt;(E expression, int searchDepth, int primitiveDepth, String previousRule,</span>
+            List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities, int complexityDebt)
+            implements SearchExecution.Position&lt;E&gt; {}
+
+<span class="fc" id="L51">    private record Move&lt;E&gt;(E source, E targetExpression, String ruleId, String ruleFamily, ExecutionWork executionWork)</span>
+            implements SearchExecution.Edge&lt;E, Move&lt;E&gt;&gt; {
+<span class="fc" id="L53">        @Override public int primitiveStepCount() { return 0; }</span>
+<span class="fc" id="L54">        @Override public List&lt;String&gt; assumptions() { return List.of(); }</span>
+<span class="fc" id="L55">        @Override public Move&lt;E&gt; withCapabilityDelta(Set&lt;String&gt; delta) { return this; }</span>
+        @Override public void requireSource(E expression) {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if (!source.equals(expression)) {</span>
+<span class="nc" id="L58">                throw new IllegalArgumentException(&quot;iteration proposal differs from its source&quot;);</span>
+            }
+<span class="fc" id="L60">        }</span>
+    }
+
+    private static final class Assessment&lt;E&gt; implements SearchExecution.Assessment&lt;E&gt; {
+<span class="fc" id="L64">        @Override public int complexity() { return 0; }</span>
+<span class="fc" id="L65">        @Override public double value() { return 0; }</span>
+<span class="fc" id="L66">        @Override public long searchWork() { return 0; }</span>
+<span class="fc" id="L67">        @Override public long primitiveWork() { return 0; }</span>
+<span class="fc" id="L68">        @Override public Map&lt;String, SearchExecution.Capability&lt;E&gt;&gt; capabilities() { return Map.of(); }</span>
+    }
+
+    private static final class Run&lt;E, V&gt;
+            implements SearchExecution.Environment&lt;E, State&lt;E&gt;, Move&lt;E&gt;, Assessment&lt;E&gt;, Check&lt;V&gt;&gt; {
+        private final E source;
+        private final Domain&lt;E, V&gt; domain;
+        private final IterationLimits limits;
+        private final MoveSearch.Budget budget;
+<span class="fc" id="L77">        private final Assessment&lt;E&gt; assessment = new Assessment&lt;&gt;();</span>
+        private final BooleanSupplier cancellation;
+<span class="fc" id="L79">        private final long start = System.nanoTime();</span>
+        private final long timeout;
+        private String reason;
+
+<span class="fc" id="L83">        Run(E source, Domain&lt;E, V&gt; domain, IterationLimits limits, int maximumStates, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L84">            this.source = Objects.requireNonNull(source);</span>
+<span class="fc" id="L85">            this.domain = domain;</span>
+<span class="fc" id="L86">            this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L87">            this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L88">            budget = new MoveSearch.Budget(0, domain.maximumDepth(), limits.maximumWork(), maximumStates, limits.maximumWork());</span>
+<span class="fc" id="L89">            timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
+<span class="fc" id="L90">            reason = domain.noPlanReason();</span>
+<span class="fc" id="L91">        }</span>
+
+<span class="fc" id="L93">        @Override public E source() { return source; }</span>
+<span class="fc" id="L94">        @Override public E goal() { return null; }</span>
+<span class="fc" id="L95">        @Override public List&lt;String&gt; initialAssumptions() { return List.of(); }</span>
+<span class="fc" id="L96">        @Override public MoveSearch.Budget budget() { return budget; }</span>
+<span class="fc" id="L97">        @Override public MoveSearch.Mode mode() { return MoveSearch.Mode.FAST; }</span>
+<span class="fc" id="L98">        @Override public MoveSearch.Scheduling scheduling() { return MoveSearch.Scheduling.INCREMENTAL_NATIVE_ORDER; }</span>
+
+        @Override public State&lt;E&gt; state(E expression, int depth, int primitive, String previous,
+                List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities, int debt) {
+<span class="fc" id="L102">            return new State&lt;&gt;(expression, depth, primitive, previous, assumptions, capabilities, debt);</span>
+        }
+
+<span class="fc" id="L105">        @Override public Assessment&lt;E&gt; inspect(State&lt;E&gt; state) { return assessment; }</span>
+<span class="fc" id="L106">        @Override public double score(State&lt;E&gt; state) { return -state.searchDepth(); }</span>
+<span class="fc" id="L107">        @Override public boolean carries(List&lt;String&gt; assumptions, State&lt;E&gt; state) { return assumptions.isEmpty(); }</span>
+<span class="fc" id="L108">        @Override public SearchExecution.Picker&lt;Move&lt;E&gt;&gt; picker(State&lt;E&gt; state) { return new RulePicker&lt;&gt;(this, state.expression()); }</span>
+
+        @Override public Check&lt;V&gt; verify(State&lt;E&gt; state, Move&lt;E&gt; move) {
+<span class="nc" id="L111">            return verify(state, move, limits.maximumWork());</span>
+        }
+
+        @Override public Check&lt;V&gt; verify(State&lt;E&gt; state, Move&lt;E&gt; move, long allowance) {
+<span class="fc" id="L115">            move.requireSource(state.expression());</span>
+<span class="fc" id="L116">            var check = domain.verify(state.expression(), move.targetExpression(),</span>
+<span class="fc" id="L117">                limits.withMaximumWork(allowance), this::interrupted);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (!check.accepted()) reason = check.reason();</span>
+<span class="fc" id="L119">            return check;</span>
+        }
+
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        private boolean interrupted() { return !interruptionReason().isEmpty(); }</span>
+
+        private String interruptionReason() {
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) return &quot;CANCELLED&quot;;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            return System.nanoTime() - start &gt;= timeout ? WORK_LIMIT : &quot;&quot;;</span>
+        }
+
+        Result&lt;V&gt; result(SearchExecution.CheckedPath&lt;State&lt;E&gt;, Move&lt;E&gt;, Check&lt;V&gt;&gt; path) {
+<span class="fc" id="L130">            String interrupted = interruptionReason();</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (!interrupted.isEmpty()) return unavailable(interrupted, path.metrics());</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (path.outcome() == MoveSearch.Outcome.QUALITY_REACHED) {</span>
+<span class="fc" id="L133">                var steps = path.witness();</span>
+<span class="fc" id="L134">                var verified = steps.getLast().verification().verified().orElseThrow();</span>
+<span class="fc" id="L135">                var witness = steps.stream().map(step -&gt; new CheckedMove(step.move().ruleId(),</span>
+<span class="fc" id="L136">                    step.move().executionWork().canonicalWorkUnits(), step.verification().work())).toList();</span>
+<span class="fc" id="L137">                return new Result&lt;&gt;(Optional.of(verified), &quot;VERIFIED&quot;, witness, path.metrics());</span>
+            }
+<span class="fc bfc" id="L139" title="All 3 branches covered.">            return unavailable(switch (path.outcome()) {</span>
+<span class="fc" id="L140">                case WORK_EXHAUSTED -&gt; WORK_LIMIT;</span>
+<span class="fc" id="L141">                case STATE_LIMIT -&gt; &quot;STATE_LIMIT&quot;;</span>
+<span class="fc" id="L142">                default -&gt; reason;</span>
+<span class="fc" id="L143">            }, path.metrics());</span>
+        }
+
+        private Result&lt;V&gt; unavailable(String reason, MoveSearch.Metrics metrics) {
+<span class="fc" id="L147">            return new Result&lt;&gt;(Optional.empty(), reason, List.of(), metrics);</span>
+        }
+    }
+
+    /** A typed iteration procedure proposes at most one move from each state. */
+    private static final class RulePicker&lt;E, V&gt; implements SearchExecution.Picker&lt;Move&lt;E&gt;&gt; {
+<span class="fc" id="L153">        private static final long DISPATCH_WORK = TransformationWorkMetrics.flatEngine(1).totalWorkUnits();</span>
+        private final Run&lt;E, V&gt; run;
+        private final E source;
+<span class="fc" id="L156">        private List&lt;Move&lt;E&gt;&gt; generated = List.of();</span>
+<span class="fc" id="L157">        private TransformationWorkMetrics metrics = TransformationWorkMetrics.ZERO;</span>
+        private boolean attempted;
+        private boolean exhausted;
+
+<span class="fc" id="L161">        RulePicker(Run&lt;E, V&gt; run, E source) {</span>
+<span class="fc" id="L162">            this.run = run;</span>
+<span class="fc" id="L163">            this.source = source;</span>
+<span class="fc" id="L164">        }</span>
+
+<span class="fc" id="L166">        @Override public boolean incremental() { return true; }</span>
+<span class="fc" id="L167">        @Override public Object executionReceipt() { return metrics; }</span>
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">        @Override public boolean complete() { return attempted &amp;&amp; !exhausted; }</span>
+<span class="fc" id="L169">        @Override public boolean workExhausted() { return exhausted; }</span>
+<span class="fc" id="L170">        @Override public List&lt;Move&lt;E&gt;&gt; generatedMoves() { return generated; }</span>
+<span class="fc" id="L171">        @Override public TransformationWorkMetrics workMetrics() { return metrics; }</span>
+<span class="nc" id="L172">        @Override public Optional&lt;Move&lt;E&gt;&gt; next() { return next(run.limits.maximumWork()); }</span>
+
+        @Override public Optional&lt;Move&lt;E&gt;&gt; next(long allowance) {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (attempted) return Optional.empty();</span>
+<span class="fc" id="L176">            attempted = true;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            if (allowance &lt;= DISPATCH_WORK) {</span>
+<span class="nc" id="L178">                exhausted = true;</span>
+<span class="nc" id="L179">                return Optional.empty();</span>
+            }
+<span class="fc" id="L181">            var remaining = run.limits.withMaximumWork(allowance - DISPATCH_WORK);</span>
+<span class="fc" id="L182">            return candidate(run.domain.propose(source, remaining, run::interrupted));</span>
+        }
+
+        private Optional&lt;Move&lt;E&gt;&gt; candidate(Proposal&lt;E&gt; proposal) {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            var work = proposal.work() == 0 ? ExecutionWork.ZERO : new ExecutionWork(0, 1, proposal.work());</span>
+<span class="fc" id="L187">            var move = proposal.target().map(target -&gt; new Move&lt;&gt;(source, target, proposal.ruleId(), run.domain.family(), work));</span>
+<span class="fc" id="L188">            generated = move.stream().toList();</span>
+<span class="fc" id="L189">            metrics = TransformationWorkMetrics.flatEngine(generated.size()).withCandidateWork(work);</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (move.isEmpty()) {</span>
+<span class="fc" id="L191">                run.reason = proposal.reason();</span>
+<span class="fc" id="L192">                exhausted = WORK_LIMIT.equals(run.reason);</span>
+            }
+<span class="fc" id="L194">            return move;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

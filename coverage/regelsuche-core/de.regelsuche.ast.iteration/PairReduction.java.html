@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PairReduction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast.iteration</a> &gt; <span class="el_source">PairReduction.java</span></div><h1>PairReduction.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Exact sum of a polynomial over all pairs of distinct rows i &amp;lt; j.
+ * The two symbols of a column stand for its value in rows i and j respectively.
+ */
+public record PairReduction(List&lt;Column&gt; columns, Expr summand) {
+    public static final int MAX_COLUMNS = 8;
+    public static final int MAX_DEGREE = 8;
+
+<span class="nc" id="L18">    public PairReduction {</span>
+<span class="nc" id="L19">        Objects.requireNonNull(columns);</span>
+<span class="nc" id="L20">        Objects.requireNonNull(summand);</span>
+<span class="nc bnc" id="L21" title="All 4 branches missed.">        if (columns.isEmpty() || columns.size() &gt; MAX_COLUMNS) {</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;COLUMN_LIMIT&quot;);</span>
+        }
+<span class="nc" id="L24">        columns = List.copyOf(columns);</span>
+<span class="nc" id="L25">        var symbols = new HashSet&lt;SymbolId&gt;();</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        for (Column column : columns) {</span>
+<span class="nc bnc" id="L27" title="All 4 branches missed.">            if (!symbols.add(column.left()) || !symbols.add(column.right())) {</span>
+<span class="nc" id="L28">                throw new IllegalArgumentException(&quot;DUPLICATE_COLUMN_SYMBOL&quot;);</span>
+            }
+<span class="nc" id="L30">        }</span>
+<span class="nc" id="L31">        IterationScope.validate(summand, symbols);</span>
+<span class="nc" id="L32">    }</span>
+
+    public record Column(SymbolId left, SymbolId right) {
+<span class="nc" id="L35">        public Column {</span>
+<span class="nc" id="L36">            Objects.requireNonNull(left);</span>
+<span class="nc" id="L37">            Objects.requireNonNull(right);</span>
+<span class="nc" id="L38">        }</span>
+    }
+
+    /** Number of evaluations of the summand in the direct triangular loop. */
+    public static BigInteger originalPairs(long rows) {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (rows &lt; 0) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;NEGATIVE_ROW_COUNT&quot;);</span>
+        }
+<span class="nc" id="L46">        return BigInteger.valueOf(rows).multiply(BigInteger.valueOf(rows - 1)).shiftRight(1);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

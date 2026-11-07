@@ -3,15 +3,15 @@
 import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.sdk.optimization.*;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Independent Newton reconstruction certificate checker; never invokes synthesis. */
 <span class="fc" id="L9">public final class PolynomialSumVerifier {</span>
 <span class="fc" id="L10">    public record Verification(boolean verified,String reason,long work) {}</span>
     public Verification verify(PolynomialSum source,PolynomialSumPlan plan,OptimizationBudget budget,CancellationToken cancellation) {
-<span class="fc" id="L12">        Objects.requireNonNull(source); Objects.requireNonNull(plan); var w=new Work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);</span>
-<span class="fc" id="L13">        try { check(source,plan,w); return new Verification(true,&quot;VERIFIED_NEWTON_SUM&quot;,w.used); }</span>
-<span class="fc" id="L14">        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used); }</span>
+<span class="fc" id="L12">        Objects.requireNonNull(source); Objects.requireNonNull(plan); var w=SeriesSupport.work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);</span>
+<span class="fc" id="L13">        try { check(source,plan,w); return new Verification(true,&quot;VERIFIED_NEWTON_SUM&quot;,w.used()); }</span>
+<span class="fc" id="L14">        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used()); }</span>
     }
     static void check(PolynomialSum source,PolynomialSumPlan plan,Work w) {
 <span class="fc" id="L17">        w.charge(6L*FiniteIteration.MAX_NODES);</span>

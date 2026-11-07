@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PairReductionPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">PairReductionPlan.java</span></div><h1>PairReductionPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.FiniteIteration;
+import de.regelsuche.ast.iteration.PairReduction;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+
+/** A proposed linear or quadratic expression in sums of row monomials. */
+public record PairReductionPlan(List&lt;Term&gt; terms, int divisor) {
+    static final int MAX_TERMS = 2 * IterationPolynomial.MAX_TERMS;
+
+<span class="fc" id="L13">    public PairReductionPlan {</span>
+<span class="pc bpc" id="L14" title="2 of 6 branches missed.">        if (terms.size() &gt; MAX_TERMS || (divisor != 1 &amp;&amp; divisor != 2)) {</span>
+<span class="nc" id="L15">            throw new IllegalArgumentException(&quot;INVALID_PAIR_PLAN&quot;);</span>
+        }
+<span class="fc" id="L17">        terms = List.copyOf(terms);</span>
+<span class="fc" id="L18">    }</span>
+
+    /** The empty monomial contributes one per row and represents the row count. */
+    public record Moment(List&lt;Integer&gt; columns) implements Comparable&lt;Moment&gt; {
+<span class="fc" id="L22">        public Moment {</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (columns.size() &gt; PairReduction.MAX_DEGREE) {</span>
+<span class="nc" id="L24">                throw new IllegalArgumentException(&quot;DEGREE_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L26">            columns = columns.stream().sorted().toList();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (!columns.isEmpty()</span>
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">                    &amp;&amp; (columns.getFirst() &lt; 0 || columns.getLast() &gt;= PairReduction.MAX_COLUMNS)) {</span>
+<span class="nc" id="L29">                throw new IllegalArgumentException(&quot;UNKNOWN_COLUMN&quot;);</span>
+            }
+<span class="fc" id="L31">        }</span>
+
+        @Override
+        public int compareTo(Moment other) {
+<span class="fc" id="L35">            int byDegree = Integer.compare(columns.size(), other.columns.size());</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (byDegree != 0) {</span>
+<span class="fc" id="L37">                return byDegree;</span>
+            }
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            for (int i = 0; i &lt; columns.size(); i++) {</span>
+<span class="fc" id="L40">                int byColumn = Integer.compare(columns.get(i), other.columns.get(i));</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                if (byColumn != 0) {</span>
+<span class="nc" id="L42">                    return byColumn;</span>
+                }
+            }
+<span class="fc" id="L45">            return 0;</span>
+        }
+    }
+
+    public record Term(BigInteger coefficient, List&lt;Moment&gt; factors) {
+<span class="fc" id="L50">        public Term {</span>
+<span class="fc" id="L51">            Objects.requireNonNull(coefficient);</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">            if (coefficient.signum() == 0 || coefficient.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">                    || factors.isEmpty() || factors.size() &gt; 2) {</span>
+<span class="nc" id="L54">                throw new IllegalArgumentException(&quot;INVALID_PAIR_PLAN_TERM&quot;);</span>
+            }
+<span class="fc" id="L56">            factors = factors.stream().sorted().toList();</span>
+<span class="fc" id="L57">        }</span>
+    }
+
+    /** Nonconstant row monomials the executable plan needs to accumulate. */
+    public List&lt;Moment&gt; accumulators() {
+<span class="fc" id="L62">        return terms.stream().flatMap(term -&gt; term.factors().stream())</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            .filter(moment -&gt; !moment.columns().isEmpty()).distinct().sorted().toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

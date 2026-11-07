@@ -157,9 +157,21 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main before typed pair sums (2026-11-07)
+
+The active baseline is the native v0.1.10 metrics snapshot of main
+`902e4ea9710aebcd81c0c172f3154106db2a5c3b`, tree
+`abb85fd8918ad2cd0cdb46b3724b4552befe8ecf`. The
+[post-merge CI](https://github.com/carstenartur/Regelsuche/actions/runs/42339349253)
+passed. A clean source archive passed the native knowledge gate, eight coverage
+controls and the 17 hotspot checks against the preceding baseline. It measured
+739670 context tokens, an increase of 13360 within the 15000 allowance. The
+[baseline snapshot](../ai-knowledge/complexity-baseline.json) has SHA-256
+`d3348a8b61c041ec096b4b0e3753ea0dfcd6f33560ce209b77dfc0c82b6f0c1a`.
+
 ### Accepted predecessor for generic numeric domains (2026-10-11)
 
-The active baseline is the exact generated snapshot of accepted main
+This historical baseline is the exact generated snapshot of accepted main
 `d7ec8b51d164dc58dbb3e9e328af8bb356425b93`, tree
 `2e9dd708951e02d68a786aa7871dee7b4a4a6347`, integrated by PR #1068.
 Its byte-identical source PR passed
@@ -177,8 +189,8 @@ are byte-identical to the new native reports. The smaller main
 API-reported digest; the larger repository artifact was not downloaded.
 
 [Independent review](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/independent-review.md)
-approved only this exact predecessor snapshot. The active file is byte-identical
-to the [accepted snapshot](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/metrics-snapshot.json),
+approved only this exact predecessor snapshot. The
+[accepted snapshot](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/metrics-snapshot.json) has
 SHA256 `d2146a9f97686f724e49d5e710f46470674b39038b8595eae71dd2983c35c12b`.
 [Promotion provenance](../ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/provenance.json)
 maps every original measurement artifact into the retained files and portable

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PairReductionVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">PairReductionVerifier.java</span></div><h1>PairReductionVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
+
+/** Proves the proposed program for all finite lists of integer rows. */
+<span class="fc" id="L19">public final class PairReductionVerifier {</span>
+<span class="fc" id="L20">    public record Result(Optional&lt;Verified&gt; verified, String reason, long work) {}</span>
+<span class="fc" id="L21">    public record NormalizationCheck(boolean accepted, String reason, long work) {}</span>
+
+    public NormalizationCheck verifyNormalization(PairReduction source, PairReductionSynthesis.NormalForm form,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L25">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L26">        Objects.requireNonNull(form);</span>
+<span class="fc" id="L27">        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+        try {
+<span class="fc" id="L29">            work.charge(source.columns().size());</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            if (!source.columns().equals(form.columns())) throw new Unavailable(&quot;COLUMN_BINDING_MISMATCH&quot;);</span>
+<span class="fc" id="L31">            var polynomial = IterationPolynomial.parsePairSummand(source, work);</span>
+<span class="fc" id="L32">            work.charge(polynomial.terms().size() + form.terms().size());</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (!polynomial.terms().equals(form.terms())) throw new Unavailable(&quot;SUMMAND_MISMATCH&quot;);</span>
+<span class="fc" id="L34">            return new NormalizationCheck(true, &quot;VERIFIED_NORMALIZATION&quot;, work.used());</span>
+<span class="fc" id="L35">        } catch (Unavailable exception) {</span>
+<span class="fc" id="L36">            return new NormalizationCheck(false, exception.getMessage(), work.used());</span>
+        }
+    }
+
+    public Result verify(PairReduction source, PairReductionPlan plan, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L42">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(plan);</span>
+<span class="fc" id="L44">        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+        try {
+<span class="fc" id="L46">            var polynomial = IterationPolynomial.parsePairSummand(source, work);</span>
+<span class="fc" id="L47">            var symbolic = new HashMap&lt;Moment, SymbolicMoment&gt;();</span>
+<span class="fc" id="L48">            var oneRow = IterationPolynomial.zero(work);</span>
+<span class="fc" id="L49">            var twoRows = IterationPolynomial.zero(work);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            for (var term : plan.terms()) {</span>
+<span class="fc" id="L51">                var first = symbolic.computeIfAbsent(term.factors().getFirst(),</span>
+<span class="fc" id="L52">                    moment -&gt; symbolicMoment(source, moment, work));</span>
+<span class="fc" id="L53">                var one = first.oneRow();</span>
+<span class="fc" id="L54">                var two = first.twoRows();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                if (term.factors().size() == 2) {</span>
+<span class="fc" id="L56">                    var second = symbolic.computeIfAbsent(term.factors().getLast(),</span>
+<span class="fc" id="L57">                        moment -&gt; symbolicMoment(source, moment, work));</span>
+<span class="fc" id="L58">                    one = one.multiply(second.oneRow());</span>
+<span class="fc" id="L59">                    two = two.multiply(second.twoRows());</span>
+                }
+<span class="fc" id="L61">                var coefficient = ExactRational.integer(term.coefficient());</span>
+<span class="fc" id="L62">                oneRow = oneRow.add(one.scale(coefficient));</span>
+<span class="fc" id="L63">                twoRows = twoRows.add(two.scale(coefficient));</span>
+<span class="fc" id="L64">            }</span>
+
+            // Degree &lt;= 2 in sums means that the expansion contains only
+            // single-row and two-distinct-row contributions. Check their
+            // entire polynomials, with independent symbols for both rows.
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (!oneRow.same(IterationPolynomial.zero(work))) {</span>
+<span class="fc" id="L70">                throw new Unavailable(&quot;DIAGONAL_MISMATCH&quot;);</span>
+            }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (!twoRows.same(polynomial.scale(ExactRational.integer(plan.divisor())))) {</span>
+<span class="fc" id="L73">                throw new Unavailable(&quot;PAIR_IDENTITY_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L75">            return new Result(Optional.of(new Verified(source, plan, polynomial.expression())), &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc" id="L76">        } catch (Unavailable exception) {</span>
+<span class="fc" id="L77">            return new Result(Optional.empty(), exception.getMessage(), work.used());</span>
+        }
+    }
+
+    private static SymbolicMoment symbolicMoment(PairReduction source, Moment moment, Work work) {
+<span class="fc" id="L82">        var left = IterationPolynomial.constant(BigInteger.ONE, work);</span>
+<span class="fc" id="L83">        var right = IterationPolynomial.constant(BigInteger.ONE, work);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int index : moment.columns()) {</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (index &gt;= source.columns().size()) {</span>
+<span class="nc" id="L86">                throw new Unavailable(&quot;UNKNOWN_COLUMN&quot;);</span>
+            }
+<span class="fc" id="L88">            var column = source.columns().get(index);</span>
+<span class="fc" id="L89">            left = left.multiply(IterationPolynomial.variable(column.left(), work));</span>
+<span class="fc" id="L90">            right = right.multiply(IterationPolynomial.variable(column.right(), work));</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        return new SymbolicMoment(left, left.add(right));</span>
+    }
+
+<span class="fc" id="L95">    private record SymbolicMoment(IterationPolynomial oneRow, IterationPolynomial twoRows) {}</span>
+
+    /** A checked program may be run on multiple inputs without repeating its symbolic proof. */
+    public static final class Verified {
+        private final PairReduction source;
+        private final PairReductionPlan plan;
+        private final Expr expandedSummand;
+        private final List&lt;Moment&gt; accumulators;
+
+<span class="fc" id="L104">        private Verified(PairReduction source, PairReductionPlan plan, Expr expandedSummand) {</span>
+<span class="fc" id="L105">            this.source = source;</span>
+<span class="fc" id="L106">            this.plan = plan;</span>
+<span class="fc" id="L107">            this.expandedSummand = expandedSummand;</span>
+<span class="fc" id="L108">            this.accumulators = plan.accumulators();</span>
+<span class="fc" id="L109">        }</span>
+
+<span class="fc" id="L111">        public PairReduction source() { return source; }</span>
+<span class="fc" id="L112">        public PairReductionPlan plan() { return plan; }</span>
+<span class="nc" id="L113">        public Expr expandedSummand() { return expandedSummand; }</span>
+
+        public Evaluation evaluate(Iterable&lt;? extends List&lt;BigInteger&gt;&gt; rows, IterationLimits limits,
+                BooleanSupplier cancellation) {
+<span class="fc" id="L117">            Objects.requireNonNull(rows);</span>
+<span class="fc" id="L118">            var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+            try {
+<span class="fc" id="L120">                return evaluate(rows, work);</span>
+<span class="fc" id="L121">            } catch (Unavailable exception) {</span>
+<span class="fc" id="L122">                throw new IllegalArgumentException(exception.getMessage(), exception);</span>
+            }
+        }
+
+        private Evaluation evaluate(Iterable&lt;? extends List&lt;BigInteger&gt;&gt; rows, Work work) {
+<span class="fc" id="L127">            work.charge(1);</span>
+<span class="fc" id="L128">            var sums = new BigInteger[accumulators.size()];</span>
+<span class="fc" id="L129">            Arrays.fill(sums, BigInteger.ZERO);</span>
+<span class="fc" id="L130">            var values = new BigInteger[source.columns().size()];</span>
+<span class="fc" id="L131">            long count = 0;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            for (var row : rows) {</span>
+<span class="fc" id="L133">                work.charge(1);</span>
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">                if (row == null || row.size() != values.length) {</span>
+<span class="fc" id="L135">                    throw new Unavailable(&quot;ROW_DIMENSION&quot;);</span>
+                }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                for (int i = 0; i &lt; values.length; i++) {</span>
+<span class="fc" id="L138">                    values[i] = row.get(i);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                    if (values[i] == null) {</span>
+<span class="nc" id="L140">                        throw new Unavailable(&quot;MISSING_ROW_VALUE&quot;);</span>
+                    }
+<span class="fc" id="L142">                    work.runtimeInteger(values[i]);</span>
+                }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                for (int i = 0; i &lt; sums.length; i++) {</span>
+<span class="fc" id="L145">                    var columns = accumulators.get(i).columns();</span>
+<span class="fc" id="L146">                    BigInteger product = values[columns.getFirst()];</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                    for (int j = 1; j &lt; columns.size(); j++) {</span>
+<span class="fc" id="L148">                        product = bounded(product.multiply(values[columns.get(j)]), work);</span>
+                    }
+<span class="fc" id="L150">                    sums[i] = bounded(sums[i].add(product), work);</span>
+                }
+<span class="fc" id="L152">                count++;</span>
+<span class="fc" id="L153">            }</span>
+<span class="fc" id="L154">            work.charge(0);</span>
+
+<span class="fc" id="L156">            var moments = new HashMap&lt;Moment, BigInteger&gt;();</span>
+<span class="fc" id="L157">            moments.put(new Moment(List.of()), BigInteger.valueOf(count));</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            for (int i = 0; i &lt; sums.length; i++) {</span>
+<span class="fc" id="L159">                moments.put(accumulators.get(i), sums[i]);</span>
+            }
+<span class="fc" id="L161">            BigInteger numerator = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (var term : plan.terms()) {</span>
+<span class="fc" id="L163">                BigInteger product = term.coefficient();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                for (var moment : term.factors()) {</span>
+<span class="fc" id="L165">                    product = bounded(product.multiply(moments.get(moment)), work);</span>
+<span class="fc" id="L166">                }</span>
+<span class="fc" id="L167">                numerator = bounded(numerator.add(product), work);</span>
+<span class="fc" id="L168">            }</span>
+<span class="fc" id="L169">            var result = numerator.divideAndRemainder(BigInteger.valueOf(plan.divisor()));</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            if (result[1].signum() != 0) {</span>
+<span class="nc" id="L171">                throw new IllegalStateException(&quot;verified pair plan produced a nonintegral result&quot;);</span>
+            }
+<span class="fc" id="L173">            return new Evaluation(result[0], count, work.used());</span>
+        }
+
+        private static BigInteger bounded(BigInteger value, Work work) {
+<span class="fc" id="L177">            work.runtimeInteger(value);</span>
+<span class="fc" id="L178">            return value;</span>
+        }
+    }
+
+<span class="fc" id="L182">    public record Evaluation(BigInteger value, long rows, long work) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

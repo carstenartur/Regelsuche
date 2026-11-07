@@ -7,13 +7,13 @@ import de.regelsuche.symbol.SymbolId;
 import de.regelsuche.sdk.optimization.*;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Bounded exact finite compositions. All child proofs and runtime arithmetic share one work ledger. */
 public final class PolynomialSeries {
     public static final int MAX_PARTS=32;
     private PolynomialSeries() {}
-<span class="fc" id="L16">    private static Work work(OptimizationBudget b,CancellationToken c) { return new Work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }</span>
+<span class="fc" id="L16">    private static Work work(OptimizationBudget b,CancellationToken c) { return SeriesSupport.work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }</span>
     private static void count(BigInteger count,Work w) {
 <span class="pc bpc" id="L18" title="1 of 2 branches missed.">        SeriesSupport.bits(count,w); if(count.signum()&lt;0) throw new Unavailable(&quot;NEGATIVE_COUNT&quot;);</span>
 <span class="fc" id="L19">    }</span>
@@ -61,8 +61,8 @@ public final class PolynomialSeries {
 <span class="fc" id="L61">        }</span>
         public PolynomialSumVerifier.Verification verify(OptimizationBudget b,CancellationToken c) {
 <span class="fc" id="L63">            var w=work(b,c);</span>
-<span class="fc" id="L64">            try { check(w); return new PolynomialSumVerifier.Verification(true,&quot;VERIFIED_NESTED_SUM&quot;,w.used); }</span>
-<span class="fc" id="L65">            catch(Unavailable e) { return new PolynomialSumVerifier.Verification(false,e.getMessage(),w.used); }</span>
+<span class="fc" id="L64">            try { check(w); return new PolynomialSumVerifier.Verification(true,&quot;VERIFIED_NESTED_SUM&quot;,w.used()); }</span>
+<span class="fc" id="L65">            catch(Unavailable e) { return new PolynomialSumVerifier.Verification(false,e.getMessage(),w.used()); }</span>
         }
         public BigInteger evaluate(BigInteger count,Map&lt;SymbolId,BigInteger&gt; parameters,OptimizationBudget b,CancellationToken c) {
 <span class="fc" id="L68">            var w=work(b,c);</span>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PairReductionSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">PairReductionSearch.java</span></div><h1>PairReductionSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.search.moves.MoveSearch;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Source-only search for a checked one-pass pair plan on the shared move frontier. */
+public final class PairReductionSearch {
+<span class="fc" id="L12">    private static final PairReductionSynthesis SYNTHESIS = new PairReductionSynthesis();</span>
+<span class="fc" id="L13">    private static final PairReductionVerifier VERIFIER = new PairReductionVerifier();</span>
+
+    private PairReductionSearch() {}
+
+<span class="fc" id="L17">    public record CheckedMove(String ruleId, long synthesisWork, long verificationWork) {}</span>
+
+    public record Result(Optional&lt;PairReductionVerifier.Verified&gt; verified, String reason,
+            List&lt;CheckedMove&gt; witness, MoveSearch.Metrics metrics) {
+<span class="fc" id="L21">        public Result {</span>
+<span class="fc" id="L22">            witness = List.copyOf(witness);</span>
+<span class="fc" id="L23">        }</span>
+    }
+
+    public static Result search(PairReduction source, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L28">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L29">        var result = IterationSearch.search(new Source(source), new PairDomain(source), limits, maximumStates, cancellation);</span>
+<span class="fc" id="L30">        var witness = result.witness().stream().map(step -&gt; new CheckedMove(step.ruleId(),</span>
+<span class="fc" id="L31">            step.synthesisWork(), step.verificationWork())).toList();</span>
+<span class="fc" id="L32">        return new Result(result.verified(), result.reason(), witness, result.metrics());</span>
+    }
+
+    private sealed interface Form permits Source, Normalized, Reduced {}
+<span class="fc" id="L36">    private record Source(PairReduction value) implements Form {}</span>
+<span class="fc" id="L37">    private record Normalized(PairReductionSynthesis.NormalForm value) implements Form {}</span>
+<span class="fc" id="L38">    private record Reduced(PairReductionPlan value) implements Form {}</span>
+
+<span class="fc" id="L40">    private record PairDomain(PairReduction original) implements IterationSearch.Domain&lt;Form, PairReductionVerifier.Verified&gt; {</span>
+<span class="fc" id="L41">        @Override public String family() { return &quot;pair-reduction&quot;; }</span>
+<span class="fc" id="L42">        @Override public String noPlanReason() { return &quot;NO_PAIR_PLAN&quot;; }</span>
+<span class="fc" id="L43">        @Override public int maximumDepth() { return 2; }</span>
+<span class="fc" id="L44">        @Override public boolean finished(Form form) { return form instanceof Reduced; }</span>
+
+        @Override public IterationSearch.Proposal&lt;Form&gt; propose(Form source, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="pc bpc" id="L47" title="1 of 3 branches missed.">            return switch (source) {</span>
+<span class="fc" id="L48">                case Source input -&gt; {</span>
+<span class="fc" id="L49">                    var proposal = SYNTHESIS.normalize(input.value(), limits, cancellation);</span>
+<span class="fc" id="L50">                    yield new IterationSearch.Proposal&lt;&gt;(&quot;normalize-pair-summand&quot;,</span>
+<span class="fc" id="L51">                        proposal.value().map(Normalized::new), proposal.reason(), proposal.work());</span>
+                }
+<span class="fc" id="L53">                case Normalized normalized -&gt; {</span>
+<span class="fc" id="L54">                    var proposal = SYNTHESIS.reduce(normalized.value(), limits, cancellation);</span>
+<span class="fc" id="L55">                    yield new IterationSearch.Proposal&lt;&gt;(&quot;reduce-pair-sum&quot;,</span>
+<span class="fc" id="L56">                        proposal.value().map(Reduced::new), proposal.reason(), proposal.work());</span>
+                }
+<span class="nc" id="L58">                case Reduced ignored -&gt; throw new IllegalStateException(&quot;pair plan is terminal&quot;);</span>
+            };
+        }
+
+        @Override public IterationSearch.Check&lt;PairReductionVerifier.Verified&gt; verify(
+                Form source, Form target, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="pc bpc" id="L64" title="1 of 3 branches missed.">            return switch (target) {</span>
+<span class="fc" id="L65">                case Normalized normalized -&gt; {</span>
+<span class="fc" id="L66">                    var check = VERIFIER.verifyNormalization(original, normalized.value(), limits, cancellation);</span>
+<span class="fc" id="L67">                    yield new IterationSearch.Check&lt;&gt;(check.accepted(), Optional.empty(), check.reason(), check.work());</span>
+                }
+<span class="fc" id="L69">                case Reduced reduced -&gt; {</span>
+<span class="fc" id="L70">                    var check = VERIFIER.verify(original, reduced.value(), limits, cancellation);</span>
+<span class="fc" id="L71">                    yield new IterationSearch.Check&lt;&gt;(check.verified().isPresent(), check.verified(), check.reason(), check.work());</span>
+                }
+<span class="nc" id="L73">                case Source ignored -&gt; throw new IllegalArgumentException(&quot;unexpected pair proposal&quot;);</span>
+            };
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

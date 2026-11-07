@@ -463,7 +463,7 @@ import static de.regelsuche.search.moves.MoveSearch.*;
 <span class="fc bfc" id="L463" title="All 2 branches covered.">        if (ledger.total() &gt;= problem.budget().totalWork()) {</span>
 <span class="fc" id="L464">            return admission(pending, child, theory, Decision.WORK_LIMIT, null, value);</span>
         }
-<span class="fc" id="L466">        var verification = problem.verify(node.state, move);</span>
+<span class="fc" id="L466">        var verification = problem.verify(node.state, move, problem.budget().totalWork() - ledger.total());</span>
 <span class="fc" id="L467">        ledger.verification = Math.addExact(ledger.verification, verification.work());</span>
 <span class="fc" id="L468">        pending[3] = verification;</span>
 <span class="fc" id="L469">        SearchExecution.completed(1);</span>
