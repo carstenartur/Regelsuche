@@ -1,8 +1,7 @@
-package de.regelsuche.sdk.optimization.iteration;
+package de.regelsuche.math.algorithms.iteration;
 
+import de.regelsuche.ast.iteration.PairReduction;
 import de.regelsuche.parse.ExpressionParser;
-import de.regelsuche.sdk.optimization.CancellationToken;
-import de.regelsuche.sdk.optimization.OptimizationBudget;
 import de.regelsuche.symbol.SymbolId;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -11,6 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
@@ -20,9 +20,9 @@ class PairReductionTest {
     private static final UUID NAMESPACE = new UUID(1, 2);
     private static final PairReduction.Column X = column(1);
     private static final PairReduction.Column W = column(3);
-    private static final OptimizationBudget BUDGET = new OptimizationBudget(8_000_000, 128, 1, 30_000);
-    private static final CancellationToken NEVER = CancellationToken.NONE;
-    private static final PairReductionOptimizer OPTIMIZER = new PairReductionOptimizer();
+    private static final IterationLimits BUDGET = new IterationLimits(8_000_000, 128, 30_000);
+    private static final BooleanSupplier NEVER = () -> false;
+    private static final PairReductionSynthesis SYNTHESIS = new PairReductionSynthesis();
     private static final PairReductionVerifier VERIFIER = new PairReductionVerifier();
 
     @Test
@@ -87,11 +87,11 @@ class PairReductionTest {
     @Test
     void failsClosedForAsymmetryUnsupportedTermsBadRowsAndBudgetExhaustion() {
         var source = source("xi*xj", X);
-        assertEquals("ASYMMETRIC_SUMMAND", OPTIMIZER.search(source("xi-xj", X), BUDGET, NEVER).reason());
-        assertEquals("UNSUPPORTED_OPERATOR", OPTIMIZER.search(source("(xi+xj)/2", X), BUDGET, NEVER).reason());
-        assertEquals("CANCELLED", OPTIMIZER.search(source, BUDGET, () -> true).reason());
+        assertEquals("ASYMMETRIC_SUMMAND", SYNTHESIS.reduce(normalized(source("xi-xj", X)), BUDGET, NEVER).reason());
+        assertEquals("UNSUPPORTED_OPERATOR", SYNTHESIS.normalize(source("(xi+xj)/2", X), BUDGET, NEVER).reason());
+        assertEquals("CANCELLED", SYNTHESIS.normalize(source, BUDGET, () -> true).reason());
         assertEquals("WORK_LIMIT",
-            OPTIMIZER.search(source, new OptimizationBudget(1, 128, 1, 30_000), NEVER).reason());
+            SYNTHESIS.normalize(source, BUDGET.withMaximumWork(1), NEVER).reason());
         var checked = checked(source);
         assertThrows(IllegalArgumentException.class, () -> checked.evaluate(List.of(row(1, 2)), BUDGET, NEVER));
         assertThrows(IllegalArgumentException.class, () -> checked.evaluate(List.of(row(1)), BUDGET, () -> true));
@@ -114,11 +114,28 @@ class PairReductionTest {
     }
 
     private static PairReductionVerifier.Verified checked(PairReduction source) {
-        var search = OPTIMIZER.search(source, BUDGET, NEVER);
-        assertTrue(search.plan().isPresent(), search.reason());
-        var check = VERIFIER.verify(source, search.plan().orElseThrow(), BUDGET, NEVER);
+        var synthesis = SYNTHESIS.reduce(normalized(source), BUDGET, NEVER);
+        assertTrue(synthesis.value().isPresent(), synthesis.reason());
+        var check = VERIFIER.verify(source, synthesis.value().orElseThrow(), BUDGET, NEVER);
         assertTrue(check.verified().isPresent(), check.reason());
         return check.verified().orElseThrow();
+    }
+
+    @Test
+    void checksTheExpandedSummandAgainstItsBindingsAndExactCoefficients() {
+        var form = normalized(source("(xi-xj)^2", X, W));
+        assertTrue(VERIFIER.verifyNormalization(source("xi*xi-2*xi*xj+xj*xj", X, W), form, BUDGET, NEVER).accepted());
+        assertEquals("SUMMAND_MISMATCH",
+            VERIFIER.verifyNormalization(source("xi*xi+xj*xj", X, W), form, BUDGET, NEVER).reason());
+        assertEquals("COLUMN_BINDING_MISMATCH",
+            VERIFIER.verifyNormalization(source("(xi-xj)^2", W, X), form, BUDGET, NEVER).reason());
+        assertThrows(IllegalArgumentException.class, () -> source("wi*xj", X));
+    }
+
+    private static PairReductionSynthesis.NormalForm normalized(PairReduction source) {
+        var result = SYNTHESIS.normalize(source, BUDGET, NEVER);
+        assertTrue(result.value().isPresent(), result.reason());
+        return result.value().orElseThrow();
     }
 
     private static PairReduction source(String expression, PairReduction.Column... columns) {

@@ -766,6 +766,7 @@
                     "expandedSummand": {"type": "string"},
                     "accumulators": {"type": "array", "items": {"type": "object", "required": ["name", "rowProduct"], "properties": {"name": {"type": "string"}, "rowProduct": {"type": "string"}}}},
                     "formula": {"type": "string"},
+                    "checkedRules": {"type": "array", "items": {"type": "string"}, "description": "Geprüfte Züge des Suchpfads in Anwendungsreihenfolge"},
                     "synthesisWork": {"type": "integer"},
                     "verificationWork": {"type": "integer"},
                     "sampleRows": {"type": "integer"},

@@ -1,6 +1,7 @@
-package de.regelsuche.sdk.optimization.iteration;
+package de.regelsuche.math.algorithms.iteration;
 
 import de.regelsuche.ast.iteration.FiniteIteration;
+import de.regelsuche.ast.iteration.PairReduction;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;

@@ -1,49 +1,84 @@
-package de.regelsuche.sdk.optimization.iteration;
+package de.regelsuche.math.algorithms.iteration;
 
 import de.regelsuche.ast.iteration.FiniteIteration;
-import de.regelsuche.sdk.optimization.CancellationToken;
-import de.regelsuche.sdk.optimization.OptimizationBudget;
+import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.symbol.SymbolId;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.Unavailable;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.Work;
-import static de.regelsuche.sdk.optimization.iteration.PairReductionPlan.Moment;
-import static de.regelsuche.sdk.optimization.iteration.PairReductionPlan.Term;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Term;
 
 /** Derives the accumulators from an input polynomial and leaves authorization to the verifier. */
-public final class PairReductionOptimizer {
-    public record Result(Optional<PairReductionPlan> plan, String reason, long work) {}
+public final class PairReductionSynthesis {
+    public record Result<T>(Optional<T> value, String reason, long work) {}
 
-    public Result search(PairReduction source, OptimizationBudget budget, CancellationToken cancellation) {
+    /** Bounded sparse form of the summand with its original ordered column bindings. */
+    public static final class NormalForm {
+        private final List<PairReduction.Column> columns;
+        private final Map<IterationPolynomial.Monomial, ExactRational> terms;
+
+        private NormalForm(PairReduction source, IterationPolynomial polynomial) {
+            columns = source.columns();
+            terms = polynomial.terms();
+        }
+
+        List<PairReduction.Column> columns() { return columns; }
+        Map<IterationPolynomial.Monomial, ExactRational> terms() { return terms; }
+
+        @Override public boolean equals(Object other) {
+            return other instanceof NormalForm form && columns.equals(form.columns) && terms.equals(form.terms);
+        }
+
+        @Override public int hashCode() { return Objects.hash(columns, terms); }
+    }
+
+    public Result<NormalForm> normalize(PairReduction source, IterationLimits limits, BooleanSupplier cancellation) {
         Objects.requireNonNull(source);
-        var work = new Work(budget, cancellation, PairReduction.MAX_DEGREE);
+        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
         try {
-            var plan = synthesize(source, work);
-            return new Result(Optional.of(plan), "CANDIDATE", work.used);
+            var form = new NormalForm(source, IterationPolynomial.parsePairSummand(source, work));
+            return new Result<>(Optional.of(form), "CANDIDATE", work.used());
         } catch (Unavailable exception) {
-            return new Result(Optional.empty(), exception.getMessage(), work.used);
+            return new Result<>(Optional.empty(), exception.getMessage(), work.used());
         }
     }
 
-    private static PairReductionPlan synthesize(PairReduction source, Work work) {
-        var polynomial = source.polynomial(work);
+    public Result<PairReductionPlan> reduce(NormalForm form, IterationLimits limits, BooleanSupplier cancellation) {
+        Objects.requireNonNull(form);
+        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
+        try {
+            work.charge(1);
+            if (form.terms().size() > limits.maximumTerms()) throw new Unavailable("TERM_LIMIT");
+            var plan = synthesize(form, work);
+            return new Result<>(Optional.of(plan), "CANDIDATE", work.used());
+        } catch (Unavailable exception) {
+            return new Result<>(Optional.empty(), exception.getMessage(), work.used());
+        }
+    }
+
+    private static PairReductionPlan synthesize(NormalForm form, Work work) {
         var leftColumns = new HashMap<SymbolId, Integer>();
         var rightColumns = new HashMap<SymbolId, Integer>();
-        for (int index = 0; index < source.columns().size(); index++) {
-            var column = source.columns().get(index);
+        for (int index = 0; index < form.columns().size(); index++) {
+            work.charge(1);
+            var column = form.columns().get(index);
             leftColumns.put(column.left(), index);
             rightColumns.put(column.right(), index);
         }
 
         var pairs = new LinkedHashMap<Split, BigInteger>();
-        for (var term : polynomial.terms.entrySet()) {
+        for (var term : form.terms().entrySet()) {
             var left = new ArrayList<Integer>();
             var right = new ArrayList<Integer>();
             for (var symbol : term.getKey().symbols()) {

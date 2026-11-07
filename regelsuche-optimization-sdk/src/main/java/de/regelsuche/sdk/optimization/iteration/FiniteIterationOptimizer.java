@@ -6,7 +6,7 @@ import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.sdk.optimization.*;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Bounded candidate search; only FiniteIterationVerifier can establish the identity. */
 public final class FiniteIterationOptimizer {
@@ -30,16 +30,16 @@ public final class FiniteIterationOptimizer {
     }
     public SearchResult search(FiniteIteration source, OptimizationBudget budget, CancellationToken cancellation) {
         Objects.requireNonNull(source);
-        var work=new Work(budget,cancellation);
+        var work=SeriesSupport.work(budget, cancellation, MAX_DEGREE + 1);
         try {
-            var parsed=source(source,work);
+            var parsed=SeriesSupport.source(source,work);
             var remaining=parsed.term(); var antidifference=zero(work);
             // Triangular elimination in the index degree; no range unrolling or stored sum formulas.
             int rounds=0;
-            while(!remaining.terms.isEmpty()) {
-                work.charge(remaining.terms.size());
+            while(!remaining.terms().isEmpty()) {
+                work.charge(remaining.terms().size());
                 if(++rounds>MAX_TERMS*(MAX_DEGREE+1)) throw new Unavailable("SYNTHESIS_LIMIT");
-                var leading=remaining.terms.entrySet().stream().max(Comparator.comparingInt(e -> e.getKey().degree(source.index()))).orElseThrow();
+                var leading=remaining.terms().entrySet().stream().max(Comparator.comparingInt(e -> e.getKey().degree(source.index()))).orElseThrow();
                 int degree=leading.getKey().degree(source.index())+1;
                 var denominator=ExactRational.integer(source.range().step().multiply(BigInteger.valueOf(degree)));
                 var primitive=single(leading.getKey(),leading.getValue().divide(denominator),work).multiply(variable(source.index(),work));
@@ -50,11 +50,11 @@ public final class FiniteIterationOptimizer {
                 .subtract(antidifference.at(source.index(),source.range().start())).add(parsed.initial()).integral(source.arithmetic());
             Expr result=value.expression(), proof=antidifference.expression();
             // Generated trees obey the same transport limits as untrusted inputs to the checker.
-            parse(proof,symbols(source,false),false,MAX_DEGREE+1,work);
+            parse(proof,SeriesSupport.symbols(source,false),false,MAX_DEGREE+1,work);
             parse(result,source.parameters(),true,MAX_DEGREE,work);
-            var cost=cost(source,result,work);
-            var candidate=new Candidate(result,new Certificate(source,proof),work.used,cost);
-            return new SearchResult(Optional.of(candidate),"CANDIDATE",work.used);
-        } catch(Unavailable unavailable) { return new SearchResult(Optional.empty(),unavailable.getMessage(),work.used); }
+            var cost=SeriesSupport.cost(source,result,work);
+            var candidate=new Candidate(result,new Certificate(source,proof),work.used(),cost);
+            return new SearchResult(Optional.of(candidate),"CANDIDATE",work.used());
+        } catch(Unavailable unavailable) { return new SearchResult(Optional.empty(),unavailable.getMessage(),work.used()); }
     }
 }

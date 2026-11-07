@@ -38,16 +38,18 @@ Periodic and piecewise incoming states are the sum of child initial values, each
 
 ## One-pass pair reductions
 
-`PairReduction(columns, summand)` describes the sum of an exact integer
-polynomial over all rows with indices `i < j`. Each column has two scoped
-symbols for its values in the two rows. `PairReductionOptimizer.search`
-normalizes the source polynomial and requires that swapping the two rows
-preserve it. It splits each monomial into a product of row monomials. The sum
+`de.regelsuche.ast.iteration.PairReduction(columns, summand)` describes the
+sum of an exact integer polynomial over all rows with indices `i < j`.
+Each column has two scoped symbols for its values in the two rows.
+`PairReductionSdk.search` delegates to the same typed search as the Workbench.
+The shared frontier first checks the sparse polynomial normalization, then
+checks the reduction to moments. The reduction requires the polynomial to be
+invariant under swapping the two rows and splits each monomial into row factors. The sum
 over the full rectangle factors into products of moments. The candidate
 subtracts the diagonal and divides by two, cancelling that divisor when all
 numerator coefficients are even.
 
-`PairReductionVerifier.verify` checks the candidate independently. An
+The mathematical verifier checks the candidate independently. An
 expression at most quadratic in sums of row monomials expands into
 single-row and two-distinct-row contributions. Expanding the numerator on one
 symbolic row checks the single-row contribution is zero. Expanding it on two
@@ -55,17 +57,21 @@ independent symbolic rows checks the remaining contribution equals the
 original summand times the divisor. This establishes equality for any
 finite row count, including empty input.
 
-The checked program evaluates an iterable of integer rows once and keeps one
-running sum per nonconstant moment. The SDK hands off the checked mathematical
-plan as moments, exact coefficients and a divisor. Sandbox owns Java source
+The result includes the checked program and the ordered move witness, with
+synthesis and verification work for each move. `PairReductionSdk.evaluate`
+evaluates an iterable of integer rows once and keeps one running sum per
+nonconstant moment. The plan exposes moments, exact coefficients and a divisor.
+Sandbox owns Java source
 extraction, emission and source-level verification for Java integrations.
 [Source adapter contract](../docs/java-optimization-sdk-integration.md)
 
 The source fragment supports one to eight columns, integer literals,
 addition, subtraction, multiplication and literal exponents from 0 to 8.
 A zero exponent gives the constant polynomial one. Intermediate total
-degree is bounded by eight. Synthesis, symbolic verification and SDK
-evaluation take explicit budgets and cancellation tokens. Pair counts and
+degree is bounded by eight. Search shares its work and timeout limits across
+both moves and their checks. A successful search fits the work limit.
+An exhausted run can include additional frontier bookkeeping in its metrics.
+Evaluation has a separate budget. Pair counts and
 row visits describe algorithmic work. Actual runtime also depends on
 the number of moments and the operand sizes.
 

@@ -1,4 +1,4 @@
-package de.regelsuche.sdk.optimization.iteration;
+package de.regelsuche.ast.iteration;
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.symbol.SymbolId;
@@ -28,6 +28,7 @@ public record PairReduction(List<Column> columns, Expr summand) {
                 throw new IllegalArgumentException("DUPLICATE_COLUMN_SYMBOL");
             }
         }
+        IterationScope.validate(summand, symbols);
     }
 
     public record Column(SymbolId left, SymbolId right) {
@@ -43,15 +44,5 @@ public record PairReduction(List<Column> columns, Expr summand) {
             throw new IllegalArgumentException("NEGATIVE_ROW_COUNT");
         }
         return BigInteger.valueOf(rows).multiply(BigInteger.valueOf(rows - 1)).shiftRight(1);
-    }
-
-    IterationPolynomial polynomial(IterationPolynomial.Work work) {
-        var allowed = new HashSet<SymbolId>();
-        for (Column column : columns) {
-            work.charge(1);
-            allowed.add(column.left());
-            allowed.add(column.right());
-        }
-        return IterationPolynomial.parseIntegerPowers(summand, allowed, MAX_DEGREE, work);
     }
 }

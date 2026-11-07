@@ -72,6 +72,7 @@ class WebWorkbenchServerTest {
         assertEquals("VERIFIED", body.get("status"));
         assertEquals("4999950000", body.get("originalPairs"));
         assertEquals("54", body.get("sampleResult"));
+        assertEquals(java.util.List.of("normalize-pair-summand", "reduce-pair-sum"), body.get("checkedRules"));
         assertNotNull(body.get("formula"));
         assertFalse(body.containsKey("javaSource"), "Java source emission belongs to the Sandbox adapter");
     }

@@ -5,13 +5,11 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.ast.iteration.PairReduction;
 import de.regelsuche.json.JsonWriter;
-import de.regelsuche.sdk.optimization.CancellationToken;
-import de.regelsuche.sdk.optimization.OptimizationBudget;
-import de.regelsuche.sdk.optimization.iteration.PairReduction;
-import de.regelsuche.sdk.optimization.iteration.PairReductionOptimizer;
-import de.regelsuche.sdk.optimization.iteration.PairReductionPlan;
-import de.regelsuche.sdk.optimization.iteration.PairReductionVerifier;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.PairReductionPlan;
+import de.regelsuche.math.algorithms.iteration.PairReductionSearch;
 import de.regelsuche.symbol.SymbolId;
 import de.regelsuche.symbol.SymbolScope;
 import de.regelsuche.symbol.SymbolicExpression;
@@ -22,13 +20,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** Workbench adapter for the exact mathematical source, certificate and execution. */
 final class PairReductionWorkbench {
     private static final Set<String> FIELDS = Set.of("columns", "summand", "rowCount", "rows");
-    private static final OptimizationBudget BUDGET = new OptimizationBudget(500_000, 128, 1, 2_000);
+    private static final IterationLimits LIMITS = new IterationLimits(500_000, 128, 2_000);
+    private static final BooleanSupplier NEVER_CANCELLED = () -> false;
     private static final Pattern INTEGER = Pattern.compile("-?[0-9]{1,256}");
 
     private PairReductionWorkbench() {}
@@ -46,25 +46,27 @@ final class PairReductionWorkbench {
         var columns = names.stream().map(name -> new PairReduction.Column(
             scope.declare(name + "_i"), scope.declare(name + "_j"))).toList();
         var symbolic = SymbolicExpression.parse(summand, scope);
-        var source = new PairReduction(columns, symbolic.expression());
-        var search = new PairReductionOptimizer().search(source, BUDGET, CancellationToken.NONE);
-        if (search.plan().isEmpty()) {
+        PairReduction source;
+        try {
+            source = new PairReduction(columns, symbolic.expression());
+        } catch (IllegalArgumentException invalidScope) {
+            return unavailable(invalidScope.getMessage());
+        }
+        var search = PairReductionSearch.search(source, LIMITS, 3, NEVER_CANCELLED);
+        if (search.verified().isEmpty()) {
             return unavailable(search.reason());
         }
-        var check = new PairReductionVerifier().verify(source, search.plan().orElseThrow(),
-            BUDGET, CancellationToken.NONE);
-        if (check.verified().isEmpty()) {
-            return unavailable(check.reason());
-        }
-        var checked = check.verified().orElseThrow();
+        var checked = search.verified().orElseThrow();
         var result = new JsonWriter().beginObject().property("status", "VERIFIED")
             .property("rowCount", count).property("originalPairs", PairReduction.originalPairs(count).toString())
             .property("expandedSummand", expansion(checked.expandedSummand(), symbolic.displayNames()))
-            .property("synthesisWork", search.work()).property("verificationWork", check.work());
+            .property("synthesisWork", search.metrics().primitiveWork())
+            .property("verificationWork", search.metrics().verificationWork())
+            .array("checkedRules", array -> search.witness().forEach(step -> array.value(step.ruleId())));
         writePlan(result, checked.plan(), names);
         if (sample != null) {
             try {
-                var evaluation = checked.evaluate(sample, BUDGET, CancellationToken.NONE);
+                var evaluation = checked.evaluate(sample, LIMITS, NEVER_CANCELLED);
                 result.property("sampleResult", evaluation.value().toString()).property("sampleRows", evaluation.rows());
             } catch (IllegalArgumentException exception) {
                 result.property("sampleUnavailable", exception.getMessage());

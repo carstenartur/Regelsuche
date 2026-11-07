@@ -1,31 +1,49 @@
-package de.regelsuche.sdk.optimization.iteration;
+package de.regelsuche.math.algorithms.iteration;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.iteration.PairReduction;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.sdk.optimization.CancellationToken;
-import de.regelsuche.sdk.optimization.OptimizationBudget;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.Unavailable;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.Work;
-import static de.regelsuche.sdk.optimization.iteration.PairReductionPlan.Moment;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
 
 /** Proves the proposed program for all finite lists of integer rows. */
 public final class PairReductionVerifier {
     public record Result(Optional<Verified> verified, String reason, long work) {}
+    public record NormalizationCheck(boolean accepted, String reason, long work) {}
 
-    public Result verify(PairReduction source, PairReductionPlan plan, OptimizationBudget budget,
-            CancellationToken cancellation) {
+    public NormalizationCheck verifyNormalization(PairReduction source, PairReductionSynthesis.NormalForm form,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        Objects.requireNonNull(source);
+        Objects.requireNonNull(form);
+        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
+        try {
+            work.charge(source.columns().size());
+            if (!source.columns().equals(form.columns())) throw new Unavailable("COLUMN_BINDING_MISMATCH");
+            var polynomial = IterationPolynomial.parsePairSummand(source, work);
+            work.charge(polynomial.terms().size() + form.terms().size());
+            if (!polynomial.terms().equals(form.terms())) throw new Unavailable("SUMMAND_MISMATCH");
+            return new NormalizationCheck(true, "VERIFIED_NORMALIZATION", work.used());
+        } catch (Unavailable exception) {
+            return new NormalizationCheck(false, exception.getMessage(), work.used());
+        }
+    }
+
+    public Result verify(PairReduction source, PairReductionPlan plan, IterationLimits limits,
+            BooleanSupplier cancellation) {
         Objects.requireNonNull(source);
         Objects.requireNonNull(plan);
-        var work = new Work(budget, cancellation, PairReduction.MAX_DEGREE);
+        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
         try {
-            var polynomial = source.polynomial(work);
+            var polynomial = IterationPolynomial.parsePairSummand(source, work);
             var symbolic = new HashMap<Moment, SymbolicMoment>();
             var oneRow = IterationPolynomial.zero(work);
             var twoRows = IterationPolynomial.zero(work);
@@ -54,9 +72,9 @@ public final class PairReductionVerifier {
             if (!twoRows.same(polynomial.scale(ExactRational.integer(plan.divisor())))) {
                 throw new Unavailable("PAIR_IDENTITY_MISMATCH");
             }
-            return new Result(Optional.of(new Verified(source, plan, polynomial.expression())), "VERIFIED", work.used);
+            return new Result(Optional.of(new Verified(source, plan, polynomial.expression())), "VERIFIED", work.used());
         } catch (Unavailable exception) {
-            return new Result(Optional.empty(), exception.getMessage(), work.used);
+            return new Result(Optional.empty(), exception.getMessage(), work.used());
         }
     }
 
@@ -94,10 +112,10 @@ public final class PairReductionVerifier {
         public PairReductionPlan plan() { return plan; }
         public Expr expandedSummand() { return expandedSummand; }
 
-        public Evaluation evaluate(Iterable<? extends List<BigInteger>> rows, OptimizationBudget budget,
-                CancellationToken cancellation) {
+        public Evaluation evaluate(Iterable<? extends List<BigInteger>> rows, IterationLimits limits,
+                BooleanSupplier cancellation) {
             Objects.requireNonNull(rows);
-            var work = new Work(budget, cancellation);
+            var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
             try {
                 return evaluate(rows, work);
             } catch (Unavailable exception) {
@@ -121,7 +139,7 @@ public final class PairReductionVerifier {
                     if (values[i] == null) {
                         throw new Unavailable("MISSING_ROW_VALUE");
                     }
-                    SeriesSupport.bits(values[i], work);
+                    work.runtimeInteger(values[i]);
                 }
                 for (int i = 0; i < sums.length; i++) {
                     var columns = accumulators.get(i).columns();
@@ -152,11 +170,11 @@ public final class PairReductionVerifier {
             if (result[1].signum() != 0) {
                 throw new IllegalStateException("verified pair plan produced a nonintegral result");
             }
-            return new Evaluation(result[0], count, work.used);
+            return new Evaluation(result[0], count, work.used());
         }
 
         private static BigInteger bounded(BigInteger value, Work work) {
-            SeriesSupport.bits(value, work);
+            work.runtimeInteger(value);
             return value;
         }
     }

@@ -73,7 +73,8 @@ class ArchitectureBoundariesTest {
             ":regelsuche-math-algorithms"));
         expectedProjectDependencies.put("regelsuche-solver-portfolio", List.of(
             ":regelsuche-solver-ir"));
-        expectedProjectDependencies.put("regelsuche-math-algorithms", List.of(":regelsuche-core", ":regelsuche-validation"));
+        expectedProjectDependencies.put("regelsuche-math-algorithms", List.of(":regelsuche-core",
+            ":regelsuche-validation", ":regelsuche-search"));
         expectedProjectDependencies.put("regelsuche-optimization-sdk", List.of(":regelsuche-search", ":regelsuche-math-algorithms"));
         expectedProjectDependencies.put("regelsuche-math-jas", List.of(":regelsuche-validation"));
         expectedProjectDependencies.put("regelsuche-persistence", List.of(":regelsuche-core"));
@@ -96,8 +97,7 @@ class ArchitectureBoundariesTest {
         expectedProjectDependencies.put("app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-search",
             ":regelsuche-validation", ":regelsuche-math-algorithms", ":regelsuche-persistence", ":regelsuche-persistence-hibernate",
             ":regelsuche-learning", ":regelsuche-experiments", ":regelsuche-cli", ":regelsuche-discovery",
-            ":regelsuche-solver-portfolio", ":regelsuche-plugin-api", ":regelsuche-discovery-sdk",
-            ":regelsuche-optimization-sdk"));
+            ":regelsuche-solver-portfolio", ":regelsuche-plugin-api", ":regelsuche-discovery-sdk"));
         for (Map.Entry<String, List<String>> entry : expectedProjectDependencies.entrySet()) {
             String build = Files.readString(REPO_ROOT.resolve(entry.getKey()).resolve("build.gradle"));
             List<String> declared = projectDependencyTokens(build);

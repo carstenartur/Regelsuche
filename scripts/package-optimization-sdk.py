@@ -136,7 +136,8 @@ def package(root, external, output, java_home, skip_consumer=False):
                  *map(str, sorted((directory / 'src').rglob('*.java')))], directory)
             log = run([str(java), '-Duser.home=' + str(directory / 'empty-dependency-cache'), '-cp',
                        str(directory / 'classes') + os.pathsep + str(binary.resolve()), 'example.JavaOptimization'], directory)
-            if 'optimization=VERIFIED' not in log or 'checked=ORIGINAL_OVERFLOW_DETECTED' not in log:
+            markers = ('optimization=VERIFIED', 'checked=ORIGINAL_OVERFLOW_DETECTED', 'pair=VERIFIED_ONE_PASS_54')
+            if not all(marker in log for marker in markers):
                 raise ValueError('standalone consumer did not verify the numeric contracts')
             provenance['consumer'] = {'freshDirectory': True, 'emptyDependencyCache': True, 'output': log.strip()}
     for artifact in sorted(coordinate.iterdir()):
