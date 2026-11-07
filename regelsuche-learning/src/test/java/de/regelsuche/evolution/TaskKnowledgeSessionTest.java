@@ -119,4 +119,30 @@ class TaskKnowledgeSessionTest {
         assertEquals(0, session.statistics().retainedCharacters());
         assertThrows(IllegalStateException.class, () -> session.prepare(path));
     }
+
+    @Test void alreadyCheckedSuccessorEntersSessionWithoutASecondReproof(@TempDir Path directory) throws Exception {
+        var inventory = TraceStrategyTransferExample.inventory();
+        var prepared = CumulativeTaskKnowledge.restorePrepared(inventory, learned.toCanonicalJson());
+        try (var session = new TaskKnowledgeSession(inventory, 2, 1_000_000)) {
+            var retained = session.retainVerified(prepared);
+            assertSame(prepared, retained.knowledge()); assertEquals(0, retained.preparationWork());
+            var restored = session.prepare(prepared.save(directory));
+            assertTrue(restored.reused()); assertSame(prepared, restored.knowledge());
+            assertEquals(0, session.statistics().preparationWork());
+            assertEquals(1, session.statistics().admissions());
+        }
+    }
+
+    @Test void directAdmissionCannotBypassInventoryOrPreparedMode() {
+        var inventory = TraceStrategyTransferExample.inventory();
+        var foreign = EvolutionGenome.create(inventory.objective(), inventory.trainingScope(), inventory.rewrites(),
+            inventory.rankingFeatures(), inventory.guardPolicy(), inventory.budget(), inventory.requiredCapabilities(),
+            List.of("sha256:" + "0".repeat(64)));
+        var wrong = CumulativeTaskKnowledge.emptyPrepared(foreign, TaskConstructionProfile.NONE);
+        try (var session = new TaskKnowledgeSession(inventory, 2, 1_000_000)) {
+            assertThrows(IllegalArgumentException.class, () -> session.retainVerified(wrong));
+            assertThrows(IllegalArgumentException.class, () -> session.retainVerified(learned));
+            assertEquals(0, session.statistics().retainedGenerations());
+        }
+    }
 }

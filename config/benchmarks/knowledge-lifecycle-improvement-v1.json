@@ -1,0 +1,247 @@
+{
+  "revision": "regelsuche.knowledge-lifecycle-improvement/v1",
+  "informationRegime": "PUBLIC_DEVELOPMENT_SINGLE_COMPOSITION_FAMILY",
+  "profiles": [
+    "PRIMITIVE",
+    "LEGACY_SESSION",
+    "LEGACY_RELOAD",
+    "PREPARED_REUSE",
+    "MEASURED_IMPROVEMENT",
+    "SYMPY"
+  ],
+  "blocks": [
+    1,
+    16
+  ],
+  "repetitions": 3,
+  "setupTimeoutSeconds": 120,
+  "queryTimeoutSeconds": 30,
+  "sympyVersion": "1.14.0",
+  "javaOptions": [
+    "-Xmx512m"
+  ],
+  "nativeBudget": [
+    32,
+    32,
+    200000,
+    512,
+    200000
+  ],
+  "seedLearningWork": 1000000,
+  "cacheGenerations": 4,
+  "cacheCharacters": 4000000,
+  "improvementPolicy": {
+    "maximumLearningWork": 5000000,
+    "maximumWallNanos": 120000000000,
+    "maximumCpuNanos": 120000000000,
+    "maximumBatches": 2,
+    "measurementRepeats": 3
+  },
+  "seedBlocks": [
+    {
+      "lessons": [
+        {
+          "source": "((a+b1)*(a-b1)+b1*b1)+3",
+          "maximumNodes": 5
+        },
+        {
+          "source": "5*(((c+d1)*(c-d1)+d1*d1))",
+          "maximumNodes": 5
+        }
+      ],
+      "validation": [
+        {
+          "source": "((p*q+v1)*(p*q-v1)+v1*v1)",
+          "maximumNodes": 5
+        },
+        {
+          "source": "((z+w1)*(z-w1)+w1*w1)+7",
+          "maximumNodes": 5
+        },
+        {
+          "source": "x",
+          "maximumNodes": 1
+        },
+        {
+          "source": "(x+y)*(x-y)+y*(y+1)",
+          "maximumNodes": 1
+        }
+      ]
+    },
+    {
+      "lessons": [
+        {
+          "source": "((((a+b1)*(a-b1)+b1*b1)+b2)*(((a+b1)*(a-b1)+b1*b1)-b2)+b2*b2)+3",
+          "maximumNodes": 7
+        },
+        {
+          "source": "5*(((((c+d1)*(c-d1)+d1*d1)+d2)*(((c+d1)*(c-d1)+d1*d1)-d2)+d2*d2))",
+          "maximumNodes": 7
+        }
+      ],
+      "validation": [
+        {
+          "source": "((p*q+v1)*(p*q-v1)+v1*v1)",
+          "maximumNodes": 5
+        },
+        {
+          "source": "((z+w1)*(z-w1)+w1*w1)+7",
+          "maximumNodes": 5
+        },
+        {
+          "source": "x",
+          "maximumNodes": 1
+        },
+        {
+          "source": "(x+y)*(x-y)+y*(y+1)",
+          "maximumNodes": 1
+        },
+        {
+          "source": "((((p*q+v1)*(p*q-v1)+v1*v1)+v2)*(((p*q+v1)*(p*q-v1)+v1*v1)-v2)+v2*v2)",
+          "maximumNodes": 7
+        },
+        {
+          "source": "((((z+w1)*(z-w1)+w1*w1)+w2)*(((z+w1)*(z-w1)+w1*w1)-w2)+w2*w2)+7",
+          "maximumNodes": 7
+        },
+        {
+          "source": "x",
+          "maximumNodes": 1
+        },
+        {
+          "source": "(x+y)*(x-y)+y*(y+1)",
+          "maximumNodes": 1
+        }
+      ]
+    }
+  ],
+  "improvementBatches": [
+    {
+      "lessons": [
+        {
+          "source": "((((((a+b1)*(a-b1)+b1*b1)+b2)*(((a+b1)*(a-b1)+b1*b1)-b2)+b2*b2)+b3)*(((((a+b1)*(a-b1)+b1*b1)+b2)*(((a+b1)*(a-b1)+b1*b1)-b2)+b2*b2)-b3)+b3*b3)+3",
+          "maximumNodes": 9
+        },
+        {
+          "source": "5*(((((((c+d1)*(c-d1)+d1*d1)+d2)*(((c+d1)*(c-d1)+d1*d1)-d2)+d2*d2)+d3)*(((((c+d1)*(c-d1)+d1*d1)+d2)*(((c+d1)*(c-d1)+d1*d1)-d2)+d2*d2)-d3)+d3*d3))",
+          "maximumNodes": 9
+        }
+      ],
+      "validation": [
+        {
+          "source": "((((((p+v1)*(p-v1)+v1*v1)+v2)*(((p+v1)*(p-v1)+v1*v1)-v2)+v2*v2)+v3)*(((((p+v1)*(p-v1)+v1*v1)+v2)*(((p+v1)*(p-v1)+v1*v1)-v2)+v2*v2)-v3)+v3*v3)",
+          "maximumNodes": 9
+        },
+        {
+          "source": "((((((z+w1)*(z-w1)+w1*w1)+w2)*(((z+w1)*(z-w1)+w1*w1)-w2)+w2*w2)+w3)*(((((z+w1)*(z-w1)+w1*w1)+w2)*(((z+w1)*(z-w1)+w1*w1)-w2)+w2*w2)-w3)+w3*w3)+7",
+          "maximumNodes": 9
+        },
+        {
+          "source": "x",
+          "maximumNodes": 1
+        },
+        {
+          "source": "(x+y)*(x-y)+y*(y+1)",
+          "maximumNodes": 1
+        }
+      ],
+      "promotion": [
+        {
+          "source": "((((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)+t3)*(((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)-t3)+t3*t3)+17",
+          "maximumNodes": 9
+        }
+      ]
+    },
+    {
+      "lessons": [
+        {
+          "source": "x+13",
+          "maximumNodes": 1
+        },
+        {
+          "source": "y+17",
+          "maximumNodes": 1
+        }
+      ],
+      "validation": [
+        {
+          "source": "z+19",
+          "maximumNodes": 1
+        }
+      ],
+      "promotion": [
+        {
+          "source": "q+23",
+          "maximumNodes": 1
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "id": "depth1",
+      "task": {
+        "source": "((u+b1)*(u-b1)+b1*b1)",
+        "maximumNodes": 5
+      }
+    },
+    {
+      "id": "depth2",
+      "task": {
+        "source": "((((v+c1)*(v-c1)+c1*c1)+c2)*(((v+c1)*(v-c1)+c1*c1)-c2)+c2*c2)",
+        "maximumNodes": 7
+      }
+    },
+    {
+      "id": "depth3",
+      "task": {
+        "source": "((((((w+d1)*(w-d1)+d1*d1)+d2)*(((w+d1)*(w-d1)+d1*d1)-d2)+d2*d2)+d3)*(((((w+d1)*(w-d1)+d1*d1)+d2)*(((w+d1)*(w-d1)+d1*d1)-d2)+d2*d2)-d3)+d3*d3)",
+        "maximumNodes": 9
+      }
+    },
+    {
+      "id": "compound-sum",
+      "task": {
+        "source": "(((u+v)+b1)*((u+v)-b1)+b1*b1)",
+        "maximumNodes": 5
+      }
+    },
+    {
+      "id": "compound-product",
+      "task": {
+        "source": "(((((u*v)+c1)*((u*v)-c1)+c1*c1)+c2)*((((u*v)+c1)*((u*v)-c1)+c1*c1)-c2)+c2*c2)",
+        "maximumNodes": 7
+      }
+    },
+    {
+      "id": "offset",
+      "task": {
+        "source": "((((z+c1)*(z-c1)+c1*c1)+c2)*(((z+c1)*(z-c1)+c1*c1)-c2)+c2*c2)+11",
+        "maximumNodes": 7
+      }
+    },
+    {
+      "id": "negative",
+      "task": {
+        "source": "(x+y)*(x-y)+y*(y+1)",
+        "maximumNodes": 1
+      }
+    },
+    {
+      "id": "already-small",
+      "task": {
+        "source": "x",
+        "maximumNodes": 1
+      }
+    }
+  ],
+  "notes": [
+    "Normal caches/JIT remain enabled; no added answer cache.",
+    "All native learned profiles acquire the same two seed generations and pay producer exit plus fresh consumer.",
+    "LEGACY_SESSION is the existing persistent-generation control; LEGACY_RELOAD intentionally represents repeated API loads.",
+    "MEASURED_IMPROVEMENT pays actual candidate and no-op attempts; futureQueries equals the actual remaining query count.",
+    "SymPy receives the same source-only prelude, may decline training, and uses targeted factorization and identity under the same node-count goal.",
+    "Query/control overlap with development validation is explicit; this is not an independent-family or sealed-holdout study."
+  ],
+  "sympyProcedure": "MIN_NODES_IDENTITY_FACTOR"
+}

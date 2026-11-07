@@ -217,6 +217,7 @@ public final class CumulativeTaskKnowledge {
     }
 
     public TaskConstructionProfile constructionProfile() { return constructionProfile; }
+    String inventoryHash() { return inventory.contentHash(); }
     public boolean usesIndexedPreparation() { return indexedPreparation; }
     public String id() { return id; }
     public int generation() { return generation; }
