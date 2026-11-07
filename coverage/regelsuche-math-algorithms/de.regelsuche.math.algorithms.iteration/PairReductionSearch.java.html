@@ -23,54 +23,94 @@ public final class PairReductionSearch {
 <span class="fc" id="L23">        }</span>
     }
 
-    public static Result search(PairReduction source, IterationLimits limits, int maximumStates,
-            BooleanSupplier cancellation) {
-<span class="fc" id="L28">        Objects.requireNonNull(source);</span>
-<span class="fc" id="L29">        var result = IterationSearch.search(new Source(source), new PairDomain(source), limits, maximumStates, cancellation);</span>
-<span class="fc" id="L30">        var witness = result.witness().stream().map(step -&gt; new CheckedMove(step.ruleId(),</span>
-<span class="fc" id="L31">            step.synthesisWork(), step.verificationWork())).toList();</span>
-<span class="fc" id="L32">        return new Result(result.verified(), result.reason(), witness, result.metrics());</span>
+    public record WindowResult(Optional&lt;RollingPairReductionPlan.Verified&gt; verified, String reason,
+            List&lt;CheckedMove&gt; witness, MoveSearch.Metrics metrics) {
+<span class="fc" id="L28">        public WindowResult {</span>
+<span class="fc" id="L29">            witness = List.copyOf(witness);</span>
+<span class="fc" id="L30">        }</span>
     }
 
-    private sealed interface Form permits Source, Normalized, Reduced {}
-<span class="fc" id="L36">    private record Source(PairReduction value) implements Form {}</span>
-<span class="fc" id="L37">    private record Normalized(PairReductionSynthesis.NormalForm value) implements Form {}</span>
-<span class="fc" id="L38">    private record Reduced(PairReductionPlan value) implements Form {}</span>
+    public static Result search(PairReduction source, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L35">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L36">        var domain = new PairDomain&lt;PairReductionPlan, PairReductionVerifier.Verified&gt;(source, &quot;reduce-pair-sum&quot;,</span>
+<span class="fc" id="L37">            SYNTHESIS::reduce, (plan, allowance, stop) -&gt; {</span>
+<span class="fc" id="L38">                var check = VERIFIER.verify(source, plan, allowance, stop);</span>
+<span class="fc" id="L39">                return new IterationSearch.Check&lt;&gt;(check.verified().isPresent(), check.verified(), check.reason(), check.work());</span>
+            });
+<span class="fc" id="L41">        var result = IterationSearch.search(new Source&lt;&gt;(source), domain, limits, maximumStates, cancellation);</span>
+<span class="fc" id="L42">        return new Result(result.verified(), result.reason(), moves(result.witness()), result.metrics());</span>
+    }
 
-<span class="fc" id="L40">    private record PairDomain(PairReduction original) implements IterationSearch.Domain&lt;Form, PairReductionVerifier.Verified&gt; {</span>
-<span class="fc" id="L41">        @Override public String family() { return &quot;pair-reduction&quot;; }</span>
-<span class="fc" id="L42">        @Override public String noPlanReason() { return &quot;NO_PAIR_PLAN&quot;; }</span>
-<span class="fc" id="L43">        @Override public int maximumDepth() { return 2; }</span>
-<span class="fc" id="L44">        @Override public boolean finished(Form form) { return form instanceof Reduced; }</span>
+    /** Derives a plan for consecutive windows of any positive runtime width. */
+    public static WindowResult searchWindows(PairReduction source, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L48">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L49">        var domain = new PairDomain&lt;RollingPairReductionPlan, RollingPairReductionPlan.Verified&gt;(source, &quot;reduce-pair-windows&quot;,</span>
+<span class="fc" id="L50">            SYNTHESIS::reduceWindows, (plan, allowance, stop) -&gt; {</span>
+<span class="fc" id="L51">                var check = verifyWindows(source, plan, allowance, stop);</span>
+<span class="fc" id="L52">                return new IterationSearch.Check&lt;&gt;(check.verified().isPresent(), check.verified(), check.reason(), check.work());</span>
+            });
+<span class="fc" id="L54">        var result = IterationSearch.search(new Source&lt;&gt;(source), domain, limits, maximumStates, cancellation);</span>
+<span class="fc" id="L55">        return new WindowResult(result.verified(), result.reason(), moves(result.witness()), result.metrics());</span>
+    }
 
-        @Override public IterationSearch.Proposal&lt;Form&gt; propose(Form source, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="pc bpc" id="L47" title="1 of 3 branches missed.">            return switch (source) {</span>
-<span class="fc" id="L48">                case Source input -&gt; {</span>
-<span class="fc" id="L49">                    var proposal = SYNTHESIS.normalize(input.value(), limits, cancellation);</span>
-<span class="fc" id="L50">                    yield new IterationSearch.Proposal&lt;&gt;(&quot;normalize-pair-summand&quot;,</span>
-<span class="fc" id="L51">                        proposal.value().map(Normalized::new), proposal.reason(), proposal.work());</span>
+    public static RollingPairReductionPlan.Verification verifyWindows(PairReduction source, RollingPairReductionPlan plan,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L60">        return RollingPairReductionPlan.verify(source, plan, limits, cancellation);</span>
+    }
+
+    private static List&lt;CheckedMove&gt; moves(List&lt;IterationSearch.CheckedMove&gt; steps) {
+<span class="fc" id="L64">        return steps.stream().map(step -&gt; new CheckedMove(step.ruleId(), step.synthesisWork(), step.verificationWork())).toList();</span>
+    }
+
+    private sealed interface Form&lt;P&gt; permits Source, Normalized, Reduced {}
+<span class="fc" id="L68">    private record Source&lt;P&gt;(PairReduction value) implements Form&lt;P&gt; {}</span>
+<span class="fc" id="L69">    private record Normalized&lt;P&gt;(PairReductionSynthesis.NormalForm value) implements Form&lt;P&gt; {}</span>
+<span class="fc" id="L70">    private record Reduced&lt;P&gt;(P value) implements Form&lt;P&gt; {}</span>
+
+    private interface Reduce&lt;P&gt; {
+        PairReductionSynthesis.Result&lt;P&gt; apply(PairReductionSynthesis.NormalForm form, IterationLimits limits,
+                BooleanSupplier cancellation);
+    }
+
+    private interface Verify&lt;P, V&gt; {
+        IterationSearch.Check&lt;V&gt; apply(P plan, IterationLimits limits, BooleanSupplier cancellation);
+    }
+
+<span class="fc" id="L81">    private record PairDomain&lt;P, V&gt;(PairReduction original, String rule, Reduce&lt;P&gt; reduction, Verify&lt;P, V&gt; checker)</span>
+            implements IterationSearch.Domain&lt;Form&lt;P&gt;, V&gt; {
+<span class="fc" id="L83">        @Override public String family() { return &quot;pair-reduction&quot;; }</span>
+<span class="fc" id="L84">        @Override public String noPlanReason() { return &quot;NO_PAIR_PLAN&quot;; }</span>
+<span class="fc" id="L85">        @Override public int maximumDepth() { return 2; }</span>
+<span class="fc" id="L86">        @Override public boolean finished(Form&lt;P&gt; form) { return form instanceof Reduced&lt;P&gt;; }</span>
+
+        @Override public IterationSearch.Proposal&lt;Form&lt;P&gt;&gt; propose(Form&lt;P&gt; source, IterationLimits limits,
+                BooleanSupplier cancellation) {
+<span class="pc bpc" id="L90" title="1 of 3 branches missed.">            return switch (source) {</span>
+<span class="fc" id="L91">                case Source(var input) -&gt; {</span>
+<span class="fc" id="L92">                    var proposal = SYNTHESIS.normalize(input, limits, cancellation);</span>
+<span class="fc" id="L93">                    yield new IterationSearch.Proposal&lt;&gt;(&quot;normalize-pair-summand&quot;,</span>
+<span class="fc" id="L94">                        proposal.value().map(Normalized&lt;P&gt;::new), proposal.reason(), proposal.work());</span>
                 }
-<span class="fc" id="L53">                case Normalized normalized -&gt; {</span>
-<span class="fc" id="L54">                    var proposal = SYNTHESIS.reduce(normalized.value(), limits, cancellation);</span>
-<span class="fc" id="L55">                    yield new IterationSearch.Proposal&lt;&gt;(&quot;reduce-pair-sum&quot;,</span>
-<span class="fc" id="L56">                        proposal.value().map(Reduced::new), proposal.reason(), proposal.work());</span>
+<span class="fc" id="L96">                case Normalized(var normalized) -&gt; {</span>
+<span class="fc" id="L97">                    var proposal = reduction.apply(normalized, limits, cancellation);</span>
+<span class="fc" id="L98">                    yield new IterationSearch.Proposal&lt;&gt;(rule,</span>
+<span class="fc" id="L99">                        proposal.value().map(Reduced&lt;P&gt;::new), proposal.reason(), proposal.work());</span>
                 }
-<span class="nc" id="L58">                case Reduced ignored -&gt; throw new IllegalStateException(&quot;pair plan is terminal&quot;);</span>
+<span class="nc" id="L101">                case Reduced&lt;P&gt; ignored -&gt; throw new IllegalStateException(&quot;pair plan is terminal&quot;);</span>
             };
         }
 
-        @Override public IterationSearch.Check&lt;PairReductionVerifier.Verified&gt; verify(
-                Form source, Form target, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="pc bpc" id="L64" title="1 of 3 branches missed.">            return switch (target) {</span>
-<span class="fc" id="L65">                case Normalized normalized -&gt; {</span>
-<span class="fc" id="L66">                    var check = VERIFIER.verifyNormalization(original, normalized.value(), limits, cancellation);</span>
-<span class="fc" id="L67">                    yield new IterationSearch.Check&lt;&gt;(check.accepted(), Optional.empty(), check.reason(), check.work());</span>
+        @Override public IterationSearch.Check&lt;V&gt; verify(
+                Form&lt;P&gt; source, Form&lt;P&gt; target, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="pc bpc" id="L107" title="1 of 3 branches missed.">            return switch (target) {</span>
+<span class="fc" id="L108">                case Normalized(var normalized) -&gt; {</span>
+<span class="fc" id="L109">                    var check = VERIFIER.verifyNormalization(original, normalized, limits, cancellation);</span>
+<span class="fc" id="L110">                    yield new IterationSearch.Check&lt;&gt;(check.accepted(), Optional.empty(), check.reason(), check.work());</span>
                 }
-<span class="fc" id="L69">                case Reduced reduced -&gt; {</span>
-<span class="fc" id="L70">                    var check = VERIFIER.verify(original, reduced.value(), limits, cancellation);</span>
-<span class="fc" id="L71">                    yield new IterationSearch.Check&lt;&gt;(check.verified().isPresent(), check.verified(), check.reason(), check.work());</span>
-                }
-<span class="nc" id="L73">                case Source ignored -&gt; throw new IllegalArgumentException(&quot;unexpected pair proposal&quot;);</span>
+<span class="fc" id="L112">                case Reduced(var reduced) -&gt; checker.apply(reduced, limits, cancellation);</span>
+<span class="nc" id="L113">                case Source&lt;P&gt; ignored -&gt; throw new IllegalArgumentException(&quot;unexpected pair proposal&quot;);</span>
             };
         }
     }

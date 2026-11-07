@@ -67,65 +67,90 @@ import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Term;
         }
     }
 
-    private static PairReductionPlan synthesize(NormalForm form, Work work) {
-<span class="fc" id="L71">        var leftColumns = new HashMap&lt;SymbolId, Integer&gt;();</span>
-<span class="fc" id="L72">        var rightColumns = new HashMap&lt;SymbolId, Integer&gt;();</span>
-<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (int index = 0; index &lt; form.columns().size(); index++) {</span>
-<span class="fc" id="L74">            work.charge(1);</span>
-<span class="fc" id="L75">            var column = form.columns().get(index);</span>
-<span class="fc" id="L76">            leftColumns.put(column.left(), index);</span>
-<span class="fc" id="L77">            rightColumns.put(column.right(), index);</span>
+    Result&lt;RollingPairReductionPlan&gt; reduceWindows(NormalForm form, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L71">        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+        try {
+<span class="fc" id="L73">            work.charge(1);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (form.terms().size() &gt; limits.maximumTerms()) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L75">            var pairs = splitByRow(form, work);</span>
+<span class="fc" id="L76">            var terms = new ArrayList&lt;RollingPairReductionPlan.Term&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (var entry : pairs.entrySet()) {</span>
+<span class="fc" id="L78">                work.charge(1);</span>
+<span class="fc" id="L79">                var coefficient = entry.getValue();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (coefficient.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS) {</span>
+<span class="fc" id="L81">                    throw new Unavailable(&quot;COEFFICIENT_LIMIT&quot;);</span>
+                }
+<span class="fc" id="L83">                terms.add(new RollingPairReductionPlan.Term(coefficient, entry.getKey().left(), entry.getKey().right()));</span>
+<span class="fc" id="L84">            }</span>
+<span class="fc" id="L85">            return new Result&lt;&gt;(Optional.of(new RollingPairReductionPlan(terms)), &quot;CANDIDATE&quot;, work.used());</span>
+<span class="fc" id="L86">        } catch (Unavailable exception) {</span>
+<span class="fc" id="L87">            return new Result&lt;&gt;(Optional.empty(), exception.getMessage(), work.used());</span>
         }
-
-<span class="fc" id="L80">        var pairs = new LinkedHashMap&lt;Split, BigInteger&gt;();</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (var term : form.terms().entrySet()) {</span>
-<span class="fc" id="L82">            var left = new ArrayList&lt;Integer&gt;();</span>
-<span class="fc" id="L83">            var right = new ArrayList&lt;Integer&gt;();</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (var symbol : term.getKey().symbols()) {</span>
-<span class="fc" id="L85">                var column = leftColumns.get(symbol);</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">                if (column != null) {</span>
-<span class="fc" id="L87">                    left.add(column);</span>
-                } else {
-<span class="fc" id="L89">                    right.add(rightColumns.get(symbol));</span>
-                }
-<span class="fc" id="L91">            }</span>
-<span class="fc" id="L92">            work.charge(1 + left.size() + right.size());</span>
-<span class="fc" id="L93">            pairs.put(new Split(new Moment(left), new Moment(right)), term.getValue().numerator());</span>
-<span class="fc" id="L94">        }</span>
-
-<span class="fc" id="L96">        var numerator = new LinkedHashMap&lt;List&lt;Moment&gt;, BigInteger&gt;();</span>
-<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (var entry : pairs.entrySet()) {</span>
-<span class="fc" id="L98">            var split = entry.getKey();</span>
-<span class="fc" id="L99">            var coefficient = entry.getValue();</span>
-<span class="fc" id="L100">            work.charge(1);</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (!coefficient.equals(pairs.get(new Split(split.right(), split.left())))) {</span>
-<span class="fc" id="L102">                throw new Unavailable(&quot;ASYMMETRIC_SUMMAND&quot;);</span>
-            }
-            // The rectangular sum separates. Remove its diagonal before dividing by two.
-<span class="fc" id="L105">            var diagonal = new ArrayList&lt;&gt;(split.left().columns());</span>
-<span class="fc" id="L106">            diagonal.addAll(split.right().columns());</span>
-<span class="fc" id="L107">            numerator.merge(split.orderedFactors(), coefficient, BigInteger::add);</span>
-<span class="fc" id="L108">            numerator.merge(List.of(new Moment(diagonal)), coefficient.negate(), BigInteger::add);</span>
-<span class="fc" id="L109">        }</span>
-
-<span class="fc" id="L111">        work.charge(numerator.size());</span>
-<span class="fc" id="L112">        boolean even = numerator.values().stream().noneMatch(coefficient -&gt; coefficient.testBit(0));</span>
-<span class="fc" id="L113">        var terms = new ArrayList&lt;Term&gt;();</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (var entry : numerator.entrySet()) {</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            var coefficient = even ? entry.getValue().shiftRight(1) : entry.getValue();</span>
-<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (coefficient.signum() != 0) {</span>
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                if (coefficient.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS) {</span>
-<span class="nc" id="L118">                    throw new Unavailable(&quot;COEFFICIENT_LIMIT&quot;);</span>
-                }
-<span class="fc" id="L120">                terms.add(new Term(coefficient, entry.getKey()));</span>
-            }
-<span class="fc" id="L122">        }</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">        return new PairReductionPlan(terms, even ? 1 : 2);</span>
     }
 
-<span class="fc" id="L126">    private record Split(Moment left, Moment right) {</span>
+    private static Map&lt;Split, BigInteger&gt; splitByRow(NormalForm form, Work work) {
+<span class="fc" id="L92">        var leftColumns = new HashMap&lt;SymbolId, Integer&gt;();</span>
+<span class="fc" id="L93">        var rightColumns = new HashMap&lt;SymbolId, Integer&gt;();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int index = 0; index &lt; form.columns().size(); index++) {</span>
+<span class="fc" id="L95">            work.charge(1);</span>
+<span class="fc" id="L96">            var column = form.columns().get(index);</span>
+<span class="fc" id="L97">            leftColumns.put(column.left(), index);</span>
+<span class="fc" id="L98">            rightColumns.put(column.right(), index);</span>
+        }
+
+<span class="fc" id="L101">        var pairs = new LinkedHashMap&lt;Split, BigInteger&gt;();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (var term : form.terms().entrySet()) {</span>
+<span class="fc" id="L103">            var left = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L104">            var right = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (var symbol : term.getKey().symbols()) {</span>
+<span class="fc" id="L106">                var column = leftColumns.get(symbol);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                if (column != null) {</span>
+<span class="fc" id="L108">                    left.add(column);</span>
+                } else {
+<span class="fc" id="L110">                    right.add(rightColumns.get(symbol));</span>
+                }
+<span class="fc" id="L112">            }</span>
+<span class="fc" id="L113">            work.charge(1 + left.size() + right.size());</span>
+<span class="fc" id="L114">            pairs.put(new Split(new Moment(left), new Moment(right)), term.getValue().numerator());</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">        return pairs;</span>
+    }
+
+    private static PairReductionPlan synthesize(NormalForm form, Work work) {
+<span class="fc" id="L120">        var pairs = splitByRow(form, work);</span>
+<span class="fc" id="L121">        var numerator = new LinkedHashMap&lt;List&lt;Moment&gt;, BigInteger&gt;();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (var entry : pairs.entrySet()) {</span>
+<span class="fc" id="L123">            var split = entry.getKey();</span>
+<span class="fc" id="L124">            var coefficient = entry.getValue();</span>
+<span class="fc" id="L125">            work.charge(1);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (!coefficient.equals(pairs.get(new Split(split.right(), split.left())))) {</span>
+<span class="fc" id="L127">                throw new Unavailable(&quot;ASYMMETRIC_SUMMAND&quot;);</span>
+            }
+            // The rectangular sum separates. Remove its diagonal before dividing by two.
+<span class="fc" id="L130">            var diagonal = new ArrayList&lt;&gt;(split.left().columns());</span>
+<span class="fc" id="L131">            diagonal.addAll(split.right().columns());</span>
+<span class="fc" id="L132">            numerator.merge(split.orderedFactors(), coefficient, BigInteger::add);</span>
+<span class="fc" id="L133">            numerator.merge(List.of(new Moment(diagonal)), coefficient.negate(), BigInteger::add);</span>
+<span class="fc" id="L134">        }</span>
+
+<span class="fc" id="L136">        work.charge(numerator.size());</span>
+<span class="fc" id="L137">        boolean even = numerator.values().stream().noneMatch(coefficient -&gt; coefficient.testBit(0));</span>
+<span class="fc" id="L138">        var terms = new ArrayList&lt;Term&gt;();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (var entry : numerator.entrySet()) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            var coefficient = even ? entry.getValue().shiftRight(1) : entry.getValue();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (coefficient.signum() != 0) {</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                if (coefficient.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS) {</span>
+<span class="nc" id="L143">                    throw new Unavailable(&quot;COEFFICIENT_LIMIT&quot;);</span>
+                }
+<span class="fc" id="L145">                terms.add(new Term(coefficient, entry.getKey()));</span>
+            }
+<span class="fc" id="L147">        }</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        return new PairReductionPlan(terms, even ? 1 : 2);</span>
+    }
+
+<span class="fc" id="L151">    private record Split(Moment left, Moment right) {</span>
         List&lt;Moment&gt; orderedFactors() {
-<span class="fc bfc" id="L128" title="All 2 branches covered.">            return left.compareTo(right) &lt;= 0 ? List.of(left, right) : List.of(right, left);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            return left.compareTo(right) &lt;= 0 ? List.of(left, right) : List.of(right, left);</span>
         }
     }
 }

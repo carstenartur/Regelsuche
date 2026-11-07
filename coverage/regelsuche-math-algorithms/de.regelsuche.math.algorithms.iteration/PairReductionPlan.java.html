@@ -38,8 +38,8 @@ public record PairReductionPlan(List&lt;Term&gt; terms, int divisor) {
             }
 <span class="fc bfc" id="L39" title="All 2 branches covered.">            for (int i = 0; i &lt; columns.size(); i++) {</span>
 <span class="fc" id="L40">                int byColumn = Integer.compare(columns.get(i), other.columns.get(i));</span>
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                if (byColumn != 0) {</span>
-<span class="nc" id="L42">                    return byColumn;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">                if (byColumn != 0) {</span>
+<span class="fc" id="L42">                    return byColumn;</span>
                 }
             }
 <span class="fc" id="L45">            return 0;</span>

@@ -5,10 +5,12 @@ import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.iteration.PairReductionPlan;
 import de.regelsuche.math.algorithms.iteration.PairReductionSearch;
 import de.regelsuche.math.algorithms.iteration.PairReductionVerifier;
+import de.regelsuche.math.algorithms.iteration.RollingPairReductionPlan;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.function.IntFunction;
 
 /** SDK access to Regelsuche's checked pair search and exact evaluation. */
 public final class PairReductionSdk {
@@ -16,21 +18,37 @@ public final class PairReductionSdk {
 
     public static PairReductionSearch.Result search(PairReduction source, OptimizationBudget budget,
             CancellationToken cancellation) {
-<span class="nc" id="L19">        return PairReductionSearch.search(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+<span class="nc" id="L21">        return PairReductionSearch.search(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
     }
 
     public static PairReductionVerifier.Result verify(PairReduction source, PairReductionPlan plan,
             OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L24">        return new PairReductionVerifier().verify(source, plan, limits(budget), cancellation::isCancelled);</span>
+<span class="nc" id="L26">        return new PairReductionVerifier().verify(source, plan, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static PairReductionVerifier.Evaluation evaluate(PairReductionVerifier.Verified checked,
             Iterable&lt;? extends List&lt;BigInteger&gt;&gt; rows, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L29">        return checked.evaluate(rows, limits(budget), cancellation::isCancelled);</span>
+<span class="nc" id="L31">        return checked.evaluate(rows, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static PairReductionSearch.WindowResult searchWindows(PairReduction source, OptimizationBudget budget,
+            CancellationToken cancellation) {
+<span class="nc" id="L36">        return PairReductionSearch.searchWindows(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+    }
+
+    public static RollingPairReductionPlan.Verification verifyWindows(PairReduction source, RollingPairReductionPlan plan,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L41">        return PairReductionSearch.verifyWindows(source, plan, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static RollingPairReductionPlan.Evaluation evaluateWindows(RollingPairReductionPlan.Verified checked,
+            int rowCount, int width, IntFunction&lt;? extends List&lt;BigInteger&gt;&gt; rowAt,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L47">        return checked.evaluate(rowCount, width, rowAt, limits(budget), cancellation::isCancelled);</span>
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {
-<span class="nc" id="L33">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="nc" id="L51">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
