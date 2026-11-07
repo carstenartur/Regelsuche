@@ -49,7 +49,11 @@ public final class IterationPolynomial {
         }
     }
     public record Monomial(List<SymbolId> symbols) {
-        public Monomial { symbols = List.copyOf(symbols); }
+        public Monomial {
+            var canonical = new ArrayList<>(symbols);
+            canonical.sort(ORDER);
+            symbols = List.copyOf(canonical);
+        }
         public int degree(SymbolId symbol) { int result=0; for(var s:symbols) if(s.equals(symbol)) result++; return result; }
         public Monomial without(SymbolId symbol) { return new Monomial(symbols.stream().filter(s -> !s.equals(symbol)).toList()); }
     }
