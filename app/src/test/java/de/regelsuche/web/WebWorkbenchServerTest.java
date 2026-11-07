@@ -1,6 +1,7 @@
 package de.regelsuche.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -57,6 +58,78 @@ class WebWorkbenchServerTest {
         assertEquals(200, connection.getResponseCode());
         String body = new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertTrue(body.contains("Regelsuche"));
+    }
+
+    @Test
+    void derivesAPairReductionFromAnEditableSummand() throws IOException {
+        var connection = postPairReduction("""
+            {"columns":["x"],"summand":"(x_i-x_j)^2","rowCount":100000,
+             "rows":[["2"],["-1"],["5"]]}
+            """);
+        assertEquals(200, connection.getResponseCode());
+        var body = new de.regelsuche.json.JsonReader(
+            new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).readObject();
+        assertEquals("VERIFIED", body.get("status"));
+        assertEquals("4999950000", body.get("originalPairs"));
+        assertEquals("54", body.get("sampleResult"));
+        assertEquals(java.util.List.of("normalize-pair-summand", "reduce-pair-sum"), body.get("checkedRules"));
+        assertNotNull(body.get("formula"));
+        assertFalse(body.containsKey("javaSource"), "Java source emission belongs to the Sandbox adapter");
+    }
+
+    @Test
+    void pairReductionRejectsAnAsymmetricKernelAndInvalidSampleRows() throws IOException {
+        var asymmetric = postPairReduction("""
+            {"columns":["x"],"summand":"x_i-x_j","rowCount":3}
+            """);
+        assertEquals(200, asymmetric.getResponseCode());
+        var body = new de.regelsuche.json.JsonReader(
+            new String(asymmetric.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).readObject();
+        assertEquals("NO_PLAN", body.get("status"));
+        assertEquals("ASYMMETRIC_SUMMAND", body.get("reason"));
+        assertEquals(400, postPairReduction("""
+            {"columns":["x","w"],"summand":"x_i*x_j","rowCount":3,"rows":[["1"]]}
+            """).getResponseCode());
+    }
+
+    @Test
+    void displaysAnExactExpansionLargerThanTheInputLiteralLimit() throws IOException {
+        String coefficient = "1" + "0".repeat(599);
+        var response = postPairReduction("""
+            {"columns":["x"],"summand":"%s^2","rowCount":2}
+            """.formatted(coefficient));
+        assertEquals(200, response.getResponseCode());
+        var body = new de.regelsuche.json.JsonReader(
+            new String(response.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).readObject();
+        assertEquals("1" + "0".repeat(1198), body.get("expandedSummand"));
+    }
+
+    @Test
+    void keepsTheCheckedPlanIfSampleEvaluationExhaustsItsBudget() throws IOException {
+        String cell = "\"" + "9".repeat(36) + "\"";
+        String row = "[" + cell + "," + cell + "," + cell + "]";
+        String rows = String.join(",", java.util.Collections.nCopies(256, row));
+        var response = postPairReduction("""
+            {"columns":["x","y","z"],"summand":"(x_i+y_i+z_i)^8+(x_j+y_j+z_j)^8",
+             "rowCount":256,"rows":[%s]}
+            """.formatted(rows));
+        assertEquals(200, response.getResponseCode());
+        var body = new de.regelsuche.json.JsonReader(
+            new String(response.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).readObject();
+        assertEquals("VERIFIED", body.get("status"));
+        assertEquals("WORK_LIMIT", body.get("sampleUnavailable"));
+        assertTrue(!body.containsKey("sampleResult"));
+    }
+
+    private HttpURLConnection postPairReduction(String request) throws IOException {
+        var connection = open("/api/pair-reductions");
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "application/json");
+        connection.setDoOutput(true);
+        try (var body = connection.getOutputStream()) {
+            body.write(request.getBytes(StandardCharsets.UTF_8));
+        }
+        return connection;
     }
 
     @Test

@@ -73,7 +73,8 @@ class ArchitectureBoundariesTest {
             ":regelsuche-math-algorithms"));
         expectedProjectDependencies.put("regelsuche-solver-portfolio", List.of(
             ":regelsuche-solver-ir"));
-        expectedProjectDependencies.put("regelsuche-math-algorithms", List.of(":regelsuche-core", ":regelsuche-validation"));
+        expectedProjectDependencies.put("regelsuche-math-algorithms", List.of(":regelsuche-core",
+            ":regelsuche-validation", ":regelsuche-search"));
         expectedProjectDependencies.put("regelsuche-optimization-sdk", List.of(":regelsuche-search", ":regelsuche-math-algorithms"));
         expectedProjectDependencies.put("regelsuche-math-jas", List.of(":regelsuche-validation"));
         expectedProjectDependencies.put("regelsuche-persistence", List.of(":regelsuche-core"));

@@ -724,6 +724,65 @@
         }
       }
     },
+    "/api/pair-reductions": {
+      "post": {
+        "tags": ["Analysis"],
+        "operationId": "derivePairReduction",
+        "summary": "Einen Ein-Pass-Algorithmus für eine exakte Paarsumme herleiten",
+        "description": "Summiert den symmetrischen ganzzahligen Summanden über alle Paare i < j. An jeden Spaltennamen werden _i und _j angehängt. Die Zeilenanzahl dient dem Arbeitsvergleich. Optionale Beispielzeilen werden separat exakt ausgewertet.",
+        "x-regelsuche-context": "/api/pair-reductions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["columns", "summand", "rowCount"],
+                "additionalProperties": false,
+                "properties": {
+                  "columns": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 24}},
+                  "summand": {"type": "string", "minLength": 1, "maxLength": 4096},
+                  "rowCount": {"type": "integer", "minimum": 0, "maximum": 1000000000},
+                  "rows": {"type": "array", "maxItems": 256, "items": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "string", "pattern": "^-?[0-9]{1,256}$"}}}
+                }
+              },
+              "example": {"columns": ["x"], "summand": "(x_i-x_j)^2", "rowCount": 100000, "rows": [["2"], ["-1"], ["5"]]}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Symbolisch geprüfter Plan oder Ablehnung einer nicht unterstützten Berechnung",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": {"type": "string", "enum": ["VERIFIED", "NO_PLAN"]},
+                    "reason": {"type": "string"},
+                    "rowCount": {"type": "integer"},
+                    "originalPairs": {"type": "string", "description": "Exakte Anzahl ursprünglicher Paarberechnungen als Dezimaltext"},
+                    "expandedSummand": {"type": "string"},
+                    "accumulators": {"type": "array", "items": {"type": "object", "required": ["name", "rowProduct"], "properties": {"name": {"type": "string"}, "rowProduct": {"type": "string"}}}},
+                    "formula": {"type": "string"},
+                    "checkedRules": {"type": "array", "items": {"type": "string"}, "description": "Geprüfte Züge des Suchpfads in Anwendungsreihenfolge"},
+                    "synthesisWork": {"type": "integer"},
+                    "verificationWork": {"type": "integer"},
+                    "sampleRows": {"type": "integer"},
+                    "sampleUnavailable": {"type": "string", "description": "Grund für abgebrochene Beispielauswertung bei weiterhin gültigem Plan"},
+                    "sampleResult": {"type": "string", "description": "Exaktes Ergebnis der optionalen Beispielzeilen als Dezimaltext"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"}
+        }
+      }
+    },
     "/api/representations": {
       "post": {
         "tags": [

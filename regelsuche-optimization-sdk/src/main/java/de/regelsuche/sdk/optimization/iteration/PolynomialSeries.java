@@ -7,13 +7,13 @@ import de.regelsuche.symbol.SymbolId;
 import de.regelsuche.sdk.optimization.*;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Bounded exact finite compositions. All child proofs and runtime arithmetic share one work ledger. */
 public final class PolynomialSeries {
     public static final int MAX_PARTS=32;
     private PolynomialSeries() {}
-    private static Work work(OptimizationBudget b,CancellationToken c) { return new Work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }
+    private static Work work(OptimizationBudget b,CancellationToken c) { return SeriesSupport.work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }
     private static void count(BigInteger count,Work w) {
         SeriesSupport.bits(count,w); if(count.signum()<0) throw new Unavailable("NEGATIVE_COUNT");
     }
@@ -61,8 +61,8 @@ public final class PolynomialSeries {
         }
         public PolynomialSumVerifier.Verification verify(OptimizationBudget b,CancellationToken c) {
             var w=work(b,c);
-            try { check(w); return new PolynomialSumVerifier.Verification(true,"VERIFIED_NESTED_SUM",w.used); }
-            catch(Unavailable e) { return new PolynomialSumVerifier.Verification(false,e.getMessage(),w.used); }
+            try { check(w); return new PolynomialSumVerifier.Verification(true,"VERIFIED_NESTED_SUM",w.used()); }
+            catch(Unavailable e) { return new PolynomialSumVerifier.Verification(false,e.getMessage(),w.used()); }
         }
         public BigInteger evaluate(BigInteger count,Map<SymbolId,BigInteger> parameters,OptimizationBudget b,CancellationToken c) {
             var w=work(b,c);

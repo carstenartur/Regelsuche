@@ -463,7 +463,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         if (ledger.total() >= problem.budget().totalWork()) {
             return admission(pending, child, theory, Decision.WORK_LIMIT, null, value);
         }
-        var verification = problem.verify(node.state, move);
+        var verification = problem.verify(node.state, move, problem.budget().totalWork() - ledger.total());
         ledger.verification = Math.addExact(ledger.verification, verification.work());
         pending[3] = verification;
         SearchExecution.completed(1);
