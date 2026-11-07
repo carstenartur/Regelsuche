@@ -180,7 +180,7 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
 
     private static int shape(Expr expression) {
 <span class="fc bfc" id="L182" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) return BINARY_SHAPE_BASE + binary.operator().ordinal();</span>
-<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr) return 0;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (expression instanceof NumberExpr) return 0;</span>
 <span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (expression instanceof VariableExpr) return 1;</span>
 <span class="nc bnc" id="L185" title="All 2 branches missed.">        if (expression instanceof FunctionExpr) return 2;</span>
 <span class="nc" id="L186">        return OTHER_SHAPE;</span>

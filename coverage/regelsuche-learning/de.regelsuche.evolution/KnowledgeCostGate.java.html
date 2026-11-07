@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>KnowledgeCostGate.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">KnowledgeCostGate.java</span></div><h1>KnowledgeCostGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+
+/** Performance eligibility only. Neither measurements nor this decision authorize mathematics. */
+public final class KnowledgeCostGate {
+<span class="fc" id="L9">    public enum Decision { ADOPT, NO_GAIN, QUALITY_REGRESSION, INCOMPLETE, NO_CANDIDATE, BUDGET_EXHAUSTED, FAILED }</span>
+    public record Cost(long wallNanos, long cpuNanos) {
+<span class="fc" id="L11">        public Cost {</span>
+<span class="fc bfc" id="L12" title="All 4 branches covered.">            if (wallNanos &lt; 0 || cpuNanos &lt; -1) throw new IllegalArgumentException(&quot;nonnegative wall/CPU or unavailable CPU required&quot;);</span>
+<span class="fc" id="L13">        }</span>
+    }
+    public record Sample(Cost cost, boolean solved, long score, boolean complete) {
+<span class="fc" id="L16">        public Sample { Objects.requireNonNull(cost); }</span>
+    }
+    public record Trial(Sample previous, Sample candidate) {
+<span class="fc" id="L19">        public Trial { Objects.requireNonNull(previous); Objects.requireNonNull(candidate); }</span>
+    }
+    private KnowledgeCostGate() { }
+
+    /** Projected average savings must repay the actually paid cost in BOTH wall time and CPU. */
+    public static Decision evaluate(Cost paid, List&lt;Trial&gt; trials, long futureQueries) {
+<span class="fc" id="L25">        Objects.requireNonNull(paid); trials = List.copyOf(trials);</span>
+<span class="fc bfc" id="L26" title="All 4 branches covered.">        if (futureQueries &lt; 1 || trials.isEmpty()) throw new IllegalArgumentException(&quot;positive horizon and actual paired trials required&quot;);</span>
+<span class="fc bfc" id="L27" title="All 8 branches covered.">        if (paid.cpuNanos() &lt; 0 || trials.stream().anyMatch(t -&gt; !complete(t.previous()) || !complete(t.candidate())))</span>
+<span class="fc" id="L28">            return Decision.INCOMPLETE;</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (var trial : trials) {</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">            if (trial.previous().solved() &amp;&amp; !trial.candidate().solved()</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">                    || trial.candidate().score() &gt; trial.previous().score()) return Decision.QUALITY_REGRESSION;</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        BigInteger wall = BigInteger.ZERO, cpu = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (var trial : trials) {</span>
+<span class="fc" id="L35">            wall = wall.add(difference(trial.previous().cost().wallNanos(), trial.candidate().cost().wallNanos()));</span>
+<span class="fc" id="L36">            cpu = cpu.add(difference(trial.previous().cost().cpuNanos(), trial.candidate().cost().cpuNanos()));</span>
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        var count = BigInteger.valueOf(trials.size());</span>
+<span class="fc" id="L39">        var horizon = BigInteger.valueOf(futureQueries);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        return wall.multiply(horizon).compareTo(BigInteger.valueOf(paid.wallNanos()).multiply(count)) &gt; 0</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            &amp;&amp; cpu.multiply(horizon).compareTo(BigInteger.valueOf(paid.cpuNanos()).multiply(count)) &gt; 0</span>
+<span class="fc" id="L42">            ? Decision.ADOPT : Decision.NO_GAIN;</span>
+    }
+<span class="fc bfc" id="L44" title="All 4 branches covered.">    private static boolean complete(Sample sample) { return sample.complete() &amp;&amp; sample.cost().cpuNanos() &gt;= 0; }</span>
+    private static BigInteger difference(long previous, long candidate) {
+<span class="fc" id="L46">        return BigInteger.valueOf(previous).subtract(BigInteger.valueOf(candidate));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

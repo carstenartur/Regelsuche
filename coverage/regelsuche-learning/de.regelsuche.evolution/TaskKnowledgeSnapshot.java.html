@@ -149,7 +149,7 @@ final class TaskKnowledgeSnapshot {
 <span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!read(path).equals(json)) throw new IOException(&quot;existing knowledge snapshot differs&quot;);</span>
 <span class="fc" id="L150">    }</span>
     static String read(Path path) throws IOException {
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;regular snapshot file required&quot;);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;regular snapshot file required&quot;);</span>
         byte[] bytes;
 <span class="fc" id="L154">        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { bytes = input.readNBytes(MAX_BYTES + 1); }</span>
 <span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_BYTES) throw new IOException(&quot;knowledge snapshot too large&quot;);</span>

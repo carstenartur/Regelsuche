@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TaskKnowledgeLifecycleWorker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TaskKnowledgeLifecycleWorker.java</span></div><h1>TaskKnowledgeLifecycleWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.MoveSearch;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Source-only lifecycle adapter over public APIs, without mathematical answer templates. */
+<span class="fc" id="L18">public final class TaskKnowledgeLifecycleWorker implements AutoCloseable {</span>
+<span class="fc" id="L19">    private static final Set&lt;String&gt; PROFILES = Set.of(&quot;PRIMITIVE&quot;, &quot;LEGACY_SESSION&quot;, &quot;LEGACY_RELOAD&quot;, &quot;PREPARED_REUSE&quot;, &quot;MEASURED_IMPROVEMENT&quot;);</span>
+<span class="fc" id="L20">    private static final MoveSearch.Budget BUDGET = new MoveSearch.Budget(32, 32, 200_000, 512, 200_000);</span>
+    private CumulativeTaskKnowledge knowledge;
+    private TaskKnowledgeSession session;
+    private String profile, seedId;
+    private Path snapshot, directory;
+<span class="fc" id="L25">    private List&lt;TaskKnowledgeSelfImprover.Batch&gt; improvements = List.of();</span>
+    private long futureQueries;
+    private boolean consumer, improved, poisoned, closed;
+
+    public Map&lt;String, Object&gt; handle(String line) {
+        try {
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">            if (poisoned || closed) throw new IllegalStateException(&quot;unavailable session&quot;);</span>
+<span class="fc" id="L32">            var request = CheckedSchemaSupport.read(line);</span>
+<span class="pc bpc" id="L33" title="1 of 6 branches missed.">            return switch (CheckedSchemaSupport.text(request, &quot;op&quot;)) {</span>
+<span class="fc" id="L34">                case &quot;initialize&quot; -&gt; initialize(request);</span>
+<span class="fc" id="L35">                case &quot;acquire&quot; -&gt; acquire(request);</span>
+<span class="fc" id="L36">                case &quot;restore&quot; -&gt; restore(request);</span>
+<span class="fc" id="L37">                case &quot;load&quot; -&gt; load(request);</span>
+<span class="fc" id="L38">                case &quot;run&quot; -&gt; run(request);</span>
+<span class="nc" id="L39">                default -&gt; throw new IllegalArgumentException(&quot;unknown lifecycle operation&quot;);</span>
+            };
+<span class="fc" id="L41">        } catch (Exception failure) {</span>
+<span class="fc" id="L42">            poisoned = true;</span>
+<span class="fc" id="L43">            return Map.of(&quot;status&quot;, &quot;ERROR&quot;, &quot;error&quot;, failure.toString(), &quot;accountingComplete&quot;, false);</span>
+        }
+    }
+
+    private void configure(JsonNode request) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (profile != null) throw new IllegalStateException(&quot;already configured&quot;);</span>
+<span class="fc" id="L49">        profile = CheckedSchemaSupport.text(request, &quot;profile&quot;);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (!PROFILES.contains(profile)) throw new IllegalArgumentException(&quot;native lifecycle profile required&quot;);</span>
+<span class="fc" id="L51">    }</span>
+    private Map&lt;String, Object&gt; initialize(JsonNode request) {
+<span class="fc" id="L53">        CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;); configure(request);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!profile.equals(&quot;PRIMITIVE&quot;)) throw new IllegalArgumentException(&quot;only primitive profile skips acquisition&quot;);</span>
+<span class="fc" id="L55">        knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory());</span>
+<span class="fc" id="L56">        seedId = knowledge.id(); consumer = true;</span>
+<span class="fc" id="L57">        return common(&quot;INITIALIZED&quot;);</span>
+    }
+    private Map&lt;String, Object&gt; acquire(JsonNode request) throws Exception {
+<span class="fc" id="L60">        CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;, &quot;seedBlocks&quot;, &quot;directory&quot;); configure(request);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (profile.equals(&quot;PRIMITIVE&quot;)) throw new IllegalArgumentException(&quot;primitive profile cannot acquire unused knowledge&quot;);</span>
+<span class="fc" id="L62">        knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory());</span>
+<span class="fc" id="L63">        var steps = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (var block : array(request.get(&quot;seedBlocks&quot;))) {</span>
+<span class="fc" id="L65">            CheckedSchemaSupport.fields(block, &quot;lessons&quot;, &quot;validation&quot;);</span>
+<span class="fc" id="L66">            String parent = knowledge.id();</span>
+<span class="fc" id="L67">            var update = knowledge.learnBatch(tasks(block.get(&quot;lessons&quot;)), tasks(block.get(&quot;validation&quot;)), 1_000_000);</span>
+<span class="fc" id="L68">            knowledge = update.next();</span>
+<span class="fc" id="L69">            steps.add(Map.of(&quot;parentId&quot;, parent, &quot;generationId&quot;, knowledge.id(), &quot;promoted&quot;, update.promoted(),</span>
+<span class="fc" id="L70">                &quot;decision&quot;, update.reason().name(), &quot;work&quot;, update.work(), &quot;lessonGenerations&quot;,</span>
+<span class="fc" id="L71">                update.training().stream().map(CumulativeTaskKnowledge.Execution::generationId).toList()));</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        snapshot = knowledge.save(Path.of(CheckedSchemaSupport.text(request, &quot;directory&quot;)));</span>
+<span class="fc" id="L74">        seedId = knowledge.id();</span>
+<span class="fc" id="L75">        var result = common(&quot;SAVED&quot;); result.put(&quot;steps&quot;, steps); return result;</span>
+    }
+    private Map&lt;String, Object&gt; restore(JsonNode request) {
+<span class="fc" id="L78">        CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;, &quot;snapshot&quot;, &quot;directory&quot;, &quot;improvementBatches&quot;, &quot;futureQueries&quot;); configure(request);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (profile.equals(&quot;PRIMITIVE&quot;)) throw new IllegalArgumentException(&quot;primitive profile does not restore&quot;);</span>
+<span class="fc" id="L80">        snapshot = Path.of(CheckedSchemaSupport.text(request, &quot;snapshot&quot;));</span>
+<span class="fc" id="L81">        directory = Path.of(CheckedSchemaSupport.text(request, &quot;directory&quot;));</span>
+<span class="fc" id="L82">        futureQueries = request.path(&quot;futureQueries&quot;).longValue();</span>
+<span class="pc bpc" id="L83" title="3 of 6 branches missed.">        if (!request.path(&quot;futureQueries&quot;).isIntegralNumber() || futureQueries &lt; 1 || futureQueries &gt; 1_000_000)</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;bounded future horizon required&quot;);</span>
+<span class="fc" id="L85">        var batches = new ArrayList&lt;TaskKnowledgeSelfImprover.Batch&gt;();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (var block : array(request.get(&quot;improvementBatches&quot;))) {</span>
+<span class="fc" id="L87">            CheckedSchemaSupport.fields(block, &quot;lessons&quot;, &quot;validation&quot;, &quot;promotion&quot;);</span>
+<span class="fc" id="L88">            batches.add(new TaskKnowledgeSelfImprover.Batch(tasks(block.get(&quot;lessons&quot;)), tasks(block.get(&quot;validation&quot;)), tasks(block.get(&quot;promotion&quot;))));</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">        improvements = List.copyOf(batches);</span>
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        if (profile.equals(&quot;PREPARED_REUSE&quot;) || profile.equals(&quot;MEASURED_IMPROVEMENT&quot;))</span>
+<span class="fc" id="L92">            session = new TaskKnowledgeSession(TraceStrategyTransferExample.inventory(), 4, 4_000_000);</span>
+<span class="fc" id="L93">        consumer = true;</span>
+<span class="fc" id="L94">        return common(&quot;CONFIGURED&quot;);</span>
+    }
+    private Map&lt;String, Object&gt; load(JsonNode request) throws Exception {
+<span class="fc" id="L97">        CheckedSchemaSupport.fields(request, &quot;op&quot;); requireConsumer();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        boolean reused = knowledge != null;</span>
+<span class="fc" id="L99">        long preparation = 0, lookup = 0;</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (session != null) {</span>
+<span class="fc" id="L101">            var loaded = session.prepare(snapshot);</span>
+<span class="fc" id="L102">            knowledge = loaded.knowledge(); reused = loaded.reused(); preparation = loaded.preparationWork(); lookup = loaded.lookupWork();</span>
+<span class="pc bnc" id="L103" title="All 6 branches missed.">        } else if (!profile.equals(&quot;PRIMITIVE&quot;) &amp;&amp; (knowledge == null || profile.equals(&quot;LEGACY_RELOAD&quot;))) {</span>
+<span class="nc" id="L104">            knowledge = CumulativeTaskKnowledge.load(TraceStrategyTransferExample.inventory(), snapshot);</span>
+<span class="nc" id="L105">            reused = false; preparation = knowledge.sessionSetupWork();</span>
+        }
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (knowledge.constructionProfile() != TaskConstructionProfile.NONE) throw new IllegalArgumentException(&quot;changed native capabilities&quot;);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (seedId == null) seedId = knowledge.id();</span>
+<span class="fc" id="L109">        TaskKnowledgeSelfImprover.Result improvement = null;</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        if (profile.equals(&quot;MEASURED_IMPROVEMENT&quot;) &amp;&amp; !improved) {</span>
+<span class="fc" id="L111">            var policy = new TaskKnowledgeSelfImprover.Policy(5_000_000, 120_000_000_000L, 120_000_000_000L, 2, 3, futureQueries);</span>
+<span class="fc" id="L112">            improvement = new TaskKnowledgeSelfImprover().improve(knowledge, improvements, policy);</span>
+<span class="fc" id="L113">            knowledge = improvement.active();</span>
+<span class="fc" id="L114">            snapshot = knowledge.save(directory);</span>
+<span class="fc" id="L115">            lookup = Math.addExact(lookup, session.retainVerified(knowledge).lookupWork());</span>
+<span class="fc" id="L116">            improved = true;</span>
+        }
+<span class="fc" id="L118">        var result = common(&quot;LOADED&quot;); result.put(&quot;cacheHit&quot;, reused); result.put(&quot;preparationWork&quot;, preparation); result.put(&quot;lookupWork&quot;, lookup);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        result.put(&quot;improvement&quot;, improvement == null ? null : Map.of(&quot;activeId&quot;, improvement.active().id(),</span>
+<span class="fc" id="L120">            &quot;attempts&quot;, improvement.attempts(), &quot;knownWork&quot;, improvement.knownWork(), &quot;paid&quot;, improvement.paid(),</span>
+<span class="fc" id="L121">            &quot;accountingComplete&quot;, improvement.accountingComplete(), &quot;budgetExhausted&quot;, improvement.budgetExhausted()));</span>
+<span class="fc" id="L122">        return result;</span>
+    }
+    private Map&lt;String, Object&gt; run(JsonNode request) {
+<span class="fc" id="L125">        CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;task&quot;); requireConsumer();</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (knowledge == null) throw new IllegalStateException(&quot;first strict load is required&quot;);</span>
+<span class="fc" id="L127">        var task = task(request.get(&quot;task&quot;));</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        var execution = knowledge.solve(task, profile.equals(&quot;PRIMITIVE&quot;)</span>
+<span class="pc" id="L129">            ? CumulativeTaskKnowledge.Strategy.BASELINE : CumulativeTaskKnowledge.Strategy.AUTOMATIC);</span>
+<span class="fc" id="L130">        var result = common(&quot;RESULT&quot;); result.put(&quot;task&quot;, CheckedSchemaSupport.JSON.convertValue(request.get(&quot;task&quot;), Map.class));</span>
+<span class="fc" id="L131">        result.put(&quot;solved&quot;, execution.solved()); result.put(&quot;nativeApiWork&quot;, execution.totalWork());</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        result.put(&quot;withinBudget&quot;, execution.totalWork() &lt;= BUDGET.totalWork()</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            &amp;&amp; execution.solution().map(s -&gt; s.evidence().withinBudget()).orElse(true));</span>
+<span class="fc" id="L134">        result.put(&quot;normalizedInput&quot;, ExpressionFormatter.format(task.source()));</span>
+<span class="fc" id="L135">        result.put(&quot;outputScore&quot;, execution.solution().map(s -&gt; s.evidence().outputScore()).orElse(Long.MAX_VALUE));</span>
+<span class="fc" id="L136">        execution.solution().ifPresent(solution -&gt; {</span>
+<span class="fc" id="L137">            var evidence = solution.evidence();</span>
+<span class="fc" id="L138">            result.put(&quot;output&quot;, ExpressionFormatter.format(evidence.incumbent().expression()));</span>
+<span class="fc" id="L139">            result.put(&quot;witness&quot;, evidence.witness().stream().map(edge -&gt; Map.of(</span>
+<span class="fc" id="L140">                &quot;source&quot;, ExpressionFormatter.format(edge.source().expression()), &quot;target&quot;, ExpressionFormatter.format(edge.target().expression()),</span>
+<span class="fc" id="L141">                &quot;move&quot;, edge.move(), &quot;verification&quot;, edge.verification())).toList());</span>
+<span class="fc" id="L142">        });</span>
+<span class="fc" id="L143">        return result;</span>
+    }
+    private Map&lt;String, Object&gt; common(String status) {
+<span class="fc" id="L146">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L147">        result.put(&quot;status&quot;, status); result.put(&quot;profile&quot;, profile); result.put(&quot;seedId&quot;, seedId);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        result.put(&quot;generationId&quot;, knowledge == null ? &quot;&quot; : knowledge.id());</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        result.put(&quot;snapshot&quot;, snapshot == null ? &quot;&quot; : snapshot.toString());</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        result.put(&quot;schemaCount&quot;, knowledge == null ? 0 : knowledge.schemaCount());</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        result.put(&quot;cache&quot;, session == null ? null : session.statistics());</span>
+<span class="fc" id="L152">        result.put(&quot;nativeBudget&quot;, List.of(32, 32, 200_000, 512, 200_000));</span>
+<span class="fc" id="L153">        return result;</span>
+    }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">    private void requireConsumer() { if (!consumer) throw new IllegalStateException(&quot;fresh query consumer required&quot;); }</span>
+    private static List&lt;JsonNode&gt; array(JsonNode node) {
+<span class="pc bpc" id="L157" title="3 of 6 branches missed.">        if (node == null || !node.isArray() || node.size() &gt; 32) throw new IllegalArgumentException(&quot;bounded array required&quot;);</span>
+<span class="fc" id="L158">        var result = new ArrayList&lt;JsonNode&gt;(); node.forEach(result::add); return List.copyOf(result);</span>
+    }
+<span class="fc" id="L160">    private static List&lt;CheckedSchemaTaskSolver.Task&gt; tasks(JsonNode node) { return array(node).stream().map(TaskKnowledgeLifecycleWorker::task).toList(); }</span>
+    private static CheckedSchemaTaskSolver.Task task(JsonNode node) {
+<span class="fc" id="L162">        CheckedSchemaSupport.fields(node, &quot;source&quot;, &quot;maximumNodes&quot;);</span>
+<span class="fc" id="L163">        String source = CheckedSchemaSupport.text(node, &quot;source&quot;);</span>
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (source.length() &gt; 2048 || !node.path(&quot;maximumNodes&quot;).isIntegralNumber()</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                || !node.path(&quot;maximumNodes&quot;).canConvertToInt()) throw new IllegalArgumentException(&quot;bounded exact task required&quot;);</span>
+<span class="fc" id="L166">        int goal = node.path(&quot;maximumNodes&quot;).intValue();</span>
+<span class="pc bpc" id="L167" title="2 of 4 branches missed.">        if (goal &lt; 1 || goal &gt; 256) throw new IllegalArgumentException(&quot;node goal bound&quot;);</span>
+<span class="fc" id="L168">        return new CheckedSchemaTaskSolver.Task(new ExpressionParser().parseExactTerm(source).expression(),</span>
+<span class="fc" id="L169">            List.of(), CheckedSchemaTaskSolver.Goal.atMostNodes(goal), BUDGET);</span>
+    }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">    @Override public void close() { if (session != null) session.close(); knowledge = null; closed = true; }</span>
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (args.length != 0) throw new IllegalArgumentException(&quot;JSONL input required&quot;);</span>
+<span class="nc" id="L174">        System.out.println(&quot;{\&quot;status\&quot;:\&quot;READY\&quot;,\&quot;java\&quot;:\&quot;&quot; + Runtime.version() + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L175">        try (var worker = new TaskKnowledgeLifecycleWorker(); var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            for (String line; (line = reader.readLine()) != null;) {</span>
+<span class="nc" id="L177">                System.out.println(LearnedSchedulingArtifacts.json(worker.handle(line))); System.out.flush();</span>
+            }
+        }
+<span class="nc" id="L180">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TaskKnowledgeSelfImprover.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TaskKnowledgeSelfImprover.java</span></div><h1>TaskKnowledgeSelfImprover.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import static de.regelsuche.evolution.KnowledgeCostGate.Decision.*;
+
+import de.regelsuche.evolution.KnowledgeCostGate.Cost;
+import de.regelsuche.evolution.KnowledgeCostGate.Decision;
+import de.regelsuche.evolution.KnowledgeCostGate.Sample;
+import de.regelsuche.evolution.KnowledgeCostGate.Trial;
+import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
+
+/** Actual-cost adoption around the existing learner; all rejected work remains in the returned ledger. */
+public final class TaskKnowledgeSelfImprover {
+    public record Batch(List&lt;CheckedSchemaTaskSolver.Task&gt; lessons, List&lt;CheckedSchemaTaskSolver.Task&gt; validation,
+            List&lt;CheckedSchemaTaskSolver.Task&gt; promotion) {
+<span class="fc" id="L19">        public Batch {</span>
+<span class="fc" id="L20">            lessons = bounded(lessons, 2); validation = bounded(validation, 1); promotion = bounded(promotion, 1);</span>
+<span class="fc" id="L21">        }</span>
+    }
+    /** Time/work cutoffs are checked between bounded atomic API operations, which remain fully paid. */
+    public record Policy(long maximumLearningWork, long maximumWallNanos, long maximumCpuNanos,
+            int maximumBatches, int measurementRepeats, long futureQueries) {
+<span class="fc" id="L26">        public Policy {</span>
+<span class="pc bpc" id="L27" title="8 of 16 branches missed.">            if (maximumLearningWork &lt; 1 || maximumWallNanos &lt; 1 || maximumCpuNanos &lt; 1</span>
+                    || maximumBatches &lt; 1 || maximumBatches &gt; 32 || measurementRepeats &lt; 1 || measurementRepeats &gt; 9 || futureQueries &lt; 1)
+<span class="nc" id="L29">                throw new IllegalArgumentException(&quot;positive bounded improvement policy required&quot;);</span>
+<span class="fc" id="L30">        }</span>
+    }
+    public record Attempt(String parentId, String candidateId, CumulativeTaskKnowledge.Decision learnerDecision,
+            Decision decision, long knownWork, Cost paid, List&lt;Trial&gt; trials, List&lt;String&gt; lessonGenerations,
+            boolean accountingComplete, String failure) {
+<span class="fc" id="L35">        public Attempt { trials = List.copyOf(trials); lessonGenerations = List.copyOf(lessonGenerations); }</span>
+    }
+    public record Result(CumulativeTaskKnowledge active, List&lt;Attempt&gt; attempts, long knownWork,
+            Cost paid, boolean accountingComplete, boolean budgetExhausted) {
+<span class="fc" id="L39">        public Result { attempts = List.copyOf(attempts); }</span>
+    }
+    @FunctionalInterface interface Meter { Cost now(); }
+    private final Meter meter;
+
+<span class="fc" id="L44">    public TaskKnowledgeSelfImprover() { this(systemMeter()); }</span>
+<span class="fc" id="L45">    TaskKnowledgeSelfImprover(Meter meter) { this.meter = Objects.requireNonNull(meter); }</span>
+
+    /** Promotion predicts future savings; an independently measured stream is still required to establish them. */
+    public Result improve(CumulativeTaskKnowledge initial, List&lt;Batch&gt; batches, Policy policy) {
+<span class="fc" id="L49">        Objects.requireNonNull(initial); Objects.requireNonNull(policy); batches = List.copyOf(batches);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (batches.size() &gt; 32) throw new IllegalArgumentException(&quot;bounded improvement batches required&quot;);</span>
+<span class="fc" id="L51">        Cost start = meter.now();</span>
+<span class="fc" id="L52">        var attempts = new ArrayList&lt;Attempt&gt;();</span>
+<span class="fc" id="L53">        var examples = batches.stream().flatMap(b -&gt; Stream.concat(b.lessons().stream(), b.validation().stream())).toList();</span>
+<span class="fc" id="L54">        var active = initial;</span>
+<span class="fc" id="L55">        long work = 0;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        boolean complete = start.cpuNanos() &gt;= 0, exhausted = false;</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        for (int i = 0; complete &amp;&amp; i &lt; Math.min(batches.size(), policy.maximumBatches()); i++) {</span>
+<span class="fc" id="L58">            Cost checkpoint = elapsed(start, meter.now());</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (overBudget(policy, checkpoint, work)) { exhausted = true; break; }</span>
+<span class="fc" id="L60">            var step = new Step(active, batches.get(i), examples, policy, start, work, i);</span>
+<span class="fc" id="L61">            var attempt = step.execute();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (attempt.decision() == ADOPT) {</span>
+                // Observe all inner gate work before committing a generation.
+                // The outer result retains the remaining controller overhead.
+<span class="fc" id="L65">                Cost point = meter.now();</span>
+<span class="fc" id="L66">                Cost paid = elapsed(step.start, point);</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">                boolean accounted = attempt.accountingComplete() &amp;&amp; paid.cpuNanos() &gt;= 0;</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                Decision decision = !accounted ? INCOMPLETE</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                    : overBudget(policy, elapsed(start, point), Math.addExact(work, attempt.knownWork())) ? BUDGET_EXHAUSTED</span>
+<span class="fc" id="L70">                    : KnowledgeCostGate.evaluate(paid, attempt.trials(), policy.futureQueries());</span>
+<span class="fc" id="L71">                attempt = new Attempt(attempt.parentId(), attempt.candidateId(), attempt.learnerDecision(), decision,</span>
+<span class="fc" id="L72">                    attempt.knownWork(), paid, attempt.trials(), attempt.lessonGenerations(), accounted, attempt.failure());</span>
+            }
+<span class="fc" id="L74">            attempts.add(attempt); work = Math.addExact(work, attempt.knownWork());</span>
+<span class="fc" id="L75">            complete &amp;= attempt.accountingComplete();</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (attempt.decision() == ADOPT) active = step.proposed;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (attempt.decision() == BUDGET_EXHAUSTED) { exhausted = true; break; }</span>
+        }
+<span class="fc" id="L79">        Cost paid = elapsed(start, meter.now());</span>
+<span class="pc bpc" id="L80" title="1 of 6 branches missed.">        return new Result(active, attempts, work, paid, complete &amp;&amp; paid.cpuNanos() &gt;= 0,</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            exhausted || overBudget(policy, paid, work));</span>
+    }
+
+    private final class Step {
+        private final CumulativeTaskKnowledge parent;
+        private final Batch batch;
+        private final List&lt;CheckedSchemaTaskSolver.Task&gt; examples;
+        private final Policy policy;
+        private final Cost overallStart, start;
+        private final long previousWork;
+        private final int sequence;
+<span class="fc" id="L92">        private final List&lt;Trial&gt; trials = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L93">        private List&lt;String&gt; lessons = List.of();</span>
+        private long work;
+<span class="fc" id="L95">        private boolean complete = true;</span>
+<span class="fc" id="L96">        private String failure = &quot;&quot;;</span>
+        private CumulativeTaskKnowledge proposed;
+        private CumulativeTaskKnowledge.Decision learnerDecision;
+<span class="fc" id="L99">        private Decision decision = NO_CANDIDATE;</span>
+        private Cost lastSampleEnd;
+
+        Step(CumulativeTaskKnowledge parent, Batch batch, List&lt;CheckedSchemaTaskSolver.Task&gt; examples,
+<span class="fc" id="L103">                Policy policy, Cost overallStart, long previousWork, int sequence) {</span>
+<span class="fc" id="L104">            this.parent = parent; this.batch = batch; this.examples = examples; this.policy = policy;</span>
+<span class="fc" id="L105">            this.overallStart = overallStart; this.previousWork = previousWork; this.sequence = sequence;</span>
+<span class="fc" id="L106">            start = meter.now();</span>
+<span class="fc" id="L107">        }</span>
+
+        Attempt execute() {
+            try {
+                // Invalid later batches must retain earlier accepted state and all paid receipts.
+<span class="fc" id="L112">                work = CumulativeTaskKnowledge.disjoint(examples, batch.promotion());</span>
+<span class="fc" id="L113">                Cost checkpoint = elapsed(overallStart, meter.now());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                if (checkpoint.cpuNanos() &lt; 0) { complete = false; decision = INCOMPLETE; }</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                else if (overBudget(policy, checkpoint, Math.addExact(previousWork, work))) decision = BUDGET_EXHAUSTED;</span>
+<span class="fc" id="L116">                else learn();</span>
+<span class="fc" id="L117">            } catch (CumulativeTaskKnowledge.BatchFailure error) {</span>
+<span class="fc" id="L118">                work = Math.addExact(work, error.knownWork().total());</span>
+<span class="fc" id="L119">                lessons = error.completedLessons().stream().map(CumulativeTaskKnowledge.Execution::generationId).toList();</span>
+<span class="fc" id="L120">                fail(error);</span>
+<span class="fc" id="L121">            } catch (RuntimeException error) { fail(error); }</span>
+<span class="fc" id="L122">            Cost point = meter.now();</span>
+<span class="fc" id="L123">            Cost paid = elapsed(start, point);</span>
+<span class="pc bpc" id="L124" title="1 of 8 branches missed.">            if (complete &amp;&amp; proposed != null &amp;&amp; !trials.isEmpty() &amp;&amp; decision != BUDGET_EXHAUSTED)</span>
+<span class="fc" id="L125">                decision = KnowledgeCostGate.evaluate(paid, trials, policy.futureQueries());</span>
+<span class="fc bfc" id="L126" title="All 4 branches covered.">            if (complete &amp;&amp; overBudget(policy, elapsed(overallStart, point), Math.addExact(previousWork, work))) decision = BUDGET_EXHAUSTED;</span>
+<span class="fc" id="L127">            Cost end = meter.now();</span>
+<span class="fc" id="L128">            paid = elapsed(start, end);</span>
+            // Include the decision's own measured work when testing its projected payback.
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (decision == ADOPT) decision = KnowledgeCostGate.evaluate(paid, trials, policy.futureQueries());</span>
+<span class="fc bfc" id="L131" title="All 4 branches covered.">            if (complete &amp;&amp; overBudget(policy, elapsed(overallStart, end), Math.addExact(previousWork, work))) decision = BUDGET_EXHAUSTED;</span>
+<span class="pc bpc" id="L132" title="3 of 8 branches missed.">            complete &amp;= paid.cpuNanos() &gt;= 0 &amp;&amp; trials.stream().allMatch(t -&gt; t.previous().complete() &amp;&amp; t.candidate().complete());</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            return new Attempt(parent.id(), proposed == null ? &quot;&quot; : proposed.id(), learnerDecision, decision,</span>
+                work, paid, trials, lessons, complete, failure);
+        }
+
+        private void learn() {
+<span class="fc" id="L138">            long remaining = policy.maximumLearningWork() - previousWork - work;</span>
+<span class="fc" id="L139">            var update = parent.learnBatch(batch.lessons(), batch.validation(), remaining);</span>
+<span class="fc" id="L140">            work = Math.addExact(work, update.work().total()); learnerDecision = update.reason();</span>
+<span class="fc" id="L141">            lessons = update.training().stream().map(CumulativeTaskKnowledge.Execution::generationId).toList();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (Math.addExact(previousWork, work) &gt;= policy.maximumLearningWork()) { decision = BUDGET_EXHAUSTED; return; }</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (!update.promoted()) return;</span>
+<span class="fc" id="L144">            proposed = update.next();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            for (int repetition = 0; repetition &lt; policy.measurementRepeats(); repetition++) {</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                for (int i = 0; i &lt; batch.promotion().size(); i++) {</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                    if (overBudget(policy, elapsed(overallStart, meter.now()), Math.addExact(previousWork, work))) {</span>
+<span class="nc" id="L148">                        decision = BUDGET_EXHAUSTED; return;</span>
+                    }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                    trial(batch.promotion().get(i), ((sequence + repetition + i) &amp; 1) == 0);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                    if (!complete) { decision = INCOMPLETE; return; }</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                    if (decision == BUDGET_EXHAUSTED) return;</span>
+                }
+            }
+<span class="fc" id="L155">        }</span>
+
+        private void trial(CheckedSchemaTaskSolver.Task task, boolean previousFirst) {
+            Sample before, after;
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (previousFirst) {</span>
+<span class="fc" id="L160">                before = observe(parent, task);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                if (stoppedAfterSample()) return;</span>
+<span class="fc" id="L162">                after = observe(proposed, task);</span>
+            } else {
+<span class="fc" id="L164">                after = observe(proposed, task);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                if (stoppedAfterSample()) return;</span>
+<span class="fc" id="L166">                before = observe(parent, task);</span>
+            }
+<span class="fc" id="L168">            trials.add(new Trial(before, after));</span>
+<span class="fc" id="L169">        }</span>
+
+        private boolean stoppedAfterSample() {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (!complete) { decision = INCOMPLETE; return true; }</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (overBudget(policy, elapsed(overallStart, lastSampleEnd), Math.addExact(previousWork, work))) {</span>
+<span class="fc" id="L174">                decision = BUDGET_EXHAUSTED; return true;</span>
+            }
+<span class="fc" id="L176">            return false;</span>
+        }
+
+        private Sample observe(CumulativeTaskKnowledge knowledge, CheckedSchemaTaskSolver.Task task) {
+<span class="fc" id="L180">            Cost begin = meter.now();</span>
+<span class="fc" id="L181">            var execution = knowledge.solve(task, CumulativeTaskKnowledge.Strategy.AUTOMATIC);</span>
+<span class="fc" id="L182">            lastSampleEnd = meter.now();</span>
+<span class="fc" id="L183">            Cost paid = elapsed(begin, lastSampleEnd);</span>
+<span class="fc" id="L184">            work = Math.addExact(work, execution.totalWork());</span>
+<span class="fc" id="L185">            long score = execution.solution().map(s -&gt; s.evidence().outputScore()).orElse(Long.MAX_VALUE);</span>
+<span class="fc" id="L186">            boolean accounted = execution.solution().map(s -&gt; s.evidence().accountingComplete()).orElse(true);</span>
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">            complete &amp;= accounted &amp;&amp; paid.cpuNanos() &gt;= 0;</span>
+<span class="fc" id="L188">            return new Sample(paid, execution.solved(), score, accounted);</span>
+        }
+
+<span class="fc" id="L191">        private void fail(RuntimeException error) { complete = false; decision = FAILED; failure = error.toString(); }</span>
+    }
+
+    private static boolean overBudget(Policy policy, Cost elapsed, long work) {
+<span class="fc bfc" id="L195" title="All 4 branches covered.">        return work &gt;= policy.maximumLearningWork() || elapsed.wallNanos() &gt;= policy.maximumWallNanos()</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            || elapsed.cpuNanos() &gt;= policy.maximumCpuNanos();</span>
+    }
+    private static Cost elapsed(Cost start, Cost end) {
+<span class="fc bfc" id="L199" title="All 4 branches covered.">        long cpu = start.cpuNanos() &lt; 0 || end.cpuNanos() &lt; start.cpuNanos() ? -1 : end.cpuNanos() - start.cpuNanos();</span>
+<span class="fc" id="L200">        return new Cost(end.wallNanos() - start.wallNanos(), cpu);</span>
+    }
+    private static List&lt;CheckedSchemaTaskSolver.Task&gt; bounded(List&lt;CheckedSchemaTaskSolver.Task&gt; tasks, int minimum) {
+<span class="fc" id="L203">        var copy = List.copyOf(tasks);</span>
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">        if (copy.size() &lt; minimum || copy.size() &gt; 32) throw new IllegalArgumentException(&quot;bounded task list required&quot;);</span>
+<span class="fc" id="L205">        return copy;</span>
+    }
+    private static Meter systemMeter() {
+<span class="fc" id="L208">        long origin = System.nanoTime();</span>
+<span class="fc" id="L209">        var os = ManagementFactory.getOperatingSystemMXBean();</span>
+<span class="fc" id="L210">        return () -&gt; new Cost(System.nanoTime() - origin,</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            os instanceof com.sun.management.OperatingSystemMXBean bean ? bean.getProcessCpuTime() : -1);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

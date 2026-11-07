@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TaskKnowledgeSession.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TaskKnowledgeSession.java</span></div><h1>TaskKnowledgeSession.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+
+/** Caller-owned reuse of independently verified generations; never a query-result cache. */
+public final class TaskKnowledgeSession implements AutoCloseable {
+<span class="fc" id="L10">    public record Preparation(CumulativeTaskKnowledge knowledge, boolean reused, long lookupWork, long preparationWork) {</span>
+<span class="nc" id="L11">        public long totalWork() { return Math.addExact(lookupWork, preparationWork); }</span>
+    }
+    /** Character bounds describe retained canonical data, not a JVM heap or RSS limit. */
+<span class="fc" id="L14">    public record Statistics(long loads, long hits, long admissions, long failures, long evictions, int retainedGenerations,</span>
+            long retainedCharacters, long lookupWork, long preparationWork, boolean accountingComplete) { }
+
+    private final EvolutionGenome inventory;
+    private final int maximumGenerations;
+    private final long maximumCharacters;
+<span class="fc" id="L20">    private final LinkedHashMap&lt;String, CumulativeTaskKnowledge&gt; retained = new LinkedHashMap&lt;&gt;(16, .75f, true);</span>
+    private long loads, hits, admissions, failures, evictions, characters, lookupWork, preparationWork;
+    private boolean closed;
+
+<span class="fc" id="L24">    public TaskKnowledgeSession(EvolutionGenome inventory, int maximumGenerations, long maximumCharacters) {</span>
+<span class="fc" id="L25">        this.inventory = Objects.requireNonNull(inventory);</span>
+<span class="pc bpc" id="L26" title="3 of 6 branches missed.">        if (maximumGenerations &lt; 1 || maximumGenerations &gt; 256 || maximumCharacters &lt; 1)</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;positive bounded prepared-generation capacity required&quot;);</span>
+<span class="fc" id="L28">        this.maximumGenerations = maximumGenerations;</span>
+<span class="fc" id="L29">        this.maximumCharacters = maximumCharacters;</span>
+<span class="fc" id="L30">    }</span>
+
+    /** Every call performs the strict file/content-address checks before consulting retained proof authority. */
+    public synchronized Preparation prepare(Path path) throws IOException {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (closed) throw new IllegalStateException(&quot;knowledge session is closed&quot;);</span>
+<span class="fc" id="L35">        loads = Math.addExact(loads, 1);</span>
+        try {
+<span class="fc" id="L37">            String json = TaskKnowledgeSnapshot.read(path);</span>
+            // Declared read/key-character units; actual CPU/I/O are measured separately by callers.
+<span class="fc" id="L39">            long lookup = Math.addExact(json.length(), 1L);</span>
+<span class="fc" id="L40">            lookupWork = Math.addExact(lookupWork, lookup);</span>
+<span class="fc" id="L41">            var cached = retained.get(json);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (cached != null) {</span>
+<span class="fc" id="L43">                hits = Math.addExact(hits, 1);</span>
+<span class="fc" id="L44">                return new Preparation(cached, true, lookup, 0);</span>
+            }
+<span class="fc" id="L46">            var knowledge = CumulativeTaskKnowledge.restorePrepared(inventory, json);</span>
+<span class="fc" id="L47">            long setup = knowledge.sessionSetupWork();</span>
+<span class="fc" id="L48">            preparationWork = Math.addExact(preparationWork, setup);</span>
+<span class="fc" id="L49">            remember(knowledge);</span>
+<span class="fc" id="L50">            return new Preparation(knowledge, false, lookup, setup);</span>
+<span class="fc" id="L51">        } catch (IOException | RuntimeException failure) {</span>
+<span class="fc" id="L52">            failures = Math.addExact(failures, 1);</span>
+<span class="fc" id="L53">            throw failure;</span>
+        }
+    }
+
+    private void remember(CumulativeTaskKnowledge knowledge) {
+<span class="fc" id="L58">        String canonical = knowledge.toCanonicalJson();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (canonical.length() &gt; maximumCharacters) return;</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">        while (retained.size() &gt;= maximumGenerations || characters &gt; maximumCharacters - canonical.length()) {</span>
+<span class="fc" id="L61">            var iterator = retained.entrySet().iterator();</span>
+<span class="fc" id="L62">            var oldest = iterator.next();</span>
+<span class="fc" id="L63">            characters -= oldest.getKey().length();</span>
+<span class="fc" id="L64">            iterator.remove();</span>
+<span class="fc" id="L65">            evictions = Math.addExact(evictions, 1);</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        retained.put(canonical, knowledge);</span>
+<span class="fc" id="L68">        characters = Math.addExact(characters, canonical.length());</span>
+<span class="fc" id="L69">    }</span>
+
+    /** Accept only an existing checked object, as returned by prepared loading or cumulative learning. */
+    public synchronized Preparation retainVerified(CumulativeTaskKnowledge knowledge) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (closed) throw new IllegalStateException(&quot;knowledge session is closed&quot;);</span>
+<span class="fc" id="L74">        Objects.requireNonNull(knowledge);</span>
+<span class="fc bfc" id="L75" title="All 4 branches covered.">        if (!inventory.contentHash().equals(knowledge.inventoryHash()) || !knowledge.usesIndexedPreparation())</span>
+<span class="fc" id="L76">            throw new IllegalArgumentException(&quot;same-inventory prepared knowledge required&quot;);</span>
+<span class="fc" id="L77">        admissions = Math.addExact(admissions, 1);</span>
+<span class="fc" id="L78">        String canonical = knowledge.toCanonicalJson();</span>
+<span class="fc" id="L79">        long lookup = Math.addExact(canonical.length(), 1L);</span>
+<span class="fc" id="L80">        lookupWork = Math.addExact(lookupWork, lookup);</span>
+<span class="fc" id="L81">        var previous = retained.get(canonical);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (previous != null) return new Preparation(previous, true, lookup, 0);</span>
+<span class="fc" id="L83">        remember(knowledge);</span>
+<span class="fc" id="L84">        return new Preparation(knowledge, false, lookup, 0);</span>
+    }
+
+    public synchronized Statistics statistics() {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        return new Statistics(loads, hits, admissions, failures, evictions, retained.size(), characters,</span>
+            lookupWork, preparationWork, failures == 0);
+    }
+
+    @Override public synchronized void close() {
+<span class="fc" id="L93">        retained.clear(); characters = 0; closed = true;</span>
+<span class="fc" id="L94">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
