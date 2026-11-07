@@ -1,5 +1,9 @@
 # Cumulative checked task knowledge
 
+Opt-in [prepared sessions and measured adoption](../prepared-task-knowledge.md)
+extend these APIs. The [2026-11-07 complete lifecycle observation](knowledge-lifecycle-improvement-2026-11-07.md)
+reports actual costs and the remaining negative result against persistent use and SymPy.
+
 `CumulativeTaskKnowledge` connects the existing task solver to the existing
 checked-schema generalizer. A completed batch can produce a new immutable
 knowledge generation. Later lessons actually use the previously learned

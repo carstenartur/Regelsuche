@@ -1,0 +1,526 @@
+{
+  "schema": "regelsuche.historical-sympy-comparison/v1",
+  "informationRegime": "PUBLIC_DEVELOPMENT;NO_SEALED_HOLDOUT;NO_GENERAL_CAS_OR_UNIQUE_LEARNING_CLAIM",
+  "profiles": [
+    "NATIVE_BASE",
+    "NATIVE_LEARNED",
+    "SYMPY"
+  ],
+  "lengths": [
+    1,
+    18,
+    72
+  ],
+  "repetitions": 3,
+  "queryTimeoutSeconds": 30,
+  "setupTimeoutSeconds": 120,
+  "warmups": [],
+  "javaOptions": [
+    "-Xmx512m"
+  ],
+  "sympyVersion": "1.14.0",
+  "nativeStructuralBudget": [
+    24,
+    12,
+    1000000,
+    128,
+    2000000
+  ],
+  "expressionAcquisitionBudget": 5000000,
+  "recurrenceAcquisitionBudget": 500000,
+  "recurrenceFamilyBudget": 500000,
+  "prelude": {
+    "expressionBlocks": [
+      {
+        "lessons": [
+          {
+            "kind": "FACTOR",
+            "source": "x^4+4*y^4"
+          },
+          {
+            "kind": "FACTOR",
+            "source": "a^4+4*b^4"
+          }
+        ],
+        "validation": [
+          {
+            "kind": "FACTOR",
+            "source": "(p*q)^4+4*r^4"
+          }
+        ]
+      },
+      {
+        "lessons": [
+          {
+            "kind": "TWO_SQUARES",
+            "source": "(a^2+b^2)*(c^2+d^2)"
+          },
+          {
+            "kind": "TWO_SQUARES",
+            "source": "(p^2+q^2)*(r^2+s^2)"
+          }
+        ],
+        "validation": [
+          {
+            "kind": "TWO_SQUARES",
+            "source": "((u+1)^2+v^2)*(w^2+z^2)"
+          }
+        ]
+      }
+    ],
+    "recurrenceBlocks": [
+      {
+        "lessons": [
+          {
+            "linear": [
+              [
+                "0",
+                "1"
+              ],
+              [
+                "1",
+                "1"
+              ]
+            ],
+            "offset": [
+              "0",
+              "0"
+            ],
+            "initial": [
+              "1",
+              "2"
+            ],
+            "degree": 2,
+            "workBudget": 100000
+          }
+        ],
+        "validation": [
+          {
+            "linear": [
+              [
+                "0",
+                "1"
+              ],
+              [
+                "1",
+                "1"
+              ]
+            ],
+            "offset": [
+              "0",
+              "0"
+            ],
+            "initial": [
+              "2",
+              "3"
+            ],
+            "degree": 2,
+            "workBudget": 100000
+          }
+        ]
+      },
+      {
+        "lessons": [
+          {
+            "linear": [
+              [
+                "0",
+                "1"
+              ],
+              [
+                "1",
+                "2"
+              ]
+            ],
+            "offset": [
+              "0",
+              "0"
+            ],
+            "initial": [
+              "1",
+              "2"
+            ],
+            "degree": 2,
+            "workBudget": 100000
+          }
+        ],
+        "validation": [
+          {
+            "linear": [
+              [
+                "0",
+                "1"
+              ],
+              [
+                "1",
+                "2"
+              ]
+            ],
+            "offset": [
+              "0",
+              "0"
+            ],
+            "initial": [
+              "2",
+              "3"
+            ],
+            "degree": 2,
+            "workBudget": 100000
+          }
+        ]
+      }
+    ],
+    "recurrenceFamilyValidation": [
+      {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "3"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "2",
+          "5"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      },
+      {
+        "linear": [
+          [
+            "0",
+            "1"
+          ],
+          [
+            "1",
+            "5"
+          ]
+        ],
+        "offset": [
+          "0",
+          "0"
+        ],
+        "initial": [
+          "3",
+          "7"
+        ],
+        "degree": 2,
+        "workBudget": 100000
+      }
+    ]
+  },
+  "procedures": {
+    "invariant": "FULL_DEGREE_1_OR_2_MONOMIAL_ANSATZ;MULTIPLIERS_PLUS_MINUS_1;EXACT_COEFFICIENT_NULLSPACE;SOURCE_BOUND_UNIVERSAL_STEP_AND_BASE",
+    "factor": "EXPLICIT_NONCONSTANT_PRODUCT;SYMPY_FACTOR_LIST_QQ;NATIVE_STRUCTURAL_V1",
+    "twoSquares": "EXPLICIT_TWO_NONCONSTANT_POLYNOMIAL_SQUARES;SYMPY_CONJUGATE_PAIR_FACTORIZATION_QQ_I_WITH_RATIONAL_SQUARE_SCALAR;NATIVE_STRUCTURAL_V1"
+  },
+  "notMeasured": [
+    {
+      "task": "Euclid/Bezout historical discovery/proof",
+      "reason": "NO_SHARED_EXECUTABLE_HISTORICAL_TASK_CONTRACT"
+    },
+    {
+      "task": "Euclid infinitude-of-primes proof discovery",
+      "reason": "NO_SHARED_EXECUTABLE_HISTORICAL_TASK_CONTRACT"
+    },
+    {
+      "task": "General Ferrari discovery/proof",
+      "reason": "NO_SHARED_EXECUTABLE_HISTORICAL_TASK_CONTRACT"
+    }
+  ],
+  "cases": [
+    {
+      "id": "cassini",
+      "role": "CLASSICAL",
+      "task": {
+        "kind": "INVARIANT",
+        "recurrence": {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "1"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "0",
+            "1"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      }
+    },
+    {
+      "id": "brahmagupta-fibonacci",
+      "role": "CLASSICAL",
+      "task": {
+        "kind": "TWO_SQUARES",
+        "source": "(a^2+b^2)*(c^2+d^2)"
+      }
+    },
+    {
+      "id": "sophie-germain",
+      "role": "CLASSICAL",
+      "task": {
+        "kind": "FACTOR",
+        "source": "x^4+4*y^4"
+      }
+    },
+    {
+      "id": "pell",
+      "role": "CLASSICAL",
+      "task": {
+        "kind": "INVARIANT",
+        "recurrence": {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "2"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "0",
+            "1"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      }
+    },
+    {
+      "id": "brahmagupta-scaled",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "TWO_SQUARES",
+        "source": "((2*a)^2+(3*b)^2)*(c^2+d^2)"
+      }
+    },
+    {
+      "id": "sophie-scaled",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "FACTOR",
+        "source": "(2*x)^4+4*(3*y)^4"
+      }
+    },
+    {
+      "id": "recurrence-parameter-4",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "INVARIANT",
+        "recurrence": {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "4"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "1",
+            "2"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      }
+    },
+    {
+      "id": "brahmagupta-shifted",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "TWO_SQUARES",
+        "source": "((a+1)^2+b^2)*(c^2+d^2)"
+      }
+    },
+    {
+      "id": "sophie-shifted",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "FACTOR",
+        "source": "(x+1)^4+4*y^4"
+      }
+    },
+    {
+      "id": "recurrence-negative-parameter",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "INVARIANT",
+        "recurrence": {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "-3"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "2",
+            "-1"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      }
+    },
+    {
+      "id": "brahmagupta-reordered",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "TWO_SQUARES",
+        "source": "(a^2+b^2)*(d^2+c^2)"
+      }
+    },
+    {
+      "id": "sophie-compound",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "FACTOR",
+        "source": "(x*y)^4+4*z^4"
+      }
+    },
+    {
+      "id": "recurrence-rational",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "INVARIANT",
+        "recurrence": {
+          "linear": [
+            [
+              "0",
+              "1"
+            ],
+            [
+              "1",
+              "1/2"
+            ]
+          ],
+          "offset": [
+            "0",
+            "0"
+          ],
+          "initial": [
+            "1/3",
+            "2/5"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      }
+    },
+    {
+      "id": "already-factored",
+      "role": "SIMPLE_CONTROL",
+      "task": {
+        "kind": "FACTOR",
+        "source": "(x+2)*(y+3)"
+      }
+    },
+    {
+      "id": "no-invariant-in-ansatz",
+      "role": "NEGATIVE_CONTROL",
+      "task": {
+        "kind": "INVARIANT",
+        "recurrence": {
+          "linear": [
+            [
+              "2"
+            ]
+          ],
+          "offset": [
+            "0"
+          ],
+          "initial": [
+            "1"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      }
+    },
+    {
+      "id": "two-squares-indefinite",
+      "role": "NEGATIVE_CONTROL",
+      "task": {
+        "kind": "TWO_SQUARES",
+        "source": "(a^2+b^2)*(c^2-d^2)"
+      }
+    },
+    {
+      "id": "factor-near-miss",
+      "role": "BOUNDED_CONTROL",
+      "task": {
+        "kind": "FACTOR",
+        "source": "x^4+4*y^4+1"
+      }
+    },
+    {
+      "id": "recurrence-affine",
+      "role": "PUBLIC_VARIANT",
+      "task": {
+        "kind": "INVARIANT",
+        "recurrence": {
+          "linear": [
+            [
+              "0",
+              "-1"
+            ],
+            [
+              "1",
+              "0"
+            ]
+          ],
+          "offset": [
+            "1",
+            "0"
+          ],
+          "initial": [
+            "0",
+            "0"
+          ],
+          "degree": 2,
+          "workBudget": 100000
+        }
+      }
+    }
+  ],
+  "cachePolicy": "NO_ADDED_QUERY_ANSWER_CACHE;NORMAL_LIBRARY_CACHES_AND_JIT_ENABLED;FRESH_PROCESSES_PER_SEQUENCE"
+}

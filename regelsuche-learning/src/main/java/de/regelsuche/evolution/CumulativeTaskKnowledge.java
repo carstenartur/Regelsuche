@@ -133,6 +133,7 @@ public final class CumulativeTaskKnowledge {
     private final Map<String, Strategy> routes;
     private final Set<String> knowledgeGoals;
     private final TaskConstructionProfile constructionProfile;
+    private final boolean indexedPreparation;
     private final Costs acquisition;
     private final Costs sessionSetup;
     private final Decision lastDecision;
@@ -145,7 +146,8 @@ public final class CumulativeTaskKnowledge {
             CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned, int generation,
             String parentId, Map<String, Strategy> routes, Costs acquisition, Costs sessionSetup,
             Decision lastDecision, List<CheckedLearnedSchemaModel.Attempt> lastAttempts, TaskConstructionProfile constructionProfile,
-            List<RecurrenceKnowledge.Entry> recurrences) {
+            List<RecurrenceKnowledge.Entry> recurrences, boolean indexedPreparation) {
+        this.indexedPreparation = indexedPreparation;
         this.recurrences = List.copyOf(recurrences);
         if (this.recurrences.size() > RecurrenceKnowledge.MAX_ENTRIES) throw new IllegalArgumentException("recurrence catalog too large");
         this.inventory = Objects.requireNonNull(inventory); this.model = Objects.requireNonNull(model);
@@ -174,10 +176,17 @@ public final class CumulativeTaskKnowledge {
         return empty(inventory, TaskConstructionProfile.NONE);
     }
     public static CumulativeTaskKnowledge empty(EvolutionGenome inventory, TaskConstructionProfile profile) {
+        return empty(inventory, profile, false);
+    }
+    /** Runtime preparation choice; mathematical capabilities and snapshot format are unchanged. */
+    public static CumulativeTaskKnowledge emptyPrepared(EvolutionGenome inventory, TaskConstructionProfile profile) {
+        return empty(inventory, profile, true);
+    }
+    private static CumulativeTaskKnowledge empty(EvolutionGenome inventory, TaskConstructionProfile profile, boolean indexed) {
         Objects.requireNonNull(inventory, "inventory"); Objects.requireNonNull(profile, "profile");
         var baseline = profile.attach(TypedLearnedMoveInventory.primitives(inventory).newTaskSolver());
         return new CumulativeTaskKnowledge(inventory, CheckedLearnedSchemaModel.empty(inventory.contentHash()),
-            baseline, baseline, 0, "", Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of(), profile, List.of());
+            baseline, baseline, 0, "", Map.of(), Costs.zero(), Costs.zero(), Decision.INITIAL, List.of(), profile, List.of(), indexed);
     }
     public int recurrenceCount() { return recurrences.size(); }
     public long recurrenceFamilyCount() { return recurrences.stream().filter(e -> e.family().isPresent()).count(); }
@@ -204,10 +213,12 @@ public final class CumulativeTaskKnowledge {
 
     CumulativeTaskKnowledge withRecurrences(List<RecurrenceKnowledge.Entry> catalog, Decision decision, Costs work) {
         return new CumulativeTaskKnowledge(inventory, model, baseline, learned, Math.addExact(generation, 1), id,
-            routes, acquisition.plus(sessionSetup).plus(work), Costs.zero(), decision, List.of(), constructionProfile, catalog);
+            routes, acquisition.plus(sessionSetup).plus(work), Costs.zero(), decision, List.of(), constructionProfile, catalog, indexedPreparation);
     }
 
     public TaskConstructionProfile constructionProfile() { return constructionProfile; }
+    String inventoryHash() { return inventory.contentHash(); }
+    public boolean usesIndexedPreparation() { return indexedPreparation; }
     public String id() { return id; }
     public int generation() { return generation; }
     public String parentId() { return parentId; }
@@ -328,7 +339,8 @@ public final class CumulativeTaskKnowledge {
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             boolean newSchemas = !candidate.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(java.util.stream.Collectors.toSet())
                 .equals(model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(java.util.stream.Collectors.toSet()));
-            var prepared = newSchemas ? constructionProfile.attach(TypedLearnedMoveInventory.primitives(inventory).newTaskSolver(candidate)) : learned;
+            var prepared = newSchemas ? constructionProfile.attach(TypedLearnedMoveInventory.primitives(inventory)
+                .newTaskSolver(candidate, indexedPreparation)) : learned;
             progress.preparation = newSchemas ? prepared.preparationWork() : 0;
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             var proposedRoutes = new TreeMap<>(routes);
@@ -438,7 +450,7 @@ public final class CumulativeTaskKnowledge {
         var work = progress.costs();
         var successor = new CumulativeTaskKnowledge(inventory, chosen, baseline, solver,
             Math.addExact(generation, 1), id, policy, acquisition.plus(sessionSetup).plus(work), Costs.zero(),
-            decision, progress.attempts, constructionProfile, recurrences);
+            decision, progress.attempts, constructionProfile, recurrences, indexedPreparation);
         return new Update(successor, decision, progress.training, progress.trials, work, progress.attempts);
     }
 
@@ -452,7 +464,7 @@ public final class CumulativeTaskKnowledge {
         if (copy.size() < minimum || copy.size() > MAX_BATCH) throw new IllegalArgumentException("batch size outside bounds");
         return copy;
     }
-    private static long disjoint(List<CheckedSchemaTaskSolver.Task> lessons, List<CheckedSchemaTaskSolver.Task> validation) {
+    static long disjoint(List<CheckedSchemaTaskSolver.Task> lessons, List<CheckedSchemaTaskSolver.Task> validation) {
         long[] work = {0};
         var exact = new ExactPolynomialAnalysis(units -> work[0] = sum(work[0], units));
         var training = new HashSet<String>();
@@ -477,17 +489,26 @@ public final class CumulativeTaskKnowledge {
         return restore(inventory, TaskKnowledgeSnapshot.read(path));
     }
     public static CumulativeTaskKnowledge restore(EvolutionGenome inventory, String json) {
+        return restore(inventory, json, false);
+    }
+    public static CumulativeTaskKnowledge loadPrepared(EvolutionGenome inventory, Path path) throws IOException {
+        return restorePrepared(inventory, TaskKnowledgeSnapshot.read(path));
+    }
+    public static CumulativeTaskKnowledge restorePrepared(EvolutionGenome inventory, String json) {
+        return restore(inventory, json, true);
+    }
+    private static CumulativeTaskKnowledge restore(EvolutionGenome inventory, String json, boolean indexed) {
         Objects.requireNonNull(inventory, "inventory");
         var snapshot = TaskKnowledgeSnapshot.decode(json);
         // A recomputed digest cannot authorize false mathematics: load re-proves every schema.
         var model = CheckedLearnedSchemaModel.load(snapshot.model(), inventory.contentHash());
         var base = TypedLearnedMoveInventory.primitives(inventory);
         var baseline = snapshot.profile().attach(base.newTaskSolver());
-        var learned = model.schemas().isEmpty() ? baseline : snapshot.profile().attach(base.newTaskSolver(model));
+        var learned = model.schemas().isEmpty() ? baseline : snapshot.profile().attach(base.newTaskSolver(model, indexed));
         var recurrenceLoad = RecurrenceKnowledgeCodec.restore(snapshot.recurrences());
         var setup = new Costs(0, 0, learned.preparationWork(), 0, 0, sum(model.loadWork(), recurrenceLoad.work()), 0);
         var restored = new CumulativeTaskKnowledge(inventory, model, baseline, learned,
-            snapshot.generation(), snapshot.parentId(), snapshot.routes(), snapshot.costs(), setup, snapshot.decision(), snapshot.attempts(), snapshot.profile(), recurrenceLoad.entries());
+            snapshot.generation(), snapshot.parentId(), snapshot.routes(), snapshot.costs(), setup, snapshot.decision(), snapshot.attempts(), snapshot.profile(), recurrenceLoad.entries(), indexed);
         if (!restored.toCanonicalJson().equals(json)) throw new IllegalArgumentException("noncanonical knowledge snapshot");
         return restored;
     }

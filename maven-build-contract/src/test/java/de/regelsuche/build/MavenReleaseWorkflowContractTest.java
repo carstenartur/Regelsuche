@@ -15,6 +15,31 @@ class MavenReleaseWorkflowContractTest {
         "app/src/main/resources/web/openapi/openapi.json";
 
     @Test
+    void releaseSdkBuildPinsInputJarTimestampsToTheSourceCommit()
+            throws IOException {
+        String workflow = Files.readString(
+            MavenPomTestSupport.repositoryRoot().resolve(".github/workflows/release.yml"),
+            StandardCharsets.UTF_8
+        );
+        int start = workflow.indexOf("- name: Build independent Java SDK distribution");
+        int end = workflow.indexOf("- name: Collect and inspect release artifacts", start);
+        assertTrue(start >= 0 && end > start, "release SDK packaging step must exist");
+        String sdkStep = workflow.substring(start, end);
+        assertTrue(
+            sdkStep.contains("SDK_SOURCE_EPOCH=$(git show -s --format=%ct HEAD)"),
+            "SDK input timestamps must derive from the committed release source"
+        );
+        int build = sdkStep.indexOf("mvn --batch-mode --no-transfer-progress -Psdk-release");
+        int packageSdk = sdkStep.indexOf("python3 -B scripts/package-student-sdk.py", build);
+        assertTrue(build >= 0 && packageSdk > build, "SDK modules must be built before packaging");
+        String install = sdkStep.substring(build, packageSdk);
+        assertTrue(install.contains("-Dproject.build.outputTimestamp=\"$SDK_SOURCE_EPOCH\""),
+            "SDK Maven build must receive the source timestamp used by the reproduction contract");
+        assertTrue(install.contains("-DskipTests clean install"),
+            "SDK packaging must rebuild its Maven inputs from clean module outputs");
+    }
+
+    @Test
     void releaseUsesCuratedNotesAndTheCompleteProductGate()
             throws IOException {
         Path root = MavenPomTestSupport.repositoryRoot();
