@@ -1,6 +1,7 @@
 package de.regelsuche.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,6 +72,8 @@ class WebWorkbenchServerTest {
         assertEquals("VERIFIED", body.get("status"));
         assertEquals("4999950000", body.get("originalPairs"));
         assertEquals("54", body.get("sampleResult"));
+        assertNotNull(body.get("formula"));
+        assertFalse(body.containsKey("javaSource"), "Java source emission belongs to the Sandbox adapter");
     }
 
     @Test

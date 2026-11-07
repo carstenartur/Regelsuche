@@ -56,10 +56,10 @@ original summand times the divisor. This establishes equality for any
 finite row count, including empty input.
 
 The checked program evaluates an iterable of integer rows once and keeps one
-running sum per nonconstant moment. `PairReductionJava.emit` generates
-standalone Java from the same checked plan. Rows supplied to that program
-must be finite, stable and composed of non-null `BigInteger` values in the
-declared column order. The proof concerns exact integer arithmetic.
+running sum per nonconstant moment. The SDK hands off the checked mathematical
+plan as moments, exact coefficients and a divisor. Sandbox owns Java source
+extraction, emission and source-level verification for Java integrations.
+[Source adapter contract](../docs/java-optimization-sdk-integration.md)
 
 The source fragment supports one to eight columns, integer literals,
 addition, subtraction, multiplication and literal exponents from 0 to 8.

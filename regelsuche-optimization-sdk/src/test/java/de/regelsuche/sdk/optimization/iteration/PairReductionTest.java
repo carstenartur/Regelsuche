@@ -5,9 +5,6 @@ import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
 import de.regelsuche.symbol.SymbolId;
 import java.math.BigInteger;
-import java.net.URLClassLoader;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -15,9 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
-import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -100,20 +95,6 @@ class PairReductionTest {
         var checked = checked(source);
         assertThrows(IllegalArgumentException.class, () -> checked.evaluate(List.of(row(1, 2)), BUDGET, NEVER));
         assertThrows(IllegalArgumentException.class, () -> checked.evaluate(List.of(row(1)), BUDGET, () -> true));
-    }
-
-    @Test
-    void generatedJavaCompilesAndEvaluatesSignedPairProductsExactly(@TempDir Path directory) throws Exception {
-        var checked = checked(source("xi*xj", X));
-        var file = directory.resolve("PairReductionProgram.java");
-        Files.writeString(file, PairReductionJava.emit(checked));
-        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null, file.toString()));
-        try (var loader = new URLClassLoader(new java.net.URL[] { directory.toUri().toURL() })) {
-            var program = loader.loadClass("PairReductionProgram").getMethod("reduce", Iterable.class);
-            assertEquals(BigInteger.valueOf(-2), program.invoke(null, List.of(row(2), row(-1))));
-            assertEquals(BigInteger.ZERO, program.invoke(null, List.of()));
-            assertEquals(BigInteger.valueOf(3), program.invoke(null, List.of(row(2), row(-1), row(5))));
-        }
     }
 
     @Test

@@ -9,7 +9,6 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
 import de.regelsuche.sdk.optimization.iteration.PairReduction;
-import de.regelsuche.sdk.optimization.iteration.PairReductionJava;
 import de.regelsuche.sdk.optimization.iteration.PairReductionOptimizer;
 import de.regelsuche.sdk.optimization.iteration.PairReductionPlan;
 import de.regelsuche.sdk.optimization.iteration.PairReductionVerifier;
@@ -63,7 +62,6 @@ final class PairReductionWorkbench {
             .property("expandedSummand", expansion(checked.expandedSummand(), symbolic.displayNames()))
             .property("synthesisWork", search.work()).property("verificationWork", check.work());
         writePlan(result, checked.plan(), names);
-        result.property("javaSource", PairReductionJava.emit(checked));
         if (sample != null) {
             try {
                 var evaluation = checked.evaluate(sample, BUDGET, CancellationToken.NONE);

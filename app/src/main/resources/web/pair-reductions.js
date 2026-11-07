@@ -44,7 +44,6 @@ function showResult(data) {
     element('pairLinear').textContent = formatted(data.rowCount);
     element('pairExpanded').textContent = data.expandedSummand;
     element('pairFormula').textContent = data.formula;
-    element('pairJava').textContent = data.javaSource;
     const sums = data.accumulators.map(({ name, rowProduct }) => {
         const item = document.createElement('li');
         item.textContent = name + ' = Summe von ' + rowProduct + ' über alle Zeilen';

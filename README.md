@@ -209,8 +209,8 @@ kanonischen Evidence erzeugt, nicht für das README nachgezeichnet.
 für ein Paar von Zeilen ein. Aus `(x_i-x_j)^2` leitet Regelsuche die beiden
 Zwischensummen für `x` und `x*x` her. Für 100.000 Zeilen stellt die Demo
 4.999.950.000 Paarberechnungen einem Durchlauf mit 100.000 Zeilen gegenüber.
-Du kannst die Herleitung, die symbolische Prüfung und den erzeugten
-`BigInteger`-Code ansehen. Die gewichtete Variante und Paarprodukte mit
+Du kannst die Herleitung, die symbolische Prüfung und die benötigten
+Zwischensummen ansehen. Die gewichtete Variante und Paarprodukte mit
 Diagonalkorrektur lassen sich mit demselben Verfahren herleiten.
 [SDK und Nachweis](regelsuche-optimization-sdk/FINITE_SERIES.md#one-pass-pair-reductions)
 
