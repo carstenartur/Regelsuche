@@ -3,10 +3,8 @@ package de.regelsuche.math.algorithms.iteration;
 import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.ast.iteration.PairReduction;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.symbol.SymbolId;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,30 +87,11 @@ public final class PairReductionSynthesis {
     }
 
     private static Map<Split, BigInteger> splitByRow(NormalForm form, Work work) {
-        var leftColumns = new HashMap<SymbolId, Integer>();
-        var rightColumns = new HashMap<SymbolId, Integer>();
-        for (int index = 0; index < form.columns().size(); index++) {
-            work.charge(1);
-            var column = form.columns().get(index);
-            leftColumns.put(column.left(), index);
-            rightColumns.put(column.right(), index);
-        }
-
+        var slots = List.of(form.columns().stream().map(PairReduction.Column::left).toList(),
+            form.columns().stream().map(PairReduction.Column::right).toList());
         var pairs = new LinkedHashMap<Split, BigInteger>();
-        for (var term : form.terms().entrySet()) {
-            var left = new ArrayList<Integer>();
-            var right = new ArrayList<Integer>();
-            for (var symbol : term.getKey().symbols()) {
-                var column = leftColumns.get(symbol);
-                if (column != null) {
-                    left.add(column);
-                } else {
-                    right.add(rightColumns.get(symbol));
-                }
-            }
-            work.charge(1 + left.size() + right.size());
-            pairs.put(new Split(new Moment(left), new Moment(right)), term.getValue().numerator());
-        }
+        RowMoments.split(slots, form.terms(), work).forEach((factors, coefficient) ->
+            pairs.put(new Split(factors.getFirst(), factors.getLast()), coefficient));
         return pairs;
     }
 

@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 /** Workbench adapter for the exact mathematical source, certificate and execution. */
 final class PairReductionWorkbench {
-    private static final Set<String> FIELDS = Set.of("columns", "summand", "rowCount", "rows");
+    private static final Set<String> FIELDS = Set.of("columns", "summand", "rowCount", "rows", "restrictions", "windowWidth");
     private static final IterationLimits LIMITS = new IterationLimits(500_000, 128, 2_000);
     private static final BooleanSupplier NEVER_CANCELLED = () -> false;
     private static final Pattern INTEGER = Pattern.compile("-?[0-9]{1,256}");
@@ -41,6 +41,14 @@ final class PairReductionWorkbench {
         var names = columnNames(input.get("columns"));
         int count = rowCount(input.get("rowCount"));
         var sample = input.containsKey("rows") ? sample(input.get("rows"), names.size()) : null;
+
+        if (input.containsKey("restrictions") || input.containsKey("windowWidth")) {
+            int width = input.containsKey("windowWidth") ? rowCount(input.get("windowWidth")) : 0;
+            if (input.containsKey("windowWidth") && width == 0) {
+                throw new IllegalArgumentException("windowWidth must be positive");
+            }
+            return OrderedReductionWorkbench.analyze(names, summand, count, sample, input.get("restrictions"), width, LIMITS);
+        }
 
         var scope = new SymbolScope();
         var columns = names.stream().map(name -> new PairReduction.Column(
@@ -75,7 +83,7 @@ final class PairReductionWorkbench {
         return result.endObject().toString();
     }
 
-    private static String unavailable(String reason) {
+    static String unavailable(String reason) {
         return new JsonWriter().beginObject().property("status", "NO_PLAN").property("reason", reason)
             .endObject().toString();
     }

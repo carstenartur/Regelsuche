@@ -8,11 +8,13 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.ast.iteration.IndexRange;
 import de.regelsuche.ast.iteration.IntegerArithmetic;
+import de.regelsuche.ast.iteration.OrderedReduction;
 import de.regelsuche.ast.iteration.PairReduction;
 import de.regelsuche.search.program.JointComputationPlan;
 import de.regelsuche.sdk.optimization.*;
 import de.regelsuche.sdk.optimization.iteration.FiniteIterationOptimizer;
 import de.regelsuche.sdk.optimization.iteration.FiniteIterationVerifier;
+import de.regelsuche.sdk.optimization.iteration.OrderedReductionSdk;
 import de.regelsuche.sdk.optimization.iteration.PairReductionSdk;
 import de.regelsuche.sdk.optimization.iteration.PolynomialSum;
 import de.regelsuche.sdk.optimization.iteration.PolynomialSumOptimizer;
@@ -28,6 +30,7 @@ import de.regelsuche.symbol.SymbolicExpression;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -73,6 +76,7 @@ public final class JavaOptimization {
         verifyFiniteSum();
         verifyRuntimeSeries();
         verifyPairReduction();
+        verifyOrderedReduction();
     }
     private static void verifyPairReduction() {
         var scope = new SymbolScope();
@@ -96,6 +100,24 @@ public final class JavaOptimization {
             throw new AssertionError("checked rolling pair search unavailable in standalone SDK");
         System.out.println("pair-windows=VERIFIED_ORDERED_3_MINUS_6");
     }
+    private static void verifyOrderedReduction() {
+        var scope = new SymbolScope();
+        var slots = List.of(List.of(scope.declare("a")), List.of(scope.declare("b")), List.of(scope.declare("c")));
+        var ascending = new OrderedReduction.KeyInterval(0, 0, Optional.empty(),
+            Optional.of(new OrderedReduction.Bound(BigInteger.ZERO, false)), false);
+        var source = new OrderedReduction(slots, List.of(ascending, ascending),
+            SymbolicExpression.parse("c-a", scope).expression());
+        var budget = OptimizationBudget.DEFAULT;
+        var token = CancellationToken.NONE;
+        var search = OrderedReductionSdk.search(source, budget, token);
+        var checked = search.verified().orElseThrow(() -> new AssertionError(search.reason()));
+        var rows = List.of(List.of(BigInteger.ZERO), List.of(BigInteger.ONE), List.of(BigInteger.TWO));
+        if (!OrderedReductionSdk.verify(source, checked.plan(), false, budget, token).verified().isPresent()
+                || !OrderedReductionSdk.evaluate(checked, rows, budget, token).sums().equals(List.of(BigInteger.TWO))) {
+            throw new AssertionError("checked ordered tuple search unavailable in standalone SDK");
+        }
+    }
+
     private static void verifyRuntimeSeries() {
         var namespace=UUID.fromString("f0b26fe5-b139-4677-bc37-9bc8c59b6f8f");
         var index=new SymbolId(namespace,1); var state=new SymbolId(namespace,2);

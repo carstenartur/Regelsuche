@@ -121,6 +121,33 @@ class WebWorkbenchServerTest {
         assertTrue(!body.containsKey("sampleResult"));
     }
 
+    @Test
+    void derivesAWindowWithAnOpenLowerBoundAndKeepsEvictionRoles() throws IOException {
+        var response = postPairReduction("""
+            {"columns":["x","u"],"summand":"u_0*(x_0-x_1)^2","rowCount":100000,"windowWidth":3,
+             "restrictions":[{"left":"x","right":"x","lower":"0","lowerInclusive":false,"upper":"2"}],
+             "rows":[["4","2"],["2","1"],["0","-3"],["1","6"]]}
+            """);
+        assertEquals(200, response.getResponseCode());
+        var body = new de.regelsuche.json.JsonReader(
+            new String(response.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).readObject();
+        assertEquals("VERIFIED", body.get("status"));
+        assertEquals("299994", body.get("originalCandidates"));
+        assertEquals(List.of("12", "5"), body.get("sampleSums"));
+        assertEquals(List.of("normalize-ordered-summand", "derive-indexed-reduction"), body.get("checkedRules"));
+        assertNotNull(body.get("eviction"));
+    }
+
+    @Test
+    void rejectsAWindowRequestWithoutAPairOfBoundRows() throws IOException {
+        assertEquals(400, postPairReduction("""
+            {"columns":["x"],"summand":"1","rowCount":10,"windowWidth":3,"restrictions":[{},{}]}
+            """).getResponseCode());
+        assertEquals(400, postPairReduction("""
+            {"columns":["x"],"summand":"1","rowCount":10,"restrictions":[{"left":"absent","right":"x","lower":"0"}]}
+            """).getResponseCode());
+    }
+
     private HttpURLConnection postPairReduction(String request) throws IOException {
         var connection = open("/api/pair-reductions");
         connection.setRequestMethod("POST");

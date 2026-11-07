@@ -17,6 +17,7 @@ import java.util.stream.Stream;
 import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
 import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
 import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
+import static de.regelsuche.math.algorithms.iteration.RowMoments.bounded;
 
 /** Ordered row factors for the sum over i &lt; j in each fixed-width window. */
 public record RollingPairReductionPlan(List<Term> terms) {
@@ -133,18 +134,9 @@ public record RollingPairReductionPlan(List<Term> terms) {
         }
 
         private Map<Moment, BigInteger> products(List<BigInteger> row, List<Moment> moments, Work work) {
-            if (row == null || row.size() != source.columns().size()) throw new Unavailable("ROW_DIMENSION");
-            var values = row.toArray(BigInteger[]::new);
-            for (var value : values) {
-                if (value == null) throw new Unavailable("MISSING_ROW_VALUE");
-                work.runtimeInteger(value);
-            }
+            var values = RowMoments.values(row, source.columns().size(), work);
             var products = new HashMap<Moment, BigInteger>();
-            for (var moment : moments) {
-                BigInteger product = BigInteger.ONE;
-                for (int column : moment.columns()) product = bounded(product.multiply(values[column]), work);
-                products.put(moment, product);
-            }
+            for (var moment : moments) products.put(moment, RowMoments.product(moment, values, work));
             return products;
         }
 
@@ -168,9 +160,5 @@ public record RollingPairReductionPlan(List<Term> terms) {
             return total;
         }
 
-        private static BigInteger bounded(BigInteger value, Work work) {
-            work.runtimeInteger(value);
-            return value;
-        }
     }
 }
