@@ -114,6 +114,23 @@ class KnowledgeLifecycleTest(unittest.TestCase):
             self.assertEqual(2,len(seq['rows']));self.assertIsNone(seq['rows'][1]['generationId'])
             self.assertEqual(1,len(seq['processes']));self.assertFalse(seq['accounting']['complete'])
 
+    def test_observer_rejection_still_preserves_original_rows_and_process_costs(self):
+        p=copy.deepcopy(self.p);p['queries']=[dict(id='only',task=dict(source='x',maximumNodes=1))]
+        # Deliberately wrong READY metadata exercises post-execution observer rejection.
+        script=('import json,sys\nprint(\'{"status":"READY","java":"17"}\',flush=True)\n'
+            'for line in sys.stdin:\n'
+            ' r=json.loads(line);op=r["op"]\n'
+            f' o=dict(profile="PRIMITIVE",generationId="seed",nativeBudget={p["nativeBudget"]!r})\n'
+            ' if op=="initialize":o["status"]="INITIALIZED"\n'
+            ' elif op=="load":o["status"]="LOADED"\n'
+            ' else:o.update(status="RESULT",task=r["task"],solved=True,withinBudget=True,output="x",outputScore=1,nativeApiWork=1,normalizedInput="x",witness=[])\n'
+            ' print(json.dumps(o),flush=True)\n')
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError):self.runner.run_sequence(p,'PRIMITIVE',1,0,[sys.executable,'-u','-c',script],Path(directory))
+            raw=json.loads((Path(directory)/'PRIMITIVE.b1.r0.raw.json').read_text())
+            self.assertEqual(1,len(raw['rows']));self.assertEqual(1,len(raw['processes']))
+            self.assertIsNotNone(raw['processes'][0]['cpu'])
+
     def test_model_bindings_remain_mandatory_after_relocation(self):
         with tempfile.TemporaryDirectory() as directory:
             output=Path(directory);content=b'{}';identity=self.runner.digest(content)

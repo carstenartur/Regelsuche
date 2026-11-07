@@ -169,6 +169,7 @@ def run_sequence(p, profile, blocks, repetition, command, output):
                 try:phase('shutdown-'+stage,lambda op,worker=worker:worker.close(graceful=True))
                 except Exception as error:seq['errors'].append(f'{type(error).__name__}: {error}')
         seq.update(wallNanos=time.perf_counter_ns()-started,controllerCpuNanos=time.process_time_ns()-cpu)
+    (output/(name+'.raw.json')).write_bytes(canonical(seq))
     seq['accounting']=account_sequence(p,seq)
     return seq
 
@@ -346,6 +347,8 @@ def verify(output):
     for seq in sequences:
         require(seq['id']==f"{seq['profile']}.b{seq['blocks']}.r{seq['repetition']}",'sequence identity mismatch')
         require(seq['accounting']==account_sequence(p,seq),'accounting summary mismatch')
+        raw=json.loads((output/(seq['id']+'.raw.json')).read_text())
+        require(raw=={key:value for key,value in seq.items() if key!='accounting'},'raw lifecycle checkpoint differs from retained sequence')
         verify_models(output,seq,metadata['originalOutput'])
     summary=summarize(p,sequences);require(summary==json.loads((output/'summary.json').read_text()),'summary mismatch');return summary
 
@@ -362,13 +365,18 @@ def execute(args):
         affinityCpus=len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else None,
         cpuMax=Path('/sys/fs/cgroup/cpu.max').read_text().strip() if Path('/sys/fs/cgroup/cpu.max').exists() else None,
         memoryMax=Path('/sys/fs/cgroup/memory.max').read_text().strip() if Path('/sys/fs/cgroup/memory.max').exists() else None))
+    (output/'metadata.json').write_bytes(canonical(metadata))
     sequences=[]
-    for profile,blocks,repetition in schedule(p):
-        seq=run_sequence(p,profile,blocks,repetition,sympy if profile=='SYMPY' else java,output);sequences.append(seq)
+    try:
+        for profile,blocks,repetition in schedule(p):
+            seq=run_sequence(p,profile,blocks,repetition,sympy if profile=='SYMPY' else java,output);sequences.append(seq)
+            (output/'sequences.json').write_bytes(canonical(sequences))
+            print(json.dumps(dict(profile=profile,blocks=blocks,repetition=repetition,accounting=seq['accounting'])),flush=True)
+        (output/'summary.json').write_bytes(canonical(summarize(p,sequences)))
+    finally:
         (output/'sequences.json').write_bytes(canonical(sequences))
-        print(json.dumps(dict(profile=profile,blocks=blocks,repetition=repetition,accounting=seq['accounting'])),flush=True)
-    (output/'metadata.json').write_bytes(canonical(metadata));(output/'summary.json').write_bytes(canonical(summarize(p,sequences)))
-    (output/'manifest.json').write_bytes(canonical(_file_inventory(output)));summary=verify(output)
+        (output/'manifest.json').write_bytes(canonical(_file_inventory(output)))
+    summary=verify(output)
     require(all(g['complete'] for g in summary['groups']),'incomplete experiment; all observed outcomes retained')
 
 
