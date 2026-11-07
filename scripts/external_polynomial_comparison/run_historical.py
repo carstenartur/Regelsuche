@@ -292,15 +292,52 @@ def snapshot_python(output):
     files = _file_inventory(destination)
     interpreter = Path(sys.executable).resolve()
     receipt = dict(files=files, runtimeBytesHash=digest(canonical(files)), interpreter=str(interpreter),
+                   commandExecutable=sys.executable,
                    interpreterSha256=digest(interpreter.read_bytes()), version=sys.version,
                    bytecodePolicy='PRECOMPILED_CHECKED_HASH;READ_ENABLED_WRITE_DISABLED_IN_WORKERS')
     (output/'python-inventory.json').write_bytes(canonical(receipt))
     return receipt
 
 
-def verify_metadata(metadata, python, java):
+def python_command(output, interpreter):
+    bootstrap = ('import sys;sys.path.insert(0,'+repr(str(output/'python-runtime'))+
+                 ');from external_polynomial_comparison.historical_sympy_worker import main;main()')
+    return [interpreter, '-I', '-B', '-u', '-c', bootstrap]
+
+
+def verify_metadata(metadata, python, java, protocol, execution_root=None):
     require(metadata['protocolHash'] == PROTOCOL_HASH and metadata['pythonRuntimeHash'] == python['runtimeBytesHash']
             and metadata['runtimeBytesHash'] == java['runtimeBytesHash'], 'metadata/runtime binding mismatch')
+    command = metadata['commands']['java']
+    require(isinstance(command, list) and len(command) == len(protocol['javaOptions'])+4
+            and command == ['java', *protocol['javaOptions'], '-cp', command[-2], JAVA_WORKER],
+            'Java command differs from frozen options/worker')
+    entries = java['classpathEntries']
+    require(entries and isinstance(command[-2], str), 'missing retained classpath')
+    # Keep the recorded execution root: relocating an archive must not require
+    # its original directory to exist or rewrite historical command receipts.
+    original = metadata.get('outputDirectoryAtExecution', execution_root)
+    require(isinstance(original, str) and Path(original).is_absolute()
+            and os.path.normpath(original) == original
+            and (execution_root is None or original == execution_root), 'original execution root is not bound to setup records')
+    root = Path(original)
+    require(command[-2] == os.pathsep.join(str(root/entry) for entry in entries),
+            'Java command does not launch the retained ordered classpath')
+    sympy = metadata['commands']['sympy']
+    require(isinstance(sympy, list) and sympy and isinstance(sympy[0], str)
+            and Path(sympy[0]).is_absolute() and sympy == python_command(root, sympy[0]),
+            'Python command does not launch the retained isolated worker')
+    if 'commandExecutable' in python:
+        require(sympy[0] == python['commandExecutable'], 'Python command differs from recorded interpreter invocation')
+    else:
+        # Original receipts retained the resolved interpreter but not its alias.
+        # Accept conventional aliases beside that interpreter without consulting
+        # the current host filesystem (the original archive may have moved).
+        executable = Path(python['interpreter'])
+        major_minor = '.'.join(python['version'].split()[0].split('.')[:2])
+        aliases = {executable.name, 'python', 'python'+major_minor.split('.')[0], 'python'+major_minor}
+        require(Path(sympy[0]).parent == executable.parent and Path(sympy[0]).name in aliases,
+                'Python command differs from retained interpreter')
 
 
 def verify_snapshot(output, sequence):
@@ -340,13 +377,21 @@ def verify(output):
     metadata = json.loads((output/'metadata.json').read_text())
     sequences = json.loads((output/'sequences.json').read_text())
     actual = [(s['profile'], s['length'], s['repetition']) for s in sequences]
-    require(len(actual) == len(set(actual)) and set(actual) == set(schedule(p)), 'incomplete/duplicated lifecycle matrix')
+    require(actual == list(schedule(p)), 'incomplete/duplicated/reordered lifecycle matrix')
+    roots = set()
     for s in sequences:
         require(s['accounting'] == account_sequence(p, s), 'lifecycle accounting summary mismatch')
         verify_snapshot(output, s)
+        for op in s['operations']:
+            if op['name'] == 'initialize' and 'request' in op:
+                directory = Path(op['request']['directory'])
+                require(directory.is_absolute() and directory.parts[-2:] ==
+                        ('models', f"{s['profile']}.n{s['length']}.r{s['repetition']}"), 'setup path differs from owned lifecycle')
+                roots.add(str(directory.parent.parent))
     summary = summarize(p, sequences)
     require(summary == json.loads((output/'summary.json').read_text()), 'retained comparison summary mismatch')
-    verify_metadata(metadata, python, java)
+    require(len(roots) <= 1, 'lifecycles changed execution root')
+    verify_metadata(metadata, python, java, p, next(iter(roots), None))
     return summary
 
 
@@ -358,14 +403,14 @@ def execute(protocol_path, classpath_path, output):
     runtime = snapshot_runtime(Path(classpath_path).read_text().strip(), output)
     python = snapshot_python(output)
     java = ['java', *p['javaOptions'], '-cp', os.pathsep.join(str(output/x) for x in runtime['classpathEntries']), JAVA_WORKER]
-    bootstrap = 'import sys;sys.path.insert(0,'+repr(str(output/'python-runtime'))+');from external_polynomial_comparison.historical_sympy_worker import main;main()'
-    sympy = [sys.executable, '-I', '-B', '-u', '-c', bootstrap]
+    sympy = python_command(output, sys.executable)
     host = dict(platform=platform.platform(), cpusVisible=os.cpu_count(),
         affinityCpus=len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None,
         cpuMax=Path('/sys/fs/cgroup/cpu.max').read_text().strip() if Path('/sys/fs/cgroup/cpu.max').exists() else None,
         memoryMax=Path('/sys/fs/cgroup/memory.max').read_text().strip() if Path('/sys/fs/cgroup/memory.max').exists() else None,
         scope='SHARED_HOST_OBSERVATION;NOT_EXCLUSIVE_HOST_OR_PRECISION_STUDY')
     metadata = dict(provenance, java=_java_provenance(), host=host, pythonRuntimeHash=python['runtimeBytesHash'],
+                    outputDirectoryAtExecution=str(output),
                     protocolHash=PROTOCOL_HASH, runtimeBytesHash=runtime['runtimeBytesHash'], commands=dict(java=java, sympy=sympy))
     sequences = []
     for profile, length, repetition in schedule(p):
@@ -382,6 +427,8 @@ def execute(protocol_path, classpath_path, output):
 
 def supervise(args):
     require(hasattr(os, 'wait4'), 'POSIX wait4 is required for measured execution')
+    receipt_path = args.output.with_name(args.output.name+'.command-receipt.json')
+    require(not args.output.exists() and not receipt_path.exists(), 'evidence or command receipt already exists')
     command = [sys.executable, '-B', '-m', 'external_polynomial_comparison.run_historical', '--execute-child',
                '--protocol', str(args.protocol), '--classpath', str(args.classpath), '--output', str(args.output)]
     started, cpu = time.perf_counter_ns(), time.process_time_ns()
@@ -392,7 +439,8 @@ def supervise(args):
         supervisorCpuNanos=time.process_time_ns()-cpu,
         childTreeCpuNanos=round((usage.ru_utime+usage.ru_stime)*1e9),
         scope='SUPERVISE_FUNCTION_BEFORE_SPAWN_THROUGH_CHILD_EXIT;EXCLUDES_SUPERVISOR_IMPORTS_AND_FINAL_RECEIPT_WRITE')
-    args.output.with_name(args.output.name+'.command-receipt.json').write_bytes(canonical(receipt))
+    with receipt_path.open('xb') as stream:
+        stream.write(canonical(receipt))
     return process.returncode
 
 

@@ -6,6 +6,7 @@ import sys
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 from external_polynomial_comparison.historical_judge import audit_task
 from external_polynomial_comparison import historical_sympy_worker as competitor
 
@@ -140,7 +141,8 @@ class HistoricalRunnerTest(unittest.TestCase):
         operations = [dict(name='startup-query', status='COMPLETE', wallNanos=1, pid=123,
                            ready=dict(status='READY', sympy='1.14.0')),
                       dict(name='initialize', status='COMPLETE', wallNanos=1, request=dict(
-                          op='initialize', profile='SYMPY', prelude=prelude, directory='/fixture'), response=initial),
+                          op='initialize', profile='SYMPY', prelude=prelude,
+                          directory='/original/measurement/models/SYMPY.n2.r0'), response=initial),
                       dict(name='shutdown-query', status='COMPLETE', wallNanos=1)]
         receipt = dict(stage='query', pid=123, exitCode=0, termination='GRACEFUL_EOF', receiptError=None,
             peakRssBytes=1024, rssScope='WAIT4_PROCESS_PEAK_RESIDENT_SET;MAX_ACROSS_SEQUENTIAL_WORKERS',
@@ -221,10 +223,86 @@ class HistoricalRunnerTest(unittest.TestCase):
         self.assertIsNone(self.runner.pair(seq, seq)['wallRatioNativeToSympy'])
 
     def test_metadata_cannot_claim_a_foreign_runtime(self):
-        metadata = dict(protocolHash=self.runner.PROTOCOL_HASH, pythonRuntimeHash='python', runtimeBytesHash='java')
-        self.runner.verify_metadata(metadata, {'runtimeBytesHash':'python'}, {'runtimeBytesHash':'java'})
+        p, metadata, python, java = self.command_fixture()
+        self.runner.verify_metadata(metadata, python, java, p)
         with self.assertRaises(ValueError):
-            self.runner.verify_metadata(dict(metadata, runtimeBytesHash='other'), {'runtimeBytesHash':'python'}, {'runtimeBytesHash':'java'})
+            self.runner.verify_metadata(dict(metadata, runtimeBytesHash='other'), python, java, p)
+
+    def command_fixture(self):
+        p, _ = self.fixture(); p['javaOptions'] = ['-Xmx512m']
+        root = Path('/original/measurement')
+        java = dict(runtimeBytesHash='java', classpathEntries=['runtime/entry-000', 'runtime/entry-001/dependency.jar'])
+        python = dict(runtimeBytesHash='python', interpreter='/opt/python/bin/python3.12',
+                      commandExecutable='/opt/python/bin/python3', version='3.12.8 (fixture)')
+        bootstrap = ('import sys;sys.path.insert(0,'+repr(str(root/'python-runtime'))+
+                     ');from external_polynomial_comparison.historical_sympy_worker import main;main()')
+        metadata = dict(protocolHash=self.runner.PROTOCOL_HASH, pythonRuntimeHash='python', runtimeBytesHash='java',
+            outputDirectoryAtExecution=str(root),
+            commands=dict(java=['java', '-Xmx512m', '-cp', ':'.join(str(root/x) for x in java['classpathEntries']), self.runner.JAVA_WORKER],
+                          sympy=[python['commandExecutable'], '-I', '-B', '-u', '-c', bootstrap]))
+        return p, metadata, python, java
+
+    def test_execution_commands_bind_retained_workers_options_and_original_archive_root(self):
+        p, metadata, python, java = self.command_fixture()
+        self.runner.verify_metadata(metadata, python, java, p)
+        mutations = [lambda m:m['commands']['java'].__setitem__(0, 'foreign-java'),
+            lambda m:m['commands']['java'].__setitem__(1, '-Xmx8g'),
+            lambda m:m['commands']['java'].__setitem__(3, '/foreign/classes'),
+            lambda m:m['commands']['java'].__setitem__(4, 'foreign.Worker'),
+            lambda m:m['commands']['sympy'].__setitem__(0, '/bin/false'),
+            lambda m:m['commands']['sympy'].__setitem__(1, '-E'),
+            lambda m:m['commands']['sympy'].__setitem__(-1, 'print("unrelated worker")'),
+            lambda m:m['commands']['sympy'].__setitem__(-1, m['commands']['sympy'][-1].replace('/original/measurement', '/foreign')),
+            lambda m:m['commands'].update({key: [arg.replace('/original/measurement', '/foreign') for arg in command]
+                                          for key, command in m['commands'].items()})]
+        for index, mutate in enumerate(mutations):
+            changed = copy.deepcopy(metadata); mutate(changed)
+            with self.subTest(mutation=index), self.assertRaises(ValueError):
+                self.runner.verify_metadata(changed, python, java, p)
+
+    def test_offline_verification_rejects_reordered_lifecycles_after_manifest_refresh(self):
+        from external_polynomial_comparison.run import canonical
+        from external_polynomial_comparison.run_schema import _file_inventory
+        p, seq = self.fixture(); p['repetitions'] = 2
+        _, metadata, python, java = self.command_fixture()
+        sequences = [dict(copy.deepcopy(seq), repetition=i) for i in range(2)]
+        for sequence in sequences:
+            sequence['operations'][1]['request']['directory'] = '/original/measurement/models/SYMPY.n2.r'+str(sequence['repetition'])
+            sequence['accounting'] = self.runner.account_sequence(p, sequence)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory); (output/'python-runtime').mkdir()
+            files = _file_inventory(output/'python-runtime')
+            python.update(files=files, runtimeBytesHash=self.runner.digest(canonical(files)))
+            metadata['pythonRuntimeHash'] = python['runtimeBytesHash']
+            values = [('protocol.json', p), ('runtime-inventory.json', java), ('python-inventory.json', python),
+                      ('metadata.json', metadata), ('summary.json', self.runner.summarize(p, sequences))]
+            for name, value in values: (output/name).write_bytes(canonical(value))
+            def retain():
+                (output/'sequences.json').write_bytes(canonical(sequences))
+                inventory = {name: value for name, value in _file_inventory(output).items() if name != 'manifest.json'}
+                (output/'manifest.json').write_bytes(canonical(inventory))
+            with patch.object(self.runner, 'load_protocol', return_value=dict(p, javaOptions=['-Xmx512m'])), \
+                    patch.object(self.runner, 'verify_runtime'):
+                retain(); self.runner.verify(output)
+                sequences.reverse(); retain()
+                with self.assertRaisesRegex(ValueError, 'lifecycle'):
+                    self.runner.verify(output)
+
+    def test_reused_evidence_or_receipt_path_never_launches_or_overwrites_measurements(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)/'evidence'
+            receipt = output.with_name(output.name+'.command-receipt.json')
+            args = SimpleNamespace(output=output, protocol=Path('protocol'), classpath=Path('classpath'))
+            original = b'{"wallNanos":123,"exitCode":0}'
+            for existing in (output, receipt):
+                existing.write_bytes(original)
+                with self.subTest(existing=existing.name), patch.object(self.runner.subprocess, 'Popen') as launch:
+                    with self.assertRaisesRegex(ValueError, 'exist'):
+                        self.runner.supervise(args)
+                    launch.assert_not_called()
+                    self.assertEqual(original, existing.read_bytes())
+                existing.unlink()
 
     def test_retained_python_runtime_has_readable_bytecode_and_stays_immutable(self):
         from external_polynomial_comparison.run_schema import _file_inventory
