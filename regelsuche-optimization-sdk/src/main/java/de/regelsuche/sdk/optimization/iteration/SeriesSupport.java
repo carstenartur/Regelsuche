@@ -1,7 +1,6 @@
 package de.regelsuche.sdk.optimization.iteration;
 
 import de.regelsuche.ast.*;
-import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.iteration.IterationPolynomial;
 import de.regelsuche.sdk.optimization.CancellationToken;
@@ -75,37 +74,12 @@ final class SeriesSupport {
         return result;
     }
 
-    static Work work(OptimizationBudget budget, CancellationToken cancellation, int maximumDegree) {
-        Objects.requireNonNull(cancellation);
-        return new Work(new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis()),
-            cancellation::isCancelled, maximumDegree);
+    static IterationLimits limits(OptimizationBudget budget) {
+        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());
     }
 
-    static Set<SymbolId> symbols(FiniteIteration source, boolean state) {
-        var result=new HashSet<>(source.parameters()); result.add(source.index());
-        if(state && source instanceof FiniteIteration.Recurrence recurrence) result.add(recurrence.state());
-        return result;
-    }
-    record Source(IterationPolynomial term, IterationPolynomial initial) {}
-    static Source source(FiniteIteration source, Work w) {
-        w.charge(1);
-        if(source instanceof FiniteIteration.Sum sum)
-            return new Source(IterationPolynomial.parse(sum.term(),symbols(source,false),true,MAX_DEGREE,w),zero(w));
-        var recurrence=(FiniteIteration.Recurrence)source;
-        var update=IterationPolynomial.parse(recurrence.update(),symbols(source,true),true,MAX_DEGREE,w);
-        var term=update.subtract(variable(recurrence.state(),w));
-        if(!term.independent(recurrence.state())) throw new Unavailable("NONLINEAR_STATE_UPDATE");
-        return new Source(term,IterationPolynomial.parse(recurrence.initial(),source.parameters(),true,MAX_DEGREE,w));
-    }
-    static long operations(Expr expression, Work w) { return operations(expression,w,1,new int[]{0}); }
-    private static long operations(Expr e, Work w, int depth,int[] nodes) {
-        w.charge(1);
-        if(depth>FiniteIteration.MAX_DEPTH || ++nodes[0]>FiniteIteration.MAX_NODES) throw new Unavailable("EXPRESSION_LIMIT");
-        return e instanceof BinaryExpr b ? 1+operations(b.left(),w,depth+1,nodes)+operations(b.right(),w,depth+1,nodes) : 0;
-    }
-    static FiniteIterationOptimizer.Cost cost(FiniteIteration source, Expr emitted, Work w) {
-        long perIteration=source instanceof FiniteIteration.Sum s ? 1+operations(s.term(),w) : operations(((FiniteIteration.Recurrence)source).update(),w);
-        long initial=source instanceof FiniteIteration.Recurrence r ? operations(r.initial(),w) : 0;
-        return new FiniteIterationOptimizer.Cost(source.range().count().multiply(BigInteger.valueOf(perIteration)).add(BigInteger.valueOf(initial)),operations(emitted,w));
+    static Work work(OptimizationBudget budget, CancellationToken cancellation, int maximumDegree) {
+        Objects.requireNonNull(cancellation);
+        return new Work(limits(budget), cancellation::isCancelled, maximumDegree);
     }
 }

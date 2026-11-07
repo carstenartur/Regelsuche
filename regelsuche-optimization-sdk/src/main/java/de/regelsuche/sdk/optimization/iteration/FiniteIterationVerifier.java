@@ -2,11 +2,12 @@ package de.regelsuche.sdk.optimization.iteration;
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.iteration.FiniteIteration;
-import de.regelsuche.sdk.optimization.*;
+import de.regelsuche.math.algorithms.iteration.FiniteIterationReduction;
+import de.regelsuche.sdk.optimization.CancellationToken;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
 import java.util.Objects;
-import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
-/** Independent telescoping checker: never invokes candidate synthesis or executes the source loop. */
+/** SDK facade for the independent telescoping checker. */
 public final class FiniteIterationVerifier {
     /** cost is null on failure; work is this verification's bounded accounting, never candidate data. */
     public record Verification(boolean verified, String reason, long work, FiniteIterationOptimizer.Cost cost) {}
@@ -18,26 +19,10 @@ public final class FiniteIterationVerifier {
     /** Recheck the actual emitted scalar expression, allowing any supported equivalent ring polynomial. */
     public Verification verify(FiniteIteration source, Expr emitted, FiniteIterationOptimizer.Certificate certificate,
                                OptimizationBudget budget, CancellationToken cancellation) {
-        Objects.requireNonNull(source); Objects.requireNonNull(emitted); Objects.requireNonNull(certificate);
-        var work=SeriesSupport.work(budget, cancellation, MAX_DEGREE + 1);
-        try {
-            work.charge(1);
-            // Both immutable sources were bounded and scope-checked at construction. Debit the
-            // worst-case two scalar trees before structural comparison; leaf sizes are bounded too.
-            work.charge(2L*FiniteIteration.MAX_NODES);
-            if(!source.equals(certificate.source())) throw new Unavailable("SOURCE_MISMATCH");
-            var parsed=SeriesSupport.source(source,work);
-            var primitive=parse(certificate.antidifference(),SeriesSupport.symbols(source,false),false,MAX_DEGREE+1,work);
-            var delta=primitive.shifted(source.index(),source.range().step()).subtract(primitive);
-            if(!delta.same(parsed.term())) throw new Unavailable("ANTIDIFFERENCE_MISMATCH");
-            var expected=primitive.at(source.index(),source.range().endExclusive())
-                .subtract(primitive.at(source.index(),source.range().start())).add(parsed.initial());
-            // Validate integral coefficients BEFORE modular reduction, including emitted leaves.
-            var expectedRing=expected.integral(source.arithmetic());
-            var actual=parse(emitted,source.parameters(),true,MAX_DEGREE,work).integral(source.arithmetic());
-            if(!expectedRing.same(actual)) throw new Unavailable("RESULT_MISMATCH");
-            var cost=SeriesSupport.cost(source,emitted,work);
-            return new Verification(true,"VERIFIED_TELESCOPING",work.used(),cost);
-        } catch(Unavailable unavailable) { return new Verification(false,unavailable.getMessage(),work.used(),null); }
+        var proof = new FiniteIterationReduction.Certificate(certificate.source(), certificate.antidifference());
+        var check = FiniteIterationReduction.verify(source, emitted, proof, SeriesSupport.limits(budget),
+            cancellation::isCancelled);
+        var cost = check.verified() ? FiniteIterationOptimizer.sdkCost(check.cost()) : null;
+        return new Verification(check.verified(), check.reason(), check.work(), cost);
     }
 }

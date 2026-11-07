@@ -132,4 +132,14 @@ termination, all live outputs and the correspondence of its actual generated pro
 
 Limits may reject a mathematically valid result or proof. Reasons such as `INDEX_DEGREE_LIMIT`, `DEGREE_LIMIT`, `TERM_LIMIT`, `EXPRESSION_LIMIT`, `COEFFICIENT_LIMIT`, `RUNTIME_BIT_LIMIT`, `WORK_LIMIT`, `CANCELLED`, `NONINTEGRAL_POLYNOMIAL`, `SOURCE_MISMATCH` and `POLE_IN_RANGE` are intentional fail-closed outcomes. Input constructors reject structurally invalid models with `IllegalArgumentException`; search and verification return a reason, and runtime evaluation throws `IllegalArgumentException` on failure.
 
-The original `FiniteIterationOptimizer` and `FiniteIterationVerifier` APIs and their original degree limits remain unchanged.
+## Fixed-range sums and additive recurrences
+
+The Core `FiniteIteration` binder describes a counted range and its arithmetic.
+`FiniteIterationSearch.search` in math-algorithms admits a scalar result through
+the shared move frontier after checking the telescoping identity independently.
+The move receipt records synthesis work, verification work, and the original
+and reduced arithmetic-operation counts.
+
+The SDK `FiniteIterationOptimizer` and `FiniteIterationVerifier` expose the
+same bounded mathematical procedures as separate synthesis and proof calls.
+Each call uses its own supplied work budget and cancellation token.
