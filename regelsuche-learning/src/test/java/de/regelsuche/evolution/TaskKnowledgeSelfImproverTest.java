@@ -34,8 +34,75 @@ class TaskKnowledgeSelfImproverTest {
         var batch = useful(1);
         var overlap = new TaskKnowledgeSelfImprover.Batch(batch.lessons(), batch.validation(),
             List.of(task(nested("h", 1, "i") + "+3", 5)));
-        assertThrows(IllegalArgumentException.class,
-            () -> new TaskKnowledgeSelfImprover().improve(empty(), List.of(overlap), policy(1_000_000, 2)));
+        var initial = empty();
+        var result = new TaskKnowledgeSelfImprover().improve(initial, List.of(overlap), policy(1_000_000, 2));
+        assertSame(initial, result.active()); assertFalse(result.accountingComplete());
+        assertEquals(KnowledgeCostGate.Decision.FAILED, result.attempts().getFirst().decision());
+        assertNull(result.attempts().getFirst().learnerDecision());
+        assertFalse(result.attempts().getFirst().failure().isEmpty());
+        assertTrue(result.paid().wallNanos() > 0);
+    }
+
+    @Test void anInvalidLaterSplitRetainsEarlierAcceptedKnowledgeAndPaidReceipts() {
+        var second = useful(2);
+        var overlap = new TaskKnowledgeSelfImprover.Batch(second.lessons(), second.validation(),
+            List.of(second.lessons().getFirst()));
+        var result = scripted(0, 1, 2, 3, 4, 5, 105, 106, 107, 108, 109, 110, 111)
+            .improve(empty(), List.of(useful(1), overlap), policy(5_000_000, 2));
+        assertEquals(2, result.attempts().size());
+        var accepted = result.attempts().getFirst();
+        var failed = result.attempts().get(1);
+        assertEquals(KnowledgeCostGate.Decision.ADOPT, accepted.decision());
+        assertEquals(accepted.candidateId(), result.active().id());
+        assertEquals(accepted.candidateId(), failed.parentId());
+        assertEquals(KnowledgeCostGate.Decision.FAILED, failed.decision());
+        assertNull(failed.learnerDecision());
+        assertFalse(failed.failure().isEmpty()); assertFalse(result.accountingComplete());
+        assertEquals(accepted.knownWork() + failed.knownWork(), result.knownWork());
+        assertTrue(result.paid().wallNanos() >= accepted.paid().wallNanos() + failed.paid().wallNanos());
+        assertTrue(accepted.knownWork() > 0);
+    }
+
+    private static TaskKnowledgeSelfImprover.Batch countingLessons(int[] evaluations) {
+        var batch = useful(1);
+        var first = batch.lessons().getFirst();
+        var goal = new CheckedSchemaTaskSolver.Goal(state -> {
+            evaluations[0]++; return new de.regelsuche.search.moves.TypedSourceOnlySearch.Score(0, 1);
+        }, 0);
+        var counted = new CheckedSchemaTaskSolver.Task(first.source(), first.assumptions(), goal, first.budget());
+        return new TaskKnowledgeSelfImprover.Batch(List.of(counted, batch.lessons().get(1)), batch.validation(), batch.promotion());
+    }
+
+    @Test void anObservedWallOrCpuDeadlineAfterSplitStopsBeforeLearning() {
+        for (boolean wall : List.of(true, false)) {
+            int[] evaluations = {0};
+            var bounded = new TaskKnowledgeSelfImprover.Policy(5_000_000,
+                wall ? 50 : Long.MAX_VALUE, wall ? Long.MAX_VALUE : 50, 1, 1, 1_000_000);
+            var initial = empty();
+            var result = scripted(0, 1, 100, 101, 102, 103, 104).improve(initial, List.of(countingLessons(evaluations)), bounded);
+            assertEquals(0, evaluations[0]);
+            assertSame(initial, result.active()); assertTrue(result.budgetExhausted());
+            var attempt = result.attempts().getFirst();
+            assertEquals(KnowledgeCostGate.Decision.BUDGET_EXHAUSTED, attempt.decision());
+            assertNull(attempt.learnerDecision()); assertTrue(attempt.knownWork() > 0);
+            assertTrue(result.paid().wallNanos() >= 101);
+        }
+    }
+
+    @Test void cpuBecomingUnavailableAfterSplitStopsBeforeLearningAndRetainsItsCosts() {
+        int[] evaluations = {0}, calls = {0};
+        var improver = new TaskKnowledgeSelfImprover(() -> {
+            int mark = calls[0]++;
+            return new KnowledgeCostGate.Cost(mark, mark >= 3 ? -1 : mark);
+        });
+        var initial = empty();
+        var result = improver.improve(initial, List.of(countingLessons(evaluations)), policy(5_000_000, 1));
+        assertEquals(0, evaluations[0]); assertSame(initial, result.active());
+        assertFalse(result.accountingComplete()); assertFalse(result.budgetExhausted());
+        assertEquals(-1, result.paid().cpuNanos()); assertTrue(result.paid().wallNanos() > 0);
+        var attempt = result.attempts().getFirst();
+        assertEquals(KnowledgeCostGate.Decision.INCOMPLETE, attempt.decision());
+        assertNull(attempt.learnerDecision()); assertTrue(attempt.knownWork() > 0);
     }
 
     @Test void spentSplitAndLearningBudgetCannotBeRefundedIntoAnotherBatch() {
@@ -48,7 +115,7 @@ class TaskKnowledgeSelfImproverTest {
 
     @Test void controlledMeasurementsExerciseRealAdoptionAndAcceptedParentChaining() {
         // Synthetic clock inputs test state transitions, never performance evidence.
-        long[] marks = {0, 1, 2, 3, 4, 104, 105, 106, 107, 108, 109, 110};
+        long[] marks = {0, 1, 2, 3, 4, 5, 105, 106, 107, 108, 109, 110};
         int[] cursor = {0};
         TaskKnowledgeSelfImprover.Meter meter = () -> {
             int index = cursor[0]++;
@@ -93,7 +160,7 @@ class TaskKnowledgeSelfImproverTest {
         batch = new TaskKnowledgeSelfImprover.Batch(batch.lessons(), batch.validation(), List.of(promotion));
         var bounded = new TaskKnowledgeSelfImprover.Policy(5_000_000, 80, Long.MAX_VALUE, 1, 1, 1_000_000);
         var initial = empty();
-        var result = scripted(0, 1, 2, 3, 4, 104, 105, 106, 107, 108).improve(initial, List.of(batch), bounded);
+        var result = scripted(0, 1, 2, 3, 4, 5, 105, 106, 107, 108, 109).improve(initial, List.of(batch), bounded);
         assertEquals(1, evaluations[0]);
         assertSame(initial, result.active()); assertTrue(result.budgetExhausted());
         assertEquals(KnowledgeCostGate.Decision.BUDGET_EXHAUSTED, result.attempts().getFirst().decision());
@@ -102,7 +169,7 @@ class TaskKnowledgeSelfImproverTest {
     @Test void observedDeadlineAtDecisionCompletionPreventsAdoption() {
         var bounded = new TaskKnowledgeSelfImprover.Policy(5_000_000, 500, Long.MAX_VALUE, 1, 1, 1_000_000);
         var initial = empty();
-        var result = scripted(0, 1, 2, 3, 4, 104, 105, 106, 107, 1000, 1001).improve(initial, List.of(useful(1)), bounded);
+        var result = scripted(0, 1, 2, 3, 4, 5, 105, 106, 107, 108, 1000, 1001).improve(initial, List.of(useful(1)), bounded);
         assertSame(initial, result.active()); assertTrue(result.budgetExhausted());
         assertEquals(KnowledgeCostGate.Decision.BUDGET_EXHAUSTED, result.attempts().getFirst().decision());
     }

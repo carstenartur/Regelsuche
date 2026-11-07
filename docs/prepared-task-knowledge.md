@@ -66,18 +66,22 @@ tests, never by the runtime experiment.
 
 The exact adoption gate rejects an individual solution/score regression or an
 incomplete sample. Predicted average savings over `expectedFutureQueries` must
-exceed **all actually paid formation and evaluation costs** in both elapsed time
-and CPU. Large horizons/products use exact integer arithmetic. The horizon is a
+exceed **all actually paid formation and evaluation costs of the current attempt**
+in both elapsed time and CPU. Earlier rejected attempts remain paid in the whole
+cycle's `Result`; this incremental gate does not prove their repayment.
+Large horizons/products use exact integer arithmetic. The horizon is a
 caller-supplied forecast; adoption predicts savings, not a measured guarantee.
 An independent complete stream is necessary to demonstrate actual amortization.
 Promotion samples must represent the expected task mix; a future query count
 alone does not specify that mix. Rejection does not recover already paid work.
 
 Time/work cutoffs are checked between bounded atomic API operations, including
-between the two members of a comparison pair. An atomic overrun remains fully
+after split inspection before learning and between the two members of a comparison pair. An atomic overrun remains fully
 paid and cannot adopt a generation. Technical failures preserve completed lessons
 and known work, mark unknown unfinished work incomplete and retain the previous
-active generation. No-op and rejected learning also stay in the returned ledger.
+active generation. Invalid promotion splits, including in later batches, return
+a failed incomplete attempt with the earlier ledger and active generation intact.
+No-op and rejected learning also stay in the returned ledger.
 Use the **whole `Result`**, not only `active().acquisitionWork()`, when accounting
 for the cycle: a rejected attempt leaves that older immutable state unchanged.
 

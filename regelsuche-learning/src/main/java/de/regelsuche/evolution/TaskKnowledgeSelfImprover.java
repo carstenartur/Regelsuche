@@ -95,10 +95,12 @@ public final class TaskKnowledgeSelfImprover {
         }
 
         Attempt execute() {
-            // Reject overlapping caller input before learning. Its inspection is still actual elapsed work.
-            work = CumulativeTaskKnowledge.disjoint(examples, batch.promotion());
             try {
-                if (Math.addExact(previousWork, work) >= policy.maximumLearningWork()) decision = BUDGET_EXHAUSTED;
+                // Invalid later batches must retain earlier accepted state and all paid receipts.
+                work = CumulativeTaskKnowledge.disjoint(examples, batch.promotion());
+                Cost checkpoint = elapsed(overallStart, meter.now());
+                if (checkpoint.cpuNanos() < 0) { complete = false; decision = INCOMPLETE; }
+                else if (overBudget(policy, checkpoint, Math.addExact(previousWork, work))) decision = BUDGET_EXHAUSTED;
                 else learn();
             } catch (CumulativeTaskKnowledge.BatchFailure error) {
                 work = Math.addExact(work, error.knownWork().total());

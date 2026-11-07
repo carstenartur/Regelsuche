@@ -61,5 +61,5 @@ Expected: pure gate decisions match literal arithmetic; real tests verify actual
 - [x] Run full Java/Python suites and unchanged semantic coverage/complexity gate; commit runnable source.
 - [x] Execute original protocol, independently audit results and complete CPU/RSS/lifecycle costs; keep negative results.
 - [x] Report factual gains/limits and expose reusable APIs with examples, then commit.
-- [ ] Fresh whole-branch review using the five Review Focus lines; one RED→GREEN fix pass for substantive findings, affected full tests and reverify untouched data.
-- [ ] Publish one focused PR against main and durable evidence. Do not claim broad SymPy superiority from this experiment.
+- [x] Fresh whole-branch review using the five Review Focus lines; one RED→GREEN fix pass for substantive findings, affected full tests and reverify untouched data.
+- [x] Publish one focused PR against main and durable evidence. Do not claim broad SymPy superiority from this experiment.

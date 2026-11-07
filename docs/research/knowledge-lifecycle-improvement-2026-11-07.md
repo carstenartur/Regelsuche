@@ -79,7 +79,7 @@ worker-process peak, not summed peaks or complete-machine memory.
 | ---: | --- | ---: | ---: | ---: |
 | 8 | PRIMITIVE | 0.683 | 1.709 | 130.199 |
 | 8 | LEGACY_SESSION | 1.630 | 3.964 | 126.688 |
-| 8 | LEGACY_RELOAD | 1.738 | 4.102 | 126.254 |
+| 8 | LEGACY_RELOAD | 1.738 | 4.082 | 126.254 |
 | 8 | PREPARED_REUSE | 1.761 | 3.961 | 128.004 |
 | 8 | MEASURED_IMPROVEMENT | 1.977 | 5.368 | 177.371 |
 | 8 | SYMPY | 0.383 | 0.383 | 72.973 |
@@ -153,12 +153,31 @@ Archive `Regelsuche-Wissenswiederverwendung-2026-11-07.zip`: **34,714,760 bytes*
 SHA256 `093c09b2cefefb3d6361a245d96f6e198799da8fa093a7743074eb1d9f362716`.
 Original evidence independently reverified unchanged with `complete=true`.
 
+The subsequent whole-branch review found two controller boundary defects:
+a later invalid promotion split could throw away the already-paid result, and
+elapsed wall/CPU limits were not checked between split inspection and learning.
+The final source catches split failures into an incomplete paid attempt, preserves
+previously accepted state, and checks time and CPU availability before learning.
+Deterministic regressions first reproduced both failures, then passed after the
+fix. The API guide also makes the gate's current-attempt cost scope explicit.
+These are post-measurement corrections; the original archived runtime and timing
+claims remain bound to the measured revision above. No replacement performance
+run or result-dependent tuning was performed.
+
 Qualification: exact-source fresh Java25 Maven learning reactor **3,547 tests**,
 zero failures/errors/skips; complete current-branch Python suite **98 tests**.
 The unchanged pinned AI Knowledge Extractor0.1.10 coverage/complexity gates pass
 (17 existing hotspots). Source-only runtime qualification used a fresh checkout
 because previous experiment files were rehydrated into the older working tree;
 those files were preserved and are not part of this PR or measured runtime.
+
+After the review corrections, the complete affected Java reactor passes
+**3,550 tests**, zero failures/errors/skips; the full comparison Python suite
+still passes **98 tests**, and the unchanged semantic coverage/complexity gates
+pass with 17 hotspots. This final check used an identical tracked-source copy
+outside workspace synchronization, with its complete source manifest verified.
+The original ZIP contains the measured-source qualification, not this later
+source correction or its validation logs.
 
 Reproduce: `bash gradle/run-knowledge-lifecycle-improvement.sh`. Offline verification:
 
