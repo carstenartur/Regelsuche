@@ -431,15 +431,15 @@ def supervise(args):
     require(not args.output.exists() and not receipt_path.exists(), 'evidence or command receipt already exists')
     command = [sys.executable, '-B', '-m', 'external_polynomial_comparison.run_historical', '--execute-child',
                '--protocol', str(args.protocol), '--classpath', str(args.classpath), '--output', str(args.output)]
-    started, cpu = time.perf_counter_ns(), time.process_time_ns()
-    process = subprocess.Popen(command)
-    _, status, usage = os.wait4(process.pid, 0)
-    process.returncode = os.waitstatus_to_exitcode(status)
-    receipt = dict(command=command, exitCode=process.returncode, wallNanos=time.perf_counter_ns()-started,
-        supervisorCpuNanos=time.process_time_ns()-cpu,
-        childTreeCpuNanos=round((usage.ru_utime+usage.ru_stime)*1e9),
-        scope='SUPERVISE_FUNCTION_BEFORE_SPAWN_THROUGH_CHILD_EXIT;EXCLUDES_SUPERVISOR_IMPORTS_AND_FINAL_RECEIPT_WRITE')
     with receipt_path.open('xb') as stream:
+        started, cpu = time.perf_counter_ns(), time.process_time_ns()
+        process = subprocess.Popen(command)
+        _, status, usage = os.wait4(process.pid, 0)
+        process.returncode = os.waitstatus_to_exitcode(status)
+        receipt = dict(command=command, exitCode=process.returncode, wallNanos=time.perf_counter_ns()-started,
+            supervisorCpuNanos=time.process_time_ns()-cpu,
+            childTreeCpuNanos=round((usage.ru_utime+usage.ru_stime)*1e9),
+            scope='SUPERVISE_FUNCTION_BEFORE_SPAWN_THROUGH_CHILD_EXIT;EXCLUDES_SUPERVISOR_IMPORTS_AND_FINAL_RECEIPT_WRITE')
         stream.write(canonical(receipt))
     return process.returncode
 

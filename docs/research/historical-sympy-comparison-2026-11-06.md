@@ -234,7 +234,7 @@ The release review additionally binds recorded worker commands to the retained
 ordered classpath, Python bootstrap/interpreter, frozen JVM options and original
 setup paths, and checks the exact lifecycle rotation. Reusing an evidence or
 command-receipt path is rejected before launching; completed measurements are
-never overwritten. The complete comparison suite passes 112 tests with Java 25,
+never overwritten, including concurrent invocations. The complete comparison suite passes 113 tests with Java 25,
 and both original attempts still pass offline verification after these changes.
 
 ## Remaining historical scope

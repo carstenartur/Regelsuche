@@ -422,5 +422,24 @@ class HistoricalRunnerTest(unittest.TestCase):
                 self.assertFalse(sequence['accounting']['complete'])
 
 
+
+    def test_concurrent_supervisors_reserve_the_receipt_before_either_child_starts(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'evidence'
+            args=SimpleNamespace(output=output,protocol=Path('protocol'),classpath=Path('classpath'))
+            usage=SimpleNamespace(ru_utime=.001,ru_stime=.002)
+            def spawn(command):
+                if launch.call_count>1: raise AssertionError('a second supervisor launched before reservation')
+                with self.assertRaisesRegex(ValueError,'exist'): self.runner.supervise(args)
+                return SimpleNamespace(pid=123,returncode=None)
+            with patch.object(self.runner.subprocess,'Popen',side_effect=spawn) as launch, \
+                    patch.object(self.runner.os,'wait4',return_value=(123,0,usage)):
+                self.assertEqual(0,self.runner.supervise(args))
+                launch.assert_called_once()
+            receipt=json.loads(output.with_name(output.name+'.command-receipt.json').read_text())
+            self.assertEqual(0,receipt['exitCode'])
+
+
 if __name__ == '__main__':
     unittest.main()
