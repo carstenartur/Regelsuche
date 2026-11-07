@@ -141,6 +141,31 @@ class TaskKnowledgeSelfImproverTest {
         assertEquals(-1, result.paid().cpuNanos());
     }
 
+    @Test void incompleteSecondPromotionSolveRetainsAnIncompleteDecision() {
+        int[] calls = {0};
+        var improver = new TaskKnowledgeSelfImprover(() -> {
+            int mark = calls[0]++;
+            return new KnowledgeCostGate.Cost(mark, mark >= 8 ? -1 : mark);
+        });
+        var initial = empty();
+        var result = improver.improve(initial, List.of(useful(1)), policy(5_000_000, 1));
+        var attempt = result.attempts().getFirst();
+        assertSame(initial, result.active()); assertFalse(result.accountingComplete());
+        assertEquals(CumulativeTaskKnowledge.Decision.PROMOTED, attempt.learnerDecision());
+        assertEquals(1, attempt.trials().size());
+        assertEquals(-1, attempt.trials().getFirst().candidate().cost().cpuNanos());
+        assertEquals(KnowledgeCostGate.Decision.INCOMPLETE, attempt.decision());
+    }
+
+    @Test void aDeadlineObservedBeforeCommittingAdoptionRetainsThePreviousGeneration() {
+        var bounded = new TaskKnowledgeSelfImprover.Policy(5_000_000, 500, Long.MAX_VALUE, 1, 1, 1_000_000);
+        var initial = empty();
+        var result = scripted(0, 1, 2, 3, 4, 5, 105, 106, 107, 108, 109, 1000)
+            .improve(initial, List.of(useful(1)), bounded);
+        assertSame(initial, result.active()); assertTrue(result.budgetExhausted());
+        assertEquals(KnowledgeCostGate.Decision.BUDGET_EXHAUSTED, result.attempts().getFirst().decision());
+    }
+
     private static TaskKnowledgeSelfImprover scripted(long... marks) {
         int[] cursor = {0};
         return new TaskKnowledgeSelfImprover(() -> {

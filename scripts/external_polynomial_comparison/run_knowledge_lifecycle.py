@@ -174,13 +174,36 @@ def run_sequence(p, profile, blocks, repetition, command, output):
     return seq
 
 
+def verify_cost(value):
+    natural(value['wallNanos'])
+    require(type(value['cpuNanos']) is int and value['cpuNanos']>=-1,'nonnegative CPU or explicit unavailable marker required')
+
+
 def verify_improvement(result,seed,horizon):
+    require(natural(horizon)>0,'positive forecast horizon required')
+    verify_cost(result['paid'])
+    require(type(result['accountingComplete']) is bool and type(result['budgetExhausted']) is bool,'explicit result accounting required')
     current=seed;work=0;wall=0;cpu=0
     for attempt in result['attempts']:
         require(attempt['parentId']==current and all(x==current for x in attempt['lessonGenerations']),'improvement parent/lesson binding')
+        require(type(attempt['accountingComplete']) is bool,'explicit attempt accounting required')
+        verify_cost(attempt['paid'])
         work+=natural(attempt['knownWork']);paid=attempt['paid'];wall+=natural(paid['wallNanos'])
         if paid['cpuNanos']>=0:cpu+=natural(paid['cpuNanos'])
         decision=attempt['decision'];trials=attempt['trials']
+        require(decision in ('ADOPT','NO_GAIN','QUALITY_REGRESSION','INCOMPLETE','NO_CANDIDATE','BUDGET_EXHAUSTED','FAILED'),'unknown improvement decision')
+        sample_wall=0;sample_cpu=0;sample_complete=True
+        for trial in trials:
+            require(set(trial)=={'previous','candidate'},'paired promotion samples required')
+            for sample in trial.values():
+                verify_cost(sample['cost'])
+                require(type(sample['complete']) is bool and type(sample['solved']) is bool
+                        and type(sample['score']) is int,'explicit sample outcome/accounting required')
+                sample_wall+=sample['cost']['wallNanos'];sample_cpu+=max(0,sample['cost']['cpuNanos'])
+                sample_complete &= sample['complete'] and sample['cost']['cpuNanos']>=0
+        require(paid['wallNanos']>=sample_wall,'attempt omits sequential promotion wall time')
+        if paid['cpuNanos']>=0:require(paid['cpuNanos']>=sample_cpu,'attempt omits sequential promotion CPU')
+        require(not attempt['accountingComplete'] or (paid['cpuNanos']>=0 and sample_complete),'incomplete attempt claims complete accounting')
         if decision in ('ADOPT','NO_GAIN','QUALITY_REGRESSION','INCOMPLETE') and trials:
             complete=paid['cpuNanos']>=0 and all(s['complete'] and s['cost']['cpuNanos']>=0 for t in trials for s in t.values())
             quality=all((not t['previous']['solved'] or t['candidate']['solved']) and t['candidate']['score']<=t['previous']['score'] for t in trials)
@@ -195,6 +218,8 @@ def verify_improvement(result,seed,horizon):
     require(result['activeId']==current and natural(result['knownWork'])==work,'active generation or paid work ledger mismatch')
     require(natural(result['paid']['wallNanos'])>=wall,'improvement omits paid wall time')
     if result['paid']['cpuNanos']>=0:require(result['paid']['cpuNanos']>=cpu,'improvement omits paid CPU')
+    require(not result['accountingComplete'] or (result['paid']['cpuNanos']>=0
+            and all(a['accountingComplete'] for a in result['attempts'])),'incomplete result claims complete accounting')
     return current
 
 
@@ -238,7 +263,8 @@ def account_sequence(p, seq):
             require(op['ready'].get('status')=='READY','missing READY binding')
             if profile=='SYMPY':require(op['ready'].get('sympy')==p['sympyVersion'],'wrong SymPy')
             else:require(str(op['ready'].get('java','')).startswith('25'),'Java25 worker required')
-        if op['status']=='COMPLETE' and 'response' in op:
+        if op['status']=='COMPLETE' and not op['name'].startswith(('startup-','shutdown-')):
+            require(isinstance(op.get('request'),dict) and isinstance(op.get('response'),dict),'completed operation omitted request/response receipt')
             verify_operation(p,seq,op)
             r=op['response']
             if profile!='SYMPY':require(r['nativeBudget']==p['nativeBudget'],'changed native budget')
@@ -329,9 +355,31 @@ def snapshot_python(output):
     shutil.copytree(Path(__file__).parent,destination/'external_polynomial_comparison',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     require(compileall.compile_dir(destination,quiet=2,force=True,invalidation_mode=py_compile.PycInvalidationMode.CHECKED_HASH),'bytecode preparation failed')
     files=_file_inventory(destination);interpreter=Path(sys.executable).resolve()
-    receipt=dict(files=files,runtimeBytesHash=digest(canonical(files)),interpreter=str(interpreter),interpreterHash=digest(interpreter.read_bytes()),version=sys.version,
+    receipt=dict(files=files,runtimeBytesHash=digest(canonical(files)),interpreter=str(interpreter),commandExecutable=sys.executable,interpreterHash=digest(interpreter.read_bytes()),version=sys.version,
         bytecodePolicy='CHECKED_HASH_PRECOMPILED;READ_ENABLED_WRITE_DISABLED')
     (output/'python-inventory.json').write_bytes(canonical(receipt));return receipt
+
+
+def python_command(output,interpreter):
+    bootstrap='import sys;sys.path.insert(0,'+repr(str(output/'python-runtime'))+');from external_polynomial_comparison.knowledge_sympy_worker import main;main()'
+    return [interpreter,'-I','-B','-u','-c',bootstrap]
+
+
+def verify_commands(metadata,python,java,p):
+    original=metadata['originalOutput']
+    require(isinstance(original,str) and Path(original).is_absolute() and os.path.normpath(original)==original,'original output must be absolute and normalized')
+    root=Path(original)
+    expected=['java',*p['javaOptions'],'-cp',os.pathsep.join(str(root/e) for e in java['classpathEntries']),JAVA_WORKER]
+    require(metadata['commands']['java']==expected,'Java command differs from retained classpath/worker/frozen options')
+    command=metadata['commands']['sympy']
+    require(isinstance(command,list) and command and isinstance(command[0],str) and Path(command[0]).is_absolute()
+            and command==python_command(root,command[0]),'Python command differs from retained isolated worker')
+    if 'commandExecutable' in python:
+        require(command[0]==python['commandExecutable'],'Python command differs from recorded interpreter invocation')
+    else:
+        executable=Path(python['interpreter']);major_minor='.'.join(python['version'].split()[0].split('.')[:2])
+        aliases={executable.name,'python','python'+major_minor.split('.')[0],'python'+major_minor}
+        require(Path(command[0]).parent==executable.parent and Path(command[0]).name in aliases,'Python command differs from retained interpreter')
 
 
 def verify(output):
@@ -342,8 +390,9 @@ def verify(output):
     require(files==python['files'] and digest(canonical(files))==python['runtimeBytesHash'],'Python runtime bytes changed')
     metadata=json.loads((output/'metadata.json').read_text())
     require(metadata['protocolHash']==PROTOCOL_HASH and metadata['runtimeBytesHash']==java['runtimeBytesHash'] and metadata['pythonRuntimeHash']==python['runtimeBytesHash'],'metadata/runtime binding')
+    verify_commands(metadata,python,java,p)
     sequences=json.loads((output/'sequences.json').read_text());actual=[(s['profile'],s['blocks'],s['repetition']) for s in sequences]
-    require(len(actual)==len(set(actual)) and set(actual)==set(schedule(p)),'incomplete/duplicated sequence matrix')
+    require(actual==list(schedule(p)),'incomplete/duplicated/reordered sequence matrix')
     for seq in sequences:
         require(seq['id']==f"{seq['profile']}.b{seq['blocks']}.r{seq['repetition']}",'sequence identity mismatch')
         require(seq['accounting']==account_sequence(p,seq),'accounting summary mismatch')
@@ -358,8 +407,7 @@ def execute(args):
     output.mkdir(parents=True,exist_ok=False);(output/'protocol.json').write_bytes(args.protocol.read_bytes())
     runtime=snapshot_runtime(args.classpath.read_text().strip(),output);python=snapshot_python(output)
     java=['java',*p['javaOptions'],'-cp',os.pathsep.join(str(output/x) for x in runtime['classpathEntries']),JAVA_WORKER]
-    bootstrap='import sys;sys.path.insert(0,'+repr(str(output/'python-runtime'))+');from external_polynomial_comparison.knowledge_sympy_worker import main;main()'
-    sympy=[sys.executable,'-I','-B','-u','-c',bootstrap]
+    sympy=python_command(output,sys.executable)
     metadata=dict(provenance,protocolHash=PROTOCOL_HASH,runtimeBytesHash=runtime['runtimeBytesHash'],pythonRuntimeHash=python['runtimeBytesHash'],
         originalOutput=str(output),java=_java_provenance(),commands=dict(java=java,sympy=sympy),host=dict(platform=platform.platform(),
         affinityCpus=len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else None,
@@ -382,12 +430,16 @@ def execute(args):
 
 def supervise(args):
     require(hasattr(os,'wait4'),'POSIX wait4 required')
+    receipt_path=args.output.with_name(args.output.name+'.command-receipt.json')
+    require(not args.output.exists() and not receipt_path.exists(),'evidence or command receipt already exists')
     command=[sys.executable,'-B','-m','external_polynomial_comparison.run_knowledge_lifecycle','--execute-child','--protocol',str(args.protocol),'--classpath',str(args.classpath),'--output',str(args.output)]
-    start,cpu=time.perf_counter_ns(),time.process_time_ns();process=subprocess.Popen(command)
-    _,status,usage=os.wait4(process.pid,0);process.returncode=os.waitstatus_to_exitcode(status)
-    receipt=dict(command=command,exitCode=process.returncode,wallNanos=time.perf_counter_ns()-start,supervisorCpuNanos=time.process_time_ns()-cpu,
-        childTreeCpuNanos=round((usage.ru_utime+usage.ru_stime)*1e9),scope='BEFORE_CHILD_SPAWN_THROUGH_REAP;EXCLUDES_SUPERVISOR_IMPORTS_AND_FINAL_RECEIPT_WRITE')
-    args.output.with_name(args.output.name+'.command-receipt.json').write_bytes(canonical(receipt));return process.returncode
+    with receipt_path.open('xb') as stream:
+        start,cpu=time.perf_counter_ns(),time.process_time_ns();process=subprocess.Popen(command)
+        _,status,usage=os.wait4(process.pid,0);process.returncode=os.waitstatus_to_exitcode(status)
+        receipt=dict(command=command,exitCode=process.returncode,wallNanos=time.perf_counter_ns()-start,supervisorCpuNanos=time.process_time_ns()-cpu,
+            childTreeCpuNanos=round((usage.ru_utime+usage.ru_stime)*1e9),scope='BEFORE_CHILD_SPAWN_THROUGH_REAP;EXCLUDES_SUPERVISOR_IMPORTS_AND_FINAL_RECEIPT_WRITE')
+        stream.write(canonical(receipt))
+    return process.returncode
 
 
 def main():

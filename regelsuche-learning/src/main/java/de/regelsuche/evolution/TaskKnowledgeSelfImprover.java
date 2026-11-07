@@ -59,6 +59,18 @@ public final class TaskKnowledgeSelfImprover {
             if (overBudget(policy, checkpoint, work)) { exhausted = true; break; }
             var step = new Step(active, batches.get(i), examples, policy, start, work, i);
             var attempt = step.execute();
+            if (attempt.decision() == ADOPT) {
+                // Observe all inner gate work before committing a generation.
+                // The outer result retains the remaining controller overhead.
+                Cost point = meter.now();
+                Cost paid = elapsed(step.start, point);
+                boolean accounted = attempt.accountingComplete() && paid.cpuNanos() >= 0;
+                Decision decision = !accounted ? INCOMPLETE
+                    : overBudget(policy, elapsed(start, point), Math.addExact(work, attempt.knownWork())) ? BUDGET_EXHAUSTED
+                    : KnowledgeCostGate.evaluate(paid, attempt.trials(), policy.futureQueries());
+                attempt = new Attempt(attempt.parentId(), attempt.candidateId(), attempt.learnerDecision(), decision,
+                    attempt.knownWork(), paid, attempt.trials(), attempt.lessonGenerations(), accounted, attempt.failure());
+            }
             attempts.add(attempt); work = Math.addExact(work, attempt.knownWork());
             complete &= attempt.accountingComplete();
             if (attempt.decision() == ADOPT) active = step.proposed;
@@ -136,7 +148,8 @@ public final class TaskKnowledgeSelfImprover {
                         decision = BUDGET_EXHAUSTED; return;
                     }
                     trial(batch.promotion().get(i), ((sequence + repetition + i) & 1) == 0);
-                    if (!complete || decision == BUDGET_EXHAUSTED) return;
+                    if (!complete) { decision = INCOMPLETE; return; }
+                    if (decision == BUDGET_EXHAUSTED) return;
                 }
             }
         }

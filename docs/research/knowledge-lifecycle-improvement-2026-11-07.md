@@ -186,6 +186,22 @@ PYTHONPATH=scripts python3 -B -m external_polynomial_comparison.run_knowledge_li
   --verify --output /absolute/extraction/evidence
 ```
 
+### Release integration review
+
+Further receipt regressions now reject underpaid sequential promotion samples,
+negative costs, implicit Boolean flags, missing completed setup receipts,
+foreign worker commands and reordered lifecycles. Supervisors reserve command
+receipts exclusively before launch, preserving prior measurements even when
+two invocations use the same fresh output path.
+
+An incomplete second comparison keeps an `INCOMPLETE` decision, and a final
+checkpoint checks observed cost and budgets before committing adoption.
+Both controller regressions failed before correction; all 13 focused Java tests
+pass after a clean rebuild, and all 105 comparison Python tests pass. The original
+36-lifecycle archive still verifies unchanged with complete accounting. Full hosted
+CI remains the integration authority. These source corrections do not replace or
+remeasure the archived runtime, inputs, results or timing observations.
+
 ## Implementation decisions and remaining scope
 
 - Proceed inline under Carsten's explicit approval, using opt-in APIs and existing

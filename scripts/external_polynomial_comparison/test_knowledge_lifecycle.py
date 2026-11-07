@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 class KnowledgeLifecycleTest(unittest.TestCase):
@@ -147,17 +148,126 @@ class KnowledgeLifecycleTest(unittest.TestCase):
             with self.assertRaises(ValueError):self.runner.verify_models(output,changed,original)
 
     def test_cost_based_adoption_is_rechecked_from_paid_trials(self):
+        result = self.improvement_fixture()
+        self.assertEqual('candidate',self.runner.verify_improvement(result,'seed',100))
+        for mutate in [lambda x:x.update(activeId='foreign'),lambda x:x['attempts'][0]['paid'].update(cpuNanos=100000),
+                       lambda x:x['attempts'][0]['trials'][0]['candidate'].update(solved=False),lambda x:x.update(knownWork=0)]:
+            bad=copy.deepcopy(result);mutate(bad)
+            with self.assertRaises(ValueError):self.runner.verify_improvement(bad,'seed',100)
+
+    def improvement_fixture(self):
         old=dict(cost=dict(wallNanos=10,cpuNanos=8),solved=True,score=3,complete=True)
         new=dict(cost=dict(wallNanos=2,cpuNanos=1),solved=True,score=3,complete=True)
         attempt=dict(parentId='seed',candidateId='candidate',learnerDecision='PROMOTED',decision='ADOPT',knownWork=100,
             paid=dict(wallNanos=100,cpuNanos=100),trials=[dict(previous=old,candidate=new)],
             lessonGenerations=['seed','seed'],accountingComplete=True,failure='')
         result=dict(activeId='candidate',attempts=[attempt],knownWork=100,paid=dict(wallNanos=110,cpuNanos=110),accountingComplete=True,budgetExhausted=False)
-        self.assertEqual('candidate',self.runner.verify_improvement(result,'seed',100))
-        for mutate in [lambda x:x.update(activeId='foreign'),lambda x:x['attempts'][0]['paid'].update(cpuNanos=100000),
-                       lambda x:x['attempts'][0]['trials'][0]['candidate'].update(solved=False),lambda x:x.update(knownWork=0)]:
-            bad=copy.deepcopy(result);mutate(bad)
-            with self.assertRaises(ValueError):self.runner.verify_improvement(bad,'seed',100)
+        return result
+
+    def test_promotion_samples_cannot_be_paid_less_than_their_sequential_cost(self):
+        for key in ('wallNanos', 'cpuNanos'):
+            bad=self.improvement_fixture()
+            bad['attempts'][0]['paid'][key]=1
+            with self.subTest(cost=key), self.assertRaises(ValueError):
+                self.runner.verify_improvement(bad,'seed',100)
+
+    def test_improvement_receipts_reject_impossible_costs_and_implicit_booleans(self):
+        mutations=[lambda r:r['attempts'][0]['trials'][0]['candidate']['cost'].update(wallNanos=-100),
+            lambda r:r['attempts'][0]['trials'][0]['candidate']['cost'].update(cpuNanos=-2),
+            lambda r:r['attempts'][0]['trials'][0]['candidate'].update(complete=1),
+            lambda r:r['attempts'][0]['trials'][0]['candidate'].update(solved=1),
+            lambda r:r['attempts'][0].update(accountingComplete=1),
+            lambda r:r['attempts'][0].update(decision='UNRECOGNIZED')]
+        for index, mutate in enumerate(mutations):
+            bad=self.improvement_fixture();mutate(bad)
+            with self.subTest(mutation=index), self.assertRaises(ValueError):
+                self.runner.verify_improvement(bad,'seed',100)
+
+    def test_complete_setup_requires_request_and_response_receipts(self):
+        p,seq=self.fixture()
+        for field in ('request','response'):
+            bad=copy.deepcopy(seq);bad['operations'][1].pop(field)
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.runner.account_sequence(p,bad)
+
+    def evidence_fixture(self, output):
+        from external_polynomial_comparison.run import canonical
+        from external_polynomial_comparison.run_schema import _file_inventory
+        p,seq=self.fixture();p=copy.deepcopy(p);p.update(profiles=['SYMPY'],blocks=[1],repetitions=2)
+        sequences=[dict(copy.deepcopy(seq),id=f'SYMPY.b1.r{i}',repetition=i) for i in range(2)]
+        for s in sequences:s['accounting']=self.runner.account_sequence(p,s)
+        (output/'python-runtime').mkdir();files=_file_inventory(output/'python-runtime')
+        python=dict(files=files,runtimeBytesHash=self.runner.digest(canonical(files)),
+                    interpreter='/opt/python/bin/python3.12',commandExecutable='/opt/python/bin/python3',version='3.12.8 (fixture)')
+        java=dict(runtimeBytesHash='java',classpathEntries=['runtime/entry-000','runtime/entry-001/dependency.jar'])
+        root=Path('/original/evidence')
+        bootstrap='import sys;sys.path.insert(0,'+repr(str(root/'python-runtime'))+');from external_polynomial_comparison.knowledge_sympy_worker import main;main()'
+        metadata=dict(protocolHash=self.runner.PROTOCOL_HASH,runtimeBytesHash='java',pythonRuntimeHash=python['runtimeBytesHash'],originalOutput=str(root),
+            commands=dict(java=['java',*p['javaOptions'],'-cp',':'.join(str(root/e) for e in java['classpathEntries']),self.runner.JAVA_WORKER],
+                          sympy=[python['commandExecutable'],'-I','-B','-u','-c',bootstrap]))
+        for name,value in [('protocol.json',p),('runtime-inventory.json',java),('python-inventory.json',python),
+                           ('summary.json',self.runner.summarize(p,sequences))]:
+            (output/name).write_bytes(canonical(value))
+        def retain():
+            for s in sequences:(output/(s['id']+'.raw.json')).write_bytes(canonical({k:v for k,v in s.items() if k!='accounting'}))
+            (output/'sequences.json').write_bytes(canonical(sequences));(output/'metadata.json').write_bytes(canonical(metadata))
+            inventory={k:v for k,v in _file_inventory(output).items() if k!='manifest.json'}
+            (output/'manifest.json').write_bytes(canonical(inventory))
+        return p,metadata,sequences,retain
+
+    def test_offline_verification_binds_commands_to_retained_runtimes_and_frozen_options(self):
+        mutations=[lambda m:m['commands'].update(java=['false'],sympy=['false']),
+            lambda m:m['commands']['java'].__setitem__(1,'-Xmx8g'),
+            lambda m:m['commands']['java'].__setitem__(-2,'/foreign/classes'),
+            lambda m:m['commands']['java'].__setitem__(-1,'foreign.Worker'),
+            lambda m:m['commands']['sympy'].__setitem__(0,'/bin/false'),
+            lambda m:m['commands']['sympy'].__setitem__(-1,'print("unrelated worker")')]
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory);p,metadata,sequences,retain=self.evidence_fixture(output)
+            original=copy.deepcopy(metadata)
+            with patch.object(self.runner,'load_protocol',return_value=p),patch.object(self.runner,'verify_runtime'):
+                retain();self.runner.verify(output)
+                for index,mutate in enumerate(mutations):
+                    metadata.clear();metadata.update(copy.deepcopy(original));mutate(metadata);retain()
+                    with self.subTest(mutation=index),self.assertRaises(ValueError):self.runner.verify(output)
+
+    def test_offline_verification_rejects_reordered_lifecycles_after_manifest_refresh(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory);p,metadata,sequences,retain=self.evidence_fixture(output)
+            with patch.object(self.runner,'load_protocol',return_value=p),patch.object(self.runner,'verify_runtime'):
+                retain();self.runner.verify(output);sequences.reverse();retain()
+                with self.assertRaisesRegex(ValueError,'sequence'):self.runner.verify(output)
+
+    def test_reused_evidence_or_receipt_is_rejected_before_launch(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'evidence';receipt=output.with_name(output.name+'.command-receipt.json')
+            args=SimpleNamespace(output=output,protocol=Path('protocol'),classpath=Path('classpath'))
+            for existing in (output,receipt):
+                original=b'{"wallNanos":123,"exitCode":0}';existing.write_bytes(original)
+                with self.subTest(path=existing.name),patch.object(self.runner.subprocess,'Popen') as launch:
+                    with self.assertRaisesRegex(ValueError,'exist'):self.runner.supervise(args)
+                    launch.assert_not_called();self.assertEqual(original,existing.read_bytes())
+                existing.unlink()
+
+
+
+    def test_concurrent_supervisors_reserve_the_receipt_before_either_child_starts(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'evidence'
+            args=SimpleNamespace(output=output,protocol=Path('protocol'),classpath=Path('classpath'))
+            usage=SimpleNamespace(ru_utime=.001,ru_stime=.002)
+            def spawn(command):
+                if launch.call_count>1: raise AssertionError('a second supervisor launched before reservation')
+                with self.assertRaisesRegex(ValueError,'exist'): self.runner.supervise(args)
+                return SimpleNamespace(pid=123,returncode=None)
+            with patch.object(self.runner.subprocess,'Popen',side_effect=spawn) as launch, \
+                    patch.object(self.runner.os,'wait4',return_value=(123,0,usage)):
+                self.assertEqual(0,self.runner.supervise(args))
+                launch.assert_called_once()
+            receipt=json.loads(output.with_name(output.name+'.command-receipt.json').read_text())
+            self.assertEqual(0,receipt['exitCode'])
 
 
 if __name__=='__main__':unittest.main()

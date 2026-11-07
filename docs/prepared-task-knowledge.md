@@ -76,7 +76,7 @@ Promotion samples must represent the expected task mix; a future query count
 alone does not specify that mix. Rejection does not recover already paid work.
 
 Time/work cutoffs are checked between bounded atomic API operations, including
-after split inspection before learning and between the two members of a comparison pair. An atomic overrun remains fully
+after split inspection before learning, between the two members of a comparison pair and before committing adoption. An atomic overrun remains fully
 paid and cannot adopt a generation. Technical failures preserve completed lessons
 and known work, mark unknown unfinished work incomplete and retain the previous
 active generation. Invalid promotion splits, including in later batches, return
