@@ -30,10 +30,10 @@
 
 **Interfaces:** Add CumulativeTaskKnowledge.emptyPrepared(inventory,profile), restorePrepared(inventory,json), loadPrepared(inventory,path), usesIndexedPreparation(). Carry a runtime-only preparation flag through constructors and learner successors. TypedLearnedMoveInventory.newTaskSolver(model,boolean indexed) shares the existing implementation. TaskKnowledgeSession(inventory,maxGenerations,maxCharacters) exposes prepare(Path):Preparation, statistics():Statistics and close(). Preparation contains knowledge, reused, lookupWork and preparationWork; statistics report hits/misses/failures/evictions/current capacity and aggregate paid work.
 
-- [ ] Write failing real-knowledge tests: indexed restore and successor equivalence; first load charged/second reuses same immutable object; changed/false/symlink snapshot rejected; foreign inventory rejected; LRU eviction, uncached over-size load, close and failed load accounting.
-- [ ] Run Maven focused tests and retain expected missing-API RED.
-- [ ] Implement opt-in indexed preparation and bounded full-canonical-byte reuse using TaskKnowledgeSnapshot.read and existing restore/proof APIs.
-- [ ] Run focused tests and the complete learning reactor; commit.
+- [x] Write failing real-knowledge tests: indexed restore and successor equivalence; first load charged/second reuses same immutable object; changed/false/symlink snapshot rejected; foreign inventory rejected; LRU eviction, uncached over-size load, close and failed load accounting.
+- [x] Run Maven focused tests and retain expected missing-API RED.
+- [x] Implement opt-in indexed preparation and bounded full-canonical-byte reuse using TaskKnowledgeSnapshot.read and existing restore/proof APIs.
+- [x] Run focused tests and the complete learning reactor; commit.
 
 Run: `mvn -o -B -ntp -pl regelsuche-learning -am -Dtest=TaskKnowledgeSessionTest -Dsurefire.failIfNoSpecifiedTests=false test` (Java25).
 Expected: all new semantic tests pass, no failures/errors/skips; default existing contracts stay green.
