@@ -307,3 +307,7 @@ var result = restored.solve(recurrenceRequest, CumulativeTaskKnowledge.Strategy.
 ./gradlew --no-daemon :regelsuche-learning:test --tests '*CumulativeRecurrenceKnowledgeTest'
 ./gradlew --no-daemon :regelsuche-math-algorithms:test --tests '*RecurrenceInvariantSynthesisTest'
 ```
+
+The [2026-11-06 historical comparison](research/historical-sympy-comparison-2026-11-06.md)
+also compares actual invariant formation against SymPy's coefficient/nullspace
+procedure, including complete fresh-process lifecycle costs.
