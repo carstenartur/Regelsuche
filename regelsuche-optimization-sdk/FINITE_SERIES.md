@@ -36,6 +36,39 @@ A caller can emit the exposed integer coefficients and binomial recurrence using
 
 Periodic and piecewise incoming states are the sum of child initial values, each included exactly once, including empty children. Use zero child initial values except where an incoming state is intended. Children must share arithmetic. All child verification and evaluation uses a single work ledger.
 
+## One-pass pair reductions
+
+`PairReduction(columns, summand)` describes the sum of an exact integer
+polynomial over all rows with indices `i < j`. Each column has two scoped
+symbols for its values in the two rows. `PairReductionOptimizer.search`
+normalizes the source polynomial and requires that swapping the two rows
+preserve it. It splits each monomial into a product of row monomials. The sum
+over the full rectangle factors into products of moments. The candidate
+subtracts the diagonal and divides by two, cancelling that divisor when all
+numerator coefficients are even.
+
+`PairReductionVerifier.verify` checks the candidate independently. An
+expression at most quadratic in sums of row monomials expands into
+single-row and two-distinct-row contributions. Expanding the numerator on one
+symbolic row checks the single-row contribution is zero. Expanding it on two
+independent symbolic rows checks the remaining contribution equals the
+original summand times the divisor. This establishes equality for any
+finite row count, including empty input.
+
+The checked program evaluates an iterable of integer rows once and keeps one
+running sum per nonconstant moment. `PairReductionJava.emit` generates
+standalone Java from the same checked plan. Rows supplied to that program
+must be finite, stable and composed of non-null `BigInteger` values in the
+declared column order. The proof concerns exact integer arithmetic.
+
+The source fragment supports one to eight columns, integer literals,
+addition, subtraction, multiplication and literal exponents from 0 to 8.
+A zero exponent gives the constant polynomial one. Intermediate total
+degree is bounded by eight. Synthesis, symbolic verification and SDK
+evaluation take explicit budgets and cancellation tokens. Pair counts and
+row visits describe algorithmic work. Actual runtime also depends on
+the number of moments and the operand sizes.
+
 ## Exact rational telescoping
 
 `RationalTelescoping.Source` is explicitly exact rational and represents a numerator polynomial in free parameters divided by a quadratic denominator of the form

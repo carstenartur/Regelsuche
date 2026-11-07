@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Paarberechnungen beschleunigen – Regelsuche</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="pair-reductions.css">
+    <script defer src="pair-reductions.js"></script>
+</head>
+<body class="pair-reduction-page">
+<header><div class="brand">
+    <a href="/">← Regelsuche Workbench</a>
+    <h1>Paarberechnungen beschleunigen</h1>
+    <p>Regelsuche leitet aus dem Ausdruck für ein Paar einen Algorithmus mit einem Durchlauf ab.</p>
+</div></header>
+<main>
+    <form id="pairForm" class="card">
+        <div class="grid">
+            <label class="field"><span>Beispiel</span>
+                <select id="pairExample">
+                    <option value="distance">Quadrierte Abstände</option>
+                    <option value="weighted">Gewichtete quadrierte Abstände</option>
+                    <option value="product">Summe aller Paarprodukte</option>
+                </select>
+            </label>
+            <label class="field"><span>Eingabespalten</span>
+                <input id="pairColumns" type="text" value="x" required spellcheck="false" maxlength="200">
+            </label>
+            <label class="field"><span>Zeilenanzahl für den Vergleich</span>
+                <input id="pairCount" type="number" min="0" max="1000000000" value="100000" required>
+            </label>
+        </div>
+        <label class="field"><span>Summand für ein Paar i &lt; j</span>
+            <input id="pairSummand" type="text" value="(x_i-x_j)^2" required spellcheck="false" maxlength="4096" aria-describedby="pairSyntax">
+        </label>
+        <p class="hint" id="pairSyntax">Trenne Spaltennamen durch Kommas. <code>x_i</code> und <code>x_j</code> bezeichnen den Wert der Spalte <code>x</code> in den beiden Zeilen. Erlaubt sind symmetrische Polynome mit ganzzahligen Koeffizienten und Grad bis 8.</p>
+        <label class="field"><span>Beispielwerte zur exakten Auswertung (optional)</span>
+            <textarea id="pairRows" rows="3" spellcheck="false" maxlength="28000" aria-describedby="pairRowHint">2
+-1
+5</textarea>
+        </label>
+        <p class="hint" id="pairRowHint">Eine Datenzeile pro Zeile. Trenne mehrere Spaltenwerte durch Leerzeichen.</p>
+        <button id="pairSubmit" type="submit" class="primary">Algorithmus herleiten</button>
+    </form>
+
+    <p id="pairStatus" role="status" aria-live="polite"></p>
+    <section id="pairResult" class="card" hidden aria-labelledby="pairResultTitle">
+        <h2 id="pairResultTitle">Geprüfter Algorithmus</h2>
+        <p>Die direkte Schleife berechnet <strong id="pairOriginal"></strong> Paare. Der hergeleitete Algorithmus liest <strong id="pairLinear"></strong> Zeilen in einem Durchlauf.</p>
+        <ol>
+            <li><h3>Summand ausmultiplizieren</h3>
+                <code id="pairExpanded"></code>
+            </li>
+            <li><h3>Zwischensummen bestimmen</h3>
+                <p>Jedes Produkt aus einem Faktor der Zeile i und einem Faktor der Zeile j lässt sich über alle i und j als Produkt zweier Summen berechnen. Der Plan zieht die Paare i = j ab und zählt jedes übrige Paar einmal.</p>
+                <ul id="pairAccumulators"></ul>
+            </li>
+            <li><h3>Ergebnis aus den Summen berechnen</h3>
+                <p><code>n</code> ist die Zahl der gelesenen Zeilen.</p>
+                <code id="pairFormula"></code>
+            </li>
+            <li><h3>Gleichheit prüfen</h3>
+                <p>Die Prüfung setzt eine und zwei symbolische Zeilen ein. Der Beitrag einer einzelnen Zeile ist null. Der Beitrag zweier verschiedener Zeilen stimmt als Polynom mit dem eingegebenen Summanden überein. Der Plan besteht nur aus Einzel- und Paarbeiträgen. Damit gilt die Gleichheit für jede Zeilenanzahl.</p>
+            </li>
+        </ol>
+        <p id="pairSample" hidden></p>
+        <p id="pairWork" class="hint"></p>
+        <details>
+            <summary>Erzeugten Java-Code anzeigen</summary>
+            <p class="hint">Die Methode verarbeitet endliche Zeilen aus exakten <code>BigInteger</code>-Werten in der angegebenen Spaltenreihenfolge.</p>
+            <pre><code id="pairJava"></code></pre>
+        </details>
+    </section>
+</main>
+</body>
+</html>

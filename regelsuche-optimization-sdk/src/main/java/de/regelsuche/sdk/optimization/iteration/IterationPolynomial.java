@@ -105,9 +105,13 @@ final class IterationPolynomial {
         return new IterationPolynomial(map,work);
     }
     static IterationPolynomial parse(Expr expression, Set<SymbolId> allowed, boolean integers, int degree, Work w) {
-        return parse(expression,allowed,integers,degree,w,1,new int[]{0});
+        return parse(expression,allowed,integers,false,degree,w,1,new int[]{0});
     }
-    private static IterationPolynomial parse(Expr expression, Set<SymbolId> allowed, boolean integers, int degree, Work w, int depth, int[] nodes) {
+    static IterationPolynomial parseIntegerPowers(Expr expression, Set<SymbolId> allowed, int degree, Work w) {
+        return parse(expression,allowed,true,true,degree,w,1,new int[]{0});
+    }
+    private static IterationPolynomial parse(Expr expression, Set<SymbolId> allowed, boolean integers,
+            boolean powers, int degree, Work w, int depth, int[] nodes) {
         w.charge(1);
         if(depth>FiniteIteration.MAX_DEPTH || ++nodes[0]>FiniteIteration.MAX_NODES) throw new Unavailable("EXPRESSION_LIMIT");
         IterationPolynomial result;
@@ -118,10 +122,21 @@ final class IterationPolynomial {
         } else if(expression instanceof VariableExpr variable) {
             if(variable.symbol().isEmpty() || !allowed.contains(variable.symbol().orElseThrow())) throw new Unavailable("UNBOUND_SYMBOL");
             result=variable(variable.symbol().orElseThrow(),w);
+        } else if (powers && expression instanceof BinaryExpr power && power.operator() == BinaryOperator.POW) {
+            if (!(power.right() instanceof NumberExpr exponent) || !exponent.value().isInteger()
+                    || exponent.value().signum() < 0
+                    || exponent.value().numerator().compareTo(BigInteger.valueOf(degree)) > 0) {
+                throw new Unavailable("UNSUPPORTED_POWER");
+            }
+            var base = parse(power.left(), allowed, integers, true, degree, w, depth + 1, nodes);
+            result = constant(BigInteger.ONE, w);
+            for (int i = 0; i < exponent.value().numerator().intValueExact(); i++) {
+                result = result.multiply(base);
+            }
         } else if(expression instanceof BinaryExpr binary) {
             if(binary.operator()!=BinaryOperator.ADD && binary.operator()!=BinaryOperator.SUB && binary.operator()!=BinaryOperator.MUL) throw new Unavailable("UNSUPPORTED_OPERATOR");
-            var left=parse(binary.left(),allowed,integers,degree,w,depth+1,nodes);
-            var right=parse(binary.right(),allowed,integers,degree,w,depth+1,nodes);
+            var left=parse(binary.left(),allowed,integers,powers,degree,w,depth+1,nodes);
+            var right=parse(binary.right(),allowed,integers,powers,degree,w,depth+1,nodes);
             result=switch(binary.operator()) { case ADD -> left.add(right); case SUB -> left.subtract(right); case MUL -> left.multiply(right); default -> throw new AssertionError(); };
         } else throw new Unavailable("UNSUPPORTED_EXPRESSION");
         for(var m:result.terms.keySet()) { w.charge(1); if(m.symbols().size()>degree) throw new Unavailable("DEGREE_LIMIT"); }
