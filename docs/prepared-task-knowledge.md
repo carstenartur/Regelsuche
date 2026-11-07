@@ -70,6 +70,8 @@ exceed **all actually paid formation and evaluation costs** in both elapsed time
 and CPU. Large horizons/products use exact integer arithmetic. The horizon is a
 caller-supplied forecast; adoption predicts savings, not a measured guarantee.
 An independent complete stream is necessary to demonstrate actual amortization.
+Promotion samples must represent the expected task mix; a future query count
+alone does not specify that mix. Rejection does not recover already paid work.
 
 Time/work cutoffs are checked between bounded atomic API operations, including
 between the two members of a comparison pair. An atomic overrun remains fully

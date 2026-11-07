@@ -57,9 +57,9 @@ Expected: pure gate decisions match literal arithmetic; real tests verify actual
 
 **Interfaces:** Source-only tasks, declared lesson/validation/promotion/query splits, fixed settings. Compare legacy repeated loads and prepared-session repeated loads with first independent restore included; one-load and repeated-load controls, retained negative cases, three rotated repetitions. Exercise actual self-improvement including rejected attempts. Publish source before first measured execution; retain originals/runtime and failure receipts. Driver validates quality before computing ratios.
 
-- [ ] Freeze exact tasks/budgets/lengths and write negative evidence tests before executing the new corpus.
-- [ ] Run full Java/Python suites and unchanged semantic coverage/complexity gate; commit runnable source.
-- [ ] Execute original protocol, independently audit results and complete CPU/RSS/lifecycle costs; keep negative results.
-- [ ] Report factual gains/limits and expose reusable APIs with examples, then commit.
+- [x] Freeze exact tasks/budgets/lengths and write negative evidence tests before executing the new corpus.
+- [x] Run full Java/Python suites and unchanged semantic coverage/complexity gate; commit runnable source.
+- [x] Execute original protocol, independently audit results and complete CPU/RSS/lifecycle costs; keep negative results.
+- [x] Report factual gains/limits and expose reusable APIs with examples, then commit.
 - [ ] Fresh whole-branch review using the five Review Focus lines; one RED→GREEN fix pass for substantive findings, affected full tests and reverify untouched data.
 - [ ] Publish one focused PR against main and durable evidence. Do not claim broad SymPy superiority from this experiment.
