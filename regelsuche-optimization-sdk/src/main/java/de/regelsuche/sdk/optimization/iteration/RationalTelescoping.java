@@ -7,7 +7,9 @@ import de.regelsuche.symbol.SymbolId;
 import de.regelsuche.sdk.optimization.*;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Exact rational fragment N(parameters)/(a*(i+b(parameters))*(i+b(parameters)+stride)).
  * a is a nonzero rational constant. No Java division semantics are represented by this API.
@@ -24,18 +26,18 @@ public final class RationalTelescoping {
     }
     public record SearchResult(Optional<Plan> plan,String reason,long work) {}
     public record Verification(boolean verified,String reason,long work) {}
-    private static Work work(OptimizationBudget b,CancellationToken c) { return new Work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }
+    private static Work work(OptimizationBudget b,CancellationToken c) { return SeriesSupport.work(b,c,PolynomialSum.MAX_TOTAL_DEGREE); }
     private static Set<SymbolId> symbols(Source s) { var ids=new HashSet<>(s.parameters()); ids.add(s.index()); return ids; }
     private static IterationPolynomial coefficient(IterationPolynomial p,SymbolId index,int power) {
-        var r=zero(p.work);
-        for(var e:p.terms.entrySet()) if(e.getKey().degree(index)==power)
-            r=r.add(single(e.getKey().without(index),e.getValue(),p.work));
+        var r=zero(p.work());
+        for(var e:p.terms().entrySet()) if(e.getKey().degree(index)==power)
+            r=r.add(single(e.getKey().without(index),e.getValue(),p.work()));
         return r;
     }
     private static ExactRational nonzeroConstant(IterationPolynomial p) {
-        p.work.charge(p.terms.size()+1);
-        if(p.terms.size()!=1) throw new Unavailable("NONCONSTANT_LEADING_COEFFICIENT");
-        var entry=p.terms.entrySet().iterator().next();
+        p.work().charge(p.terms().size()+1);
+        if(p.terms().size()!=1) throw new Unavailable("NONCONSTANT_LEADING_COEFFICIENT");
+        var entry=p.terms().entrySet().iterator().next();
         if(!entry.getKey().symbols().isEmpty()) throw new Unavailable("NONCONSTANT_LEADING_COEFFICIENT");
         return entry.getValue();
     }
@@ -60,8 +62,8 @@ public final class RationalTelescoping {
             var numerator=SeriesSupport.parse(source.numerator(),ids,w).scale(ExactRational.NEGATIVE_ONE.divide(scale));
             var plan=new Plan(source,numerator.expression(),factor.expression());
             check(source,plan,w);
-            return new SearchResult(Optional.of(plan),"CANDIDATE",w.used);
-        } catch(Unavailable e) { return new SearchResult(Optional.empty(),e.getMessage(),w.used); }
+            return new SearchResult(Optional.of(plan),"CANDIDATE",w.used());
+        } catch(Unavailable e) { return new SearchResult(Optional.empty(),e.getMessage(),w.used()); }
     }
     /** Primitive numerator and denominator are the emitted rational boundary expression. */
     public record Plan(Source source,Expr primitiveNumerator,Expr primitiveDenominator) {
@@ -91,8 +93,8 @@ public final class RationalTelescoping {
     }
     public static Verification verify(Source source,Plan plan,OptimizationBudget budget,CancellationToken cancellation) {
         Objects.requireNonNull(source); Objects.requireNonNull(plan); var w=work(budget,cancellation);
-        try { check(source,plan,w); return new Verification(true,"VERIFIED_RATIONAL_TELESCOPE",w.used); }
-        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used); }
+        try { check(source,plan,w); return new Verification(true,"VERIFIED_RATIONAL_TELESCOPE",w.used()); }
+        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used()); }
     }
     private static void check(Source source,Plan plan,Work w) {
         w.charge(6L*FiniteIteration.MAX_NODES);

@@ -3,15 +3,15 @@ package de.regelsuche.sdk.optimization.iteration;
 import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.sdk.optimization.*;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Independent Newton reconstruction certificate checker; never invokes synthesis. */
 public final class PolynomialSumVerifier {
     public record Verification(boolean verified,String reason,long work) {}
     public Verification verify(PolynomialSum source,PolynomialSumPlan plan,OptimizationBudget budget,CancellationToken cancellation) {
-        Objects.requireNonNull(source); Objects.requireNonNull(plan); var w=new Work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);
-        try { check(source,plan,w); return new Verification(true,"VERIFIED_NEWTON_SUM",w.used); }
-        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used); }
+        Objects.requireNonNull(source); Objects.requireNonNull(plan); var w=SeriesSupport.work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);
+        try { check(source,plan,w); return new Verification(true,"VERIFIED_NEWTON_SUM",w.used()); }
+        catch(Unavailable e) { return new Verification(false,e.getMessage(),w.used()); }
     }
     static void check(PolynomialSum source,PolynomialSumPlan plan,Work w) {
         w.charge(6L*FiniteIteration.MAX_NODES);

@@ -190,7 +190,8 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
             ("outcome=CONFIRMED outcome=REFUTED sdk.provider.artifactSha256", "solver dependencies", []),
             ("provider=primachsenraum-number-theory-provider bases=[2, 3] 2047 falsePrimes=0 falseCompositeDecisions=0",
              "number theory dependencies", []),
-            ("optimization=VERIFIED checked=ORIGINAL_OVERFLOW_DETECTED", "optimizer dependencies", []),
+            ("optimization=VERIFIED checked=ORIGINAL_OVERFLOW_DETECTED pair=VERIFIED_ONE_PASS_54",
+             "optimizer dependencies", []),
             ("extension=hello origin=greeting-plugin catalog=sha256:" + "a" * 64,
              "extension dependencies", []),
         ]

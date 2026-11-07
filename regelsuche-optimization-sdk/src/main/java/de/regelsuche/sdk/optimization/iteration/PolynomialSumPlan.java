@@ -5,7 +5,7 @@ import de.regelsuche.symbol.SymbolId;
 import de.regelsuche.sdk.optimization.*;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Immutable untrusted transport: initial + sum_j coefficients[j] binomial(count,j+1). */
 public record PolynomialSumPlan(PolynomialSum source,Expr initial,List<Expr> coefficients) {
@@ -17,7 +17,7 @@ public record PolynomialSumPlan(PolynomialSum source,Expr initial,List<Expr> coe
     /** Independently validates this plan before bounded evaluation; zero count avoids unused parameter reads. */
     public BigInteger evaluate(BigInteger count,Map<SymbolId,BigInteger> parameters,OptimizationBudget budget,CancellationToken cancellation) {
         Objects.requireNonNull(count); Objects.requireNonNull(parameters);
-        var w=new Work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);
+        var w=SeriesSupport.work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);
         try { return evaluate(count,parameters,w); }
         catch(Unavailable e) { throw new IllegalArgumentException(e.getMessage(),e); }
     }

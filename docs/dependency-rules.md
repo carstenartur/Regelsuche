@@ -53,6 +53,7 @@ flowchart TD
     egraph --> core
     validation --> core
     math --> core
+    math --> search
     persistence --> core
 ```
 
@@ -93,6 +94,10 @@ ist aber keine Sandbox. Details stehen unter
 
 - `:regelsuche-math-algorithms` enthält reine oder klar begrenzte mathematische
   Verfahren und keine Campaign-Entscheidungen.
+- Die Paarsummensuche verbindet den typisierten Paarbinder aus Core mit
+  Synthese und unabhängiger Prüfung im Mathematikmodul. Sie führt beide Züge
+  über dieselbe Frontier wie die übrige Zugsuche aus. Workbench und
+  Optimierungs-SDK greifen auf diese Fähigkeit zu.
 - `:regelsuche-math-jas` und `:regelsuche-math-sympy` sind technische
   Mathematikadapter und dürfen von den stabilen inneren Verträgen abhängen.
 - `:regelsuche-math-sympy` darf GraalPy, Polyglot, eingebettete Python-Pakete

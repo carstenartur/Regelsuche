@@ -4,15 +4,15 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.sdk.optimization.*;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Newton forward differences, bounded by polynomial degree, independent of runtime count. */
 public final class PolynomialSumOptimizer {
     public record SearchResult(Optional<PolynomialSumPlan> plan,String reason,long work) {}
     public SearchResult search(PolynomialSum source,OptimizationBudget budget,CancellationToken cancellation) {
-        Objects.requireNonNull(source); var w=new Work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);
-        try { return new SearchResult(Optional.of(create(source,w)),"CANDIDATE",w.used); }
-        catch(Unavailable e) { return new SearchResult(Optional.empty(),e.getMessage(),w.used); }
+        Objects.requireNonNull(source); var w=SeriesSupport.work(budget,cancellation,PolynomialSum.MAX_TOTAL_DEGREE);
+        try { return new SearchResult(Optional.of(create(source,w)),"CANDIDATE",w.used()); }
+        catch(Unavailable e) { return new SearchResult(Optional.empty(),e.getMessage(),w.used()); }
     }
     static PolynomialSumPlan create(PolynomialSum source,Work w) {
             var difference=SeriesSupport.source(source,w); int d=SeriesSupport.degree(difference,source.index());

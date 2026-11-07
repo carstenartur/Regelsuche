@@ -325,6 +325,7 @@ public class WebWorkbenchServer {
         handlers.put("/api/didactic", this::handleDidactic);
         handlers.put("/api/inspect", this::handleInspect);
         handlers.put("/api/representations", this::handleMatrixRepresentations);
+        handlers.put("/api/pair-reductions", this::handlePairReductions);
         handlers.put("/api/discovery-domains", this::handleDiscoveryDomains);
         handlers.put("/api/rule-radar", ruleRadarHandler);
         handlers.put(
@@ -390,6 +391,16 @@ public class WebWorkbenchServer {
                 sendJson(exchange, 200, workbench.run(input));
             }
         } catch (IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError exception) {
+            sendStatus(exchange, 400, exception.getMessage());
+        }
+    }
+
+    private void handlePairReductions(HttpExchange exchange) throws IOException {
+        try {
+            var input = new StreamingJsonRequestBody(Math.min(32 * 1024, securityConfig.maxRequestBytes()))
+                .readObject(exchange);
+            sendJson(exchange, 200, PairReductionWorkbench.analyze(input));
+        } catch (IllegalArgumentException exception) {
             sendStatus(exchange, 400, exception.getMessage());
         }
     }

@@ -1,11 +1,15 @@
 package de.regelsuche.sdk.optimization.iteration;
 
 import de.regelsuche.ast.*;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial;
+import de.regelsuche.sdk.optimization.CancellationToken;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.symbol.SymbolId;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.IterationPolynomial.*;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.*;
 
 /** Shared bounded arithmetic, not a certificate authority. */
 final class SeriesSupport {
@@ -20,13 +24,13 @@ final class SeriesSupport {
         return IterationPolynomial.parse(e,ids,false,PolynomialSum.MAX_TOTAL_DEGREE,w);
     }
     static int degree(IterationPolynomial p,SymbolId index) {
-        p.work.charge(p.terms.size()); return p.terms.keySet().stream().mapToInt(m->m.degree(index)).max().orElse(0);
+        p.work().charge(p.terms().size()); return p.terms().keySet().stream().mapToInt(m->m.degree(index)).max().orElse(0);
     }
     /** Integer-valued polynomial criterion: every multivariate Newton coefficient is integral. */
     static void integerValued(IterationPolynomial p) {
-        p.work.charge(p.terms.size());
-        if(p.terms.values().stream().allMatch(ExactRational::isInteger)) return;
-        var symbol=p.terms.keySet().stream().flatMap(m->m.symbols().stream()).findFirst();
+        p.work().charge(p.terms().size());
+        if(p.terms().values().stream().allMatch(ExactRational::isInteger)) return;
+        var symbol=p.terms().keySet().stream().flatMap(m->m.symbols().stream()).findFirst();
         if(symbol.isEmpty()) throw new Unavailable("NONINTEGRAL_POLYNOMIAL");
         var x=symbol.orElseThrow(); int d=degree(p,x); var difference=p;
         for(int j=0;j<=d;j++) {
@@ -45,8 +49,7 @@ final class SeriesSupport {
         return term.substitute(s.index(),ordinal);
     }
     static void bits(BigInteger x,Work w) {
-        w.charge(1+((long)x.bitLength()/64));
-        if(x.bitLength()>PolynomialSum.MAX_RUNTIME_BITS) throw new Unavailable("RUNTIME_BIT_LIMIT");
+        w.runtimeInteger(x);
     }
     static ExactRational bounded(ExactRational x,Work w) { bits(x.numerator(),w); bits(x.denominator(),w); return x; }
     static BigInteger value(IterationPolynomial p,Map<SymbolId,BigInteger> values) {
@@ -55,19 +58,28 @@ final class SeriesSupport {
     }
     static ExactRational rationalValue(IterationPolynomial p,Map<SymbolId,BigInteger> values) {
         var r=ExactRational.ZERO;
-        for(var e:p.terms.entrySet()) {
+        for(var e:p.terms().entrySet()) {
             var term=e.getValue();
             for(var symbol:e.getKey().symbols()) {
-                var n=values.get(symbol); if(n==null) throw new Unavailable("UNBOUND_SYMBOL"); bits(n,p.work);
-                term=bounded(term.multiply(ExactRational.integer(n)),p.work);
+                var n=values.get(symbol); if(n==null) throw new Unavailable("UNBOUND_SYMBOL"); bits(n,p.work());
+                term=bounded(term.multiply(ExactRational.integer(n)),p.work());
             }
-            r=bounded(r.add(term),p.work);
+            r=bounded(r.add(term),p.work());
         }
         return r;
     }
     static IterationPolynomial binomial(IterationPolynomial x,int k) {
-        var result=constant(BigInteger.ONE,x.work);
-        for(int j=0;j<k;j++) result=result.multiply(x.add(constant(BigInteger.valueOf(-j),x.work))).scale(ExactRational.ONE.divide(ExactRational.integer(j+1)));
+        var result=constant(BigInteger.ONE,x.work());
+        for(int j=0;j<k;j++) result=result.multiply(x.add(constant(BigInteger.valueOf(-j),x.work()))).scale(ExactRational.ONE.divide(ExactRational.integer(j+1)));
         return result;
+    }
+
+    static IterationLimits limits(OptimizationBudget budget) {
+        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());
+    }
+
+    static Work work(OptimizationBudget budget, CancellationToken cancellation, int maximumDegree) {
+        Objects.requireNonNull(cancellation);
+        return new Work(limits(budget), cancellation::isCancelled, maximumDegree);
     }
 }

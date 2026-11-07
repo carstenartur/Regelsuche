@@ -8,10 +8,12 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.ast.iteration.IndexRange;
 import de.regelsuche.ast.iteration.IntegerArithmetic;
+import de.regelsuche.ast.iteration.PairReduction;
 import de.regelsuche.search.program.JointComputationPlan;
 import de.regelsuche.sdk.optimization.*;
 import de.regelsuche.sdk.optimization.iteration.FiniteIterationOptimizer;
 import de.regelsuche.sdk.optimization.iteration.FiniteIterationVerifier;
+import de.regelsuche.sdk.optimization.iteration.PairReductionSdk;
 import de.regelsuche.sdk.optimization.iteration.PolynomialSum;
 import de.regelsuche.sdk.optimization.iteration.PolynomialSumOptimizer;
 import de.regelsuche.sdk.optimization.iteration.PolynomialSumVerifier;
@@ -21,6 +23,8 @@ import de.regelsuche.sdk.optimization.iteration.LinearIterationOptimizer;
 import de.regelsuche.sdk.optimization.iteration.LinearIterationVerifier;
 import de.regelsuche.sdk.optimization.iteration.LinearIterationEvaluator;
 import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.symbol.SymbolScope;
+import de.regelsuche.symbol.SymbolicExpression;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +72,20 @@ public final class JavaOptimization {
         System.out.println("domains=ORIGINAL_AND_CANDIDATE_VERIFIED");
         verifyFiniteSum();
         verifyRuntimeSeries();
+        verifyPairReduction();
+    }
+    private static void verifyPairReduction() {
+        var scope = new SymbolScope();
+        var column = new PairReduction.Column(scope.declare("left"), scope.declare("right"));
+        var term = SymbolicExpression.parse("(left-right)^2", scope).expression();
+        var result = PairReductionSdk.search(new PairReduction(List.of(column), term),
+            OptimizationBudget.DEFAULT, CancellationToken.NONE);
+        var checked = result.verified().orElseThrow(() -> new AssertionError(result.reason()));
+        var rows = List.of(List.of(BigInteger.TWO), List.of(BigInteger.ONE.negate()), List.of(BigInteger.valueOf(5)));
+        var evaluation = PairReductionSdk.evaluate(checked, rows, OptimizationBudget.DEFAULT, CancellationToken.NONE);
+        if (result.witness().size() != 2 || !evaluation.value().equals(BigInteger.valueOf(54)))
+            throw new AssertionError("checked pair search unavailable in standalone SDK");
+        System.out.println("pair=VERIFIED_ONE_PASS_54");
     }
     private static void verifyRuntimeSeries() {
         var namespace=UUID.fromString("f0b26fe5-b139-4677-bc37-9bc8c59b6f8f");

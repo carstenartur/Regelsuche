@@ -8,10 +8,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /** Representation boundary of the one frontier. Neither scheduling nor proof authority lives here. */
 public final class SearchExecution {
     private SearchExecution() {}
+
+    /** Run a typed source-only domain on the shared move frontier. */
+    public static <E, S extends Position<E>, M extends Edge<E, M>, A extends Assessment<E>, V extends Verification>
+            CheckedPath<S, M, V> searchUntil(Environment<E, S, M, A, V> environment,
+                    Function<S, MoveSearch.ObjectiveScore> objective, long maximumOutputScore) {
+        if (environment.goal() != null || environment.mode() != MoveSearch.Mode.FAST) {
+            throw new IllegalArgumentException("quality stopping requires source-only FAST search");
+        }
+        var online = new MoveSearchObjective<S, M, V>(objective, maximumOutputScore);
+        var result = new MoveSearchKernel<E, S, M, A, V>()
+            .search(environment, SearchContinuationContract.PATH_SENSITIVE, online);
+        return new CheckedPath<>(result.outcome(), result.witness(), result.metrics());
+    }
+
+    public record CheckedPath<S, M, V>(MoveSearch.Outcome outcome, List<Step<S, M, V>> witness,
+            MoveSearch.Metrics metrics) {}
+
     /** Internal abort transport. Only completed, not-yet-transferred work; never mathematical authority. */
     public static final class ResourceLimit extends RuntimeException {
         private long mechanical,verification;
@@ -71,11 +89,12 @@ public final class SearchExecution {
         default Object executionReceipt() { return null; }
         @Override default void close() {}
     }
-    interface Environment<E,S extends Position<E>,M extends Edge<E,M>,A extends Assessment<E>,V extends Verification> {
+    public interface Environment<E,S extends Position<E>,M extends Edge<E,M>,A extends Assessment<E>,V extends Verification> {
         E source(); E goal(); List<String> initialAssumptions(); MoveSearch.Budget budget();
         MoveSearch.Mode mode(); MoveSearch.Scheduling scheduling();
         S state(E expression,int depth,int primitive,String previous,List<String> assumptions,Set<String> capabilities,int debt);
         A inspect(S state); double score(S state); V verify(S state,M move); boolean carries(List<String> assumptions,S state);
+        default V verify(S state, M move, long allowance) { return verify(state, move); }
         Picker<M> picker(S state);
         default void ownership(RetainedGraph.View root) {}
         default void checkpoint() {}
