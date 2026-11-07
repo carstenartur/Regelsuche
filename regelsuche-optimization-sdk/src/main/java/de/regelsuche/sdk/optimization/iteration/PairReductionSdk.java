@@ -5,10 +5,12 @@ import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.iteration.PairReductionPlan;
 import de.regelsuche.math.algorithms.iteration.PairReductionSearch;
 import de.regelsuche.math.algorithms.iteration.PairReductionVerifier;
+import de.regelsuche.math.algorithms.iteration.RollingPairReductionPlan;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.function.IntFunction;
 
 /** SDK access to Regelsuche's checked pair search and exact evaluation. */
 public final class PairReductionSdk {
@@ -27,6 +29,22 @@ public final class PairReductionSdk {
     public static PairReductionVerifier.Evaluation evaluate(PairReductionVerifier.Verified checked,
             Iterable<? extends List<BigInteger>> rows, OptimizationBudget budget, CancellationToken cancellation) {
         return checked.evaluate(rows, limits(budget), cancellation::isCancelled);
+    }
+
+    public static PairReductionSearch.WindowResult searchWindows(PairReduction source, OptimizationBudget budget,
+            CancellationToken cancellation) {
+        return PairReductionSearch.searchWindows(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);
+    }
+
+    public static RollingPairReductionPlan.Verification verifyWindows(PairReduction source, RollingPairReductionPlan plan,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return PairReductionSearch.verifyWindows(source, plan, limits(budget), cancellation::isCancelled);
+    }
+
+    public static RollingPairReductionPlan.Evaluation evaluateWindows(RollingPairReductionPlan.Verified checked,
+            int rowCount, int width, IntFunction<? extends List<BigInteger>> rowAt,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return checked.evaluate(rowCount, width, rowAt, limits(budget), cancellation::isCancelled);
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {

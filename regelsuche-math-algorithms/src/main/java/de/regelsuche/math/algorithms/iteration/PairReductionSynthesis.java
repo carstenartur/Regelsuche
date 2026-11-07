@@ -67,7 +67,28 @@ public final class PairReductionSynthesis {
         }
     }
 
-    private static PairReductionPlan synthesize(NormalForm form, Work work) {
+    Result<RollingPairReductionPlan> reduceWindows(NormalForm form, IterationLimits limits, BooleanSupplier cancellation) {
+        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
+        try {
+            work.charge(1);
+            if (form.terms().size() > limits.maximumTerms()) throw new Unavailable("TERM_LIMIT");
+            var pairs = splitByRow(form, work);
+            var terms = new ArrayList<RollingPairReductionPlan.Term>();
+            for (var entry : pairs.entrySet()) {
+                work.charge(1);
+                var coefficient = entry.getValue();
+                if (coefficient.abs().bitLength() > FiniteIteration.MAX_COEFFICIENT_BITS) {
+                    throw new Unavailable("COEFFICIENT_LIMIT");
+                }
+                terms.add(new RollingPairReductionPlan.Term(coefficient, entry.getKey().left(), entry.getKey().right()));
+            }
+            return new Result<>(Optional.of(new RollingPairReductionPlan(terms)), "CANDIDATE", work.used());
+        } catch (Unavailable exception) {
+            return new Result<>(Optional.empty(), exception.getMessage(), work.used());
+        }
+    }
+
+    private static Map<Split, BigInteger> splitByRow(NormalForm form, Work work) {
         var leftColumns = new HashMap<SymbolId, Integer>();
         var rightColumns = new HashMap<SymbolId, Integer>();
         for (int index = 0; index < form.columns().size(); index++) {
@@ -92,7 +113,11 @@ public final class PairReductionSynthesis {
             work.charge(1 + left.size() + right.size());
             pairs.put(new Split(new Moment(left), new Moment(right)), term.getValue().numerator());
         }
+        return pairs;
+    }
 
+    private static PairReductionPlan synthesize(NormalForm form, Work work) {
+        var pairs = splitByRow(form, work);
         var numerator = new LinkedHashMap<List<Moment>, BigInteger>();
         for (var entry : pairs.entrySet()) {
             var split = entry.getKey();

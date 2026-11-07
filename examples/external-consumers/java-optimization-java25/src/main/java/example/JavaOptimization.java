@@ -86,6 +86,15 @@ public final class JavaOptimization {
         if (result.witness().size() != 2 || !evaluation.value().equals(BigInteger.valueOf(54)))
             throw new AssertionError("checked pair search unavailable in standalone SDK");
         System.out.println("pair=VERIFIED_ONE_PASS_54");
+        var windowTerm = SymbolicExpression.parse("left-right", scope).expression();
+        var windows = PairReductionSdk.searchWindows(new PairReduction(List.of(column), windowTerm),
+            OptimizationBudget.DEFAULT, CancellationToken.NONE);
+        var windowPlan = windows.verified().orElseThrow(() -> new AssertionError(windows.reason()));
+        var windowValues = PairReductionSdk.evaluateWindows(windowPlan, rows.size(), 2, rows::get,
+            OptimizationBudget.DEFAULT, CancellationToken.NONE);
+        if (!windowValues.sums().equals(List.of(BigInteger.valueOf(3), BigInteger.valueOf(-6))))
+            throw new AssertionError("checked rolling pair search unavailable in standalone SDK");
+        System.out.println("pair-windows=VERIFIED_ORDERED_3_MINUS_6");
     }
     private static void verifyRuntimeSeries() {
         var namespace=UUID.fromString("f0b26fe5-b139-4677-bc37-9bc8c59b6f8f");

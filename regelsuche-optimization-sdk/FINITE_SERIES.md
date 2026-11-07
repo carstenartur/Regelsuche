@@ -75,6 +75,28 @@ Evaluation has a separate budget. Pair counts and
 row visits describe algorithmic work. Actual runtime also depends on
 the number of moments and the operand sizes.
 
+## Rolling pair sums
+
+`PairReductionSdk.searchWindows` uses the same pair binder and checked normalization
+for successive windows of a positive runtime width. Its ordered plan also
+accepts asymmetric integer polynomials. Each term is a coefficient times
+a monomial of the left row times a monomial of the right row. The checker
+reconstructs the input polynomial with independent symbols for both rows.
+
+The plan maintains a sum for each needed row monomial and the sum of ordered
+pairs in the active window. On removal, it subtracts the oldest row from the
+moments, then subtracts that row's pairs as a left endpoint. On insertion, it
+adds the newest row's pairs as a right endpoint, then adds its moments.
+These steps establish the same invariant after every slide and use only
+addition, subtraction and multiplication.
+
+`evaluateWindows` takes a stable indexed row source. It reads each row at
+entry and at most once at exit, returns one exact sum per complete window,
+and charges the evaluation budget separately from search and proof.
+The plan contains no division. Java adapters can use the same schedule in
+an integer ring if they independently prove the operand widths, stable
+array ownership, output writes and index bounds.
+
 ## Exact rational telescoping
 
 `RationalTelescoping.Source` is explicitly exact rational and represents a numerator polynomial in free parameters divided by a quadratic denominator of the form
