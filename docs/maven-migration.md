@@ -60,6 +60,19 @@ mvn --batch-mode --no-transfer-progress \
 No GitHub API, Git checkout metadata or host-side interpreter is used by these
 commands.
 
+The additional wrapper Git-index diagnostic is explicitly checkout-only:
+
+```text
+mvn --batch-mode --no-transfer-progress -pl maven-build-contract \
+  -Dtest=GitWrapperNormalizationContractTest \
+  -Dregelsuche.checkoutContracts=true test
+```
+
+Only this opt-in diagnostic requires Git and its index. The default wrapper
+contract accepts the declared LF/CRLF source-archive representation without
+invoking Git. Existing checkout CI also rejects a dirty source tree before
+binding execution evidence.
+
 ## Transitional verification
 
 Until all modules and evidence gates have moved, the existing Gradle `check`
