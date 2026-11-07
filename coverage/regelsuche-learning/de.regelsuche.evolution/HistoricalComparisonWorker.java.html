@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalComparisonWorker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">HistoricalComparisonWorker.java</span></div><h1>HistoricalComparisonWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import de.regelsuche.search.moves.MoveSearch;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Thin experiment adapter; all mathematics and learning belong to existing public APIs. */
+<span class="fc" id="L26">public final class HistoricalComparisonWorker {</span>
+<span class="fc" id="L27">    private static final MoveSearch.Budget STRUCTURAL = new MoveSearch.Budget(24, 12, 1_000_000, 128, 2_000_000);</span>
+    private CumulativeTaskKnowledge knowledge;
+    private String profile, preludeHash;
+    private boolean consumer, poisoned;
+
+    public Map&lt;String, Object&gt; handle(String line) {
+        try {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if (poisoned) throw new IllegalStateException(&quot;poisoned session&quot;);</span>
+<span class="fc" id="L35">            var request = CheckedSchemaSupport.read(line);</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">            return switch (CheckedSchemaSupport.text(request, &quot;op&quot;)) {</span>
+<span class="fc" id="L37">                case &quot;initialize&quot; -&gt; initialize(request);</span>
+<span class="fc" id="L38">                case &quot;restore&quot; -&gt; restore(request);</span>
+<span class="fc" id="L39">                case &quot;run&quot; -&gt; run(request);</span>
+<span class="nc" id="L40">                default -&gt; throw new IllegalArgumentException(&quot;unknown operation&quot;);</span>
+            };
+<span class="fc" id="L42">        } catch (Exception failure) {</span>
+<span class="fc" id="L43">            poisoned = true;</span>
+<span class="fc" id="L44">            return Map.of(&quot;status&quot;, &quot;ERROR&quot;, &quot;error&quot;, failure.toString(), &quot;accountingComplete&quot;, false);</span>
+        }
+    }
+
+    private void configure(JsonNode request) {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (knowledge != null) throw new IllegalStateException(&quot;already configured&quot;);</span>
+<span class="fc" id="L50">        profile = CheckedSchemaSupport.text(request, &quot;profile&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (!Set.of(&quot;NATIVE_BASE&quot;, &quot;NATIVE_LEARNED&quot;).contains(profile)) throw new IllegalArgumentException(&quot;native profile required&quot;);</span>
+<span class="fc" id="L52">        var prelude = request.get(&quot;prelude&quot;);</span>
+<span class="fc" id="L53">        CheckedSchemaSupport.fields(prelude, &quot;expressionBlocks&quot;, &quot;recurrenceBlocks&quot;, &quot;recurrenceFamilyValidation&quot;);</span>
+<span class="fc" id="L54">        preludeHash = SchematicProofPlan.hash(LearnedSchedulingArtifacts.json(CheckedSchemaSupport.JSON.convertValue(prelude, Map.class)) + &quot;\n&quot;);</span>
+<span class="fc" id="L55">    }</span>
+
+    private Map&lt;String, Object&gt; initialize(JsonNode request) throws Exception {
+<span class="fc" id="L58">        CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;, &quot;prelude&quot;, &quot;directory&quot;);</span>
+<span class="fc" id="L59">        configure(request);</span>
+<span class="fc" id="L60">        knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory(), TaskConstructionProfile.STRUCTURAL_V1);</span>
+<span class="fc" id="L61">        var operations = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (profile.equals(&quot;NATIVE_BASE&quot;)) {</span>
+<span class="fc" id="L63">            consumer = true;</span>
+<span class="fc" id="L64">            return setup(&quot;INITIALIZED&quot;, operations);</span>
+        }
+<span class="fc" id="L66">        var prelude = request.get(&quot;prelude&quot;);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (var block : array(prelude.get(&quot;expressionBlocks&quot;))) {</span>
+<span class="fc" id="L68">            CheckedSchemaSupport.fields(block, &quot;lessons&quot;, &quot;validation&quot;);</span>
+<span class="fc" id="L69">            var update = knowledge.learnBatch(expressions(block.get(&quot;lessons&quot;)), expressions(block.get(&quot;validation&quot;)), 5_000_000);</span>
+<span class="fc" id="L70">            knowledge = update.next();</span>
+<span class="fc" id="L71">            operations.add(Map.of(&quot;stage&quot;, &quot;EXPRESSION&quot;, &quot;promoted&quot;, update.promoted(), &quot;reason&quot;, update.reason().name(), &quot;work&quot;, update.work().total()));</span>
+<span class="fc" id="L72">        }</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        for (var block : array(prelude.get(&quot;recurrenceBlocks&quot;))) {</span>
+<span class="nc" id="L74">            CheckedSchemaSupport.fields(block, &quot;lessons&quot;, &quot;validation&quot;);</span>
+<span class="nc" id="L75">            var update = knowledge.learnRecurrences(recurrences(block.get(&quot;lessons&quot;)), recurrences(block.get(&quot;validation&quot;)), new Budget(500_000));</span>
+<span class="nc" id="L76">            knowledge = update.next();</span>
+<span class="nc" id="L77">            operations.add(Map.of(&quot;stage&quot;, &quot;RECURRENCE&quot;, &quot;promoted&quot;, update.promoted(), &quot;reason&quot;, update.reason().name(), &quot;work&quot;, update.work().total()));</span>
+<span class="nc" id="L78">        }</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (!array(prelude.get(&quot;recurrenceFamilyValidation&quot;)).isEmpty()) {</span>
+<span class="nc" id="L80">            var update = knowledge.generalizeRecurrences(recurrences(prelude.get(&quot;recurrenceFamilyValidation&quot;)), new Budget(500_000));</span>
+<span class="nc" id="L81">            knowledge = update.next();</span>
+<span class="nc" id="L82">            operations.add(Map.of(&quot;stage&quot;, &quot;FAMILY&quot;, &quot;promoted&quot;, update.promoted(), &quot;reason&quot;, update.reason().name(), &quot;work&quot;, update.work().total()));</span>
+        }
+<span class="fc" id="L84">        Path snapshot = knowledge.save(Path.of(CheckedSchemaSupport.text(request, &quot;directory&quot;)));</span>
+<span class="fc" id="L85">        var result = setup(&quot;SAVED&quot;, operations);</span>
+<span class="fc" id="L86">        result.put(&quot;snapshot&quot;, snapshot.toString());</span>
+<span class="fc" id="L87">        result.put(&quot;snapshotHash&quot;, SchematicProofPlan.hash(Files.readString(snapshot)));</span>
+<span class="fc" id="L88">        return result;</span>
+    }
+
+    private Map&lt;String, Object&gt; restore(JsonNode request) throws Exception {
+<span class="fc" id="L92">        CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;profile&quot;, &quot;prelude&quot;, &quot;snapshot&quot;);</span>
+<span class="fc" id="L93">        configure(request);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (!profile.equals(&quot;NATIVE_LEARNED&quot;)) throw new IllegalArgumentException(&quot;only learned knowledge restores&quot;);</span>
+<span class="fc" id="L95">        Path snapshot = Path.of(CheckedSchemaSupport.text(request, &quot;snapshot&quot;));</span>
+<span class="fc" id="L96">        knowledge = CumulativeTaskKnowledge.load(TraceStrategyTransferExample.inventory(), snapshot);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (knowledge.constructionProfile() != TaskConstructionProfile.STRUCTURAL_V1) throw new IllegalArgumentException(&quot;changed native capabilities&quot;);</span>
+<span class="fc" id="L98">        consumer = true;</span>
+<span class="fc" id="L99">        var result = setup(&quot;RESTORED&quot;, List.of());</span>
+<span class="fc" id="L100">        result.put(&quot;snapshotHash&quot;, SchematicProofPlan.hash(Files.readString(snapshot)));</span>
+<span class="fc" id="L101">        return result;</span>
+    }
+
+    private Map&lt;String, Object&gt; setup(String status, List&lt;Map&lt;String, Object&gt;&gt; operations) {
+<span class="fc" id="L105">        var result = common(status);</span>
+<span class="fc" id="L106">        result.put(&quot;operations&quot;, operations);</span>
+<span class="fc" id="L107">        result.put(&quot;structuralBudget&quot;, List.of(24, 12, 1_000_000, 128, 2_000_000));</span>
+<span class="fc" id="L108">        return result;</span>
+    }
+
+    private Map&lt;String, Object&gt; common(String status) {
+<span class="fc" id="L112">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L113">        result.put(&quot;status&quot;, status); result.put(&quot;profile&quot;, profile); result.put(&quot;preludeHash&quot;, preludeHash);</span>
+<span class="fc" id="L114">        result.put(&quot;generationId&quot;, knowledge.id());</span>
+<span class="fc" id="L115">        result.put(&quot;acquisitionApiWork&quot;, knowledge.acquisitionWork());</span>
+<span class="fc" id="L116">        result.put(&quot;restorationApiWork&quot;, knowledge.sessionSetupWork());</span>
+<span class="fc" id="L117">        result.put(&quot;schemaCount&quot;, knowledge.schemaCount()); result.put(&quot;recurrenceCount&quot;, knowledge.recurrenceCount());</span>
+<span class="fc" id="L118">        result.put(&quot;recurrenceFamilyCount&quot;, knowledge.recurrenceFamilyCount());</span>
+<span class="fc" id="L119">        return result;</span>
+    }
+
+    private Map&lt;String, Object&gt; run(JsonNode request) {
+<span class="fc" id="L123">        CheckedSchemaSupport.fields(request, &quot;op&quot;, &quot;task&quot;);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (!consumer) throw new IllegalStateException(&quot;a configured query consumer is required&quot;);</span>
+<span class="fc" id="L125">        var task = request.get(&quot;task&quot;);</span>
+<span class="fc" id="L126">        var result = common(&quot;RESULT&quot;);</span>
+<span class="fc" id="L127">        result.put(&quot;task&quot;, CheckedSchemaSupport.JSON.convertValue(task, Map.class));</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        var strategy = profile.equals(&quot;NATIVE_BASE&quot;) ? CumulativeTaskKnowledge.Strategy.BASELINE : CumulativeTaskKnowledge.Strategy.AUTOMATIC;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (CheckedSchemaSupport.text(task, &quot;kind&quot;).equals(&quot;INVARIANT&quot;)) {</span>
+<span class="fc" id="L130">            CheckedSchemaSupport.fields(task, &quot;kind&quot;, &quot;recurrence&quot;);</span>
+<span class="fc" id="L131">            var execution = knowledge.solve(recurrence(task.get(&quot;recurrence&quot;)), strategy);</span>
+<span class="fc" id="L132">            result.put(&quot;solved&quot;, execution.solved()); result.put(&quot;reused&quot;, execution.reused());</span>
+<span class="fc" id="L133">            result.put(&quot;nativeApiWork&quot;, execution.totalWork()); result.put(&quot;outcome&quot;, execution.outcome().name());</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            result.put(&quot;withinBudget&quot;, execution.totalWork() &lt;= task.path(&quot;recurrence&quot;).path(&quot;workBudget&quot;).asInt());</span>
+<span class="fc" id="L135">            result.put(&quot;law&quot;, execution.law().map(law -&gt; Map.of(&quot;polynomial&quot;, law.proposal().polynomial(),</span>
+<span class="fc" id="L136">                &quot;evolution&quot;, law.proposal().evolution().name(), &quot;initialValue&quot;, law.initialValue().toString())).orElse(null));</span>
+<span class="fc" id="L137">        } else {</span>
+<span class="fc" id="L138">            var expression = expression(task);</span>
+<span class="fc" id="L139">            var execution = knowledge.solve(expression, strategy);</span>
+<span class="fc" id="L140">            result.put(&quot;solved&quot;, execution.solved()); result.put(&quot;nativeApiWork&quot;, execution.totalWork());</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            result.put(&quot;withinBudget&quot;, execution.totalWork() &lt;= STRUCTURAL.totalWork()</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                &amp;&amp; execution.solution().map(s -&gt; s.evidence().withinBudget()).orElse(false));</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            result.put(&quot;outcome&quot;, execution.solved() ? &quot;VERIFIED&quot; : &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            result.put(&quot;reused&quot;, execution.solution().map(s -&gt; s.learnedApplications() &gt; 0).orElse(false));</span>
+<span class="fc" id="L145">            result.put(&quot;normalizedInput&quot;, ExpressionFormatter.format(expression.source()));</span>
+<span class="fc" id="L146">            execution.solution().ifPresent(solution -&gt; {</span>
+<span class="fc" id="L147">                var evidence = solution.evidence();</span>
+<span class="fc" id="L148">                result.put(&quot;output&quot;, ExpressionFormatter.format(evidence.incumbent().expression()));</span>
+<span class="fc" id="L149">                result.put(&quot;witness&quot;, evidence.witness().stream().map(edge -&gt; Map.of(</span>
+<span class="fc" id="L150">                    &quot;source&quot;, ExpressionFormatter.format(edge.source().expression()),</span>
+<span class="fc" id="L151">                    &quot;target&quot;, ExpressionFormatter.format(edge.target().expression()),</span>
+<span class="fc" id="L152">                    &quot;move&quot;, edge.move(), &quot;verification&quot;, edge.verification())).toList());</span>
+<span class="fc" id="L153">            });</span>
+        }
+<span class="fc" id="L155">        return result;</span>
+    }
+
+    private static CheckedSchemaTaskSolver.Task expression(JsonNode task) {
+<span class="fc" id="L159">        CheckedSchemaSupport.fields(task, &quot;kind&quot;, &quot;source&quot;);</span>
+<span class="pc bpc" id="L160" title="1 of 3 branches missed.">        var objective = switch (CheckedSchemaSupport.text(task, &quot;kind&quot;)) {</span>
+<span class="fc" id="L161">            case &quot;FACTOR&quot; -&gt; StructuralTaskObjective.FACTORIZATION;</span>
+<span class="fc" id="L162">            case &quot;TWO_SQUARES&quot; -&gt; StructuralTaskObjective.SUM_OF_TWO_SQUARES;</span>
+<span class="nc" id="L163">            default -&gt; throw new IllegalArgumentException(&quot;structural goal required&quot;);</span>
+        };
+<span class="fc" id="L165">        String source = CheckedSchemaSupport.text(task, &quot;source&quot;);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (source.length() &gt; 2048) throw new IllegalArgumentException(&quot;source length&quot;);</span>
+<span class="fc" id="L167">        return new CheckedSchemaTaskSolver.Task(new ExpressionParser().parseExactTerm(source).expression(), List.of(), objective.goal(), STRUCTURAL);</span>
+    }
+
+    private static List&lt;JsonNode&gt; array(JsonNode value) {
+<span class="pc bpc" id="L171" title="3 of 6 branches missed.">        if (value == null || !value.isArray() || value.size() &gt; 32) throw new IllegalArgumentException(&quot;bounded task array required&quot;);</span>
+<span class="fc" id="L172">        var result = new ArrayList&lt;JsonNode&gt;(); value.forEach(result::add); return List.copyOf(result);</span>
+    }
+<span class="fc" id="L174">    private static List&lt;CheckedSchemaTaskSolver.Task&gt; expressions(JsonNode value) { return array(value).stream().map(HistoricalComparisonWorker::expression).toList(); }</span>
+<span class="nc" id="L175">    private static List&lt;Request&gt; recurrences(JsonNode value) { return array(value).stream().map(HistoricalComparisonWorker::recurrence).toList(); }</span>
+    private static Request recurrence(JsonNode task) {
+<span class="fc" id="L177">        CheckedSchemaSupport.fields(task, &quot;linear&quot;, &quot;offset&quot;, &quot;initial&quot;, &quot;degree&quot;, &quot;workBudget&quot;);</span>
+<span class="fc" id="L178">        var rows = array(task.get(&quot;linear&quot;));</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">        if (rows.isEmpty() || rows.size() &gt; 3) throw new IllegalArgumentException(&quot;transition dimension&quot;);</span>
+<span class="fc" id="L180">        var matrix = new ArrayList&lt;List&lt;Rational&gt;&gt;(); rows.forEach(row -&gt; matrix.add(vector(row, rows.size())));</span>
+<span class="fc" id="L181">        int degree = integer(task.get(&quot;degree&quot;)), budget = integer(task.get(&quot;workBudget&quot;));</span>
+<span class="pc bpc" id="L182" title="4 of 8 branches missed.">        if (degree &lt; 1 || degree &gt; 2 || budget &lt; 1 || budget &gt; 100_000) throw new IllegalArgumentException(&quot;recurrence bound&quot;);</span>
+<span class="fc" id="L183">        return new Request(new Transition(new ExactMatrix(matrix), new ExactVector(vector(task.get(&quot;offset&quot;), rows.size()))),</span>
+<span class="fc" id="L184">            vector(task.get(&quot;initial&quot;), rows.size()), degree, new Budget(budget));</span>
+    }
+    private static int integer(JsonNode value) {
+<span class="pc bpc" id="L187" title="3 of 6 branches missed.">        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) throw new IllegalArgumentException(&quot;integer required&quot;);</span>
+<span class="fc" id="L188">        return value.intValue();</span>
+    }
+    private static List&lt;Rational&gt; vector(JsonNode value, int dimension) {
+<span class="fc" id="L191">        var coordinates = array(value);</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (coordinates.size() != dimension) throw new IllegalArgumentException(&quot;coordinate dimension&quot;);</span>
+<span class="fc" id="L193">        return coordinates.stream().map(coordinate -&gt; {</span>
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">            if (!coordinate.isTextual() || coordinate.textValue().length() &gt; 80</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                    || !coordinate.textValue().matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;)) throw new IllegalArgumentException(&quot;rational required&quot;);</span>
+<span class="fc" id="L196">            String[] parts = coordinate.textValue().split(&quot;/&quot;);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            var rational = new Rational(new BigInteger(parts[0]), parts.length == 1 ? BigInteger.ONE : new BigInteger(parts[1]));</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (!rational.toString().equals(coordinate.textValue())) throw new IllegalArgumentException(&quot;noncanonical rational&quot;);</span>
+<span class="fc" id="L199">            return rational;</span>
+<span class="fc" id="L200">        }).toList();</span>
+    }
+
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (args.length != 0) throw new IllegalArgumentException(&quot;JSONL stdin only&quot;);</span>
+<span class="nc" id="L205">        System.out.println(&quot;{\&quot;status\&quot;:\&quot;READY\&quot;,\&quot;java\&quot;:\&quot;&quot; + Runtime.version() + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L206">        var worker = new HistoricalComparisonWorker();</span>
+<span class="nc" id="L207">        try (var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            for (String line; (line = reader.readLine()) != null;) {</span>
+<span class="nc" id="L209">                System.out.println(LearnedSchedulingArtifacts.json(worker.handle(line)));</span>
+<span class="nc" id="L210">                System.out.flush();</span>
+            }
+        }
+<span class="nc" id="L213">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

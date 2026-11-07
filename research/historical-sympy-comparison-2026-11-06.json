@@ -1,0 +1,1404 @@
+{
+  "schema": "regelsuche.historical-sympy-observation/v1",
+  "date": "2026-11-06",
+  "source": {
+    "localCommit": "a5e53c0d99278d7830f539ee2dfa4b0a76ddf607",
+    "publishedContentIdenticalCommit": "f9b25697d84b96249b0c19d16f659206f6653d8d",
+    "tree": "git:2bb6adee574c4050e8435729ba51b2fca4196ae3",
+    "base": "33f482850e22fe8e3200c1f0d05a2d5e584450d0"
+  },
+  "protocolSha256": "fcd686dabd14c6bdf5318602c37b0915134a010a0ae5acc85dbe28fc48abbb1a",
+  "javaRuntimeBytesHash": "sha256:e6d3488c992cc3c3de154cf894257d64f44f32c40b2a613afe87220a63aba9b1",
+  "pythonRuntimeBytesHash": "sha256:f2406799ca98bf2f768d6f87caf968863099f4e07cb74b6b7e7889ffde607cf1",
+  "host": {
+    "affinityCpus": 9,
+    "cpuMax": "800000 100000",
+    "cpusVisible": 9,
+    "memoryMax": "8589934592",
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.39",
+    "scope": "SHARED_HOST_OBSERVATION;NOT_EXCLUSIVE_HOST_OR_PRECISION_STUDY"
+  },
+  "lifecycles": 27,
+  "queryRecords": 819,
+  "processReceipts": 36,
+  "allAccountingComplete": true,
+  "summary": {
+    "comparisons": [
+      {
+        "length": 1,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": true,
+        "repetition": 0,
+        "wallRatioNativeToSympy": 1.8843713042371424
+      },
+      {
+        "length": 1,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": true,
+        "repetition": 1,
+        "wallRatioNativeToSympy": 2.0017585885036215
+      },
+      {
+        "length": 1,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": true,
+        "repetition": 2,
+        "wallRatioNativeToSympy": 1.4698121033975329
+      },
+      {
+        "length": 18,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": false,
+        "repetition": 0,
+        "wallRatioNativeToSympy": null
+      },
+      {
+        "length": 18,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": false,
+        "repetition": 1,
+        "wallRatioNativeToSympy": null
+      },
+      {
+        "length": 18,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": false,
+        "repetition": 2,
+        "wallRatioNativeToSympy": null
+      },
+      {
+        "length": 72,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": false,
+        "repetition": 0,
+        "wallRatioNativeToSympy": null
+      },
+      {
+        "length": 72,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": false,
+        "repetition": 1,
+        "wallRatioNativeToSympy": null
+      },
+      {
+        "length": 72,
+        "profile": "NATIVE_BASE",
+        "qualityMatched": false,
+        "repetition": 2,
+        "wallRatioNativeToSympy": null
+      },
+      {
+        "length": 1,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 0,
+        "wallRatioNativeToSympy": 6.650241464896125
+      },
+      {
+        "length": 1,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 1,
+        "wallRatioNativeToSympy": 6.564518533927185
+      },
+      {
+        "length": 1,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 2,
+        "wallRatioNativeToSympy": 6.236875204605502
+      },
+      {
+        "length": 18,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 0,
+        "wallRatioNativeToSympy": 3.5555812911260105
+      },
+      {
+        "length": 18,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 1,
+        "wallRatioNativeToSympy": 3.605974116998671
+      },
+      {
+        "length": 18,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 2,
+        "wallRatioNativeToSympy": 3.7764032601583533
+      },
+      {
+        "length": 72,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 0,
+        "wallRatioNativeToSympy": 2.0751184674420795
+      },
+      {
+        "length": 72,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 1,
+        "wallRatioNativeToSympy": 2.214318686867094
+      },
+      {
+        "length": 72,
+        "profile": "NATIVE_LEARNED",
+        "qualityMatched": true,
+        "repetition": 2,
+        "wallRatioNativeToSympy": 2.265248324105721
+      }
+    ],
+    "groups": [
+      {
+        "complete": true,
+        "fullCpuSeconds": 1.259777353,
+        "length": 1,
+        "peakWorkerRssMiB": 97.640625,
+        "profile": "NATIVE_BASE",
+        "solved": [
+          1,
+          1,
+          1
+        ],
+        "wallSeconds": 0.603923564
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 4.987886624,
+        "length": 18,
+        "peakWorkerRssMiB": 212.01953125,
+        "profile": "NATIVE_BASE",
+        "solved": [
+          11,
+          11,
+          11
+        ],
+        "wallSeconds": 1.57407196
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 7.945573723,
+        "length": 72,
+        "peakWorkerRssMiB": 230.765625,
+        "profile": "NATIVE_BASE",
+        "solved": [
+          44,
+          44,
+          44
+        ],
+        "wallSeconds": 2.519824222
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 5.507415661,
+        "length": 1,
+        "peakWorkerRssMiB": 199.49609375,
+        "profile": "NATIVE_LEARNED",
+        "solved": [
+          1,
+          1,
+          1
+        ],
+        "wallSeconds": 2.210643795
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 7.13513667,
+        "length": 18,
+        "peakWorkerRssMiB": 202.37890625,
+        "profile": "NATIVE_LEARNED",
+        "solved": [
+          15,
+          15,
+          15
+        ],
+        "wallSeconds": 2.688298357
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 9.061811611,
+        "length": 72,
+        "peakWorkerRssMiB": 198.27734375,
+        "profile": "NATIVE_LEARNED",
+        "solved": [
+          60,
+          60,
+          60
+        ],
+        "wallSeconds": 3.372161776
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 0.34497622,
+        "length": 1,
+        "peakWorkerRssMiB": 73.78125,
+        "profile": "SYMPY",
+        "solved": [
+          1,
+          1,
+          1
+        ],
+        "wallSeconds": 0.354447335
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 0.726486802,
+        "length": 18,
+        "peakWorkerRssMiB": 73.78125,
+        "profile": "SYMPY",
+        "solved": [
+          15,
+          15,
+          15
+        ],
+        "wallSeconds": 0.729177832
+      },
+      {
+        "complete": true,
+        "fullCpuSeconds": 1.530898994,
+        "length": 72,
+        "peakWorkerRssMiB": 73.78125,
+        "profile": "SYMPY",
+        "solved": [
+          60,
+          60,
+          60
+        ],
+        "wallSeconds": 1.570176903
+      }
+    ],
+    "notMeasured": [
+      {
+        "reason": "NO_SHARED_EXECUTABLE_HISTORICAL_TASK_CONTRACT",
+        "task": "Euclid/Bezout historical discovery/proof"
+      },
+      {
+        "reason": "NO_SHARED_EXECUTABLE_HISTORICAL_TASK_CONTRACT",
+        "task": "Euclid infinitude-of-primes proof discovery"
+      },
+      {
+        "reason": "NO_SHARED_EXECUTABLE_HISTORICAL_TASK_CONTRACT",
+        "task": "General Ferrari discovery/proof"
+      }
+    ],
+    "quality": [
+      {
+        "attempts": 3,
+        "case": "cassini",
+        "profile": "NATIVE_BASE",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-fibonacci",
+        "profile": "NATIVE_BASE",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-germain",
+        "profile": "NATIVE_BASE",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "pell",
+        "profile": "NATIVE_BASE",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-scaled",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-scaled",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-parameter-4",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-shifted",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-shifted",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-negative-parameter",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-reordered",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-compound",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-rational",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "already-factored",
+        "profile": "NATIVE_BASE",
+        "role": "SIMPLE_CONTROL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "no-invariant-in-ansatz",
+        "profile": "NATIVE_BASE",
+        "role": "NEGATIVE_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "two-squares-indefinite",
+        "profile": "NATIVE_BASE",
+        "role": "NEGATIVE_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "factor-near-miss",
+        "profile": "NATIVE_BASE",
+        "role": "BOUNDED_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-affine",
+        "profile": "NATIVE_BASE",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "cassini",
+        "profile": "NATIVE_LEARNED",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-fibonacci",
+        "profile": "NATIVE_LEARNED",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-germain",
+        "profile": "NATIVE_LEARNED",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "pell",
+        "profile": "NATIVE_LEARNED",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-scaled",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-scaled",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-parameter-4",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-shifted",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-shifted",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-negative-parameter",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-reordered",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-compound",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-rational",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "already-factored",
+        "profile": "NATIVE_LEARNED",
+        "role": "SIMPLE_CONTROL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "no-invariant-in-ansatz",
+        "profile": "NATIVE_LEARNED",
+        "role": "NEGATIVE_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "two-squares-indefinite",
+        "profile": "NATIVE_LEARNED",
+        "role": "NEGATIVE_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "factor-near-miss",
+        "profile": "NATIVE_LEARNED",
+        "role": "BOUNDED_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-affine",
+        "profile": "NATIVE_LEARNED",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "cassini",
+        "profile": "SYMPY",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-fibonacci",
+        "profile": "SYMPY",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-germain",
+        "profile": "SYMPY",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "pell",
+        "profile": "SYMPY",
+        "role": "CLASSICAL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-scaled",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-scaled",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-parameter-4",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-shifted",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-shifted",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-negative-parameter",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "brahmagupta-reordered",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "sophie-compound",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-rational",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "already-factored",
+        "profile": "SYMPY",
+        "role": "SIMPLE_CONTROL",
+        "solved": 3,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "no-invariant-in-ansatz",
+        "profile": "SYMPY",
+        "role": "NEGATIVE_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "two-squares-indefinite",
+        "profile": "SYMPY",
+        "role": "NEGATIVE_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "factor-near-miss",
+        "profile": "SYMPY",
+        "role": "BOUNDED_CONTROL",
+        "solved": 0,
+        "valid": 3
+      },
+      {
+        "attempts": 3,
+        "case": "recurrence-affine",
+        "profile": "SYMPY",
+        "role": "PUBLIC_VARIANT",
+        "solved": 3,
+        "valid": 3
+      }
+    ]
+  },
+  "caseLatency": [
+    {
+      "profile": "NATIVE_BASE",
+      "case": "cassini",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 6.115662
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "pell",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 6.946217
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "brahmagupta-fibonacci",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 58.508352
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "sophie-germain",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 52.5058435
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "cassini",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 4.704254
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "pell",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 6.225554
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "brahmagupta-fibonacci",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 12.028559999999999
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "sophie-germain",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 12.3389045
+    },
+    {
+      "profile": "SYMPY",
+      "case": "cassini",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 4.721528
+    },
+    {
+      "profile": "SYMPY",
+      "case": "pell",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 5.0551385
+    },
+    {
+      "profile": "SYMPY",
+      "case": "brahmagupta-fibonacci",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 44.4700795
+    },
+    {
+      "profile": "SYMPY",
+      "case": "sophie-germain",
+      "observations": 12,
+      "queryEndToEndMedianMillis": 4.8663285
+    }
+  ],
+  "exampleOutputs": [
+    {
+      "profile": "NATIVE_BASE",
+      "case": "cassini",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "-1",
+        "polynomial": "x0^2 + x0*x1 - x1^2"
+      },
+      "nativeApiWork": 4350
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "brahmagupta-fibonacci",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+      "nativeApiWork": 27045
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "sophie-germain",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "nativeApiWork": 34508
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "pell",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "-1",
+        "polynomial": "x0^2 + 2*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 4400
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "brahmagupta-scaled",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(2 * a * c + 3 * b * d) ^ 2 + (3 * b * c + 0 - 2 * a * d) ^ 2",
+      "nativeApiWork": 35109
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "sophie-scaled",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "(2 * x) ^ 4 + 4 * (3 * y) ^ 4",
+      "nativeApiWork": 513
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "recurrence-parameter-4",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "5",
+        "polynomial": "x0^2 + 4*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 4416
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "brahmagupta-shifted",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "((a + 1) ^ 2 + b ^ 2) * (c ^ 2 + d ^ 2)",
+      "nativeApiWork": 725
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "sophie-shifted",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "(x + 1) ^ 4 + (2 * y ^ 2) ^ 2",
+      "nativeApiWork": 7479
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "recurrence-negative-parameter",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "9",
+        "polynomial": "x0^2 - 3*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 4503
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "brahmagupta-reordered",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+      "nativeApiWork": 27045
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "sophie-compound",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "(x * y) ^ 4 + (2 * z ^ 2) ^ 2",
+      "nativeApiWork": 7247
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "recurrence-rational",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "4/225",
+        "polynomial": "x0^2 + 1/2*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 4560
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "already-factored",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(x + 2) * (y + 3)",
+      "nativeApiWork": 40
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "no-invariant-in-ansatz",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "NO_LAW_IN_ANSATZ",
+      "law": null,
+      "nativeApiWork": 1038
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "two-squares-indefinite",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "(a ^ 2 + b ^ 2) * (c ^ 2 - d ^ 2)",
+      "nativeApiWork": 5160
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "factor-near-miss",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "x ^ 4 + 4 * y ^ 4 + 1",
+      "nativeApiWork": 17340
+    },
+    {
+      "profile": "NATIVE_BASE",
+      "case": "recurrence-affine",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "FIXED",
+        "initialValue": "0",
+        "polynomial": "-x0^2 - x1^2 + x0 + x1"
+      },
+      "nativeApiWork": 5781
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "cassini",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "-1",
+        "polynomial": "x0^2 + x0*x1 - x1^2"
+      },
+      "nativeApiWork": 537
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "brahmagupta-fibonacci",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+      "nativeApiWork": 378
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "sophie-germain",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)",
+      "nativeApiWork": 481
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "pell",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "-1",
+        "polynomial": "x0^2 + 2*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 549
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "brahmagupta-scaled",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "(2 * a * c + 3 * b * d) ^ 2 + (3 * b * c + 0 - 2 * a * d) ^ 2",
+      "nativeApiWork": 490
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "sophie-scaled",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "((2 * x) ^ 2 + 2 * (3 * y) ^ 2 - 2 * 2 * x * 3 * y) * ((2 * x) ^ 2 + 2 * (3 * y) ^ 2 + 2 * 2 * x * 3 * y)",
+      "nativeApiWork": 673
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "recurrence-parameter-4",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "5",
+        "polynomial": "x0^2 + 4*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 195
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "brahmagupta-shifted",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "((a + 1) * c + b * d) ^ 2 + (b * c + 0 - (a + 1) * d) ^ 2",
+      "nativeApiWork": 444
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "sophie-shifted",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "((x + 1) ^ 2 + 2 * y ^ 2 - 2 * (x + 1) * y) * ((x + 1) ^ 2 + 2 * y ^ 2 + 2 * (x + 1) * y)",
+      "nativeApiWork": 607
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "recurrence-negative-parameter",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "9",
+        "polynomial": "x0^2 - 3*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 209
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "brahmagupta-reordered",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "(a * d + b * c) ^ 2 + (b * d + 0 - a * c) ^ 2",
+      "nativeApiWork": 378
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "sophie-compound",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "output": "((x * y) ^ 2 + 2 * z ^ 2 - 2 * x * y * z) * ((x * y) ^ 2 + 2 * z ^ 2 + 2 * x * y * z)",
+      "nativeApiWork": 577
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "recurrence-rational",
+      "solved": true,
+      "withinBudget": true,
+      "reused": true,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "4/225",
+        "polynomial": "x0^2 + 1/2*x0*x1 - x1^2"
+      },
+      "nativeApiWork": 235
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "already-factored",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(x + 2) * (y + 3)",
+      "nativeApiWork": 47
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "no-invariant-in-ansatz",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "NO_LAW_IN_ANSATZ",
+      "law": null,
+      "nativeApiWork": 1047
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "two-squares-indefinite",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "(a ^ 2 + b ^ 2) * (c ^ 2 - d ^ 2)",
+      "nativeApiWork": 5167
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "factor-near-miss",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "x ^ 4 + 4 * y ^ 4 + 1",
+      "nativeApiWork": 17347
+    },
+    {
+      "profile": "NATIVE_LEARNED",
+      "case": "recurrence-affine",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "FIXED",
+        "initialValue": "0",
+        "polynomial": "-x0^2 - x1^2 + x0 + x1"
+      },
+      "nativeApiWork": 5799
+    },
+    {
+      "profile": "SYMPY",
+      "case": "cassini",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "1",
+        "polynomial": "-x0**2 - x0*x1 + x1**2"
+      }
+    },
+    {
+      "profile": "SYMPY",
+      "case": "brahmagupta-fibonacci",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(a*c - b*d)**2 + (a*d + b*c)**2"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "sophie-germain",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(x**2 - 2*x*y + 2*y**2)*(x**2 + 2*x*y + 2*y**2)"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "pell",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "1",
+        "polynomial": "-x0**2 - 2*x0*x1 + x1**2"
+      }
+    },
+    {
+      "profile": "SYMPY",
+      "case": "brahmagupta-scaled",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(2*a*c - 3*b*d)**2 + (2*a*d + 3*b*c)**2"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "sophie-scaled",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(4*(2*x**2 - 6*x*y + 9*y**2))*(2*x**2 + 6*x*y + 9*y**2)"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "recurrence-parameter-4",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "-5",
+        "polynomial": "-x0**2 - 4*x0*x1 + x1**2"
+      }
+    },
+    {
+      "profile": "SYMPY",
+      "case": "brahmagupta-shifted",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(a*c - b*d + c)**2 + (a*d + b*c + d)**2"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "sophie-shifted",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(x**2 - 2*x*y + 2*x + 2*y**2 - 2*y + 1)*(x**2 + 2*x*y + 2*x + 2*y**2 + 2*y + 1)"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "recurrence-negative-parameter",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "-9",
+        "polynomial": "-x0**2 + 3*x0*x1 + x1**2"
+      }
+    },
+    {
+      "profile": "SYMPY",
+      "case": "brahmagupta-reordered",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(a*c - b*d)**2 + (a*d + b*c)**2"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "sophie-compound",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(x**2*y**2 - 2*x*y*z + 2*z**2)*(x**2*y**2 + 2*x*y*z + 2*z**2)"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "recurrence-rational",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "ALTERNATING",
+        "initialValue": "-4/225",
+        "polynomial": "-x0**2 - x0*x1/2 + x1**2"
+      }
+    },
+    {
+      "profile": "SYMPY",
+      "case": "already-factored",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "output": "(x + 2)*(y + 3)"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "no-invariant-in-ansatz",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "NO_LAW_IN_ANSATZ",
+      "law": null
+    },
+    {
+      "profile": "SYMPY",
+      "case": "two-squares-indefinite",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "factor-near-miss",
+      "solved": false,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "INCONCLUSIVE",
+      "output": "x**4 + 4*y**4 + 1"
+    },
+    {
+      "profile": "SYMPY",
+      "case": "recurrence-affine",
+      "solved": true,
+      "withinBudget": true,
+      "reused": false,
+      "outcome": "VERIFIED",
+      "law": {
+        "evolution": "FIXED",
+        "initialValue": "0",
+        "polynomial": "-x0**2 + x0 - x1**2 + x1"
+      }
+    }
+  ],
+  "limits": [
+    "PUBLIC_DEVELOPMENT_NOT_SEALED_HOLDOUT",
+    "NORMAL_LIBRARY_CACHES_ENABLED_NO_ADDED_QUERY_RESULT_MEMOIZATION",
+    "QUERY_TIMES_EXCLUDE_ACQUISITION_LOAD_STARTUP_SHUTDOWN",
+    "MIXED_LIFECYCLE_INCLUDES_ACTUAL_ACQUISITION_PERSISTENCE_REPROOF_AND_SHUTDOWN",
+    "CLASSICAL_CASES_OVERLAP_TEACHING;BRAHMAGUPTA_SHIFTED_AND_SOPHIE_COMPOUND_ALPHA_OVERLAP_VALIDATION",
+    "NOT_GENERAL_CAS_RANKING_OR_GLOBAL_COMPLETENESS"
+  ],
+  "archive": {
+    "bytes": 63721895,
+    "sha256": "3f99331d3be2f29f72fa1e4e16fc3c01e34b7e6ebf87ddf0c078cc028f682824",
+    "name": "Regelsuche-Historischer-SymPy-Vergleich-2026-11-06.zip"
+  }
+}
