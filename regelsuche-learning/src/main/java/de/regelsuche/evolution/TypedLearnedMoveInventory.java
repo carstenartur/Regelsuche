@@ -103,11 +103,18 @@ public final class TypedLearnedMoveInventory {
      * keeps the primitive fallback; this does not change the historical exploration sessions.
      */
     public CheckedSchemaTaskSolver newTaskSolver(CheckedLearnedSchemaModel model) {
+        return newTaskSolver(model, false);
+    }
+
+    /** Optional existing shape index; preparation and each dispatch remain explicitly paid. */
+    public CheckedSchemaTaskSolver newTaskSolver(CheckedLearnedSchemaModel model, boolean indexed) {
         java.util.Objects.requireNonNull(model, "model");
         if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException("schema inventory mismatch");
         var included = model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id)
             .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        var plan = CheckedSchemaMatcherPlan.prepare(model, model.bounds().maximumSchemas(), Map.of(), included);
+        var plan = indexed
+            ? CheckedSchemaMatcherPlan.prepareIndexed(model, model.bounds().maximumSchemas(), Map.of(), included)
+            : CheckedSchemaMatcherPlan.prepare(model, model.bounds().maximumSchemas(), Map.of(), included);
         return new CheckedSchemaTaskSolver(newSchemaSearchSession(model, List.of(plan.provider())), plan.compilationReceipt());
     }
 
