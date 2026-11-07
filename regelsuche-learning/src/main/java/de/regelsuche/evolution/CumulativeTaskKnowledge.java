@@ -463,7 +463,7 @@ public final class CumulativeTaskKnowledge {
         if (copy.size() < minimum || copy.size() > MAX_BATCH) throw new IllegalArgumentException("batch size outside bounds");
         return copy;
     }
-    private static long disjoint(List<CheckedSchemaTaskSolver.Task> lessons, List<CheckedSchemaTaskSolver.Task> validation) {
+    static long disjoint(List<CheckedSchemaTaskSolver.Task> lessons, List<CheckedSchemaTaskSolver.Task> validation) {
         long[] work = {0};
         var exact = new ExactPolynomialAnalysis(units -> work[0] = sum(work[0], units));
         var training = new HashSet<String>();

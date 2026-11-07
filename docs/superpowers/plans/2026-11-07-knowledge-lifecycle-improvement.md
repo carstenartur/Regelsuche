@@ -44,10 +44,10 @@ Expected: all new semantic tests pass, no failures/errors/skips; default existin
 
 **Interfaces:** KnowledgeCostGate.Cost(wallNanos,cpuNanos), Sample(cost,solved,score,complete), Trial(previous,candidate), and evaluate(paid,List<Trial>,futureQueries):Decision. CPU=-1 means unavailable; exact BigInteger comparison of projected wall AND CPU savings against paid cost, per-task quality protection. TaskKnowledgeSelfImprover.Batch(lessons,validation,promotion), Policy(maximumLearningWork,maximumWallNanos,maximumCpuNanos,maximumBatches,measurementRepeats,futureQueries), improve(initial,batches,policy):Result. Result retains active immutable knowledge, ordered attempts, known work, actual wall/process CPU and accounting status. Attempts retain candidate IDs, measured trials, decisions, paid work and failure details.
 
-- [ ] Write literal failing gate tests for profitable/unprofitable horizon, equal/slower costs, one-case quality regression, missing CPU, invalid samples and long-count overflow.
-- [ ] Write real learner tests for no-op/rejected attempts retaining costs, split overlap rejection, budget exhaustion, technical failures and accepted-parent chaining whenever adoption occurs (no nondeterministic timing acceptance assertion).
-- [ ] Run focused tests RED; implement the controller using learnBatch and process CPU/monotonic clocks, with actual alternating-order promotion trials and alpha-disjoint promotion inputs.
-- [ ] Run focused and full Java reactor; commit.
+- [x] Write literal failing gate tests for profitable/unprofitable horizon, equal/slower costs, one-case quality regression, missing CPU, invalid samples and long-count overflow.
+- [x] Write real learner tests for no-op/rejected attempts retaining costs, split overlap rejection, budget exhaustion, technical failures and accepted-parent chaining whenever adoption occurs (no nondeterministic timing acceptance assertion).
+- [x] Run focused tests RED; implement the controller using learnBatch and process CPU/monotonic clocks, with actual alternating-order promotion trials and alpha-disjoint promotion inputs.
+- [x] Run focused and full Java reactor; commit.
 
 Expected: pure gate decisions match literal arithmetic; real tests verify actual learner paths and all costs without assuming timings. Per-call atomic work can overrun a cutoff only with explicit full paid receipt and no adoption.
 
