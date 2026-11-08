@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedReductionEvaluation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">OrderedReductionEvaluation.java</span></div><h1>OrderedReductionEvaluation.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.OrderedReduction;
+import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionPlan.Evaluation;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionPlan.Lookup;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
+import static de.regelsuche.math.algorithms.iteration.RowMoments.bounded;
+
+/** Fixed evaluation schedules used by verified indexed plans. */
+final class OrderedReductionEvaluation {
+    private OrderedReductionEvaluation() {}
+
+    static Evaluation evaluate(OrderedReduction source, OrderedReductionPlan plan, List&lt;? extends List&lt;BigInteger&gt;&gt; rows,
+            int width, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L26">        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+        try {
+<span class="fc" id="L28">            work.charge(1);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            if (width &gt; rows.size()) return new Evaluation(List.of(), 0, 0, work.used());</span>
+<span class="fc" id="L30">            var data = new ArrayList&lt;BigInteger[]&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (var row : rows) {</span>
+<span class="fc" id="L32">                work.charge(source.columnCount());</span>
+<span class="fc" id="L33">                data.add(RowMoments.values(row, source.columnCount(), work));</span>
+<span class="fc" id="L34">            }</span>
+<span class="fc" id="L35">            var indexes = new OrderedSummaries(data, work);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            var sums = width == 0 ? List.of(chains(plan, data, indexes, work))</span>
+<span class="fc" id="L37">                : windows(plan, data, width, indexes, work);</span>
+<span class="fc" id="L38">            return new Evaluation(sums, data.size(), indexes.accesses(), work.used());</span>
+<span class="fc" id="L39">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L40">            throw new IllegalArgumentException(unavailable.getMessage(), unavailable);</span>
+        }
+    }
+
+    private static BigInteger chains(OrderedReductionPlan plan, List&lt;BigInteger[]&gt; rows, OrderedSummaries indexes, Work work) {
+<span class="fc" id="L45">        var states = new LinkedHashMap&lt;List&lt;Moment&gt;, Prefix&gt;();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (var term : plan.terms()) {</span>
+<span class="fc" id="L47">            Prefix parent = null;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (int size = 1; size &lt;= term.factors().size(); size++) {</span>
+<span class="fc" id="L49">                work.charge(1);</span>
+<span class="fc" id="L50">                var path = term.factors().subList(0, size);</span>
+<span class="fc" id="L51">                var node = states.get(path);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                if (node == null) {</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                    var summary = size &lt; term.factors().size() ? indexes.create(plan.lookups().get(size - 1)) : null;</span>
+<span class="fc" id="L54">                    node = new Prefix(parent, path.getLast(), summary);</span>
+<span class="fc" id="L55">                    states.put(path, node);</span>
+                }
+<span class="fc" id="L57">                parent = node;</span>
+            }
+<span class="fc" id="L59">            parent.coefficient = bounded(parent.coefficient.add(term.coefficient()), work);</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        var factors = states.values().stream().map(node -&gt; node.factor).distinct().toList();</span>
+<span class="fc" id="L62">        BigInteger total = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L64">            work.charge(1);</span>
+<span class="fc" id="L65">            var products = products(row, factors, work);</span>
+            // Parents occur before their children. Every lookup sees only earlier rows.
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (var node : states.values()) {</span>
+<span class="fc" id="L68">                node.current = products.get(node.factor);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                if (node.parent != null) {</span>
+<span class="fc" id="L70">                    node.current = bounded(node.current.multiply(node.parent.prior), work);</span>
+                }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                if (node.summary != null) {</span>
+<span class="fc" id="L73">                    node.prior = node.summary.query(row);</span>
+                } else {
+<span class="fc" id="L75">                    var contribution = bounded(node.coefficient.multiply(node.current), work);</span>
+<span class="fc" id="L76">                    total = bounded(total.add(contribution), work);</span>
+                }
+<span class="fc" id="L78">            }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (var node : states.values()) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (node.summary != null) node.summary.add(row, node.current);</span>
+<span class="fc" id="L81">            }</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        return total;</span>
+    }
+
+    private static final class Prefix {
+        private final Prefix parent;
+        private final Moment factor;
+        private final OrderedSummaries.Summary summary;
+<span class="fc" id="L90">        private BigInteger coefficient = BigInteger.ZERO;</span>
+        private BigInteger current;
+        private BigInteger prior;
+
+<span class="fc" id="L94">        Prefix(Prefix parent, Moment factor, OrderedSummaries.Summary summary) {</span>
+<span class="fc" id="L95">            this.parent = parent;</span>
+<span class="fc" id="L96">            this.factor = factor;</span>
+<span class="fc" id="L97">            this.summary = summary;</span>
+<span class="fc" id="L98">        }</span>
+    }
+
+    private static List&lt;BigInteger&gt; windows(OrderedReductionPlan plan, List&lt;BigInteger[]&gt; rows, int width,
+            OrderedSummaries indexes, Work work) {
+<span class="fc" id="L103">        var channels = new LinkedHashMap&lt;Channel, OrderedSummaries.Summary&gt;();</span>
+<span class="fc" id="L104">        var terms = new ArrayList&lt;WindowTerm&gt;();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (var term : plan.terms()) {</span>
+<span class="fc" id="L106">            work.charge(1);</span>
+<span class="fc" id="L107">            var left = term.factors().getFirst();</span>
+<span class="fc" id="L108">            var right = term.factors().getLast();</span>
+<span class="fc" id="L109">            var append = channels.computeIfAbsent(new Channel(plan.lookups().getFirst(), left),</span>
+<span class="fc" id="L110">                channel -&gt; indexes.create(channel.lookup()));</span>
+<span class="fc" id="L111">            var remove = channels.computeIfAbsent(new Channel(plan.eviction().orElseThrow(), right),</span>
+<span class="fc" id="L112">                channel -&gt; indexes.create(channel.lookup()));</span>
+<span class="fc" id="L113">            terms.add(new WindowTerm(term.coefficient(), left, right, append, remove));</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc" id="L115">        var factors = channels.keySet().stream().map(Channel::moment).distinct().toList();</span>
+<span class="fc" id="L116">        var output = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc" id="L117">        BigInteger total = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (int index = 0; index &lt; rows.size(); index++) {</span>
+<span class="fc" id="L119">            work.charge(1);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (index &gt;= width) {</span>
+<span class="fc" id="L121">                var oldest = rows.get(index - width);</span>
+<span class="fc" id="L122">                var weights = products(oldest, factors, work);</span>
+<span class="fc" id="L123">                channels.forEach((channel, summary) -&gt; summary.add(oldest, weights.get(channel.moment()).negate()));</span>
+<span class="fc" id="L124">                total = bounded(total.subtract(contribution(terms, oldest, weights, false, work)), work);</span>
+            }
+<span class="fc" id="L126">            var newest = rows.get(index);</span>
+<span class="fc" id="L127">            var weights = products(newest, factors, work);</span>
+<span class="fc" id="L128">            total = bounded(total.add(contribution(terms, newest, weights, true, work)), work);</span>
+<span class="fc" id="L129">            channels.forEach((channel, summary) -&gt; summary.add(newest, weights.get(channel.moment())));</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (index &gt;= width - 1) output.add(total);</span>
+        }
+<span class="fc" id="L132">        return output;</span>
+    }
+
+    private static BigInteger contribution(List&lt;WindowTerm&gt; terms, BigInteger[] row, Map&lt;Moment, BigInteger&gt; products,
+            boolean entering, Work work) {
+<span class="fc" id="L137">        var matches = new HashMap&lt;OrderedSummaries.Summary, BigInteger&gt;();</span>
+<span class="fc" id="L138">        BigInteger total = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (var term : terms) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            var summary = entering ? term.append() : term.remove();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            var factor = entering ? term.right() : term.left();</span>
+<span class="fc" id="L142">            var sum = matches.computeIfAbsent(summary, index -&gt; index.query(row));</span>
+<span class="fc" id="L143">            var scaled = bounded(term.coefficient().multiply(sum), work);</span>
+<span class="fc" id="L144">            total = bounded(total.add(bounded(scaled.multiply(products.get(factor)), work)), work);</span>
+<span class="fc" id="L145">        }</span>
+<span class="fc" id="L146">        return total;</span>
+    }
+
+    private static Map&lt;Moment, BigInteger&gt; products(BigInteger[] row, List&lt;Moment&gt; factors, Work work) {
+<span class="fc" id="L150">        var products = new HashMap&lt;Moment, BigInteger&gt;();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (var factor : factors) products.put(factor, RowMoments.product(factor, row, work));</span>
+<span class="fc" id="L152">        return products;</span>
+    }
+
+<span class="fc" id="L155">    private record Channel(Lookup lookup, Moment moment) {}</span>
+<span class="fc" id="L156">    private record WindowTerm(BigInteger coefficient, Moment left, Moment right,</span>
+            OrderedSummaries.Summary append, OrderedSummaries.Summary remove) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

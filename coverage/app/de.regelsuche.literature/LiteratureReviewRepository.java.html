@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LiteratureReviewRepository.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">LiteratureReviewRepository.java</span></div><h1>LiteratureReviewRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.type.LogicalType;
+import de.regelsuche.literature.TheoremSearchClient.Hit;
+import de.regelsuche.literature.TheoremSearchClient.Result;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Pattern;
+
+/** Private receipts for explicit literature lookups, separate from mathematical evidence. */
+public final class LiteratureReviewRepository {
+    public static final String SCHEMA = &quot;regelsuche.literature-search-receipt/v1&quot;;
+
+    private static final int MAX_BYTES = 131_072;
+    private static final int MAX_SUBJECTS = 256;
+    private static final int MAX_RECEIPTS_PER_SUBJECT = 32;
+<span class="fc" id="L50">    private static final Pattern SHA_256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L51">    private static final Pattern ID = Pattern.compile(&quot;[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}&quot;);</span>
+<span class="fc" id="L52">    private static final Pattern RECEIPT_FILE = Pattern.compile(ID.pattern() + &quot;\\.json&quot;);</span>
+    private static final String LOCK_FILE = &quot;.lock&quot;;
+    // Java file locks are JVM-wide; serialize requests here before taking the interprocess lock.
+<span class="fc" id="L55">    private static final ReentrantLock LOCAL_LOCK = new ReentrantLock();</span>
+<span class="fc" id="L56">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L57">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L58">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L59">        .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)</span>
+<span class="fc" id="L60">        .withCoercionConfig(LogicalType.Textual, config -&gt; config</span>
+<span class="fc" id="L61">            .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)</span>
+<span class="fc" id="L62">            .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)</span>
+<span class="fc" id="L63">            .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))</span>
+<span class="fc" id="L64">        .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)</span>
+<span class="fc" id="L65">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L66">        .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L67">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L68">        .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)</span>
+<span class="fc" id="L69">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L70">        .build();</span>
+
+    private final Path directory;
+    private final Clock clock;
+
+    public LiteratureReviewRepository(Path directory) {
+<span class="fc" id="L76">        this(directory, Clock.systemUTC());</span>
+<span class="fc" id="L77">    }</span>
+
+<span class="fc" id="L79">    LiteratureReviewRepository(Path directory, Clock clock) {</span>
+<span class="fc" id="L80">        this.directory = Objects.requireNonNull(directory).toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (this.directory.getParent() == null) throw new IllegalArgumentException(&quot;receipt directory needs a parent&quot;);</span>
+<span class="fc" id="L82">        this.clock = Objects.requireNonNull(clock);</span>
+<span class="fc" id="L83">    }</span>
+
+    /** The identity and exact retained evidence to which a lookup was attached. */
+    public record Subject(String runId, String candidateId, String artifactHash) {
+<span class="fc" id="L87">        public Subject {</span>
+<span class="fc" id="L88">            requireHash(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L89">            requireHash(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L90">            requireHash(artifactHash, &quot;artifactHash&quot;);</span>
+<span class="fc" id="L91">        }</span>
+    }
+
+    /** A null result and completion time mean the terminal result was not recorded. */
+    public record Receipt(String schema, String id, Subject subject, String startedAt, String query,
+                          String endpoint, int resultLimit, Result result, String completedAt) {
+<span class="fc" id="L97">        public Receipt {</span>
+<span class="pc bpc" id="L98" title="4 of 8 branches missed.">            if (!SCHEMA.equals(schema) || id == null || !ID.matcher(id).matches() || subject == null</span>
+<span class="pc bpc" id="L99" title="3 of 10 branches missed.">                || !TheoremSearchClient.ENDPOINT.toString().equals(endpoint)</span>
+                || resultLimit != TheoremSearchClient.RESULT_LIMIT || (result == null) != (completedAt == null)) {
+<span class="nc" id="L101">                throw new IllegalArgumentException(&quot;invalid literature search receipt&quot;);</span>
+            }
+<span class="fc" id="L103">            requireTimestamp(startedAt);</span>
+<span class="fc" id="L104">            requireQuery(query);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (result != null) {</span>
+<span class="fc" id="L106">                requireTimestamp(completedAt);</span>
+<span class="fc" id="L107">                requireTerminalResult(result);</span>
+            }
+<span class="fc" id="L109">        }</span>
+
+        public boolean pending() {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            return result == null;</span>
+        }
+
+        private Receipt asPending() {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            return pending() ? this : new Receipt(schema, id, subject, startedAt, query, endpoint, resultLimit, null, null);</span>
+        }
+    }
+
+    /** Persist the query before the caller contacts the provider. */
+    public Receipt begin(Subject subject, String exactQuery) throws IOException {
+<span class="fc" id="L122">        Objects.requireNonNull(subject);</span>
+<span class="fc" id="L123">        requireQuery(exactQuery);</span>
+<span class="fc" id="L124">        return withRepository(true, null, () -&gt; {</span>
+<span class="fc" id="L125">            Path scope = subjectDirectory(subject);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (!isPrivateDirectory(scope)) {</span>
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">                if (entries(directory).stream().filter(entry -&gt; !entry.getFileName().toString().equals(LOCK_FILE)).count()</span>
+                    &gt;= MAX_SUBJECTS) {
+<span class="nc" id="L129">                    throw new IOException(&quot;literature receipt repository has reached its subject limit&quot;);</span>
+                }
+<span class="fc" id="L131">                createPrivateDirectory(scope);</span>
+            }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (entries(scope).size() &gt;= MAX_RECEIPTS_PER_SUBJECT) {</span>
+<span class="nc" id="L134">                throw new IOException(&quot;literature receipt subject has reached its attempt limit&quot;);</span>
+            }
+<span class="fc" id="L136">            var receipt = new Receipt(SCHEMA, UUID.randomUUID().toString(), subject, clock.instant().toString(),</span>
+<span class="fc" id="L137">                exactQuery, TheoremSearchClient.ENDPOINT.toString(), TheoremSearchClient.RESULT_LIMIT, null, null);</span>
+<span class="fc" id="L138">            Path target = receiptPath(scope, receipt.id());</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (attributes(target) != null) throw new IOException(&quot;literature receipt ID collision&quot;);</span>
+<span class="fc" id="L140">            write(target, receipt, false);</span>
+<span class="fc" id="L141">            return receipt;</span>
+        });
+    }
+
+    /** Atomically replace the matching pending receipt, leaving any existing terminal result intact. */
+    public Receipt complete(Receipt pending, Result result) throws IOException {
+<span class="fc" id="L147">        Objects.requireNonNull(pending);</span>
+<span class="fc" id="L148">        requireTerminalResult(result);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!pending.pending()) throw new IOException(&quot;literature receipt is not pending&quot;);</span>
+<span class="fc" id="L150">        return withRepository(false, null, () -&gt; {</span>
+<span class="fc" id="L151">            Path scope = subjectDirectory(pending.subject());</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (!isPrivateDirectory(scope)) throw new IOException(&quot;literature receipt subject does not exist&quot;);</span>
+<span class="fc" id="L153">            Path target = receiptPath(scope, pending.id());</span>
+<span class="fc" id="L154">            Receipt existing = read(target, pending.subject(), pending.id());</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (!existing.asPending().equals(pending)) throw new IOException(&quot;literature receipt does not match pending attempt&quot;);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (!existing.pending()) {</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                if (existing.result().equals(result)) return existing;</span>
+<span class="fc" id="L158">                throw new IOException(&quot;literature receipt already has a different terminal result&quot;);</span>
+            }
+<span class="fc" id="L160">            var completed = new Receipt(pending.schema(), pending.id(), pending.subject(), pending.startedAt(),</span>
+<span class="fc" id="L161">                pending.query(), pending.endpoint(), pending.resultLimit(), result, clock.instant().toString());</span>
+<span class="fc" id="L162">            write(target, completed, true);</span>
+<span class="fc" id="L163">            return completed;</span>
+        });
+    }
+
+    /** Return only receipts for this exact subject, newest attempt first. */
+    public List&lt;Receipt&gt; list(Subject subject) throws IOException {
+<span class="fc" id="L169">        Objects.requireNonNull(subject);</span>
+<span class="fc" id="L170">        return withRepository(false, List.of(), () -&gt; {</span>
+<span class="fc" id="L171">            Path scope = subjectDirectory(subject);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (!isPrivateDirectory(scope)) return List.of();</span>
+<span class="fc" id="L173">            var receipts = new ArrayList&lt;Receipt&gt;();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            for (Path path : entries(scope)) {</span>
+<span class="fc" id="L175">                String name = path.getFileName().toString();</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                if (RECEIPT_FILE.matcher(name).matches()) {</span>
+<span class="fc" id="L177">                    receipts.add(read(path, subject, name.substring(0, name.length() - &quot;.json&quot;.length())));</span>
+                }
+<span class="fc" id="L179">            }</span>
+<span class="pc" id="L180">            receipts.sort(Comparator.comparing((Receipt receipt) -&gt; Instant.parse(receipt.startedAt()))</span>
+<span class="fc" id="L181">                .reversed().thenComparing(Receipt::id));</span>
+<span class="fc" id="L182">            return List.copyOf(receipts);</span>
+        });
+    }
+
+    private &lt;T&gt; T withRepository(boolean create, T missing, IoOperation&lt;T&gt; operation) throws IOException {
+<span class="fc" id="L187">        LOCAL_LOCK.lock();</span>
+        try {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (!checkDirectoryTree(create)) {</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                if (missing != null) return missing;</span>
+<span class="nc" id="L191">                throw new IOException(&quot;literature receipt repository does not exist&quot;);</span>
+            }
+<span class="fc" id="L193">            Path lockPath = directory.resolve(LOCK_FILE);</span>
+            try {
+<span class="fc" id="L195">                Files.createFile(lockPath, privateAttributes(directory, &quot;rw-------&quot;));</span>
+<span class="fc" id="L196">            } catch (FileAlreadyExistsException alreadyExists) {</span>
+                // Another instance can create the lock after the directory check.
+<span class="fc" id="L198">            }</span>
+<span class="fc" id="L199">            requirePrivateRegularFile(lockPath);</span>
+<span class="fc" id="L200">            try (var channel = FileChannel.open(lockPath, StandardOpenOption.WRITE, NOFOLLOW_LINKS);</span>
+<span class="fc" id="L201">                 var lock = channel.lock()) {</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                if (!lock.isValid()) throw new IOException(&quot;literature receipt lock unavailable&quot;);</span>
+<span class="fc" id="L203">                return operation.run();</span>
+            }
+        } finally {
+<span class="fc" id="L206">            LOCAL_LOCK.unlock();</span>
+        }
+    }
+
+    private boolean checkDirectoryTree(boolean create) throws IOException {
+<span class="fc" id="L211">        Path current = directory.getRoot();</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (Path part : directory) {</span>
+<span class="fc" id="L213">            current = current.resolve(part);</span>
+<span class="fc" id="L214">            BasicFileAttributes attrs = attributes(current);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            if (attrs == null) {</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                if (!create) return false;</span>
+<span class="fc" id="L217">                createPrivateDirectory(current);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            } else if (!attrs.isDirectory()) {</span>
+<span class="fc" id="L219">                throw new IOException(&quot;invalid literature receipt directory component&quot;);</span>
+            }
+<span class="fc" id="L221">        }</span>
+<span class="fc" id="L222">        requirePrivate(directory);</span>
+<span class="fc" id="L223">        return true;</span>
+    }
+
+    private static boolean isPrivateDirectory(Path path) throws IOException {
+<span class="fc" id="L227">        BasicFileAttributes attrs = attributes(path);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (attrs == null) return false;</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (!attrs.isDirectory()) throw new IOException(&quot;invalid literature receipt subject directory&quot;);</span>
+<span class="fc" id="L230">        requirePrivate(path);</span>
+<span class="fc" id="L231">        return true;</span>
+    }
+
+    private static void createPrivateDirectory(Path path) throws IOException {
+        try {
+<span class="fc" id="L236">            Files.createDirectory(path, privateAttributes(path.getParent(), &quot;rwx------&quot;));</span>
+<span class="fc" id="L237">            forceDirectory(path.getParent());</span>
+<span class="nc" id="L238">        } catch (FileAlreadyExistsException alreadyExists) {</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            if (!isPrivateDirectory(path)) throw alreadyExists;</span>
+<span class="fc" id="L240">        }</span>
+<span class="fc" id="L241">    }</span>
+
+    private List&lt;Path&gt; entries(Path path) throws IOException {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        int max = path.equals(directory) ? MAX_SUBJECTS + 1 : MAX_RECEIPTS_PER_SUBJECT;</span>
+<span class="fc" id="L245">        var result = new ArrayList&lt;Path&gt;();</span>
+<span class="fc" id="L246">        try (var stream = Files.newDirectoryStream(path)) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            for (Path entry : stream) {</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                if (result.size() == max) throw new IOException(&quot;literature receipt repository exceeds its entry limit&quot;);</span>
+<span class="fc" id="L249">                result.add(entry);</span>
+<span class="fc" id="L250">            }</span>
+<span class="nc" id="L251">        } catch (DirectoryIteratorException e) {</span>
+<span class="nc" id="L252">            throw e.getCause();</span>
+<span class="fc" id="L253">        }</span>
+<span class="fc" id="L254">        return result;</span>
+    }
+
+    private static BasicFileAttributes attributes(Path path) throws IOException {
+        try {
+<span class="fc" id="L259">            return Files.readAttributes(path, BasicFileAttributes.class, NOFOLLOW_LINKS);</span>
+<span class="fc" id="L260">        } catch (NoSuchFileException missing) {</span>
+<span class="fc" id="L261">            return null;</span>
+        }
+    }
+
+    private static void requirePrivate(Path path) throws IOException {
+<span class="fc" id="L266">        var view = Files.getFileAttributeView(path, PosixFileAttributeView.class, NOFOLLOW_LINKS);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (view != null &amp;&amp; view.readAttributes().permissions().stream()</span>
+<span class="pc bpc" id="L268" title="2 of 4 branches missed.">            .anyMatch(permission -&gt; !permission.name().startsWith(&quot;OWNER_&quot;))) {</span>
+<span class="nc" id="L269">            throw new IOException(&quot;literature receipt storage is not owner-only&quot;);</span>
+        }
+<span class="fc" id="L271">    }</span>
+
+    private static BasicFileAttributes requirePrivateRegularFile(Path path) throws IOException {
+<span class="fc" id="L274">        BasicFileAttributes attrs = attributes(path);</span>
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">        if (attrs == null || !attrs.isRegularFile()) throw new IOException(&quot;invalid literature receipt file&quot;);</span>
+<span class="fc" id="L276">        requirePrivate(path);</span>
+<span class="fc" id="L277">        return attrs;</span>
+    }
+
+    private static FileAttribute&lt;?&gt;[] privateAttributes(Path parent, String permissions) throws IOException {
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (!Files.getFileStore(parent).supportsFileAttributeView(&quot;posix&quot;)) return new FileAttribute&lt;?&gt;[0];</span>
+<span class="fc" id="L282">        return new FileAttribute&lt;?&gt;[] {PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(permissions))};</span>
+    }
+
+    private static Receipt read(Path path, Subject expectedSubject, String expectedId) throws IOException {
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (requirePrivateRegularFile(path).size() &gt; MAX_BYTES) throw new IOException(&quot;literature receipt too large&quot;);</span>
+<span class="fc" id="L287">        try (var input = Files.newInputStream(path, NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L288">            byte[] bytes = input.readNBytes(MAX_BYTES + 1);</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (bytes.length &gt; MAX_BYTES) throw new IOException(&quot;literature receipt too large&quot;);</span>
+<span class="fc" id="L290">            Receipt receipt = JSON.readValue(bytes, Receipt.class);</span>
+<span class="pc bpc" id="L291" title="3 of 6 branches missed.">            if (receipt == null || !expectedSubject.equals(receipt.subject()) || !expectedId.equals(receipt.id())) {</span>
+<span class="nc" id="L292">                throw new IOException(&quot;literature receipt does not match its storage identity&quot;);</span>
+            }
+<span class="fc" id="L294">            return receipt;</span>
+        }
+    }
+
+    private static void write(Path path, Receipt receipt, boolean replace) throws IOException {
+<span class="fc" id="L299">        byte[] bytes = JSON.writeValueAsBytes(receipt);</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_BYTES) throw new IOException(&quot;literature receipt too large&quot;);</span>
+<span class="fc" id="L301">        Path parent = path.getParent();</span>
+<span class="fc" id="L302">        Path temporary = Files.createTempFile(parent, &quot;.receipt-&quot;, &quot;.tmp&quot;, privateAttributes(parent, &quot;rw-------&quot;));</span>
+        try {
+<span class="fc" id="L304">            try (var output = FileChannel.open(temporary, StandardOpenOption.WRITE, NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L305">                ByteBuffer buffer = ByteBuffer.wrap(bytes);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                while (buffer.hasRemaining()) output.write(buffer);</span>
+<span class="fc" id="L307">                output.force(true);</span>
+            }
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (replace) Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="fc" id="L310">            else Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE);</span>
+<span class="fc" id="L311">            forceDirectory(parent);</span>
+        } finally {
+<span class="fc" id="L313">            Files.deleteIfExists(temporary);</span>
+        }
+<span class="fc" id="L315">    }</span>
+
+    private static void forceDirectory(Path path) throws IOException {
+        // POSIX directory metadata must also reach disk before an outbound request can proceed.
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (Files.getFileStore(path).supportsFileAttributeView(&quot;posix&quot;)) {</span>
+<span class="fc" id="L320">            try (var directoryChannel = FileChannel.open(path, StandardOpenOption.READ, NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L321">                directoryChannel.force(true);</span>
+            }
+        }
+<span class="fc" id="L324">    }</span>
+
+    private Path subjectDirectory(Subject subject) {
+<span class="fc" id="L327">        String value = subject.runId() + '\n' + subject.candidateId() + '\n' + subject.artifactHash();</span>
+        try {
+<span class="fc" id="L329">            return directory.resolve(HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L330">                .digest(value.getBytes(StandardCharsets.UTF_8))));</span>
+<span class="nc" id="L331">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L332">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, impossible);</span>
+        }
+    }
+
+    private static Path receiptPath(Path scope, String id) {
+<span class="fc" id="L337">        return scope.resolve(id + &quot;.json&quot;);</span>
+    }
+
+    private static void requireHash(String value, String field) {
+<span class="pc bpc" id="L341" title="1 of 4 branches missed.">        if (value == null || !SHA_256.matcher(value).matches()) {</span>
+<span class="fc" id="L342">            throw new IllegalArgumentException(field + &quot; must be a lowercase SHA-256 identity&quot;);</span>
+        }
+<span class="fc" id="L344">    }</span>
+
+    private static void requireTimestamp(String value) {
+<span class="pc bpc" id="L347" title="3 of 6 branches missed.">        if (value == null || value.length() &gt; 40 || !Instant.parse(value).toString().equals(value)) {</span>
+<span class="nc" id="L348">            throw new IllegalArgumentException(&quot;invalid literature receipt timestamp&quot;);</span>
+        }
+<span class="fc" id="L350">    }</span>
+
+    private static void requireQuery(String value) {
+<span class="pc bpc" id="L353" title="3 of 6 branches missed.">        if (value == null || value.length() &gt; TheoremSearchClient.MAX_QUERY_CHARS || !validUnicode(value)</span>
+<span class="pc bpc" id="L354" title="3 of 8 branches missed.">            || value.codePoints().noneMatch(c -&gt; !Character.isWhitespace(c) &amp;&amp; !Character.isSpaceChar(c) &amp;&amp; c != 0x85)) {</span>
+<span class="nc" id="L355">            throw new IllegalArgumentException(&quot;invalid literature receipt query&quot;);</span>
+        }
+<span class="fc" id="L357">    }</span>
+
+    private static boolean validText(String value, int maxLength) {
+<span class="pc bpc" id="L360" title="3 of 6 branches missed.">        return value.length() &lt;= maxLength &amp;&amp; !value.isBlank() &amp;&amp; validUnicode(value)</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            &amp;&amp; value.codePoints().noneMatch(Character::isISOControl);</span>
+    }
+
+    private static boolean validUnicode(String value) {
+<span class="fc" id="L365">        return StandardCharsets.UTF_8.newEncoder().canEncode(value);</span>
+    }
+
+    private static void requireTerminalResult(Result result) {
+<span class="pc bpc" id="L369" title="3 of 6 branches missed.">        if (result == null || result.status() == null || result.hits().size() &gt; TheoremSearchClient.RESULT_LIMIT</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            || result.retryAfterSeconds() &lt; 0) {</span>
+<span class="nc" id="L371">            throw new IllegalArgumentException(&quot;invalid literature search result&quot;);</span>
+        }
+<span class="pc bpc" id="L373" title="2 of 4 branches missed.">        boolean valid = switch (result.status()) {</span>
+<span class="pc bpc" id="L374" title="2 of 4 branches missed.">            case SUCCESS -&gt; result.retryAfterSeconds() == 0 &amp;&amp; result.hits().stream().allMatch(LiteratureReviewRepository::validHit);</span>
+<span class="pc bpc" id="L375" title="2 of 4 branches missed.">            case FAILED -&gt; result.hits().isEmpty() &amp;&amp; result.retryAfterSeconds() == 0;</span>
+<span class="nc" id="L376">            case RATE_LIMITED -&gt; result.hits().isEmpty();</span>
+<span class="nc" id="L377">            case DISABLED, CONFIRMATION_REQUIRED -&gt; false;</span>
+        };
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (!valid) throw new IllegalArgumentException(&quot;invalid literature search result&quot;);</span>
+<span class="fc" id="L380">    }</span>
+
+    private static boolean validHit(Hit hit) {
+<span class="pc bpc" id="L383" title="8 of 10 branches missed.">        return hit != null &amp;&amp; (hit.name() != null || hit.link() != null || hit.title() != null || hit.source() != null)</span>
+<span class="pc bpc" id="L384" title="2 of 4 branches missed.">            &amp;&amp; (hit.name() == null || validText(hit.name(), 240))</span>
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">            &amp;&amp; (hit.title() == null || validText(hit.title(), 360))</span>
+<span class="pc bpc" id="L386" title="2 of 4 branches missed.">            &amp;&amp; (hit.source() == null || validText(hit.source(), 160))</span>
+<span class="pc bpc" id="L387" title="2 of 6 branches missed.">            &amp;&amp; (hit.year() == null || hit.year() &gt;= 1 &amp;&amp; hit.year() &lt;= 9999)</span>
+<span class="pc bpc" id="L388" title="2 of 4 branches missed.">            &amp;&amp; (hit.link() == null || validLink(hit.link()));</span>
+    }
+
+    private static boolean validLink(String value) {
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        if (!validText(value, 2048)) return false;</span>
+        try {
+<span class="fc" id="L394">            var uri = URI.create(value);</span>
+<span class="pc bpc" id="L395" title="3 of 4 branches missed.">            return (&quot;https&quot;.equalsIgnoreCase(uri.getScheme()) || &quot;http&quot;.equalsIgnoreCase(uri.getScheme()))</span>
+<span class="pc bpc" id="L396" title="2 of 4 branches missed.">                &amp;&amp; uri.getHost() != null &amp;&amp; uri.getUserInfo() == null;</span>
+<span class="nc" id="L397">        } catch (IllegalArgumentException invalid) {</span>
+<span class="nc" id="L398">            return false;</span>
+        }
+    }
+
+    @FunctionalInterface
+    private interface IoOperation&lt;T&gt; {
+        T run() throws IOException;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LiteratureWorkbenchActions.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">LiteratureWorkbenchActions.java</span></div><h1>LiteratureWorkbenchActions.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.CANDIDATE_DOSSIERS;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactStatus.AVAILABLE;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.sun.net.httpserver.HttpExchange;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace;
+import de.regelsuche.discovery.representation.TargetFreeSearchArtifactStore;
+import de.regelsuche.discovery.representation.TargetFreeSearchExecution;
+import de.regelsuche.discovery.representation.TargetFreeSymPyBridgeDiscoveryScenario;
+import de.regelsuche.literature.CandidateLiteratureAssessments;
+import de.regelsuche.literature.LiteratureReviewRepository;
+import de.regelsuche.literature.LiteratureReviewRepository.Subject;
+import de.regelsuche.literature.TheoremSearchClient;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/** Explicit operator actions on private literature evidence for an immutable retained candidate. */
+final class LiteratureWorkbenchActions {
+<span class="fc" id="L28">    private static final JsonMapper JSON = JsonMapper.builder().build();</span>
+    private static final String CONSENT_HEADER = &quot;X-Regelsuche-Literature&quot;;
+<span class="fc" id="L30">    private static final Set&lt;String&gt; LOCAL_HOSTS = Set.of(&quot;127.0.0.1&quot;, &quot;::1&quot;, &quot;[::1]&quot;, &quot;localhost&quot;);</span>
+    private final Path runs;
+    private final boolean privateAccess;
+    private final boolean requireLoopbackAuthority;
+    private final int requestLimit;
+    private final LiteratureReviewRepository receipts;
+    private final CandidateLiteratureAssessments assessments;
+    private final TheoremSearchClient client;
+<span class="fc" id="L38">    private final AtomicBoolean lookupInProgress = new AtomicBoolean();</span>
+
+<span class="fc" id="L40">    LiteratureWorkbenchActions(Path runs, String host, WebSecurityConfig security) {</span>
+<span class="fc" id="L41">        this.runs = runs;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        requireLoopbackAuthority = !security.isAuthEnabled();</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">        privateAccess = !requireLoopbackAuthority || LOCAL_HOSTS.contains(host);</span>
+<span class="fc" id="L44">        requestLimit = security.maxRequestBytes();</span>
+<span class="fc" id="L45">        receipts = new LiteratureReviewRepository(runs.resolveSibling(runs.getFileName() + &quot;-literature&quot;));</span>
+<span class="fc" id="L46">        assessments = new CandidateLiteratureAssessments(runs.resolveSibling(runs.getFileName() + &quot;-literature-assessments&quot;));</span>
+<span class="fc" id="L47">        boolean optIn = Boolean.parseBoolean(System.getProperty(&quot;regelsuche.literature.theoremsearch.enabled&quot;,</span>
+<span class="fc" id="L48">            System.getenv(&quot;REGELSUCHE_THEOREMSEARCH_ENABLED&quot;)));</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        client = new TheoremSearchClient(privateAccess &amp;&amp; optIn);</span>
+<span class="fc" id="L50">    }</span>
+
+    void handle(HttpExchange exchange, String suffix) throws IOException {
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        if (!privateAccess || !sameOriginAction(exchange)) {</span>
+<span class="fc" id="L54">            error(exchange, 403, &quot;PRIVATE_WORKBENCH_REQUIRED&quot;);</span>
+<span class="fc" id="L55">            return;</span>
+        }
+<span class="fc" id="L57">        String method = exchange.getRequestMethod();</span>
+        try {
+<span class="fc" id="L59">            Map&lt;String, Object&gt; query = Map.of();</span>
+<span class="fc" id="L60">            byte[] assessment = null;</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            if (&quot;POST&quot;.equals(method)) {</span>
+<span class="fc" id="L62">                requireJson(exchange);</span>
+<span class="fc" id="L63">                query = new StreamingJsonRequestBody(Math.min(requestLimit, 4096)).readObject(exchange);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                if (!client.enabled()) {</span>
+<span class="fc" id="L65">                    error(exchange, 403, &quot;THEOREMSEARCH_DISABLED&quot;);</span>
+<span class="fc" id="L66">                    return;</span>
+                }
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            } else if (&quot;PUT&quot;.equals(method)) {</span>
+<span class="fc" id="L69">                requireJson(exchange);</span>
+<span class="fc" id="L70">                try (var input = BoundedRequestBody.open(exchange, Math.min(requestLimit, CandidateLiteratureAssessments.MAX_BYTES))) {</span>
+<span class="fc" id="L71">                    assessment = input.readAllBytes();</span>
+                }
+            }
+<span class="fc" id="L74">            String[] parts = suffix.split(&quot;/&quot;, -1);</span>
+<span class="pc bpc" id="L75" title="3 of 6 branches missed.">            if (parts.length != 3 || !parts[0].matches(&quot;[0-9a-f]{64}&quot;) || !parts[2].matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L76">                error(exchange, 400, &quot;INVALID_LITERATURE_SUBJECT&quot;);</span>
+<span class="nc" id="L77">                return;</span>
+            }
+<span class="fc" id="L79">            var subject = retainedSubject(&quot;sha256:&quot; + parts[0], &quot;sha256:&quot; + parts[2]);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (subject.isEmpty()) {</span>
+<span class="fc" id="L81">                error(exchange, 404, &quot;LITERATURE_CANDIDATE_NOT_RETAINED&quot;);</span>
+<span class="fc" id="L82">                return;</span>
+            }
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">            switch (method) {</span>
+<span class="fc" id="L85">                case &quot;GET&quot; -&gt; read(exchange, subject.get());</span>
+<span class="nc" id="L86">                case &quot;POST&quot; -&gt; lookup(exchange, subject.get(), query);</span>
+<span class="fc" id="L87">                case &quot;PUT&quot; -&gt; send(exchange, 201, JSON.valueToTree(assessments.retain(subject.get(), assessment)));</span>
+<span class="nc" id="L88">                default -&gt; error(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;);</span>
+            }
+<span class="fc" id="L90">        } catch (BoundedRequestBody.PayloadTooLargeException exception) {</span>
+<span class="fc" id="L91">            throw exception;</span>
+<span class="fc" id="L92">        } catch (CandidateLiteratureAssessments.InvalidAssessmentException</span>
+                | StreamingJsonRequestBody.MalformedJsonRequestException | IllegalArgumentException exception) {
+<span class="fc" id="L94">            error(exchange, 400, &quot;INVALID_LITERATURE_REQUEST&quot;);</span>
+<span class="nc" id="L95">        } catch (IOException | IllegalStateException exception) {</span>
+<span class="nc" id="L96">            error(exchange, 500, &quot;PRIVATE_LITERATURE_STORE_UNAVAILABLE&quot;);</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">    }</span>
+
+    private Optional&lt;Subject&gt; retainedSubject(String runId, String candidateId) throws IOException {
+<span class="fc" id="L101">        var retained = RepresentationDiscoveryRunWorkspace.findRetained(runs, runId);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (retained.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L103">        var run = retained.get();</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        var reference = run.artifacts().stream().filter(item -&gt; item.role() == CANDIDATE_DOSSIERS).findFirst().orElseThrow();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (reference.status() != AVAILABLE) return Optional.empty();</span>
+<span class="pc bpc" id="L106" title="2 of 3 branches missed.">        boolean matches = switch (reference.artifactSchema()) {</span>
+            case TargetFreeSearchExecution.SCHEMA -&gt; {
+<span class="nc" id="L108">                var artifact = TargetFreeSearchArtifactStore.read(runs, run);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (artifact.isEmpty()) yield false;</span>
+<span class="nc" id="L110">                var states = JSON.readTree(artifact.get()).path(&quot;content&quot;).path(&quot;states&quot;);</span>
+<span class="nc" id="L111">                boolean found = false;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                for (var state : states) {</span>
+<span class="nc bnc" id="L113" title="All 4 branches missed.">                    if (candidateId.equals(state.path(&quot;stateId&quot;).asText()) &amp;&amp; !state.path(&quot;generationSequences&quot;).isEmpty()) {</span>
+<span class="nc" id="L114">                        found = true;</span>
+<span class="nc" id="L115">                        break;</span>
+                    }
+<span class="nc" id="L117">                }</span>
+<span class="nc" id="L118">                yield found;</span>
+            }
+            case TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA -&gt; {
+<span class="fc" id="L121">                var artifact = RetainedCandidateDossierRepository.read(runs, run);</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">                yield artifact.isPresent() &amp;&amp; candidateId.equals(JSON.readTree(artifact.get())</span>
+<span class="fc" id="L123">                    .path(&quot;content&quot;).path(&quot;discoveredBridge&quot;).path(&quot;stateHash&quot;).asText());</span>
+            }
+<span class="nc" id="L125">            default -&gt; false;</span>
+        };
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        return matches ? Optional.of(new Subject(runId, candidateId, reference.targetContentHash())) : Optional.empty();</span>
+    }
+
+    private void read(HttpExchange exchange, Subject subject) throws IOException {
+<span class="fc" id="L131">        var response = JSON.createObjectNode().put(&quot;onlineEnabled&quot;, client.enabled())</span>
+<span class="fc" id="L132">            .put(&quot;endpoint&quot;, TheoremSearchClient.ENDPOINT.toString())</span>
+<span class="fc" id="L133">            .put(&quot;maxQueryChars&quot;, TheoremSearchClient.MAX_QUERY_CHARS)</span>
+<span class="fc" id="L134">            .put(&quot;resultLimit&quot;, TheoremSearchClient.RESULT_LIMIT);</span>
+<span class="fc" id="L135">        response.set(&quot;subject&quot;, JSON.valueToTree(subject));</span>
+<span class="fc" id="L136">        response.set(&quot;receipts&quot;, JSON.valueToTree(receipts.list(subject)));</span>
+<span class="fc" id="L137">        response.set(&quot;assessments&quot;, JSON.valueToTree(assessments.list(subject)));</span>
+<span class="fc" id="L138">        send(exchange, 200, response);</span>
+<span class="fc" id="L139">    }</span>
+
+    private void lookup(HttpExchange exchange, Subject subject, Map&lt;String, Object&gt; body) throws IOException {
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        if (!body.keySet().equals(Set.of(&quot;query&quot;, &quot;confirmed&quot;)) || !(body.get(&quot;query&quot;) instanceof String query)) {</span>
+<span class="nc" id="L143">            error(exchange, 400, &quot;INVALID_LITERATURE_QUERY&quot;);</span>
+<span class="nc" id="L144">            return;</span>
+        }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (!Boolean.TRUE.equals(body.get(&quot;confirmed&quot;))) {</span>
+<span class="nc" id="L147">            error(exchange, 403, &quot;LITERATURE_CONFIRMATION_REQUIRED&quot;);</span>
+<span class="nc" id="L148">            return;</span>
+        }
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (!lookupInProgress.compareAndSet(false, true)) {</span>
+<span class="nc" id="L151">            exchange.getResponseHeaders().set(&quot;Retry-After&quot;, &quot;1&quot;);</span>
+<span class="nc" id="L152">            error(exchange, 429, &quot;LITERATURE_LOOKUP_IN_PROGRESS&quot;);</span>
+<span class="nc" id="L153">            return;</span>
+        }
+        try {
+<span class="nc" id="L156">            var pending = receipts.begin(subject, query);</span>
+<span class="nc" id="L157">            Thread.startVirtualThread(() -&gt; finishLookup(exchange, pending));</span>
+<span class="nc" id="L158">        } catch (IOException | RuntimeException exception) {</span>
+<span class="nc" id="L159">            lookupInProgress.set(false);</span>
+<span class="nc" id="L160">            throw exception;</span>
+<span class="nc" id="L161">        }</span>
+<span class="nc" id="L162">    }</span>
+
+    private void finishLookup(HttpExchange exchange, LiteratureReviewRepository.Receipt pending) {
+        try {
+<span class="nc" id="L166">            var result = client.search(pending.query(), true);</span>
+<span class="nc" id="L167">            var receipt = receipts.complete(pending, result);</span>
+<span class="nc bnc" id="L168" title="All 3 branches missed.">            int status = switch (result.status()) {</span>
+<span class="nc" id="L169">                case SUCCESS -&gt; 201;</span>
+<span class="nc" id="L170">                case RATE_LIMITED -&gt; 429;</span>
+<span class="nc" id="L171">                default -&gt; 502;</span>
+            };
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (status == 429) exchange.getResponseHeaders().set(&quot;Retry-After&quot;, Long.toString(result.retryAfterSeconds()));</span>
+<span class="nc" id="L174">            send(exchange, status, JSON.valueToTree(receipt));</span>
+<span class="nc" id="L175">        } catch (IOException | RuntimeException exception) {</span>
+            try {
+<span class="nc" id="L177">                error(exchange, 500, &quot;PRIVATE_LITERATURE_LOOKUP_UNAVAILABLE&quot;);</span>
+<span class="nc" id="L178">            } catch (IOException ignored) {</span>
+<span class="nc" id="L179">                exchange.close();</span>
+<span class="nc" id="L180">            }</span>
+        } finally {
+<span class="nc" id="L182">            lookupInProgress.set(false);</span>
+        }
+<span class="nc" id="L184">    }</span>
+
+    private boolean sameOriginAction(HttpExchange exchange) {
+<span class="fc" id="L187">        var headers = exchange.getRequestHeaders();</span>
+<span class="fc" id="L188">        String fetchSite = headers.getFirst(&quot;Sec-Fetch-Site&quot;);</span>
+<span class="fc" id="L189">        String authority = headers.getFirst(&quot;Host&quot;);</span>
+<span class="pc bpc" id="L190" title="2 of 6 branches missed.">        if (authority == null || !&quot;workbench&quot;.equals(headers.getFirst(CONSENT_HEADER))</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                || (fetchSite != null &amp;&amp; !&quot;same-origin&quot;.equals(fetchSite))) return false;</span>
+        try {
+<span class="fc" id="L193">            var host = URI.create(&quot;http://&quot; + authority);</span>
+<span class="pc bpc" id="L194" title="4 of 8 branches missed.">            if (host.getHost() == null || !authority.equals(host.getRawAuthority()) || host.getRawUserInfo() != null</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    || (requireLoopbackAuthority &amp;&amp; !LOCAL_HOSTS.contains(host.getHost().toLowerCase(Locale.ROOT)))) {</span>
+<span class="fc" id="L196">                return false;</span>
+            }
+<span class="fc" id="L198">            String origin = headers.getFirst(&quot;Origin&quot;);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (origin == null) return true;</span>
+<span class="nc" id="L200">            var uri = URI.create(origin);</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">            return (&quot;http&quot;.equals(uri.getScheme()) || &quot;https&quot;.equals(uri.getScheme()))</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                &amp;&amp; authority.equalsIgnoreCase(uri.getRawAuthority());</span>
+<span class="nc" id="L203">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L204">            return false;</span>
+        }
+    }
+
+    private static void requireJson(HttpExchange exchange) {
+<span class="fc" id="L209">        String type = exchange.getRequestHeaders().getFirst(&quot;Content-Type&quot;);</span>
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (type == null || !&quot;application/json&quot;.equals(type.split(&quot;;&quot;, 2)[0].strip().toLowerCase(Locale.ROOT))) {</span>
+<span class="nc" id="L211">            throw new IllegalArgumentException(&quot;expected JSON&quot;);</span>
+        }
+<span class="fc" id="L213">    }</span>
+
+    private static void error(HttpExchange exchange, int status, String code) throws IOException {
+<span class="fc" id="L216">        send(exchange, status, JSON.createObjectNode().put(&quot;error&quot;, true).put(&quot;code&quot;, code).put(&quot;message&quot;, code));</span>
+<span class="fc" id="L217">    }</span>
+
+    private static void send(HttpExchange exchange, int status, JsonNode body) throws IOException {
+<span class="fc" id="L220">        byte[] bytes = JSON.writeValueAsBytes(body);</span>
+<span class="fc" id="L221">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L222">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
+<span class="fc" id="L223">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L224">        try (var output = exchange.getResponseBody()) { output.write(bytes); }</span>
+<span class="fc" id="L225">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

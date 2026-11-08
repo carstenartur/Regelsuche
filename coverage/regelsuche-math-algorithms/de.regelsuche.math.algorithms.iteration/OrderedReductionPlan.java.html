@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedReductionPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">OrderedReductionPlan.java</span></div><h1>OrderedReductionPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.FiniteIteration;
+import de.regelsuche.ast.iteration.OrderedReduction;
+import de.regelsuche.ast.iteration.OrderedReduction.All;
+import de.regelsuche.ast.iteration.OrderedReduction.Bound;
+import de.regelsuche.ast.iteration.OrderedReduction.KeyInterval;
+import de.regelsuche.ast.iteration.OrderedReduction.Restriction;
+import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
+
+/** A candidate factorization and its indexed access schedule for ordered rows. */
+public record OrderedReductionPlan(List&lt;Term&gt; terms, List&lt;Lookup&gt; lookups, Optional&lt;Lookup&gt; eviction) {
+<span class="fc" id="L25">    public OrderedReductionPlan {</span>
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">        if (terms.size() &gt; IterationPolynomial.MAX_TERMS || lookups.size() &gt;= OrderedReduction.MAX_ARITY) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;ORDERED_PLAN_LIMIT&quot;);</span>
+        }
+<span class="fc" id="L29">        terms = List.copyOf(terms);</span>
+<span class="fc" id="L30">        lookups = List.copyOf(lookups);</span>
+<span class="fc" id="L31">        Objects.requireNonNull(eviction);</span>
+<span class="fc" id="L32">    }</span>
+
+    public record Term(BigInteger coefficient, List&lt;Moment&gt; factors) {
+<span class="fc" id="L35">        public Term {</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">            if (coefficient.signum() == 0 || coefficient.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">                    || factors.size() &lt; 2 || factors.size() &gt; OrderedReduction.MAX_ARITY) {</span>
+<span class="nc" id="L38">                throw new IllegalArgumentException(&quot;INVALID_ORDERED_TERM&quot;);</span>
+            }
+<span class="fc" id="L40">            factors = List.copyOf(factors);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (factors.stream().mapToInt(moment -&gt; moment.columns().size()).sum() &gt; PairReduction.MAX_DEGREE) {</span>
+<span class="nc" id="L42">                throw new IllegalArgumentException(&quot;INVALID_ORDERED_TERM&quot;);</span>
+            }
+<span class="fc" id="L44">        }</span>
+    }
+
+<span class="fc" id="L47">    public enum Access { SCALAR, HASH, RANGE }</span>
+
+    public record Lookup(Restriction restriction, Access access) {
+<span class="fc" id="L50">        public Lookup {</span>
+<span class="fc" id="L51">            Objects.requireNonNull(restriction);</span>
+<span class="fc" id="L52">            Objects.requireNonNull(access);</span>
+<span class="fc" id="L53">        }</span>
+    }
+
+<span class="fc" id="L56">    public record Verification(Optional&lt;Verified&gt; verified, String reason, long work) {}</span>
+
+    static Verification verify(OrderedReduction source, OrderedReductionPlan plan, boolean windows,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L60">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L61">        Objects.requireNonNull(plan);</span>
+<span class="fc" id="L62">        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+        try {
+<span class="fc" id="L64">            checkSchedule(source, plan, windows, work);</span>
+<span class="fc" id="L65">            var original = IterationPolynomial.parseOrderedSummand(source, work);</span>
+<span class="fc" id="L66">            var reconstruction = IterationPolynomial.zero(work);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (var term : plan.terms()) {</span>
+<span class="fc" id="L68">                var monomial = symbols(source, term, work);</span>
+<span class="fc" id="L69">                reconstruction = reconstruction.add(IterationPolynomial.single(</span>
+<span class="fc" id="L70">                    monomial, ExactRational.integer(term.coefficient()), work));</span>
+<span class="fc" id="L71">            }</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (!reconstruction.same(original)) throw new Unavailable(&quot;ORDERED_IDENTITY_MISMATCH&quot;);</span>
+<span class="fc" id="L73">            return new Verification(Optional.of(new Verified(source, plan)), &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc" id="L74">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L75">            return new Verification(Optional.empty(), unavailable.getMessage(), work.used());</span>
+        }
+    }
+
+    private static IterationPolynomial.Monomial symbols(OrderedReduction source, Term term, Work work) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (term.factors().size() != source.slots().size()) throw new Unavailable(&quot;ORDERED_ARITY_MISMATCH&quot;);</span>
+<span class="fc" id="L81">        var symbols = new ArrayList&lt;SymbolId&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (int slot = 0; slot &lt; source.slots().size(); slot++) {</span>
+<span class="fc" id="L83">            work.charge(1);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (int column : term.factors().get(slot).columns()) {</span>
+<span class="fc" id="L85">                work.charge(1);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                if (column &gt;= source.columnCount()) throw new Unavailable(&quot;UNKNOWN_COLUMN&quot;);</span>
+<span class="fc" id="L87">                symbols.add(source.slots().get(slot).get(column));</span>
+<span class="fc" id="L88">            }</span>
+        }
+<span class="fc" id="L90">        return new IterationPolynomial.Monomial(symbols);</span>
+    }
+
+    private static void checkSchedule(OrderedReduction source, OrderedReductionPlan plan, boolean windows, Work work) {
+<span class="fc" id="L94">        work.charge(1);</span>
+<span class="pc bpc" id="L95" title="2 of 6 branches missed.">        if (plan.lookups().size() != source.restrictions().size() || plan.eviction().isPresent() != windows</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                || (windows &amp;&amp; source.slots().size() != 2)) {</span>
+<span class="nc" id="L97">            throw new Unavailable(&quot;ORDERED_DOMAIN_MISMATCH&quot;);</span>
+        }
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (int i = 0; i &lt; plan.lookups().size(); i++) {</span>
+<span class="fc" id="L100">            work.charge(1);</span>
+<span class="fc" id="L101">            var lookup = plan.lookups().get(i);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (!lookup.restriction().equals(source.restrictions().get(i))) {</span>
+<span class="nc" id="L103">                throw new Unavailable(&quot;ORDERED_PREDICATE_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L105">            checkAccess(lookup);</span>
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (windows) {</span>
+<span class="fc" id="L108">            var reverse = plan.eviction().orElseThrow();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (!reversed(source.restrictions().getFirst(), reverse.restriction())) {</span>
+<span class="fc" id="L110">                throw new Unavailable(&quot;EVICTION_PREDICATE_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L112">            checkAccess(reverse);</span>
+        }
+<span class="fc" id="L114">    }</span>
+
+    private static void checkAccess(Lookup lookup) {
+<span class="fc bfc" id="L117" title="All 3 branches covered.">        boolean supported = switch (lookup.access()) {</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            case SCALAR -&gt; lookup.restriction() == All.ROWS;</span>
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">            case HASH -&gt; lookup.restriction() instanceof KeyInterval interval &amp;&amp; interval.isPoint();</span>
+<span class="fc" id="L120">            case RANGE -&gt; lookup.restriction() instanceof KeyInterval;</span>
+        };
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!supported) throw new Unavailable(&quot;INVALID_INDEX_ACCESS&quot;);</span>
+<span class="fc" id="L123">    }</span>
+
+    private static boolean reversed(Restriction original, Restriction candidate) {
+<span class="pc bpc" id="L126" title="3 of 4 branches missed.">        if (original == All.ROWS) return candidate == All.ROWS;</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        return original instanceof KeyInterval forward &amp;&amp; candidate instanceof KeyInterval reverse</span>
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">            &amp;&amp; forward.leftColumn() == reverse.rightColumn() &amp;&amp; forward.rightColumn() == reverse.leftColumn()</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            &amp;&amp; forward.complement() == reverse.complement()</span>
+<span class="pc bpc" id="L130" title="2 of 6 branches missed.">            &amp;&amp; opposite(forward.lower(), reverse.upper()) &amp;&amp; opposite(forward.upper(), reverse.lower());</span>
+    }
+
+    private static boolean opposite(Optional&lt;Bound&gt; bound, Optional&lt;Bound&gt; opposite) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (bound.isEmpty()) return opposite.isEmpty();</span>
+<span class="fc" id="L135">        var forward = bound.orElseThrow();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        return opposite.filter(reverse -&gt; forward.inclusive() == reverse.inclusive()</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            &amp;&amp; forward.offset().add(reverse.offset()).signum() == 0).isPresent();</span>
+    }
+
+    public record Evaluation(List&lt;BigInteger&gt; sums, long rowReads, long indexAccesses, long work) {
+<span class="fc" id="L141">        public Evaluation {</span>
+<span class="fc" id="L142">            sums = List.copyOf(sums);</span>
+<span class="fc" id="L143">        }</span>
+    }
+
+    /** Execution is restricted to a source-bound plan that passed the identity and schedule checks. */
+    public static final class Verified {
+        private final OrderedReduction source;
+        private final OrderedReductionPlan plan;
+
+<span class="fc" id="L151">        private Verified(OrderedReduction source, OrderedReductionPlan plan) {</span>
+<span class="fc" id="L152">            this.source = source;</span>
+<span class="fc" id="L153">            this.plan = plan;</span>
+<span class="fc" id="L154">        }</span>
+
+<span class="nc" id="L156">        public OrderedReduction source() { return source; }</span>
+<span class="fc" id="L157">        public OrderedReductionPlan plan() { return plan; }</span>
+
+        /** Returns a single sum over the ordered tuples. */
+        public Evaluation evaluate(List&lt;? extends List&lt;BigInteger&gt;&gt; rows, IterationLimits limits,
+                BooleanSupplier cancellation) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (plan.eviction().isPresent()) throw new IllegalArgumentException(&quot;WINDOW_WIDTH_REQUIRED&quot;);</span>
+<span class="fc" id="L163">            return OrderedReductionEvaluation.evaluate(source, plan, rows, 0, limits, cancellation);</span>
+        }
+
+        /** Returns one sum per complete window, in input order. */
+        public Evaluation evaluateWindows(List&lt;? extends List&lt;BigInteger&gt;&gt; rows, int width, IterationLimits limits,
+                BooleanSupplier cancellation) {
+<span class="pc bpc" id="L169" title="2 of 4 branches missed.">            if (width &lt; 1 || plan.eviction().isEmpty()) throw new IllegalArgumentException(&quot;INVALID_WINDOW&quot;);</span>
+<span class="fc" id="L170">            return OrderedReductionEvaluation.evaluate(source, plan, rows, width, limits, cancellation);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

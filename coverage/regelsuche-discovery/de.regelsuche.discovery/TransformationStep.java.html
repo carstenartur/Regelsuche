@@ -16,25 +16,36 @@ public record TransformationStep(
     boolean equivalencePreserving,
     String explanation,
     List&lt;String&gt; assumptions,
-    RecordedExecution execution
+    RecordedExecution execution,
+    String ruleRevision
 ) {
-<span class="fc" id="L21">    public TransformationStep {</span>
-<span class="pc bpc" id="L22" title="3 of 8 branches missed.">        if (beforeExpression == null || afterExpression == null || ruleId == null || ruleKind == null) {</span>
-<span class="fc" id="L23">            throw new IllegalArgumentException(&quot;step expressions, ruleId and ruleKind are required&quot;);</span>
+<span class="fc" id="L22">    public TransformationStep {</span>
+<span class="pc bpc" id="L23" title="3 of 8 branches missed.">        if (beforeExpression == null || afterExpression == null || ruleId == null || ruleKind == null) {</span>
+<span class="fc" id="L24">            throw new IllegalArgumentException(&quot;step expressions, ruleId and ruleKind are required&quot;);</span>
         }
-<span class="fc bfc" id="L25" title="All 2 branches covered.">        explanation = explanation == null ? &quot;&quot; : explanation;</span>
-<span class="fc" id="L26">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (execution != null) execution.requireStep(beforeExpression, afterExpression, ruleId, ruleKind,</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="pc bpc" id="L27" title="3 of 4 branches missed.">        if (ruleRevision != null &amp;&amp; !ruleRevision.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;invalid rule revision&quot;);</span>
+        }
+<span class="fc" id="L30">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (execution != null) execution.requireStep(beforeExpression, afterExpression, ruleId, ruleKind,</span>
             equivalencePreserving, assumptions);
-<span class="fc" id="L29">    }</span>
+<span class="fc" id="L33">    }</span>
+
+    public TransformationStep(int index, String beforeExpression, String afterExpression, String ruleId,
+            RewriteKind ruleKind, int scoreBefore, int scoreAfter, boolean equivalencePreserving,
+            String explanation, List&lt;String&gt; assumptions, RecordedExecution execution) {
+<span class="fc" id="L38">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
+            equivalencePreserving, explanation, assumptions, execution, null);
+<span class="fc" id="L40">    }</span>
 
     /** Display-only observations may lack retained execution; they cannot authorize replay. */
     public TransformationStep(int index, String beforeExpression, String afterExpression, String ruleId,
             RewriteKind ruleKind, int scoreBefore, int scoreAfter, boolean equivalencePreserving,
             String explanation, List&lt;String&gt; assumptions) {
-<span class="fc" id="L35">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
+<span class="fc" id="L46">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
             equivalencePreserving, explanation, assumptions, null);
-<span class="fc" id="L37">    }</span>
+<span class="fc" id="L48">    }</span>
 
     public TransformationStep(
         int index,
@@ -47,8 +58,8 @@ public record TransformationStep(
         boolean equivalencePreserving,
         String explanation
     ) {
-<span class="fc" id="L50">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
-<span class="fc" id="L51">            equivalencePreserving, explanation, List.of());</span>
-<span class="fc" id="L52">    }</span>
+<span class="fc" id="L61">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
+<span class="fc" id="L62">            equivalencePreserving, explanation, List.of());</span>
+<span class="fc" id="L63">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

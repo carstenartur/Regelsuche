@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 
 /** Workbench adapter for the exact mathematical source, certificate and execution. */
 final class PairReductionWorkbench {
-<span class="fc" id="L29">    private static final Set&lt;String&gt; FIELDS = Set.of(&quot;columns&quot;, &quot;summand&quot;, &quot;rowCount&quot;, &quot;rows&quot;);</span>
+<span class="fc" id="L29">    private static final Set&lt;String&gt; FIELDS = Set.of(&quot;columns&quot;, &quot;summand&quot;, &quot;rowCount&quot;, &quot;rows&quot;, &quot;restrictions&quot;, &quot;windowWidth&quot;);</span>
 <span class="fc" id="L30">    private static final IterationLimits LIMITS = new IterationLimits(500_000, 128, 2_000);</span>
 <span class="fc" id="L31">    private static final BooleanSupplier NEVER_CANCELLED = () -&gt; false;</span>
 <span class="fc" id="L32">    private static final Pattern INTEGER = Pattern.compile(&quot;-?[0-9]{1,256}&quot;);</span>
@@ -42,136 +42,144 @@ final class PairReductionWorkbench {
 <span class="fc" id="L42">        int count = rowCount(input.get(&quot;rowCount&quot;));</span>
 <span class="fc bfc" id="L43" title="All 2 branches covered.">        var sample = input.containsKey(&quot;rows&quot;) ? sample(input.get(&quot;rows&quot;), names.size()) : null;</span>
 
-<span class="fc" id="L45">        var scope = new SymbolScope();</span>
-<span class="fc" id="L46">        var columns = names.stream().map(name -&gt; new PairReduction.Column(</span>
-<span class="fc" id="L47">            scope.declare(name + &quot;_i&quot;), scope.declare(name + &quot;_j&quot;))).toList();</span>
-<span class="fc" id="L48">        var symbolic = SymbolicExpression.parse(summand, scope);</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">        if (input.containsKey(&quot;restrictions&quot;) || input.containsKey(&quot;windowWidth&quot;)) {</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            int width = input.containsKey(&quot;windowWidth&quot;) ? rowCount(input.get(&quot;windowWidth&quot;)) : 0;</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">            if (input.containsKey(&quot;windowWidth&quot;) &amp;&amp; width == 0) {</span>
+<span class="nc" id="L48">                throw new IllegalArgumentException(&quot;windowWidth must be positive&quot;);</span>
+            }
+<span class="fc" id="L50">            return OrderedReductionWorkbench.analyze(names, summand, count, sample, input.get(&quot;restrictions&quot;), width, LIMITS);</span>
+        }
+
+<span class="fc" id="L53">        var scope = new SymbolScope();</span>
+<span class="fc" id="L54">        var columns = names.stream().map(name -&gt; new PairReduction.Column(</span>
+<span class="fc" id="L55">            scope.declare(name + &quot;_i&quot;), scope.declare(name + &quot;_j&quot;))).toList();</span>
+<span class="fc" id="L56">        var symbolic = SymbolicExpression.parse(summand, scope);</span>
         PairReduction source;
         try {
-<span class="fc" id="L51">            source = new PairReduction(columns, symbolic.expression());</span>
-<span class="nc" id="L52">        } catch (IllegalArgumentException invalidScope) {</span>
-<span class="nc" id="L53">            return unavailable(invalidScope.getMessage());</span>
-<span class="fc" id="L54">        }</span>
-<span class="fc" id="L55">        var search = PairReductionSearch.search(source, LIMITS, 3, NEVER_CANCELLED);</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (search.verified().isEmpty()) {</span>
-<span class="fc" id="L57">            return unavailable(search.reason());</span>
+<span class="fc" id="L59">            source = new PairReduction(columns, symbolic.expression());</span>
+<span class="nc" id="L60">        } catch (IllegalArgumentException invalidScope) {</span>
+<span class="nc" id="L61">            return unavailable(invalidScope.getMessage());</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">        var search = PairReductionSearch.search(source, LIMITS, 3, NEVER_CANCELLED);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (search.verified().isEmpty()) {</span>
+<span class="fc" id="L65">            return unavailable(search.reason());</span>
         }
-<span class="fc" id="L59">        var checked = search.verified().orElseThrow();</span>
-<span class="fc" id="L60">        var result = new JsonWriter().beginObject().property(&quot;status&quot;, &quot;VERIFIED&quot;)</span>
-<span class="fc" id="L61">            .property(&quot;rowCount&quot;, count).property(&quot;originalPairs&quot;, PairReduction.originalPairs(count).toString())</span>
-<span class="fc" id="L62">            .property(&quot;expandedSummand&quot;, expansion(checked.expandedSummand(), symbolic.displayNames()))</span>
-<span class="fc" id="L63">            .property(&quot;synthesisWork&quot;, search.metrics().primitiveWork())</span>
-<span class="fc" id="L64">            .property(&quot;verificationWork&quot;, search.metrics().verificationWork())</span>
-<span class="fc" id="L65">            .array(&quot;checkedRules&quot;, array -&gt; search.witness().forEach(step -&gt; array.value(step.ruleId())));</span>
-<span class="fc" id="L66">        writePlan(result, checked.plan(), names);</span>
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (sample != null) {</span>
+<span class="fc" id="L67">        var checked = search.verified().orElseThrow();</span>
+<span class="fc" id="L68">        var result = new JsonWriter().beginObject().property(&quot;status&quot;, &quot;VERIFIED&quot;)</span>
+<span class="fc" id="L69">            .property(&quot;rowCount&quot;, count).property(&quot;originalPairs&quot;, PairReduction.originalPairs(count).toString())</span>
+<span class="fc" id="L70">            .property(&quot;expandedSummand&quot;, expansion(checked.expandedSummand(), symbolic.displayNames()))</span>
+<span class="fc" id="L71">            .property(&quot;synthesisWork&quot;, search.metrics().primitiveWork())</span>
+<span class="fc" id="L72">            .property(&quot;verificationWork&quot;, search.metrics().verificationWork())</span>
+<span class="fc" id="L73">            .array(&quot;checkedRules&quot;, array -&gt; search.witness().forEach(step -&gt; array.value(step.ruleId())));</span>
+<span class="fc" id="L74">        writePlan(result, checked.plan(), names);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (sample != null) {</span>
             try {
-<span class="fc" id="L69">                var evaluation = checked.evaluate(sample, LIMITS, NEVER_CANCELLED);</span>
-<span class="fc" id="L70">                result.property(&quot;sampleResult&quot;, evaluation.value().toString()).property(&quot;sampleRows&quot;, evaluation.rows());</span>
-<span class="fc" id="L71">            } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L72">                result.property(&quot;sampleUnavailable&quot;, exception.getMessage());</span>
-<span class="fc" id="L73">            }</span>
+<span class="fc" id="L77">                var evaluation = checked.evaluate(sample, LIMITS, NEVER_CANCELLED);</span>
+<span class="fc" id="L78">                result.property(&quot;sampleResult&quot;, evaluation.value().toString()).property(&quot;sampleRows&quot;, evaluation.rows());</span>
+<span class="fc" id="L79">            } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L80">                result.property(&quot;sampleUnavailable&quot;, exception.getMessage());</span>
+<span class="fc" id="L81">            }</span>
         }
-<span class="fc" id="L75">        return result.endObject().toString();</span>
+<span class="fc" id="L83">        return result.endObject().toString();</span>
     }
 
-    private static String unavailable(String reason) {
-<span class="fc" id="L79">        return new JsonWriter().beginObject().property(&quot;status&quot;, &quot;NO_PLAN&quot;).property(&quot;reason&quot;, reason)</span>
-<span class="fc" id="L80">            .endObject().toString();</span>
+    static String unavailable(String reason) {
+<span class="fc" id="L87">        return new JsonWriter().beginObject().property(&quot;status&quot;, &quot;NO_PLAN&quot;).property(&quot;reason&quot;, reason)</span>
+<span class="fc" id="L88">            .endObject().toString();</span>
     }
 
     private static List&lt;String&gt; columnNames(Object input) {
-<span class="pc bpc" id="L84" title="3 of 6 branches missed.">        if (!(input instanceof List&lt;?&gt; list) || list.isEmpty() || list.size() &gt; PairReduction.MAX_COLUMNS) {</span>
-<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;declare one to eight columns&quot;);</span>
+<span class="pc bpc" id="L92" title="3 of 6 branches missed.">        if (!(input instanceof List&lt;?&gt; list) || list.isEmpty() || list.size() &gt; PairReduction.MAX_COLUMNS) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(&quot;declare one to eight columns&quot;);</span>
         }
-<span class="fc" id="L87">        var names = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (Object item : list) {</span>
-<span class="pc bpc" id="L89" title="2 of 4 branches missed.">            if (!(item instanceof String name) || name.length() &gt; 24) {</span>
-<span class="nc" id="L90">                throw new IllegalArgumentException(&quot;invalid column name&quot;);</span>
+<span class="fc" id="L95">        var names = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (Object item : list) {</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">            if (!(item instanceof String name) || name.length() &gt; 24) {</span>
+<span class="nc" id="L98">                throw new IllegalArgumentException(&quot;invalid column name&quot;);</span>
             }
-<span class="fc" id="L92">            names.add(SymbolScope.requireName(name));</span>
-<span class="fc" id="L93">        }</span>
-<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(names).size() != names.size()) {</span>
-<span class="nc" id="L95">            throw new IllegalArgumentException(&quot;column names must be distinct&quot;);</span>
+<span class="fc" id="L100">            names.add(SymbolScope.requireName(name));</span>
+<span class="fc" id="L101">        }</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(names).size() != names.size()) {</span>
+<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;column names must be distinct&quot;);</span>
         }
-<span class="fc" id="L97">        return names;</span>
+<span class="fc" id="L105">        return names;</span>
     }
 
     private static int rowCount(Object value) {
-<span class="pc bpc" id="L101" title="3 of 4 branches missed.">        if (!(value instanceof Integer || value instanceof Long)</span>
-<span class="pc bpc" id="L102" title="2 of 4 branches missed.">                || ((Number) value).longValue() &lt; 0 || ((Number) value).longValue() &gt; 1_000_000_000) {</span>
-<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;rowCount must be an integer between 0 and 1000000000&quot;);</span>
+<span class="pc bpc" id="L109" title="3 of 4 branches missed.">        if (!(value instanceof Integer || value instanceof Long)</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">                || ((Number) value).longValue() &lt; 0 || ((Number) value).longValue() &gt; 1_000_000_000) {</span>
+<span class="nc" id="L111">            throw new IllegalArgumentException(&quot;rowCount must be an integer between 0 and 1000000000&quot;);</span>
         }
-<span class="fc" id="L105">        return ((Number) value).intValue();</span>
+<span class="fc" id="L113">        return ((Number) value).intValue();</span>
     }
 
     private static List&lt;List&lt;BigInteger&gt;&gt; sample(Object value, int width) {
-<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        if (!(value instanceof List&lt;?&gt; list) || list.size() &gt; 256) {</span>
-<span class="nc" id="L110">            throw new IllegalArgumentException(&quot;provide at most 256 sample rows&quot;);</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">        if (!(value instanceof List&lt;?&gt; list) || list.size() &gt; 256) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;provide at most 256 sample rows&quot;);</span>
         }
-<span class="fc" id="L112">        var rows = new ArrayList&lt;List&lt;BigInteger&gt;&gt;();</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (Object item : list) {</span>
-<span class="pc bpc" id="L114" title="1 of 4 branches missed.">            if (!(item instanceof List&lt;?&gt; row) || row.size() != width) {</span>
-<span class="fc" id="L115">                throw new IllegalArgumentException(&quot;sample rows must match the number of columns&quot;);</span>
+<span class="fc" id="L120">        var rows = new ArrayList&lt;List&lt;BigInteger&gt;&gt;();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (Object item : list) {</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">            if (!(item instanceof List&lt;?&gt; row) || row.size() != width) {</span>
+<span class="fc" id="L123">                throw new IllegalArgumentException(&quot;sample rows must match the number of columns&quot;);</span>
             }
-<span class="fc" id="L117">            var values = new ArrayList&lt;BigInteger&gt;();</span>
-<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (Object cell : row) {</span>
-<span class="pc bpc" id="L119" title="2 of 4 branches missed.">                if (!(cell instanceof String number) || !INTEGER.matcher(number).matches()) {</span>
-<span class="nc" id="L120">                    throw new IllegalArgumentException(&quot;sample cells must be decimal integer strings&quot;);</span>
+<span class="fc" id="L125">            var values = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            for (Object cell : row) {</span>
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">                if (!(cell instanceof String number) || !INTEGER.matcher(number).matches()) {</span>
+<span class="nc" id="L128">                    throw new IllegalArgumentException(&quot;sample cells must be decimal integer strings&quot;);</span>
                 }
-<span class="fc" id="L122">                values.add(new BigInteger(number));</span>
-<span class="fc" id="L123">            }</span>
-<span class="fc" id="L124">            rows.add(values);</span>
-<span class="fc" id="L125">        }</span>
-<span class="fc" id="L126">        return rows;</span>
+<span class="fc" id="L130">                values.add(new BigInteger(number));</span>
+<span class="fc" id="L131">            }</span>
+<span class="fc" id="L132">            rows.add(values);</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return rows;</span>
     }
 
     private static String expansion(Expr expression, Map&lt;SymbolId, String&gt; names) {
-<span class="fc" id="L130">        var text = new StringBuilder();</span>
-<span class="fc" id="L131">        appendExpansion(expression, names, text);</span>
-<span class="fc" id="L132">        return text.toString().replace(&quot; + -&quot;, &quot; - &quot;);</span>
+<span class="fc" id="L138">        var text = new StringBuilder();</span>
+<span class="fc" id="L139">        appendExpansion(expression, names, text);</span>
+<span class="fc" id="L140">        return text.toString().replace(&quot; + -&quot;, &quot; - &quot;);</span>
     }
 
     // Normal form is a sum of products with integer leaves. Presentation may
     // include larger coefficients than the textual input grammar accepts.
     private static void appendExpansion(Expr expression, Map&lt;SymbolId, String&gt; names, StringBuilder text) {
-<span class="pc bpc" id="L138" title="1 of 4 branches missed.">        switch (expression) {</span>
-<span class="fc" id="L139">            case NumberExpr number -&gt; text.append(number.value().numerator());</span>
-<span class="fc" id="L140">            case VariableExpr variable -&gt; text.append(names.get(variable.symbol().orElseThrow()));</span>
-<span class="fc" id="L141">            case BinaryExpr binary -&gt; {</span>
-<span class="fc" id="L142">                appendExpansion(binary.left(), names, text);</span>
-<span class="fc" id="L143">                text.append(' ').append(binary.operator().symbol()).append(' ');</span>
-<span class="fc" id="L144">                appendExpansion(binary.right(), names, text);</span>
-<span class="fc" id="L145">            }</span>
-<span class="nc" id="L146">            case FunctionExpr ignored -&gt; throw new IllegalStateException(&quot;unexpected function in polynomial normal form&quot;);</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        switch (expression) {</span>
+<span class="fc" id="L147">            case NumberExpr number -&gt; text.append(number.value().numerator());</span>
+<span class="fc" id="L148">            case VariableExpr variable -&gt; text.append(names.get(variable.symbol().orElseThrow()));</span>
+<span class="fc" id="L149">            case BinaryExpr binary -&gt; {</span>
+<span class="fc" id="L150">                appendExpansion(binary.left(), names, text);</span>
+<span class="fc" id="L151">                text.append(' ').append(binary.operator().symbol()).append(' ');</span>
+<span class="fc" id="L152">                appendExpansion(binary.right(), names, text);</span>
+<span class="fc" id="L153">            }</span>
+<span class="nc" id="L154">            case FunctionExpr ignored -&gt; throw new IllegalStateException(&quot;unexpected function in polynomial normal form&quot;);</span>
         }
-<span class="fc" id="L148">    }</span>
+<span class="fc" id="L156">    }</span>
 
     private static void writePlan(JsonWriter result, PairReductionPlan plan, List&lt;String&gt; names) {
-<span class="fc" id="L151">        var labels = new LinkedHashMap&lt;PairReductionPlan.Moment, String&gt;();</span>
-<span class="fc" id="L152">        labels.put(new PairReductionPlan.Moment(List.of()), &quot;n&quot;);</span>
-<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (var moment : plan.accumulators()) {</span>
-<span class="fc" id="L154">            labels.put(moment, &quot;S&quot; + labels.size());</span>
-<span class="fc" id="L155">        }</span>
-<span class="fc" id="L156">        result.array(&quot;accumulators&quot;, array -&gt; plan.accumulators().forEach(moment -&gt; {</span>
-<span class="fc" id="L157">            String product = moment.columns().stream().map(names::get).collect(Collectors.joining(&quot; · &quot;));</span>
-<span class="fc" id="L158">            array.objectValue(item -&gt; item.property(&quot;name&quot;, labels.get(moment)).property(&quot;rowProduct&quot;, product));</span>
-<span class="fc" id="L159">        }));</span>
-<span class="fc" id="L160">        var formula = new StringBuilder();</span>
-<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (var term : plan.terms()) {</span>
-<span class="fc" id="L162">            var coefficient = term.coefficient();</span>
-<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (formula.isEmpty()) {</span>
-<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                if (coefficient.signum() &lt; 0) formula.append('−');</span>
+<span class="fc" id="L159">        var labels = new LinkedHashMap&lt;PairReductionPlan.Moment, String&gt;();</span>
+<span class="fc" id="L160">        labels.put(new PairReductionPlan.Moment(List.of()), &quot;n&quot;);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (var moment : plan.accumulators()) {</span>
+<span class="fc" id="L162">            labels.put(moment, &quot;S&quot; + labels.size());</span>
+<span class="fc" id="L163">        }</span>
+<span class="fc" id="L164">        result.array(&quot;accumulators&quot;, array -&gt; plan.accumulators().forEach(moment -&gt; {</span>
+<span class="fc" id="L165">            String product = moment.columns().stream().map(names::get).collect(Collectors.joining(&quot; · &quot;));</span>
+<span class="fc" id="L166">            array.objectValue(item -&gt; item.property(&quot;name&quot;, labels.get(moment)).property(&quot;rowProduct&quot;, product));</span>
+<span class="fc" id="L167">        }));</span>
+<span class="fc" id="L168">        var formula = new StringBuilder();</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (var term : plan.terms()) {</span>
+<span class="fc" id="L170">            var coefficient = term.coefficient();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (formula.isEmpty()) {</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                if (coefficient.signum() &lt; 0) formula.append('−');</span>
             } else {
-<span class="fc bfc" id="L166" title="All 2 branches covered.">                formula.append(coefficient.signum() &lt; 0 ? &quot; − &quot; : &quot; + &quot;);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                formula.append(coefficient.signum() &lt; 0 ? &quot; − &quot; : &quot; + &quot;);</span>
             }
-<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (!coefficient.abs().equals(BigInteger.ONE)) {</span>
-<span class="fc" id="L169">                formula.append(coefficient.abs()).append(&quot; · &quot;);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (!coefficient.abs().equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L177">                formula.append(coefficient.abs()).append(&quot; · &quot;);</span>
             }
-<span class="fc" id="L171">            formula.append(term.factors().stream().map(labels::get).collect(Collectors.joining(&quot; · &quot;)));</span>
-<span class="fc" id="L172">        }</span>
-<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        String numerator = formula.isEmpty() ? &quot;0&quot; : formula.toString();</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        result.property(&quot;formula&quot;, plan.divisor() == 1 ? numerator : &quot;(&quot; + numerator + &quot;) / 2&quot;);</span>
-<span class="fc" id="L175">    }</span>
+<span class="fc" id="L179">            formula.append(term.factors().stream().map(labels::get).collect(Collectors.joining(&quot; · &quot;)));</span>
+<span class="fc" id="L180">        }</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        String numerator = formula.isEmpty() ? &quot;0&quot; : formula.toString();</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        result.property(&quot;formula&quot;, plan.divisor() == 1 ? numerator : &quot;(&quot; + numerator + &quot;) / 2&quot;);</span>
+<span class="fc" id="L183">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

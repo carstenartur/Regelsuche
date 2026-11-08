@@ -121,7 +121,7 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
                         + &quot;SET step.ruleId = $ruleId, step.ruleKind = $ruleKind, step.explanation = $explanation, &quot;
                         + &quot;step.scoreBefore = $scoreBefore, step.scoreAfter = $scoreAfter, &quot;
                         + &quot;step.equivalencePreserving = $equivalencePreserving, step.execution = $execution, &quot;
-                        + &quot;step.assumptions = $assumptions &quot;
+                        + &quot;step.assumptions = $assumptions, step.ruleRevision = $ruleRevision &quot;
                         + &quot;MERGE (path)-[:HAS_STEP]-&gt;(step) &quot;
                         + &quot;MERGE (step)-[:FROM]-&gt;(from) &quot;
                         + &quot;MERGE (step)-[:TO]-&gt;(to)&quot;,
@@ -140,49 +140,50 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
 <span class="nc" id="L140">        values.put(&quot;scoreAfter&quot;, step.scoreAfter()); values.put(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
 <span class="nc" id="L141">        values.put(&quot;assumptions&quot;, step.assumptions());</span>
 <span class="nc bnc" id="L142" title="All 2 branches missed.">        values.put(&quot;execution&quot;, step.execution() == null ? null : step.execution().toCanonicalJson());</span>
-<span class="nc" id="L143">        return values;</span>
+<span class="nc" id="L143">        values.put(&quot;ruleRevision&quot;, step.ruleRevision());</span>
+<span class="nc" id="L144">        return values;</span>
     }
 
     @Override
     public void saveRuleCandidate(RuleCandidate candidate) {
-<span class="nc" id="L148">        try (Session session = driver.session()) {</span>
-<span class="nc" id="L149">            session.run(</span>
+<span class="nc" id="L149">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L150">            session.run(</span>
                 &quot;MERGE (candidate:RuleCandidate {canonicalHash: $canonicalHash}) &quot;
                     + &quot;SET candidate.leftPattern = $leftPattern, candidate.rightPattern = $rightPattern, &quot;
                     + &quot;candidate.proofStatus = $proofStatus, candidate.status = $status&quot;,
-<span class="nc" id="L153">                Map.of(</span>
-<span class="nc" id="L154">                    &quot;canonicalHash&quot;, candidate.canonicalHash(),</span>
-<span class="nc" id="L155">                    &quot;leftPattern&quot;, candidate.leftPattern(),</span>
-<span class="nc" id="L156">                    &quot;rightPattern&quot;, candidate.rightPattern(),</span>
-<span class="nc" id="L157">                    &quot;proofStatus&quot;, candidate.proofStatus().name(),</span>
-<span class="nc" id="L158">                    &quot;status&quot;, candidate.status().name()</span>
+<span class="nc" id="L154">                Map.of(</span>
+<span class="nc" id="L155">                    &quot;canonicalHash&quot;, candidate.canonicalHash(),</span>
+<span class="nc" id="L156">                    &quot;leftPattern&quot;, candidate.leftPattern(),</span>
+<span class="nc" id="L157">                    &quot;rightPattern&quot;, candidate.rightPattern(),</span>
+<span class="nc" id="L158">                    &quot;proofStatus&quot;, candidate.proofStatus().name(),</span>
+<span class="nc" id="L159">                    &quot;status&quot;, candidate.status().name()</span>
                 )
             );
         }
-<span class="nc" id="L162">    }</span>
+<span class="nc" id="L163">    }</span>
 
     @Override
     public void saveReusableRule(ReusableRule rule) {
-<span class="nc" id="L166">        try (Session session = driver.session()) {</span>
-<span class="nc" id="L167">            session.run(</span>
+<span class="nc" id="L167">        try (Session session = driver.session()) {</span>
+<span class="nc" id="L168">            session.run(</span>
                 &quot;MERGE (rule:ReusableRule {id: $id}) &quot;
                     + &quot;SET rule.leftPattern = $leftPattern, rule.rightPattern = $rightPattern, &quot;
                     + &quot;rule.status = $status, rule.proofStatus = $proofStatus, rule.createdAt = $createdAt&quot;,
-<span class="nc" id="L171">                Map.of(</span>
-<span class="nc" id="L172">                    &quot;id&quot;, rule.id(),</span>
-<span class="nc" id="L173">                    &quot;leftPattern&quot;, rule.leftPattern(),</span>
-<span class="nc" id="L174">                    &quot;rightPattern&quot;, rule.rightPattern(),</span>
-<span class="nc" id="L175">                    &quot;status&quot;, rule.knownRuleStatus().name(),</span>
-<span class="nc" id="L176">                    &quot;proofStatus&quot;, rule.proofStatus().name(),</span>
-<span class="nc" id="L177">                    &quot;createdAt&quot;, rule.createdAt().toString()</span>
+<span class="nc" id="L172">                Map.of(</span>
+<span class="nc" id="L173">                    &quot;id&quot;, rule.id(),</span>
+<span class="nc" id="L174">                    &quot;leftPattern&quot;, rule.leftPattern(),</span>
+<span class="nc" id="L175">                    &quot;rightPattern&quot;, rule.rightPattern(),</span>
+<span class="nc" id="L176">                    &quot;status&quot;, rule.knownRuleStatus().name(),</span>
+<span class="nc" id="L177">                    &quot;proofStatus&quot;, rule.proofStatus().name(),</span>
+<span class="nc" id="L178">                    &quot;createdAt&quot;, rule.createdAt().toString()</span>
                 )
             );
         }
-<span class="nc" id="L181">    }</span>
+<span class="nc" id="L182">    }</span>
 
     @Override
     public void close() {
-<span class="nc" id="L185">        driver.close();</span>
-<span class="nc" id="L186">    }</span>
+<span class="nc" id="L186">        driver.close();</span>
+<span class="nc" id="L187">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -7,6 +7,7 @@ import de.regelsuche.api.searchgraph.SearchGraphJsonSerializer;
 import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.literature.RuleLiteratureCatalog;
 import de.regelsuche.mining.RuleCandidate;
 import java.io.IOException;
 import java.io.Writer;
@@ -20,6 +21,10 @@ public interface TransformationExportService {
 
     String exportLatex(List&lt;DiscoveredTransformation&gt; transformations);
 
+    default RuleLiteratureCatalog literatureCatalog() {
+<span class="nc" id="L25">        return RuleLiteratureCatalog.empty();</span>
+    }
+
     String exportJson(List&lt;DiscoveredTransformation&gt; transformations, List&lt;ReusableRule&gt; rules);
 
     default String exportJson(
@@ -27,7 +32,7 @@ public interface TransformationExportService {
         List&lt;RuleCandidate&gt; candidates,
         List&lt;ReusableRule&gt; rules
     ) {
-<span class="nc" id="L30">        return exportJson(transformations, rules);</span>
+<span class="nc" id="L35">        return exportJson(transformations, rules);</span>
     }
 
     /**
@@ -40,18 +45,18 @@ public interface TransformationExportService {
         List&lt;RuleCandidate&gt; candidates,
         List&lt;ReusableRule&gt; rules
     ) throws IOException {
-<span class="nc" id="L43">        destination.write(exportJson(transformations, candidates, rules));</span>
-<span class="nc" id="L44">    }</span>
+<span class="nc" id="L48">        destination.write(exportJson(transformations, candidates, rules));</span>
+<span class="nc" id="L49">    }</span>
 
     default String exportBundle(ExportBundle bundle) {
-<span class="nc" id="L47">        return exportJson(bundle.transformations(), bundle.ruleCandidates(), bundle.reusableRules());</span>
+<span class="nc" id="L52">        return exportJson(bundle.transformations(), bundle.ruleCandidates(), bundle.reusableRules());</span>
     }
 
     String exportMermaid(List&lt;DiscoveredTransformation&gt; transformations);
 
     /** Serialises a {@link SearchGraphDto} to the JSON shape consumed by the UI. */
     default String exportSearchGraphJson(SearchGraphDto searchGraph) {
-<span class="fc" id="L54">        return SearchGraphJsonSerializer.toJson(searchGraph);</span>
+<span class="fc" id="L59">        return SearchGraphJsonSerializer.toJson(searchGraph);</span>
     }
 
     /**
@@ -60,40 +65,40 @@ public interface TransformationExportService {
      * fallback in the UI.
      */
     default String exportSearchGraphMermaid(SearchGraphDto searchGraph) {
-<span class="fc" id="L63">        StringBuilder builder = new StringBuilder(&quot;graph TD\n&quot;);</span>
-<span class="fc" id="L64">        java.util.Map&lt;String, String&gt; nodeIds = new java.util.LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L65">        int counter = 0;</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (SearchGraphNodeDto node : searchGraph.nodes()) {</span>
-<span class="fc" id="L67">            String safe = &quot;N&quot; + counter++;</span>
-<span class="fc" id="L68">            nodeIds.put(node.id(), safe);</span>
-<span class="fc" id="L69">            builder.append(&quot;  &quot;).append(safe)</span>
-<span class="fc" id="L70">                .append(&quot;[\&quot;&quot;).append(node.expression().replace(&quot;\&quot;&quot;, &quot;'&quot;)).append(&quot;\&quot;]\n&quot;);</span>
-<span class="fc" id="L71">        }</span>
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (SearchGraphEdgeDto edge : searchGraph.edges()) {</span>
-<span class="fc" id="L73">            String from = nodeIds.get(edge.from());</span>
-<span class="fc" id="L74">            String to = nodeIds.get(edge.to());</span>
-<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            if (from == null || to == null) {</span>
+<span class="fc" id="L68">        StringBuilder builder = new StringBuilder(&quot;graph TD\n&quot;);</span>
+<span class="fc" id="L69">        java.util.Map&lt;String, String&gt; nodeIds = new java.util.LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L70">        int counter = 0;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (SearchGraphNodeDto node : searchGraph.nodes()) {</span>
+<span class="fc" id="L72">            String safe = &quot;N&quot; + counter++;</span>
+<span class="fc" id="L73">            nodeIds.put(node.id(), safe);</span>
+<span class="fc" id="L74">            builder.append(&quot;  &quot;).append(safe)</span>
+<span class="fc" id="L75">                .append(&quot;[\&quot;&quot;).append(node.expression().replace(&quot;\&quot;&quot;, &quot;'&quot;)).append(&quot;\&quot;]\n&quot;);</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (SearchGraphEdgeDto edge : searchGraph.edges()) {</span>
+<span class="fc" id="L78">            String from = nodeIds.get(edge.from());</span>
+<span class="fc" id="L79">            String to = nodeIds.get(edge.to());</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">            if (from == null || to == null) {</span>
                 // Skip edges that reference nodes not present in the graph
                 // rather than silently redirecting them to a placeholder.
-<span class="nc" id="L78">                continue;</span>
+<span class="nc" id="L83">                continue;</span>
             }
-<span class="fc" id="L80">            builder.append(&quot;  &quot;).append(from).append(&quot; --&gt;|&quot;)</span>
-<span class="fc" id="L81">                .append(edge.ruleId().replace(&quot;\&quot;&quot;, &quot;'&quot;))</span>
-<span class="fc" id="L82">                .append(&quot;| &quot;).append(to).append('\n');</span>
-<span class="fc" id="L83">        }</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (SearchGraphNodeDto node : searchGraph.nodes()) {</span>
-<span class="fc" id="L85">            String safe = nodeIds.get(node.id());</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (node.isBest()) {</span>
-<span class="fc" id="L87">                builder.append(&quot;  class &quot;).append(safe).append(&quot; best;\n&quot;);</span>
-<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            } else if (node.isDeadEnd()) {</span>
-<span class="nc" id="L89">                builder.append(&quot;  class &quot;).append(safe).append(&quot; deadend;\n&quot;);</span>
+<span class="fc" id="L85">            builder.append(&quot;  &quot;).append(from).append(&quot; --&gt;|&quot;)</span>
+<span class="fc" id="L86">                .append(edge.ruleId().replace(&quot;\&quot;&quot;, &quot;'&quot;))</span>
+<span class="fc" id="L87">                .append(&quot;| &quot;).append(to).append('\n');</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (SearchGraphNodeDto node : searchGraph.nodes()) {</span>
+<span class="fc" id="L90">            String safe = nodeIds.get(node.id());</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (node.isBest()) {</span>
+<span class="fc" id="L92">                builder.append(&quot;  class &quot;).append(safe).append(&quot; best;\n&quot;);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            } else if (node.isDeadEnd()) {</span>
+<span class="nc" id="L94">                builder.append(&quot;  class &quot;).append(safe).append(&quot; deadend;\n&quot;);</span>
             }
-<span class="fc" id="L91">        }</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (!searchGraph.nodes().isEmpty()) {</span>
-<span class="fc" id="L93">            builder.append(&quot;  classDef best fill:#cfe2ff,stroke:#1a73e8,stroke-width:2px;\n&quot;);</span>
-<span class="fc" id="L94">            builder.append(&quot;  classDef deadend fill:#fce8e6,stroke:#ea4335;\n&quot;);</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (!searchGraph.nodes().isEmpty()) {</span>
+<span class="fc" id="L98">            builder.append(&quot;  classDef best fill:#cfe2ff,stroke:#1a73e8,stroke-width:2px;\n&quot;);</span>
+<span class="fc" id="L99">            builder.append(&quot;  classDef deadend fill:#fce8e6,stroke:#ea4335;\n&quot;);</span>
         }
-<span class="fc" id="L96">        return builder.toString();</span>
+<span class="fc" id="L101">        return builder.toString();</span>
     }
 
     /**
@@ -101,43 +106,43 @@ public interface TransformationExportService {
      * use in tools like yEd / Gephi.
      */
     default String exportSearchGraphGraphMl(SearchGraphDto searchGraph) {
-<span class="fc" id="L104">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L105">        builder.append(&quot;&lt;?xml version=\&quot;1.0\&quot; encoding=\&quot;UTF-8\&quot;?&gt;\n&quot;);</span>
-<span class="fc" id="L106">        builder.append(&quot;&lt;graphml xmlns=\&quot;http://graphml.graphdrawing.org/xmlns\&quot;&gt;\n&quot;);</span>
-<span class="fc" id="L107">        builder.append(&quot;  &lt;key id=\&quot;d_expression\&quot; for=\&quot;node\&quot; attr.name=\&quot;expression\&quot; attr.type=\&quot;string\&quot;/&gt;\n&quot;);</span>
-<span class="fc" id="L108">        builder.append(&quot;  &lt;key id=\&quot;d_score\&quot; for=\&quot;node\&quot; attr.name=\&quot;score\&quot; attr.type=\&quot;int\&quot;/&gt;\n&quot;);</span>
-<span class="fc" id="L109">        builder.append(&quot;  &lt;key id=\&quot;d_best\&quot; for=\&quot;node\&quot; attr.name=\&quot;isBest\&quot; attr.type=\&quot;boolean\&quot;/&gt;\n&quot;);</span>
-<span class="fc" id="L110">        builder.append(&quot;  &lt;key id=\&quot;d_deadend\&quot; for=\&quot;node\&quot; attr.name=\&quot;isDeadEnd\&quot; attr.type=\&quot;boolean\&quot;/&gt;\n&quot;);</span>
-<span class="fc" id="L111">        builder.append(&quot;  &lt;key id=\&quot;d_rule\&quot; for=\&quot;edge\&quot; attr.name=\&quot;ruleId\&quot; attr.type=\&quot;string\&quot;/&gt;\n&quot;);</span>
-<span class="fc" id="L112">        builder.append(&quot;  &lt;graph id=\&quot;G\&quot; edgedefault=\&quot;directed\&quot;&gt;\n&quot;);</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (SearchGraphNodeDto node : searchGraph.nodes()) {</span>
-<span class="fc" id="L114">            builder.append(&quot;    &lt;node id=\&quot;&quot;).append(xmlAttr(node.id())).append(&quot;\&quot;&gt;\n&quot;);</span>
-<span class="fc" id="L115">            builder.append(&quot;      &lt;data key=\&quot;d_expression\&quot;&gt;&quot;).append(xmlText(node.expression())).append(&quot;&lt;/data&gt;\n&quot;);</span>
-<span class="fc" id="L116">            builder.append(&quot;      &lt;data key=\&quot;d_score\&quot;&gt;&quot;).append(node.score()).append(&quot;&lt;/data&gt;\n&quot;);</span>
-<span class="fc" id="L117">            builder.append(&quot;      &lt;data key=\&quot;d_best\&quot;&gt;&quot;).append(node.isBest()).append(&quot;&lt;/data&gt;\n&quot;);</span>
-<span class="fc" id="L118">            builder.append(&quot;      &lt;data key=\&quot;d_deadend\&quot;&gt;&quot;).append(node.isDeadEnd()).append(&quot;&lt;/data&gt;\n&quot;);</span>
-<span class="fc" id="L119">            builder.append(&quot;    &lt;/node&gt;\n&quot;);</span>
-<span class="fc" id="L120">        }</span>
-<span class="fc" id="L121">        int edgeIndex = 0;</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (SearchGraphEdgeDto edge : searchGraph.edges()) {</span>
-<span class="fc" id="L123">            builder.append(&quot;    &lt;edge id=\&quot;e&quot;).append(edgeIndex++).append(&quot;\&quot; source=\&quot;&quot;)</span>
-<span class="fc" id="L124">                .append(xmlAttr(edge.from())).append(&quot;\&quot; target=\&quot;&quot;)</span>
-<span class="fc" id="L125">                .append(xmlAttr(edge.to())).append(&quot;\&quot;&gt;\n&quot;);</span>
-<span class="fc" id="L126">            builder.append(&quot;      &lt;data key=\&quot;d_rule\&quot;&gt;&quot;).append(xmlText(edge.ruleId())).append(&quot;&lt;/data&gt;\n&quot;);</span>
-<span class="fc" id="L127">            builder.append(&quot;    &lt;/edge&gt;\n&quot;);</span>
-<span class="fc" id="L128">        }</span>
-<span class="fc" id="L129">        builder.append(&quot;  &lt;/graph&gt;\n&lt;/graphml&gt;\n&quot;);</span>
-<span class="fc" id="L130">        return builder.toString();</span>
+<span class="fc" id="L109">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L110">        builder.append(&quot;&lt;?xml version=\&quot;1.0\&quot; encoding=\&quot;UTF-8\&quot;?&gt;\n&quot;);</span>
+<span class="fc" id="L111">        builder.append(&quot;&lt;graphml xmlns=\&quot;http://graphml.graphdrawing.org/xmlns\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L112">        builder.append(&quot;  &lt;key id=\&quot;d_expression\&quot; for=\&quot;node\&quot; attr.name=\&quot;expression\&quot; attr.type=\&quot;string\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L113">        builder.append(&quot;  &lt;key id=\&quot;d_score\&quot; for=\&quot;node\&quot; attr.name=\&quot;score\&quot; attr.type=\&quot;int\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L114">        builder.append(&quot;  &lt;key id=\&quot;d_best\&quot; for=\&quot;node\&quot; attr.name=\&quot;isBest\&quot; attr.type=\&quot;boolean\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L115">        builder.append(&quot;  &lt;key id=\&quot;d_deadend\&quot; for=\&quot;node\&quot; attr.name=\&quot;isDeadEnd\&quot; attr.type=\&quot;boolean\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L116">        builder.append(&quot;  &lt;key id=\&quot;d_rule\&quot; for=\&quot;edge\&quot; attr.name=\&quot;ruleId\&quot; attr.type=\&quot;string\&quot;/&gt;\n&quot;);</span>
+<span class="fc" id="L117">        builder.append(&quot;  &lt;graph id=\&quot;G\&quot; edgedefault=\&quot;directed\&quot;&gt;\n&quot;);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (SearchGraphNodeDto node : searchGraph.nodes()) {</span>
+<span class="fc" id="L119">            builder.append(&quot;    &lt;node id=\&quot;&quot;).append(xmlAttr(node.id())).append(&quot;\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L120">            builder.append(&quot;      &lt;data key=\&quot;d_expression\&quot;&gt;&quot;).append(xmlText(node.expression())).append(&quot;&lt;/data&gt;\n&quot;);</span>
+<span class="fc" id="L121">            builder.append(&quot;      &lt;data key=\&quot;d_score\&quot;&gt;&quot;).append(node.score()).append(&quot;&lt;/data&gt;\n&quot;);</span>
+<span class="fc" id="L122">            builder.append(&quot;      &lt;data key=\&quot;d_best\&quot;&gt;&quot;).append(node.isBest()).append(&quot;&lt;/data&gt;\n&quot;);</span>
+<span class="fc" id="L123">            builder.append(&quot;      &lt;data key=\&quot;d_deadend\&quot;&gt;&quot;).append(node.isDeadEnd()).append(&quot;&lt;/data&gt;\n&quot;);</span>
+<span class="fc" id="L124">            builder.append(&quot;    &lt;/node&gt;\n&quot;);</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">        int edgeIndex = 0;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (SearchGraphEdgeDto edge : searchGraph.edges()) {</span>
+<span class="fc" id="L128">            builder.append(&quot;    &lt;edge id=\&quot;e&quot;).append(edgeIndex++).append(&quot;\&quot; source=\&quot;&quot;)</span>
+<span class="fc" id="L129">                .append(xmlAttr(edge.from())).append(&quot;\&quot; target=\&quot;&quot;)</span>
+<span class="fc" id="L130">                .append(xmlAttr(edge.to())).append(&quot;\&quot;&gt;\n&quot;);</span>
+<span class="fc" id="L131">            builder.append(&quot;      &lt;data key=\&quot;d_rule\&quot;&gt;&quot;).append(xmlText(edge.ruleId())).append(&quot;&lt;/data&gt;\n&quot;);</span>
+<span class="fc" id="L132">            builder.append(&quot;    &lt;/edge&gt;\n&quot;);</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        builder.append(&quot;  &lt;/graph&gt;\n&lt;/graphml&gt;\n&quot;);</span>
+<span class="fc" id="L135">        return builder.toString();</span>
     }
 
     /** Markdown rendering of the single best path for didactic distribution. */
     default String exportBestPathMarkdown(List&lt;DiscoveredTransformation&gt; transformations) {
-<span class="fc" id="L135">        Optional&lt;DiscoveredTransformation&gt; best = transformations.stream()</span>
-<span class="fc" id="L136">            .max(java.util.Comparator.comparingInt(DiscoveredTransformation::totalImprovement));</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (best.isEmpty()) {</span>
-<span class="fc" id="L138">            return &quot;# Best Path\n\n_Keine erfolgreichen Pfade gefunden._\n&quot;;</span>
+<span class="fc" id="L140">        Optional&lt;DiscoveredTransformation&gt; best = transformations.stream()</span>
+<span class="fc" id="L141">            .max(java.util.Comparator.comparingInt(DiscoveredTransformation::totalImprovement));</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (best.isEmpty()) {</span>
+<span class="fc" id="L143">            return &quot;# Best Path\n\n_Keine erfolgreichen Pfade gefunden._\n&quot;;</span>
         }
-<span class="fc" id="L140">        return exportMarkdown(List.of(best.get()));</span>
+<span class="fc" id="L145">        return exportMarkdown(List.of(best.get()));</span>
     }
 
     /**
@@ -151,53 +156,53 @@ public interface TransformationExportService {
         List&lt;RuleCandidate&gt; candidates,
         List&lt;IdentityReportDto&gt; identities
     ) {
-<span class="fc" id="L154">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L155">        builder.append(&quot;\\documentclass{article}\n\\begin{document}\n&quot;);</span>
-<span class="fc" id="L156">        builder.append(&quot;\\section*{Suchgraph-Bericht}\n&quot;);</span>
-<span class="fc" id="L157">        builder.append(&quot;Knoten: &quot;).append(searchGraph.stats().nodesVisited())</span>
-<span class="fc" id="L158">            .append(&quot;, Kanten: &quot;).append(searchGraph.stats().edgesGenerated())</span>
-<span class="fc" id="L159">            .append(&quot;, Sackgassen: &quot;).append(searchGraph.stats().deadEnds())</span>
-<span class="fc" id="L160">            .append(&quot;, Bester Score: &quot;).append(searchGraph.stats().bestScore())</span>
-<span class="fc" id="L161">            .append(&quot;\n\n&quot;);</span>
-<span class="fc" id="L162">        builder.append(&quot;\\section*{Bester Pfad}\n&quot;);</span>
-<span class="fc" id="L163">        builder.append(exportLatex(transformations.stream()</span>
-<span class="fc" id="L164">            .max(java.util.Comparator.comparingInt(DiscoveredTransformation::totalImprovement))</span>
-<span class="fc" id="L165">            .map(List::of).orElse(List.of())));</span>
-<span class="fc" id="L166">        builder.append(&quot;\n\n\\section*{Regelkandidaten}\n&quot;);</span>
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        for (RuleCandidate candidate : candidates) {</span>
-<span class="nc" id="L168">            builder.append(&quot;\\textbf{&quot;).append(candidate.leftPattern())</span>
-<span class="nc" id="L169">                .append(&quot; $\\to$ &quot;).append(candidate.rightPattern())</span>
-<span class="nc" id="L170">                .append(&quot;} – Status: &quot;).append(candidate.proofStatus().name()).append(&quot;\\\\\n&quot;);</span>
-<span class="nc" id="L171">        }</span>
-<span class="fc" id="L172">        builder.append(&quot;\n\\section*{Emergent Identities}\n&quot;);</span>
-<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        for (IdentityReportDto identity : identities) {</span>
-<span class="nc" id="L174">            builder.append(&quot;\\textbf{&quot;).append(identity.leftPattern())</span>
-<span class="nc" id="L175">                .append(&quot; $\\to$ &quot;).append(identity.rightPattern())</span>
-<span class="nc" id="L176">                .append(&quot;} – occurrences: &quot;).append(identity.occurrences())</span>
-<span class="nc" id="L177">                .append(&quot;, bekannt: &quot;).append(identity.knownRuleStatus().name())</span>
-<span class="nc" id="L178">                .append(&quot;\\\\\n&quot;);</span>
-<span class="nc" id="L179">        }</span>
-<span class="fc" id="L180">        builder.append(&quot;\\end{document}\n&quot;);</span>
-<span class="fc" id="L181">        return builder.toString();</span>
+<span class="fc" id="L159">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L160">        builder.append(&quot;\\documentclass{article}\n\\begin{document}\n&quot;);</span>
+<span class="fc" id="L161">        builder.append(&quot;\\section*{Suchgraph-Bericht}\n&quot;);</span>
+<span class="fc" id="L162">        builder.append(&quot;Knoten: &quot;).append(searchGraph.stats().nodesVisited())</span>
+<span class="fc" id="L163">            .append(&quot;, Kanten: &quot;).append(searchGraph.stats().edgesGenerated())</span>
+<span class="fc" id="L164">            .append(&quot;, Sackgassen: &quot;).append(searchGraph.stats().deadEnds())</span>
+<span class="fc" id="L165">            .append(&quot;, Bester Score: &quot;).append(searchGraph.stats().bestScore())</span>
+<span class="fc" id="L166">            .append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L167">        builder.append(&quot;\\section*{Bester Pfad}\n&quot;);</span>
+<span class="fc" id="L168">        builder.append(exportLatex(transformations.stream()</span>
+<span class="fc" id="L169">            .max(java.util.Comparator.comparingInt(DiscoveredTransformation::totalImprovement))</span>
+<span class="fc" id="L170">            .map(List::of).orElse(List.of())));</span>
+<span class="fc" id="L171">        builder.append(&quot;\n\n\\section*{Regelkandidaten}\n&quot;);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        for (RuleCandidate candidate : candidates) {</span>
+<span class="nc" id="L173">            builder.append(&quot;\\textbf{&quot;).append(candidate.leftPattern())</span>
+<span class="nc" id="L174">                .append(&quot; $\\to$ &quot;).append(candidate.rightPattern())</span>
+<span class="nc" id="L175">                .append(&quot;} – Status: &quot;).append(candidate.proofStatus().name()).append(&quot;\\\\\n&quot;);</span>
+<span class="nc" id="L176">        }</span>
+<span class="fc" id="L177">        builder.append(&quot;\n\\section*{Emergent Identities}\n&quot;);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        for (IdentityReportDto identity : identities) {</span>
+<span class="nc" id="L179">            builder.append(&quot;\\textbf{&quot;).append(identity.leftPattern())</span>
+<span class="nc" id="L180">                .append(&quot; $\\to$ &quot;).append(identity.rightPattern())</span>
+<span class="nc" id="L181">                .append(&quot;} – occurrences: &quot;).append(identity.occurrences())</span>
+<span class="nc" id="L182">                .append(&quot;, bekannt: &quot;).append(identity.knownRuleStatus().name())</span>
+<span class="nc" id="L183">                .append(&quot;\\\\\n&quot;);</span>
+<span class="nc" id="L184">        }</span>
+<span class="fc" id="L185">        builder.append(&quot;\\end{document}\n&quot;);</span>
+<span class="fc" id="L186">        return builder.toString();</span>
     }
 
     private static String xmlText(String value) {
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (value == null) {</span>
-<span class="nc" id="L186">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L191">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L188">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;);</span>
+<span class="fc" id="L193">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;);</span>
     }
 
     private static String xmlAttr(String value) {
-<span class="fc" id="L192">        return xmlText(value).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+<span class="fc" id="L197">        return xmlText(value).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
     }
 
     default void writeExports(Path exportDirectory, List&lt;DiscoveredTransformation&gt; transformations, List&lt;ReusableRule&gt; rules)
         throws IOException {
-<span class="nc" id="L197">        Files.createDirectories(exportDirectory);</span>
-<span class="nc" id="L198">        Files.writeString(exportDirectory.resolve(&quot;discovered-transformations.md&quot;), exportMarkdown(transformations));</span>
-<span class="nc" id="L199">        Files.writeString(exportDirectory.resolve(&quot;rule-inventory.json&quot;), exportJson(transformations, rules));</span>
-<span class="nc" id="L200">        Files.writeString(exportDirectory.resolve(&quot;transformation-graph.mmd&quot;), exportMermaid(transformations));</span>
-<span class="nc" id="L201">    }</span>
+<span class="nc" id="L202">        Files.createDirectories(exportDirectory);</span>
+<span class="nc" id="L203">        Files.writeString(exportDirectory.resolve(&quot;discovered-transformations.md&quot;), exportMarkdown(transformations));</span>
+<span class="nc" id="L204">        Files.writeString(exportDirectory.resolve(&quot;rule-inventory.json&quot;), exportJson(transformations, rules));</span>
+<span class="nc" id="L205">        Files.writeString(exportDirectory.resolve(&quot;transformation-graph.mmd&quot;), exportMermaid(transformations));</span>
+<span class="nc" id="L206">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

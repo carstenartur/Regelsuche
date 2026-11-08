@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RowMoments.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">RowMoments.java</span></div><h1>RowMoments.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
+
+/** Shared factorization and evaluation of monomials grouped by row slot. */
+final class RowMoments {
+    private RowMoments() {}
+
+<span class="fc" id="L20">    private record Position(int slot, int column) {}</span>
+
+    static Map&lt;List&lt;Moment&gt;, BigInteger&gt; split(List&lt;List&lt;SymbolId&gt;&gt; slots,
+            Map&lt;IterationPolynomial.Monomial, ExactRational&gt; terms, Work work) {
+<span class="fc" id="L24">        var positions = new HashMap&lt;SymbolId, Position&gt;();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for (int column = 0; column &lt; slots.getFirst().size(); column++) {</span>
+<span class="fc" id="L26">            work.charge(1);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            for (int slot = 0; slot &lt; slots.size(); slot++) {</span>
+<span class="fc" id="L28">                positions.put(slots.get(slot).get(column), new Position(slot, column));</span>
+            }
+        }
+<span class="fc" id="L31">        var factors = new LinkedHashMap&lt;List&lt;Moment&gt;, BigInteger&gt;();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (var term : terms.entrySet()) {</span>
+<span class="fc" id="L33">            var perSlot = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc" id="L34">            work.charge(1 + term.getKey().symbols().size());</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            for (int i = 0; i &lt; slots.size(); i++) perSlot.add(new ArrayList&lt;&gt;());</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            for (var symbol : term.getKey().symbols()) {</span>
+<span class="fc" id="L37">                var position = positions.get(symbol);</span>
+<span class="fc" id="L38">                perSlot.get(position.slot()).add(position.column());</span>
+<span class="fc" id="L39">            }</span>
+<span class="fc" id="L40">            factors.put(perSlot.stream().map(Moment::new).toList(), term.getValue().numerator());</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        return factors;</span>
+    }
+
+    static BigInteger[] values(List&lt;BigInteger&gt; row, int columns, Work work) {
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (row == null || row.size() != columns) throw new Unavailable(&quot;ROW_DIMENSION&quot;);</span>
+<span class="fc" id="L47">        var values = row.toArray(BigInteger[]::new);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (var value : values) {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (value == null) throw new Unavailable(&quot;MISSING_ROW_VALUE&quot;);</span>
+<span class="fc" id="L50">            work.runtimeInteger(value);</span>
+        }
+<span class="fc" id="L52">        return values;</span>
+    }
+
+    static BigInteger product(Moment moment, BigInteger[] values, Work work) {
+<span class="fc" id="L56">        BigInteger product = BigInteger.ONE;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (int column : moment.columns()) product = bounded(product.multiply(values[column]), work);</span>
+<span class="fc" id="L58">        return product;</span>
+    }
+
+    static BigInteger bounded(BigInteger value, Work work) {
+<span class="fc" id="L62">        work.runtimeInteger(value);</span>
+<span class="fc" id="L63">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

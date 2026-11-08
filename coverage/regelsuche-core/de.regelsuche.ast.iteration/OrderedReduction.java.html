@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedReduction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast.iteration</a> &gt; <span class="el_source">OrderedReduction.java</span></div><h1>OrderedReduction.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Sum over distinct rows in increasing index order. Each slot binds the same
+ * columns, and a restriction relates each pair of adjacent slots.
+ */
+public record OrderedReduction(List&lt;List&lt;SymbolId&gt;&gt; slots, List&lt;Restriction&gt; restrictions, Expr summand) {
+    public static final int MAX_ARITY = 8;
+
+<span class="nc" id="L19">    public OrderedReduction {</span>
+<span class="nc bnc" id="L20" title="All 6 branches missed.">        if (slots.size() &lt; 2 || slots.size() &gt; MAX_ARITY || restrictions.size() != slots.size() - 1) {</span>
+<span class="nc" id="L21">            throw new IllegalArgumentException(&quot;INVALID_ORDERED_ARITY&quot;);</span>
+        }
+<span class="nc" id="L23">        slots = List.copyOf(slots);</span>
+<span class="nc" id="L24">        restrictions = List.copyOf(restrictions);</span>
+<span class="nc" id="L25">        int columns = slots.getFirst().size();</span>
+<span class="nc bnc" id="L26" title="All 4 branches missed.">        if (columns &lt; 1 || columns &gt; PairReduction.MAX_COLUMNS) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;COLUMN_LIMIT&quot;);</span>
+        }
+<span class="nc" id="L29">        var symbols = new HashSet&lt;SymbolId&gt;();</span>
+<span class="nc" id="L30">        var snapshot = new ArrayList&lt;List&lt;SymbolId&gt;&gt;();</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        for (var slot : slots) {</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">            if (slot.size() != columns) throw new IllegalArgumentException(&quot;ROW_DIMENSION&quot;);</span>
+<span class="nc" id="L33">            var bound = List.copyOf(slot);</span>
+<span class="nc" id="L34">            snapshot.add(bound);</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">            for (var symbol : bound) {</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">                if (!symbols.add(symbol)) throw new IllegalArgumentException(&quot;DUPLICATE_COLUMN_SYMBOL&quot;);</span>
+<span class="nc" id="L37">            }</span>
+<span class="nc" id="L38">        }</span>
+<span class="nc" id="L39">        slots = List.copyOf(snapshot);</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        for (var restriction : restrictions) {</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            if (restriction instanceof KeyInterval interval</span>
+<span class="nc bnc" id="L42" title="All 4 branches missed.">                    &amp;&amp; (interval.leftColumn() &gt;= columns || interval.rightColumn() &gt;= columns)) {</span>
+<span class="nc" id="L43">                throw new IllegalArgumentException(&quot;UNKNOWN_COLUMN&quot;);</span>
+            }
+<span class="nc" id="L45">        }</span>
+<span class="nc" id="L46">        IterationScope.validate(summand, symbols);</span>
+<span class="nc" id="L47">    }</span>
+
+    public int columnCount() {
+<span class="nc" id="L50">        return slots.getFirst().size();</span>
+    }
+
+    public sealed interface Restriction permits All, KeyInterval {}
+
+<span class="nc" id="L55">    public enum All implements Restriction { ROWS }</span>
+
+    public record Bound(BigInteger offset, boolean inclusive) {
+<span class="nc" id="L58">        public Bound {</span>
+<span class="nc" id="L59">            Objects.requireNonNull(offset);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            if (offset.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS) {</span>
+<span class="nc" id="L61">                throw new IllegalArgumentException(&quot;BOUND_LIMIT&quot;);</span>
+            }
+<span class="nc" id="L63">        }</span>
+    }
+
+    /**
+     * Constrains the exact difference leftKey - rightKey. Absent bounds
+     * are unbounded on that side. Complement selects rows outside the interval.
+     */
+    public record KeyInterval(int leftColumn, int rightColumn, Optional&lt;Bound&gt; lower, Optional&lt;Bound&gt; upper,
+            boolean complement) implements Restriction {
+<span class="nc" id="L72">        public KeyInterval {</span>
+<span class="nc" id="L73">            Objects.requireNonNull(lower);</span>
+<span class="nc" id="L74">            Objects.requireNonNull(upper);</span>
+<span class="nc bnc" id="L75" title="All 8 branches missed.">            if (leftColumn &lt; 0 || rightColumn &lt; 0 || (lower.isEmpty() &amp;&amp; upper.isEmpty())) {</span>
+<span class="nc" id="L76">                throw new IllegalArgumentException(&quot;INVALID_KEY_INTERVAL&quot;);</span>
+            }
+<span class="nc bnc" id="L78" title="All 4 branches missed.">            if (lower.isPresent() &amp;&amp; upper.isPresent()</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                    &amp;&amp; lower.orElseThrow().offset().compareTo(upper.orElseThrow().offset()) &gt; 0) {</span>
+<span class="nc" id="L80">                throw new IllegalArgumentException(&quot;INVALID_KEY_INTERVAL&quot;);</span>
+            }
+<span class="nc" id="L82">        }</span>
+
+        public boolean isPoint() {
+<span class="nc bnc" id="L85" title="All 6 branches missed.">            return lower.isPresent() &amp;&amp; lower.equals(upper) &amp;&amp; lower.orElseThrow().inclusive();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

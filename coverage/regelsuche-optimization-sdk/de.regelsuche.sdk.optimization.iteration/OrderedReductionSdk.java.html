@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedReductionSdk.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">OrderedReductionSdk.java</span></div><h1>OrderedReductionSdk.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.iteration.OrderedReduction;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionPlan;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionSearch;
+import de.regelsuche.sdk.optimization.CancellationToken;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
+import java.math.BigInteger;
+import java.util.List;
+
+/** Delegates ordered reductions to the mathematical search, checker and evaluator. */
+public final class OrderedReductionSdk {
+    private OrderedReductionSdk() {}
+
+    public static OrderedReductionSearch.Result search(OrderedReduction source, OptimizationBudget budget,
+            CancellationToken cancellation) {
+<span class="nc" id="L18">        return OrderedReductionSearch.search(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionSearch.Result searchWindows(OrderedReduction source, OptimizationBudget budget,
+            CancellationToken cancellation) {
+<span class="nc" id="L23">        return OrderedReductionSearch.searchWindows(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionPlan.Verification verify(OrderedReduction source, OrderedReductionPlan plan,
+            boolean windows, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L28">        return OrderedReductionSearch.verify(source, plan, windows, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionPlan.Evaluation evaluate(OrderedReductionPlan.Verified plan,
+            List&lt;? extends List&lt;BigInteger&gt;&gt; rows, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L33">        return plan.evaluate(rows, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionPlan.Evaluation evaluateWindows(OrderedReductionPlan.Verified plan,
+            List&lt;? extends List&lt;BigInteger&gt;&gt; rows, int width, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L38">        return plan.evaluateWindows(rows, width, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    private static IterationLimits limits(OptimizationBudget budget) {
+<span class="nc" id="L42">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

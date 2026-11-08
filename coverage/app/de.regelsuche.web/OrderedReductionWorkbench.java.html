@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedReductionWorkbench.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">OrderedReductionWorkbench.java</span></div><h1>OrderedReductionWorkbench.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import de.regelsuche.ast.iteration.OrderedReduction;
+import de.regelsuche.ast.iteration.OrderedReduction.All;
+import de.regelsuche.ast.iteration.OrderedReduction.Bound;
+import de.regelsuche.ast.iteration.OrderedReduction.KeyInterval;
+import de.regelsuche.ast.iteration.OrderedReduction.Restriction;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionPlan.Lookup;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionSearch;
+import de.regelsuche.symbol.SymbolScope;
+import de.regelsuche.symbol.SymbolicExpression;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BooleanSupplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+/** HTTP presentation of the same checked plans available through the mathematical API. */
+final class OrderedReductionWorkbench {
+<span class="fc" id="L26">    private static final BooleanSupplier NEVER_CANCELLED = () -&gt; false;</span>
+<span class="fc" id="L27">    private static final Pattern INTEGER = Pattern.compile(&quot;-?[0-9]{1,256}&quot;);</span>
+<span class="fc" id="L28">    private static final Set&lt;String&gt; FIELDS = Set.of(&quot;left&quot;, &quot;right&quot;, &quot;lower&quot;, &quot;upper&quot;,</span>
+        &quot;lowerInclusive&quot;, &quot;upperInclusive&quot;, &quot;complement&quot;);
+
+    private OrderedReductionWorkbench() {}
+
+    static String analyze(List&lt;String&gt; names, String summand, int count, List&lt;List&lt;BigInteger&gt;&gt; sample,
+            Object conditions, int width, IterationLimits limits) {
+<span class="fc" id="L35">        var restrictions = restrictions(conditions, names);</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">        if (width &gt; 0 &amp;&amp; restrictions.size() != 1) {</span>
+<span class="fc" id="L37">            throw new IllegalArgumentException(&quot;windowWidth requires two ordered row slots&quot;);</span>
+        }
+<span class="fc" id="L39">        var scope = new SymbolScope();</span>
+<span class="fc" id="L40">        var slots = IntStream.rangeClosed(0, restrictions.size()).mapToObj(slot -&gt;</span>
+<span class="fc" id="L41">            names.stream().map(name -&gt; scope.declare(name + &quot;_&quot; + slot)).toList()).toList();</span>
+<span class="fc" id="L42">        var symbolic = SymbolicExpression.parse(summand, scope);</span>
+        OrderedReduction source;
+        try {
+<span class="fc" id="L45">            source = new OrderedReduction(slots, restrictions, symbolic.expression());</span>
+<span class="nc" id="L46">        } catch (IllegalArgumentException invalidScope) {</span>
+<span class="nc" id="L47">            return PairReductionWorkbench.unavailable(invalidScope.getMessage());</span>
+<span class="fc" id="L48">        }</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        var search = width &gt; 0 ? OrderedReductionSearch.searchWindows(source, limits, 3, NEVER_CANCELLED)</span>
+<span class="pc" id="L50">            : OrderedReductionSearch.search(source, limits, 3, NEVER_CANCELLED);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (search.verified().isEmpty()) return PairReductionWorkbench.unavailable(search.reason());</span>
+
+<span class="fc" id="L53">        var checked = search.verified().orElseThrow();</span>
+<span class="fc" id="L54">        var result = new JsonWriter().beginObject().property(&quot;status&quot;, &quot;VERIFIED&quot;)</span>
+<span class="fc" id="L55">            .property(&quot;rowCount&quot;, count)</span>
+<span class="fc" id="L56">            .property(&quot;originalCandidates&quot;, candidates(count, width, slots.size()).toString())</span>
+<span class="fc" id="L57">            .property(&quot;synthesisWork&quot;, search.metrics().primitiveWork())</span>
+<span class="fc" id="L58">            .property(&quot;verificationWork&quot;, search.metrics().verificationWork())</span>
+<span class="fc" id="L59">            .array(&quot;checkedRules&quot;, array -&gt; search.witness().forEach(step -&gt; array.value(step.ruleId())))</span>
+<span class="fc" id="L60">            .array(&quot;lookups&quot;, array -&gt; checked.plan().lookups().forEach(lookup -&gt;</span>
+<span class="fc" id="L61">                array.objectValue(item -&gt; writeLookup(item, lookup, names))))</span>
+<span class="fc" id="L62">            .array(&quot;terms&quot;, array -&gt; checked.plan().terms().forEach(term -&gt; array.objectValue(item -&gt;</span>
+<span class="fc" id="L63">                item.property(&quot;coefficient&quot;, term.coefficient().toString()).array(&quot;factors&quot;, factors -&gt;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                    term.factors().forEach(moment -&gt; factors.value(moment.columns().isEmpty() ? &quot;1&quot;</span>
+<span class="fc" id="L65">                        : moment.columns().stream().map(names::get).collect(Collectors.joining(&quot; · &quot;))))))));</span>
+<span class="fc" id="L66">        checked.plan().eviction().ifPresent(lookup -&gt; result.object(&quot;eviction&quot;, item -&gt; writeLookup(item, lookup, names)));</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (sample != null) {</span>
+            try {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                var evaluation = width &gt; 0 ? checked.evaluateWindows(sample, width, limits, NEVER_CANCELLED)</span>
+<span class="pc" id="L70">                    : checked.evaluate(sample, limits, NEVER_CANCELLED);</span>
+<span class="fc" id="L71">                result.array(&quot;sampleSums&quot;, array -&gt; evaluation.sums().forEach(value -&gt; array.value(value.toString())))</span>
+<span class="fc" id="L72">                    .property(&quot;sampleRows&quot;, evaluation.rowReads()).property(&quot;indexAccesses&quot;, evaluation.indexAccesses());</span>
+<span class="nc" id="L73">            } catch (IllegalArgumentException unavailable) {</span>
+<span class="nc" id="L74">                result.property(&quot;sampleUnavailable&quot;, unavailable.getMessage());</span>
+<span class="fc" id="L75">            }</span>
+        }
+<span class="fc" id="L77">        return result.endObject().toString();</span>
+    }
+
+    private static List&lt;Restriction&gt; restrictions(Object conditions, List&lt;String&gt; names) {
+<span class="pc bpc" id="L81" title="3 of 6 branches missed.">        if (!(conditions instanceof List&lt;?&gt; list) || list.isEmpty() || list.size() &gt;= OrderedReduction.MAX_ARITY) {</span>
+<span class="nc" id="L82">            throw new IllegalArgumentException(&quot;provide one restriction for each pair of adjacent row slots&quot;);</span>
+        }
+<span class="fc" id="L84">        return list.stream().map(value -&gt; restriction(value, names)).toList();</span>
+    }
+
+    private static Restriction restriction(Object value, List&lt;String&gt; names) {
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (!(value instanceof Map&lt;?, ?&gt; item) || !FIELDS.containsAll(item.keySet())) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(&quot;invalid row restriction&quot;);</span>
+        }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (item.isEmpty()) return All.ROWS;</span>
+<span class="fc" id="L92">        return new KeyInterval(column(item.get(&quot;left&quot;), names), column(item.get(&quot;right&quot;), names),</span>
+<span class="fc" id="L93">            bound(item, &quot;lower&quot;), bound(item, &quot;upper&quot;), flag(item, &quot;complement&quot;, false));</span>
+    }
+
+    private static int column(Object value, List&lt;String&gt; names) {
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        if (!(value instanceof String name) || !names.contains(name)) {</span>
+<span class="fc" id="L98">            throw new IllegalArgumentException(&quot;row restriction uses an unknown column&quot;);</span>
+        }
+<span class="fc" id="L100">        return names.indexOf(name);</span>
+    }
+
+    private static Optional&lt;Bound&gt; bound(Map&lt;?, ?&gt; input, String name) {
+<span class="pc bpc" id="L104" title="3 of 4 branches missed.">        if (!input.containsKey(name) &amp;&amp; !input.containsKey(name + &quot;Inclusive&quot;)) return Optional.empty();</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">        if (!(input.get(name) instanceof String offset) || !INTEGER.matcher(offset).matches()) {</span>
+<span class="nc" id="L106">            throw new IllegalArgumentException(&quot;bounds must be decimal integer strings&quot;);</span>
+        }
+<span class="fc" id="L108">        return Optional.of(new Bound(new BigInteger(offset), flag(input, name + &quot;Inclusive&quot;, true)));</span>
+    }
+
+    private static boolean flag(Map&lt;?, ?&gt; input, String name, boolean defaultValue) {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (!input.containsKey(name)) return defaultValue;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (input.get(name) instanceof Boolean flag) return flag;</span>
+<span class="nc" id="L114">        throw new IllegalArgumentException(name + &quot; must be boolean&quot;);</span>
+    }
+
+    private static void writeLookup(JsonWriter writer, Lookup lookup, List&lt;String&gt; names) {
+<span class="fc" id="L118">        writer.property(&quot;access&quot;, lookup.access().name());</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (lookup.restriction() instanceof KeyInterval interval) {</span>
+<span class="fc" id="L120">            writer.property(&quot;left&quot;, names.get(interval.leftColumn())).property(&quot;right&quot;, names.get(interval.rightColumn()))</span>
+<span class="fc" id="L121">                .property(&quot;complement&quot;, interval.complement());</span>
+<span class="fc" id="L122">            interval.lower().ifPresent(bound -&gt; writeBound(writer, &quot;lower&quot;, bound));</span>
+<span class="fc" id="L123">            interval.upper().ifPresent(bound -&gt; writeBound(writer, &quot;upper&quot;, bound));</span>
+        }
+<span class="fc" id="L125">    }</span>
+
+    private static void writeBound(JsonWriter writer, String name, Bound bound) {
+<span class="fc" id="L128">        writer.property(name, bound.offset().toString()).property(name + &quot;Inclusive&quot;, bound.inclusive());</span>
+<span class="fc" id="L129">    }</span>
+
+    private static BigInteger candidates(int rows, int width, int arity) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        int block = width == 0 ? rows : width;</span>
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        if (block &lt; arity || width &gt; rows) return BigInteger.ZERO;</span>
+<span class="fc" id="L134">        BigInteger count = BigInteger.ONE;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (int i = 1; i &lt;= arity; i++) {</span>
+<span class="fc" id="L136">            count = count.multiply(BigInteger.valueOf(block - i + 1L)).divide(BigInteger.valueOf(i));</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        return width == 0 ? count : count.multiply(BigInteger.valueOf(rows - width + 1L));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

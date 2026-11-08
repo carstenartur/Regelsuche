@@ -9,6 +9,7 @@ import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.example.AlgebraicExampleGenerator;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.literature.RuleLiteratureCatalog;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -31,16 +32,17 @@ import java.util.concurrent.Executors;
 public class RuleDiscoveryService {
     private final AlgebraicExampleGenerator exampleGenerator;
     private final TransformationEngine transformationEngine;
+    private final Map&lt;String, String&gt; ruleRevisions;
     private final EquivalenceService equivalenceService;
     private final ExpressionScorer expressionScorer;
-<span class="fc" id="L36">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L38">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
     private final ExpressionGraphStore graphStore;
     private final RuleCandidateMiner miner;
     private final RuleCandidateListener listener;
     private final SearchStrategy searchStrategy;
     private final DiscoverySettings discoverySettings;
-<span class="fc" id="L42">    private final ExecutorService executorService = Executors.newSingleThreadExecutor();</span>
-<span class="fc" id="L43">    private final Set&lt;String&gt; announcedCandidateHashes = ConcurrentHashMap.newKeySet();</span>
+<span class="fc" id="L44">    private final ExecutorService executorService = Executors.newSingleThreadExecutor();</span>
+<span class="fc" id="L45">    private final Set&lt;String&gt; announcedCandidateHashes = ConcurrentHashMap.newKeySet();</span>
 
     public RuleDiscoveryService(
         AlgebraicExampleGenerator exampleGenerator,
@@ -51,7 +53,7 @@ public class RuleDiscoveryService {
         RuleCandidateMiner miner,
         RuleCandidateListener listener
     ) {
-<span class="fc" id="L54">        this(</span>
+<span class="fc" id="L56">        this(</span>
             exampleGenerator,
             transformationEngine,
             equivalenceService,
@@ -60,9 +62,9 @@ public class RuleDiscoveryService {
             miner,
             listener,
             new BestFirstSearchStrategy(),
-<span class="fc" id="L63">            DiscoverySettings.defaults()</span>
+<span class="fc" id="L65">            DiscoverySettings.defaults()</span>
         );
-<span class="fc" id="L65">    }</span>
+<span class="fc" id="L67">    }</span>
 
     public RuleDiscoveryService(
         AlgebraicExampleGenerator exampleGenerator,
@@ -74,7 +76,7 @@ public class RuleDiscoveryService {
         RuleCandidateListener listener,
         SearchStrategy searchStrategy
     ) {
-<span class="nc" id="L77">        this(</span>
+<span class="nc" id="L79">        this(</span>
             exampleGenerator,
             transformationEngine,
             equivalenceService,
@@ -83,9 +85,9 @@ public class RuleDiscoveryService {
             miner,
             listener,
             searchStrategy,
-<span class="nc" id="L86">            DiscoverySettings.defaults()</span>
+<span class="nc" id="L88">            DiscoverySettings.defaults()</span>
         );
-<span class="nc" id="L88">    }</span>
+<span class="nc" id="L90">    }</span>
 
     public RuleDiscoveryService(
         AlgebraicExampleGenerator exampleGenerator,
@@ -97,163 +99,165 @@ public class RuleDiscoveryService {
         RuleCandidateListener listener,
         SearchStrategy searchStrategy,
         DiscoverySettings discoverySettings
-<span class="fc" id="L100">    ) {</span>
-<span class="fc" id="L101">        this.exampleGenerator = exampleGenerator;</span>
-<span class="fc" id="L102">        this.transformationEngine = transformationEngine;</span>
-<span class="fc" id="L103">        this.equivalenceService = equivalenceService;</span>
-<span class="fc" id="L104">        this.expressionScorer = expressionScorer;</span>
-<span class="fc" id="L105">        this.graphStore = graphStore;</span>
-<span class="fc" id="L106">        this.miner = miner;</span>
-<span class="fc" id="L107">        this.listener = listener;</span>
-<span class="fc" id="L108">        this.searchStrategy = searchStrategy;</span>
-<span class="fc" id="L109">        this.discoverySettings = discoverySettings;</span>
-<span class="fc" id="L110">    }</span>
+<span class="fc" id="L102">    ) {</span>
+<span class="fc" id="L103">        this.exampleGenerator = exampleGenerator;</span>
+<span class="fc" id="L104">        this.transformationEngine = transformationEngine;</span>
+<span class="fc" id="L105">        this.ruleRevisions = RuleLiteratureCatalog.captureRuleRevisions(transformationEngine);</span>
+<span class="fc" id="L106">        this.equivalenceService = equivalenceService;</span>
+<span class="fc" id="L107">        this.expressionScorer = expressionScorer;</span>
+<span class="fc" id="L108">        this.graphStore = graphStore;</span>
+<span class="fc" id="L109">        this.miner = miner;</span>
+<span class="fc" id="L110">        this.listener = listener;</span>
+<span class="fc" id="L111">        this.searchStrategy = searchStrategy;</span>
+<span class="fc" id="L112">        this.discoverySettings = discoverySettings;</span>
+<span class="fc" id="L113">    }</span>
 
     public CompletableFuture&lt;List&lt;RuleCandidate&gt;&gt; discoverAsync(int min, int max) {
-<span class="fc" id="L113">        return CompletableFuture.supplyAsync(() -&gt; discover(min, max), executorService);</span>
+<span class="fc" id="L116">        return CompletableFuture.supplyAsync(() -&gt; discover(min, max), executorService);</span>
     }
 
     public List&lt;RuleCandidate&gt; discover(int min, int max) {
-<span class="fc" id="L117">        List&lt;SuccessfulTransformationPath&gt; paths = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L118" title="All 2 branches covered.">        SearchHeuristic discoveryHeuristic = discoverySettings.includeNonImprovingEquivalentPaths()</span>
-<span class="fc" id="L119">            ? new SearchHeuristic(7, 1500, 1, 10, 200, 200)</span>
-<span class="fc" id="L120">            : new SearchHeuristic(7, 400, 1, 5, 120, 25);</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (String expression : exampleGenerator.generateSmallIntegerExamples(min, max)) {</span>
-<span class="fc" id="L122">            String root = canonicalizer.canonicalize(expression);</span>
-<span class="fc" id="L123">            ExpressionScore before = expressionScorer.score(root);</span>
-<span class="fc" id="L124">            graphStore.saveNode(root, before.weightedTotal());</span>
-<span class="fc" id="L125">            SearchProblem problem = new SearchProblem(root, transformationEngine, expressionScorer, canonicalizer, discoveryHeuristic);</span>
-<span class="fc bfc" id="L126" title="All 2 branches covered.">            for (SearchState state : searchStrategy.search(problem)) {</span>
-<span class="fc" id="L127">                graphStore.saveNode(state.expression(), state.score().weightedTotal());</span>
-<span class="pc bpc" id="L128" title="1 of 4 branches missed.">                if (state.parentExpression() != null &amp;&amp; state.appliedRuleId() != null) {</span>
-<span class="fc" id="L129">                    graphStore.saveEdge(new GraphEdge(</span>
-<span class="fc" id="L130">                        state.parentExpression(),</span>
-<span class="fc" id="L131">                        state.expression(),</span>
-<span class="fc" id="L132">                        state.appliedRuleId(),</span>
-<span class="fc" id="L133">                        state.depth(),</span>
-<span class="fc" id="L134">                        state.improvement(),</span>
-<span class="fc" id="L135">                        root + &quot;#&quot; + state.depth(),</span>
-<span class="fc" id="L136">                        state.canonicalHash(),</span>
-<span class="fc" id="L137">                        expressionScorer.score(state.parentExpression()).weightedTotal(),</span>
-<span class="fc" id="L138">                        state.score().weightedTotal(),</span>
-<span class="fc" id="L139">                        state.appliedRuleKind(),</span>
-<span class="fc" id="L140">                        state.mayIncreaseComplexity(),</span>
-<span class="fc" id="L141">                        state.estimatedCostDelta(),</span>
-<span class="fc" id="L142">                        state.equivalencePreservingByConstruction(),</span>
-<span class="fc" id="L143">                        CandidateProofStatus.OBSERVED, null, state.incomingExecution().orElse(null)</span>
+<span class="fc" id="L120">        List&lt;SuccessfulTransformationPath&gt; paths = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        SearchHeuristic discoveryHeuristic = discoverySettings.includeNonImprovingEquivalentPaths()</span>
+<span class="fc" id="L122">            ? new SearchHeuristic(7, 1500, 1, 10, 200, 200)</span>
+<span class="fc" id="L123">            : new SearchHeuristic(7, 400, 1, 5, 120, 25);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (String expression : exampleGenerator.generateSmallIntegerExamples(min, max)) {</span>
+<span class="fc" id="L125">            String root = canonicalizer.canonicalize(expression);</span>
+<span class="fc" id="L126">            ExpressionScore before = expressionScorer.score(root);</span>
+<span class="fc" id="L127">            graphStore.saveNode(root, before.weightedTotal());</span>
+<span class="fc" id="L128">            SearchProblem problem = new SearchProblem(root, transformationEngine, expressionScorer, canonicalizer, discoveryHeuristic);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (SearchState state : searchStrategy.search(problem)) {</span>
+<span class="fc" id="L130">                graphStore.saveNode(state.expression(), state.score().weightedTotal());</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">                if (state.parentExpression() != null &amp;&amp; state.appliedRuleId() != null) {</span>
+<span class="fc" id="L132">                    graphStore.saveEdge(new GraphEdge(</span>
+<span class="fc" id="L133">                        state.parentExpression(),</span>
+<span class="fc" id="L134">                        state.expression(),</span>
+<span class="fc" id="L135">                        state.appliedRuleId(),</span>
+<span class="fc" id="L136">                        state.depth(),</span>
+<span class="fc" id="L137">                        state.improvement(),</span>
+<span class="fc" id="L138">                        root + &quot;#&quot; + state.depth(),</span>
+<span class="fc" id="L139">                        state.canonicalHash(),</span>
+<span class="fc" id="L140">                        expressionScorer.score(state.parentExpression()).weightedTotal(),</span>
+<span class="fc" id="L141">                        state.score().weightedTotal(),</span>
+<span class="fc" id="L142">                        state.appliedRuleKind(),</span>
+<span class="fc" id="L143">                        state.mayIncreaseComplexity(),</span>
+<span class="fc" id="L144">                        state.estimatedCostDelta(),</span>
+<span class="fc" id="L145">                        state.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L146">                        CandidateProofStatus.OBSERVED, null, state.incomingExecution().orElse(null)</span>
                     ));
                 }
-<span class="fc bfc" id="L146" title="All 2 branches covered.">                if (state.depth() == 0) {</span>
-<span class="fc" id="L147">                    continue;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                if (state.depth() == 0) {</span>
+<span class="fc" id="L150">                    continue;</span>
                 }
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (state.depth() &gt; discoverySettings.maxPathLengthForCandidateMining()) {</span>
-<span class="nc" id="L150">                    continue;</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                if (state.depth() &gt; discoverySettings.maxPathLengthForCandidateMining()) {</span>
+<span class="nc" id="L153">                    continue;</span>
                 }
-<span class="fc" id="L152">                int totalImprovement = before.improvementTo(state.score());</span>
-<span class="fc" id="L153">                boolean equivalent = equivalenceService.areEquivalent(root, state.expression());</span>
-<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                if (!equivalent) {</span>
-<span class="nc" id="L155">                    continue;</span>
+<span class="fc" id="L155">                int totalImprovement = before.improvementTo(state.score());</span>
+<span class="fc" id="L156">                boolean equivalent = equivalenceService.areEquivalent(root, state.expression());</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                if (!equivalent) {</span>
+<span class="nc" id="L158">                    continue;</span>
                 }
-<span class="fc bfc" id="L157" title="All 2 branches covered.">                boolean improving = totalImprovement &gt; 0;</span>
-<span class="fc bfc" id="L158" title="All 4 branches covered.">                if (!improving &amp;&amp; !discoverySettings.includeNonImprovingEquivalentPaths()) {</span>
-<span class="fc" id="L159">                    continue;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                boolean improving = totalImprovement &gt; 0;</span>
+<span class="fc bfc" id="L161" title="All 4 branches covered.">                if (!improving &amp;&amp; !discoverySettings.includeNonImprovingEquivalentPaths()) {</span>
+<span class="fc" id="L162">                    continue;</span>
                 }
-<span class="fc" id="L161">                String pathId = stablePathId(root, state);</span>
-<span class="fc" id="L162">                paths.add(new SuccessfulTransformationPath(</span>
+<span class="fc" id="L164">                String pathId = stablePathId(root, state);</span>
+<span class="fc" id="L165">                paths.add(new SuccessfulTransformationPath(</span>
                     pathId,
                     root,
-<span class="fc" id="L165">                    state.expression(),</span>
-<span class="fc" id="L166">                    state.path(),</span>
-<span class="fc" id="L167">                    state.appliedRuleIds(),</span>
+<span class="fc" id="L168">                    state.expression(),</span>
+<span class="fc" id="L169">                    state.path(),</span>
+<span class="fc" id="L170">                    state.appliedRuleIds(),</span>
                     before,
-<span class="fc" id="L169">                    state.score(),</span>
+<span class="fc" id="L172">                    state.score(),</span>
                     equivalent,
-<span class="fc" id="L171">                    equivalenceService.evidence(root, state.expression()),</span>
-<span class="fc" id="L172">                    Map.of(&quot;variable&quot;, &quot;x&quot;),</span>
-<span class="fc" id="L173">                    state.assumptions()</span>
+<span class="fc" id="L174">                    equivalenceService.evidence(root, state.expression()),</span>
+<span class="fc" id="L175">                    Map.of(&quot;variable&quot;, &quot;x&quot;),</span>
+<span class="fc" id="L176">                    state.assumptions()</span>
                 ));
-<span class="fc" id="L175">                graphStore.saveDiscoveredTransformation(toDiscovered(pathId, root, state, before));</span>
-<span class="fc" id="L176">            }</span>
-<span class="fc" id="L177">        }</span>
-<span class="fc" id="L178">        List&lt;RuleCandidate&gt; candidates = miner.mine(paths, discoverySettings);</span>
-<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (RuleCandidate candidate : candidates) {</span>
-<span class="fc" id="L180">            graphStore.saveRuleCandidate(candidate);</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (announcedCandidateHashes.add(candidate.canonicalHash())) {</span>
-<span class="fc" id="L182">                listener.onRuleCandidateDiscovered(new RuleCandidateDiscoveredEvent(candidate, Instant.now()));</span>
+<span class="fc" id="L178">                graphStore.saveDiscoveredTransformation(toDiscovered(pathId, root, state, before));</span>
+<span class="fc" id="L179">            }</span>
+<span class="fc" id="L180">        }</span>
+<span class="fc" id="L181">        List&lt;RuleCandidate&gt; candidates = miner.mine(paths, discoverySettings);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (RuleCandidate candidate : candidates) {</span>
+<span class="fc" id="L183">            graphStore.saveRuleCandidate(candidate);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (announcedCandidateHashes.add(candidate.canonicalHash())) {</span>
+<span class="fc" id="L185">                listener.onRuleCandidateDiscovered(new RuleCandidateDiscoveredEvent(candidate, Instant.now()));</span>
             }
-<span class="fc" id="L184">        }</span>
-<span class="fc" id="L185">        return candidates;</span>
+<span class="fc" id="L187">        }</span>
+<span class="fc" id="L188">        return candidates;</span>
     }
 
     private String stablePathId(String root, SearchState state) {
-<span class="fc" id="L189">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L190">        builder.append(root).append('\u0001');</span>
-<span class="fc" id="L191">        builder.append(state.canonicalHash()).append('\u0001');</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (String step : state.path()) {</span>
-<span class="fc" id="L193">            builder.append(step).append('\u0002');</span>
-<span class="fc" id="L194">        }</span>
-<span class="fc" id="L195">        builder.append('\u0001');</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (String rule : state.appliedRuleIds()) {</span>
-<span class="fc" id="L197">            builder.append(rule).append('\u0003');</span>
-<span class="fc" id="L198">        }</span>
-<span class="fc" id="L199">        return &quot;path-&quot; + Long.toHexString(Integer.toUnsignedLong(builder.toString().hashCode()));</span>
+<span class="fc" id="L192">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L193">        builder.append(root).append('\u0001');</span>
+<span class="fc" id="L194">        builder.append(state.canonicalHash()).append('\u0001');</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (String step : state.path()) {</span>
+<span class="fc" id="L196">            builder.append(step).append('\u0002');</span>
+<span class="fc" id="L197">        }</span>
+<span class="fc" id="L198">        builder.append('\u0001');</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (String rule : state.appliedRuleIds()) {</span>
+<span class="fc" id="L200">            builder.append(rule).append('\u0003');</span>
+<span class="fc" id="L201">        }</span>
+<span class="fc" id="L202">        return &quot;path-&quot; + Long.toHexString(Integer.toUnsignedLong(builder.toString().hashCode()));</span>
     }
 
     private DiscoveredTransformation toDiscovered(String pathId, String root, SearchState state, ExpressionScore before) {
-<span class="fc" id="L203">        List&lt;TransformationStep&gt; steps = buildSteps(state);</span>
-<span class="fc" id="L204">        return new DiscoveredTransformation(</span>
+<span class="fc" id="L206">        List&lt;TransformationStep&gt; steps = buildSteps(state);</span>
+<span class="fc" id="L207">        return new DiscoveredTransformation(</span>
             pathId,
             root,
-<span class="fc" id="L207">            state.expression(),</span>
+<span class="fc" id="L210">            state.expression(),</span>
             steps,
             before,
-<span class="fc" id="L210">            state.score(),</span>
-<span class="fc" id="L211">            before.improvementTo(state.score()),</span>
+<span class="fc" id="L213">            state.score(),</span>
+<span class="fc" id="L214">            before.improvementTo(state.score()),</span>
             CandidateProofStatus.OBSERVED,
-<span class="fc" id="L213">            Instant.now(),</span>
-<span class="fc" id="L214">            state.canonicalHash()</span>
+<span class="fc" id="L216">            Instant.now(),</span>
+<span class="fc" id="L217">            state.canonicalHash()</span>
         );
     }
 
     private List&lt;TransformationStep&gt; buildSteps(SearchState state) {
-<span class="fc" id="L219">        List&lt;String&gt; expressionPath = state.path();</span>
-<span class="fc" id="L220">        List&lt;String&gt; ruleIds = state.appliedRuleIds();</span>
-<span class="fc" id="L221">        List&lt;RewriteKind&gt; ruleKinds = state.appliedRuleKinds();</span>
-<span class="fc" id="L222">        List&lt;Boolean&gt; equivalenceFlags = state.equivalencePreservingFlags();</span>
-<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        if (expressionPath.size() &lt; 2 || ruleIds.isEmpty()) {</span>
-<span class="nc" id="L224">            return List.of();</span>
+<span class="fc" id="L222">        List&lt;String&gt; expressionPath = state.path();</span>
+<span class="fc" id="L223">        List&lt;String&gt; ruleIds = state.appliedRuleIds();</span>
+<span class="fc" id="L224">        List&lt;RewriteKind&gt; ruleKinds = state.appliedRuleKinds();</span>
+<span class="fc" id="L225">        List&lt;Boolean&gt; equivalenceFlags = state.equivalencePreservingFlags();</span>
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">        if (expressionPath.size() &lt; 2 || ruleIds.isEmpty()) {</span>
+<span class="nc" id="L227">            return List.of();</span>
         }
-<span class="fc" id="L226">        List&lt;TransformationStep&gt; steps = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L227">        int stepCount = Math.min(ruleIds.size(), expressionPath.size() - 1);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (int i = 0; i &lt; stepCount; i++) {</span>
-<span class="fc" id="L229">            String before = expressionPath.get(i);</span>
-<span class="fc" id="L230">            String after = expressionPath.get(i + 1);</span>
-<span class="fc" id="L231">            int scoreBefore = expressionScorer.score(before).weightedTotal();</span>
-<span class="fc" id="L232">            int scoreAfter = expressionScorer.score(after).weightedTotal();</span>
-<span class="pc bpc" id="L233" title="2 of 4 branches missed.">            RewriteKind kind = i &lt; ruleKinds.size() &amp;&amp; ruleKinds.get(i) != null</span>
-<span class="fc" id="L234">                ? ruleKinds.get(i)</span>
-<span class="pc" id="L235">                : RewriteKind.NORMALIZE;</span>
-<span class="pc bpc" id="L236" title="2 of 4 branches missed.">            boolean equivalencePreserving = i &gt;= equivalenceFlags.size() || equivalenceFlags.get(i);</span>
-<span class="fc" id="L237">            steps.add(new TransformationStep(</span>
+<span class="fc" id="L229">        List&lt;TransformationStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L230">        int stepCount = Math.min(ruleIds.size(), expressionPath.size() - 1);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int i = 0; i &lt; stepCount; i++) {</span>
+<span class="fc" id="L232">            String before = expressionPath.get(i);</span>
+<span class="fc" id="L233">            String after = expressionPath.get(i + 1);</span>
+<span class="fc" id="L234">            int scoreBefore = expressionScorer.score(before).weightedTotal();</span>
+<span class="fc" id="L235">            int scoreAfter = expressionScorer.score(after).weightedTotal();</span>
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">            RewriteKind kind = i &lt; ruleKinds.size() &amp;&amp; ruleKinds.get(i) != null</span>
+<span class="fc" id="L237">                ? ruleKinds.get(i)</span>
+<span class="pc" id="L238">                : RewriteKind.NORMALIZE;</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">            boolean equivalencePreserving = i &gt;= equivalenceFlags.size() || equivalenceFlags.get(i);</span>
+<span class="fc" id="L240">            steps.add(new TransformationStep(</span>
                 i,
                 before,
                 after,
-<span class="fc" id="L241">                ruleIds.get(i),</span>
+<span class="fc" id="L244">                ruleIds.get(i),</span>
                 kind,
                 scoreBefore,
                 scoreAfter,
                 equivalencePreserving,
-<span class="fc" id="L246">                ruleIds.get(i),</span>
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                state.transformations() == null ? state.assumptions() : state.transformations().get(i).assumptions(),</span>
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(</span>
-<span class="fc" id="L249">                    before, List.of(state.transformations().get(i)))</span>
+<span class="fc" id="L249">                ruleIds.get(i),</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                state.transformations() == null ? state.assumptions() : state.transformations().get(i).assumptions(),</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(</span>
+<span class="fc" id="L252">                    before, List.of(state.transformations().get(i))),</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                state.transformations() == null ? null : ruleRevisions.get(ruleIds.get(i))</span>
             ));
         }
-<span class="fc" id="L252">        return steps;</span>
+<span class="fc" id="L256">        return steps;</span>
     }
 
     public void shutdown() {
-<span class="fc" id="L256">        executorService.shutdown();</span>
-<span class="fc" id="L257">    }</span>
+<span class="fc" id="L260">        executorService.shutdown();</span>
+<span class="fc" id="L261">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

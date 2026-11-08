@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedSummaries.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">OrderedSummaries.java</span></div><h1>OrderedSummaries.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.OrderedReduction.Bound;
+import de.regelsuche.ast.iteration.OrderedReduction.KeyInterval;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionPlan.Lookup;
+import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.RowMoments.bounded;
+
+/** Exact scalar, point, and interval aggregates with shared sorted key coordinates. */
+final class OrderedSummaries {
+    private static final int MAX_INDEX_CELLS = 4_000_000;
+
+    private final List&lt;BigInteger[]&gt; rows;
+    private final Work work;
+<span class="fc" id="L22">    private final Map&lt;Integer, List&lt;BigInteger&gt;&gt; coordinates = new HashMap&lt;&gt;();</span>
+    private int cells;
+    private long accesses;
+
+<span class="fc" id="L26">    OrderedSummaries(List&lt;BigInteger[]&gt; rows, Work work) {</span>
+<span class="fc" id="L27">        this.rows = rows;</span>
+<span class="fc" id="L28">        this.work = work;</span>
+<span class="fc" id="L29">    }</span>
+
+<span class="fc" id="L31">    long accesses() { return accesses; }</span>
+
+    Summary create(Lookup lookup) {
+<span class="fc bfc" id="L34" title="All 3 branches covered.">        return switch (lookup.access()) {</span>
+<span class="fc" id="L35">            case SCALAR -&gt; new Scalar();</span>
+<span class="fc" id="L36">            case HASH -&gt; new Point((KeyInterval) lookup.restriction());</span>
+            case RANGE -&gt; {
+<span class="fc" id="L38">                var interval = (KeyInterval) lookup.restriction();</span>
+<span class="fc" id="L39">                var keys = coordinates.computeIfAbsent(interval.leftColumn(), this::sortedKeys);</span>
+<span class="fc" id="L40">                reserve(keys.size() + 1);</span>
+<span class="fc" id="L41">                yield new Range(interval, keys);</span>
+            }
+        };
+    }
+
+    private List&lt;BigInteger&gt; sortedKeys(int column) {
+<span class="fc" id="L47">        var keys = new TreeSet&lt;BigInteger&gt;((left, right) -&gt; {</span>
+<span class="fc" id="L48">            work.charge(1);</span>
+<span class="fc" id="L49">            return left.compareTo(right);</span>
+        });
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L52">            work.charge(1);</span>
+<span class="fc" id="L53">            keys.add(row[column]);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (keys.size() &gt;= MAX_INDEX_CELLS - cells) throw new Unavailable(&quot;INDEX_CAPACITY_LIMIT&quot;);</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        work.charge(keys.size());</span>
+<span class="fc" id="L57">        return List.copyOf(keys);</span>
+    }
+
+    private void reserve(int needed) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (needed &gt; MAX_INDEX_CELLS - cells) throw new Unavailable(&quot;INDEX_CAPACITY_LIMIT&quot;);</span>
+<span class="fc" id="L62">        work.charge(needed);</span>
+<span class="fc" id="L63">        cells += needed;</span>
+<span class="fc" id="L64">    }</span>
+
+    interface Summary {
+        void add(BigInteger[] row, BigInteger value);
+        BigInteger query(BigInteger[] row);
+    }
+
+<span class="fc" id="L71">    private class Scalar implements Summary {</span>
+<span class="fc" id="L72">        BigInteger total = BigInteger.ZERO;</span>
+
+        @Override public void add(BigInteger[] row, BigInteger value) {
+<span class="fc" id="L75">            total = bounded(total.add(value), work);</span>
+<span class="fc" id="L76">        }</span>
+
+        @Override public BigInteger query(BigInteger[] row) {
+<span class="fc" id="L79">            work.charge(1);</span>
+<span class="fc" id="L80">            return total;</span>
+        }
+    }
+
+    private final class Point extends Scalar {
+        private final KeyInterval interval;
+<span class="fc" id="L86">        private final Map&lt;BigInteger, BigInteger&gt; byKey = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L88">        Point(KeyInterval interval) {</span>
+<span class="fc" id="L89">            this.interval = interval;</span>
+<span class="fc" id="L90">        }</span>
+
+        @Override public void add(BigInteger[] row, BigInteger value) {
+<span class="fc" id="L93">            work.charge(1);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (value.signum() == 0) return;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (interval.complement()) super.add(row, value);</span>
+<span class="fc" id="L96">            var key = row[interval.leftColumn()];</span>
+<span class="fc" id="L97">            var previous = byKey.get(key);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            var sum = bounded(previous == null ? value : previous.add(value), work);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (sum.signum() == 0) {</span>
+<span class="fc" id="L100">                byKey.remove(key);</span>
+<span class="fc" id="L101">                cells--;</span>
+            } else {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (previous == null) reserve(1);</span>
+<span class="fc" id="L104">                byKey.put(key, sum);</span>
+            }
+<span class="fc" id="L106">        }</span>
+
+        @Override public BigInteger query(BigInteger[] row) {
+<span class="fc" id="L109">            var key = bound(row[interval.rightColumn()], interval.lower().orElseThrow());</span>
+<span class="fc" id="L110">            var exact = byKey.getOrDefault(key, BigInteger.ZERO);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            return interval.complement() ? bounded(total.subtract(exact), work) : exact;</span>
+        }
+    }
+
+    private final class Range extends Scalar {
+        private final KeyInterval interval;
+        private final List&lt;BigInteger&gt; keys;
+        private final BigInteger[] tree;
+
+<span class="fc" id="L120">        Range(KeyInterval interval, List&lt;BigInteger&gt; keys) {</span>
+<span class="fc" id="L121">            this.interval = interval;</span>
+<span class="fc" id="L122">            this.keys = keys;</span>
+<span class="fc" id="L123">            tree = new BigInteger[keys.size() + 1];</span>
+<span class="fc" id="L124">        }</span>
+
+        @Override public void add(BigInteger[] row, BigInteger value) {
+<span class="fc" id="L127">            work.charge(1);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (value.signum() == 0) return;</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (interval.complement()) super.add(row, value);</span>
+<span class="fc" id="L130">            int start = rank(row[interval.leftColumn()], false) + 1;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (int index = start; index &lt; tree.length; index += index &amp; -index) {</span>
+<span class="fc" id="L132">                var next = bounded(cell(index).add(value), work);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                tree[index] = next.signum() == 0 ? null : next;</span>
+            }
+<span class="fc" id="L135">        }</span>
+
+        @Override public BigInteger query(BigInteger[] row) {
+<span class="fc" id="L138">            work.charge(1);</span>
+<span class="fc" id="L139">            var key = row[interval.rightColumn()];</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            int from = interval.lower().map(endpoint -&gt; rank(bound(key, endpoint), !endpoint.inclusive())).orElse(0);</span>
+<span class="fc" id="L141">            int to = interval.upper().map(endpoint -&gt; rank(bound(key, endpoint), endpoint.inclusive())).orElse(keys.size());</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            var inside = from &lt; to ? bounded(prefix(to).subtract(prefix(from)), work) : BigInteger.ZERO;</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            return interval.complement() ? bounded(total.subtract(inside), work) : inside;</span>
+        }
+
+        private BigInteger prefix(int end) {
+<span class="fc" id="L147">            BigInteger total = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            for (int index = end; index &gt; 0; index -= index &amp; -index) {</span>
+<span class="fc" id="L149">                total = bounded(total.add(cell(index)), work);</span>
+            }
+<span class="fc" id="L151">            return total;</span>
+        }
+
+        private BigInteger cell(int index) {
+<span class="fc" id="L155">            accesses++;</span>
+<span class="fc" id="L156">            var value = tree[index];</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            return value == null ? BigInteger.ZERO : value;</span>
+        }
+
+        private int rank(BigInteger target, boolean includeEqual) {
+<span class="fc" id="L161">            int low = 0, high = keys.size();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            while (low &lt; high) {</span>
+<span class="fc" id="L163">                work.charge(1);</span>
+<span class="fc" id="L164">                int mid = low + (high - low) / 2;</span>
+<span class="fc" id="L165">                int comparison = keys.get(mid).compareTo(target);</span>
+<span class="fc bfc" id="L166" title="All 6 branches covered.">                if (comparison &lt; 0 || (includeEqual &amp;&amp; comparison == 0)) low = mid + 1;</span>
+<span class="fc" id="L167">                else high = mid;</span>
+<span class="fc" id="L168">            }</span>
+<span class="fc" id="L169">            return low;</span>
+        }
+    }
+
+    private BigInteger bound(BigInteger key, Bound endpoint) {
+<span class="fc" id="L174">        return bounded(key.add(endpoint.offset()), work);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

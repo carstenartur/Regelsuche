@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedReductionSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">OrderedReductionSearch.java</span></div><h1>OrderedReductionSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.FiniteIteration;
+import de.regelsuche.ast.iteration.OrderedReduction;
+import de.regelsuche.ast.iteration.OrderedReduction.All;
+import de.regelsuche.ast.iteration.OrderedReduction.Bound;
+import de.regelsuche.ast.iteration.OrderedReduction.KeyInterval;
+import de.regelsuche.ast.iteration.OrderedReduction.Restriction;
+import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.search.moves.MoveSearch;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+
+/** Derives ordered tuple and window plans through the shared checked move frontier. */
+public final class OrderedReductionSearch {
+    private OrderedReductionSearch() {}
+
+<span class="fc" id="L26">    public record CheckedMove(String ruleId, long synthesisWork, long verificationWork) {}</span>
+
+    public record Result(Optional&lt;OrderedReductionPlan.Verified&gt; verified, String reason,
+            List&lt;CheckedMove&gt; witness, MoveSearch.Metrics metrics) {
+<span class="fc" id="L30">        public Result {</span>
+<span class="fc" id="L31">            witness = List.copyOf(witness);</span>
+<span class="fc" id="L32">        }</span>
+    }
+
+    public static Result search(OrderedReduction source, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L37">        return search(source, false, limits, maximumStates, cancellation);</span>
+    }
+
+    public static Result searchWindows(OrderedReduction source, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (source.slots().size() != 2) throw new IllegalArgumentException(&quot;WINDOW_REQUIRES_PAIR&quot;);</span>
+<span class="fc" id="L43">        return search(source, true, limits, maximumStates, cancellation);</span>
+    }
+
+    private static Result search(OrderedReduction source, boolean windows, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L48">        var result = IterationSearch.search(new Input(), new Domain(Objects.requireNonNull(source), windows),</span>
+            limits, maximumStates, cancellation);
+<span class="fc" id="L50">        return new Result(result.verified(), result.reason(), result.witness().stream()</span>
+<span class="fc" id="L51">            .map(step -&gt; new CheckedMove(step.ruleId(), step.synthesisWork(), step.verificationWork())).toList(),</span>
+<span class="fc" id="L52">            result.metrics());</span>
+    }
+
+    public static OrderedReductionPlan.Verification verify(OrderedReduction source, OrderedReductionPlan plan,
+            boolean windows, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L57">        return OrderedReductionPlan.verify(source, plan, windows, limits, cancellation);</span>
+    }
+
+    private sealed interface Form permits Input, Normalized, Candidate {}
+    private record Input() implements Form {}
+<span class="fc" id="L62">    private record Normalized(Map&lt;IterationPolynomial.Monomial, ExactRational&gt; terms) implements Form {}</span>
+<span class="fc" id="L63">    private record Candidate(OrderedReductionPlan plan) implements Form {}</span>
+
+<span class="fc" id="L65">    private record Domain(OrderedReduction source, boolean windows)</span>
+            implements IterationSearch.Domain&lt;Form, OrderedReductionPlan.Verified&gt; {
+<span class="fc" id="L67">        @Override public String family() { return &quot;ordered-reduction&quot;; }</span>
+<span class="fc" id="L68">        @Override public String noPlanReason() { return &quot;NO_ORDERED_PLAN&quot;; }</span>
+<span class="fc" id="L69">        @Override public int maximumDepth() { return 2; }</span>
+<span class="fc" id="L70">        @Override public boolean finished(Form form) { return form instanceof Candidate; }</span>
+
+        @Override public IterationSearch.Proposal&lt;Form&gt; propose(Form form, IterationLimits limits,
+                BooleanSupplier cancellation) {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            String rule = form instanceof Input ? &quot;normalize-ordered-summand&quot; : &quot;derive-indexed-reduction&quot;;</span>
+<span class="fc" id="L75">            var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+            try {
+<span class="pc bpc" id="L77" title="1 of 3 branches missed.">                Form candidate = switch (form) {</span>
+<span class="fc" id="L78">                    case Input ignored -&gt; new Normalized(IterationPolynomial.parseOrderedSummand(source, work).terms());</span>
+<span class="fc" id="L79">                    case Normalized(var terms) -&gt; new Candidate(derive(source, terms, windows, work));</span>
+<span class="nc" id="L80">                    case Candidate ignored -&gt; throw new IllegalStateException(&quot;ordered plan is terminal&quot;);</span>
+<span class="fc" id="L81">                };</span>
+<span class="fc" id="L82">                return new IterationSearch.Proposal&lt;&gt;(rule, Optional.of(candidate), &quot;CANDIDATE&quot;, work.used());</span>
+<span class="fc" id="L83">            } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L84">                return new IterationSearch.Proposal&lt;&gt;(rule, Optional.empty(), unavailable.getMessage(), work.used());</span>
+            }
+        }
+
+        @Override public IterationSearch.Check&lt;OrderedReductionPlan.Verified&gt; verify(Form from, Form to,
+                IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (to instanceof Candidate candidate) {</span>
+<span class="fc" id="L91">                var check = OrderedReductionPlan.verify(source, candidate.plan(), windows, limits, cancellation);</span>
+<span class="fc" id="L92">                return new IterationSearch.Check&lt;&gt;(check.verified().isPresent(), check.verified(),</span>
+<span class="fc" id="L93">                    check.reason(), check.work());</span>
+            }
+<span class="fc" id="L95">            var normalized = (Normalized) to;</span>
+<span class="fc" id="L96">            var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);</span>
+            try {
+<span class="fc" id="L98">                var original = IterationPolynomial.parseOrderedSummand(source, work);</span>
+<span class="fc" id="L99">                work.charge(original.terms().size() + normalized.terms().size());</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                if (!original.terms().equals(normalized.terms())) throw new Unavailable(&quot;SUMMAND_MISMATCH&quot;);</span>
+<span class="fc" id="L101">                return new IterationSearch.Check&lt;&gt;(true, Optional.empty(), &quot;VERIFIED_NORMALIZATION&quot;, work.used());</span>
+<span class="nc" id="L102">            } catch (Unavailable unavailable) {</span>
+<span class="nc" id="L103">                return new IterationSearch.Check&lt;&gt;(false, Optional.empty(), unavailable.getMessage(), work.used());</span>
+            }
+        }
+    }
+
+    private static OrderedReductionPlan derive(OrderedReduction source, Map&lt;IterationPolynomial.Monomial, ExactRational&gt; polynomial,
+            boolean windows, Work work) {
+<span class="fc" id="L110">        var terms = new ArrayList&lt;OrderedReductionPlan.Term&gt;();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (var entry : RowMoments.split(source.slots(), polynomial, work).entrySet()) {</span>
+<span class="fc" id="L112">            work.charge(1);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (entry.getValue().abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS) {</span>
+<span class="fc" id="L114">                throw new Unavailable(&quot;COEFFICIENT_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L116">            terms.add(new OrderedReductionPlan.Term(entry.getValue(), entry.getKey()));</span>
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">        work.charge(source.restrictions().size());</span>
+<span class="fc" id="L119">        var lookups = source.restrictions().stream().map(OrderedReductionSearch::lookup).toList();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        var eviction = windows ? Optional.of(lookup(reverse(source.restrictions().getFirst())))</span>
+<span class="fc" id="L121">            : Optional.&lt;OrderedReductionPlan.Lookup&gt;empty();</span>
+<span class="fc" id="L122">        return new OrderedReductionPlan(terms, lookups, eviction);</span>
+    }
+
+    private static OrderedReductionPlan.Lookup lookup(Restriction condition) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        var access = switch (condition) {</span>
+<span class="fc" id="L127">            case All ignored -&gt; OrderedReductionPlan.Access.SCALAR;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            case KeyInterval interval -&gt; interval.isPoint() ? OrderedReductionPlan.Access.HASH</span>
+<span class="fc" id="L129">                : OrderedReductionPlan.Access.RANGE;</span>
+<span class="fc" id="L130">        };</span>
+<span class="fc" id="L131">        return new OrderedReductionPlan.Lookup(condition, access);</span>
+    }
+
+    private static Restriction reverse(Restriction condition) {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        return switch (condition) {</span>
+<span class="nc" id="L136">            case All ignored -&gt; All.ROWS;</span>
+<span class="fc" id="L137">            case KeyInterval interval -&gt; new KeyInterval(interval.rightColumn(), interval.leftColumn(),</span>
+<span class="fc" id="L138">                interval.upper().map(OrderedReductionSearch::negate), interval.lower().map(OrderedReductionSearch::negate),</span>
+<span class="fc" id="L139">                interval.complement());</span>
+        };
+    }
+
+    private static Bound negate(Bound bound) {
+<span class="fc" id="L144">        return new Bound(bound.offset().negate(), bound.inclusive());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

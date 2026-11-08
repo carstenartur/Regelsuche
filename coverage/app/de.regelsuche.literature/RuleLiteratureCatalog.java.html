@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RuleLiteratureCatalog.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">RuleLiteratureCatalog.java</span></div><h1>RuleLiteratureCatalog.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.TransformationEngine;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/** Reviewed bibliography kept separately from the executable inventory and proof artifacts. */
+public final class RuleLiteratureCatalog {
+    public static final String SCHEMA = &quot;regelsuche.rule-literature/v1&quot;;
+    private static final int MAX_BYTES = 1 &lt;&lt; 20;
+<span class="fc" id="L38">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L39">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L40">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L41">        .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)</span>
+<span class="fc" id="L42">        .build();</span>
+<span class="fc" id="L43">    private static final RuleLiteratureCatalog EMPTY = new RuleLiteratureCatalog(List.of(), List.of());</span>
+
+    private final Map&lt;String, Source&gt; sources;
+    private final Map&lt;String, List&lt;Link&gt;&gt; byRule;
+
+<span class="fc" id="L48">    private RuleLiteratureCatalog(List&lt;Source&gt; sources, List&lt;Link&gt; links) {</span>
+<span class="fc" id="L49">        this.sources = sources.stream().collect(Collectors.toUnmodifiableMap(Source::id, source -&gt; source,</span>
+<span class="nc" id="L50">            (first, duplicate) -&gt; { throw new IllegalArgumentException(&quot;duplicate literature source id&quot;); }));</span>
+<span class="fc" id="L51">        Set&lt;Link&gt; unique = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (Link link : links) {</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">            if (!unique.add(link) || !this.sources.containsKey(link.sourceId())) {</span>
+<span class="nc" id="L54">                throw new IllegalArgumentException(&quot;duplicate literature link or unknown source id&quot;);</span>
+            }
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        byRule = links.stream().filter(Link::released).collect(Collectors.groupingBy(Link::ruleId));</span>
+<span class="fc" id="L58">    }</span>
+
+    public static RuleLiteratureCatalog empty() {
+<span class="fc" id="L61">        return EMPTY;</span>
+    }
+
+    public static RuleLiteratureCatalog configured() {
+<span class="fc" id="L65">        String file = System.getProperty(&quot;regelsuche.literature.catalog&quot;, System.getenv(&quot;REGELSUCHE_LITERATURE_CATALOG&quot;));</span>
+<span class="pc bpc" id="L66" title="3 of 4 branches missed.">        if (file == null || file.isBlank()) return empty();</span>
+        try {
+<span class="nc" id="L68">            return read(Path.of(file));</span>
+<span class="nc" id="L69">        } catch (IOException exception) {</span>
+<span class="nc" id="L70">            throw new UncheckedIOException(&quot;cannot read configured literature catalog&quot;, exception);</span>
+        }
+    }
+
+    public static RuleLiteratureCatalog read(Path path) throws IOException {
+<span class="fc" id="L75">        try (var input = Files.newInputStream(path)) {</span>
+<span class="fc" id="L76">            byte[] bytes = input.readNBytes(MAX_BYTES + 1);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (bytes.length &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;literature catalog exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L78">            CatalogFile file = JSON.readValue(bytes, CatalogFile.class);</span>
+<span class="pc bpc" id="L79" title="4 of 8 branches missed.">            if (file == null || !SCHEMA.equals(file.schema()) || file.sources() == null || file.links() == null) {</span>
+<span class="nc" id="L80">                throw new IllegalArgumentException(&quot;invalid literature catalog schema&quot;);</span>
+            }
+<span class="fc" id="L82">            return new RuleLiteratureCatalog(file.sources(), file.links());</span>
+<span class="fc" id="L83">        } catch (com.fasterxml.jackson.core.JacksonException exception) {</span>
+<span class="fc" id="L84">            throw new IllegalArgumentException(&quot;invalid literature catalog&quot;, exception);</span>
+        }
+    }
+
+    public Numbering numbering() {
+<span class="fc" id="L89">        return new Numbering();</span>
+    }
+
+    /**
+     * Declarative rule revisions are bound by their pattern and recognition policy.
+     * Other engines can use explicit occurrence links.
+     */
+    public static Map&lt;String, String&gt; captureRuleRevisions(TransformationEngine engine) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (!(engine instanceof AstRewriteTransformationEngine ast)</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                || engine.getClass() != AstRewriteTransformationEngine.class) return Map.of();</span>
+<span class="fc" id="L99">        var revisions = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L100">        var seen = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (var rule : ast.rules()) {</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (!seen.add(rule.id())) revisions.remove(rule.id());</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            else if (rule.getClass() == PatternRewriteRule.class) {</span>
+<span class="fc" id="L104">                revisions.put(rule.id(), RuleInventoryFingerprint.ruleContentHash(rule));</span>
+            }
+<span class="fc" id="L106">        }</span>
+<span class="fc" id="L107">        return Map.copyOf(revisions);</span>
+    }
+
+    public static String occurrence(DiscoveredTransformation path, TransformationStep step) {
+<span class="fc" id="L111">        String json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L112">            .property(&quot;schema&quot;, &quot;regelsuche.literature-occurrence/v1&quot;)</span>
+<span class="fc" id="L113">            .property(&quot;pathId&quot;, path.id()).property(&quot;pathHash&quot;, path.canonicalHash())</span>
+<span class="fc" id="L114">            .property(&quot;index&quot;, step.index()).property(&quot;ruleId&quot;, step.ruleId())</span>
+<span class="fc" id="L115">            .property(&quot;kind&quot;, step.ruleKind().name()).property(&quot;equivalencePreserving&quot;, step.equivalencePreserving())</span>
+<span class="fc" id="L116">            .property(&quot;before&quot;, step.beforeExpression()).property(&quot;after&quot;, step.afterExpression())</span>
+<span class="fc" id="L117">            .stringArray(&quot;assumptions&quot;, step.assumptions())</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            .property(&quot;revision&quot;, step.ruleRevision() == null ? &quot;&quot; : step.ruleRevision())</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            .property(&quot;execution&quot;, step.execution() == null ? &quot;&quot; : step.execution().contentHash())</span>
+<span class="fc" id="L120">            .endObject().toString();</span>
+        try {
+<span class="fc" id="L122">            return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L123">                .digest(json.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L124">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L125">            throw new IllegalStateException(exception);</span>
+        }
+    }
+
+<span class="fc" id="L129">    private record CatalogFile(String schema, List&lt;Source&gt; sources, List&lt;Link&gt; links) { }</span>
+
+    public record Source(String id, List&lt;String&gt; authors, String title, Integer year,
+            String identifier, String version, String locator, String url) {
+<span class="fc" id="L133">        public Source {</span>
+<span class="fc" id="L134">            requireText(id, &quot;id&quot;, 128);</span>
+<span class="fc" id="L135">            authors = List.copyOf(authors);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (authors.isEmpty()) throw new IllegalArgumentException(&quot;literature source requires authors&quot;);</span>
+<span class="fc" id="L137">            authors.forEach(author -&gt; requireText(author, &quot;author&quot;, 300));</span>
+<span class="fc" id="L138">            requireText(title, &quot;title&quot;, 1000);</span>
+<span class="pc bpc" id="L139" title="3 of 6 branches missed.">            if (year != null &amp;&amp; (year &lt; 1 || year &gt; 9999)) throw new IllegalArgumentException(&quot;invalid literature year&quot;);</span>
+<span class="fc" id="L140">            requireText(identifier, &quot;identifier&quot;, 500);</span>
+<span class="fc" id="L141">            requireText(version, &quot;version&quot;, 300);</span>
+<span class="fc" id="L142">            requireText(locator, &quot;locator&quot;, 500);</span>
+<span class="fc" id="L143">            requireText(url, &quot;url&quot;, 2000);</span>
+<span class="fc" id="L144">            URI uri = URI.create(url);</span>
+<span class="pc bpc" id="L145" title="3 of 6 branches missed.">            if (!&quot;https&quot;.equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null) {</span>
+<span class="nc" id="L146">                throw new IllegalArgumentException(&quot;literature source URL must use HTTPS&quot;);</span>
+            }
+<span class="fc" id="L148">            url = uri.toASCIIString();</span>
+<span class="fc" id="L149">        }</span>
+
+        public String description() {
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            return String.join(&quot;, &quot;, authors) + (year == null ? &quot;&quot; : &quot; (&quot; + year + &quot;)&quot;)</span>
+                + &quot;. &quot; + title + &quot;. &quot; + identifier + &quot; · &quot; + version + &quot; · &quot; + locator;
+        }
+    }
+
+<span class="fc" id="L157">    public enum Relation {</span>
+<span class="fc" id="L158">        EXACT(&quot;gleiche Aussage&quot;),</span>
+<span class="fc" id="L159">        EQUIVALENT(&quot;äquivalent&quot;),</span>
+<span class="fc" id="L160">        SOURCE_SPECIAL_CASE(&quot;Quelle ist ein Spezialfall&quot;),</span>
+<span class="fc" id="L161">        SOURCE_GENERALIZATION(&quot;Quelle ist eine Verallgemeinerung&quot;),</span>
+<span class="fc" id="L162">        RELATED(&quot;verwandt&quot;);</span>
+
+        private final String label;
+<span class="fc" id="L165">        Relation(String label) { this.label = label; }</span>
+<span class="fc" id="L166">        public String label() { return label; }</span>
+    }
+
+<span class="fc" id="L169">    public enum Role {</span>
+<span class="fc" id="L170">        RULE_SOURCE(&quot;Regelquelle&quot;),</span>
+<span class="fc" id="L171">        USED_AS_LEMMA(&quot;Verwendetes Lemma&quot;),</span>
+<span class="fc" id="L172">        FOUND_AFTER_FREEZE(&quot;Literaturabgleich nach der Herleitung&quot;);</span>
+
+        private final String label;
+<span class="fc" id="L175">        Role(String label) { this.label = label; }</span>
+<span class="fc" id="L176">        public String label() { return label; }</span>
+    }
+
+    public record Link(String ruleId, String ruleRevision, String occurrence, String sourceId, Relation relation,
+            Role role, List&lt;String&gt; assumptions, String reviewedBy, String reviewedOn, String rationale, boolean released) {
+<span class="fc" id="L181">        public Link {</span>
+<span class="fc" id="L182">            requireText(ruleId, &quot;ruleId&quot;, 300);</span>
+<span class="fc" id="L183">            requireText(sourceId, &quot;sourceId&quot;, 128);</span>
+<span class="fc" id="L184">            Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc" id="L185">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            if (ruleRevision != null) requireHash(ruleRevision);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (occurrence != null) requireHash(occurrence);</span>
+<span class="pc bpc" id="L188" title="1 of 6 branches missed.">            if (occurrence == null &amp;&amp; (ruleRevision == null || role != Role.RULE_SOURCE)) {</span>
+<span class="fc" id="L189">                throw new IllegalArgumentException(&quot;literature link needs an exact rule revision or bound occurrence&quot;);</span>
+            }
+<span class="fc" id="L191">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L192">            assumptions.forEach(assumption -&gt; requireText(assumption, &quot;assumption&quot;, 1000));</span>
+<span class="fc" id="L193">            requireText(reviewedBy, &quot;reviewedBy&quot;, 300);</span>
+<span class="fc" id="L194">            requireText(reviewedOn, &quot;reviewedOn&quot;, 10);</span>
+<span class="fc" id="L195">            LocalDate.parse(reviewedOn);</span>
+<span class="fc" id="L196">            requireText(rationale, &quot;rationale&quot;, 2000);</span>
+<span class="fc" id="L197">        }</span>
+    }
+
+    public record Citation(int number, Source source, Role role, Relation relation, List&lt;String&gt; assumptions, String rationale) {
+<span class="fc" id="L201">        public Citation {</span>
+<span class="fc" id="L202">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L203">        }</span>
+    }
+
+    /** Citation numbers are local to one replay or document. */
+<span class="fc" id="L207">    public final class Numbering {</span>
+<span class="fc" id="L208">        private final Map&lt;Source, Integer&gt; bibliography = new LinkedHashMap&lt;&gt;();</span>
+
+        public List&lt;Citation&gt; forStep(DiscoveredTransformation path, TransformationStep step) {
+<span class="fc" id="L211">            List&lt;Link&gt; links = byRule.getOrDefault(step.ruleId(), List.of());</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (links.isEmpty()) return List.of();</span>
+<span class="fc bfc" id="L213" title="All 4 branches covered.">            String digest = links.stream().anyMatch(link -&gt; link.occurrence() != null) ? occurrence(path, step) : null;</span>
+<span class="fc" id="L214">            List&lt;Citation&gt; citations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            for (Link link : links) {</span>
+<span class="fc bfc" id="L216" title="All 4 branches covered.">                if (link.occurrence() != null &amp;&amp; !link.occurrence().equals(digest)) continue;</span>
+<span class="fc bfc" id="L217" title="All 4 branches covered.">                if (link.ruleRevision() != null &amp;&amp; !link.ruleRevision().equals(step.ruleRevision())) continue;</span>
+<span class="fc" id="L218">                Source source = sources.get(link.sourceId());</span>
+<span class="fc" id="L219">                int number = bibliography.computeIfAbsent(source, key -&gt; bibliography.size() + 1);</span>
+<span class="fc" id="L220">                Citation citation = new Citation(number, source, link.role(), link.relation(), link.assumptions(), link.rationale());</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                if (!citations.contains(citation)) citations.add(citation);</span>
+<span class="fc" id="L222">            }</span>
+<span class="fc" id="L223">            return List.copyOf(citations);</span>
+        }
+
+        public List&lt;Source&gt; bibliography() {
+<span class="fc" id="L227">            return List.copyOf(bibliography.keySet());</span>
+        }
+    }
+
+    private static void requireHash(String value) {
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (!value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) throw new IllegalArgumentException(&quot;invalid literature binding digest&quot;);</span>
+<span class="fc" id="L233">    }</span>
+
+    private static void requireText(String value, String field, int limit) {
+<span class="pc bpc" id="L236" title="2 of 6 branches missed.">        if (value == null || value.isBlank() || value.length() &gt; limit</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">                || value.chars().anyMatch(Character::isISOControl)</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                || !StandardCharsets.UTF_8.newEncoder().canEncode(value)) {</span>
+<span class="fc" id="L239">            throw new IllegalArgumentException(&quot;invalid literature field &quot; + field);</span>
+        }
+<span class="fc" id="L241">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

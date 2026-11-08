@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TheoremSearchClient.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">TheoremSearchClient.java</span></div><h1>TheoremSearchClient.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Optional literature lookup. Each instance allows at most one request at a time and five attempts
+ * in a rolling hour across all users of that instance. Only the explicitly confirmed query and
+ * fixed result count are sent. Returned metadata is untrusted and is not proof evidence.
+ */
+public final class TheoremSearchClient {
+<span class="fc" id="L41">    public static final URI ENDPOINT = URI.create(&quot;https://api.theoremsearch.com/search&quot;);</span>
+    /** Length in Java UTF-16 code units. */
+    public static final int MAX_QUERY_CHARS = 500;
+    public static final int RESULT_LIMIT = 5;
+
+    private static final int ATTEMPTS_PER_WINDOW = 5;
+<span class="fc" id="L47">    private static final Duration BUDGET_WINDOW = Duration.ofHours(1);</span>
+<span class="fc" id="L48">    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);</span>
+<span class="fc" id="L49">    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);</span>
+<span class="fc" id="L50">    private static final Duration DEFAULT_COOLDOWN = Duration.ofMinutes(1);</span>
+    private static final int MAX_RESPONSE_BYTES = 256 * 1024;
+<span class="fc" id="L52">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L53">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L54">            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L55">            .build();</span>
+
+    private final boolean enabled;
+    private final URI endpoint;
+    private final Clock clock;
+    private final HttpClient http;
+<span class="fc" id="L61">    private final Object policyLock = new Object();</span>
+<span class="fc" id="L62">    private final Deque&lt;Instant&gt; attempts = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L63">    private Instant cooldownUntil = Instant.MIN;</span>
+    private boolean inFlight;
+
+    public TheoremSearchClient(boolean enabled) {
+<span class="fc" id="L67">        this(enabled, ENDPOINT, Clock.systemUTC(), true);</span>
+<span class="fc" id="L68">    }</span>
+
+    TheoremSearchClient(boolean enabled, URI endpoint, Clock clock) {
+<span class="fc" id="L71">        this(enabled, endpoint, clock, false);</span>
+<span class="fc" id="L72">    }</span>
+
+<span class="fc" id="L74">    private TheoremSearchClient(boolean enabled, URI endpoint, Clock clock, boolean production) {</span>
+<span class="fc" id="L75">        this.enabled = enabled;</span>
+<span class="fc" id="L76">        this.endpoint = Objects.requireNonNull(endpoint);</span>
+<span class="fc" id="L77">        this.clock = Objects.requireNonNull(clock);</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (!production &amp;&amp; !(&quot;http&quot;.equals(endpoint.getScheme())</span>
+<span class="pc bpc" id="L79" title="3 of 4 branches missed.">                &amp;&amp; (&quot;127.0.0.1&quot;.equals(endpoint.getHost()) || &quot;[::1]&quot;.equals(endpoint.getHost()))</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">                &amp;&amp; endpoint.getPort() &gt; 0 &amp;&amp; endpoint.getRawUserInfo() == null</span>
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">                &amp;&amp; endpoint.getRawQuery() == null &amp;&amp; endpoint.getRawFragment() == null</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                &amp;&amp; &quot;/search&quot;.equals(endpoint.getRawPath()))) {</span>
+<span class="nc" id="L83">            throw new IllegalArgumentException(&quot;The test endpoint must be a loopback search endpoint&quot;);</span>
+        }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        http = enabled ? HttpClient.newBuilder()</span>
+<span class="fc" id="L86">                .connectTimeout(CONNECT_TIMEOUT)</span>
+<span class="fc" id="L87">                .followRedirects(HttpClient.Redirect.NEVER)</span>
+<span class="fc" id="L88">                .proxy(HttpClient.Builder.NO_PROXY)</span>
+<span class="fc" id="L89">                .version(HttpClient.Version.HTTP_1_1)</span>
+<span class="fc" id="L90">                .build() : null;</span>
+<span class="fc" id="L91">    }</span>
+
+    public boolean enabled() {
+<span class="fc" id="L94">        return enabled;</span>
+    }
+
+    public Result search(String query, boolean confirmed) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!enabled) {</span>
+<span class="fc" id="L99">            return empty(Status.DISABLED);</span>
+        }
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!confirmed) {</span>
+<span class="fc" id="L102">            return empty(Status.CONFIRMATION_REQUIRED);</span>
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (!validQuery(query)) {</span>
+<span class="fc" id="L105">            return empty(Status.FAILED);</span>
+        }
+<span class="fc" id="L107">        synchronized (policyLock) {</span>
+<span class="fc" id="L108">            Instant now = clock.instant();</span>
+<span class="fc" id="L109">            long wait = retryDelay(now);</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">            if (inFlight || wait &gt; 0) {</span>
+<span class="fc" id="L111">                return limited(Math.max(wait, 1));</span>
+            }
+<span class="fc" id="L113">            attempts.addLast(now);</span>
+<span class="fc" id="L114">            inFlight = true;</span>
+<span class="fc" id="L115">        }</span>
+        try {
+<span class="fc" id="L117">            return performSearch(query);</span>
+<span class="nc" id="L118">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L119">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L120">            return empty(Status.FAILED);</span>
+<span class="fc" id="L121">        } catch (IOException | ExecutionException | TimeoutException e) {</span>
+<span class="fc" id="L122">            return empty(Status.FAILED);</span>
+        } finally {
+<span class="fc" id="L124">            synchronized (policyLock) {</span>
+<span class="fc" id="L125">                inFlight = false;</span>
+<span class="fc" id="L126">            }</span>
+        }
+    }
+
+    private Result performSearch(String query)
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+<span class="fc" id="L132">        byte[] payload = JSON.writeValueAsBytes(JSON.createObjectNode()</span>
+<span class="fc" id="L133">                .put(&quot;query&quot;, query)</span>
+<span class="fc" id="L134">                .put(&quot;n_results&quot;, RESULT_LIMIT));</span>
+        // A transport-level replay cannot obtain the query body a second time.
+<span class="fc" id="L136">        var available = new AtomicBoolean(true);</span>
+<span class="fc" id="L137">        var body = HttpRequest.BodyPublishers.ofInputStream(</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                () -&gt; available.getAndSet(false) ? new ByteArrayInputStream(payload) : null);</span>
+<span class="fc" id="L139">        var request = HttpRequest.newBuilder(endpoint)</span>
+<span class="fc" id="L140">                .timeout(REQUEST_TIMEOUT)</span>
+<span class="fc" id="L141">                .header(&quot;Content-Type&quot;, &quot;application/json&quot;)</span>
+<span class="fc" id="L142">                .header(&quot;Accept&quot;, &quot;application/json&quot;)</span>
+<span class="fc" id="L143">                .POST(HttpRequest.BodyPublishers.fromPublisher(body, payload.length))</span>
+<span class="fc" id="L144">                .build();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        var pending = http.sendAsync(request, info -&gt; info.statusCode() == 200</span>
+<span class="fc" id="L146">                ? new BoundedBodySubscriber()</span>
+<span class="fc" id="L147">                : HttpResponse.BodySubscribers.mapping(HttpResponse.BodySubscribers.ofInputStream(), stream -&gt; {</span>
+                    try {
+<span class="fc" id="L149">                        stream.close();</span>
+<span class="nc" id="L150">                    } catch (IOException ignored) {</span>
+                        // No error response content is needed.
+<span class="fc" id="L152">                    }</span>
+<span class="fc" id="L153">                    return new byte[0];</span>
+                }));
+        HttpResponse&lt;byte[]&gt; response;
+        try {
+            // Bound the entire exchange, including reading a successful response body.
+<span class="fc" id="L158">            response = pending.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L159">        } catch (TimeoutException | InterruptedException e) {</span>
+<span class="nc" id="L160">            pending.cancel(true);</span>
+<span class="nc" id="L161">            throw e;</span>
+<span class="fc" id="L162">        }</span>
+<span class="fc" id="L163">        int status = response.statusCode();</span>
+<span class="fc bfc" id="L164" title="All 4 branches covered.">        if (status == 429 || status == 503) {</span>
+<span class="fc" id="L165">            var retryAfter = response.headers().firstValue(&quot;Retry-After&quot;);</span>
+<span class="fc" id="L166">            synchronized (policyLock) {</span>
+<span class="fc" id="L167">                Instant now = clock.instant();</span>
+<span class="fc" id="L168">                Instant retry = retryAfter.map(value -&gt; retryAfter(value, now)).orElse(null);</span>
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">                if (retry != null || status == 429) {</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                    cooldownUntil = retry == null ? now.plus(DEFAULT_COOLDOWN) : retry;</span>
+                }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                if (status == 429) {</span>
+<span class="fc" id="L173">                    return limited(retryDelay(now));</span>
+                }
+<span class="fc" id="L175">            }</span>
+        }
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (status != 200) {</span>
+<span class="fc" id="L178">            return empty(Status.FAILED);</span>
+        }
+<span class="fc" id="L180">        return new Result(Status.SUCCESS, metadata(response.body()), 0);</span>
+    }
+
+    private long retryDelay(Instant now) {
+<span class="fc bfc" id="L184" title="All 4 branches covered.">        while (!attempts.isEmpty() &amp;&amp; !attempts.getFirst().plus(BUDGET_WINDOW).isAfter(now)) {</span>
+<span class="fc" id="L185">            attempts.removeFirst();</span>
+        }
+<span class="fc" id="L187">        Instant until = cooldownUntil;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (attempts.size() &gt;= ATTEMPTS_PER_WINDOW) {</span>
+<span class="fc" id="L189">            Instant budgetUntil = attempts.getFirst().plus(BUDGET_WINDOW);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (budgetUntil.isAfter(until)) {</span>
+<span class="fc" id="L191">                until = budgetUntil;</span>
+            }
+        }
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (!until.isAfter(now)) {</span>
+<span class="fc" id="L195">            return 0;</span>
+        }
+<span class="fc" id="L197">        Duration remaining = Duration.between(now, until);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        return remaining.getSeconds() + (remaining.getNano() == 0 ? 0 : 1);</span>
+    }
+
+    private static Instant retryAfter(String value, Instant now) {
+<span class="fc" id="L202">        String header = value.strip();</span>
+<span class="pc bpc" id="L203" title="2 of 8 branches missed.">        if (!header.isEmpty() &amp;&amp; header.chars().allMatch(c -&gt; c &gt;= '0' &amp;&amp; c &lt;= '9')) {</span>
+<span class="fc" id="L204">            BigInteger seconds = new BigInteger(header);</span>
+<span class="fc" id="L205">            long maxSeconds = Duration.between(now, Instant.MAX).getSeconds();</span>
+<span class="fc" id="L206">            return now.plusSeconds(seconds.min(BigInteger.valueOf(maxSeconds)).longValueExact());</span>
+        }
+        try {
+<span class="fc" id="L209">            return ZonedDateTime.parse(header, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();</span>
+<span class="nc" id="L210">        } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L211">            return null;</span>
+        }
+    }
+
+    private static boolean validQuery(String query) {
+<span class="fc bfc" id="L216" title="All 6 branches covered.">        return query != null &amp;&amp; query.length() &lt;= MAX_QUERY_CHARS &amp;&amp; validUnicode(query)</span>
+<span class="fc bfc" id="L217" title="All 4 branches covered.">                &amp;&amp; query.codePoints().anyMatch(c -&gt; !Character.isWhitespace(c)</span>
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">                        &amp;&amp; !Character.isSpaceChar(c) &amp;&amp; c != 0x85);</span>
+    }
+
+    private static boolean validUnicode(String text) {
+<span class="fc" id="L222">        return StandardCharsets.UTF_8.newEncoder().canEncode(text);</span>
+    }
+
+    private static List&lt;Hit&gt; metadata(byte[] body) throws IOException {
+<span class="fc" id="L226">        JsonNode root = JSON.readTree(body);</span>
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        if (root == null || !root.path(&quot;theorems&quot;).isArray()) {</span>
+<span class="fc" id="L228">            throw malformed();</span>
+        }
+<span class="fc" id="L230">        var hits = new ArrayList&lt;Hit&gt;(RESULT_LIMIT);</span>
+<span class="fc" id="L231">        int inspected = 0;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (JsonNode theorem : root.path(&quot;theorems&quot;)) {</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (inspected++ == RESULT_LIMIT) {</span>
+<span class="fc" id="L234">                break;</span>
+            }
+<span class="fc" id="L236">            JsonNode paper = theorem.path(&quot;paper&quot;);</span>
+<span class="pc bpc" id="L237" title="4 of 8 branches missed.">            if (!theorem.isObject() || (!paper.isMissingNode() &amp;&amp; !paper.isNull() &amp;&amp; !paper.isObject())) {</span>
+<span class="nc" id="L238">                throw malformed();</span>
+            }
+<span class="fc" id="L240">            String name = text(theorem.path(&quot;name&quot;), 240);</span>
+<span class="fc" id="L241">            String link = safeLink(text(theorem.path(&quot;link&quot;), 2_048));</span>
+<span class="fc" id="L242">            String title = text(paper.path(&quot;title&quot;), 360);</span>
+<span class="fc" id="L243">            String source = text(paper.path(&quot;source&quot;), 160);</span>
+<span class="fc" id="L244">            Integer year = year(paper.path(&quot;year&quot;));</span>
+<span class="pc bpc" id="L245" title="7 of 8 branches missed.">            if (name != null || link != null || title != null || source != null) {</span>
+<span class="fc" id="L246">                hits.add(new Hit(name, link, title, source, year));</span>
+            }
+<span class="fc" id="L248">        }</span>
+<span class="fc" id="L249">        return hits;</span>
+    }
+
+    private static String text(JsonNode node, int maxLength) throws IOException {
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">        if (node.isMissingNode() || node.isNull()) {</span>
+<span class="nc" id="L254">            return null;</span>
+        }
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (!node.isTextual()) {</span>
+<span class="nc" id="L257">            throw malformed();</span>
+        }
+<span class="fc" id="L259">        String value = node.textValue();</span>
+<span class="pc bpc" id="L260" title="2 of 6 branches missed.">        return value.length() &lt;= maxLength &amp;&amp; !value.isBlank() &amp;&amp; validUnicode(value)</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                &amp;&amp; value.codePoints().noneMatch(Character::isISOControl) ? value : null;</span>
+    }
+
+    private static String safeLink(String link) {
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (link != null) {</span>
+            try {
+<span class="fc" id="L267">                URI uri = URI.create(link);</span>
+<span class="pc bpc" id="L268" title="1 of 4 branches missed.">                if ((&quot;https&quot;.equalsIgnoreCase(uri.getScheme()) || &quot;http&quot;.equalsIgnoreCase(uri.getScheme()))</span>
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">                        &amp;&amp; uri.getHost() != null &amp;&amp; uri.getRawUserInfo() == null) {</span>
+<span class="fc" id="L270">                    return link;</span>
+                }
+<span class="nc" id="L272">            } catch (IllegalArgumentException ignored) {</span>
+                // Keep other metadata even if the provider supplied an invalid link.
+<span class="fc" id="L274">            }</span>
+        }
+<span class="fc" id="L276">        return null;</span>
+    }
+
+    private static Integer year(JsonNode node) throws IOException {
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">        if (node.isMissingNode() || node.isNull()) {</span>
+<span class="fc" id="L281">            return null;</span>
+        }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (!node.isIntegralNumber()) {</span>
+<span class="nc" id="L284">            throw malformed();</span>
+        }
+<span class="pc bpc" id="L286" title="3 of 6 branches missed.">        return node.canConvertToInt() &amp;&amp; node.intValue() &gt; 0 &amp;&amp; node.intValue() &lt;= 9_999 ? node.intValue() : null;</span>
+    }
+
+    private static IOException malformed() {
+<span class="fc" id="L290">        return new IOException(&quot;Invalid literature response&quot;);</span>
+    }
+
+    private static Result empty(Status status) {
+<span class="fc" id="L294">        return new Result(status, List.of(), 0);</span>
+    }
+
+    private static Result limited(long retryAfterSeconds) {
+<span class="fc" id="L298">        return new Result(Status.RATE_LIMITED, List.of(), retryAfterSeconds);</span>
+    }
+
+<span class="fc" id="L301">    public enum Status {</span>
+<span class="fc" id="L302">        DISABLED, CONFIRMATION_REQUIRED, SUCCESS, RATE_LIMITED, FAILED</span>
+    }
+
+<span class="fc" id="L305">    public record Hit(String name, String link, String title, String source, Integer year) {</span>
+    }
+
+    public record Result(Status status, List&lt;Hit&gt; hits, long retryAfterSeconds) {
+<span class="fc" id="L309">        public Result {</span>
+<span class="fc" id="L310">            hits = List.copyOf(hits);</span>
+<span class="fc" id="L311">        }</span>
+    }
+
+<span class="fc" id="L314">    private static final class BoundedBodySubscriber implements HttpResponse.BodySubscriber&lt;byte[]&gt; {</span>
+<span class="fc" id="L315">        private final HttpResponse.BodySubscriber&lt;byte[]&gt; delegate = HttpResponse.BodySubscribers.ofByteArray();</span>
+        private Flow.Subscription subscription;
+<span class="fc" id="L317">        private int remaining = MAX_RESPONSE_BYTES;</span>
+        private boolean exceeded;
+
+        @Override
+        public CompletionStage&lt;byte[]&gt; getBody() {
+<span class="fc" id="L322">            return delegate.getBody();</span>
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+<span class="fc" id="L327">            this.subscription = subscription;</span>
+<span class="fc" id="L328">            delegate.onSubscribe(subscription);</span>
+<span class="fc" id="L329">        }</span>
+
+        @Override
+        public void onNext(List&lt;ByteBuffer&gt; buffers) {
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">            if (exceeded) {</span>
+<span class="nc" id="L334">                return;</span>
+            }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            for (ByteBuffer buffer : buffers) {</span>
+<span class="fc" id="L337">                remaining -= buffer.remaining();</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                if (remaining &lt; 0) {</span>
+<span class="fc" id="L339">                    exceeded = true;</span>
+<span class="fc" id="L340">                    subscription.cancel();</span>
+<span class="fc" id="L341">                    delegate.onError(new IOException(&quot;Literature response exceeded its size limit&quot;));</span>
+<span class="fc" id="L342">                    return;</span>
+                }
+<span class="fc" id="L344">            }</span>
+<span class="fc" id="L345">            delegate.onNext(buffers);</span>
+<span class="fc" id="L346">        }</span>
+
+        @Override
+        public void onError(Throwable error) {
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            if (!exceeded) {</span>
+<span class="nc" id="L351">                delegate.onError(error);</span>
+            }
+<span class="nc" id="L353">        }</span>
+
+        @Override
+        public void onComplete() {
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">            if (!exceeded) {</span>
+<span class="fc" id="L358">                delegate.onComplete();</span>
+            }
+<span class="fc" id="L360">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
