@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FieldBatchInversionPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">FieldBatchInversionPlan.java</span></div><h1>FieldBatchInversionPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.FieldInversionBatch;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.LongConsumer;
+
+/**
+ * A straight-line schedule with one output for each inversion operand.
+ * Slots start with the source operands in order, followed by step results.
+ */
+public record FieldBatchInversionPlan(List&lt;Step&gt; steps, List&lt;Integer&gt; outputs) {
+<span class="fc" id="L14">    public FieldBatchInversionPlan {</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (steps.size() &gt; maximumSteps(FieldInversionBatch.MAX_OPERANDS)</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">                || outputs.size() &gt; FieldInversionBatch.MAX_OPERANDS) {</span>
+<span class="nc" id="L17">            throw new IllegalArgumentException(&quot;FIELD_BATCH_PLAN_LIMIT&quot;);</span>
+        }
+<span class="fc" id="L19">        steps = List.copyOf(steps);</span>
+<span class="fc" id="L20">        outputs = List.copyOf(outputs);</span>
+<span class="fc" id="L21">    }</span>
+
+    public sealed interface Step permits Multiply, Invert {}
+
+<span class="fc" id="L25">    public record Multiply(int left, int right) implements Step {}</span>
+
+<span class="fc" id="L27">    public record Invert(int operand) implements Step {}</span>
+
+    private static int maximumSteps(int operands) {
+<span class="fc" id="L30">        return 3 * (operands - 1) + 1;</span>
+    }
+
+    static Optional&lt;FieldBatchInversionPlan&gt; derive(FieldInversionBatch source, LongConsumer charge) {
+<span class="fc" id="L34">        int operands = source.operands();</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (operands &lt; 2) return Optional.empty();</span>
+<span class="fc" id="L36">        var steps = new ArrayList&lt;Step&gt;(maximumSteps(operands));</span>
+<span class="fc" id="L37">        var prefixes = new int[operands];</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int i = 1; i &lt; operands; i++) {</span>
+<span class="fc" id="L39">            charge.accept(1);</span>
+<span class="fc" id="L40">            prefixes[i] = operands + steps.size();</span>
+<span class="fc" id="L41">            steps.add(new Multiply(prefixes[i - 1], i));</span>
+        }
+<span class="fc" id="L43">        charge.accept(1);</span>
+<span class="fc" id="L44">        int inverse = operands + steps.size();</span>
+<span class="fc" id="L45">        steps.add(new Invert(prefixes[operands - 1]));</span>
+<span class="fc" id="L46">        var outputs = new Integer[operands];</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (int i = operands - 1; i &gt; 0; i--) {</span>
+<span class="fc" id="L48">            charge.accept(2);</span>
+<span class="fc" id="L49">            outputs[i] = operands + steps.size();</span>
+<span class="fc" id="L50">            steps.add(new Multiply(prefixes[i - 1], inverse));</span>
+<span class="fc" id="L51">            int previous = operands + steps.size();</span>
+<span class="fc" id="L52">            steps.add(new Multiply(inverse, i));</span>
+<span class="fc" id="L53">            inverse = previous;</span>
+        }
+<span class="fc" id="L55">        outputs[0] = inverse;</span>
+<span class="fc" id="L56">        return Optional.of(new FieldBatchInversionPlan(steps, List.of(outputs)));</span>
+    }
+
+    /**
+     * Replay the candidate as products of symbolic powers. Each operand starts
+     * with exponent +1 in its own slot. Verify that each output ends with
+     * exponent -1 in that slot and zero in every other slot.
+     */
+    static Optional&lt;Verified&gt; check(FieldInversionBatch source, FieldBatchInversionPlan plan, LongConsumer charge) {
+<span class="fc" id="L65">        int operands = source.operands();</span>
+<span class="pc bpc" id="L66" title="3 of 6 branches missed.">        if (operands &lt; 2 || plan.outputs().size() != operands || plan.steps().size() &gt; maximumSteps(operands)) {</span>
+<span class="nc" id="L67">            return Optional.empty();</span>
+        }
+<span class="fc" id="L69">        var powers = new ArrayList&lt;Powers&gt;(operands + plan.steps().size());</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (int i = 0; i &lt; operands; i++) {</span>
+<span class="fc" id="L71">            charge.accept(1);</span>
+<span class="fc" id="L72">            powers.add(new Powers(1L &lt;&lt; i, 0));</span>
+        }
+<span class="fc" id="L74">        boolean inverted = false;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (var step : plan.steps()) {</span>
+<span class="fc" id="L76">            charge.accept(1);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (step instanceof Multiply multiply) {</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">                if (!slot(multiply.left(), powers.size()) || !slot(multiply.right(), powers.size())) return Optional.empty();</span>
+<span class="fc" id="L79">                var product = powers.get(multiply.left()).multiply(powers.get(multiply.right()));</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (product == null) return Optional.empty();</span>
+<span class="fc" id="L81">                powers.add(product);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            } else if (step instanceof Invert invert) {</span>
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">                if (inverted || !slot(invert.operand(), powers.size())) return Optional.empty();</span>
+<span class="fc" id="L84">                powers.add(powers.get(invert.operand()).inverse());</span>
+<span class="fc" id="L85">                inverted = true;</span>
+            }
+<span class="fc" id="L87">        }</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (!inverted) return Optional.empty();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (int i = 0; i &lt; operands; i++) {</span>
+<span class="fc" id="L90">            charge.accept(1);</span>
+<span class="fc" id="L91">            int output = plan.outputs().get(i);</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            if (!slot(output, powers.size()) || !powers.get(output).equals(new Powers(0, 1L &lt;&lt; i))) return Optional.empty();</span>
+        }
+<span class="fc" id="L94">        return Optional.of(new Verified(source, plan));</span>
+    }
+
+    private static boolean slot(int index, int size) {
+<span class="fc bfc" id="L98" title="All 4 branches covered.">        return index &gt;= 0 &amp;&amp; index &lt; size;</span>
+    }
+
+    /** Disjoint masks encode exponents in {-1, 0, +1}. */
+<span class="fc" id="L102">    private record Powers(long positive, long negative) {</span>
+        Powers multiply(Powers other) {
+<span class="pc bpc" id="L104" title="1 of 4 branches missed.">            if ((positive &amp; other.positive) != 0 || (negative &amp; other.negative) != 0) return null;</span>
+<span class="fc" id="L105">            long cancelled = (positive &amp; other.negative) | (negative &amp; other.positive);</span>
+<span class="fc" id="L106">            return new Powers((positive | other.positive) &amp; ~cancelled, (negative | other.negative) &amp; ~cancelled);</span>
+        }
+
+        Powers inverse() {
+<span class="fc" id="L110">            return new Powers(negative, positive);</span>
+        }
+    }
+
+    public static final class Verified {
+        private final FieldInversionBatch source;
+        private final FieldBatchInversionPlan plan;
+
+<span class="fc" id="L118">        private Verified(FieldInversionBatch source, FieldBatchInversionPlan plan) {</span>
+<span class="fc" id="L119">            this.source = source;</span>
+<span class="fc" id="L120">            this.plan = plan;</span>
+<span class="fc" id="L121">        }</span>
+
+<span class="fc" id="L123">        public FieldInversionBatch source() { return source; }</span>
+<span class="fc" id="L124">        public FieldBatchInversionPlan plan() { return plan; }</span>
+<span class="fc" id="L125">        public int originalInversions() { return source.operands(); }</span>
+<span class="fc" id="L126">        public int plannedInversions() { return 1; }</span>
+<span class="fc" id="L127">        public int plannedMultiplications() { return plan.steps().size() - plannedInversions(); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
