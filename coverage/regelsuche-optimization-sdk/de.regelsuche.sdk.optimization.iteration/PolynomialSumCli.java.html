@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSumCli.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">PolynomialSumCli.java</span></div><h1>PolynomialSumCli.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.exc.StreamConstraintsException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.ast.iteration.FiniteIteration;
+import de.regelsuche.ast.iteration.IntegerArithmetic;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.sdk.optimization.CancellationToken;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
+import de.regelsuche.symbol.SymbolId;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.UUID;
+
+/** Standalone JSON entry point for verified Newton plans of counted sums with constant start and stride. */
+public final class PolynomialSumCli {
+    private static final int VERSION = 1;
+    private static final int MAX_REQUEST_BYTES = 4_096;
+    private static final int MAX_INTEGER_TOKEN_LENGTH = 1_235; // 4096 coefficient bits in decimal plus a sign
+<span class="fc" id="L38">    private static final Set&lt;String&gt; REQUEST_FIELDS = Set.of(</span>
+        &quot;version&quot;, &quot;kind&quot;, &quot;bits&quot;, &quot;overflow&quot;, &quot;start&quot;, &quot;stride&quot;, &quot;initial&quot;, &quot;term&quot;);
+<span class="fc" id="L40">    private static final Set&lt;String&gt; INDEX_FIELDS = Set.of(&quot;op&quot;);</span>
+<span class="fc" id="L41">    private static final Set&lt;String&gt; INTEGER_FIELDS = Set.of(&quot;op&quot;, &quot;value&quot;);</span>
+<span class="fc" id="L42">    private static final Set&lt;String&gt; BINARY_FIELDS = Set.of(&quot;op&quot;, &quot;left&quot;, &quot;right&quot;);</span>
+<span class="fc" id="L43">    private static final SymbolId INDEX = new SymbolId(new UUID(0L, 0L), 1);</span>
+<span class="fc" id="L44">    private static final OptimizationBudget BUDGET = new OptimizationBudget(100_000, 10, 10, 5_000);</span>
+<span class="fc" id="L45">    private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()</span>
+<span class="fc" id="L46">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L47">        .streamReadConstraints(StreamReadConstraints.builder()</span>
+<span class="fc" id="L48">            .maxNestingDepth(FiniteIteration.MAX_DEPTH + 1) // includes the request object</span>
+<span class="fc" id="L49">            .maxNumberLength(MAX_INTEGER_TOKEN_LENGTH)</span>
+<span class="fc" id="L50">            .maxNameLength(32)</span>
+<span class="fc" id="L51">            .maxStringLength(MAX_INTEGER_TOKEN_LENGTH) // Jackson also uses this buffer for large integers</span>
+<span class="fc" id="L52">            .build())</span>
+<span class="fc" id="L53">        .build()).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+    private PolynomialSumCli() {}
+
+    /** Reads one UTF-8 request from standard input and writes a response only after verification. */
+    public static void main(String[] args) {
+<span class="nc" id="L59">        int status = run(args, System.in, System.out, System.err);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (status != 0) {</span>
+<span class="nc" id="L61">            System.exit(status);</span>
+        }
+<span class="nc" id="L63">    }</span>
+
+    static int run(String[] args, InputStream input, PrintStream output, PrintStream error) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (args.length != 0) {</span>
+<span class="nc" id="L67">            return reject(error, &quot;expected one JSON request on stdin and no command-line arguments&quot;);</span>
+        }
+        try {
+<span class="fc" id="L70">            byte[] bytes = input.readNBytes(MAX_REQUEST_BYTES + 1);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (bytes.length &gt; MAX_REQUEST_BYTES) {</span>
+<span class="fc" id="L72">                return reject(error, &quot;request exceeds &quot; + MAX_REQUEST_BYTES + &quot; bytes&quot;);</span>
+            }
+<span class="fc" id="L74">            String text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();</span>
+<span class="fc" id="L75">            ObjectNode response = prove(JSON.readTree(text));</span>
+<span class="fc" id="L76">            output.println(JSON.writeValueAsString(response));</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            return output.checkError() ? reject(error, &quot;could not write response&quot;) : 0;</span>
+<span class="fc" id="L78">        } catch (CharacterCodingException exception) {</span>
+<span class="fc" id="L79">            return reject(error, &quot;request is not UTF-8&quot;);</span>
+<span class="fc" id="L80">        } catch (StreamConstraintsException exception) {</span>
+<span class="fc" id="L81">            return reject(error, &quot;JSON request exceeds parser limits&quot;);</span>
+<span class="fc" id="L82">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L83">            return reject(error, &quot;invalid JSON; expected a single document with no duplicate fields&quot;);</span>
+<span class="fc" id="L84">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L85">            return reject(error, exception.getMessage());</span>
+<span class="nc" id="L86">        } catch (IOException exception) {</span>
+<span class="nc" id="L87">            return reject(error, &quot;could not read request from stdin&quot;);</span>
+        }
+    }
+
+    private static ObjectNode prove(JsonNode request) {
+<span class="fc" id="L92">        requireFields(request, REQUEST_FIELDS, &quot;request&quot;);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (smallInteger(request, &quot;version&quot;) != VERSION) {</span>
+<span class="fc" id="L94">            throw new IllegalArgumentException(&quot;unsupported request version&quot;);</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (!text(request, &quot;kind&quot;).equals(&quot;counted-sum&quot;)) {</span>
+<span class="nc" id="L97">            throw new IllegalArgumentException(&quot;unsupported request kind; expected counted-sum&quot;);</span>
+        }
+<span class="fc" id="L99">        int bits = smallInteger(request, &quot;bits&quot;);</span>
+<span class="fc" id="L100">        IntegerArithmetic arithmetic = arithmetic(bits, text(request, &quot;overflow&quot;));</span>
+<span class="fc" id="L101">        var source = new PolynomialSum(INDEX, Set.of(), number(request, &quot;start&quot;, bits), integer(request, &quot;stride&quot;),</span>
+<span class="fc" id="L102">            term(request.path(&quot;term&quot;), bits), number(request, &quot;initial&quot;, bits), arithmetic);</span>
+
+<span class="fc" id="L104">        var search = new PolynomialSumOptimizer().search(source, BUDGET, CancellationToken.NONE);</span>
+<span class="fc" id="L105">        var plan = search.plan().orElseThrow(() -&gt; new IllegalArgumentException(&quot;search rejected: &quot; + search.reason()));</span>
+<span class="fc" id="L106">        var proof = new PolynomialSumVerifier().verify(source, plan, BUDGET, CancellationToken.NONE);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (!proof.verified()) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(&quot;verification rejected: &quot; + proof.reason());</span>
+        }
+
+<span class="fc" id="L111">        var response = JSON.createObjectNode().put(&quot;version&quot;, VERSION);</span>
+<span class="fc" id="L112">        response.set(&quot;request&quot;, request);</span>
+<span class="fc" id="L113">        response.put(&quot;initial&quot;, constant(plan.initial()));</span>
+<span class="fc" id="L114">        var coefficients = response.putArray(&quot;coefficients&quot;);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (var coefficient : plan.coefficients()) {</span>
+<span class="fc" id="L116">            coefficients.add(constant(coefficient));</span>
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">        return response;</span>
+    }
+
+    private static IntegerArithmetic arithmetic(int bits, String overflow) {
+<span class="fc bfc" id="L122" title="All 4 branches covered.">        if (bits == 0 &amp;&amp; overflow.equals(&quot;exact&quot;)) {</span>
+<span class="fc" id="L123">            return IntegerArithmetic.EXACT;</span>
+        }
+<span class="fc bfc" id="L125" title="All 4 branches covered.">        if (bits == 32 || bits == 64) {</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (overflow.equals(&quot;checked&quot;)) {</span>
+<span class="fc" id="L127">                return IntegerArithmetic.EXACT;</span>
+            }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (overflow.equals(&quot;wrap&quot;)) {</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                return bits == 32 ? IntegerArithmetic.JAVA_INT : IntegerArithmetic.JAVA_LONG;</span>
+            }
+        }
+<span class="fc" id="L133">        throw new IllegalArgumentException(&quot;unsupported arithmetic; expected 32 or 64 with wrap or checked, or 0 with exact&quot;);</span>
+    }
+
+    private static Expr term(JsonNode node, int bits) {
+<span class="fc bfc" id="L137" title="All 6 branches covered.">        return switch (text(node, &quot;op&quot;)) {</span>
+            case &quot;index&quot; -&gt; {
+<span class="fc" id="L139">                requireFields(node, INDEX_FIELDS, &quot;index term&quot;);</span>
+<span class="fc" id="L140">                yield VariableExpr.scoped(INDEX);</span>
+            }
+            case &quot;integer&quot; -&gt; {
+<span class="fc" id="L143">                requireFields(node, INTEGER_FIELDS, &quot;integer term&quot;);</span>
+<span class="fc" id="L144">                yield number(node, &quot;value&quot;, bits);</span>
+            }
+<span class="fc" id="L146">            case &quot;add&quot; -&gt; binary(node, bits, BinaryOperator.ADD);</span>
+<span class="fc" id="L147">            case &quot;subtract&quot; -&gt; binary(node, bits, BinaryOperator.SUB);</span>
+<span class="fc" id="L148">            case &quot;multiply&quot; -&gt; binary(node, bits, BinaryOperator.MUL);</span>
+<span class="fc" id="L149">            default -&gt; throw new IllegalArgumentException(&quot;unsupported term operator&quot;);</span>
+        };
+    }
+
+    private static Expr binary(JsonNode node, int bits, BinaryOperator operator) {
+<span class="fc" id="L154">        requireFields(node, BINARY_FIELDS, &quot;binary term&quot;);</span>
+<span class="fc" id="L155">        return new BinaryExpr(term(node.path(&quot;left&quot;), bits), operator, term(node.path(&quot;right&quot;), bits));</span>
+    }
+
+    private static NumberExpr number(JsonNode object, String field, int bits) {
+<span class="fc" id="L159">        var value = integer(object, field);</span>
+<span class="fc bfc" id="L160" title="All 4 branches covered.">        if (bits != 0 &amp;&amp; value.bitLength() &gt;= bits) {</span>
+<span class="fc" id="L161">            throw new IllegalArgumentException(field + &quot; does not fit signed &quot; + bits + &quot;-bit arithmetic&quot;);</span>
+        }
+<span class="fc" id="L163">        return new NumberExpr(ExactRational.integer(value));</span>
+    }
+
+    private static int smallInteger(JsonNode object, String field) {
+<span class="fc" id="L167">        var value = integer(object, field);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (value.bitLength() &gt;= Integer.SIZE) {</span>
+<span class="nc" id="L169">            throw new IllegalArgumentException(field + &quot; is out of range&quot;);</span>
+        }
+<span class="fc" id="L171">        return value.intValue();</span>
+    }
+
+    private static BigInteger integer(JsonNode object, String field) {
+<span class="fc" id="L175">        var value = object.path(field);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (!value.isIntegralNumber()) {</span>
+<span class="fc" id="L177">            throw new IllegalArgumentException(field + &quot; must be a JSON integer&quot;);</span>
+        }
+<span class="fc" id="L179">        return value.bigIntegerValue();</span>
+    }
+
+    private static String text(JsonNode object, String field) {
+<span class="fc" id="L183">        var value = object.path(field);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (!value.isTextual()) {</span>
+<span class="nc" id="L185">            throw new IllegalArgumentException(field + &quot; must be a JSON string&quot;);</span>
+        }
+<span class="fc" id="L187">        return value.textValue();</span>
+    }
+
+    private static void requireFields(JsonNode object, Set&lt;String&gt; fields, String context) {
+<span class="pc bpc" id="L191" title="2 of 6 branches missed.">        if (object == null || !object.isObject() || object.size() != fields.size()</span>
+<span class="fc bfc" id="L192" title="All 4 branches covered.">            || fields.stream().anyMatch(field -&gt; !object.has(field))) {</span>
+<span class="fc" id="L193">            throw new IllegalArgumentException(context + &quot; has missing or unexpected fields; expected a JSON object&quot;);</span>
+        }
+<span class="fc" id="L195">    }</span>
+
+    private static BigInteger constant(Expr expression) {
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        if (expression instanceof NumberExpr number &amp;&amp; number.value().isInteger()) {</span>
+<span class="fc" id="L199">            return number.value().numerator();</span>
+        }
+<span class="nc" id="L201">        throw new IllegalArgumentException(&quot;verified plan contains a nonconstant or noninteger coefficient&quot;);</span>
+    }
+
+    private static int reject(PrintStream error, String reason) {
+<span class="fc" id="L205">        error.println(&quot;PolynomialSumCli: &quot; + reason);</span>
+<span class="fc" id="L206">        return 1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

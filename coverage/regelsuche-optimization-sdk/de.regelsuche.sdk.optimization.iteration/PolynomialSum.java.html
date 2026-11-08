@@ -15,7 +15,7 @@ public record PolynomialSum(SymbolId index, Set&lt;SymbolId&gt; parameters, Expr
 <span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if(parameters.size()&gt;FiniteIteration.MAX_PARAMETERS) throw new IllegalArgumentException(&quot;TOO_MANY_PARAMETERS&quot;);</span>
 <span class="fc" id="L16">        parameters=Set.copyOf(parameters);</span>
 <span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if(parameters.contains(index)) throw new IllegalArgumentException(&quot;COLLIDING_BINDERS&quot;);</span>
-<span class="pc bpc" id="L18" title="2 of 4 branches missed.">        if(stride.signum()==0 || stride.bitLength()&gt;FiniteIteration.MAX_COEFFICIENT_BITS) throw new IllegalArgumentException(&quot;INVALID_STRIDE&quot;);</span>
+<span class="pc bpc" id="L18" title="1 of 4 branches missed.">        if(stride.signum()==0 || stride.bitLength()&gt;FiniteIteration.MAX_COEFFICIENT_BITS) throw new IllegalArgumentException(&quot;INVALID_STRIDE&quot;);</span>
 <span class="fc" id="L19">        var range=new IndexRange(BigInteger.ZERO,stride,BigInteger.ZERO);</span>
 <span class="fc" id="L20">        new FiniteIteration.Sum(range,index,parameters,term,arithmetic);</span>
         // Existing scope validator permits the index in terms; explicitly forbid it in bound/initial.
