@@ -185,3 +185,27 @@ inversion and multiplication counts for a given number of selected rows.
 
 A source adapter must establish the arithmetic contract and preserve the
 evaluation of bindings, row selection, Java effects and exception behavior.
+
+## Ordered tuples and filtered pair windows
+
+`OrderedReduction` binds two to eight row slots in increasing input order.
+Each slot binds the same columns. Adjacent slots can be unrestricted or
+related by an exact interval on their key difference, optionally complemented.
+The summand is an integer polynomial of total degree at most eight in the
+bound values.
+
+`OrderedReductionSdk.search` and `searchWindows` call the shared checked
+search. The plan factors the summand into row monomials and chooses a scalar
+summary, hash index or ordered index according to each restriction.
+For chains, common prefixes share a state and each state is updated only
+after the current row's queries. For pair windows, adding a row queries its
+earlier partners and removing a row queries its later partners.
+The verifier independently reconstructs the polynomial and checks the
+lookup intervals and reversed eviction predicate.
+
+`evaluate` returns one sum. `evaluateWindows` returns one exact sum per
+complete window. Range access compresses keys from the supplied rows and
+uses Fenwick summaries with logarithmic query and update cost. Evaluation
+reports source row reads, Fenwick cell accesses and charged work.
+The Java source adapter must separately prove the arithmetic, effects and
+exception behavior of a program before applying a rewrite.

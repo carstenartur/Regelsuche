@@ -130,8 +130,21 @@ public final class IterationPolynomial {
             allowed.add(column.left());
             allowed.add(column.right());
         }
-        return parse(source.summand(), allowed, true, true, PairReduction.MAX_DEGREE, work, 1, new int[]{0});
+        return parseRowSummand(source.summand(), allowed, work);
     }
+
+    static IterationPolynomial parseRowSummand(Expr summand, Set<SymbolId> allowed, Work work) {
+        return parse(summand, allowed, true, true, PairReduction.MAX_DEGREE, work, 1, new int[]{0});
+    }
+    static IterationPolynomial parseOrderedSummand(OrderedReduction source, Work work) {
+        var allowed = new HashSet<SymbolId>();
+        for (var slot : source.slots()) {
+            work.charge(slot.size());
+            allowed.addAll(slot);
+        }
+        return parseRowSummand(source.summand(), allowed, work);
+    }
+
     private static IterationPolynomial parse(Expr expression, Set<SymbolId> allowed, boolean integers,
             boolean powers, int degree, Work w, int depth, int[] nodes) {
         w.charge(1);

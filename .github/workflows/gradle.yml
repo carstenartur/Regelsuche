@@ -48,6 +48,8 @@ jobs:
           # Resolve only the pinned Playwright CLI. The independent bootstrap
           # avoids configuring and compiling the complete production reactor.
           ./gradlew --no-daemon -p playwright-bootstrap installPlaywrightHostDependencies --console=plain
+      - name: Provision the pinned OSV Scanner
+        run: bash gradle/provision-osv-scanner.sh
       - name: Run the checkout-owned Gradle authority without duplicate JMH or loaded SymPy runtime work
         run: |
           set -o pipefail
@@ -186,6 +188,8 @@ jobs:
           mvn --batch-mode --no-transfer-progress \
             -f playwright-bootstrap/pom.xml \
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
+      - name: Provision the pinned OSV Scanner
+        run: bash gradle/provision-osv-scanner.sh
       - name: Verify the complete Maven product and Docker contract
         run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
       - name: Retain Maven product verification evidence
@@ -283,11 +287,14 @@ jobs:
       - name: Install the pinned Lean and mathlib reference environment
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends elan z3
+          sudo apt-get install -y --no-install-recommends curl z3 zstd
+          lean_bin=$(bash gradle/provision-lean.sh "$RUNNER_TEMP")
+          export PATH="$lean_bin:$GITHUB_WORKSPACE/.ci/lean-proof/transport:$PATH"
           cd .ci/lean-proof
-          lake update
+          MATHLIB_NO_CACHE_ON_UPDATE=1 lake update
           lake exe cache get
           lake env lean --version
+          printf '%s\n' "$lean_bin" >> "$GITHUB_PATH"
       - name: Check native contracts and actual application proof admission
         run: >-
           mvn -B -pl app -am

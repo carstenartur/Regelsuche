@@ -728,8 +728,8 @@
       "post": {
         "tags": ["Analysis"],
         "operationId": "derivePairReduction",
-        "summary": "Einen Ein-Pass-Algorithmus für eine exakte Paarsumme herleiten",
-        "description": "Summiert den symmetrischen ganzzahligen Summanden über alle Paare i < j. An jeden Spaltennamen werden _i und _j angehängt. Die Zeilenanzahl dient dem Arbeitsvergleich. Optionale Beispielzeilen werden separat exakt ausgewertet.",
+        "summary": "Einen geprüften Algorithmus für eine exakte Summenschleife herleiten",
+        "description": "Ohne restrictions wird der symmetrische Summand mit _i und _j über alle Paare summiert. Mit restrictions werden zwei bis acht Zeilenpositionen mit _0, _1 usw. gebunden. Jede Bedingung bezieht sich auf die Differenz der Schlüssel benachbarter Positionen. windowWidth mit genau einer Bedingung liefert eine Summe je vollständigem Fenster. Optionale Beispielzeilen werden separat exakt ausgewertet.",
         "x-regelsuche-context": "/api/pair-reductions",
         "requestBody": {
           "required": true,
@@ -743,6 +743,23 @@
                   "columns": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 24}},
                   "summand": {"type": "string", "minLength": 1, "maxLength": 4096},
                   "rowCount": {"type": "integer", "minimum": 0, "maximum": 1000000000},
+                  "windowWidth": {"type": "integer", "minimum": 1, "maximum": 1000000000, "description": "Benötigt genau eine Bedingung in restrictions"},
+                  "restrictions": {
+                    "type": "array", "minItems": 1, "maxItems": 7,
+                    "items": {
+                      "type": "object", "additionalProperties": false,
+                      "description": "Ein leeres Objekt lässt alle Werte zu. Ansonsten sind left, right und mindestens eine Grenze erforderlich.",
+                      "properties": {
+                        "left": {"type": "string"},
+                        "right": {"type": "string"},
+                        "lower": {"type": "string", "pattern": "^-?[0-9]{1,256}$"},
+                        "upper": {"type": "string", "pattern": "^-?[0-9]{1,256}$"},
+                        "lowerInclusive": {"type": "boolean", "default": true},
+                        "upperInclusive": {"type": "boolean", "default": true},
+                        "complement": {"type": "boolean", "default": false}
+                      }
+                    }
+                  },
                   "rows": {"type": "array", "maxItems": 256, "items": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "string", "pattern": "^-?[0-9]{1,256}$"}}}
                 }
               },
@@ -763,6 +780,10 @@
                     "reason": {"type": "string"},
                     "rowCount": {"type": "integer"},
                     "originalPairs": {"type": "string", "description": "Exakte Anzahl ursprünglicher Paarberechnungen als Dezimaltext"},
+                    "originalCandidates": {"type": "string", "description": "Anzahl der direkten Kandidaten vor dem Filtern im Tupel- oder Fenstermodus"},
+                    "lookups": {"type": "array", "items": {"type": "object"}, "description": "Geprüfter Zugriff je Tupelposition mit Indexart und Bedingung"},
+                    "eviction": {"type": "object", "description": "Geprüfter Zugriff für aus einem Fenster entfernte Zeilen"},
+                    "terms": {"type": "array", "items": {"type": "object"}, "description": "Koeffizient und zeilenlokale Faktoren je Summand"},
                     "expandedSummand": {"type": "string"},
                     "accumulators": {"type": "array", "items": {"type": "object", "required": ["name", "rowProduct"], "properties": {"name": {"type": "string"}, "rowProduct": {"type": "string"}}}},
                     "formula": {"type": "string"},
@@ -770,6 +791,8 @@
                     "synthesisWork": {"type": "integer"},
                     "verificationWork": {"type": "integer"},
                     "sampleRows": {"type": "integer"},
+                    "sampleSums": {"type": "array", "items": {"type": "string"}, "description": "Exakte Summe oder eine Summe je vollständigem Beispielfenster"},
+                    "indexAccesses": {"type": "integer", "description": "Anzahl der berührten Fenwick-Zellen während der Beispielauswertung"},
                     "sampleUnavailable": {"type": "string", "description": "Grund für abgebrochene Beispielauswertung bei weiterhin gültigem Plan"},
                     "sampleResult": {"type": "string", "description": "Exaktes Ergebnis der optionalen Beispielzeilen als Dezimaltext"}
                   }

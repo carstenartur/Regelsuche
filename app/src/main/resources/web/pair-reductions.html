@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Paarberechnungen beschleunigen – Regelsuche</title>
+    <title>Summenschleifen beschleunigen – Regelsuche</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="pair-reductions.css">
     <script defer src="pair-reductions.js"></script>
@@ -11,8 +11,8 @@
 <body class="pair-reduction-page">
 <header><div class="brand">
     <a href="/">← Regelsuche Workbench</a>
-    <h1>Paarberechnungen beschleunigen</h1>
-    <p>Regelsuche leitet aus dem Ausdruck für ein Paar einen Algorithmus mit einem Durchlauf ab.</p>
+    <h1>Summenschleifen beschleunigen</h1>
+    <p>Regelsuche leitet Algorithmen für Paare, geordnete Ketten und gleitende Paarfenster her.</p>
 </div></header>
 <main>
     <form id="pairForm" class="card">
@@ -22,6 +22,15 @@
                     <option value="distance">Quadrierte Abstände</option>
                     <option value="weighted">Gewichtete quadrierte Abstände</option>
                     <option value="product">Summe aller Paarprodukte</option>
+                    <option value="band">Gewichtete Paare mit begrenztem Abstand</option>
+                    <option value="chain">Gewichtete steigende Dreierketten</option>
+                </select>
+            </label>
+            <label class="field"><span>Berechnung</span>
+                <select id="pairMode">
+                    <option value="symmetric">Symmetrische Paarsumme</option>
+                    <option value="ordered">Geordnete Tupel</option>
+                    <option value="windows">Gleitende Paarfenster</option>
                 </select>
             </label>
             <label class="field"><span>Eingabespalten</span>
@@ -31,10 +40,20 @@
                 <input id="pairCount" type="number" min="0" max="1000000000" value="100000" required>
             </label>
         </div>
-        <label class="field"><span>Summand für ein Paar i &lt; j</span>
+        <label class="field"><span>Summand</span>
             <input id="pairSummand" type="text" value="(x_i-x_j)^2" required spellcheck="false" maxlength="4096" aria-describedby="pairSyntax">
         </label>
         <p class="hint" id="pairSyntax">Trenne Spaltennamen durch Kommas. <code>x_i</code> und <code>x_j</code> bezeichnen den Wert der Spalte <code>x</code> in den beiden Zeilen. Erlaubt sind symmetrische Polynome mit ganzzahligen Koeffizienten und Grad bis 8.</p>
+        <p class="hint" id="pairOrderedSyntax" hidden>Die Zeilen eines Tupels haben die Endungen <code>_0</code>, <code>_1</code> und so weiter. Erlaubt sind ganzzahlige Polynome bis Grad 8.</p>
+        <div id="pairRestrictions" hidden>
+            <label class="field"><span>Bedingungen zwischen benachbarten Zeilen eines Tupels</span>
+                <textarea id="pairPredicates" rows="2" maxlength="5000" spellcheck="false" aria-describedby="pairPredicateHint">x - x in (0, 4]</textarea>
+            </label>
+            <p class="hint" id="pairPredicateHint">Eine Bedingung pro Zeile. <code>x - x in (0, 4]</code> verlangt einen Abstand größer als null und höchstens vier. Eine leere Intervallgrenze ist unbeschränkt. <code>nicht in</code> kehrt die Auswahl um. <code>*</code> lässt alle Werte zu.</p>
+            <label class="field" id="pairWidthField" hidden><span>Fensterbreite</span>
+                <input id="pairWidth" type="number" min="1" max="1000000000" value="3" required disabled>
+            </label>
+        </div>
         <label class="field"><span>Beispielwerte zur exakten Auswertung (optional)</span>
             <textarea id="pairRows" rows="3" spellcheck="false" maxlength="28000" aria-describedby="pairRowHint">2
 -1
@@ -66,6 +85,20 @@
         </ol>
         <p id="pairSample" hidden></p>
         <p id="pairWork" class="hint"></p>
+    </section>
+    <section id="pairIndexedResult" class="card" hidden aria-labelledby="pairIndexedTitle">
+        <h2 id="pairIndexedTitle">Geprüfter Algorithmus</h2>
+        <p>Die direkte Aufzählung prüft <strong id="pairIndexedCandidates"></strong> Kandidatentupel.</p>
+        <ol>
+            <li><h3>Summand in Faktoren je Zeile zerlegen</h3><ul id="pairFactors"></ul></li>
+            <li><h3>Passende frühere Beiträge abfragen</h3><ul id="pairLookups"></ul></li>
+            <li><h3>Reihenfolge und Gleichheit prüfen</h3>
+                <p id="pairSchedule"></p>
+                <p>Die Prüfung rekonstruiert den ursprünglichen Summanden aus den Faktoren und gleicht die Abfragegrenzen mit der Eingabe ab.</p>
+            </li>
+        </ol>
+        <p id="pairIndexedSample" hidden></p>
+        <p id="pairIndexedWork" class="hint"></p>
     </section>
 </main>
 </body>
