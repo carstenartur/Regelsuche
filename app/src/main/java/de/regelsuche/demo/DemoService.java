@@ -36,6 +36,7 @@ public final class DemoService {
 
     private final ExpressionGraphStore graphStore;
     private final TransformationEngine engine;
+    private final java.util.Map<String, String> ruleRevisions;
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final de.regelsuche.search.memory.SearchMemory searchMemory;
@@ -55,6 +56,7 @@ public final class DemoService {
     ) {
         this.graphStore = graphStore;
         this.engine = engine;
+        this.ruleRevisions = de.regelsuche.literature.RuleLiteratureCatalog.captureRuleRevisions(engine);
         this.searchMemory = searchMemory;
     }
 
@@ -264,7 +266,8 @@ public final class DemoService {
                 ruleIds.get(i),
                 state.transformations() == null ? List.of() : state.transformations().get(i).assumptions(),
                 state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(
-                    beforeExpr, List.of(state.transformations().get(i)))
+                    beforeExpr, List.of(state.transformations().get(i))),
+                state.transformations() == null ? null : ruleRevisions.get(ruleIds.get(i))
             ));
         }
         return steps;

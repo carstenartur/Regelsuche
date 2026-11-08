@@ -87,6 +87,7 @@ public class WebWorkbenchServer {
     private final PluginRuntimeConfig pluginRuntimeConfig;
     private final de.regelsuche.radar.RuleRadarHttpHandler ruleRadarHandler;
     private final Path representationRunDirectory;
+    private final LiteratureWorkbenchActions literatureActions;
 
     private final TransformationQueryService transformationQuery;
     private final RuleInventoryQueryService inventoryQuery;
@@ -229,6 +230,7 @@ public class WebWorkbenchServer {
         );
         this.representationRunDirectory =
             defaultRepresentationRunDirectory();
+        this.literatureActions = new LiteratureWorkbenchActions(representationRunDirectory, host, this.securityConfig);
     }
 
     private static Path defaultRepresentationRunDirectory() {
@@ -501,7 +503,9 @@ public class WebWorkbenchServer {
     ) throws IOException {
         try {
             String suffix = representationRunSuffix(exchange);
-            if (suffix.contains("/")) {
+            if (suffix.contains("/literature/")) {
+                literatureActions.handle(exchange, suffix);
+            } else if (suffix.contains("/")) {
                 RetainedRunActions.handle(exchange, representationRunDirectory,
                     suffix, securityConfig.maxRequestBytes());
             } else if (!suffix.isEmpty()) {
@@ -948,10 +952,11 @@ public class WebWorkbenchServer {
                 sendStatus(exchange, 404, "path not found");
                 return;
             }
-            sendJson(exchange, 200, replayJson(de.regelsuche.api.PathReplayDto.from(
-                match.get(),
+            var retainedPath = match.get();
+            sendJson(exchange, 200, replayJson(retainedPath, de.regelsuche.api.PathReplayDto.from(
+                retainedPath,
                 explanationService,
-                macroExpansionsFor(match.get())
+                macroExpansionsFor(retainedPath)
             )));
             return;
         }
@@ -1156,31 +1161,60 @@ public class WebWorkbenchServer {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private String replayJson(de.regelsuche.api.PathReplayDto dto) {
+    private String replayJson(DiscoveredTransformation path, de.regelsuche.api.PathReplayDto dto) {
+        var bibliography = exportService.literatureCatalog().numbering();
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("pathId", dto.pathId());
         writer.property("alignedDerivationLatex", dto.alignedDerivationLatex());
         writer.property("alignedDerivationLatexWithDiff", dto.alignedDerivationLatexWithDiff());
         MathLayoutJsonWriter.write(writer, "derivationLayout", dto.derivationLayout());
-        writer.array("steps", w -> dto.steps().forEach(step ->
-            w.objectValue(inner -> {
-                inner.property("stepIndex", step.stepIndex());
-                inner.property("fromExpression", step.fromExpression());
-                inner.property("fromLatex", step.fromLatex());
-                inner.property("toExpression", step.toExpression());
-                inner.property("toLatex", step.toLatex());
-                inner.property("ruleId", step.ruleId());
-                de.regelsuche.transform.RecordedExecution.writeOptional(inner, step.execution());
-                inner.property("ruleExplanation", step.ruleExplanation());
-                inner.property("scoreDelta", step.scoreDelta());
-                inner.property("equivalencePreserving", step.equivalencePreserving());
-                inner.property("comparatorFlipped", step.comparatorFlipped());
-                writeReplaySpanArray(inner, "changedFromSpans", step.changedFromSpans());
-                writeReplaySpanArray(inner, "changedToSpans", step.changedToSpans());
-                writeReplayMacroExpansion(inner, step.macroMoveExpansion());
-                MathLayoutJsonWriter.write(inner, "layout", step.layout());
-            })));
+        writer.array("steps", w -> {
+            for (int i = 0; i < dto.steps().size(); i++) {
+                var step = dto.steps().get(i);
+                var retainedStep = path.steps().get(i);
+                var citations = bibliography.forStep(path, retainedStep);
+                w.objectValue(inner -> {
+                    inner.property("stepIndex", step.stepIndex());
+                    inner.property("fromExpression", step.fromExpression());
+                    inner.property("fromLatex", step.fromLatex());
+                    inner.property("toExpression", step.toExpression());
+                    inner.property("toLatex", step.toLatex());
+                    inner.property("ruleId", step.ruleId());
+                    if (retainedStep.ruleRevision() != null) inner.property("ruleRevision", retainedStep.ruleRevision());
+                    inner.property("literatureOccurrence", de.regelsuche.literature.RuleLiteratureCatalog.occurrence(path, retainedStep));
+                    if (!citations.isEmpty()) {
+                        inner.array("citations", array -> citations.forEach(citation -> array.objectValue(item -> item
+                            .property("number", citation.number()).property("role", citation.role().name())
+                            .property("label", citation.role().label()).property("relation", citation.relation().name())
+                            .property("relationLabel", citation.relation().label())
+                            .stringArray("assumptions", citation.assumptions()).property("rationale", citation.rationale()))));
+                    }
+                    de.regelsuche.transform.RecordedExecution.writeOptional(inner, step.execution());
+                    inner.property("ruleExplanation", step.ruleExplanation());
+                    inner.property("scoreDelta", step.scoreDelta());
+                    inner.property("equivalencePreserving", step.equivalencePreserving());
+                    inner.property("comparatorFlipped", step.comparatorFlipped());
+                    writeReplaySpanArray(inner, "changedFromSpans", step.changedFromSpans());
+                    writeReplaySpanArray(inner, "changedToSpans", step.changedToSpans());
+                    writeReplayMacroExpansion(inner, step.macroMoveExpansion());
+                    MathLayoutJsonWriter.write(inner, "layout", step.layout());
+                });
+            }
+        });
+        var sources = bibliography.bibliography();
+        if (!sources.isEmpty()) {
+            writer.array("sources", array -> {
+                for (int i = 0; i < sources.size(); i++) {
+                    var source = sources.get(i);
+                    int number = i + 1;
+                    array.objectValue(item -> item.property("number", number).property("id", source.id())
+                        .property("description", source.description()).property("url", source.url())
+                        .property("identifier", source.identifier()).property("version", source.version())
+                        .property("locator", source.locator()));
+                }
+            });
+        }
         writer.endObject();
         return writer.toString();
     }
@@ -1725,7 +1759,7 @@ public class WebWorkbenchServer {
         if (match.isEmpty()) {
             return null;
         }
-        return new de.regelsuche.export.AstLatexRenderer().renderPath(match.get());
+        return exportService.exportLatex(List.of(match.get()));
     }
 
     private String renderIdentityMarkdown(String identityId) {

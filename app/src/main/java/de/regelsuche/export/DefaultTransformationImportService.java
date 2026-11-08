@@ -75,7 +75,8 @@ public class DefaultTransformationImportService implements TransformationImportS
             booleanValue(values.get("equivalencePreserving"), true),
             stringValue(values.get("explanation"), ""),
             stringList(values.get("assumptions")),
-            de.regelsuche.transform.RecordedExecution.readOptional(values)
+            de.regelsuche.transform.RecordedExecution.readOptional(values),
+            stringValue(values.get("ruleRevision"), null)
         );
     }
 

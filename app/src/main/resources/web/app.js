@@ -1572,7 +1572,7 @@
     }
 
     /* ─── Replay tab ─── */
-    let replayState = { steps: [], index: 0, timer: null, alignedDerivationLatex: '', derivationLayout: null };
+    let replayState = { steps: [], sources: [], index: 0, timer: null, alignedDerivationLatex: '', derivationLayout: null };
     if ($('replayLoad')) {
         $('replayLoad').addEventListener('click', loadReplay);
         $('replayPrev').addEventListener('click', () => { stopReplay(); stepReplay(-1); });
@@ -1623,6 +1623,7 @@
             const response = await fetch('/api/paths/' + encodeURIComponent(pathId) + '/replay');
             const data = await response.json();
             replayState.steps = data.steps || [];
+            replayState.sources = data.sources || [];
             replayState.alignedDerivationLatex = data.alignedDerivationLatex || '';
             replayState.alignedDerivationLatexWithDiff = data.alignedDerivationLatexWithDiff || '';
             replayState.derivationLayout = data.derivationLayout || null;
@@ -1678,8 +1679,40 @@
         if (toHost) {
             window.renderMathLayout(step.layout, toHost);
         }
+        renderReplaySources(canvas, step.citations || [], replayState.sources);
         window.renderMath(canvas);
         window.__regelsucheReplayReady = true;
+    }
+
+    function renderReplaySources(canvas, citations, sources) {
+        if (!sources.length) return;
+        const append = (parent, tag, value) => {
+            const node = document.createElement(tag);
+            node.textContent = value;
+            parent.appendChild(node);
+            return node;
+        };
+        if (citations.length) {
+            const list = append(canvas.querySelector('.replay-step'), 'ul', '');
+            list.className = 'replay-step-citations';
+            citations.forEach(citation => {
+                const assumptions = citation.assumptions.length ? ' · Voraussetzungen ' + citation.assumptions.join(', ') : '';
+                append(list, 'li', citation.label + ' [' + citation.number + '] (' + citation.relationLabel + ')'
+                    + assumptions + ' · ' + citation.rationale);
+            });
+        }
+        const list = append(canvas, 'details', '');
+        list.className = 'replay-sources';
+        append(list, 'summary', 'Quellen der Herleitung');
+        const entries = append(list, 'ol', '');
+        sources.forEach(source => {
+            const item = append(entries, 'li', source.description + ' ');
+            if (typeof source.url === 'string' && /^https:\/\//i.test(source.url)) {
+                const link = append(item, 'a', 'Fundstelle');
+                link.href = source.url;
+                link.rel = 'noreferrer';
+            }
+        });
     }
 
     function renderReplayMetrics() {

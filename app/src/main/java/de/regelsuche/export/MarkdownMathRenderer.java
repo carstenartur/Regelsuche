@@ -2,8 +2,10 @@ package de.regelsuche.export;
 
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.literature.RuleLiteratureCatalog;
 import de.regelsuche.scoring.ExpressionScore;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -20,9 +22,16 @@ public class MarkdownMathRenderer implements MathRenderer {
 
     @Override
     public String renderPath(DiscoveredTransformation path) {
+        return renderPath(path, RuleLiteratureCatalog.empty().numbering());
+    }
+
+    String renderPath(DiscoveredTransformation path, RuleLiteratureCatalog.Numbering numbering) {
         String numberedSteps = IntStream.range(0, path.steps().size())
-            .mapToObj(i -> (i + 1) + ". `" + renderStep(path.steps().get(i)) + "` _(Regel: "
-                + path.steps().get(i).ruleId() + ")_")
+            .mapToObj(i -> {
+                TransformationStep step = path.steps().get(i);
+                return (i + 1) + ". `" + renderStep(step) + "` _(Regel: " + step.ruleId() + ")_"
+                    + LiteratureExport.markdownCitations(numbering.forStep(path, step));
+            })
             .collect(Collectors.joining("\n"));
         return "### Gefundene Umformung: " + path.originalExpression() + " → " + path.improvedExpression() + "\n\n"
             + "#### Ausgang\n"
@@ -35,7 +44,8 @@ public class MarkdownMathRenderer implements MathRenderer {
             + path.validationStatus();
     }
 
-    static String renderDocument(List<DiscoveredTransformation> transformations, MathRenderer renderer) {
+    static String renderDocument(List<DiscoveredTransformation> transformations,
+            Function<DiscoveredTransformation, String> renderPath) {
         StringBuilder builder = new StringBuilder("# Gefundene Umformungen\n\n");
         if (!transformations.isEmpty()) {
             builder.append("## Inhaltsverzeichnis\n\n");
@@ -54,7 +64,7 @@ public class MarkdownMathRenderer implements MathRenderer {
             builder.append("## ").append(i + 1).append(". ")
                 .append(transformation.originalExpression()).append(" → ")
                 .append(transformation.improvedExpression()).append("\n\n");
-            builder.append(renderer.renderPath(transformation));
+            builder.append(renderPath.apply(transformation));
             builder.append("\n\n");
         }
         return builder.toString();

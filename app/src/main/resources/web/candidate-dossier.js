@@ -1,4 +1,4 @@
-/* Bounded dossier renderer. All evidence comes from the active retained run. */
+/* Bounded dossier renderer and operator actions bound to the active retained run. */
 (() => {
     'use strict';
     const api = window.RegelsucheCandidateDossierState;
@@ -31,6 +31,162 @@
         return node;
     }
     const fact = value => value ? 'TRUE' : 'FALSE';
+
+    function renderLiterature(parent, runId, candidateId) {
+        const panel = text('details', undefined, parent);
+        panel.className = 'candidate-literature';
+        text('summary', 'Private Literaturprüfung', panel);
+        const status = text('p', undefined, panel);
+        status.setAttribute('role', 'status');
+        const view = text('div', undefined, panel);
+        const url = '/api/discovery-runs/' + runId.slice(7) + '/literature/' + candidateId.slice(7);
+        const labels = {
+            PRIOR_ART_FOUND: 'Bekannte Vorarbeit gefunden',
+            NO_PRIOR_ART_FOUND_WITHIN_SCOPE: 'Im dokumentierten Umfang keine Vorarbeit gefunden',
+            UNRESOLVED: 'Literaturprüfung offen',
+            SUCCESS: 'Abruf abgeschlossen',
+            RATE_LIMITED: 'Abruf begrenzt',
+            FAILED: 'Abruf fehlgeschlagen'
+        };
+        const relations = {
+            EXACT: 'gleiche Aussage',
+            EQUIVALENT: 'äquivalent',
+            SOURCE_SPECIAL_CASE: 'Quelle ist ein Spezialfall',
+            SOURCE_GENERALIZATION: 'Quelle ist eine Verallgemeinerung',
+            RELATED: 'verwandt'
+        };
+        let opened = false;
+        let busy = false;
+
+        async function request(method, body) {
+            const response = await fetch(url, {
+                method, body, cache: 'no-store',
+                headers: {'X-Regelsuche-Literature': 'workbench', 'Content-Type': 'application/json'}
+            });
+            const value = await response.json();
+            if (!response.ok && !value.result) {
+                throw new Error(response.status === 403 ? 'Aktion im privaten Arbeitsbereich nicht freigegeben' : (value.code || response.status));
+            }
+            return value;
+        }
+
+        function sourceLink(parent, label, href) {
+            if (typeof href === 'string' && /^https?:\/\//i.test(href)) {
+                const link = text('a', label, parent);
+                link.href = href;
+                link.rel = 'noreferrer';
+            } else {
+                text('span', label, parent);
+            }
+        }
+
+        async function refresh() {
+            const data = await request('GET');
+            if (!panel.isConnected) return;
+            view.replaceChildren();
+            text('h4', 'Geprüfte Literaturbezüge', view);
+            if (!data.assessments.length) text('p', 'Literaturstand ungeprüft.', view);
+            data.assessments.forEach(assessment => {
+                const detail = text('details', undefined, view);
+                text('summary', labels[assessment.status] + ' · ' + assessment.reviewedOn, detail);
+                text('p', 'Geprüft durch ' + assessment.reviewedBy, detail);
+                assessment.scope.forEach(scope => text('p', scope.source + ' · ' + scope.versionOrDate, detail));
+                assessment.matches.forEach(match => {
+                    const row = text('p', undefined, detail);
+                    sourceLink(row, match.source.title + ' · ' + match.source.locator, match.source.url);
+                    text('span', ' · ' + relations[match.relation] + ' · ' + match.rationale, row);
+                    if (match.assumptions.length) text('p', 'Voraussetzungen · ' + match.assumptions.join(', '), detail);
+                    if (match.entailmentRationale) text('p', match.entailmentRationale, detail);
+                });
+            });
+            const template = text('button', 'Bewertungsvorlage herunterladen', view);
+            template.type = 'button';
+            template.addEventListener('click', () => {
+                const templateData = {
+                    schema: 'regelsuche.literature-assessment/v1', subject: data.subject, reviewedOn: '',
+                    reviewedBy: '', scope: [{source: '', versionOrDate: ''}], queries: [''], status: 'UNRESOLVED', matches: []
+                };
+                const blob = new Blob([JSON.stringify(templateData, null, 2) + '\n'], {type: 'application/json'});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'literaturbewertung.json';
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            });
+            const label = text('label', ' Bewertung importieren ', view);
+            const upload = text('input', undefined, label);
+            upload.type = 'file';
+            upload.accept = '.json,application/json';
+            upload.addEventListener('change', async () => {
+                const file = upload.files[0];
+                if (!file || busy || !panel.isConnected) return;
+                if (file.size > 128 * 1024) { status.textContent = 'Die Bewertung überschreitet 128 KiB.'; return; }
+                busy = true;
+                upload.disabled = true;
+                try {
+                    await request('PUT', await file.text());
+                    await refresh();
+                    status.textContent = 'Literaturbewertung gespeichert.';
+                } catch (error) { status.textContent = 'Import fehlgeschlagen · ' + error.message; }
+                finally { busy = false; upload.disabled = false; }
+            });
+
+            text('h4', 'TheoremSearch', view);
+            if (!data.onlineEnabled) {
+                text('p', 'Der externe Abruf ist serverseitig ausgeschaltet.', view);
+            } else {
+                text('p', 'TheoremSearch protokolliert den abgesendeten Suchtext. Die Anfrage wird erst nach deiner Bestätigung gesendet.', view);
+                const field = text('label', 'Suchtext für TheoremSearch ', view);
+                const query = text('textarea', undefined, field);
+                query.maxLength = data.maxQueryChars;
+                const prepare = text('button', 'Anfrage prüfen', view);
+                prepare.type = 'button';
+                const confirmation = text('div', undefined, view);
+                query.addEventListener('input', () => confirmation.replaceChildren());
+                prepare.addEventListener('click', () => {
+                    if (busy || !query.value.trim()) return;
+                    const exact = query.value;
+                    confirmation.replaceChildren();
+                    text('p', 'Dieser Text wird an ' + data.endpoint + ' übertragen.', confirmation);
+                    text('pre', exact, confirmation);
+                    const submit = text('button', 'An TheoremSearch senden', confirmation);
+                    submit.type = 'button';
+                    submit.addEventListener('click', async () => {
+                        if (busy || !panel.isConnected || query.value !== exact) return;
+                        busy = true;
+                        submit.disabled = query.disabled = prepare.disabled = true;
+                        try {
+                            const receipt = await request('POST', JSON.stringify({query: exact, confirmed: true}));
+                            await refresh();
+                            status.textContent = labels[receipt.result.status]
+                                + (receipt.result.retryAfterSeconds ? ' · Wartezeit ' + receipt.result.retryAfterSeconds + ' s' : '');
+                        } catch (error) { status.textContent = 'Abruf fehlgeschlagen · ' + error.message; }
+                        finally { busy = false; submit.disabled = query.disabled = prepare.disabled = false; }
+                    });
+                });
+            }
+            data.receipts.forEach(receipt => {
+                const detail = text('details', undefined, view);
+                const result = receipt.result;
+                text('summary', receipt.startedAt + ' · ' + (result ? labels[result.status] : 'Abruf ohne gespeicherten Abschluss'), detail);
+                text('pre', receipt.query, detail);
+                if (!result || result.status !== 'SUCCESS') return;
+                text('p', 'Ungeprüfte Treffer · ' + result.hits.length, detail);
+                result.hits.forEach(hit => {
+                    const row = text('p', undefined, detail);
+                    sourceLink(row, [hit.name, hit.title, hit.source].filter(Boolean).join(' · '), hit.link);
+                });
+            });
+        }
+        panel.addEventListener('toggle', () => {
+            if (!panel.open || opened) return;
+            opened = true;
+            refresh().catch(error => {
+                status.textContent = 'Literaturprüfung nicht verfügbar · ' + error.message;
+                opened = false;
+            });
+        });
+    }
 
     function renderNative(parent, run, artifact, selected, select, edge) {
         const data = artifact.content, candidate = selected.candidate, state = selected.observation;
@@ -283,6 +439,9 @@
                 });
             });
             renderDossier(host, active.workspace, state.artifact, selected, select, active.edge || '');
+            if (native ? selected.candidate.generationSequences.length : selected.bridge) {
+                renderLiterature(host.querySelector('#candidateDossierDetail'), active.workspace.runId, candidateId);
+            }
         }
         return Object.freeze({
             clear: () => { host = active = workspace = null; store.clear(); },

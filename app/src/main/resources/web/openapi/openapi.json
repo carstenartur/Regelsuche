@@ -978,6 +978,57 @@
         }
       }
     },
+    "/api/discovery-runs/{runDigest}/literature/{candidateDigest}": {
+      "parameters": [
+        {"name": "runDigest", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+        {"name": "candidateDigest", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+        {"name": "X-Regelsuche-Literature", "in": "header", "required": true, "schema": {"type": "string", "const": "workbench"}}
+      ],
+      "get": {
+        "tags": ["Discovery Runs"],
+        "operationId": "readCandidateLiterature",
+        "summary": "Private Literaturprüfung zum gespeicherten Kandidaten lesen",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "responses": {
+          "200": {"description": "Kandidatenbindung, Freigabe des Dienstes, Abrufprotokolle und getrennte manuelle Bewertungen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
+          "403": {"description": "Lokale oder authentifizierte Workbench erforderlich"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      },
+      "post": {
+        "tags": ["Discovery Runs"],
+        "operationId": "searchCandidateLiteratureManually",
+        "summary": "Bestätigte Anfrage einmalig an TheoremSearch senden",
+        "description": "Erfordert serverseitige Freigabe. Nur query und die feste Ergebnisgrenze werden übertragen. Ein privates Protokoll hält die Kandidatenbindung und die Antwort getrennt von der fachlichen Bewertung fest.",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": false, "required": ["query", "confirmed"], "properties": {"query": {"type": "string", "minLength": 1, "maxLength": 500}, "confirmed": {"type": "boolean", "const": true}}}}}},
+        "responses": {
+          "201": {"description": "Protokoll des Abrufs mit ungeprüften Treffern", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
+          "403": {"description": "Private Workbench, serverseitige Freigabe und Bestätigung erforderlich"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"},
+          "429": {"description": "Anfragebudget, aktiver Abruf oder Wartefrist"},
+          "502": {"description": "Abruf ohne verwertbare Antwort"}
+        }
+      },
+      "put": {
+        "tags": ["Discovery Runs"],
+        "operationId": "retainCandidateLiteratureAssessment",
+        "summary": "Manuelle Literaturbewertung lokal ablegen",
+        "description": "Importiert eine Bewertung im Schema regelsuche.literature-assessment/v1. Die Identitäten von Run, Kandidat und gebundenem Artefakt müssen übereinstimmen.",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+        "responses": {
+          "201": {"description": "Gebundene Literaturbewertung", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
+          "403": {"description": "Lokale oder authentifizierte Workbench erforderlich"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"}
+        }
+      }
+    },
     "/api/discovery-runs/{runDigest}/duplicate": {
       "post": {
         "tags": ["Discovery Runs"],

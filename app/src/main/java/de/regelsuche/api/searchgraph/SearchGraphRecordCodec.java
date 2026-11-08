@@ -179,6 +179,7 @@ public final class SearchGraphRecordCodec {
         writer.property("explanation", step.explanation());
         if (!step.assumptions().isEmpty()) writer.stringArray("assumptions", step.assumptions());
         de.regelsuche.transform.RecordedExecution.writeOptional(writer, step.execution());
+        if (step.ruleRevision() != null) writer.property("ruleRevision", step.ruleRevision());
     }
 
     /**
@@ -371,7 +372,8 @@ public final class SearchGraphRecordCodec {
                 RewriteKind.valueOf(stringValue(step.get("ruleKind"), RewriteKind.NORMALIZE.name())),
                 intValue(step.get("scoreBefore"), 0), intValue(step.get("scoreAfter"), 0),
                 booleanValue(step.get("equivalencePreserving"), true), stringValue(step.get("explanation"), ""),
-                stringList(step.get("assumptions")), de.regelsuche.transform.RecordedExecution.readOptional(step))).toList();
+                stringList(step.get("assumptions")), de.regelsuche.transform.RecordedExecution.readOptional(step),
+                stringValue(step.get("ruleRevision"), null))).toList();
         return new MacroMoveExpansion(stringValue(values.get("macroRuleId"), ""),
             stringValue(values.get("fromExpression"), ""), stringValue(values.get("toExpression"), ""),
             steps, stringList(values.get("supportingPathIds")), stringList(values.get("assumptions")),
