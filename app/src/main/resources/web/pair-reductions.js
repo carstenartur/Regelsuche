@@ -44,6 +44,8 @@ function syncMode() {
     element('pairWidth').disabled = mode !== 'windows';
     element('pairSyntax').hidden = mode !== 'symmetric';
     element('pairOrderedSyntax').hidden = mode === 'symmetric';
+    element('pairSummand').setAttribute(
+        'aria-describedby', mode === 'symmetric' ? 'pairSyntax' : 'pairOrderedSyntax');
 }
 
 form.addEventListener('input', clearResult);
