@@ -165,3 +165,23 @@ and reduced arithmetic-operation counts.
 The SDK `FiniteIterationOptimizer` and `FiniteIterationVerifier` expose the
 same bounded mathematical procedures as separate synthesis and proof calls.
 Each call uses its own supplied work budget and cancellation token.
+
+## Fixed-power and field inversion schedules
+
+`FieldInversionReduction` describes a product or a per-element output of
+pure multiplicative factors. Binding numbers name values and factor positions
+distinguish repeated uses. Each factor declares whether the value varies
+over the selected rows. A fixed positive power preserves products, including
+those containing zero. A nonzero inverse has the same law over the
+commutative multiplicative group of units.
+
+`FieldInversionSdk.search` uses the shared move frontier. For products, the
+plan accumulates factors under the same inversion before applying it. For
+per-element output, it groups invariant inversions outside the repeated
+calculation and preserves each varying inversion. The verifier replays the
+source partition, checks the invariant bindings and requires a nonempty
+domain before computing the grouped inverse. The verified plan reports
+inversion and multiplication counts for a given number of selected rows.
+
+A source adapter must establish the arithmetic contract and preserve the
+evaluation of bindings, row selection, Java effects and exception behavior.
