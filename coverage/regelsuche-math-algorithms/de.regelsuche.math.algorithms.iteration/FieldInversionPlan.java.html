@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FieldInversionPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">FieldInversionPlan.java</span></div><h1>FieldInversionPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.FieldInversionReduction;
+import de.regelsuche.ast.iteration.FieldInversionReduction.Kind;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.LongConsumer;
+
+/**
+ * Factor positions for a checked inversion schedule. Product plans combine the
+ * grouped factors over the selected rows before inversion. Elementwise plans
+ * combine invariant factors once and apply the result to each selected row.
+ */
+public record FieldInversionPlan(Kind kind, List&lt;Integer&gt; ordinaryFactors, List&lt;Integer&gt; groupedInverses,
+        List&lt;Integer&gt; rowInverses, boolean requiresNonempty) {
+<span class="fc" id="L19">    public FieldInversionPlan {</span>
+<span class="fc" id="L20">        Objects.requireNonNull(kind);</span>
+<span class="fc" id="L21">        long total = (long) ordinaryFactors.size() + groupedInverses.size() + rowInverses.size();</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (total &gt; FieldInversionReduction.MAX_FACTORS) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;FIELD_FACTOR_LIMIT&quot;);</span>
+        }
+<span class="fc" id="L25">        ordinaryFactors = List.copyOf(ordinaryFactors);</span>
+<span class="fc" id="L26">        groupedInverses = List.copyOf(groupedInverses);</span>
+<span class="fc" id="L27">        rowInverses = List.copyOf(rowInverses);</span>
+<span class="fc" id="L28">    }</span>
+
+    static Optional&lt;FieldInversionPlan&gt; derive(FieldInversionReduction source, LongConsumer charge) {
+<span class="fc" id="L31">        var ordinary = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L32">        var grouped = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L33">        var perRow = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (int i = 0; i &lt; source.factors().size(); i++) {</span>
+<span class="fc" id="L35">            charge.accept(1);</span>
+<span class="fc" id="L36">            var factor = source.factors().get(i);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (!factor.inverted()) ordinary.add(i);</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">            else if (source.kind() == Kind.PRODUCT || factor.invariant()) grouped.add(i);</span>
+<span class="fc" id="L39">            else perRow.add(i);</span>
+        }
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (grouped.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L42">        return Optional.of(new FieldInversionPlan(source.kind(), ordinary, grouped, perRow, true));</span>
+    }
+
+    /**
+     * Replay the factor partition against the source. In a commutative monoid,
+     * a fixed positive power preserves products, even with a zero factor.
+     * Inversion has the same law on a commutative group of units.
+     */
+    static Optional&lt;Verified&gt; check(FieldInversionReduction source, FieldInversionPlan candidate, LongConsumer charge) {
+<span class="fc" id="L51">        charge.accept(1);</span>
+<span class="pc bpc" id="L52" title="2 of 6 branches missed.">        if (candidate.kind() != source.kind() || !candidate.requiresNonempty() || candidate.groupedInverses().isEmpty()) {</span>
+<span class="fc" id="L53">            return Optional.empty();</span>
+        }
+<span class="fc" id="L55">        var seen = new boolean[source.factors().size()];</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!checkPositions(source, candidate.ordinaryFactors(), seen, Role.ORDINARY, charge)</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                || !checkPositions(source, candidate.groupedInverses(), seen, Role.GROUPED, charge)</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                || !checkPositions(source, candidate.rowInverses(), seen, Role.ROW, charge)) {</span>
+<span class="fc" id="L59">            return Optional.empty();</span>
+        }
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (boolean factorSeen : seen) {</span>
+<span class="fc" id="L62">            charge.accept(1);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (!factorSeen) return Optional.empty();</span>
+        }
+<span class="fc" id="L65">        return Optional.of(new Verified(source, candidate));</span>
+    }
+
+<span class="fc" id="L68">    private enum Role { ORDINARY, GROUPED, ROW }</span>
+
+    private static boolean checkPositions(FieldInversionReduction source, List&lt;Integer&gt; positions, boolean[] seen,
+            Role role, LongConsumer charge) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (int position : positions) {</span>
+<span class="fc" id="L73">            charge.accept(1);</span>
+<span class="pc bpc" id="L74" title="2 of 6 branches missed.">            if (position &lt; 0 || position &gt;= seen.length || seen[position]) return false;</span>
+<span class="fc" id="L75">            var factor = source.factors().get(position);</span>
+<span class="fc bfc" id="L76" title="All 3 branches covered.">            boolean admitted = switch (role) {</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                case ORDINARY -&gt; !factor.inverted();</span>
+<span class="pc bpc" id="L78" title="1 of 6 branches missed.">                case GROUPED -&gt; factor.inverted() &amp;&amp; (source.kind() == Kind.PRODUCT || factor.invariant());</span>
+<span class="pc bpc" id="L79" title="3 of 6 branches missed.">                case ROW -&gt; factor.inverted() &amp;&amp; source.kind() == Kind.PER_ELEMENT &amp;&amp; !factor.invariant();</span>
+            };
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (!admitted) return false;</span>
+<span class="fc" id="L82">            seen[position] = true;</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        return true;</span>
+    }
+
+<span class="fc" id="L87">    public record Cost(BigInteger originalInversions, BigInteger plannedInversions,</span>
+            BigInteger originalMultiplications, BigInteger plannedMultiplications) {}
+
+    /** A plan replayed for the exact source and inversion contract. */
+    public static final class Verified {
+        private final FieldInversionReduction source;
+        private final FieldInversionPlan plan;
+
+<span class="fc" id="L95">        private Verified(FieldInversionReduction source, FieldInversionPlan plan) {</span>
+<span class="fc" id="L96">            this.source = source;</span>
+<span class="fc" id="L97">            this.plan = plan;</span>
+<span class="fc" id="L98">        }</span>
+
+<span class="nc" id="L100">        public FieldInversionReduction source() { return source; }</span>
+<span class="fc" id="L101">        public FieldInversionPlan plan() { return plan; }</span>
+
+        /** Multiplication counts exclude the internal work of the inversion primitive. */
+        public Cost cost(long selectedRows) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (selectedRows &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_ROW_COUNT&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (selectedRows == 0) {</span>
+<span class="fc" id="L107">                return new Cost(BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO, BigInteger.ZERO);</span>
+            }
+<span class="fc" id="L109">            var rows = BigInteger.valueOf(selectedRows);</span>
+<span class="fc" id="L110">            int grouped = plan.groupedInverses().size();</span>
+<span class="fc" id="L111">            int rowInverses = plan.rowInverses().size();</span>
+<span class="fc" id="L112">            int factors = source.factors().size();</span>
+<span class="fc" id="L113">            var originalInversions = rows.multiply(BigInteger.valueOf(grouped + rowInverses));</span>
+<span class="fc" id="L114">            var plannedInversions = BigInteger.ONE.add(rows.multiply(BigInteger.valueOf(rowInverses)));</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (source.kind() == Kind.PRODUCT) {</span>
+<span class="fc" id="L116">                var products = rows.multiply(BigInteger.valueOf(factors));</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                var combine = plan.ordinaryFactors().isEmpty() ? BigInteger.ZERO : BigInteger.ONE;</span>
+<span class="fc" id="L118">                return new Cost(originalInversions, plannedInversions, products, products.add(combine));</span>
+            }
+<span class="fc" id="L120">            var originalProducts = rows.multiply(BigInteger.valueOf(factors - 1L));</span>
+<span class="fc" id="L121">            var plannedProducts = rows.multiply(BigInteger.valueOf(factors - grouped))</span>
+<span class="fc" id="L122">                .add(BigInteger.valueOf(grouped - 1L));</span>
+<span class="fc" id="L123">            return new Cost(originalInversions, plannedInversions, originalProducts, plannedProducts);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
