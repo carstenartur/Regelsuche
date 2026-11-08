@@ -5,6 +5,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.ast.iteration.FieldInversionBatch;
 import de.regelsuche.ast.iteration.FieldInversionReduction;
 import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.ast.iteration.IndexRange;
@@ -91,6 +92,15 @@ public final class JavaOptimization {
                 || !cost.plannedInversions().equals(BigInteger.ONE)
                 || !FieldInversionSdk.verify(source, checked.plan(), budget, token).verified().isPresent()) {
             throw new AssertionError("checked field inversion scheduling unavailable in standalone SDK");
+        }
+        var batch = new FieldInversionBatch(3);
+        var batchBudget = new OptimizationBudget(1000, 2, 1, 5000);
+        var result = FieldInversionSdk.searchBatch(batch, batchBudget, token);
+        var scheduled = result.verified().orElseThrow(() -> new AssertionError(result.reason()));
+        if (scheduled.originalInversions() != 3 || scheduled.plannedInversions() != 1
+                || scheduled.plannedMultiplications() != 6
+                || FieldInversionSdk.verifyBatch(batch, scheduled.plan(), batchBudget, token).verified().isEmpty()) {
+            throw new AssertionError("checked inversion batch unavailable in standalone SDK");
         }
     }
 
