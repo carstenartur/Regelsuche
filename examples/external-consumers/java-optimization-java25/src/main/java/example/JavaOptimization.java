@@ -5,6 +5,8 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.ast.iteration.FieldInversionBatch;
+import de.regelsuche.ast.iteration.FieldInversionReduction;
 import de.regelsuche.ast.iteration.FiniteIteration;
 import de.regelsuche.ast.iteration.IndexRange;
 import de.regelsuche.ast.iteration.IntegerArithmetic;
@@ -12,6 +14,7 @@ import de.regelsuche.ast.iteration.OrderedReduction;
 import de.regelsuche.ast.iteration.PairReduction;
 import de.regelsuche.search.program.JointComputationPlan;
 import de.regelsuche.sdk.optimization.*;
+import de.regelsuche.sdk.optimization.iteration.FieldInversionSdk;
 import de.regelsuche.sdk.optimization.iteration.FiniteIterationOptimizer;
 import de.regelsuche.sdk.optimization.iteration.FiniteIterationVerifier;
 import de.regelsuche.sdk.optimization.iteration.OrderedReductionSdk;
@@ -77,7 +80,34 @@ public final class JavaOptimization {
         verifyRuntimeSeries();
         verifyPairReduction();
         verifyOrderedReduction();
+        verifyFieldInversions();
     }
+    private static void verifyFieldInversions() {
+        var source = new FieldInversionReduction(FieldInversionReduction.Kind.PRODUCT,
+            new FieldInversionReduction.FixedPower(254),
+            List.of(new FieldInversionReduction.Factor(0, false, false),
+                new FieldInversionReduction.Factor(1, false, true)));
+        var budget = OptimizationBudget.DEFAULT;
+        var token = CancellationToken.NONE;
+        var search = FieldInversionSdk.search(source, budget, token);
+        var checked = search.verified().orElseThrow(() -> new AssertionError(search.reason()));
+        var cost = checked.cost(127);
+        if (!cost.originalInversions().equals(BigInteger.valueOf(127))
+                || !cost.plannedInversions().equals(BigInteger.ONE)
+                || !FieldInversionSdk.verify(source, checked.plan(), budget, token).verified().isPresent()) {
+            throw new AssertionError("checked field inversion scheduling unavailable in standalone SDK");
+        }
+        var batch = new FieldInversionBatch(3);
+        var batchBudget = new OptimizationBudget(1000, 2, 1, 5000);
+        var result = FieldInversionSdk.searchBatch(batch, batchBudget, token);
+        var scheduled = result.verified().orElseThrow(() -> new AssertionError(result.reason()));
+        if (scheduled.originalInversions() != 3 || scheduled.plannedInversions() != 1
+                || scheduled.plannedMultiplications() != 6
+                || FieldInversionSdk.verifyBatch(batch, scheduled.plan(), batchBudget, token).verified().isEmpty()) {
+            throw new AssertionError("checked inversion batch unavailable in standalone SDK");
+        }
+    }
+
     private static void verifyPairReduction() {
         var scope = new SymbolScope();
         var column = new PairReduction.Column(scope.declare("left"), scope.declare("right"));
