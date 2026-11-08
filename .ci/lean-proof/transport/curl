@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Lake in Lean 4.19.0 uses this exact argument list for a GitHub build archive.
+proofwidgets_url='https://github.com/leanprover-community/ProofWidgets4/releases/download/v0.0.57/ProofWidgets4.tar.gz'
+if [[ $# -ne 7 || $1 != -s || $2 != -S || $3 != -f || $4 != -o || $6 != -L || $7 != "$proofwidgets_url" ]]; then
+  exec /usr/bin/curl "$@"
+fi
+
+output=$5
+staged=$(mktemp -- "$output.tmp.XXXXXX")
+trap 'rm -f -- "$staged"' EXIT
+size=11348131
+digest=fc6fa33a1272b7e2ec38a2b6427ea7645557e79a9338828ace91bf7403449f8e
+download=(/usr/bin/curl --fail --silent --show-error --location --retry 2 --retry-max-time 120
+  --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120
+  --max-filesize "$size" --output "$staged")
+
+if ! "${download[@]}" "$proofwidgets_url"; then
+  printf '%s\n' 'Trying the official ProofWidgets release asset API.' >&2
+  "${download[@]}" -H 'Accept: application/octet-stream' \
+    'https://api.github.com/repos/leanprover-community/ProofWidgets4/releases/assets/251055614'
+fi
+
+archive_size=$(wc -c < "$staged")
+archive_hash=$(sha256sum < "$staged")
+if [[ $archive_size -ne $size || ${archive_hash%% *} != "$digest" ]]; then
+  printf '%s\n' 'ProofWidgets v0.0.57 release does not match the pinned size and SHA-256.' >&2
+  exit 1
+fi
+mv -T -- "$staged" "$output"
