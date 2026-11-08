@@ -7,6 +7,7 @@
   <dependencies>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-search</artifactId></dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-algorithms</artifactId></dependency>
+    <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
   </dependencies>
   <profiles><profile><id>sdk-release</id><build><plugins>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-source-plugin</artifactId><executions><execution><id>sdk-sources</id><goals><goal>jar-no-fork</goal></goals></execution></executions></plugin>

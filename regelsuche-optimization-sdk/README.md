@@ -143,12 +143,11 @@ The migrated affine calculation retains its original EPL-2.0 notice.
 
 ## Reproducible local distribution
 
-The normal Maven/Gradle module coordinate is
-`de.regelsuche:regelsuche-optimization-sdk:0.5.1-SNAPSHOT`, aligned by the BOM.
-This is a build coordinate, not a claim that a public repository serves it.
-The pinned standalone distribution uses
-`0.5.1-issue1657-<commit12>` with classifier `all`, includes the dependency
-closure, licenses, sources, Javadoc, consumer and SHA-256 provenance.
+The BOM aligns the Maven and Gradle version of
+`de.regelsuche:regelsuche-optimization-sdk`. The pinned standalone distribution
+uses the checkout's base version in `<version>-issue1657-<commit12>` and the
+classifier `all`. It includes the dependency closure, licenses, sources,
+Javadoc, an example consumer and SHA-256 provenance.
 
 From a clean committed checkout, build with Java 25:
 
@@ -175,6 +174,60 @@ build adapter. The normal API, publication, coverage and `ciCheck` authorities
 include this module. See the [current qualification and integration status](../docs/superpowers/plans/2026-10-26-typed-cas-computation.md#current-status-2026-10-27).
 The [October 4 reconstruction report](../docs/java-optimization-sdk-qualification.md)
 is historical evidence for its recorded revision, not the current distribution.
+
+## Standalone counted-sum CLI
+
+Set `OPTIMIZATION_SDK_JAR` to the qualified `-all.jar` from the standalone
+distribution above and invoke the CLI with Java 25.
+
+```sh
+printf '%s\n' '{"version":1,"kind":"counted-sum","bits":32,"overflow":"wrap","start":0,"stride":1,"initial":0,"term":{"op":"index"}}' |
+  java -cp "$OPTIMIZATION_SDK_JAR" de.regelsuche.sdk.optimization.iteration.PolynomialSumCli
+```
+
+On success the CLI writes one JSON object to stdout.
+
+```json
+{"version":1,"request":{"version":1,"kind":"counted-sum","bits":32,"overflow":"wrap","start":0,"stride":1,"initial":0,"term":{"op":"index"}},"initial":0,"coefficients":[0,1]}
+```
+
+The CLI takes no arguments and reads one UTF-8 JSON object through EOF, up to
+4,096 bytes including whitespace. All shown request fields are required. Extra
+or duplicate fields, trailing JSON values, and noninteger numeric tokens are
+rejected. Every term uses the arithmetic selected by `bits` and `overflow`.
+
+| `bits` | `overflow` | Meaning |
+| --- | --- | --- |
+| 32 or 64 | `wrap` | Signed two's-complement arithmetic at the selected width |
+| 32 or 64 | `checked` | Exact identity for a signed source whose operations are checked |
+| 0 | `exact` | Exact integer arithmetic |
+
+`start`, `stride`, `initial`, and all term literals are JSON integers. For a
+signed request, `start`, `initial`, and term literals must fit the selected
+width. `stride` is the exact nonzero step of the mathematical progression. It
+can be negative and is subject to the SDK's 1,024-bit range bound.
+
+| Term | Exact fields |
+| --- | --- |
+| Index | `{"op":"index"}` |
+| Integer literal | `{"op":"integer","value":2}` |
+| Addition, subtraction, or multiplication | `{"op":"add","left":{"op":"index"},"right":{"op":"integer","value":2}}` with `op` equal to `add`, `subtract`, or `multiply` |
+
+For a nonnegative runtime count `n`, the verified plan gives
+`initial + sum(coefficients[j] * binomial(n, j + 1))` for the sum of `term`
+at `start + stride*k`, for `0 <= k < n`. The response echoes the request JSON
+value and returns exact integer coefficients, which can exceed 64 bits. Read
+them losslessly and evaluate the formula with exact intermediates. In `wrap`
+mode, reduce the result modulo `2^bits` and interpret it as signed.
+
+The CLI uses the SDK's polynomial limits (including index degree 8, expression
+depth 64, and coefficient size 4,096 bits), with separate search and verification
+budgets of 100,000 work units and a 5-second timeout each. It writes no response
+on rejection, reports the reason to stderr, and exits nonzero. The caller
+establishes source admission, a valid count and terminating counter behavior,
+and preservation of source effects. For `checked` arithmetic, the caller also
+preserves the overflow behavior of term operations and every accumulation
+prefix.
 
 
 ## Proof-bound explanations and contextual residues
