@@ -40,7 +40,7 @@ class OpenApiRouteRegistryTest {
     void loadsEveryCanonicalOperationAndContext() {
         OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
 
-        assertEquals(75, registry.routes().size());
+        assertEquals(78, registry.routes().size());
         assertEquals(26, registry.contexts().size());
         assertTrue(registry.contexts().containsAll(Set.of(
             "/api/search",
@@ -84,6 +84,10 @@ class OpenApiRouteRegistryTest {
             "retainCandidateDossier");
         assertAllowed(registry, "/api/discovery-runs", "/api/discovery-runs/" + "a".repeat(64) + "/duplicate", "POST",
             "duplicateRetainedRunWithSeedChange");
+        String literature = "/api/discovery-runs/" + "a".repeat(64) + "/literature/" + "b".repeat(64);
+        assertAllowed(registry, "/api/discovery-runs", literature, "GET", "readCandidateLiterature");
+        assertAllowed(registry, "/api/discovery-runs", literature, "POST", "searchCandidateLiteratureManually");
+        assertAllowed(registry, "/api/discovery-runs", literature, "PUT", "retainCandidateLiteratureAssessment");
         assertAllowed(registry, "/api/discovery-domains", "/api/discovery-domains", "GET",
             "listInstalledDiscoveryDomains");
         assertAllowed(registry, "/api/discovery-domains", "/api/discovery-domains/run", "POST",

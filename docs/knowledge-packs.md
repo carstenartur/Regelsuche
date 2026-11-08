@@ -16,6 +16,9 @@ Nur Regeln mit freigegebenem Status wie `VALIDATED` oder `REVIEWED` dürfen
 registriert werden. Kandidaten bleiben deaktiviert, bis die Review- und
 Validierungsanforderungen erfüllt sind.
 
+Für zitierfähige Fundstellen zu konkreten Regelrevisionen oder Schritten steht
+der [lokale Quellenkatalog](literature-references.md) zur Verfügung.
+
 ## Pattern-Syntax und AST-Semantik
 
 Regelpattern verwenden dieselbe binäre Operatorstruktur wie der produktive

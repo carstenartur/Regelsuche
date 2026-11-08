@@ -16,16 +16,27 @@ public record TransformationStep(
     boolean equivalencePreserving,
     String explanation,
     List<String> assumptions,
-    RecordedExecution execution
+    RecordedExecution execution,
+    String ruleRevision
 ) {
     public TransformationStep {
         if (beforeExpression == null || afterExpression == null || ruleId == null || ruleKind == null) {
             throw new IllegalArgumentException("step expressions, ruleId and ruleKind are required");
         }
         explanation = explanation == null ? "" : explanation;
+        if (ruleRevision != null && !ruleRevision.matches("sha256:[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("invalid rule revision");
+        }
         assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
         if (execution != null) execution.requireStep(beforeExpression, afterExpression, ruleId, ruleKind,
             equivalencePreserving, assumptions);
+    }
+
+    public TransformationStep(int index, String beforeExpression, String afterExpression, String ruleId,
+            RewriteKind ruleKind, int scoreBefore, int scoreAfter, boolean equivalencePreserving,
+            String explanation, List<String> assumptions, RecordedExecution execution) {
+        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,
+            equivalencePreserving, explanation, assumptions, execution, null);
     }
 
     /** Display-only observations may lack retained execution; they cannot authorize replay. */

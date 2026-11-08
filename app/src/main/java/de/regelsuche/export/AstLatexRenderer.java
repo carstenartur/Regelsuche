@@ -11,6 +11,7 @@ import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
+import de.regelsuche.literature.RuleLiteratureCatalog;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.parse.ParsedInput;
 import java.util.List;
@@ -74,6 +75,10 @@ public class AstLatexRenderer implements MathRenderer {
 
     @Override
     public String renderPath(DiscoveredTransformation path) {
+        return renderPath(path, RuleLiteratureCatalog.empty().numbering());
+    }
+
+    String renderPath(DiscoveredTransformation path, RuleLiteratureCatalog.Numbering numbering) {
         StringBuilder body = new StringBuilder();
         body.append("\\begin{align*}\n");
         List<TransformationStep> steps = path.steps();
@@ -88,12 +93,14 @@ public class AstLatexRenderer implements MathRenderer {
                 .append(renderExpression(steps.get(0).afterExpression()))
                 .append(" && \\text{(")
                 .append(escapeText(steps.get(0).ruleId()))
+                .append(LiteratureExport.latexCitations(numbering.forStep(path, steps.get(0))))
                 .append(")} \\tag{1}\\\\\n");
             for (int i = 1; i < steps.size(); i++) {
                 body.append("        &\\rightarrow ")
                     .append(renderExpression(steps.get(i).afterExpression()))
                     .append(" && \\text{(")
                     .append(escapeText(steps.get(i).ruleId()))
+                    .append(LiteratureExport.latexCitations(numbering.forStep(path, steps.get(i))))
                     .append(")} \\tag{")
                     .append(i + 1)
                     .append("}\\\\\n");

@@ -6,6 +6,7 @@ import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.literature.RuleLiteratureCatalog;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.scoring.ExpressionScore;
 import java.io.IOException;
@@ -16,26 +17,41 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class DefaultTransformationExportService implements TransformationExportService {
-    private final MathRenderer markdownRenderer = new MarkdownMathRenderer();
-    private final MathRenderer latexRenderer = new LaTeXMathRenderer();
+    private final MarkdownMathRenderer markdownRenderer = new MarkdownMathRenderer();
+    private final AstLatexRenderer latexRenderer = new AstLatexRenderer();
     private final Clock clock;
+    private final RuleLiteratureCatalog literatureCatalog;
 
     public DefaultTransformationExportService() {
         this(Clock.systemUTC());
     }
 
     public DefaultTransformationExportService(Clock clock) {
+        this(clock, RuleLiteratureCatalog.configured());
+    }
+
+    public DefaultTransformationExportService(Clock clock, RuleLiteratureCatalog literatureCatalog) {
         this.clock = clock;
+        this.literatureCatalog = java.util.Objects.requireNonNull(literatureCatalog);
+    }
+
+    @Override
+    public RuleLiteratureCatalog literatureCatalog() {
+        return literatureCatalog;
     }
 
     @Override
     public String exportMarkdown(List<DiscoveredTransformation> transformations) {
-        return MarkdownMathRenderer.renderDocument(transformations, markdownRenderer);
+        var numbering = literatureCatalog.numbering();
+        return MarkdownMathRenderer.renderDocument(transformations, path -> markdownRenderer.renderPath(path, numbering))
+            + LiteratureExport.markdownBibliography(numbering);
     }
 
     @Override
     public String exportLatex(List<DiscoveredTransformation> transformations) {
-        return transformations.stream().map(latexRenderer::renderPath).collect(Collectors.joining("\n\n"));
+        var numbering = literatureCatalog.numbering();
+        return transformations.stream().map(path -> latexRenderer.renderPath(path, numbering)).collect(Collectors.joining("\n\n"))
+            + LiteratureExport.latexBibliography(numbering);
     }
 
     @Override
@@ -163,6 +179,7 @@ public class DefaultTransformationExportService implements TransformationExportS
         writer.property("explanation", step.explanation());
         if (!step.assumptions().isEmpty()) writer.stringArray("assumptions", step.assumptions());
         de.regelsuche.transform.RecordedExecution.writeOptional(writer, step.execution());
+        if (step.ruleRevision() != null) writer.property("ruleRevision", step.ruleRevision());
     }
 
     private void writeScore(JsonWriter writer, ExpressionScore score) {

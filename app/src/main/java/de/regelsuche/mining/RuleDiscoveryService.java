@@ -9,6 +9,7 @@ import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.example.AlgebraicExampleGenerator;
 import de.regelsuche.graph.ExpressionGraphStore;
 import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.literature.RuleLiteratureCatalog;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -31,6 +32,7 @@ import java.util.concurrent.Executors;
 public class RuleDiscoveryService {
     private final AlgebraicExampleGenerator exampleGenerator;
     private final TransformationEngine transformationEngine;
+    private final Map<String, String> ruleRevisions;
     private final EquivalenceService equivalenceService;
     private final ExpressionScorer expressionScorer;
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
@@ -100,6 +102,7 @@ public class RuleDiscoveryService {
     ) {
         this.exampleGenerator = exampleGenerator;
         this.transformationEngine = transformationEngine;
+        this.ruleRevisions = RuleLiteratureCatalog.captureRuleRevisions(transformationEngine);
         this.equivalenceService = equivalenceService;
         this.expressionScorer = expressionScorer;
         this.graphStore = graphStore;
@@ -246,7 +249,8 @@ public class RuleDiscoveryService {
                 ruleIds.get(i),
                 state.transformations() == null ? state.assumptions() : state.transformations().get(i).assumptions(),
                 state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(
-                    before, List.of(state.transformations().get(i)))
+                    before, List.of(state.transformations().get(i))),
+                state.transformations() == null ? null : ruleRevisions.get(ruleIds.get(i))
             ));
         }
         return steps;

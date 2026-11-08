@@ -7,6 +7,7 @@ import de.regelsuche.api.searchgraph.SearchGraphJsonSerializer;
 import de.regelsuche.api.searchgraph.SearchGraphNodeDto;
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.literature.RuleLiteratureCatalog;
 import de.regelsuche.mining.RuleCandidate;
 import java.io.IOException;
 import java.io.Writer;
@@ -19,6 +20,10 @@ public interface TransformationExportService {
     String exportMarkdown(List<DiscoveredTransformation> transformations);
 
     String exportLatex(List<DiscoveredTransformation> transformations);
+
+    default RuleLiteratureCatalog literatureCatalog() {
+        return RuleLiteratureCatalog.empty();
+    }
 
     String exportJson(List<DiscoveredTransformation> transformations, List<ReusableRule> rules);
 

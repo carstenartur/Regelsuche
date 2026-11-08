@@ -121,7 +121,7 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
                         + "SET step.ruleId = $ruleId, step.ruleKind = $ruleKind, step.explanation = $explanation, "
                         + "step.scoreBefore = $scoreBefore, step.scoreAfter = $scoreAfter, "
                         + "step.equivalencePreserving = $equivalencePreserving, step.execution = $execution, "
-                        + "step.assumptions = $assumptions "
+                        + "step.assumptions = $assumptions, step.ruleRevision = $ruleRevision "
                         + "MERGE (path)-[:HAS_STEP]->(step) "
                         + "MERGE (step)-[:FROM]->(from) "
                         + "MERGE (step)-[:TO]->(to)",
@@ -140,6 +140,7 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
         values.put("scoreAfter", step.scoreAfter()); values.put("equivalencePreserving", step.equivalencePreserving());
         values.put("assumptions", step.assumptions());
         values.put("execution", step.execution() == null ? null : step.execution().toCanonicalJson());
+        values.put("ruleRevision", step.ruleRevision());
         return values;
     }
 

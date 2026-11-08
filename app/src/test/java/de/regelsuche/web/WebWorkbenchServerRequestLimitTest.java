@@ -297,6 +297,7 @@ class WebWorkbenchServerRequestLimitTest {
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
+        if (path.contains("/literature/")) connection.setRequestProperty("X-Regelsuche-Literature", "workbench");
         return connection;
     }
 
@@ -345,6 +346,8 @@ class WebWorkbenchServerRequestLimitTest {
             new Endpoint("/api/discovery-runs", "/api/discovery-runs", ""),
             new Endpoint("/api/discovery-runs/{runDigest}/dossier", "/api/discovery-runs/request-limit/dossier", ""),
             new Endpoint("/api/discovery-runs/{runDigest}/duplicate", "/api/discovery-runs/request-limit/duplicate", ""),
+            new Endpoint("/api/discovery-runs/{runDigest}/literature/{candidateDigest}",
+                "/api/discovery-runs/request-limit/literature/request-limit", "\"confirmed\":false"),
             new Endpoint("/api/discovery-domains/run", "/api/discovery-domains/run", ""),
             new Endpoint("/api/discovery-domains/exports", "/api/discovery-domains/exports", ""),
             new Endpoint("/api/discovery-domains/exports/{runDigest}/replay",

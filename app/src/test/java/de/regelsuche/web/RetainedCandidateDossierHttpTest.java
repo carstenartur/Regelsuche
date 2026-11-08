@@ -111,6 +111,69 @@ class RetainedCandidateDossierHttpTest {
         assertEquals(400, request("POST", path("duplicate"), "{\"deterministicSeed\":2,\"deterministicSeed\":3}").statusCode());
     }
 
+    @Test void literatureSearchIsOffAndOfflineAssessmentIsBoundToRetainedCandidate() throws Exception {
+        String previous = System.getProperty("regelsuche.literature.theoremsearch.enabled");
+        System.setProperty("regelsuche.literature.theoremsearch.enabled", "false");
+        try {
+            server.stop();
+            server = new WebWorkbenchServer("127.0.0.1", 0, new InMemoryExpressionGraphStore(),
+                new InMemoryRuleInventoryRepository(), new DefaultTransformationExportService(), WebSecurityConfig.none());
+            server.start();
+            String candidate = BUNDLE.scenario().content().discoveredBridge().stateHash();
+            String suffix = path("literature/" + candidate.substring(7));
+            assertEquals(404, literature("GET", suffix, null, false).statusCode());
+            assertEquals(201, request("POST", path("dossier"), BUNDLE.scenario().toCanonicalJson()).statusCode());
+            var initial = literature("GET", suffix, null, false);
+            assertEquals(200, initial.statusCode(), initial.body());
+            var json = JsonMapper.builder().build();
+            var status = json.readTree(initial.body());
+            assertFalse(status.get("onlineEnabled").booleanValue());
+            assertTrue(status.get("receipts").isEmpty());
+            assertTrue(status.get("assessments").isEmpty());
+            assertEquals("no-store", initial.headers().firstValue("Cache-Control").orElseThrow());
+            var blocked = literature("POST", suffix, "{\"query\":\"public test\",\"confirmed\":false}", false);
+            assertEquals(403, blocked.statusCode());
+            assertTrue(blocked.body().contains("THEOREMSEARCH_DISABLED"), blocked.body());
+            assertEquals(403, literature("GET", suffix, null, true).statusCode());
+            assertEquals(413, literature("PUT", suffix, "x".repeat(128 * 1024 + 1), false).statusCode());
+            try (var socket = new java.net.Socket("127.0.0.1", server.boundPort())) {
+                socket.setSoTimeout(5000);
+                socket.getOutputStream().write(("GET /api/discovery-runs" + suffix + " HTTP/1.1\r\n"
+                    + "Host: rebound.example.org\r\nX-Regelsuche-Literature: workbench\r\n"
+                    + "Sec-Fetch-Site: same-origin\r\nConnection: close\r\n\r\n")
+                    .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                socket.getOutputStream().flush();
+                assertTrue(new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream(),
+                    java.nio.charset.StandardCharsets.US_ASCII)).readLine().contains(" 403 "));
+            }
+            String assessment = """
+                {"schema":"regelsuche.literature-assessment/v1","subject":%s,
+                 "reviewedOn":"2026-11-08","reviewedBy":"Local reviewer",
+                 "scope":[{"source":"Local references","versionOrDate":"2026-11-08"}],
+                 "queries":["published example"],"status":"NO_PRIOR_ART_FOUND_WITHIN_SCOPE","matches":[]}
+                """.formatted(status.get("subject"));
+            var retained = literature("PUT", suffix, assessment, false);
+            assertEquals(201, retained.statusCode(), retained.body());
+            assertEquals(400, literature("PUT", suffix, assessment.replace(candidate, "sha256:" + "b".repeat(64)), false).statusCode());
+            var reviewed = json.readTree(literature("GET", suffix, null, false).body());
+            assertEquals("NO_PRIOR_ART_FOUND_WITHIN_SCOPE", reviewed.get("assessments").get(0).get("status").asText());
+            assertTrue(reviewed.get("receipts").isEmpty());
+            assertEquals(BUNDLE.scenario().toCanonicalJson(), request("GET", path("dossier"), null).body());
+        } finally {
+            if (previous == null) System.clearProperty("regelsuche.literature.theoremsearch.enabled");
+            else System.setProperty("regelsuche.literature.theoremsearch.enabled", previous);
+        }
+    }
+
+    private HttpResponse<String> literature(String method, String suffix, String body, boolean crossSite) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.boundPort() + "/api/discovery-runs" + suffix))
+            .header("Content-Type", "application/json")
+            .header("X-Regelsuche-Literature", "workbench")
+            .header("Sec-Fetch-Site", crossSite ? "cross-site" : "same-origin")
+            .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+        return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     @Test void rejectsAnIncompleteArtifactEvenWhenItsContentHashAndRunBindingAreValid() throws Exception {
         var content = BUNDLE.scenario().content();
         var incomplete = new TargetFreeSymPyBridgeDiscoveryScenario.ScenarioContent(content.schema(), content.scenarioId(),
