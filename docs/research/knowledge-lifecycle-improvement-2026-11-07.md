@@ -1,4 +1,4 @@
-# Prepared knowledge and paid self-improvement, 2026-11-07
+# Prepared knowledge reuse and measured adoption, 2026-11-07
 
 The reusable APIs are implemented and the complete lifecycle experiment ran.
 **This observation does not establish a total-cost advantage over the existing
@@ -6,6 +6,10 @@ persistent learned session or targeted SymPy factorization.** Repeated model
 reproofs are avoided, but lower preparation work does not by itself prove a
 complete runtime improvement. All measured outcomes, including this negative
 result, are retained.
+
+This is a historical observation under the frozen protocol below. The current
+[research methodology](../research-methodology.md) explains the purpose and
+reference choice; this editorial clarification does not rerun the experiment.
 
 ## Implementation
 
@@ -99,8 +103,10 @@ no native/SymPy aggregate performance ratio, despite equal goal-attainment vecto
 
 The 128-request prepared/legacy-persistent paired wall ratios are 0.886, 1.051
 and 1.082. Prepared/repeated-load ratios are 0.915, 1.132 and 0.876. Thus even
-the lower prepared group median versus repeated loads is not a win in every
-repetition. These shared-host observations do not establish a robust broad gain.
+the lower prepared group median versus repeated loads is not a reduction in every
+repetition. Prepared reuse is not shown to be cheaper than the persistent control
+on the complete measured lifecycle; the paired observations and separate wall/CPU
+medians above retain the variation.
 
 ## The improvement forecast versus actual execution
 
@@ -120,7 +126,8 @@ It does not isolate the contribution of matching, JIT, setup or sample mix.
 
 No inputs, lengths, procedures, budgets or performance thresholds were retuned
 after observing these results. No longer-stream break-even is extrapolated.
-SymPy remains the faster and, on several cases, more compact procedure here.
+The targeted SymPy procedure uses less complete median wall time and CPU at both
+measured lengths and returns lower node counts on several of these queries.
 This is separate from the historical Brahmagupta query result and the polynomial
 operation-count comparison; their inputs/goals and conclusions are unchanged.
 
@@ -213,8 +220,8 @@ remeasure the archived runtime, inputs, results or timing observations.
   evidence uses the production process meter and independent wait4 receipts;
   process samples can still be affected by JVM/background activity.
 - Include primitive and already-persistent controls and targeted SymPy factorization
-  before measurement. This makes broad superiority harder to claim and exposes
-  the actual remaining overhead.
+  before measurement. These controls distinguish preparation/reproof savings
+  from overhead that an existing persistent caller already avoids.
 - Use a fresh feature checkout when host synchronization prevented file isolation
   in the older linked worktree. Extra local checkout space was paid; prior files
   and the separate comparison were preserved.
@@ -224,3 +231,4 @@ compositions. Autonomous invention of new mathematical procedures, Euclid/Ferrar
 comparison, broad independent-family transfer and complete P01–P12 delivery are
 not established by this change. The failed complete-cost prediction here remains
 an explicit target for further work.
+

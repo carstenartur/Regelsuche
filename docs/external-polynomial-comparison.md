@@ -1,10 +1,12 @@
-# External polynomial comparison
+# Comparing rational-polynomial procedures
 
 This is a **public preregistered pilot**, separate from the protected flagship
 FINAL TEST and all historical #235 comparisons. Its application is finding
 shorter equivalent rational-polynomial representations **without a target**.
 Neither a known historical identity nor a syntactic reference answer enters a
-worker request. This pilot is not external novelty or a universal leaderboard.
+worker request. The pilot studies representation quality and resource costs in
+the declared rational-polynomial fragment. See the [research methodology](research-methodology.md)
+for the purpose of these procedure comparisons and the choice of reference software.
 
 ## Freeze and scope
 
@@ -30,7 +32,7 @@ negative powers and logarithms remain separate unsupported controls. The calculu
 domain issue #982 and the SAFE product adapter #972 are **not resolved or exercised**
 by this lane. It does not grant production qualification under #745.
 
-## Competitors and objective
+## Procedures and objective
 
 Regelsuche uses the real `LearnedSchedulingModel` and its existing BASE,
 LEARNED_NAIVE, LEARNED_RANKED and EXPERT provider/policy combinations. The source-only
@@ -76,11 +78,12 @@ but that result is **not** a successful claim under the exceeded logical work bu
 The external quality comparison uses the common wall boundary, not a fictitious
 conversion between CAS operations and Regelsuche's work units.
 
-Three repetitions and deterministic rotated profile order expose noise but do not
-establish steady-state JMH performance or a reliable general speed ranking. Timing
-is retained as non-canonical diagnostics. `canonical-rows.json` removes clock fields;
+Three repetitions and deterministic rotated profile order expose timing variation.
+They measure this pilot under its declared boundary; steady-state performance
+would require a separate JMH experiment. Timing is retained as non-canonical
+diagnostics. `canonical-rows.json` removes clock fields;
 deadline outcomes may still differ across machines and are not falsely required to
-be byte-identical. No faster-than-SymPy threshold is added to CI.
+be byte-identical. CI adds no relative-speed acceptance threshold.
 
 ## Reproduction
 
@@ -109,4 +112,6 @@ the pilot. `gradle/run-external-polynomial-comparison.sh` owns its complete loca
 execution, and the aggregate CI check requires its success alongside the existing
 Java 25 Gradle, Maven/product/Docker, SymPy and JMH checks. The dedicated showcase
 branch-creation authority keeps its existing scope.
-A passing harness test is not an executed benchmark or a demonstrated competitive win.
+A passing harness test verifies the harness. Measured quality and resource
+conclusions require an executed protocol and its retained evidence.
+

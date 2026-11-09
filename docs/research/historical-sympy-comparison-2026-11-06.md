@@ -1,4 +1,4 @@
-# Historical tasks versus SymPy, 2026-11-06
+# Procedure comparison on historical task families, 2026-11-06
 
 **Both native profiles and SymPy solve the four canonical tasks: Cassini, Pell,
 Brahmagupta–Fibonacci and Sophie Germain.** On ten public variants, the native
@@ -9,6 +9,9 @@ experiment, but its complete lifecycle remains slower through 72 requests.
 This is a separate experiment from the operation-count polynomial comparison.
 It measures the requested historical goals, not whether an expression is shorter.
 No production mathematical algorithm was changed to obtain these observations.
+This is a historical observation under the frozen protocol below. The current
+[research methodology](../research-methodology.md) explains the purpose and
+reference choice; this editorial clarification does not rerun the experiment.
 
 ## Tasks and equal starting information
 
@@ -140,7 +143,8 @@ would need a separate predeclared execution; no break-even is extrapolated.
 
 Observed host: shared Linux x86-64, nine affinity-visible CPUs, eight-CPU cgroup
 quota, 8 GiB memory limit, Temurin 25.0.5+8 and Python 3.12.14. This is not an
-exclusive-host precision study or universal ranking of CAS programs. Java uses
+exclusive-host precision study; the timings describe the declared task stream
+and complete process boundaries. Java uses
 `-Xmx512m`; this is not a common 512 MiB address-space limit for both runtimes.
 
 The outer successful command records 55.506 seconds wall and 124.702 seconds
@@ -177,7 +181,7 @@ it supplies no native quality or speed ratio. The adapter-only fix unifies the
 canonical trailing LF, and the executable runtime was rebuilt cleanly after
 stale incremental bytecode was detected. No mathematical procedure, task or
 budget changed after the first attempt. Both original attempts were independently
-reverified without rerunning competitors.
+reverified without rerunning the measured procedures.
 
 The [numeric observation](historical-sympy-comparison-2026-11-06.json) retains
 all case outcomes, median resources, paired comparisons and representative
@@ -204,13 +208,16 @@ also verifies; removing model binding or changing its restore input is rejected
 even after refreshing its file-integrity manifest. No measured runtime, input,
 result or timing was replaced by these observer corrections.
 
-Review boundaries remain explicit: this finite public experiment establishes no
-general CAS superiority, novel discovery, sealed-holdout generalization, or result
-for NOT_MEASURED tasks. Shared-host timings do not establish a precision ranking.
+Review boundaries remain explicit: the success vectors concern the declared
+public task families and budgets, with the teaching/validation overlap described
+above. They do not demonstrate novel mathematical discovery or sealed-holdout
+generalization. NOT_MEASURED tasks have no result here. Shared-host timing samples
+include host variation within the reported request and lifecycle boundaries.
 The author ran the full Java reactor; the independent reviewer did not repeat
 that entire reactor. Retained runtime/package hashes check the declared bytes,
 not a whole-OS image or adversarial proof of authorship. Normal library caches
-remain enabled to avoid imposing extra cache-clearing work on the CAS.
+remain enabled in the measured procedures; cache-clearing work is outside
+the declared protocol.
 
 With Java 25, Maven and Python venv support, reproduce a new observation using:
 
@@ -218,7 +225,7 @@ With Java 25, Maven and Python venv support, reproduce a new observation using:
 bash gradle/run-historical-sympy-comparison.sh
 ```
 
-Verify an extracted original attempt without executing either competitor:
+Verify an extracted original attempt without executing either measured procedure:
 
 ```sh
 PYTHONPATH=scripts python3 -B -m external_polynomial_comparison.run_historical \
@@ -243,5 +250,8 @@ The Euclid/Bézout historical discovery/proof task, Euclid's infinitude-of-prime
 proof discovery and the general Ferrari method are **NOT_MEASURED** here: no
 shared executable historical task contract is implemented in this comparison.
 That does not say their numerical subalgorithms are absent from either library.
-The results above do not establish parity for those tasks or all historical
-mathematics, global completeness, or an automatically invented proof language.
+Those tasks require their own shared goal, procedure and verification contracts
+before a comparison can be measured. The observed successes above use the supplied
+procedures and domain-specific certificates; they do not establish global
+completeness or an automatically invented proof language.
+
