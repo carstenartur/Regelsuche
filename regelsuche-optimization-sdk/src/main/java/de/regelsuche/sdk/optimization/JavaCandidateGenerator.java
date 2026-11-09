@@ -8,7 +8,7 @@ import java.util.*;
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
     // Signed-additive proposals now come exclusively from the shared core rule inventory.
-    static final String REVISION = "java-core-algebra-proposals/v13-filtered-value-arithmetic";
+    static final String REVISION = "java-core-algebra-proposals/v14-source-factor-position";
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -225,9 +225,19 @@ final class JavaCandidateGenerator {
     private static Expr factor(NumericKind kind, Expr left, Expr right) {
         if (operation(left) != NumericOperation.MULTIPLY || operation(right) != NumericOperation.MULTIPLY) return null;
         var a = children(left); var b = children(right);
-        for (int i=0;i<2;i++) for (int j=0;j<2;j++) if (a.get(i).equals(b.get(j)))
-            return JavaExpressions.operation(kind, NumericOperation.MULTIPLY, a.get(i),
-                JavaExpressions.operation(kind, NumericOperation.ADD, a.get(1-i), b.get(1-j)));
+        // Match equal positions first, including when a product repeats the factor.
+        for (int offset = 0; offset < 2; offset++) {
+            for (int leftIndex = 0; leftIndex < 2; leftIndex++) {
+                int rightIndex = offset == 0 ? leftIndex : 1 - leftIndex;
+                Expr common = a.get(leftIndex);
+                if (!common.equals(b.get(rightIndex))) continue;
+                Expr sum = JavaExpressions.operation(kind, NumericOperation.ADD,
+                        a.get(1 - leftIndex), b.get(1 - rightIndex));
+                return leftIndex == 1 && rightIndex == 1
+                        ? JavaExpressions.operation(kind, NumericOperation.MULTIPLY, sum, common)
+                        : JavaExpressions.operation(kind, NumericOperation.MULTIPLY, common, sum);
+            }
+        }
         return null;
     }
     private static List<Expr> children(Expr expression) { return JavaExpressions.operands(expression); }

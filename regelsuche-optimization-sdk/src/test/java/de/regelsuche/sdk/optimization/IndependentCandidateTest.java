@@ -100,6 +100,31 @@ class IndependentCandidateTest {
         assertTrue(first.work() > 0);
     }
 
+    @Test
+    void boundedFactoringKeepsTheCommonFactorOnItsSourceSide() {
+        Expr factor = new VariableExpr("k");
+        Expr sum = operation(NumericOperation.ADD, X, Y);
+        var plan = new JointComputationPlan(
+                Map.of("x", NumericKind.INT.type(), "y", NumericKind.INT.type(), "k", NumericKind.INT.type()),
+                Map.of(), List.of(
+                        output("left", operation(NumericOperation.ADD, operation(NumericOperation.MULTIPLY, factor, X),
+                                operation(NumericOperation.MULTIPLY, factor, Y))),
+                        output("right", operation(NumericOperation.ADD, operation(NumericOperation.MULTIPLY, X, factor),
+                                operation(NumericOperation.MULTIPLY, Y, factor))),
+                        output("repeated", operation(NumericOperation.ADD, operation(NumericOperation.MULTIPLY, X, factor),
+                                operation(NumericOperation.MULTIPLY, factor, factor)))));
+        var request = request(plan, Set.of());
+        var generator = new JavaCandidateGenerator(request, new VerificationWork(request, CancellationToken.NONE));
+        var proposal = generator.generate(plan, 1).proposals().getFirst();
+        var factored = plan.withExpression(proposal.expression());
+
+        assertEquals(List.of(operation(NumericOperation.MULTIPLY, factor, sum),
+                operation(NumericOperation.MULTIPLY, sum, factor),
+                operation(NumericOperation.MULTIPLY, operation(NumericOperation.ADD, X, factor), factor)),
+                factored.outputExpressions());
+        assertInstanceOf(VerificationResult.Verified.class, optimizer.verify(request, factored, CancellationToken.NONE));
+    }
+
     private static OptimizationRequest request(JointComputationPlan plan, Set<SemanticAssumption> assumptions) {
         return new OptimizationRequest(plan, SourceEvaluationTrace.fromPlan(plan), EnumSet.allOf(NumericKind.class),
                 ComputationOptimizer.SEMANTICS_REVISION, assumptions, SafetyProfile.PRESERVE_JAVA,
