@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * Verifies that {@code GET /api/benchmark} surfaces the quality metrics
  * introduced in PR #16 follow-up §2 so the workbench dashboard can render
  * "Ampelstatus", "gefunden / erwartet getroffen / Proof-Status", e-graph size
- * and saturation savings without re-running the benchmark.
+ * and explicitly unavailable savings without inferring an unmeasured ratio.
  */
 class BenchmarkApiQualityMetricsTest {
 
@@ -62,8 +62,15 @@ class BenchmarkApiQualityMetricsTest {
             "benchmark JSON must include matcher cache metrics");
         assertTrue(body.contains("\"saturationIterations\"") && body.contains("\"rulesFired\""),
             "benchmark JSON must include saturation iteration/rule metrics");
-        assertTrue(body.contains("\"saturationSavings\""),
-            "benchmark JSON must include saturationSavings");
+        var payload = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+        for (var scenario : payload.get("scenarios")) {
+            for (var row : scenario.get("results")) {
+                assertTrue(row.get("saturationSavings").isNull(), "no savings baseline was measured");
+                assertEquals("UNAVAILABLE", row.get("saturationSavingsStatus").asText());
+                assertTrue(!row.get("saturationSavingsReason").asText().isBlank());
+            }
+        }
+        assertTrue(!body.contains("NaN"), "compatibility sentinel must not escape into JSON");
         assertTrue(body.contains("\"learnedRuleUsed\""),
             "benchmark JSON must include learnedRuleUsed");
         assertTrue(body.contains("\"exportBundleValid\""),

@@ -3140,7 +3140,9 @@ public class WebWorkbenchServer {
                         r.property("matcherCacheMisses", row.matcherCacheMisses());
                         r.property("saturationIterations", row.saturationIterations());
                         r.property("rulesFired", row.rulesFired());
-                        r.property("saturationSavings", row.saturationSavings());
+                        r.nullProperty("saturationSavings");
+                        r.property("saturationSavingsStatus", row.saturationSavingsStatus());
+                        r.property("saturationSavingsReason", row.saturationSavingsReason());
                         r.property("learnedRuleUsed", row.learnedRuleUsed());
                         r.property("exportBundleValid", row.exportBundleValid());
                         r.property("quality", row.qualityLabel());
@@ -3226,6 +3228,7 @@ public class WebWorkbenchServer {
             sendStaticResource(exchange, resource, mimeFor(resource));
         } else if (path.startsWith("/vendor/")
             || path.equals("/app.js")
+            || path.equals("/workbench-entry.js")
             || path.equals("/style.css")
             || path.equals("/run-workspace-state.js")
             || path.equals("/candidate-dossier-state.js")

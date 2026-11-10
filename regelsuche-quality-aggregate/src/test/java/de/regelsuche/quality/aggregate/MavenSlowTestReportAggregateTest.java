@@ -31,7 +31,9 @@ class MavenSlowTestReportAggregateTest {
             System.getProperty(FULL_PROPERTY, "false")
         );
 
-        assertEquals(fullProfile ? 25 : 24, modules.size());
+        assertEquals(MavenSlowTestModuleContract.expectedModules(root,
+            fullProfile ? "full" : "product-reactor"), modules,
+            "slow-test reporting must cover every reportable module in the active reactor");
         assertTrue(modules.contains("regelsuche-quality"));
         assertTrue(modules.contains("maven-build-contract"));
         assertTrue(modules.contains("regelsuche-discovery-sdk"));

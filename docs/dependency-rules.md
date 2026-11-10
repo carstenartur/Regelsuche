@@ -1,10 +1,12 @@
 # Dependency-Regeln
 
 Diese Regeln definieren die zulässigen Abhängigkeitsrichtungen zwischen den
-Gradle-Modulen. In den folgenden Diagrammen bedeutet `A → B`: **A darf von B
+Java-Modulen. In den folgenden Diagrammen bedeutet `A → B`: **A darf von B
 abhängen**.
 
-Die tatsächlichen Kanten werden durch die `build.gradle`-Dateien erzwungen.
+Die tatsächlichen Maven-Kanten stehen in den Modul-POMs. Die bestehenden
+`build.gradle`-Dateien und Architekturtests bleiben während der Migration
+zusätzliche Prüfgates; ein Wechsel des Buildwerkzeugs ändert keine Trust-Grenze.
 Diese Seite erklärt die architektonische Absicht und die fachlichen Grenzen.
 
 ## Hauptrichtung

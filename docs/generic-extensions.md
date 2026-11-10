@@ -22,6 +22,11 @@ replaced during encoding. Valid supplementary characters are preserved; the
 Unicode contract test pins an independently calculated exact manifest/hash pair.
 A catalog hash describes the metadata and declared provenance, not the mutable
 state of arbitrary Java implementation objects or proof of mathematical validity.
+Classpath origin includes the provider's CodeSource URL, so moving the same class
+bytes to a different absolute directory can change the catalogue identity.
+Classpath origins have empty artifact/trust hashes and do not thereby attest
+provider bytecode. External-admission origins instead include their admitted
+artifact SHA-256 and any trust-evidence hash in the canonical manifest.
 
 ## Admission and lifetime
 

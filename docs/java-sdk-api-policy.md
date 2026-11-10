@@ -83,8 +83,9 @@ Vor Ausführung und Evidence-Erstellung werden die Artefaktbytes erneut verglich
 
 ## Noch ausstehende Abnahmen
 
-Das neue SDK-ZIP muss erstmals durch einen erfolgreichen getaggten Release
-öffentlich bereitgestellt werden. Die getrennte Veröffentlichung auf Maven
+Das SDK-ZIP ist mit [v0.5.2](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.2)
+seit 7. November 2026 öffentlich veröffentlicht. Der bevorzugte Einstieg ist das
+[Release-Repository mit Maven-Consumer](java-sdk-quickstart.md). Die getrennte Veröffentlichung auf Maven
 Central/GitHub Packages und eine öffentlich im Browser navigierbare
 Javadoc-Website sind noch nicht eingerichtet; die versionierten HTML-Seiten
 liegen im gehosteten Release-ZIP. Die [Human-DX-Erprobung](java-sdk-human-dx.md)

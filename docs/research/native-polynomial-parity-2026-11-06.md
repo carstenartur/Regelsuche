@@ -1,11 +1,15 @@
-# Native polynomial comparison, 2026-11-06
+# Polynomial simplification procedures, 2026-11-06
 
-The opt-in `POLYNOMIAL_SIMPLIFICATION_V1` task profile closes the observed
-expression-quality gaps on the declared polynomial comparison. Both native
-profiles reach the fixed SymPy 1.14.0 portfolio's arithmetic-operation cost on
-every supported input. They are slower in this measurement. The learned profile
-does not establish an additional quality or total-cost benefit over the native
-baseline.
+The opt-in `POLYNOMIAL_SIMPLIFICATION_V1` task profile returns equivalent
+representations with arithmetic-operation costs no higher than the fixed SymPy
+1.14.0 portfolio on every supported input in this experiment. Both native
+profiles use more complete sequence wall time and CPU in this measurement.
+The learned profile does not establish an additional quality or total-cost
+benefit over the native baseline.
+
+This is a historical observation under the frozen protocol below. The current
+[research methodology](../research-methodology.md) explains the purpose and
+reference choice; this editorial clarification does not rerun the experiment.
 
 ## Observed quality
 
@@ -16,18 +20,19 @@ variants duplicate another input. Three rotated repetitions of three profiles
 produce 675 retained rows: 648 valid supported results and 27 expected unsupported
 results. All three repetitions have the same quality outcomes.
 
-| Native profile, per repetition | Better than portfolio | Same cost | Worse | Incomplete |
+| Native profile, per repetition | Lower cost than portfolio | Same cost | Higher cost | Incomplete |
 | --- | ---: | ---: | ---: | ---: |
 | Native baseline | 3 | 69 | 0 | 0 |
 | Native learned, acquired and restored | 3 | 69 | 0 | 0 |
 
 On the 24 historical supported inputs, each profile, including SymPy, improves
 21 expressions and retains three. One native result has a lower output cost
-than SymPy; the other 23 tie. The 48 additional variants contribute two better
+than SymPy; the other 23 tie. The 48 additional variants contribute two lower-cost
 results and 46 ties. Unsupported controls are excluded from these denominators.
-No win cancels a loss: acceptance compares every case and repetition separately.
+Acceptance compares every case and repetition separately; a cost reduction on
+one input does not offset a cost increase on another.
 
-The three strictly better outputs below are from repetition zero and occur in
+The three strictly lower-cost outputs below are from repetition zero and occur in
 both native profiles. The objective counts arithmetic syntax operations, not
 execution latency or global mathematical simplicity.
 
@@ -105,9 +110,12 @@ qualify the final published head separately.
 
 The additional variants were committed before their first evaluation, but they
 are public variants of known families, not a sealed independent-family holdout.
-These results support parity on this finite rational-polynomial comparison, not
-general CAS coverage, global optimality, arbitrary SymPy calls or a speed/memory
-advantage. Variable denominators and nonpolynomial functions remain outside the
-shared comparison domain. Historical protocols and default task profiles remain
-unchanged. Native normalization and factoring improve the common capability set;
-these data do not attribute that improvement to learning.
+The measured quality criterion is arithmetic-operation count on these finite
+rational-polynomial inputs under the declared budgets. It does not establish
+globally minimal representations. Variable denominators and nonpolynomial
+functions remain outside the shared comparison domain. Resource observations
+apply to the complete sequences and process boundaries above. Historical
+protocols and default task profiles remain unchanged. Native normalization and
+factoring improve the common capability set; these data do not attribute that
+improvement to learning.
+

@@ -54,6 +54,8 @@ class BenchmarkReportRendererTest {
             "report must include the e-graph size columns");
         assertTrue(md.contains("Sat-Sparung"),
             "report must include the saturation-savings column");
+        assertTrue(md.contains("nicht gemessen"), "unmeasured savings must be explicit");
+        assertTrue(!md.contains("0.50"), "legacy constructor values must not become savings claims");
         assertTrue(md.contains("Lernregel"),
             "report must include the learned-rule indicator");
         // Per-row values must be rendered.
@@ -86,8 +88,10 @@ class BenchmarkReportRendererTest {
             "summary must include prunedStates");
         assertTrue(json.contains("\"eGraphClasses\"") && json.contains("\"eGraphNodes\""),
             "summary must include e-graph metrics");
-        assertTrue(json.contains("\"saturationSavings\""),
-            "summary must include saturationSavings");
+        assertTrue(json.contains("\"saturationSavings\":null"),
+            "unmeasured savings must be null, not a numeric fraction");
+        assertTrue(json.contains("\"saturationSavingsStatus\":\"UNAVAILABLE\""));
+        assertTrue(json.contains("\"saturationSavingsReason\""));
         assertTrue(json.contains("\"classesScanned\"") && json.contains("\"nodesScanned\""),
             "summary must include scan metrics");
         assertTrue(json.contains("\"candidateClassesSkipped\"") && json.contains("\"matchesFound\""),
@@ -104,5 +108,18 @@ class BenchmarkReportRendererTest {
         // surface as a FAIL quality label.
         assertTrue(json.contains("\"quality\":\"FAIL\""),
             "summary must surface a FAIL quality label for the false-match row");
+    }
+    @Test
+    void genericJsonSerializationCannotLeakAnUnmeasuredNumericValue() throws Exception {
+        var row = new SearchBenchmarkResult("equality-saturation", "x + 0", 2, 1, 1, 0, 1);
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        String json = mapper.writeValueAsString(row);
+        var parsed = mapper.readTree(json);
+        assertTrue(parsed.get("saturationSavings").isNull());
+        assertTrue(parsed.get("saturationSavingsStatus").asText().equals("UNAVAILABLE"));
+        assertTrue(!json.contains("NaN"));
+        assertTrue(parsed.get("rulesFired").isInt());
+        assertTrue(parsed.get("eGraphClasses").isInt());
+        assertTrue(parsed.get("eGraphNodes").isInt());
     }
 }

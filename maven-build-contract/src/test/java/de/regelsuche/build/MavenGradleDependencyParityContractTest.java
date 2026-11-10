@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 class MavenGradleDependencyParityContractTest {
   private static final List<String> JACKSON_DATABIND_BUILD_FILES = List.of(
       "regelsuche-core/build.gradle",
+      "regelsuche-experiments/build.gradle",
       "regelsuche-discovery/build.gradle",
       "regelsuche-learning/build.gradle",
       "regelsuche-math-sympy/build.gradle",
@@ -30,6 +31,9 @@ class MavenGradleDependencyParityContractTest {
       assertDependency(root, relative,
           "com.fasterxml.jackson.core:jackson-databind", version);
     }
+    assertDependency(root, "regelsuche-experiments/build.gradle",
+        "com.fasterxml.jackson.core:jackson-annotations",
+        mavenProperty(root, "jackson.annotations.version"));
     assertDependency(root, "regelsuche-core/build.gradle",
         "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version);
     assertDependency(root, "app/build.gradle",

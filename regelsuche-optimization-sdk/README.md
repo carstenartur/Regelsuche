@@ -1,10 +1,24 @@
 # Java computation optimization SDK
 
+For released binaries, start with the [0.5.2 SDK distribution guide](../docs/java-sdk-quickstart.md).
+The preferred Maven route uses `regelsuche-sdk-0.5.2.zip` and
+`de.regelsuche:regelsuche-optimization-sdk:0.5.2`. The separately published
+`regelsuche-optimization-sdk-0.5.2.zip` contains a self-contained `-all.jar`
+under the exact internal version `0.5.2-issue1657-ca38d64cca3e` and a matching
+qualification record for source `ca38d64cca3e415e7c7823e39cadbf762b908ef6`.
+Its retained `publiclyPublished=false` field predates the actual GitHub release;
+publication is established by the release entry, not by rewriting the record.
+Read its own consumer and qualification metadata when using that archive.
+
+The following API documentation describes current `0.5.3-SNAPSHOT` source.
+It is not a retroactive compatibility or qualification claim for 0.5.2 JARs.
+
 Finite reductions have a separate scoped API alongside scalar computations. See
 [FINITE_SERIES.md](FINITE_SERIES.md) for constant and runtime-bound polynomial sums,
 nested/periodic/piecewise composition, exact rational telescoping, affine and coupled
-linear recurrences, geometric series, products, independent proof checks and explicit
-limits. The standalone Java25 consumer exercises runtime polynomial and affine plans,
+linear recurrences, geometric series, products, pair and filtered-window reductions,
+ordered tuples and the shared kernel's inversion plans, with independent checks and
+explicit limits. The standalone Java25 consumer exercises runtime polynomial and affine plans,
 including rejection of changed evidence.
 
 The Java 25 headless facade `de.regelsuche.sdk.optimization.ComputationOptimizer`
@@ -367,3 +381,4 @@ disjoint bit ranges. Generic proposals remove redundant masks under a common low
 word observation and reconstruct high/low words joined by addition. Wrong masks,
 widths, signs and overlapping carry bits remain unproved. There are no source-name
 or cryptography-specific recognizers.
+

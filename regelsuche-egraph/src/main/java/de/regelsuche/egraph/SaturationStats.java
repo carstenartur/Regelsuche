@@ -41,7 +41,9 @@ public record SaturationStats(
         /** Hit the configured iteration budget. */
         ITERATION_BUDGET,
         /** Hit the configured node-count guard. */
-        NODE_BUDGET
+        NODE_BUDGET,
+        /** No further progress, but rule failures prevented a certified fix-point. */
+        RULE_FAILURES
     }
 
     public SaturationStats {

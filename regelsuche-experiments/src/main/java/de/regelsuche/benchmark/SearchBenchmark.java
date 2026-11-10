@@ -79,7 +79,6 @@ public class SearchBenchmark {
                     .anyMatch(id -> id != null && (id.startsWith("learned-") || id.startsWith("macro-")));
                 int eGraphClasses = 0;
                 int eGraphNodes = 0;
-                double saturationSavings = 0.0;
                 long classesScanned = 0L;
                 long nodesScanned = 0L;
                 long candidateClassesSkipped = 0L;
@@ -93,10 +92,6 @@ public class SearchBenchmark {
                     var stats = es.lastStats();
                     eGraphClasses = stats.eclasses();
                     eGraphNodes = stats.enodes();
-                    int applications = stats.totalApplications();
-                    saturationSavings = applications == 0
-                        ? 0.0
-                        : stats.merges() / (double) applications;
                     classesScanned = stats.classesScanned();
                     nodesScanned = stats.nodesScanned();
                     candidateClassesSkipped = stats.candidateClassesSkipped();
@@ -120,7 +115,8 @@ public class SearchBenchmark {
                     strategy.name(), expression, states.size(), bestImprovement,
                     shortestImprovingDepth, expandedSteps, distinctRules, elapsedMillis,
                     proofStatus, expectedResultMatched, prunedStates, eGraphClasses,
-                    eGraphNodes, saturationSavings, classesScanned, nodesScanned,
+                    // No comparable baseline was measured; rewrite unions are not saved work.
+                    eGraphNodes, Double.NaN, classesScanned, nodesScanned,
                     candidateClassesSkipped, matchesFound, matcherCacheHits,
                     matcherCacheMisses, saturationIterations, rulesFired,
                     learnedRuleUsed, true

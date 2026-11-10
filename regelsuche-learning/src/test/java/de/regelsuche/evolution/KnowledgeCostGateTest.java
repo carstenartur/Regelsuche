@@ -50,6 +50,15 @@ class KnowledgeCostGateTest {
         assertEquals(KnowledgeCostGate.Decision.NO_GAIN,
             KnowledgeCostGate.evaluate(new KnowledgeCostGate.Cost(1, 1), List.of(reverse, reverse), Long.MAX_VALUE));
     }
+    @Test void aSpecialisedWinCannotHideTheCostOfTheSevenOtherStreamRoles() {
+        var specialised = new KnowledgeCostGate.Trial(sample(100, 100, true, 3), sample(10, 10, true, 3));
+        var regression = new KnowledgeCostGate.Trial(sample(10, 10, true, 3), sample(30, 30, true, 3));
+        var paid = new KnowledgeCostGate.Cost(1, 1);
+        assertEquals(KnowledgeCostGate.Decision.ADOPT, KnowledgeCostGate.evaluate(paid, List.of(specialised), 128));
+        assertEquals(KnowledgeCostGate.Decision.NO_GAIN, KnowledgeCostGate.evaluate(paid,
+            List.of(regression, regression, specialised, regression, regression, regression, regression, regression), 128));
+    }
+
     @Test void zeroHorizonEmptyTrialsAndNegativeCostsAreRejected() {
         assertThrows(IllegalArgumentException.class, () -> new KnowledgeCostGate.Cost(-1, 0));
         assertThrows(IllegalArgumentException.class, () -> new KnowledgeCostGate.Cost(0, -2));

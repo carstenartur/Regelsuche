@@ -73,6 +73,19 @@ public final class EGraph {
     private long version = 0L;
     /** Number of currently canonical e-classes. */
     private int canonicalClassCount = 0;
+    private int insertionLimit = Integer.MAX_VALUE;
+
+    /** Saturation-local insertion cap; restoring the previous limit is the caller's responsibility. */
+    int setInsertionLimit(int limit) {
+        int previous = insertionLimit;
+        insertionLimit = limit;
+        return previous;
+    }
+
+    static final class NodeBudgetExceeded extends RuntimeException {
+        NodeBudgetExceeded() { super("e-graph node budget exhausted"); }
+    }
+
 
     /**
      * Add an e-node. Children must already be present in the graph (use
@@ -86,6 +99,9 @@ public final class EGraph {
         if (existing != null) {
             return unionFind.find(existing);
         }
+        // Check before mutation. An interrupted RHS may leave valid disconnected
+        // subterms, but never an incomplete node or a union with that RHS.
+        if (nodeCount() >= insertionLimit) throw new NodeBudgetExceeded();
         EClassId id = unionFind.makeSet();
         EClass eclass = new EClass(id, canonical);
         classes.put(id, eclass);
@@ -319,6 +335,37 @@ public final class EGraph {
      * stabilises.</p>
      */
     public Expr extract(EClassId id, java.util.function.ToIntFunction<ENode> costOfNode) {
+        EClassId canonical = unionFind.find(id);
+        ExtractionChoices choices = extractionChoices(costOfNode);
+        if (!choices.nodes().containsKey(canonical)) {
+            throw new IllegalStateException("No extractable node in e-class " + canonical
+                + " — every node has unavailable cost or unresolved children");
+        }
+        return buildExpression(canonical, choices.nodes());
+    }
+
+    /**
+     * One finite AST per root e-node, using cheapest child representatives.
+     * This deliberately does not enumerate all combinations of child alternatives.
+     * Alternatives with unavailable node/child costs are skipped. A wholly
+     * unavailable class has an empty representative list.
+     */
+    public List<Expr> representatives(EClassId id, java.util.function.ToIntFunction<ENode> costOfNode) {
+        EClass eclass = classOf(id);
+        ExtractionChoices choices = extractionChoices(costOfNode);
+        LinkedHashSet<Expr> result = new LinkedHashSet<>();
+        for (ENode node : eclass.nodes()) {
+            if (extractionCost(node, costOfNode, choices.costs()) < Integer.MAX_VALUE) {
+                result.add(nodeToExpr(node, choices.nodes()));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private record ExtractionChoices(Map<EClassId, Integer> costs, Map<EClassId, ENode> nodes) {}
+
+    private ExtractionChoices extractionChoices(java.util.function.ToIntFunction<ENode> costOfNode) {
+        Objects.requireNonNull(costOfNode, "costOfNode");
         Map<EClassId, Integer> bestCost = new HashMap<>();
         Map<EClassId, ENode> bestNode = new HashMap<>();
         for (EClass eclass : classes()) {
@@ -338,18 +385,26 @@ public final class EGraph {
                 }
             }
         }
-        EClassId canonical = unionFind.find(id);
-        ENode pick = bestNode.get(canonical);
-        if (pick == null) {
-            throw new IllegalStateException("No extractable node in e-class " + canonical
-                + " — every node has unresolved children (cyclic class with no base case?)");
+        return new ExtractionChoices(bestCost, bestNode);
+    }
+
+    /** Validate the objective without requiring an initially extractable root. */
+    void validateNodeCosts(java.util.function.ToIntFunction<ENode> costOfNode) {
+        Objects.requireNonNull(costOfNode, "costOfNode");
+        for (EClass eclass : classes()) {
+            for (ENode node : eclass.nodes()) validatedNodeCost(node, costOfNode);
         }
-        return buildExpression(canonical, bestNode);
+    }
+
+    private static int validatedNodeCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode) {
+        int cost = costOfNode.applyAsInt(node);
+        if (cost < 0) throw new IllegalArgumentException("Additive extraction requires non-negative node costs");
+        return cost;
     }
 
     private int extractionCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode,
             Map<EClassId, Integer> bestCost) {
-        long total = costOfNode.applyAsInt(node);
+        long total = validatedNodeCost(node, costOfNode);
         if (total == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         }
