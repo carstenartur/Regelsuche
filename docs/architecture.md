@@ -1,8 +1,11 @@
 # Architektur
 
-Regelsuche ist ein Gradle-Multi-Projekt mit einem technologiearmen
+Regelsuche besitzt einen Java-25-Maven-Reaktor mit einem technologiearmen
 mathematischen Kern, expliziten Capability-Modulen und einer dünnen
-Laufzeitkomposition. Die Architektur soll drei Eigenschaften gleichzeitig
+Laufzeitkomposition. Die Root- und Modul-POMs beschreiben den Java-Produktbuild;
+die vorhandenen Gradle-, Browser- und Reproduktions-Gates bleiben während der
+Migration zusätzlich aktiv ([Modulstruktur](module-structure.md), [Testing](testing.md)).
+Die Architektur soll drei Eigenschaften gleichzeitig
 sichern:
 
 1. mathematische Semantik bleibt unabhängig von Web, Datenbanken und CI;
@@ -40,6 +43,9 @@ autoritative Verifikationsvertrag liegt im Checkout.
   semantische Views sowie exakte Koeffizientendomänen, Polynomringe,
   Faktorisierungsengine- und Verifier-Verträge.
 - `regelsuche-egraph` — Equality-Saturation-Strukturen auf Basis des Core.
+- `regelsuche-optimization-sdk` — externe Java-Fassade für typisierte numerische
+  Rechenpläne, unabhängige Prüfung und explizite Java-Zahlensemantik auf Search
+  und Math Algorithms; keine eigene zweite Suchmaschine.
 - `regelsuche-search` — Suchprobleme, Strategien, Scoring, Budgets,
   Frontier-/Transposition-Memory und die Koordinatoren für direkte, exakte und
   lokal mustergerichtete Regelvorbereitung.
@@ -284,11 +290,15 @@ Der mathematische Kern enthält:
 - einen unabhängigen Verifier als einzige Quelle vertrauenswürdiger
   Faktorisierungsevidence.
 
-`PolynomialSemanticView` liest numerische Koeffizienten und Exponenten nur aus
-parserausgestellter exakter Literalprovenienz. Der historische
-`NumberExpr(double)`-Wert ist keine Quelle exakter Mathematik. Konkrete
-AST-Vorkommen und Anzeigezeichenfolgen verbleiben im View; die Engine arbeitet
-nur auf dem mathematischen Polynom.
+Im aktuellen Entwicklungsstand trägt `NumberExpr.value()` einen normalisierten
+`ExactRational`; Ganzzahl- und Dezimalliterale werden ohne `double`-Umweg gelesen.
+`parseExactTerm` liefert zusätzlich Quellbereiche und Literalzertifikate;
+`PolynomialSemanticView` bindet diese an die konkreten Vorkommen. Ein `double`-
+Konstruktor gehört nicht mehr zum numerischen AST. Auch die tatsächlich
+veröffentlichten Core-Binärdateien des SDK 0.5.2 tragen bereits diesen rationalen
+Werttyp; für eine konkrete Integration bleiben die Javadocs ihrer Version maßgeblich.
+Konkrete AST-Vorkommen und Anzeigezeichenfolgen verbleiben im View; die Engine
+arbeitet auf dem mathematischen Polynom. Details: [Exakte Zahlen im AST](exact-numeric-ast.md).
 
 Eine `FactorizationEngine` darf Kandidaten vorschlagen und eigene Backend-Claims
 retained ausgeben. Diese Daten sind ausdrücklich untrusted. Erst
@@ -318,8 +328,17 @@ Wesentliche Grenzen:
 - Ein Backend-Claim ist keine unabhängig zertifizierte Vollständigkeit.
 - Die aktuelle Quartikengine belegt eine exakte Zerlegung, nicht die
   Irreduzibilität jedes ausgegebenen Faktors.
-- Vollständige Faktorisierung über `Z[x]` oder `Q[x]`, endliche Körper,
-  Hensel-Lifting, Rekombination und multivariate Verfahren sind Folgearbeiten.
+- Die allgemeine begrenzte `NativeUnivariateFactorizationEngine` für `Z[x]` und
+  `Q[x]`, Primkörperfaktorisierung, Hensel-Lifting, Zassenhaus-Rekombination und
+  rationale Reassemblierung sind inzwischen implementiert. Produktgleichheit,
+  Originaldomänen-Irreduzibilität und Vollständigkeit bleiben getrennte Claims;
+  nur ein erfolgreicher unabhängiger Nachweis autorisiert die stärkere Aussage.
+- Gröbner-Basen für kleine rationale Ideale werden bereits durch
+  `GroebnerBasisEngine` berechnet. Größere multivariate Verfahren sowie
+  F4/F5 und LLL-/van-Hoeij-Rekombination sind dadurch nicht abgedeckt.
+  [Mathematische Algorithmen](mathematical-algorithms.md) und
+  [Faktorisierungsvertrag](domain-aware-polynomial-factorization.md) beschreiben
+  Budgets, unterstützte Fragmente und unabhängige Zertifikate.
 - Die früheren verschachtelten Quartiktypen werden nicht als parallele
   Kompatibilitäts-API weitergeführt.
 
@@ -418,11 +437,13 @@ Details stehen in [Persistenz](persistence.md) und
 
 Die Architektur wird nicht nur beschrieben, sondern durch den Build geprüft:
 
-- Gradle-Projektabhängigkeiten erzwingen die wichtigsten Modulgrenzen;
+- Maven-Modul-POMs und die bestehenden Gradle-Verträge beschreiben und prüfen Modulgrenzen;
 - JUnit charakterisiert fachliche und infrastrukturelle Verträge;
 - Python- und Shell-Verifier prüfen kanonische Artefakte aus dem Checkout;
 - Testcontainers führt reale Container- und Datenbankintegration lokal aus;
-- `ciCheck` ist der gemeinsame lokale und CI-seitige Einstiegspunkt;
+- `mvn test` prüft den normalen Java-Produktreaktor; `mvn -Pfull verify` ergänzt
+  die vollständigen Maven-Verträge mit ihren Laufzeitvoraussetzungen;
+- das bestehende Gradle-`ciCheck` bleibt eine zusätzliche geschützte Autorität;
 - `verifyWorkflowSemantics` verhindert workfloweigene Parallel-Logik.
 
 Siehe [Testing](testing.md) und [Testing-Strategie](testing-strategy.md).

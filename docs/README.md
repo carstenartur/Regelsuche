@@ -5,6 +5,10 @@ Suche, kumulativem Lernen und geprüfter Rechenoptimierung. Sie ordnet Seiten
 nach Zielgruppe und Aufgabe. Die [Forschungsmethodik](research-methodology.md)
 erläutert die untersuchten Verfahren und die Rolle von Referenzmessungen.
 
+English entry: [Start here](start-here.md). Without installation:
+[recorded discovery demo](demos/recorded-discovery.html). For external Java code:
+[released SDK and Maven quickstart](java-sdk-quickstart.md).
+
 ## Der passende Einstieg
 
 | Ich möchte … | Empfohlener Einstieg |
@@ -43,7 +47,7 @@ Regelsuche verwendet je Informationstyp genau eine maßgebliche Quelle:
 | Capability- und Claim-Status | generierte Capability-Matrix und gebundene Evidence |
 | Architekturentscheidungen | Architekturtexte und ADRs unter `docs/adr/` |
 | maschinenlesbare Verträge | versionierte JSON-Schemas unter `docs/schemas/` |
-| Build- und Testsemantik | Gradle, JUnit und Skripte im Checkout |
+| Build- und Testsemantik | Maven-POMs und JUnit; zusätzliche bestehende Gradle-/Reproduktions-Gates im Checkout |
 
 Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen in
 [Dokumentationskonventionen](documentation-conventions.md).
