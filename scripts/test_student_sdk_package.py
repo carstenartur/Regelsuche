@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 import re
 import shlex
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -81,11 +82,10 @@ class SdkPackageTest(unittest.TestCase):
             self.write(path, 'fixture')
         for example in package.EXAMPLES:
             self.write(f'examples/external-consumers/{example}/build.gradle', 'version=0.5.0-SNAPSHOT')
-        content = b'version=0.5.0-SNAPSHOT'
-        self.write('examples/external-consumers/number-theory-plan-java25/SOURCE.json', json.dumps({
-            'commit': package.verify_pinned_consumer.__globals__['PRIMACHSENRAUM_COMMIT'],
-            'repository': 'https://github.com/carstenartur/primachsenraum',
-            'files': {'build.gradle': hashlib.sha1(b'blob ' + str(len(content)).encode() + b'\0' + content).hexdigest()}}))
+        pinned = Path(__file__).resolve().parents[1] / 'examples/external-consumers/number-theory-plan-java25'
+        destination = self.root / 'examples/external-consumers/number-theory-plan-java25'
+        shutil.rmtree(destination)
+        shutil.copytree(pinned, destination)
         for module in ('regelsuche-discovery-sdk', 'regelsuche-bom'):
             directory = self.repo / 'de/regelsuche' / module / self.version
             directory.mkdir(parents=True)
@@ -113,7 +113,12 @@ class SdkPackageTest(unittest.TestCase):
             self.assertIn(prefix + 'javadoc/regelsuche-discovery-sdk/index.html', archive.namelist())
             self.assertIn(prefix + 'SHA256SUMS.txt', archive.namelist())
             for example in package.EXAMPLES:
-                self.assertEqual(b'version=0.5.0-SNAPSHOT' if example == 'number-theory-plan-java25' else b'version=0.5.0', archive.read(prefix + f'examples/external-consumers/{example}/build.gradle'))
+                if example == 'number-theory-plan-java25':
+                    derived = package.current_sdk_consumer_files(self.root / 'examples/external-consumers' / example)
+                    for name, data in derived.items():
+                        self.assertEqual(data, archive.read(prefix + f'examples/external-consumers/{example}/{name}'))
+                else:
+                    self.assertEqual(b'version=0.5.0', archive.read(prefix + f'examples/external-consumers/{example}/build.gradle'))
         with self.assertRaises(FileExistsError):
             package.package(self.root, self.repo, self.version, one)
 
