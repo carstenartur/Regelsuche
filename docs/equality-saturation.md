@@ -52,6 +52,8 @@ Rule implementers remain responsible for the truth of that declaration.
   representative per root e-node, with cheapest child representatives.
   This finds alternatives hidden by extracting just the cheapest root.
   It does **not** enumerate the Cartesian product of child alternatives.
+  Alternatives whose objective cost or child cost is unavailable are skipped;
+  a wholly unavailable class is an ordinary miss, not a rule callback failure.
 * Non-exact recognition profiles, including associative/commutative
   matching, take the concrete path so their recognition semantics are
   honored. The native e-matcher does not implement complete AC matching.

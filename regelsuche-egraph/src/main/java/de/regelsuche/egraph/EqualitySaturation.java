@@ -176,6 +176,9 @@ public final class EqualitySaturation {
             List<Expr> representatives;
             try {
                 representatives = graph.representatives(source, cost);
+                if (representatives.isEmpty()) {
+                    run.diagnostics.record(rule.id(), source, NON_APPLICABLE, EXTRACTION, null);
+                }
             } catch (RuntimeException failure) {
                 run.diagnostics.record(rule.id(), source, RULE_FAILURE, EXTRACTION, failure);
                 continue;
