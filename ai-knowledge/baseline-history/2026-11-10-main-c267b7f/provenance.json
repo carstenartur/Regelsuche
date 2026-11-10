@@ -1,0 +1,96 @@
+{
+  "purpose": "Advance only to the already merged and independently qualified main predecessor; no failed feature measurement supplies reference values.",
+  "acceptedSource": {
+    "revision": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+    "tree": "a023dbc29cc3402d26b9e42e28d41ab2c3c450f4",
+    "workflowRun": 42752771954,
+    "event": "push",
+    "branch": "main",
+    "attempt": 1,
+    "conclusion": "success",
+    "requiredAuthoritiesAndConvergence": "source-qualification.json",
+    "artifactId": 13736057654,
+    "artifactName": "quality-acceptance-evidence",
+    "artifactSha256": "852a601689c9757b5924f46bdd6857446e2babed03211edc5a6ed9ac1e537519",
+    "artifactBytes": 29176328,
+    "artifactUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/artifacts/13736057654"
+  },
+  "nativeEvidence": {
+    "main-native-complexity.json": {
+      "sourcePath": "build/ai-knowledge/complexity.json",
+      "archivePath": "files/build/ai-knowledge/complexity.json",
+      "sha256": "d3fff399adb4624e844e47d1b2469286fa4b4a895d9f84e1e35a69262f91c250",
+      "bytes": 20766
+    },
+    "main-native-check.json": {
+      "sourcePath": "build/ai-knowledge/check.json",
+      "archivePath": "files/build/ai-knowledge/check.json",
+      "sha256": "30803f563efb9d22143a2a02a56c184c863b353ab539c58ede389aad5acd8c35",
+      "bytes": 10185
+    },
+    "previous-baseline.json": {
+      "sourcePath": "ai-knowledge/complexity-baseline.json",
+      "archivePath": "files/ai-knowledge/complexity-baseline.json",
+      "sha256": "d3348a8b61c041ec096b4b0e3753ea0dfcd6f33560ce209b77dfc0c82b6f0c1a",
+      "bytes": 315
+    }
+  },
+  "originalIndex": {
+    "retainedFile": "original-index.json",
+    "sha256": "9853e447f1ae49d102cbd9f46ac9285f14f6fb5a9b88534accb2d0b6edd06e59",
+    "bytes": 522992,
+    "allIndexedFilesVerified": 284,
+    "checkout": {
+      "revision": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "trackedChangesPresent": false,
+      "tree": "a023dbc29cc3402d26b9e42e28d41ab2c3c450f4"
+    },
+    "claimBoundary": "The original index binds collection only; independent complete successful main CI supplies gate-execution qualification."
+  },
+  "baseline": {
+    "previousSha256": "d3348a8b61c041ec096b4b0e3753ea0dfcd6f33560ce209b77dfc0c82b6f0c1a",
+    "projectedSha256": "8a5f0e2efa4673872858d6df4e62404724727a018940c6d7f3978d5c4bb5f95a",
+    "activeEqualsProjectedBytes": true,
+    "derivation": "Unchanged original TrendAnalyzer.snapshot over the native accepted-main complexity.json; contextDebtModelVersion derived from native contextFootprint.schemaVersion=3. This is a projection, not an original downloaded metrics-snapshot.json.",
+    "projectionReceipt": "projection-verification.json"
+  },
+  "rejectedCombined": {
+    "revision": "f4bd06eb2d05981cdb0917d2e4a1f98637e6095d",
+    "tree": "751ff62e242aeb356d327ab000955b9dd78125a5",
+    "workflowRun": 42777624386,
+    "failedGradleJob": 129699748295,
+    "retainedFile": "rejected-combined-trend.json",
+    "sha256": "e80b9f5bfa68565f1591b7f279734f3ebe5ecdd379e18eb9e9e6eb01886f5126",
+    "bytes": 2125,
+    "inputToBaseline": false
+  },
+  "limits": {
+    "maxContextTokenIncrease": 15000,
+    "previousReferenceTokens": 739670,
+    "acceptedMainTokens": 750870,
+    "acceptedMainIncrease": 11200,
+    "combinedFeatureTokens": 755575,
+    "combinedFeatureIncreaseFromPreviousReference": 15905,
+    "combinedFeatureIncreaseFromAcceptedMain": 4705
+  },
+  "unchangedPolicySha256": {
+    "ai-knowledge-verification/build.gradle": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+    "gradle/ai-knowledge-verification.gradle": "f1df0d336d519f10a0bf35129e1b80cd8cbbad5d0d3939e0fffd2cd5d7ee91b8",
+    "config/quality/complexity-hotspots.json": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4",
+    "config/ai-knowledge-capability-coverage.json": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+    "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+    "ai-knowledge/capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108"
+  },
+  "verification": {
+    "officialArtifactDigestVerified": true,
+    "allIndexedFilesVerified": 284,
+    "nativeMainCheckPassed": true,
+    "samePreviousBaselineVerified": true,
+    "fullSourceAndCiBindingVerified": true,
+    "independentScopedReview": "required before integration",
+    "freshLocalFullExtractorRun": false,
+    "featureFinalHeadCi": "required after publication"
+  },
+  "scope": "Only accepted-main reference/evidence and current-reference documentation. No product source, tests, selectors, thresholds, exclusions or workflow changes."
+}
