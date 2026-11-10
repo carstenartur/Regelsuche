@@ -28,6 +28,7 @@ class MavenDependencyManagementContractTest {
   private static final Set<String> MANAGED_EXTERNAL_DEPENDENCIES =
       Set.of(
           "com.fasterxml.jackson.core:jackson-databind",
+          "com.fasterxml.jackson.core:jackson-annotations",
           "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml",
           "org.postgresql:postgresql",
           "org.hibernate.orm:hibernate-core",
