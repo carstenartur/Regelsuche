@@ -22,31 +22,24 @@ Weiterführend: [15-Minuten-Quickstart](java-sdk-quickstart.md), [Domain-Tutoria
 
 ## Abhängigkeit
 
-Der Checkout veröffentlicht den ersten Slice als
+Der bevorzugte externe Einstieg verwendet das veröffentlichte
+[SDK-ZIP 0.5.2 und einen eigenständigen Maven-Consumer](java-sdk-quickstart.md).
+Das ZIP enthält das Maven-Repository; ein Regelsuche-Source-Build ist nicht nötig.
+Die Koordinate der Discovery-Fassade lautet:
 
 ```text
-de.regelsuche:regelsuche-discovery-sdk:0.5.0-SNAPSHOT
+de.regelsuche:regelsuche-discovery-sdk:0.5.2
 ```
 
-in ein isoliertes lokales Maven-Repository. Ein externer Gradle-Verbraucher
-benötigt Java 25. Die Regelsuche-Gruppe sollte exklusiv aus diesem Repository
-bezogen werden, während Fremdabhängigkeiten weiterhin aus Maven Central kommen:
+Die Produktversion wird über `de.regelsuche:regelsuche-bom:0.5.2` fixiert.
+Für eigene Regeln ergänzt der Consumer `regelsuche-plugin-api`. Die vollständige
+Maven-Konfiguration steht im [ausführbaren Beispiel](../examples/external-consumers/hello-rule-java25/).
+Für Gradle enthalten die veröffentlichten Beispiele exklusive Repositoryregeln
+für `de.regelsuche`; Fremdabhängigkeiten kommen weiterhin aus Central.
 
-```gradle
-repositories {
-    exclusiveContent {
-        forRepository {
-            maven { url = uri(regelsucheRepository) }
-        }
-        filter { includeGroup "de.regelsuche" }
-    }
-    mavenCentral()
-}
-
-dependencies {
-    implementation "de.regelsuche:regelsuche-discovery-sdk:0.5.0-SNAPSHOT"
-}
-```
+Die folgenden Builder-/SPI-Beschreibungen gelten für den aktuellen Quellstand.
+Für 0.5.2 sind dessen mitgelieferte Javadocs und API-Revisionen verbindlich;
+neuere `0.5.3-SNAPSHOT`-Funktionen sind nicht rückwirkend veröffentlicht.
 
 Die Checkout-Prüfung baut das Beispiel aus einer frischen Kopie außerhalb des
 Multi-Projekts und mit einem leeren eigenen `GRADLE_USER_HOME`. Interne

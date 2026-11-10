@@ -60,7 +60,26 @@ Abhängigkeitsauflösung erzeugen. Diese Auflösung ist noch kein Download und
 keine Installation. Details stehen unter
 [Unveränderlicher Plugin- und Paketindex](plugin-artifact-index.md).
 
-## Eigene Plugins hinzufügen
+## Eigene Plugins: zwei unterschiedliche Einstiegspunkte
+
+| Ziel | Vertrag und ausführbarer Einstieg | Grenze |
+| --- | --- | --- |
+| Eine Anwendungsregel über die bestehende API v1 registrieren | `de.regelsuche.plugin.RegelsuchePlugin`; [hello-rule-java25](../examples/external-consumers/hello-rule-java25/README.md) und [SDK-Quickstart](java-sdk-quickstart.md) | Regel-/Anwendungs-API, kein generischer v2-Beitrag |
+| Einen eigenen typisierten Beitrag im Headless-Runtime laden | SPI v2 `de.regelsuche.extension.RegelsuchePlugin`; [extension-runtime-java25](../examples/external-consumers/extension-runtime-java25/README.md) mit Release 0.5.2, Maven-/Wrapper-/Java-Aufrufen und erwarteter Ausgabe | vertrauenswürdiger Classpath-Code; keine externe JAR-Admission oder automatische Workbench-Installation |
+
+Die Revision **v2** gehört zur Extension-SPI und ist keine Produktversion: Die
+veröffentlichten Klassen werden über `regelsuche-extension-runtime:0.5.2` und
+die BOM 0.5.2 bezogen. Ein fremdes JAR in `externalPluginJars` benötigt dagegen
+eine hostseitige `PluginArtifactAdmission`; die Classpath-Demo umgeht oder
+ersetzt diesen Vertrag nicht. Details: [Generische Erweiterungen](generic-extensions.md).
+
+Der unveränderliche Veröffentlichungsindex beschreibt Artefaktmetadaten. Daraus
+folgt weder ein bereits gehosteter Community-Katalog noch eine automatische
+Übergabe veröffentlichter Artefakte in die laufende Workbench. Die vorhandenen
+v1-Anwendungsplugins, Discovery-SPI und `.regelsuche`-Regelpakete sind damit
+nicht auf die generische v2-SPI migriert.
+
+### Bestehende Anwendungsplugins über API v1 hinzufügen
 
 1. Implementiere `de.regelsuche.plugin.RegelsuchePlugin` (siehe [Plugin-API](plugin-api.md)).
 2. Registriere deine Klasse in `META-INF/services/de.regelsuche.plugin.RegelsuchePlugin`.

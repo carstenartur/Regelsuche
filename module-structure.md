@@ -1,16 +1,18 @@
 # Modulstruktur
 
-Regelsuche ist ein Gradle-Multi-Projekt. Fachliche Verantwortungen werden in
-eigenständigen Modulen gehalten; `app` bleibt die äußere Composition Root für
+Regelsuche besitzt einen vollständigen Maven-Produktreaktor für Java 25.
+Fachliche Verantwortungen werden in eigenständigen Modulen gehalten; `app` bleibt die äußere Composition Root für
 Web, konkrete CLI, Bootstrap und technische Adapter.
 
-`settings.gradle` und die jeweiligen `build.gradle`-Dateien sind die
-maßgebliche technische Quelle. Diese Seite erklärt die beabsichtigte
-Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
+`pom.xml` und die jeweiligen Modul-POMs beschreiben den Maven-Reaktor und seine
+Abhängigkeiten. `settings.gradle` und `build.gradle` bleiben für die bestehenden
+zusätzlichen Gradle-Gates relevant. Während der Migration gelten beide
+Prüfwege; ein Maven-Modultest ersetzt keine Browser-/Reproduktionsqualifikation.
+Diese Seite erklärt die beabsichtigte Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 
 ## Modulübersicht
 
-| Gradle-Projekt | Verantwortung | Typische direkte Grundlagen |
+| Modul (Gradle-Schreibweise) | Verantwortung | Typische direkte Grundlagen |
 | --- | --- | --- |
 | `:regelsuche-core` | AST, Parser, kanonische Identität, Annahmen und atomare Transformationen | keine Projektabhängigkeit |
 | `:regelsuche-extension-api` | suchunabhängige Extension Points, Plugin-Verträge, Kataloge und Herkunftsmetadaten | Core (API-Lifecycle-Annotationen) |
@@ -25,6 +27,7 @@ Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 | `:regelsuche-solver-portfolio` | capability-aware Backend-Auswahl, Budgets, Cache und Konflikte | Solver IR |
 | `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten, schematische Beweispläne und Rewrite-Program-Lernen | Core, Search, Validation, Math Algorithms, Solver IR |
 | `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff | Core, Search, Validation |
+| `:regelsuche-optimization-sdk` | externe Fassade für typisierte numerische Rechenpläne und unabhängige Java-Semantikprüfung | Search, Math Algorithms |
 | `:regelsuche-discovery-sdk` | kleine externe Java-25-Fassade, Domain-Builder und ServiceLoader-SPI | Discovery |
 | `:regelsuche-experiments` | Experiment-, Corpus-, Budget- und Evidence-DAG-Verträge | Search, Validation, Discovery, Math Algorithms |
 | `:regelsuche-benchmarks` | track-spezifische Vergleiche und Informationsparität | Search, Solver IR, Solver Portfolio |
@@ -35,6 +38,29 @@ Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 | `:regelsuche-cli` | projektunabhängige CLI-Primitiven und Optionsverarbeitung | keine Projektabhängigkeit |
 | `:app` | Composition Root, Web-Workbench, konkrete CLI, Docker-/Runtime-Wiring | produktive Fachmodule und Adapter |
 | `:ai-knowledge-verification` | optionaler Consumer-Vertrag des externen AI-Knowledge-Extractors | nur bei expliziter Aktivierung |
+
+## Build- und Auslieferungsstand
+
+Mit JDK 25 und Maven 3.9.9+ aus der 3.x-Linie:
+
+```bash
+mvn --batch-mode --no-transfer-progress test
+mvn --batch-mode --no-transfer-progress package
+```
+
+Das standardmäßig aktive Profil `product-reactor` ergänzt die Basis um
+Hibernate-Persistenz, Autopilot, Release, Benchmarks, `app` und Qualitätsaggregation.
+`package` erzeugt JAR und ZIP/TAR-Distributionen unter `app/target/`.
+`-Pfull` aktiviert zusätzlich das Integrationstestmodul; `verify` verlangt die
+jeweiligen Docker-/Solver-/Browser- und Release-Prüfvoraussetzungen. Die
+zusätzlichen Module `regelsuche-bom`, `regelsuche-quality`,
+`regelsuche-quality-aggregate` und `maven-build-contract` gehören ebenfalls zum
+Root-POM. Die Maven-Migration entfernt kein bestehendes geschütztes Gradle-Gate;
+die konkreten CI-Autoritäten stehen in [Testing](testing.md).
+
+Die externe SDK-Verwendung benötigt diesen Reaktor nicht: Das veröffentlichte
+[SDK-ZIP 0.5.2](java-sdk-quickstart.md) enthält ein Maven-Repository mit den elf
+öffentlichen SDK-Modulen, BOM und Parent-POM.
 
 ## Schichten
 
@@ -59,7 +85,7 @@ flowchart TD
 ```
 
 Die Darstellung zeigt Verantwortungsebenen, nicht jede einzelne direkte
-Gradle-Kante. Verbindliche Richtungen stehen in
+Modul-Kante. Verbindliche Richtungen stehen in
 [Dependency-Regeln](dependency-rules.md).
 
 ## Mathematischer Kern
@@ -172,14 +198,14 @@ als Architekturstatus geführt.
 
 ## Regeln für neue Module
 
-Ein neues Gradle-Modul benötigt:
+Ein neues Modul benötigt:
 
 - eine eindeutige fachliche Verantwortung;
 - eine gerichtete, azyklische Dependency-Position;
 - einen öffentlichen Port oder klar begrenzte API;
 - unabhängige Tests;
 - dokumentierte Auswirkungen auf Evidence und Versionierung;
-- Aktualisierung von `settings.gradle`, dieser Seite und
+- Aktualisierung von Root-/Modul-POMs, den weiterhin benötigten Gradle-Verträgen, dieser Seite und
   [Dependency-Regeln](dependency-rules.md).
 
 Reine Verzeichnisorganisation oder die Umgehung eines bestehenden Zyklus ohne

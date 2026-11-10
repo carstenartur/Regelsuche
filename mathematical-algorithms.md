@@ -289,21 +289,23 @@ Rückmultiplikation von Einheit, Faktoren, Multiplizitäten und ungelöstem Rest
 Backend-Claims zu Vollständigkeit oder Irreduzibilität bleiben von unabhängig
 zertifizierter Evidence getrennt.
 
-## Noch offene `Z[x]`-/`Q[x]`-Faktorisierung
+## Integrierte begrenzte `Z[x]`-/`Q[x]`-Faktorisierung
 
-Primkörperfaktorisierung und geeignete Primzahlauswahl sind qualifizierte
-algorithmische Bausteine, aber noch keine vollständige Faktorisierungsengine für
-ganzzahlige oder rationale Quellen. Noch offen sind:
+`NativeUnivariateFactorizationEngine` und `NativeUnivariateFactorizationPipeline`
+verbinden inzwischen Inhaltsnormalisierung, quadratfreie Zerlegung, geeignete
+Primzahlauswahl, Primkörperfaktorisierung, multifaktorielles Hensel-Lifting,
+Zassenhaus-Rekombination und exakte rationale Reassemblierung. Die frühere
+Auflistung dieser vorhandenen Stufen als fehlende Folgearbeiten war überholt.
 
-1. Hensel-Lifting mit expliziter Liftpräzision und Zwischenwertgrenzen;
-2. ganzzahlige Rekombination, zunächst etwa Zassenhaus;
-3. spätere LLL-/van-Hoeij-Rekombination, wenn qualifiziert;
-4. exakte rationale Faktorreassemblierung;
-5. unabhängige vollständige `Z[x]`-/`Q[x]`-Evidence hinter dem allgemeinen
-   Engine-/Verifier-Vertrag.
-
-Ein vollständiger Abschluss in `F_p[x]` ist kein Beweis für Vollständigkeit
-oder Irreduzibilität in `Z[x]` oder `Q[x]`.
+Der `FactorizationVerifier` rekonstruiert das Produkt unabhängig. Ein
+Backend-Abschluss autorisiert für sich weder Irreduzibilität noch
+`COMPLETE_FACTORIZATION`. Die inzwischen vorhandenen begrenzten unabhängigen
+Originaldomänen-Prüfer können diese stärkeren Claims bei vollständigem Erfolg
+ausstellen; Ressourcenlimits oder ein Engine-Miss liefern keinen solchen Beweis.
+[Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md)
+beschreibt diese Trennung und die aktuelle Engine-/Verifier-Grenze.
+LLL-/van-Hoeij-Rekombination für größere Fälle und allgemeine multivariate
+Faktorisierung sind damit nicht implementiert.
 
 ## Gröbner-Basen
 

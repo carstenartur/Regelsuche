@@ -3228,162 +3228,163 @@ public class WebWorkbenchServer {
 <span class="fc" id="L3228">            sendStaticResource(exchange, resource, mimeFor(resource));</span>
 <span class="fc bfc" id="L3229" title="All 2 branches covered.">        } else if (path.startsWith(&quot;/vendor/&quot;)</span>
 <span class="fc bfc" id="L3230" title="All 2 branches covered.">            || path.equals(&quot;/app.js&quot;)</span>
-<span class="fc bfc" id="L3231" title="All 2 branches covered.">            || path.equals(&quot;/style.css&quot;)</span>
-<span class="fc bfc" id="L3232" title="All 2 branches covered.">            || path.equals(&quot;/run-workspace-state.js&quot;)</span>
-<span class="fc bfc" id="L3233" title="All 2 branches covered.">            || path.equals(&quot;/candidate-dossier-state.js&quot;)</span>
-<span class="fc bfc" id="L3234" title="All 2 branches covered.">            || path.equals(&quot;/candidate-dossier.js&quot;)</span>
-<span class="fc bfc" id="L3235" title="All 2 branches covered.">            || path.equals(&quot;/run-workspace.js&quot;)</span>
-<span class="fc bfc" id="L3236" title="All 2 branches covered.">            || path.equals(&quot;/run-workspace.css&quot;)</span>
-<span class="fc bfc" id="L3237" title="All 2 branches covered.">            || path.equals(&quot;/rule-radar.js&quot;)</span>
-<span class="pc bpc" id="L3238" title="1 of 2 branches missed.">            || path.equals(&quot;/rule-radar.css&quot;)</span>
-<span class="nc bnc" id="L3239" title="All 2 branches missed.">            || path.equals(&quot;/discovery-domains.html&quot;)</span>
-<span class="nc bnc" id="L3240" title="All 2 branches missed.">            || path.equals(&quot;/discovery-domains.js&quot;)</span>
-<span class="nc bnc" id="L3241" title="All 2 branches missed.">            || path.equals(&quot;/discovery-domains.css&quot;)) {</span>
-<span class="fc" id="L3242">            sendStaticResource(exchange, &quot;/web&quot; + path, mimeFor(path));</span>
+<span class="fc bfc" id="L3231" title="All 2 branches covered.">            || path.equals(&quot;/workbench-entry.js&quot;)</span>
+<span class="fc bfc" id="L3232" title="All 2 branches covered.">            || path.equals(&quot;/style.css&quot;)</span>
+<span class="fc bfc" id="L3233" title="All 2 branches covered.">            || path.equals(&quot;/run-workspace-state.js&quot;)</span>
+<span class="fc bfc" id="L3234" title="All 2 branches covered.">            || path.equals(&quot;/candidate-dossier-state.js&quot;)</span>
+<span class="fc bfc" id="L3235" title="All 2 branches covered.">            || path.equals(&quot;/candidate-dossier.js&quot;)</span>
+<span class="fc bfc" id="L3236" title="All 2 branches covered.">            || path.equals(&quot;/run-workspace.js&quot;)</span>
+<span class="fc bfc" id="L3237" title="All 2 branches covered.">            || path.equals(&quot;/run-workspace.css&quot;)</span>
+<span class="fc bfc" id="L3238" title="All 2 branches covered.">            || path.equals(&quot;/rule-radar.js&quot;)</span>
+<span class="pc bpc" id="L3239" title="1 of 2 branches missed.">            || path.equals(&quot;/rule-radar.css&quot;)</span>
+<span class="nc bnc" id="L3240" title="All 2 branches missed.">            || path.equals(&quot;/discovery-domains.html&quot;)</span>
+<span class="nc bnc" id="L3241" title="All 2 branches missed.">            || path.equals(&quot;/discovery-domains.js&quot;)</span>
+<span class="nc bnc" id="L3242" title="All 2 branches missed.">            || path.equals(&quot;/discovery-domains.css&quot;)) {</span>
+<span class="fc" id="L3243">            sendStaticResource(exchange, &quot;/web&quot; + path, mimeFor(path));</span>
         } else {
-<span class="nc" id="L3244">            sendStatus(exchange, 404, &quot;not found&quot;);</span>
+<span class="nc" id="L3245">            sendStatus(exchange, 404, &quot;not found&quot;);</span>
         }
-<span class="fc" id="L3246">    }</span>
+<span class="fc" id="L3247">    }</span>
 
     private String mimeFor(String resource) {
-<span class="fc bfc" id="L3249" title="All 2 branches covered.">        if (resource.endsWith(&quot;.html&quot;)) {</span>
-<span class="fc" id="L3250">            return &quot;text/html; charset=utf-8&quot;;</span>
+<span class="fc bfc" id="L3250" title="All 2 branches covered.">        if (resource.endsWith(&quot;.html&quot;)) {</span>
+<span class="fc" id="L3251">            return &quot;text/html; charset=utf-8&quot;;</span>
         }
-<span class="fc bfc" id="L3252" title="All 2 branches covered.">        if (resource.endsWith(&quot;.js&quot;)) {</span>
-<span class="fc" id="L3253">            return &quot;application/javascript; charset=utf-8&quot;;</span>
+<span class="fc bfc" id="L3253" title="All 2 branches covered.">        if (resource.endsWith(&quot;.js&quot;)) {</span>
+<span class="fc" id="L3254">            return &quot;application/javascript; charset=utf-8&quot;;</span>
         }
-<span class="fc bfc" id="L3255" title="All 2 branches covered.">        if (resource.endsWith(&quot;.css&quot;)) {</span>
-<span class="fc" id="L3256">            return &quot;text/css; charset=utf-8&quot;;</span>
+<span class="fc bfc" id="L3256" title="All 2 branches covered.">        if (resource.endsWith(&quot;.css&quot;)) {</span>
+<span class="fc" id="L3257">            return &quot;text/css; charset=utf-8&quot;;</span>
         }
-<span class="pc bpc" id="L3258" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.woff2&quot;)) {</span>
-<span class="nc" id="L3259">            return &quot;font/woff2&quot;;</span>
+<span class="pc bpc" id="L3259" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.woff2&quot;)) {</span>
+<span class="nc" id="L3260">            return &quot;font/woff2&quot;;</span>
         }
-<span class="pc bpc" id="L3261" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.woff&quot;)) {</span>
-<span class="nc" id="L3262">            return &quot;font/woff&quot;;</span>
+<span class="pc bpc" id="L3262" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.woff&quot;)) {</span>
+<span class="nc" id="L3263">            return &quot;font/woff&quot;;</span>
         }
-<span class="pc bpc" id="L3264" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.ttf&quot;)) {</span>
-<span class="nc" id="L3265">            return &quot;font/ttf&quot;;</span>
+<span class="pc bpc" id="L3265" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.ttf&quot;)) {</span>
+<span class="nc" id="L3266">            return &quot;font/ttf&quot;;</span>
         }
-<span class="pc bpc" id="L3267" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.svg&quot;)) {</span>
-<span class="nc" id="L3268">            return &quot;image/svg+xml&quot;;</span>
+<span class="pc bpc" id="L3268" title="1 of 2 branches missed.">        if (resource.endsWith(&quot;.svg&quot;)) {</span>
+<span class="nc" id="L3269">            return &quot;image/svg+xml&quot;;</span>
         }
-<span class="pc bpc" id="L3270" title="1 of 4 branches missed.">        if (resource.endsWith(&quot;.json&quot;) || resource.endsWith(&quot;.map&quot;)) {</span>
-<span class="fc" id="L3271">            return &quot;application/json; charset=utf-8&quot;;</span>
+<span class="pc bpc" id="L3271" title="1 of 4 branches missed.">        if (resource.endsWith(&quot;.json&quot;) || resource.endsWith(&quot;.map&quot;)) {</span>
+<span class="fc" id="L3272">            return &quot;application/json; charset=utf-8&quot;;</span>
         }
-<span class="fc" id="L3273">        return &quot;application/octet-stream&quot;;</span>
+<span class="fc" id="L3274">        return &quot;application/octet-stream&quot;;</span>
     }
 
     private void sendStaticResource(HttpExchange exchange, String resource, String contentType) throws IOException {
-<span class="fc" id="L3277">        try (InputStream stream = WebWorkbenchServer.class.getResourceAsStream(resource)) {</span>
-<span class="pc bpc" id="L3278" title="1 of 2 branches missed.">            if (stream == null) {</span>
-<span class="nc" id="L3279">                sendStatus(exchange, 404, &quot;missing resource: &quot; + resource);</span>
-<span class="nc" id="L3280">                return;</span>
+<span class="fc" id="L3278">        try (InputStream stream = WebWorkbenchServer.class.getResourceAsStream(resource)) {</span>
+<span class="pc bpc" id="L3279" title="1 of 2 branches missed.">            if (stream == null) {</span>
+<span class="nc" id="L3280">                sendStatus(exchange, 404, &quot;missing resource: &quot; + resource);</span>
+<span class="nc" id="L3281">                return;</span>
             }
-<span class="fc" id="L3282">            ByteArrayOutputStream buffer = new ByteArrayOutputStream();</span>
-<span class="fc" id="L3283">            stream.transferTo(buffer);</span>
-<span class="fc" id="L3284">            byte[] bytes = buffer.toByteArray();</span>
-<span class="fc" id="L3285">            exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
-<span class="fc" id="L3286">            exchange.sendResponseHeaders(200, bytes.length);</span>
-<span class="fc" id="L3287">            try (OutputStream body = exchange.getResponseBody()) {</span>
-<span class="fc" id="L3288">                body.write(bytes);</span>
+<span class="fc" id="L3283">            ByteArrayOutputStream buffer = new ByteArrayOutputStream();</span>
+<span class="fc" id="L3284">            stream.transferTo(buffer);</span>
+<span class="fc" id="L3285">            byte[] bytes = buffer.toByteArray();</span>
+<span class="fc" id="L3286">            exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
+<span class="fc" id="L3287">            exchange.sendResponseHeaders(200, bytes.length);</span>
+<span class="fc" id="L3288">            try (OutputStream body = exchange.getResponseBody()) {</span>
+<span class="fc" id="L3289">                body.write(bytes);</span>
             }
-<span class="nc bnc" id="L3290" title="All 2 branches missed.">        }</span>
-<span class="fc" id="L3291">    }</span>
+<span class="nc bnc" id="L3291" title="All 2 branches missed.">        }</span>
+<span class="fc" id="L3292">    }</span>
 
     private String dtoListToJson(String wrapper, List&lt;?&gt; dtos) {
         // Reuse the existing export JSON shape for transformations.
-<span class="fc" id="L3295">        StringBuilder builder = new StringBuilder(&quot;{\&quot;&quot; + wrapper + &quot;\&quot;:[&quot;);</span>
-<span class="fc bfc" id="L3296" title="All 2 branches covered.">        for (int i = 0; i &lt; dtos.size(); i++) {</span>
-<span class="fc bfc" id="L3297" title="All 2 branches covered.">            if (i &gt; 0) {</span>
-<span class="fc" id="L3298">                builder.append(',');</span>
+<span class="fc" id="L3296">        StringBuilder builder = new StringBuilder(&quot;{\&quot;&quot; + wrapper + &quot;\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L3297" title="All 2 branches covered.">        for (int i = 0; i &lt; dtos.size(); i++) {</span>
+<span class="fc bfc" id="L3298" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L3299">                builder.append(',');</span>
             }
-<span class="fc" id="L3300">            builder.append(singleDtoJson(dtos.get(i)));</span>
+<span class="fc" id="L3301">            builder.append(singleDtoJson(dtos.get(i)));</span>
         }
-<span class="fc" id="L3302">        builder.append(&quot;]}&quot;);</span>
-<span class="fc" id="L3303">        return builder.toString();</span>
+<span class="fc" id="L3303">        builder.append(&quot;]}&quot;);</span>
+<span class="fc" id="L3304">        return builder.toString();</span>
     }
 
     private String singleDtoJson(Object dto) {
-<span class="pc bpc" id="L3307" title="1 of 2 branches missed.">        if (dto instanceof de.regelsuche.api.TransformationPathDto pathDto) {</span>
-<span class="fc" id="L3308">            JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L3309">            writer.beginObject();</span>
-<span class="fc" id="L3310">            writer.property(&quot;id&quot;, pathDto.id());</span>
-<span class="fc" id="L3311">            writer.property(&quot;originalExpression&quot;, pathDto.originalExpression());</span>
-<span class="fc" id="L3312">            writer.property(&quot;improvedExpression&quot;, pathDto.improvedExpression());</span>
-<span class="fc" id="L3313">            writer.property(&quot;originalScore&quot;, pathDto.originalScore());</span>
-<span class="fc" id="L3314">            writer.property(&quot;improvedScore&quot;, pathDto.improvedScore());</span>
-<span class="fc" id="L3315">            writer.property(&quot;totalImprovement&quot;, pathDto.totalImprovement());</span>
-<span class="fc" id="L3316">            writer.property(&quot;validationStatus&quot;, pathDto.validationStatus());</span>
-<span class="pc bpc" id="L3317" title="1 of 2 branches missed.">            writer.property(&quot;discoveredAt&quot;, pathDto.discoveredAt() == null ? &quot;&quot; : pathDto.discoveredAt().toString());</span>
-<span class="fc" id="L3318">            writer.array(&quot;steps&quot;, w -&gt; pathDto.steps().forEach(step -&gt;</span>
-<span class="fc" id="L3319">                w.objectValue(inner -&gt; {</span>
-<span class="fc" id="L3320">                    inner.property(&quot;index&quot;, step.index());</span>
-<span class="fc" id="L3321">                    inner.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
-<span class="fc" id="L3322">                    inner.property(&quot;afterExpression&quot;, step.afterExpression());</span>
-<span class="fc" id="L3323">                    inner.property(&quot;ruleId&quot;, step.ruleId());</span>
-<span class="fc" id="L3324">                    inner.property(&quot;ruleKind&quot;, step.ruleKind());</span>
-<span class="fc" id="L3325">                    inner.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
-<span class="fc" id="L3326">                    inner.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
-<span class="fc" id="L3327">                    inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
-<span class="fc" id="L3328">                })));</span>
-<span class="fc" id="L3329">            writer.endObject();</span>
-<span class="fc" id="L3330">            return writer.toString();</span>
+<span class="pc bpc" id="L3308" title="1 of 2 branches missed.">        if (dto instanceof de.regelsuche.api.TransformationPathDto pathDto) {</span>
+<span class="fc" id="L3309">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L3310">            writer.beginObject();</span>
+<span class="fc" id="L3311">            writer.property(&quot;id&quot;, pathDto.id());</span>
+<span class="fc" id="L3312">            writer.property(&quot;originalExpression&quot;, pathDto.originalExpression());</span>
+<span class="fc" id="L3313">            writer.property(&quot;improvedExpression&quot;, pathDto.improvedExpression());</span>
+<span class="fc" id="L3314">            writer.property(&quot;originalScore&quot;, pathDto.originalScore());</span>
+<span class="fc" id="L3315">            writer.property(&quot;improvedScore&quot;, pathDto.improvedScore());</span>
+<span class="fc" id="L3316">            writer.property(&quot;totalImprovement&quot;, pathDto.totalImprovement());</span>
+<span class="fc" id="L3317">            writer.property(&quot;validationStatus&quot;, pathDto.validationStatus());</span>
+<span class="pc bpc" id="L3318" title="1 of 2 branches missed.">            writer.property(&quot;discoveredAt&quot;, pathDto.discoveredAt() == null ? &quot;&quot; : pathDto.discoveredAt().toString());</span>
+<span class="fc" id="L3319">            writer.array(&quot;steps&quot;, w -&gt; pathDto.steps().forEach(step -&gt;</span>
+<span class="fc" id="L3320">                w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L3321">                    inner.property(&quot;index&quot;, step.index());</span>
+<span class="fc" id="L3322">                    inner.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="fc" id="L3323">                    inner.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="fc" id="L3324">                    inner.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L3325">                    inner.property(&quot;ruleKind&quot;, step.ruleKind());</span>
+<span class="fc" id="L3326">                    inner.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="fc" id="L3327">                    inner.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
+<span class="fc" id="L3328">                    inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L3329">                })));</span>
+<span class="fc" id="L3330">            writer.endObject();</span>
+<span class="fc" id="L3331">            return writer.toString();</span>
         }
-<span class="nc" id="L3332">        return &quot;{}&quot;;</span>
+<span class="nc" id="L3333">        return &quot;{}&quot;;</span>
     }
 
     private String queryParam(HttpExchange exchange, String name, String fallback) {
-<span class="fc" id="L3336">        String query = exchange.getRequestURI().getRawQuery();</span>
-<span class="pc bpc" id="L3337" title="1 of 4 branches missed.">        if (query == null || query.isBlank()) {</span>
-<span class="fc" id="L3338">            return fallback;</span>
+<span class="fc" id="L3337">        String query = exchange.getRequestURI().getRawQuery();</span>
+<span class="pc bpc" id="L3338" title="1 of 4 branches missed.">        if (query == null || query.isBlank()) {</span>
+<span class="fc" id="L3339">            return fallback;</span>
         }
-<span class="fc" id="L3340">        Map&lt;String, String&gt; parsed = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L3341" title="All 2 branches covered.">        for (String part : query.split(&quot;&amp;&quot;)) {</span>
-<span class="fc" id="L3342">            int idx = part.indexOf('=');</span>
-<span class="pc bpc" id="L3343" title="1 of 2 branches missed.">            if (idx &gt; 0) {</span>
-<span class="fc" id="L3344">                String rawValue = part.substring(idx + 1);</span>
+<span class="fc" id="L3341">        Map&lt;String, String&gt; parsed = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L3342" title="All 2 branches covered.">        for (String part : query.split(&quot;&amp;&quot;)) {</span>
+<span class="fc" id="L3343">            int idx = part.indexOf('=');</span>
+<span class="pc bpc" id="L3344" title="1 of 2 branches missed.">            if (idx &gt; 0) {</span>
+<span class="fc" id="L3345">                String rawValue = part.substring(idx + 1);</span>
                 String decoded;
                 try {
-<span class="fc" id="L3347">                    decoded = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);</span>
-<span class="nc" id="L3348">                } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L3349">                    decoded = rawValue;</span>
-<span class="fc" id="L3350">                }</span>
-<span class="fc" id="L3351">                parsed.put(part.substring(0, idx), decoded);</span>
+<span class="fc" id="L3348">                    decoded = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L3349">                } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L3350">                    decoded = rawValue;</span>
+<span class="fc" id="L3351">                }</span>
+<span class="fc" id="L3352">                parsed.put(part.substring(0, idx), decoded);</span>
             }
         }
-<span class="fc" id="L3354">        return parsed.getOrDefault(name, fallback);</span>
+<span class="fc" id="L3355">        return parsed.getOrDefault(name, fallback);</span>
     }
 
     private void sendPayloadTooLarge(HttpExchange exchange, int limitBytes) throws IOException {
-<span class="fc" id="L3358">        JsonWriter writer = new JsonWriter().beginObject()</span>
-<span class="fc" id="L3359">            .property(&quot;error&quot;, true)</span>
-<span class="fc" id="L3360">            .property(&quot;code&quot;, &quot;PAYLOAD_TOO_LARGE&quot;)</span>
-<span class="fc" id="L3361">            .property(&quot;message&quot;, &quot;request body exceeds configured limit&quot;)</span>
-<span class="fc" id="L3362">            .property(&quot;limitBytes&quot;, limitBytes)</span>
-<span class="fc" id="L3363">            .endObject();</span>
-<span class="fc" id="L3364">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
-<span class="fc" id="L3365">        sendJson(exchange, 413, writer.toString());</span>
-<span class="fc" id="L3366">    }</span>
+<span class="fc" id="L3359">        JsonWriter writer = new JsonWriter().beginObject()</span>
+<span class="fc" id="L3360">            .property(&quot;error&quot;, true)</span>
+<span class="fc" id="L3361">            .property(&quot;code&quot;, &quot;PAYLOAD_TOO_LARGE&quot;)</span>
+<span class="fc" id="L3362">            .property(&quot;message&quot;, &quot;request body exceeds configured limit&quot;)</span>
+<span class="fc" id="L3363">            .property(&quot;limitBytes&quot;, limitBytes)</span>
+<span class="fc" id="L3364">            .endObject();</span>
+<span class="fc" id="L3365">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L3366">        sendJson(exchange, 413, writer.toString());</span>
+<span class="fc" id="L3367">    }</span>
 
     private void sendJson(HttpExchange exchange, int status, String body) throws IOException {
-<span class="fc" id="L3369">        send(exchange, status, &quot;application/json; charset=utf-8&quot;, body);</span>
-<span class="fc" id="L3370">    }</span>
+<span class="fc" id="L3370">        send(exchange, status, &quot;application/json; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L3371">    }</span>
 
     private void sendText(HttpExchange exchange, int status, String body) throws IOException {
-<span class="fc" id="L3373">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
-<span class="fc" id="L3374">    }</span>
+<span class="fc" id="L3374">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L3375">    }</span>
 
     private void sendStatus(HttpExchange exchange, int status, String body) throws IOException {
-<span class="fc" id="L3377">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
-<span class="fc" id="L3378">    }</span>
+<span class="fc" id="L3378">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L3379">    }</span>
 
     private void send(HttpExchange exchange, int status, String contentType, String body) throws IOException {
-<span class="fc" id="L3381">        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L3382">        exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
-<span class="fc" id="L3383">        exchange.sendResponseHeaders(status, bytes.length);</span>
-<span class="fc" id="L3384">        try (OutputStream stream = exchange.getResponseBody()) {</span>
-<span class="fc" id="L3385">            stream.write(bytes);</span>
+<span class="fc" id="L3382">        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L3383">        exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
+<span class="fc" id="L3384">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L3385">        try (OutputStream stream = exchange.getResponseBody()) {</span>
+<span class="fc" id="L3386">            stream.write(bytes);</span>
         }
-<span class="fc" id="L3387">    }</span>
+<span class="fc" id="L3388">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
