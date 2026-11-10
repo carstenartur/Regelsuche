@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import zipfile
 import xml.etree.ElementTree as ET
-from student_sdk_source import verify_pinned_consumer
+from student_sdk_source import current_sdk_consumer_files
 
 EXAMPLES = ('hello-rule-java25', 'geometric-sequence-domain-java25',
             'finite-difference-domain-java25', 'solver-adapter-java25', 'number-theory-plan-java25',
@@ -100,7 +100,9 @@ def package(root, repository, version, output):
         if not source.is_dir() or source.is_symlink():
             raise ValueError(f'required SDK example is missing or invalid: {example}')
         if example == 'number-theory-plan-java25':
-            verify_pinned_consumer(source)
+            for name, data in current_sdk_consumer_files(source).items():
+                members[f'examples/external-consumers/{example}/{name}'] = data
+            continue
         for file in sorted(source.rglob('*')):
             relative = file.relative_to(root)
             if any(part in ('build', '.gradle', 'target', 'repository') for part in relative.parts):

@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 import unittest
@@ -45,7 +46,11 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.write(self.source / "keep.txt", "maintained consumer")
         for name in ("hello-rule-java25", "finite-difference-domain-java25", "solver-adapter-java25", "number-theory-plan-java25",
                      "java-optimization-java25", "extension-runtime-java25"):
-            self.write(self.root / "examples/external-consumers" / name / "keep.txt", "maintained consumer")
+            if name == "number-theory-plan-java25":
+                shutil.copytree(SCRIPT.parent.parent / "examples/external-consumers" / name,
+                                self.root / "examples/external-consumers" / name)
+            else:
+                self.write(self.root / "examples/external-consumers" / name / "keep.txt", "maintained consumer")
         self.write(self.root / verifier.GENERATOR_RELATIVE, "# fixture generator\n")
         self.write(self.root / "release.properties", "version=0.4.0-SNAPSHOT\n")
 
@@ -137,7 +142,6 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         # This verifies orchestration, not the result of a real Java build.
         with patch.object(sys, "argv", self.argv()), \
                 patch.object(verifier, "artifact_files", return_value={}), \
-                patch.object(verifier, "verify_pinned_consumer", return_value={}), \
                 patch.object(verifier, "execute_consumer",
                              side_effect=self.consumer_results()) as consumers, \
                 patch.object(verifier, "verify_generated_project_shape", return_value={}), \
@@ -159,6 +163,12 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.assertEqual(str(self.output / "generated-starter" / wrapper), second_call[0])
         report = json.loads((self.output / "consumer-report.json").read_text())
         self.assertEqual("success", report["result"])
+        derived = verifier.current_sdk_consumer_files(self.root / "examples/external-consumers/number-theory-plan-java25")
+        for name, data in derived.items():
+            self.assertEqual(data, (self.output / "number-theory-plan-java25" / name).read_bytes())
+        self.assertEqual(json.loads(derived["SDK-ADAPTATION.json"]),
+                         report["consumerBuildAdaptations"]["number-theory-plan-java25"])
+
         self.assertEqual({
             "hello-rule-java25": "success",
             "finite-difference-domain-java25": "success",
@@ -203,7 +213,6 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.write(self.output / "consumer-report.json", '{"result":"success"}')
         with patch.object(sys, "argv", self.argv()), \
                 patch.object(verifier, "artifact_files", return_value={}), \
-                patch.object(verifier, "verify_pinned_consumer", return_value={}), \
                 patch.object(verifier, "execute_consumer", side_effect=results) as consumers, \
                 patch.object(verifier, "verify_generated_project_shape", return_value={}), \
                 patch.object(verifier, "run", return_value="generated"), \

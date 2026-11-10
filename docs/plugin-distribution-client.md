@@ -372,7 +372,36 @@ there is no separate production npm or Python orchestrator. Issue #104 remains o
 for a real hosted/federated catalog, qualification and deployment of the externally
 protected checkpoint provider, substantiated source-to-binary provenance,
 separately published community examples and public service operations. The
-embedded installed-JAR-to-v2 activation path is implemented; migrating existing
-App commands, Discovery extension points and data-only rule/knowledge-pack
-installation remains separate work. Activation of a typed Java contribution does
-not establish those broader migrations.
+embedded installed-JAR-to-v2 activation path and the App's installed Discovery
+command below are implemented in the current source. Workbench/HTTP transformation
+routes, the legacy v1 runtime and data-only rule/knowledge-pack installation remain
+separate migrations. This command does not establish those broader migrations.
+
+## Run an installed Discovery domain
+
+The App composes the transaction-backed installed runtime with the existing Discovery
+runner and canonical export:
+
+```text
+domains installed --config /absolute/package-config.json list
+domains installed --config /absolute/package-config.json run provider-id domain-id@revision campaign-id seed.txt evidence.json [small|tiny]
+```
+
+Reuse the `plugins package` v1 configuration; activation permits null `sources`
+and `selection`, performs no installation/transport download and still requires
+current authority access. The admitted closure must target SPI `2` and core `1.0.0`.
+One current selection supplies all catalog, artifact and installation evidence for
+the complete command. Runtime staging remains alive through late resource access
+and export, and closes before transport ownership. An unavailable authority,
+tampered cache or provider/export failure returns `1`, without stale fallback or
+raw secret-bearing diagnostics. A committed empty installation is listed by its
+hash; pre-genesis absence is explicitly `NONE (pre-genesis)`.
+
+Selection is by provider ID plus exact domain revision. Evidence distinguishes the
+actual provider artifact from its contributing plugin artifact and retains the
+installation trust hash and catalog hash in protected `sdk.provider.*` properties.
+The [SDK guide](java-discovery-sdk.md#installierte-spi-v2-domänen-ausführen-aktueller-quellstand)
+lists all fields, budgets and semantic exit codes. Authenticated Java retains process
+privileges and no mathematical authority. This is a current-source capability;
+existing SDK ZIPs, Workbench/HTTP transformation routes, v1 runtime and data packs
+are not migrated by this command.

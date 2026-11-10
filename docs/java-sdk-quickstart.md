@@ -145,7 +145,7 @@ APIs, die in 0.5.2 vorhanden sind.
 
 ## Erster realer Zahlentheorie-Verbraucher
 
-`examples/external-consumers/number-theory-plan-java25` ist ein unveränderter,
+`examples/external-consumers/number-theory-plan-java25` im Quellcheckout ist ein unveränderter,
 MIT-lizenzierter Snapshot des unabhängig gepflegten Primachsenraum-Consumers
 (Commit `9917424453fd4382e8ce088c969902cbced64302`). `SOURCE.json` enthält die
 Original-Git-Blob-Hashes. Seine eigenen Tests bestätigen die Basisliste `[2,3]`,
@@ -153,3 +153,23 @@ behalten das Gegenbeispiel `2047` gegen Basis 2 und prüfen alle Entscheidungen 
 100000 unabhängig. Das begründet kein unbeschränktes Primzahlkriterium und
 ersetzt keine spätere Abnahme der veröffentlichten Version im aktuellen
 Primachsenraum-Repository.
+
+
+Für den aktuellen SDK-Quellstand verwenden die externe Verifikation und neue
+SDK-ZIPs eine ausdrücklich **abgeleitete Build-Konfiguration** dieses Consumers.
+Nach vollständiger Prüfung des gepinnten Snapshots wird ausschließlich die exakte
+Runtime-Modulliste in `build.gradle` um `regelsuche-extension-api` ergänzt: Das
+Discovery SDK benötigt diese öffentliche API für seinen typisierten Erweiterungspunkt.
+Die Gleichheitsprüfung bleibt strikt; App, Extension-Runtime oder weitere Module
+werden nicht freigegeben. Java-Code, Ressourcen, Tests und das historische README
+bleiben unverändert. Dessen ältere Aussage zur sechsmoduligen Closure beschreibt
+den damaligen Upstream-Stand, nicht die aktuelle siebenmodulige SDK-Closure.
+
+`upstream-build.gradle` bewahrt die Originalbytes. `SDK-ADAPTATION.json` dokumentiert
+Adaptations-ID, Upstream-Commit und Git-Blob sowie SHA-256 der ursprünglichen und
+abgeleiteten Build-Datei. Das unverändert mitgelieferte `SOURCE.json` bezeichnet
+**den Upstream-Ausgangsstand**, nicht die geänderte `build.gradle`. Verifier-Kopie
+und ZIP verwenden dieselbe überprüfte Ableitung; der Verifikationsbericht weist
+sie als solche aus. Ein erfolgreicher aktueller Lauf ist daher kein Nachweis einer
+unveränderten Ausführung des historischen Upstream-Builds. Bereits veröffentlichte
+SDK-ZIPs werden dadurch nicht verändert.

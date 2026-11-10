@@ -5,13 +5,11 @@ import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import de.regelsuche.plugin.PluginCheckpointTransactions.Scope;
 import java.io.*;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.*;
-import java.time.Duration;
 import java.util.*;
 
 /** Explicit package CLI; no discovery/latest selection or runtime activation. */
@@ -40,17 +38,10 @@ public final class PluginPackageCommand {
                 throw new IllegalArgumentException("irrelevant package option");
             }
             if (action.equals("rollback")) PluginSignatureManifest.requireSha256(options.get("target"), "target");
-            var config = JSON.readValue(read(Path.of(Objects.requireNonNull(options.get("config"), "explicit config"))), Config.class);
-            if (config == null) throw new IllegalArgumentException("null package config");
-            String password = environment.get(config.authority().passwordEnvironment());
-            var scope = new Scope(config.installationId(), config.trustDomain(),
-                PluginDistributionJson.hash(config.pinnedRoots().toCanonicalJson()));
-            var authority = PostgresPluginCheckpointAuthority.connect(config.authority().jdbcUrl(), config.authority().user(),
-                password, absolute(config.authority().tlsRootCertificate()), scope, config.authority().timeoutSeconds());
-            try (var transport = new PluginDistributionTransport(config.allowedOrigins(),
-                    Duration.ofSeconds(config.connectTimeoutSeconds()), Duration.ofSeconds(config.responseTimeoutSeconds()), false, null)) {
-                var client = new PluginDistributionTransactions(absolute(config.packageDirectory()),
-                    config.pinnedRoots(), authority, transport, config.limits());
+            var config = readConfiguration(Path.of(Objects.requireNonNull(options.get("config"), "explicit config")));
+            try (var session = PluginPackageSession.open(config, environment)) {
+                var scope = session.scope();
+                var client = session.transactions();
                 if (action.equals("status")) {
                     var response = new LinkedHashMap<String, Object>();
                     response.put("schema", "regelsuche.plugin-package-status/v1");
@@ -93,10 +84,16 @@ public final class PluginPackageCommand {
         return values;
     }
 
-    private static Path absolute(String value) {
+    static Path absolute(String value) {
         Path path = Path.of(Objects.requireNonNull(value, "absolute path"));
         if (!path.isAbsolute() || !path.normalize().equals(path)) throw new IllegalArgumentException("normalized absolute path required");
         return path;
+    }
+
+    static Config readConfiguration(Path file) throws IOException {
+        var config = JSON.readValue(read(file), Config.class);
+        if (config == null) throw new IllegalArgumentException("null package config");
+        return config;
     }
 
     private static byte[] read(Path file) throws IOException {

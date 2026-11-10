@@ -195,6 +195,74 @@ class StudentDiscoveryStarterTest(unittest.TestCase):
         for path in ("build", ".gradle", "repository"):
             self.assertFalse((self.output / path).exists())
 
+class DiscoveryRuntimeContractTest(unittest.TestCase):
+    """Check real maintained consumer contracts against both build dependency graphs."""
+
+    def test_maintained_consumers_and_generated_starter_have_exact_sdk_closure(self):
+        import re
+        import xml.etree.ElementTree as ET
+        root = SCRIPT.parent.parent
+        namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
+
+        def closure(module, build):
+            result = {module}
+            if build == 'gradle':
+                dependencies = re.findall(r"(?:api|implementation) project\(':([^']+)'\)",
+                                          (root / module / 'build.gradle').read_text())
+            else:
+                tree = ET.parse(root / module / 'pom.xml')
+                dependencies = [dependency.find('m:artifactId', namespace).text
+                                for dependency in tree.findall('./m:dependencies/m:dependency', namespace)
+                                if dependency.find('m:groupId', namespace).text == 'de.regelsuche']
+            for dependency in dependencies:
+                result.update(closure(dependency, build))
+            return result
+
+        expected = closure('regelsuche-discovery-sdk', 'gradle')
+        self.assertEqual(expected, closure('regelsuche-discovery-sdk', 'maven'))
+        self.assertIn('regelsuche-extension-api', expected)
+        examples = root / 'examples/external-consumers'
+        for name in ('geometric-sequence-domain-java25', 'finite-difference-domain-java25',
+                     'solver-adapter-java25'):
+            with self.subTest(consumer=name):
+                build = (examples / name / 'build.gradle').read_text()
+                block = re.search(r'def expectedRegelsucheRuntimeModules = \[(.*?)\] as Set', build, re.S)
+                self.assertIsNotNone(block)
+                self.assertEqual(expected, set(re.findall(r"'(regelsuche-[^']+)'", block[1])))
+                self.assertIn('if (observed != expectedRegelsucheRuntimeModules)', build)
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'generated'
+            starter.generate(root, output, 'org.example.regression', 'runtime-contract',
+                             'runtime-domain', 'runtime-provider')
+            build = (output / 'build.gradle').read_text()
+            block = re.search(r'def expectedRegelsucheRuntimeModules = \[(.*?)\] as Set', build, re.S)
+            self.assertEqual(expected, set(re.findall(r"'(regelsuche-[^']+)'", block[1])))
+
+    def test_pinned_consumer_adaptation_is_exact_reproducible_and_preserves_upstream(self):
+        import hashlib
+        import student_sdk_source
+        source = SCRIPT.parent.parent / 'examples/external-consumers/number-theory-plan-java25'
+        before = {path.relative_to(source).as_posix(): path.read_bytes()
+                  for path in source.rglob('*') if path.is_file()}
+        files = student_sdk_source.current_sdk_consumer_files(source)
+        self.assertEqual(files, student_sdk_source.current_sdk_consumer_files(source))
+        original = before['build.gradle']
+        expected = original.replace(b"    'regelsuche-discovery-sdk'\n] as Set",
+                                    b"    'regelsuche-discovery-sdk',\n    'regelsuche-extension-api'\n] as Set")
+        self.assertEqual(expected, files['build.gradle'])
+        self.assertEqual(original, files['upstream-build.gradle'])
+        receipt = json.loads(files['SDK-ADAPTATION.json'])
+        self.assertEqual(hashlib.sha256(original).hexdigest(), receipt['upstreamBuildSha256'])
+        self.assertEqual(hashlib.sha256(expected).hexdigest(), receipt['adaptedBuildSha256'])
+        self.assertEqual(json.loads(before['SOURCE.json'])['files']['build.gradle'], receipt['upstreamBuildGitBlob'])
+        for name, data in before.items():
+            self.assertEqual(data, (source / name).read_bytes())
+            if name != 'build.gradle':
+                self.assertEqual(data, files[name])
+        for malformed in (original.replace(b"'regelsuche-core'", b"'unexpected-module'"), original + original):
+            with self.assertRaises(ValueError):
+                student_sdk_source.adapt_discovery_runtime_inventory(malformed)
+
 
 if __name__ == "__main__":
     unittest.main()

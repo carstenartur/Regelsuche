@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import sys
 from typing import Callable, Mapping
-from student_sdk_source import verify_pinned_consumer
+from student_sdk_source import current_sdk_consumer_files
 
 SDK_MODULES = (
     "regelsuche-core",
@@ -357,6 +357,7 @@ def main() -> int:
         )
 
     progressive = {}
+    adaptations = {}
     for name, expected in (
         ("hello-rule-java25", ("rule=hello-add-zero", "replay=VERIFIED")),
         ("finite-difference-domain-java25", ("outcome=CONFIRMED", "sdk.provider.artifactSha256")),
@@ -366,10 +367,16 @@ def main() -> int:
          ("optimization=VERIFIED", "checked=ORIGINAL_OVERFLOW_DETECTED", "pair=VERIFIED_ONE_PASS_54")),
         ("extension-runtime-java25", ("extension=hello", "origin=greeting-plugin", "catalog=sha256:")),
     ):
-        if name == "number-theory-plan-java25":
-            verify_pinned_consumer(root / "examples/external-consumers" / name)
         project = output / name
-        shutil.copytree(root / "examples/external-consumers" / name, project)
+        if name == "number-theory-plan-java25":
+            files = current_sdk_consumer_files(root / "examples/external-consumers" / name)
+            for relative, data in files.items():
+                target = project / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+            adaptations[name] = json.loads(files["SDK-ADAPTATION.json"])
+        else:
+            shutil.copytree(root / "examples/external-consumers" / name, project)
         consumer_log, dependency_log, rejected = execute_consumer(
             arguments.gradle, project, repository, version, output / (name + "-gradle-cache"))
         require_output(consumer_log, expected, name)
@@ -408,6 +415,7 @@ def main() -> int:
         "requiredOutcomes": ["CONFIRMED", "REFUTED", "BUDGET_EXHAUSTED"],
         "generatedStarter": generated_manifest,
         "progressiveConsumers": progressive,
+        "consumerBuildAdaptations": adaptations,
         "generatedBuildTool": "PINNED_GRADLE_WRAPPER",
         "forbiddenRuntimeDependenciesObserved": sorted(
             set(forbidden + generated_forbidden)
@@ -426,6 +434,7 @@ def main() -> int:
         "- Dependency caches: isolated and initially empty per consumer\n"
         "- Java: `25`\n"
         "- External consumer: `geometric-sequence-domain-java25`\n"
+        "- Primachsenraum: verified upstream snapshot with documented current-SDK build inventory adaptation; see `number-theory-plan-java25/SDK-ADAPTATION.json`.\n"
         "- ServiceLoader provider: `example-geometric-sequence-provider`\n"
         "- Confirmed candidate: `multiplier=2`\n"
         "- Negative paths: `REFUTED`, `BUDGET_EXHAUSTED`\n"

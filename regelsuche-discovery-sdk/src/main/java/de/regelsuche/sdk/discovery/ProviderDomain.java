@@ -9,13 +9,27 @@ import java.util.TreeMap;
 final class ProviderDomain<S, C, K> implements DiscoveryDomain<S, C, K> {
     private final DiscoveryDomain<S, C, K> delegate;
     private final Map<String, String> provenance;
+    private final java.util.Optional<DiscoveryExtensionProvenance> extensionProvenance;
     private final java.util.function.Supplier<ProviderProvenance> observedArtifact;
 
     ProviderDomain(DiscoveryDomain<S, C, K> delegate, Map<String, String> provenance,
             java.util.function.Supplier<ProviderProvenance> observedArtifact) {
+        this(delegate, provenance, observedArtifact, java.util.Optional.empty());
+    }
+
+    ProviderDomain(DiscoveryDomain<S, C, K> delegate, Map<String, String> provenance,
+            java.util.function.Supplier<ProviderProvenance> observedArtifact,
+            java.util.Optional<DiscoveryExtensionProvenance> extensionProvenance) {
         this.delegate = delegate;
-        this.provenance = Map.copyOf(provenance);
+        var properties = new TreeMap<>(provenance);
+        this.extensionProvenance = java.util.Objects.requireNonNull(extensionProvenance, "extensionProvenance");
+        extensionProvenance.ifPresent(origin -> properties.putAll(origin.properties()));
+        this.provenance = Map.copyOf(properties);
         this.observedArtifact = observedArtifact;
+    }
+
+    java.util.Optional<DiscoveryExtensionProvenance> extensionProvenance() {
+        return extensionProvenance;
     }
 
     void validateArtifact() {
