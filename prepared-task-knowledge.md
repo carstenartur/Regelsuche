@@ -99,7 +99,8 @@ bash gradle/run-knowledge-lifecycle-improvement.sh
 ```
 
 Use `REGELSUCHE_KNOWLEDGE_OUTPUT` for a new destination; an existing experiment is
-never silently replaced. Offline verification runs no competitor:
+never silently replaced. Offline verification checks the retained evidence without
+executing reference procedures:
 
 ```sh
 PYTHONPATH=scripts python3 -B -m external_polynomial_comparison.run_knowledge_lifecycle \
@@ -113,5 +114,9 @@ one family. Resource receipts include acquisition, the fresh first load/reproof,
 all repeated loads/queries, rejected attempts and shutdown. Runtime snapshots,
 original selected paths, failed outcomes and the outer command costs are retained.
 Performance ratios require unchanged goal attainment and no worse output-node
-scores on every case. This experiment is not a claim of broad CAS superiority,
-general proof invention or completion of Euclid/Ferrari capabilities.
+scores on every case. The experiment measures preparation and further learning
+within the declared composition family; proof-strategy formation and the
+Euclid/Ferrari historical tasks require separate task contracts. The
+[research methodology](research-methodology.md) explains the role of reference
+procedures in these measurements.
+

@@ -152,6 +152,15 @@ bleiben:
 
 ## Claims und Messwerte
 
+Die [Forschungsmethodik](research-methodology.md) beschreibt die Projektziele
+und die Rolle externer Referenzsoftware. Vergleichsseiten benennen die
+untersuchte Verfahrensfrage, die konkrete Referenzkonfiguration und den Grund
+für ihre Auswahl. SymPy wird in vorhandenen Versuchen wegen seiner praktischen
+Verfügbarkeit ohne Lizenzgebühren verwendet; andere geeignete Implementierungen
+können dieselbe Rolle übernehmen. Die Selbstdarstellung des Projekts orientiert
+sich an den erforschten Verfahren. Aussagen über Ergebnisse bleiben auf die
+jeweiligen Aufgaben, Messgrößen und Ausführungsbedingungen bezogen.
+
 Jede quantitative oder wissenschaftliche Aussage nennt oder verlinkt:
 
 - den Track beziehungsweise das Evidence Profile;
@@ -225,3 +234,4 @@ Eine Dokumentationsänderung ist erst vollständig, wenn:
 
 Die operative Prüfliste steht in
 [Documentation Quality Checklist](documentation-quality-checklist.md).
+

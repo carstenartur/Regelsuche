@@ -1,8 +1,9 @@
 # Regelsuche-Dokumentation
 
-Diese Seite ist der zentrale Einstieg in die Dokumentation. Sie ordnet Seiten
-nach Zielgruppe und Aufgabe; maschinenlesbare Verträge und generierte Berichte
-sind bewusst von Handbüchern und Architekturtexten getrennt.
+Diese Seite ist der zentrale Einstieg in die Dokumentation zu symbolischer
+Suche, kumulativem Lernen und geprüfter Rechenoptimierung. Sie ordnet Seiten
+nach Zielgruppe und Aufgabe. Die [Forschungsmethodik](research-methodology.md)
+erläutert die untersuchten Verfahren und die Rolle von Referenzmessungen.
 
 ## Der passende Einstieg
 
@@ -16,11 +17,15 @@ sind bewusst von Handbüchern und Architekturtexten getrennt.
 | einen generationenbasierten Mining-Lauf reproduzieren | [Generationenbasiertes Regelmining](generational-rule-mining.md) |
 | die Polynom- und Faktorisierungsarchitektur verstehen | [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md), [parsergebundene exakte Faktorisierung](exact-parsed-factorization-pipeline.md), [verifizierte Faktorisierungstransformation](exact-factorization-transformation-pipeline.md), [univariate Polynomgrundlage](univariate-polynomial-foundation.md), [Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md), [Primkörperfaktorisierung](finite-field-factorization.md), [Primzahlauswahl](suitable-prime-selection.md) und [quartische Zerlegungsengine](polynomial-decomposition-synthesis.md) |
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
+| Forschungsfragen und Vergleichsverfahren einordnen | [Forschungsmethodik](research-methodology.md) und [externe Polynomvergleiche](external-polynomial-comparison.md) |
+| geprüftes Wissen über mehrere Läufe wiederverwenden | [Kumulatives Aufgabenwissen](research/cumulative-task-knowledge.md) und [vorbereitete Wissenssitzungen](prepared-task-knowledge.md) |
 | Claims und Evidence korrekt einordnen | [Capability-Status](generated/capability-status.md), [Glossar](glossary.md) und [Release Readiness](release-readiness.md) |
 | die Architektur verstehen oder Code ändern | [Architektur](architecture.md) und [Developer Guide](developer-guide.md) |
 | einen Release durchführen | [Release-Betrieb](release-operations.md) |
 | Regeln oder Plugins entwickeln | [Erweiterungssystem](extension-system.md) |
 | Java-Berechnungen optimieren oder einen CAS anbinden | [Java-Optimierungs-SDK](../regelsuche-optimization-sdk/README.md) und [JDT/CAS-Architektur](superpowers/specs/2026-10-26-typed-cas-computation-design.md) |
+| Summen, Rekurrenzen und Paarberechnungen in geprüfte Pläne überführen | [Endliche Summen und Iterationen](../regelsuche-optimization-sdk/FINITE_SERIES.md) und [Standalone-Summen-CLI](../regelsuche-optimization-sdk/README.md#standalone-counted-sum-cli) |
+| Quellen an Regeln und Herleitungen binden | [Literaturreferenzen und private Vorarbeitsprüfung](literature-references.md) |
 | einen Lauf reproduzieren | [Scientific Reproducibility](scientific-reproducibility.md) und [Independent Reproduction](independent-reproduction.md) |
 | inkrementelle Zählerzustände ableiten | [Geprüfte Zustandssynthese](derived-incremental-counter-states.md) |
 | einen JSON-Vertrag nachschlagen | [Schema-Katalog](schema-catalog.md) |
@@ -34,6 +39,7 @@ Regelsuche verwendet je Informationstyp genau eine maßgebliche Quelle:
 | Bedienabläufe und sichtbare Zustände | Markdown-Handbücher und Browser-E2E-Tests |
 | HTTP-Methoden, Pfade, Payloads und Statuscodes | lokale Swagger UI und OpenAPI 3.1 |
 | aktueller Forschungsstand | `discovery-status.md` mit Datumsangabe |
+| Forschungsziel und Rolle von Referenzverfahren | `research-methodology.md` |
 | Capability- und Claim-Status | generierte Capability-Matrix und gebundene Evidence |
 | Architekturentscheidungen | Architekturtexte und ADRs unter `docs/adr/` |
 | maschinenlesbare Verträge | versionierte JSON-Schemas unter `docs/schemas/` |
@@ -71,6 +77,7 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 ### Status und Claim-Grenzen
 
+- [Forschungsfragen und Vergleichsmethodik](research-methodology.md)
 - [Aktueller Discovery- und Forschungsstand](discovery-status.md)
 - [Generierte Capability- und Claim-Matrix](generated/capability-status.md)
 - [Release Readiness](release-readiness.md)
@@ -79,6 +86,12 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 ### Suche, Vorbereitung, Discovery und Lernen
 
+- [Kumulatives geprüftes Aufgabenwissen](research/cumulative-task-knowledge.md) —
+  echte Wissensgenerationen, Persistenz und Erwerbs-/Wiederverwendungsbilanz.
+- [Strukturelle Konstruktionen und Aufgabenlernen](research/structural-construction-learning.md) —
+  quellengestützte Faktorisierungen, Quadratsummen und gelernte Konstruktionen.
+- [Vorbereitetes Wissen und kostenbewusste Selbstverbesserung](prepared-task-knowledge.md) —
+  begrenzte Sitzungen und gemessene Übernahmeentscheidungen.
 - [Search Intelligence](search-intelligence.md) — Suchprofile,
   Diversity-Kontrolle, begrenztes Reachability-Orakel und historischer
   Rediscovery-Atlas.
@@ -133,6 +146,10 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 ### Vergleich und Reproduktion
 
+- [Externe Referenzverfahren für Polynomaufgaben](external-polynomial-comparison.md)
+- [Polynomverfahren: Operationszahl und Kosten](research/native-polynomial-parity-2026-11-06.md)
+- [Historische Aufgaben: Konstruktion, Invarianten und Wiederverwendung](research/historical-sympy-comparison-2026-11-06.md)
+- [Wissenssitzungen und weitere Lernversuche im Lebenszyklus](research/knowledge-lifecycle-improvement-2026-11-07.md)
 - [Comparative Discovery Benchmarks](discovery-benchmarks.md)
 - [JMH-Performance-Historie](performance-history.md) — checksumgebundene
   Snapshots, einheitliche `ms/op`-Charts und Maven-/Gradle-Reproduktion.
@@ -154,6 +171,11 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 ### Domänen und Solver
 
+- [Geprüfte endliche Summen und Iterationen](../regelsuche-optimization-sdk/FINITE_SERIES.md) —
+  Polynomsummen, Komposition, lineare Zustände, Paar-/Fenster-/Tupelreduktionen
+  und Inversionspläne mit expliziten Definitionsbereichen.
+- [Literaturreferenzen](literature-references.md) — Quellen im Replay und Export,
+  private Kandidatenbewertung und optionaler externer Abruf.
 - [Geprüfte gemeinsame Rechenpläne als externes SDK-Beispiel](checked-modular-profile-example.md) —
   begrenzte Komposition und Ausführung; vollständige Studie und Daten in Primachsenraum.
 - [Generische Discovery-Domänen](generic-discovery-domains.md)
@@ -249,3 +271,4 @@ Verträge und Gates.
   aus dem Checkout erzeugter Qualitäts- und Benchmarkbericht (nicht ins
   Repository eingecheckt; wird von `./gradlew benchmarkReport` erzeugt und als
   CI-Artefakt bereitgestellt).
+

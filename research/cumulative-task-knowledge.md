@@ -130,8 +130,10 @@ The cumulative total includes **31,611** acquisition/validation/preparation unit
 **2,263** fresh restore/preparation units, and **152,832** query units. This is about
 17.2% less declared work than the primitive baseline on this development stream.
 It is an executed amortization example, not a scaled single-query estimate.
-It is not a preregistered sealed holdout, broad CAS comparison, wall-clock speedup,
-complete JVM CPU/heap/serialization ledger, or completion of P04/P05–P12.
+The cases form a public development family, not a preregistered sealed holdout.
+The logical ledger does not measure wall-clock speedup or complete JVM
+CPU/heap/serialization costs; the remaining P04/P05–P12 study obligations retain
+their separate acceptance criteria.
 
 ## Verification
 
@@ -157,3 +159,4 @@ acquisition costs, and always selecting the baseline. Initial RED was missing-AP
 compilation failure; mutations are supplemental negative controls, not original
 behavioral RED. Gradle was attempted and failed resolving services.gradle.org.
 Full hosted Java-25/JUnit CI and independent review remain necessary before merge.
+
