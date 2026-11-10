@@ -16,7 +16,10 @@ throughout the run. Negative costs are rejected, since negative cycles
 would invalidate finite extraction. `Integer.MAX_VALUE` denotes an
 unavailable representative; costs at or above it cannot be extracted.
 The result minimizes this additive objective over finite extractable
-representatives in the graph, within those integer limits.
+representatives in the graph, within those integer limits. Saturation validates
+nonnegative node costs before rewriting but does not require a finite initial
+root: rewrites may introduce an extractable alternative. Final extraction still
+requires a finite root.
 
 The search strategy dispatches explicitly:
 
@@ -49,11 +52,15 @@ Rule implementers remain responsible for the truth of that declaration.
   e-class identity. The matcher uses symbol/arity indices and memoization.
 * Pattern subclasses and custom rules use their actual `matches`,
   `assumptions` and `apply` callbacks. They are tried against one concrete
-  representative per root e-node, with cheapest child representatives.
-  This finds alternatives hidden by extracting just the cheapest root.
-  It does **not** enumerate the Cartesian product of child alternatives.
-  Alternatives whose objective cost or child cost is unavailable are skipped;
-  a wholly unavailable class is an ordinary miss, not a rule callback failure.
+  representative per root e-node, with children chosen under uniform node
+  cost 1 independently of the optimization objective. This finds alternatives
+  hidden by extracting just one root and allows rewrites whose source is
+  excluded by the requested result objective. It does **not** enumerate the
+  Cartesian product of child alternatives. A class without a finite structural
+  representative is an ordinary miss, not a rule callback failure.
+  The public `EGraph.representatives(id, cost)` API still honors its explicitly
+  supplied cost function; saturation uses uniform cost for applicability and
+  the caller's objective only for initial validation and final extraction.
 * Non-exact recognition profiles, including associative/commutative
   matching, take the concrete path so their recognition semantics are
   honored. The native e-matcher does not implement complete AC matching.
@@ -113,8 +120,13 @@ Provenance retains at most 256 concrete `(ruleId, before, after)` local
 witnesses, with `droppedWitnesses()` accounting for overflow. `Witness.replay`
 checks the supplied rule's ID, construction guarantee, applicability,
 empty assumptions and exact output. Native witnesses instantiate source
-and target from the same concrete placeholder bindings. Replaying a
-witness trusts the supplied rule implementation; it is not an independent
+and target from the same concrete placeholder bindings. Those bindings use
+finite syntax under uniform structural cost, independently of the requested
+optimization objective. Witnesses are built only for new unions; unavailable
+explanations and a full witness buffer do not prevent admitted rewrites.
+`nativeWitnessExtractions()` counts actual native binding extraction attempts
+(including failures), making this work observable without timing thresholds.
+Replaying a witness trusts the supplied rule implementation; it is not an independent
 proof of that rule's mathematics.
 
 These witnesses do **not** connect the original input to the extracted

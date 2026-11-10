@@ -45,8 +45,9 @@ public final class EqualitySaturation {
         Objects.requireNonNull(graph, "graph");
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(costOfNode, "costOfNode");
-        // Validate the extraction objective before any rewrite mutates the graph.
-        graph.extract(root, costOfNode);
+        // Validate costs before mutation, but allow rewriting to make the root finite.
+        graph.find(root);
+        graph.validateNodeCosts(costOfNode);
         var matcher = new EGraphPatternMatcher(graph);
         var applier = new EGraphPatternApplier(graph);
         var run = new Run();
@@ -68,7 +69,7 @@ public final class EqualitySaturation {
                 int applicationsBefore = run.applications();
                 boolean budgetStop = false;
                 try {
-                    applyAllRules(graph, matcher, applier, costOfNode, run,
+                    applyAllRules(graph, matcher, applier, run,
                         config.useDirtyWorklist() ? dirty : allClasses(graph));
                 } catch (EGraph.NodeBudgetExceeded exhausted) {
                     budgetStop = true;
@@ -99,7 +100,7 @@ public final class EqualitySaturation {
             metrics.candidateClassesSkipped(), metrics.matchesFound(), metrics.matcherCacheHits(),
             metrics.matcherCacheMisses(), iterations, run.applications());
         return new Result(best, stats, run.diagnostics.snapshot(),
-            new SaturationProvenance(run.witnesses, run.droppedWitnesses));
+            new SaturationProvenance(run.witnesses, run.droppedWitnesses, run.nativeWitnessExtractions));
     }
 
     private void checkBudget(EGraph graph) {
@@ -107,7 +108,7 @@ public final class EqualitySaturation {
     }
 
     private void applyAllRules(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
-            ToIntFunction<ENode> cost, Run run, Collection<EClassId> candidates) {
+            Run run, Collection<EClassId> candidates) {
         List<EClassId> snapshot = canonicalSorted(graph, candidates);
         for (RewriteRule rule : rules) {
             checkBudget(graph);
@@ -122,15 +123,15 @@ public final class EqualitySaturation {
             }
             if (rule.getClass() == PatternRewriteRule.class
                     && ((PatternRewriteRule) rule).recognitionProfile().equals(RecognitionProfile.exact())) {
-                applyPattern(graph, matcher, applier, (PatternRewriteRule) rule, snapshot, cost, run);
+                applyPattern(graph, matcher, applier, (PatternRewriteRule) rule, snapshot, run);
             } else {
-                applyConcrete(graph, rule, snapshot, cost, run);
+                applyConcrete(graph, rule, snapshot, run);
             }
         }
     }
 
     private void applyPattern(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
-            PatternRewriteRule rule, List<EClassId> snapshot, ToIntFunction<ENode> cost, Run run) {
+            PatternRewriteRule rule, List<EClassId> snapshot, Run run) {
         List<EGraphPatternMatcher.Match> matches;
         try {
             matches = matcher.matchAll(rule.id(), rule.source(), snapshot);
@@ -141,33 +142,40 @@ public final class EqualitySaturation {
         if (matches.isEmpty()) run.diagnostics.record(rule.id(), null, NON_APPLICABLE, MATCHES, null);
         for (var match : matches) {
             checkBudget(graph);
-            var stage = EXTRACTION;
             try {
-                SaturationProvenance.Witness witness = null;
-                if (run.witnesses.size() < SaturationProvenance.MAX_WITNESSES) {
-                    Map<String, Expr> bindings = new LinkedHashMap<>();
-                    for (var binding : match.bindings().entrySet()) {
-                        bindings.put(binding.getKey(), graph.extract(binding.getValue(), cost));
-                    }
-                    witness = new SaturationProvenance.Witness(rule.id(),
-                        rule.source().instantiate(bindings), rule.target().instantiate(bindings));
-                }
-                stage = INSERTION;
                 EClassId rhs = applier.instantiate(rule.target(), match.bindings());
-                if (!graph.areEquivalent(match.root(), rhs)) {
-                    graph.union(match.root(), rhs);
-                    run.applied(rule.id(), witness);
-                }
+                if (graph.areEquivalent(match.root(), rhs)) continue;
+                // Only new equalities need witnesses. Explanation work never gates the union.
+                SaturationProvenance.Witness witness = nativeWitness(graph, rule, match, run);
+                graph.union(match.root(), rhs);
+                run.applied(rule.id(), witness);
             } catch (EGraph.NodeBudgetExceeded exhausted) {
                 throw exhausted;
             } catch (RuntimeException failure) {
-                run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, stage, failure);
+                run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, INSERTION, failure);
             }
         }
     }
 
-    private void applyConcrete(EGraph graph, RewriteRule rule, List<EClassId> snapshot,
-            ToIntFunction<ENode> cost, Run run) {
+    private SaturationProvenance.Witness nativeWitness(EGraph graph, PatternRewriteRule rule,
+            EGraphPatternMatcher.Match match, Run run) {
+        if (run.witnesses.size() >= SaturationProvenance.MAX_WITNESSES) return null;
+        try {
+            Map<String, Expr> bindings = new LinkedHashMap<>();
+            for (var binding : match.bindings().entrySet()) {
+                run.nativeWitnessExtractions++;
+                // A witness needs finite syntax, independently of the optimization objective.
+                bindings.put(binding.getKey(), graph.extract(binding.getValue(), node -> 1));
+            }
+            return new SaturationProvenance.Witness(rule.id(),
+                rule.source().instantiate(bindings), rule.target().instantiate(bindings));
+        } catch (RuntimeException failure) {
+            run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, EXTRACTION, failure);
+            return null;
+        }
+    }
+
+    private void applyConcrete(EGraph graph, RewriteRule rule, List<EClassId> snapshot, Run run) {
         var seen = new LinkedHashSet<EClassId>();
         for (EClassId raw : snapshot) {
             checkBudget(graph);
@@ -175,7 +183,8 @@ public final class EqualitySaturation {
             if (!seen.add(source)) continue;
             List<Expr> representatives;
             try {
-                representatives = graph.representatives(source, cost);
+                // The optimization objective ranks results; it must not hide applicable rules.
+                representatives = graph.representatives(source, node -> 1);
                 if (representatives.isEmpty()) {
                     run.diagnostics.record(rule.id(), source, NON_APPLICABLE, EXTRACTION, null);
                 }
@@ -228,6 +237,7 @@ public final class EqualitySaturation {
         final SaturationDiagnostics.Collector diagnostics = new SaturationDiagnostics.Collector();
         final List<SaturationProvenance.Witness> witnesses = new ArrayList<>();
         long droppedWitnesses;
+        long nativeWitnessExtractions;
         int applications() { return appliedRules.values().stream().mapToInt(Integer::intValue).sum(); }
         void applied(String rule, SaturationProvenance.Witness witness) {
             appliedRules.merge(rule, 1, Integer::sum);
