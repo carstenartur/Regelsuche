@@ -1582,8 +1582,7 @@
                 + '<td>' + (r.visitedStates || r.exploredStates || 0) + '</td>'
                 + '<td>' + (r.prunedStates || 0) + '</td>'
                 + '<td>' + eGraph + '</td>'
-                + '<td>' + (r.saturationSavings != null
-                    ? (r.saturationSavings * 100).toFixed(1) + '%' : '–') + '</td>'
+                + '<td title="Ohne vergleichbaren Referenzlauf sind Einsparungen nicht bestimmbar.">nicht gemessen</td>'
                 + '<td>' + learned + '</td>'
                 + '<td>' + renderProofStatusBadge(r.proofStatus) + '</td>'
                 + '</tr>';

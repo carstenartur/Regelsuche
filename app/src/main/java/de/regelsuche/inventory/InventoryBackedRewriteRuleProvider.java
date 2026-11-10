@@ -1,22 +1,44 @@
 package de.regelsuche.inventory;
 
-import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.evolution.ExactPolynomialPatternIdentityVerifier;
 import de.regelsuche.mining.PatternBinary;
 import de.regelsuche.mining.PatternFunction;
 import de.regelsuche.mining.PatternNumber;
 import de.regelsuche.mining.PatternVariable;
 import de.regelsuche.mining.RulePatternNode;
 import de.regelsuche.mining.RulePatternParser;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.transform.EquivalenceAwarePatternMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
+/**
+ * Compatibility adapter for unconditional polynomial inventory rules.
+ *
+ * <p>Stored proof labels are metadata, not execution authority. Every accepted
+ * pattern is rechecked by the bounded exact polynomial verifier. Conditional
+ * patterns and other mathematical fragments require the condition-aware,
+ * replay-authorised learned runtime instead of this legacy adapter. Polynomial
+ * ring proofs do not authorize partial real-domain powers or the loss of an
+ * eliminated placeholder's domain; those boundaries are checked separately.</p>
+ */
 public class InventoryBackedRewriteRuleProvider {
     private static final Logger LOGGER = Logger.getLogger(InventoryBackedRewriteRuleProvider.class.getName());
 
@@ -24,6 +46,8 @@ public class InventoryBackedRewriteRuleProvider {
     private final RuleInventoryConfiguration configuration;
     private final List<RewriteRule> existingRules;
     private final RulePatternParser parser = new RulePatternParser();
+    private final ExactPolynomialPatternIdentityVerifier verifier =
+        new ExactPolynomialPatternIdentityVerifier();
     private final List<RuleActivationDecision> lastDecisions = new ArrayList<>();
 
     public InventoryBackedRewriteRuleProvider(
@@ -66,7 +90,7 @@ public class InventoryBackedRewriteRuleProvider {
                     "Rule id " + reusableRule.id() + " not allowed by allow/deny/disabled list"));
                 continue;
             }
-            if (usedIds.contains(ruleId) || !usedPatterns.add(patternKey)) {
+            if (usedIds.contains(ruleId) || usedPatterns.contains(patternKey)) {
                 lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
                     "Rule conflicts with an existing rewrite rule or duplicate pattern"));
                 continue;
@@ -88,17 +112,63 @@ public class InventoryBackedRewriteRuleProvider {
                         + " exceeds limit " + configuration.maxComplexityIncrease()));
                 continue;
             }
-            activated.add(new PatternRewriteRule(
+            if (!reusableRule.assumptions().isEmpty()
+                    || !reusableRule.parameterRelations().isEmpty()) {
+                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
+                    "Assumptions and parameter relations require the condition-aware learned runtime"));
+                continue;
+            }
+            PatternExpr left;
+            PatternExpr right;
+            Set<String> eliminatedBindings;
+            ExactPolynomialPatternIdentityVerifier.Verification verification;
+            try {
+                left = toPatternExpr(parser.parse(reusableRule.leftPattern()));
+                right = toPatternExpr(parser.parse(reusableRule.rightPattern()));
+                Set<String> sourceBindings = new HashSet<>();
+                Set<String> targetBindings = new HashSet<>();
+                collectPlaceholders(left, sourceBindings);
+                collectPlaceholders(right, targetBindings);
+                Set<String> unboundTarget = new java.util.TreeSet<>(targetBindings);
+                unboundTarget.removeAll(sourceBindings);
+                if (!unboundTarget.isEmpty()) {
+                    throw new IllegalArgumentException("Unbound target placeholders: " + unboundTarget);
+                }
+                requireUnconditionalPowers(left);
+                requireUnconditionalPowers(right);
+                eliminatedBindings = new java.util.TreeSet<>(sourceBindings);
+                eliminatedBindings.removeAll(targetBindings);
+                // Verify the actual parsed objects that will execute, not a
+                // second parser's interpretation or a persisted status label.
+                verification = verifier.verify(left, right);
+            } catch (IllegalArgumentException exception) {
+                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
+                    "Invalid pattern: " + exception.getMessage()));
+                continue;
+            }
+            if (!verification.proved()) {
+                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
+                    "Fresh exact verification: " + verification.status()
+                        + " (" + verification.detailCode() + ")"));
+                continue;
+            }
+            var executable = new PatternRewriteRule(
                 ruleId,
-                toPatternExpr(parser.parse(reusableRule.leftPattern())),
-                toPatternExpr(parser.parse(reusableRule.rightPattern())),
+                left,
+                right,
                 RewriteKind.NORMALIZE,
                 false,
                 0,
                 true
-            ));
+            );
+            activated.add(eliminatedBindings.isEmpty() ? executable
+                : new DomainPreservingInventoryRule(executable, List.copyOf(eliminatedBindings)));
             usedIds.add(ruleId);
-            lastDecisions.add(RuleActivationDecision.activated(reusableRule));
+            usedPatterns.add(patternKey);
+            lastDecisions.add(new RuleActivationDecision(reusableRule, true,
+                "Activated after fresh exact polynomial verification: " + verification.proofHash()
+                    + (eliminatedBindings.isEmpty() ? ""
+                        : "; concrete eliminated bindings must be total: " + eliminatedBindings)));
         }
         logDecisions();
         return activated;
@@ -118,6 +188,102 @@ public class InventoryBackedRewriteRuleProvider {
                 LOGGER.fine(() -> "Inventory rule " + decision.rule().id()
                     + " not activated: " + decision.reason());
             }
+        }
+    }
+
+    /** Mathematical identity alone does not guarantee an instantiable rewrite target. */
+    private static void collectPlaceholders(PatternExpr pattern, Set<String> names) {
+        if (pattern instanceof PatternExpr.Placeholder placeholder) {
+            names.add(placeholder.name());
+        } else if (pattern instanceof PatternExpr.Operation operation) {
+            collectPlaceholders(operation.left(), names);
+            collectPlaceholders(operation.right(), names);
+        } else if (pattern instanceof PatternExpr.Function function) {
+            for (PatternExpr argument : function.arguments()) collectPlaceholders(argument, names);
+        }
+    }
+
+    /** The formal polynomial-ring convention x^0=1 is not our real-domain contract. */
+    private static void requireUnconditionalPowers(PatternExpr pattern) {
+        if (pattern instanceof PatternExpr.Operation operation) {
+            if (operation.operator() == BinaryOperator.POW
+                    && operation.right() instanceof PatternExpr.LiteralNumber exponent
+                    && exponent.value().equalsInteger(0)
+                    && !(operation.left() instanceof PatternExpr.LiteralNumber base
+                        && !base.value().equalsInteger(0))) {
+                throw new IllegalArgumentException(
+                    "Domain-sensitive zero power requires a defined, nonzero base");
+            }
+            requireUnconditionalPowers(operation.left());
+            requireUnconditionalPowers(operation.right());
+        } else if (pattern instanceof PatternExpr.Function function) {
+            for (PatternExpr argument : function.arguments()) requireUnconditionalPowers(argument);
+        }
+    }
+
+    /**
+     * Pattern placeholders can bind partial expressions, not just ring indeterminates.
+     * Keep a bounded concrete guard whenever an identity removes a whole binding.
+     * Composition deliberately prevents the native unguarded PatternRewriteRule path.
+     */
+    private record DomainPreservingInventoryRule(
+        PatternRewriteRule delegate, List<String> eliminatedBindings
+    ) implements RewriteRule, RetainedGraph.View {
+        private static final int MAX_ELISION_NODES = 512;
+
+        DomainPreservingInventoryRule {
+            eliminatedBindings = List.copyOf(eliminatedBindings);
+        }
+
+        @Override public String id() { return delegate.id(); }
+        @Override public RewriteKind kind() { return delegate.kind(); }
+        @Override public boolean mayIncreaseComplexity() { return delegate.mayIncreaseComplexity(); }
+        @Override public int estimatedCostDelta() { return delegate.estimatedCostDelta(); }
+        @Override public boolean isEquivalencePreservingByConstruction() { return true; }
+        @Override public de.regelsuche.knowledge.RuleDescriptor descriptor() { return delegate.descriptor(); }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(delegate);
+            visitor.reference(eliminatedBindings);
+        }
+
+        @Override public boolean matches(Expr subtree) { return safeBindings(subtree) != null; }
+
+        @Override public Expr apply(Expr subtree) {
+            Map<String, Expr> bindings = safeBindings(subtree);
+            if (bindings == null) throw new IllegalArgumentException("Rule does not match without domain loss");
+            return delegate.target().instantiate(bindings);
+        }
+
+        private Map<String, Expr> safeBindings(Expr subtree) {
+            Map<String, Expr> bindings = new HashMap<>();
+            if (!EquivalenceAwarePatternMatcher.match(
+                    delegate.source(), subtree, bindings, RecognitionProfile.exact())) return null;
+            for (String name : eliminatedBindings) {
+                if (!totalWithinBound(bindings.get(name))) return null;
+            }
+            return bindings;
+        }
+
+        private static boolean totalWithinBound(Expr expression) {
+            var pending = new ArrayDeque<Expr>();
+            pending.add(expression);
+            int visited = 0;
+            while (!pending.isEmpty()) {
+                RetainedOperation.work(1);
+                if (++visited > MAX_ELISION_NODES) return false;
+                Expr current = pending.removeLast();
+                if (current instanceof BinaryExpr binary) {
+                    pending.add(binary.left());
+                    pending.add(binary.right());
+                } else if (current instanceof FunctionExpr function) {
+                    // The shared definedness checker accepts only unary functions.
+                    // Reject wider calls before their argument list can expand the queue.
+                    if (function.arguments().size() != 1) return false;
+                    pending.add(function.argument());
+                }
+            }
+            RetainedOperation.work(visited);
+            return ExpressionDefinedness.isTotal(expression);
         }
     }
 

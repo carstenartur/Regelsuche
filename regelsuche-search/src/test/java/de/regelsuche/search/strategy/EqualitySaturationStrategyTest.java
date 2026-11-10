@@ -138,6 +138,57 @@ class EqualitySaturationStrategyTest {
             "equality saturation has its own deduplication via e-classes");
     }
 
+    @Test
+    void unsupportedObjectivesUseExplicitFallbackAndDoNotReportSaturation() {
+        var strategy = new EqualitySaturationStrategy();
+        var problem = problemFor("x + 0").withCostModel(
+            de.regelsuche.scoring.cost.StructuralCostModel.FACTORED_FORM);
+        assertFalse(strategy.search(problem).isEmpty());
+        assertTrue(strategy.lastExtractionSelection().fallback());
+        assertEquals("factored-form", strategy.lastExtractionSelection().requestedObjective());
+        assertEquals("best-first", strategy.lastExtractionSelection().strategy());
+        org.junit.jupiter.api.Assertions.assertNull(strategy.lastStats());
+    }
+
+    @Test
+    void customModelCannotClaimNativeSupportByReusingAnId() {
+        var custom = new de.regelsuche.scoring.cost.CostModel() {
+            @Override public String id() { return "operator-count"; }
+            @Override public int cost(String expression, de.regelsuche.ast.Expr ast,
+                    de.regelsuche.scoring.ExpressionScore score) { return score.nestingDepth(); }
+        };
+        var strategy = new EqualitySaturationStrategy();
+        strategy.search(problemFor("x + 0").withCostModel(custom));
+        assertTrue(strategy.lastExtractionSelection().fallback());
+    }
+
+    @Test
+    void zeroArgumentFunctionsStillCountAsOperators() {
+        assertEquals(1, EqualitySaturationStrategy.nodeCost(de.regelsuche.egraph.ENode.leaf("fn:f")));
+        assertEquals(0, EqualitySaturationStrategy.nodeCost(de.regelsuche.egraph.ENode.leaf("var:x")));
+    }
+
+    @Test
+    void extractedStateDoesNotInventAReplayableRuleStep() {
+        var strategy = new EqualitySaturationStrategy();
+        var states = strategy.search(problemFor("x + 0"));
+        var extracted = states.getLast();
+        assertEquals("x", extracted.expression());
+        assertFalse(extracted.equivalencePreservingByConstruction());
+        assertEquals(List.of(Boolean.FALSE), extracted.equivalencePreservingFlags());
+        assertFalse(strategy.lastProvenance().hasExtractionProof());
+        assertFalse(strategy.lastProvenance().witnesses().isEmpty());
+    }
+
+    @Test
+    void invalidInputClearsPreviousRunMetadata() {
+        var strategy = new EqualitySaturationStrategy();
+        strategy.search(problemFor("x + 0"));
+        strategy.search(problemFor("("));
+        org.junit.jupiter.api.Assertions.assertNull(strategy.lastStats());
+        assertTrue(strategy.lastProvenance().witnesses().isEmpty());
+    }
+
     private SearchProblem problemFor(String expression) {
         return new SearchProblem(expression, engine, scorer, canonicalizer, heuristic);
     }

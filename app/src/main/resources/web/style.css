@@ -61,6 +61,7 @@ main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
 .workflow-card:hover { border-color: #2563eb; background: #eff6ff; }
 :is(a, button, input, select, textarea):focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
 .tab:focus-visible { outline-color: #93c5fd; outline-offset: -3px; }
+.tab.active:focus-visible { outline-color: #2563eb; }
 .search-result-summary .result-expression { display: block; overflow-wrap: anywhere; font-size: 1.05rem; padding: .75rem; }
 .search-result-summary h4 { margin-bottom: .5rem; }
 body.retained-run #workflowEntry { display: none; }

@@ -51,6 +51,21 @@ class SearchBenchmarkTest {
     }
 
     @Test
+    void saturationApplicationsDoNotEstablishMeasuredSavings() {
+        var strategy = new de.regelsuche.search.strategy.EqualitySaturationStrategy();
+        var benchmark = new SearchBenchmark(new AstRewriteTransformationEngine(),
+            new SearchHeuristic(4, 100, 1, 3, 50, 8));
+        var row = benchmark.run(List.of("x + 0"), List.of(
+            new SearchBenchmark.NamedSearchStrategy("equality-saturation", strategy))).getFirst();
+        assertTrue(row.rulesFired() > 0);
+        assertEquals(strategy.lastStats().eclasses(), row.eGraphClasses());
+        assertEquals(strategy.lastStats().enodes(), row.eGraphNodes());
+        assertEquals(strategy.lastStats().rulesFired(), row.rulesFired());
+        assertTrue(Double.isNaN(row.saturationSavings()),
+            "merges/applications is not a measured savings fraction");
+    }
+
+    @Test
     void repeatedSubexpressionIsEvaluatedOncePerDistinctValue() {
         Expr syntax = parser.parseTerm("(a + b) * (a + b)");
         Map<String, Double> variables = Map.of("a", 2.0, "b", 3.0);

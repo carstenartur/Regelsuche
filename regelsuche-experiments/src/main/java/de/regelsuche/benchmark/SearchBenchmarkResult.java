@@ -1,6 +1,8 @@
 package de.regelsuche.benchmark;
 
 import de.regelsuche.validation.CandidateProofStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Per-row result of a single benchmark scenario.
@@ -19,8 +21,8 @@ import de.regelsuche.validation.CandidateProofStatus;
  *       (transposition table, dominance, …); higher = less wasted work.</li>
  *   <li>{@link #eGraphClasses()} / {@link #eGraphNodes()} —
  *       size of the e-graph for the EQUALITY_SATURATION strategy.</li>
- *   <li>{@link #saturationSavings()} — fraction of duplicated rewrites the
- *       e-graph collapsed (only meaningful for saturation runs).</li>
+ *   <li>{@link #saturationSavingsStatus()} — explicitly unavailable: graph
+ *       union/application counts do not measure saved work against a baseline.</li>
  *   <li>{@link #learnedRuleUsed()} — true if at least one applied rule came
  *       from the learned macro inventory.</li>
  *   <li>{@link #exportBundleValid()} — did the export bundle for this row
@@ -41,7 +43,7 @@ public record SearchBenchmarkResult(
     int prunedStates,
     int eGraphClasses,
     int eGraphNodes,
-    double saturationSavings,
+    @JsonIgnore double saturationSavings,
     long classesScanned,
     long nodesScanned,
     long candidateClassesSkipped,
@@ -54,6 +56,8 @@ public record SearchBenchmarkResult(
     boolean exportBundleValid
 ) {
     public SearchBenchmarkResult {
+        // Retain the old constructor slot without treating caller-supplied ratios as evidence.
+        saturationSavings = Double.NaN;
         if (proofStatus == null) {
             proofStatus = CandidateProofStatus.OBSERVED;
         }
@@ -81,7 +85,7 @@ public record SearchBenchmarkResult(
             /* prunedStates          */ 0,
             /* eGraphClasses         */ 0,
             /* eGraphNodes           */ 0,
-            /* saturationSavings     */ 0.0,
+            /* saturationSavings     */ Double.NaN,
             /* classesScanned        */ 0L,
             /* nodesScanned          */ 0L,
             /* candidateClassesSkipped */ 0L,
@@ -112,6 +116,27 @@ public record SearchBenchmarkResult(
         this(strategyName, expression, exploredStates, bestImprovement,
             shortestImprovingDepth, expandedSteps, distinctRules,
             0L, CandidateProofStatus.OBSERVED);
+    }
+
+    /**
+     * Unmeasured compatibility slot. Always NaN; use {@link #saturationSavingsStatus()}.
+     * The old primitive accessor and constructor remain source/binary compatible.
+     * JSON exports use null rather than serializing this sentinel.
+     */
+    @Deprecated(forRemoval = false)
+    @JsonIgnore
+    public double saturationSavings() { return saturationSavings; }
+
+    /** Nullable serialization view; no numeric savings value has been measured. */
+    @JsonProperty("saturationSavings")
+    public Double saturationSavingsJson() { return null; }
+
+    @JsonProperty("saturationSavingsStatus")
+    public String saturationSavingsStatus() { return "UNAVAILABLE"; }
+
+    @JsonProperty("saturationSavingsReason")
+    public String saturationSavingsReason() {
+        return "No comparable baseline was measured; rewrite unions and applications do not quantify saved work.";
     }
 
     /** Did the search produce at least one improving state? */

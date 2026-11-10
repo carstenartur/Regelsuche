@@ -1,0 +1,305 @@
+{
+  "method": "Unmodified org.aiknowledge.core.TrendAnalyzer.snapshot/trend from pinned extractor v0.1.10",
+  "extractorSourceRevision": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "originalSourceUrl": "https://github.com/carstenartur/ai-knowledge-extractor/blob/v0.1.10/core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java",
+  "originalSourceSha256": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae",
+  "wrapperSha256": "bb53a72c1cbca91eb070b541876148ac879d93987cc0b671bb7cf336b323e497",
+  "scope": "Projection and trend recomputation over native retained reports only; not a fresh extractor run or complete gate/CI execution. The smaller artifact contains no original snapshot/trend.",
+  "acceptedMainAgainstPreviousReference": {
+    "schemaVersion": 1,
+    "baselinePresent": true,
+    "baselinePath": "complexity-baseline.json",
+    "current": {
+      "schemaVersion": 1,
+      "estimatedContextTokens": 750870.0,
+      "conceptRadius": 106.0,
+      "dependencyRadius": 302.0,
+      "knowledgeDensity": 210.88235294117646,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.0159814615046546,
+      "aiCognitiveComplexity": 901.87,
+      "aiCognitiveDebt": 833.2523529411765,
+      "aiContextDebt": 14.64,
+      "contextDebtModelVersion": "context-footprint-v3"
+    },
+    "thresholds": {
+      "maxCognitiveDebtIncrease": 10.0,
+      "maxConceptRadiusIncrease": 3.0,
+      "maxContextTokenIncrease": 15000.0,
+      "failOnWarnings": false
+    },
+    "baseline": {
+      "estimatedContextTokens": 739670.0,
+      "conceptRadius": 104.0,
+      "dependencyRadius": 298.0,
+      "knowledgeDensity": 208.0,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.016223450998418213,
+      "aiCognitiveComplexity": 888.67,
+      "aiCognitiveDebt": 820.37,
+      "aiContextDebt": 14.46,
+      "contextDebtModelVersion": "context-footprint-v3"
+    },
+    "deltas": {
+      "estimatedContextTokens": {
+        "baseline": 739670.0,
+        "current": 750870.0,
+        "absolute": 11200.0,
+        "percent": 1.5141887598523667
+      },
+      "conceptRadius": {
+        "baseline": 104.0,
+        "current": 106.0,
+        "absolute": 2.0,
+        "percent": 1.9230769230769231
+      },
+      "dependencyRadius": {
+        "baseline": 298.0,
+        "current": 302.0,
+        "absolute": 4.0,
+        "percent": 1.342281879194631
+      },
+      "knowledgeDensity": {
+        "baseline": 208.0,
+        "current": 210.88235294117646,
+        "absolute": 2.882352941176464,
+        "percent": 1.3857466063348385
+      },
+      "contextLocality": {
+        "baseline": 0.0,
+        "current": 0.0,
+        "absolute": 0.0,
+        "percent": 0.0
+      },
+      "compressionRatio": {
+        "baseline": 0.016223450998418213,
+        "current": 0.0159814615046546,
+        "absolute": -0.00024198949376361134,
+        "percent": -1.4916030737677535
+      },
+      "aiCognitiveComplexity": {
+        "baseline": 888.67,
+        "current": 901.87,
+        "absolute": 13.200000000000045,
+        "percent": 1.485365771321193
+      },
+      "aiCognitiveDebt": {
+        "baseline": 820.37,
+        "current": 833.2523529411765,
+        "absolute": 12.882352941176464,
+        "percent": 1.570310096807107
+      },
+      "aiContextDebt": {
+        "baseline": 14.46,
+        "current": 14.64,
+        "absolute": 0.17999999999999972,
+        "percent": 1.2448132780082968
+      }
+    },
+    "warnings": [],
+    "violations": [],
+    "violationCount": 0,
+    "passed": true
+  },
+  "rejectedCombinedAgainstPreviousReference": {
+    "schemaVersion": 1,
+    "baselinePresent": true,
+    "baselinePath": "complexity-baseline.json",
+    "current": {
+      "schemaVersion": 1,
+      "estimatedContextTokens": 755575.0,
+      "conceptRadius": 106.0,
+      "dependencyRadius": 313.0,
+      "knowledgeDensity": 212.2941176470588,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.015881944214670946,
+      "aiCognitiveComplexity": 912.075,
+      "aiCognitiveDebt": 838.3691176470588,
+      "aiContextDebt": 14.59,
+      "contextDebtModelVersion": "context-footprint-v3"
+    },
+    "thresholds": {
+      "maxCognitiveDebtIncrease": 10.0,
+      "maxConceptRadiusIncrease": 3.0,
+      "maxContextTokenIncrease": 15000.0,
+      "failOnWarnings": false
+    },
+    "baseline": {
+      "estimatedContextTokens": 739670.0,
+      "conceptRadius": 104.0,
+      "dependencyRadius": 298.0,
+      "knowledgeDensity": 208.0,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.016223450998418213,
+      "aiCognitiveComplexity": 888.67,
+      "aiCognitiveDebt": 820.37,
+      "aiContextDebt": 14.46,
+      "contextDebtModelVersion": "context-footprint-v3"
+    },
+    "deltas": {
+      "estimatedContextTokens": {
+        "baseline": 739670.0,
+        "current": 755575.0,
+        "absolute": 15905.0,
+        "percent": 2.1502832344153475
+      },
+      "conceptRadius": {
+        "baseline": 104.0,
+        "current": 106.0,
+        "absolute": 2.0,
+        "percent": 1.9230769230769231
+      },
+      "dependencyRadius": {
+        "baseline": 298.0,
+        "current": 313.0,
+        "absolute": 15.0,
+        "percent": 5.033557046979865
+      },
+      "knowledgeDensity": {
+        "baseline": 208.0,
+        "current": 212.2941176470588,
+        "absolute": 4.294117647058812,
+        "percent": 2.064479638009044
+      },
+      "contextLocality": {
+        "baseline": 0.0,
+        "current": 0.0,
+        "absolute": 0.0,
+        "percent": 0.0
+      },
+      "compressionRatio": {
+        "baseline": 0.016223450998418213,
+        "current": 0.015881944214670946,
+        "absolute": -0.00034150678374726684,
+        "percent": -2.105019356119507
+      },
+      "aiCognitiveComplexity": {
+        "baseline": 888.67,
+        "current": 912.075,
+        "absolute": 23.405000000000086,
+        "percent": 2.633711051346404
+      },
+      "aiCognitiveDebt": {
+        "baseline": 820.37,
+        "current": 838.3691176470588,
+        "absolute": 17.999117647058824,
+        "percent": 2.194024360600561
+      },
+      "aiContextDebt": {
+        "baseline": 14.46,
+        "current": 14.59,
+        "absolute": 0.129999999999999,
+        "percent": 0.8990318118948755
+      }
+    },
+    "warnings": [],
+    "violations": [
+      {
+        "metric": "estimatedContextTokens",
+        "increase": 15905.0,
+        "threshold": 15000.0,
+        "message": "Estimated context size increased beyond the configured threshold."
+      }
+    ],
+    "violationCount": 1,
+    "passed": false
+  },
+  "sameCombinedMeasurementAgainstAcceptedMain": {
+    "schemaVersion": 1,
+    "baselinePresent": true,
+    "baselinePath": "complexity-baseline.json",
+    "current": {
+      "schemaVersion": 1,
+      "estimatedContextTokens": 755575.0,
+      "conceptRadius": 106.0,
+      "dependencyRadius": 313.0,
+      "knowledgeDensity": 212.2941176470588,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.015881944214670946,
+      "aiCognitiveComplexity": 912.075,
+      "aiCognitiveDebt": 838.3691176470588,
+      "aiContextDebt": 14.59,
+      "contextDebtModelVersion": "context-footprint-v3"
+    },
+    "thresholds": {
+      "maxCognitiveDebtIncrease": 10.0,
+      "maxConceptRadiusIncrease": 3.0,
+      "maxContextTokenIncrease": 15000.0,
+      "failOnWarnings": false
+    },
+    "baseline": {
+      "estimatedContextTokens": 750870.0,
+      "conceptRadius": 106.0,
+      "dependencyRadius": 302.0,
+      "knowledgeDensity": 210.88235294117646,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.0159814615046546,
+      "aiCognitiveComplexity": 901.87,
+      "aiCognitiveDebt": 833.2523529411765,
+      "aiContextDebt": 14.64,
+      "contextDebtModelVersion": "context-footprint-v3"
+    },
+    "deltas": {
+      "estimatedContextTokens": {
+        "baseline": 750870.0,
+        "current": 755575.0,
+        "absolute": 4705.0,
+        "percent": 0.6266064698283325
+      },
+      "conceptRadius": {
+        "baseline": 106.0,
+        "current": 106.0,
+        "absolute": 0.0,
+        "percent": 0.0
+      },
+      "dependencyRadius": {
+        "baseline": 302.0,
+        "current": 313.0,
+        "absolute": 11.0,
+        "percent": 3.642384105960265
+      },
+      "knowledgeDensity": {
+        "baseline": 210.88235294117646,
+        "current": 212.2941176470588,
+        "absolute": 1.411764705882348,
+        "percent": 0.6694560669456043
+      },
+      "contextLocality": {
+        "baseline": 0.0,
+        "current": 0.0,
+        "absolute": 0.0,
+        "percent": 0.0
+      },
+      "compressionRatio": {
+        "baseline": 0.0159814615046546,
+        "current": 0.015881944214670946,
+        "absolute": -9.95172899836555e-05,
+        "percent": -0.6227045627502283
+      },
+      "aiCognitiveComplexity": {
+        "baseline": 901.87,
+        "current": 912.075,
+        "absolute": 10.205000000000041,
+        "percent": 1.131537804783399
+      },
+      "aiCognitiveDebt": {
+        "baseline": 833.2523529411765,
+        "current": 838.3691176470588,
+        "absolute": 5.11676470588236,
+        "percent": 0.6140714380009172
+      },
+      "aiContextDebt": {
+        "baseline": 14.64,
+        "current": 14.59,
+        "absolute": -0.05000000000000071,
+        "percent": -0.34153005464481356
+      }
+    },
+    "warnings": [],
+    "violations": [],
+    "violationCount": 0,
+    "passed": true
+  },
+  "activeBaselineEqualsProjectedBytes": true,
+  "combinedProjectionEqualsOriginalFailedSnapshotValues": true
+}
