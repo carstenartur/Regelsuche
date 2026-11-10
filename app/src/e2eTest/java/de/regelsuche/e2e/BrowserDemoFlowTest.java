@@ -61,6 +61,8 @@ class BrowserDemoFlowTest {
         System.getProperty("regelsuche.recordDocs", "false"));
     private static final int DEMO_COMPLETION_TIMEOUT_MILLIS = 30_000;
     private static final int REPLAY_COMPLETION_TIMEOUT_MILLIS = 10_000;
+    private static final String REPORT_BUNDLE_EXPORT_LINK =
+        "#tab-exports a[href='/api/exports/bundle.zip']";
     private static final long MATRIX_REPLAY_RUNTIME_BOUND_MILLIS = 45_000L;
 
     private static final Path DOCS_ROOT = Paths.get("..", "docs", "assets")
@@ -396,7 +398,7 @@ class BrowserDemoFlowTest {
             new Page.WaitForSelectorOptions().setTimeout(5_000));
         waitForDownloadReady();
         Download download = page.waitForDownload(() ->
-            page.locator("a[href='/api/exports/bundle.zip']").first().click());
+            page.locator(REPORT_BUNDLE_EXPORT_LINK).click());
         Path saved = Files.createTempFile("regelsuche-bundle-", ".zip");
         download.saveAs(saved);
         long size = Files.size(saved);
@@ -598,7 +600,7 @@ class BrowserDemoFlowTest {
     }
 
     private void waitForDownloadReady() {
-        page.waitForSelector("a[href='/api/exports/bundle.zip']",
+        page.waitForSelector(REPORT_BUNDLE_EXPORT_LINK,
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(10_000));
