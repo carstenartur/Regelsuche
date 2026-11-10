@@ -3,7 +3,6 @@ package de.regelsuche.evolution;
 import de.regelsuche.ast.*;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.parse.ExpressionFormatter;
-import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -14,13 +13,14 @@ import java.util.stream.Stream;
 
 /** Preferred prospective learning evaluation; its public inputs are not a sealed holdout. */
 public final class MixedTaskKnowledgeStudy {
-    private MixedTaskKnowledgeStudy() { }
-    private static KnowledgeCostGate.Cost now() {
-        var os = ManagementFactory.getOperatingSystemMXBean();
-        return new KnowledgeCostGate.Cost(System.nanoTime(),
-            os instanceof com.sun.management.OperatingSystemMXBean bean ? bean.getProcessCpuTime() : -1);
+    private final TaskKnowledgeSelfImprover.Meter meter;
+
+    private MixedTaskKnowledgeStudy() { this(TaskKnowledgeSelfImprover.systemMeter()); }
+    MixedTaskKnowledgeStudy(TaskKnowledgeSelfImprover.Meter meter) {
+        this.meter = java.util.Objects.requireNonNull(meter);
     }
-    private static KnowledgeCostGate.Cost elapsed(KnowledgeCostGate.Cost start) {
+    KnowledgeCostGate.Cost now() { return meter.now(); }
+    KnowledgeCostGate.Cost elapsed(KnowledgeCostGate.Cost start) {
         var end = now();
         return new KnowledgeCostGate.Cost(end.wallNanos() - start.wallNanos(),
             start.cpuNanos() < 0 || end.cpuNanos() < 0 ? -1 : end.cpuNanos() - start.cpuNanos());
@@ -35,7 +35,7 @@ public final class MixedTaskKnowledgeStudy {
         return Math.addExact(Math.addExact(CumulativeTaskKnowledge.disjoint(training, promotion),
             CumulativeTaskKnowledge.disjoint(training, evaluation)), CumulativeTaskKnowledge.disjoint(promotion, evaluation));
     }
-    private static Map<String, Object> arm(boolean improve, int blocks, Path directory) {
+    private Map<String, Object> arm(boolean improve, int blocks, Path directory) {
         var start = now();
         var report = new TreeMap<String, Object>();
         var acquisition = new ArrayList<Map<String, Object>>();
@@ -153,6 +153,10 @@ public final class MixedTaskKnowledgeStudy {
 
     /** CLI: output directory [blocks=16] [repetitions=3]; stdout is one JSON report. */
     public static void main(String[] args) throws Exception {
+        new MixedTaskKnowledgeStudy().run(args);
+    }
+
+    private void run(String[] args) throws Exception {
         var start = now();
         if (args.length < 1 || args.length > 3) throw new IllegalArgumentException("directory [blocks] [repetitions]");
         Path directory = Path.of(args[0]);

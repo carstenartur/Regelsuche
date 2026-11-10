@@ -10,6 +10,7 @@ import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.LongSupplier;
 import java.util.stream.Stream;
 
 /** Actual-cost adoption around the existing learner; all rejected work remains in the returned ledger. */
@@ -232,10 +233,16 @@ public final class TaskKnowledgeSelfImprover {
         if (copy.size() < minimum || copy.size() > 32) throw new IllegalArgumentException("bounded task list required");
         return copy;
     }
-    private static Meter systemMeter() {
-        long origin = System.nanoTime();
+    static Meter systemMeter() {
         var os = ManagementFactory.getOperatingSystemMXBean();
-        return () -> new Cost(System.nanoTime() - origin,
-            os instanceof com.sun.management.OperatingSystemMXBean bean ? bean.getProcessCpuTime() : -1);
+        return systemMeter(System::nanoTime,
+            os instanceof com.sun.management.OperatingSystemMXBean bean ? bean::getProcessCpuTime : () -> -1);
+    }
+
+    static Meter systemMeter(LongSupplier wallClock, LongSupplier cpuClock) {
+        long origin = wallClock.getAsLong();
+        // nanoTime has an arbitrary signed origin. Subtraction also preserves short durations
+        // across signed wraparound; only the elapsed value belongs in a nonnegative Cost.
+        return () -> new Cost(wallClock.getAsLong() - origin, cpuClock.getAsLong());
     }
 }
