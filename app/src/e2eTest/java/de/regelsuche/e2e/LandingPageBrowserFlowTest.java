@@ -149,6 +149,8 @@ class LandingPageBrowserFlowTest {
         assertEquals("/static/pair-reductions.html", page.locator("#workflowOptimize").getAttribute("href"));
         page.locator("#workflowLearn").click();
         assertTrue(page.locator("#tab-compare").isVisible());
+        assertFalse(page.locator("#workflowEntry").isVisible(),
+            "task entry cards belong to the Workbench, not the comparison view");
         assertFalse(page.locator("#demoHero").isVisible());
         assertTrue(page.url().endsWith("#tab=compare"));
         page.locator(".tab[data-tab='compare']").focus();
@@ -158,6 +160,34 @@ class LandingPageBrowserFlowTest {
         page.reload();
         page.waitForLoadState(LoadState.NETWORKIDLE);
         assertTrue(page.locator("#tab-inventory").isVisible(), "a copied tool URL must reopen the same view");
+    }
+
+    @Test
+    void workflowEntryStaysInWorkbenchWhileDemoContextSurvivesToolNavigation() {
+        assertTrue(page.locator("#workflowEntry").isVisible());
+        page.locator(".demo-button[data-demo='binomial']").click();
+        page.waitForFunction("() => window.__regelsucheDemoReady === true");
+        String summary = page.locator("#demoSummary").textContent();
+        assertFalse(summary.isBlank(), "a successful demo supplies context for its graph and replay");
+
+        for (String tool : new String[] {"graph", "replay"}) {
+            page.locator(".tab[data-tab='" + tool + "']").click();
+            assertFalse(page.locator("#workflowEntry").isVisible(), tool);
+            assertTrue(page.locator("#demoHero").isVisible(), tool);
+            assertTrue(page.locator("#demoSummary").isVisible(), tool);
+            assertEquals(summary, page.locator("#demoSummary").textContent(), tool);
+            assertTrue(page.locator("#tab-" + tool).isVisible(), tool);
+        }
+
+        page.locator(".tab[data-tab='compare']").click();
+        assertFalse(page.locator("#workflowEntry").isVisible());
+        assertFalse(page.locator("#demoHero").isVisible());
+        assertEquals(summary, page.locator("#demoSummary").textContent());
+
+        page.locator(".tab[data-tab='workbench']").click();
+        assertTrue(page.locator("#workflowEntry").isVisible());
+        assertTrue(page.locator("#demoHero").isVisible());
+        assertEquals(summary, page.locator("#demoSummary").textContent());
     }
 
     @Test

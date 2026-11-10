@@ -24,7 +24,10 @@
             candidate.tabIndex = active ? 0 : -1;
         });
         panels.forEach((candidate) => candidate.classList.toggle('active', candidate === panel));
-        byId('demoHero').hidden = name !== 'workbench';
+        // Task choices belong to the entry view. Preserve the existing demo
+        // area in graph/replay; other tools keep their focused entry view.
+        byId('workflowEntry').hidden = name !== 'workbench';
+        byId('demoHero').hidden = !['workbench', 'graph', 'replay'].includes(name);
         const query = new URLSearchParams(location.hash.slice(1));
         // The retained-run controller owns its richer run/artifact/candidate URL.
         if (!restoringTab && !query.has('run') && query.get('tab') !== name) {
