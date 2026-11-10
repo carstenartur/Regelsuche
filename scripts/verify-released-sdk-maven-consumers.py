@@ -42,7 +42,7 @@ CONSUMERS = {
         'main': 'example.Main',
         'modules': {'regelsuche-core', 'regelsuche-extension-api', 'regelsuche-extension-runtime'},
         'tests': {'example.ExtensionRuntimeConsumerTest#classpathPluginContributesTypedExtensionWithStableReloadIdentity'},
-        'stdout': 'extension=hello\norigin=greeting-plugin\ngreeting=Hello Ada\ncatalog=sha256:382c54a84050795402d4b9850f0139f4a92bfd8b24bc7c476e0ce0c917194c5a\n',
+        'stdoutPrefix': 'extension=hello\norigin=greeting-plugin\ngreeting=Hello Ada\n',
     },
 }
 
@@ -255,6 +255,25 @@ def check_toolchain(maven_output, java_output):
     return {'mavenVersion': '.'.join(maven.groups()), 'mavenJavaMajor': 25, 'cliJavaMajor': 25}
 
 
+def check_cli_output(name, stdout, repeat_stdout=None):
+    contract = CONSUMERS[name]
+    if 'stdout' in contract:
+        if stdout != contract['stdout']:
+            raise ValueError('actual CLI output differs from expected released consumer contract')
+        return {'policy': 'EXACT_OUTPUT'}
+    # Classpath origins include their absolute CodeSource URL in the catalogue
+    # manifest. Require canonical identity and same-build stability, not a hash
+    # copied from a different private compilation/runtime directory.
+    match = re.fullmatch(re.escape(contract['stdoutPrefix'])
+                         + r'catalog=(sha256:[0-9a-f]{64})\n', stdout)
+    if not match:
+        raise ValueError('actual extension CLI output lacks the exact greeting/canonical catalogue hash')
+    if repeat_stdout is None or repeat_stdout != stdout:
+        raise ValueError('extension CLI catalogue identity is not stable across actual same-build runs')
+    return {'policy': 'CANONICAL_CATALOGUE_AND_STABLE_REPEAT',
+            'catalogHash': match[1], 'repeatVerified': True}
+
+
 def run_command(command, cwd, log, timeout=1200):
     environment = dict(os.environ)
     for key in ('MAVEN_ARGS', 'MAVEN_OPTS', 'MAVEN_PROJECTBASEDIR', 'JAVA_TOOL_OPTIONS',
@@ -361,12 +380,16 @@ def qualify(root, evidence, maven):
                             consumer, output / 'maven-runtime-tree.log', result['commands'])
                     result['runtimeClosure'] = check_runtime_closure(
                         graph, consumer / 'target/dependency', repository, contract['modules'])
-                    execute([java, '-cp', 'target/classes' + os.pathsep + 'target/dependency/*', contract['main']],
-                            consumer, output / 'cli.log', result['commands'])
+                    cli = [java, '-cp', 'target/classes' + os.pathsep + 'target/dependency/*', contract['main']]
+                    execute(cli, consumer, output / 'cli.log', result['commands'])
                     stdout = (output / 'cli.log').read_text(encoding='utf-8')
-                    if stdout != contract['stdout']:
-                        raise ValueError('actual CLI output differs from expected released consumer contract')
                     result['stdout'] = stdout
+                    repeated = None
+                    if 'stdoutPrefix' in contract:
+                        execute(cli, consumer, output / 'cli-repeat.log', result['commands'])
+                        repeated = (output / 'cli-repeat.log').read_text(encoding='utf-8')
+                        result['repeatStdout'] = repeated
+                    result['cliIdentity'] = check_cli_output(name, stdout, repeated)
                     result['status'] = 'PASSED'
                 except Exception as error:
                     result.update(status='FAILED', error=str(error))

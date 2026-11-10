@@ -115,11 +115,21 @@ catalog=sha256:382c54a84050795402d4b9850f0139f4a92bfd8b24bc7c476e0ce0c917194c5a
 
 `GreetingPlugin.contribute(ExtensionContext)` registers the `hello` implementation
 under the consumer-owned `Greeting` contract. `Main` retrieves that typed
-registration, invokes it and closes the runtime. The catalogue hash describes
-this catalogue snapshot; it is not a publisher signature or a mathematical
-certificate. Changes to the contribution or descriptor can change it.
-The existing JUnit test also reloads the same classpath snapshot and requires
-successful publication with the same hash.
+registration, invokes it and closes the runtime. The hash above is the observed
+identity for that particular smoke-run class directory. The canonical catalogue
+includes the classpath provider's CodeSource URL in its origin; another absolute
+class directory, including Maven's `target/classes`, can legitimately produce a
+different canonical `sha256:<64 lowercase hex>` identity. Descriptor or
+contribution metadata changes can change it too.
+
+For this trusted-classpath example, the origin's artifact/trust hashes are empty,
+so the catalogue hash does not attest the provider class bytes or mutable object
+state. For externally admitted plugins those artifact/trust hash fields are
+included in the catalogue manifest. Neither case makes the catalogue ID itself
+a publisher signature or mathematical certificate. The existing JUnit test
+reloads the same classpath snapshot and requires successful publication with
+the same hash. The Maven qualification additionally runs the actual CLI twice
+from the same build and requires identical complete output and catalogue ID.
 
 The independent Maven package attempt in this environment was blocked while
 resolving imported BOMs because Maven Central DNS was unavailable. A successful

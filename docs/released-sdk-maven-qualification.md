@@ -7,10 +7,11 @@ SDK 0.5.2 ZIP**, rather than rebuilding SDK modules from the source reactor.
 From a checkout with JDK 25 and Maven **3.9.9 or newer from the 3.x line**:
 
 ```bash
-python3 -m unittest discover -s scripts -p test_released_sdk_maven_consumers.py -v
-python3 scripts/verify-released-sdk-maven-consumers.py
+bash gradle/run-released-sdk-maven-consumers.sh
 ```
 
+The thin checkout-owned adapter runs the unit contracts, then the verifier.
+It can also be invoked outside the repository directory; it finds its own root.
 The verifier uses the existing `mvn` executable. `--maven /absolute/path/to/mvn`
 selects another installed Maven. It records the precise Maven and Java versions
 and rejects Maven outside the supported range or Java other than 25. It neither
@@ -48,9 +49,21 @@ actual Surefire XML, resolves the runtime dependency graph and runs its Java CLI
 Missing expected test cases, zero tests, failures, errors or skips reject the
 qualification. Runtime closures must use product version 0.5.2 and exclude app,
 Spring, Hibernate and persistence. The resolved dependency graph must match the
-copied runtime JAR set. The actual CLI output must match the documented concrete
-rule/replay/negative-case result or greeting/catalogue identity respectively.
-No stub Maven runner or generated success fixture is used.
+copied runtime JAR set. The hello-rule CLI output must match its exact concrete
+rule/replay/negative-case result. The extension CLI must print the exact extension,
+origin and greeting plus one canonical lowercase `sha256:<64hex>` catalogue ID.
+It is run twice from the same actual Maven build; complete outputs and catalogue
+IDs must match, alongside the required JUnit reload-identity test. Missing,
+malformed or unstable IDs reject qualification.
+
+The classpath catalogue includes the provider's absolute CodeSource URL in its
+origin, so a different private build directory legitimately changes its hash.
+A hash recorded by a separate `javac` smoke run is not a universal expected
+Maven-build hash. For this trusted-classpath example the artifact/trust hash
+fields are empty: its catalogue identity does not attest provider class bytes.
+External-admission origins instead bind their admitted artifact/trust hashes in
+the manifest; this does not turn a catalogue ID into a publisher signature or
+mathematical proof. No stub Maven runner or success fixture is used.
 
 ## Evidence and CI
 
@@ -63,7 +76,8 @@ output, raw Surefire reports and CLI output remain alongside it, including on
 failure. `PASSED` is written only after **both** consumers satisfy every gate;
 a failed run exits nonzero and retains `FAILED` evidence.
 
-The existing Maven product job runs this narrow check **before** the unchanged
+The existing Maven product job invokes the adapter, keeping assertions and
+qualification orchestration out of the workflow itself. It runs **before** the unchanged
 `mvn -Pfull,sdk-release verify`. Its existing always-run artifact upload includes
 the dedicated evidence directory. No new workflow or relaxed gate is introduced.
 

@@ -131,6 +131,41 @@ class ReleasedConsumerContracts(unittest.TestCase):
             self.verifier.copy_consumer(source, self.root / 'unsafe-copy')
         self.assertFalse((self.root / 'unsafe-copy').exists())
 
+    def test_catalogue_identity_accepts_legitimate_build_origin_variation(self):
+        prefix = 'extension=hello\norigin=greeting-plugin\ngreeting=Hello Ada\n'
+        for digest in ['428dbb205a4dd3fb39c7ede138886729069edba5cb1a977734577d67019d52e2',
+                       '382c54a84050795402d4b9850f0139f4a92bfd8b24bc7c476e0ce0c917194c5a']:
+            output = prefix + 'catalog=sha256:' + digest + '\n'
+            try:
+                checked = self.verifier.check_cli_output('extension-runtime-java25', output, output)
+            except ValueError as error:
+                self.fail(f'legitimate source-origin catalogue identity rejected: {error}')
+            self.assertEqual('sha256:' + digest, checked['catalogHash'])
+            self.assertTrue(checked['repeatVerified'])
+
+    def test_catalogue_output_rejects_missing_malformed_or_extra_content(self):
+        prefix = 'extension=hello\norigin=greeting-plugin\ngreeting=Hello Ada\n'
+        malformed = [prefix, prefix + 'catalog=not-a-hash\n',
+                     prefix + 'catalog=sha256:' + 'A' * 64 + '\n',
+                     prefix + 'catalog=sha256:' + 'a' * 63 + '\n',
+                     prefix.replace('Hello Ada', 'Wrong greeting') + 'catalog=sha256:' + 'a' * 64 + '\n',
+                     prefix + 'catalog=sha256:' + 'a' * 64 + '\nextra=unapproved\n']
+        for output in malformed:
+            with self.assertRaises(ValueError):
+                self.verifier.check_cli_output('extension-runtime-java25', output, output)
+
+    def test_catalogue_output_requires_identical_actual_repeat(self):
+        prefix = 'extension=hello\norigin=greeting-plugin\ngreeting=Hello Ada\n'
+        output = prefix + 'catalog=sha256:382c54a84050795402d4b9850f0139f4a92bfd8b24bc7c476e0ce0c917194c5a\n'
+        changed = prefix + 'catalog=sha256:428dbb205a4dd3fb39c7ede138886729069edba5cb1a977734577d67019d52e2\n'
+        for repeated in [None, changed]:
+            with self.assertRaises(ValueError):
+                self.verifier.check_cli_output('extension-runtime-java25', output, repeated)
+        hello = self.verifier.CONSUMERS['hello-rule-java25']['stdout']
+        self.verifier.check_cli_output('hello-rule-java25', hello)
+        with self.assertRaises(ValueError):
+            self.verifier.check_cli_output('hello-rule-java25', hello.replace('negative=REJECTED', 'negative=ACCEPTED'))
+
     def test_failed_command_preserves_original_output_and_exit_status(self):
         log = self.root / 'failure.log'
         record = self.verifier.run_command(

@@ -192,9 +192,7 @@ jobs:
         run: bash gradle/provision-osv-scanner.sh
       - name: Qualify current Maven consumers against the released SDK
         timeout-minutes: 30
-        run: |
-          python3 -m unittest discover -s scripts -p test_released_sdk_maven_consumers.py -v
-          python3 scripts/verify-released-sdk-maven-consumers.py
+        run: bash gradle/run-released-sdk-maven-consumers.sh
       - name: Verify the complete Maven product and Docker contract
         run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
       - name: Retain Maven product verification evidence
