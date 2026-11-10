@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AssumptionTest {
@@ -57,6 +58,45 @@ class AssumptionTest {
             assertEquals(AssumptionTruthValue.UNKNOWN, required.truthValueUnder(java.util.List.of(continuous)));
             assertEquals(AssumptionTruthValue.TRUE, required.truthValueUnder(java.util.List.of(required)));
         }
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void domainFactsRequireTheSameExpressionInEitherDirection() {
+        for (Assumption.Kind kind : List.of(Assumption.Kind.DOMAIN_MEMBERSHIP, Assumption.Kind.DOMAIN)) {
+            for (List<String> symbols : List.of(List.of("x"), List.<String>of())) {
+                Assumption integer = new Assumption(kind, "x ∈ Z", symbols);
+                Assumption real = new Assumption(kind, "x ∈ R", symbols);
+                assertEquals(AssumptionTruthValue.UNKNOWN, integer.truthValueUnder(List.of(real)),
+                    () -> kind + " with symbols " + symbols + " must not infer integer from real");
+                assertEquals(AssumptionTruthValue.UNKNOWN, real.truthValueUnder(List.of(integer)),
+                    () -> kind + " with symbols " + symbols + " must not infer generic domain inclusion");
+                assertEquals(AssumptionTruthValue.TRUE, integer.truthValueUnder(List.of(integer)));
+                assertEquals(AssumptionTruthValue.TRUE, real.truthValueUnder(List.of(real)));
+            }
+        }
+    }
+
+    @Test
+    void unknownKnowledgeCannotProveAnIdenticalExpression() {
+        Assumption required = Assumption.domainMembership("x", "Z");
+        Assumption unknown = new Assumption(Assumption.Kind.UNKNOWN, "x ∈ Z", List.of("x"));
+        assertEquals(AssumptionTruthValue.UNKNOWN, required.truthValueUnder(List.of(unknown)));
+        assertEquals(AssumptionTruthValue.TRUE, required.truthValueUnder(List.of(unknown, required)));
+    }
+
+    @Test
+    void typedNumericAndSignImplicationsRemainAvailable() {
+        assertEquals(AssumptionTruthValue.TRUE,
+            Assumption.integer("n").truthValueUnder(List.of(Assumption.natural("n"))));
+        assertEquals(AssumptionTruthValue.TRUE,
+            Assumption.real("n").truthValueUnder(List.of(Assumption.rational("n"))));
+        assertEquals(AssumptionTruthValue.TRUE,
+            Assumption.nonZero("x").truthValueUnder(List.of(Assumption.positive("x"))));
+        assertEquals(AssumptionTruthValue.UNKNOWN,
+            Assumption.integer("n").truthValueUnder(List.of(Assumption.real("n"))));
+        assertEquals(AssumptionTruthValue.UNKNOWN,
+            Assumption.nonZero("y").truthValueUnder(List.of(Assumption.positive("x"))));
     }
 
     @Test

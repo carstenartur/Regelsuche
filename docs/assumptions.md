@@ -261,8 +261,13 @@ For example, splitting `diff(abs(x) - abs(x), x)` requires
 at zero. Such predicates remain unresolved unless a caller supplies appropriate
 assumption-aware evidence. The local evaluator requires exact custom-predicate
 identity: knowledge of `continuous(abs(x), x)` does not establish
-`differentiable(abs(x), x)` merely because the symbols match. This corrected
-implication behavior is identified by evaluator revision `known-assumptions/v2`.
+`differentiable(abs(x), x)` merely because the symbols match. This predicate
+identity rule was introduced in evaluator revision `known-assumptions/v2`.
+The current revision, `known-assumptions/v3`, also requires exact domain
+predicate identity: `x ∈ R` does not establish `x ∈ Z`, including through the
+deprecated `DOMAIN` kind. Explicitly `UNKNOWN` information cannot establish a
+requirement even when its expression text matches. Existing typed implications,
+such as natural to integer and positive to nonzero, remain available.
 These predicates do not add standalone differentiation support
 for `abs`, unknown functions or other unsupported operands.
 

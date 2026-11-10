@@ -35,6 +35,43 @@ class AssumptionEvaluatorPortfolioTest {
             evaluation.evidence().get(0).disposition());
         assertTrue(evaluation.evaluatorProfileHash()
             .matches("sha256:[0-9a-f]{64}"));
+        // The v2 profile could incorrectly discharge domain and UNKNOWN facts.
+        assertNotEquals(
+            "sha256:2c3d435d916e6a11d76abb2dd148503e6a88c9b0448625eaa82c28bdb9535ec6",
+            evaluation.evaluatorProfileHash());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void localEvaluatorDoesNotSatisfyDifferentDomainExpressions() {
+        AssumptionEvaluatorPortfolio portfolio = AssumptionEvaluatorPortfolio.localOnly();
+        for (Assumption.Kind kind : List.of(Assumption.Kind.DOMAIN_MEMBERSHIP, Assumption.Kind.DOMAIN)) {
+            for (List<String> symbols : List.of(List.of("x"), List.<String>of())) {
+                Assumption integer = new Assumption(kind, "x ∈ Z", symbols);
+                Assumption real = new Assumption(kind, "x ∈ R", symbols);
+                for (List<Assumption> pair : List.of(List.of(integer, real), List.of(real, integer))) {
+                    AssumptionEvaluation evaluation = portfolio.evaluate(pair.get(0), List.of(pair.get(1)));
+                    assertEquals(AssumptionTruthValue.UNKNOWN, evaluation.result(),
+                        () -> kind + " with symbols " + symbols + ": " + pair);
+                    assertFalse(evaluation.isSatisfied());
+                    assertTrue(evaluation.isInconclusive());
+                    assertEquals(AssumptionTruthValue.UNKNOWN, evaluation.evidence().get(0).result());
+                }
+                assertTrue(portfolio.evaluate(integer, List.of(integer)).isSatisfied());
+                assertTrue(portfolio.evaluate(real, List.of(real)).isSatisfied());
+            }
+        }
+    }
+
+    @Test
+    void localEvaluatorCannotUseUnknownKnowledgeAsAnExactMatch() {
+        Assumption required = Assumption.nonZero("x");
+        Assumption unknown = new Assumption(Assumption.Kind.UNKNOWN, "x != 0", List.of("x"));
+        AssumptionEvaluation evaluation = AssumptionEvaluatorPortfolio.localOnly()
+            .evaluate(required, List.of(unknown));
+        assertEquals(AssumptionTruthValue.UNKNOWN, evaluation.result());
+        assertFalse(evaluation.isSatisfied());
+        assertTrue(evaluation.isInconclusive());
     }
 
     @Test

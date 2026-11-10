@@ -46,6 +46,12 @@ public final class DirectScalarEliminationSolver {
     private static final int MAX_ABSOLUTE_CONSTANT_EXPONENT = 64;
 
     public Result solve(Source source, Budget budget) {
+        return solveWithEvidence(source, budget, null);
+    }
+
+    // Export from this execution only. The sink pays before evaluating the conversion supplier.
+    Result solveWithEvidence(Source source, Budget budget,
+        java.util.function.Predicate<java.util.function.Supplier<ExactRrefReduction.RowOperation>> evidence) {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(budget, "budget");
         WorkCounter work = new WorkCounter(budget.maxWorkUnits());
@@ -99,6 +105,15 @@ public final class DirectScalarEliminationSolver {
                 operations,
                 consequence,
                 work.profile());
+            if (evidence != null) {
+                for (EquationOperation operation : operations) {
+                    if (!evidence.test(() -> switch (operation.kind()) {
+                        case SWAP_EQUATIONS -> ExactRrefReduction.RowOperation.swap(operation.targetEquation(), operation.sourceEquation());
+                        case SCALE_EQUATION -> ExactRrefReduction.RowOperation.scale(operation.targetEquation(), operation.multiplier());
+                        case ADD_EQUATION_MULTIPLE -> ExactRrefReduction.RowOperation.addMultiple(operation.targetEquation(), operation.sourceEquation(), operation.multiplier());
+                    })) break;
+                }
+            }
             return Result.solved(
                 consequence,
                 certificate,
