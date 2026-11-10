@@ -521,7 +521,11 @@ class PluginDistributionClientTest {
 
     static Publication publish(PluginDistributionFixtures fixture, String version, byte[] bytes,
             long sequence, String previous, PluginTrustStore store) throws Exception {
-        var entry = fixture.entry(version, bytes);
+        return publish(fixture, fixture.entry(version, bytes), bytes, sequence, previous, store);
+    }
+
+    static Publication publish(PluginDistributionFixtures fixture, PluginArtifactIndex.Entry entry,
+            byte[] bytes, long sequence, String previous, PluginTrustStore store) throws Exception {
         var index = PluginArtifactIndex.create("community-index", "revision-" + sequence, "curator", List.of(entry));
         var signature = PluginSignatureManifest.create(entry.artifactFileName(), entry.artifactSha256(),
             "publisher", "key-1", PluginDistributionFixtures.sign(fixture.publisherKey,

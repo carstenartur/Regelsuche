@@ -6,6 +6,13 @@ install/update, whole-closure removal, retained rollback, status and operation
 recovery. It performs no catalog discovery, automatic latest selection, package
 hooks or runtime activation.
 
+Embedded Java hosts can separately call
+[`InstalledExtensionRuntime.open(transactions)`](plugin-distribution-client.md#activating-installed-extension-spi-v2)
+to activate the verified installed closure through SPI v2. That adapter reads the
+current authority selection; a historical `COMMITTED` recovery receipt does not
+select an older runtime generation. This API does not add activation to the
+`plugins package` command or migrate existing App and Discovery workflows.
+
 The old `PluginCheckpointAuthority` boolean-CAS contract and all original
 trust/index/artifact/installation v1 encodings retain their meanings. The new
 `PluginCheckpointTransactions` port is necessary because a lost remote commit
@@ -205,7 +212,9 @@ The provider controls compile; actual local execution failed with
 container remains a required CI gate. No deployed-hosted authority is claimed.
 
 Hosted catalog publication and browse/source selection, bounded trust-chain
-refresh, runtime closure handoff/activation, rule/knowledge-pack installation,
-external published examples, deployed role/backup operations and full public E2E
-CI still remain. Every install/update continues to require the immediate successor
-trust revision. This slice does not close issue #104.
+refresh, adoption of the embedded activation API in concrete CLI/App and Discovery
+workflows, data-only rule/knowledge-pack installation, externally published
+community packages, deployed role/backup operations and full public E2E CI still
+remain. The installed Java-closure handoff to the embedded v2 runtime is available
+through the adapter linked above. Every install/update continues to require the
+immediate successor trust revision. This slice does not close issue #104.

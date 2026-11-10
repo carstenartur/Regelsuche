@@ -19,6 +19,8 @@ flowchart TD
     app --> portfolio
     app --> search
     app --> mathSympy
+    app --> extensionRuntime
+    app --> extensionApi
 
     discoverySdk --> discovery
     extensionRuntime --> extensionApi
@@ -85,11 +87,14 @@ Search, Discovery, `app`, Web und Persistenz. Diese direkten Projektkanten
 werden in `ArchitectureBoundariesTest` geprüft.
 
 Externe Beiträge gelangen über die generischen Extension Points in einen
-unveränderlichen Katalog. Die konkrete Anwendung verdrahtet diesen Katalog erst
-in einer späteren Migrationsstufe; die neue Runtime darf das alte Pluginmodell
-nicht als versteckte Abhängigkeit übernehmen. Ihre Artefaktzulassung schützt
-die dokumentierte Ladegrenze für vertrauenswürdige In-process-Erweiterungen,
-ist aber keine Sandbox. Details stehen unter
+unveränderlichen Katalog. `app` darf die Extension API und Runtime direkt
+verwenden: `InstalledExtensionRuntime` verbindet dort die authentisierte
+Distribution mit der v2-Aktivierung. Die umgekehrten Kanten bleiben verboten;
+die generische Runtime übernimmt weder `app` noch das alte Pluginmodell als
+Abhängigkeit. Die Nutzung des Katalogs in konkreten App-Befehlen und Discovery
+bleibt eine gesonderte Migration. Die Artefaktzulassung schützt die dokumentierte
+Ladegrenze für vertrauenswürdige In-process-Erweiterungen, ist aber keine Sandbox.
+Details stehen unter
 [Generische Erweiterungen](generic-extensions.md).
 
 ### Mathematische Algorithmen und Adapter

@@ -8,10 +8,13 @@ Updates, removal and retained rollback use the same external activation boundary
 
 This is a client library in `de.regelsuche.plugin`. The additive
 [operation-aware PostgreSQL/CLI adapter](plugin-checkpoint-transactions.md) uses
-the same verification and generation preparation. It is not a hosted catalog. It does not load plugin classes, run package hooks, import rules,
-prove build reproducibility, provide cross-client transparency, or publish external
-examples. Rule packages and knowledge packs remain discoverable by the existing
-index/resolver but are rejected by this network installer. Existing index,
+the same verification and generation preparation. The client does not load plugin
+classes; the app-owned `InstalledExtensionRuntime` adapter described below activates
+its verified installed Java closure through the generic extension SPI v2. Neither
+component hosts a catalog, runs package hooks, imports rule files, proves build
+reproducibility, or provides cross-client transparency. Rule packages and knowledge
+packs remain discoverable by the existing index/resolver but are rejected by this
+network installer. Existing index,
 resolution and preload contracts retain their existing meanings and policies.
 
 ## Operator inputs and trusted state
@@ -121,6 +124,7 @@ does not reclaim rollback history. Disk quotas remain operator policy.
 | `remove()` | Selects a new empty generation, retaining previous generations | Keeps the current checkpoint and working store |
 | `rollback(generationHash)` | Reproduces a retained ancestor's closure and creates a new generation | Rechecks index, artifact and provenance signatures under the current working store; never rolls trust back |
 | `readArtifact(identityHash)` | Returns the exact retained snapshot bound to active evidence | Requires a successful authority read and matching retained hashes |
+| `installedSnapshot()` | Freezes and revalidates the complete closure selected by one authority read | Uses that generation's checkpoint and retained working store; performs no catalog or artifact download |
 
 Rollback targets must be reachable through the bounded previous-generation chain.
 Unrelated staged generations cannot become rollback targets. Current revocations
@@ -151,10 +155,83 @@ The root and generation container require POSIX mode `0700`; staging directories
 created with that mode. Symlink path components and non-regular retained files are
 rejected, and file reads use `NOFOLLOW_LINKS`. A privileged attacker or another process
 with the same credentials can deny service or race filesystem operations; this is
-not an isolation boundary against the installation owner. Use `readArtifact()` for
-verified byte handoff. Passing a cache path directly to an unrelated loader does not
-inherit this API's snapshot guarantees. Runtime loading and activation validation
-still require their own existing preload/runtime gates and are not attempted here.
+not an isolation boundary against the installation owner. `readArtifact()` remains
+available for a single verified byte handoff. For v2 activation, use
+`InstalledExtensionRuntime` to bind the complete closure and its metadata to one
+authority selection. Separate calls to `active()` and `readArtifact()` can select
+different generations during a concurrent update. Passing a cache path directly
+to an unrelated loader does not inherit either API's snapshot guarantees.
+
+## Activating installed extension SPI v2
+
+`InstalledExtensionRuntime` lives in the app module and composes distribution
+verification with `regelsuche-extension-runtime`; the generic runtime has no
+dependency back to the app. An embedding host calls `open(client)` or
+`open(transactions)`, consumes typed contributions from `catalog()`, and closes the
+runtime after all uses of those contributions finish. The adapter supplies the
+admission callback; callers do not construct one or pass cache paths to a loader.
+
+Each open performs one `installedSnapshot()` selection:
+
+1. Read the external authority exactly once and load its selected immutable
+   generation. Require matching retained file hashes, pinned roots and checkpoint.
+2. Reuse that generation's authenticated working store to verify the retained
+   index signature, resolve the original request again, and recheck every artifact
+   signature and publisher provenance assertion. Require the regenerated closure
+   and canonical verification evidence to match the selected installation. Trust
+   validation is not restarted as a new genesis.
+3. Freeze the complete artifact list and bytes. `InstalledPluginSnapshot` has no
+   public constructor that asserts trust; its byte accessors return defensive
+   copies. A concurrent authority update cannot mix this generation's metadata
+   with a later generation's JARs.
+4. Before loading provider classes, require the authenticated resolution request's
+   API version to be `ExtensionApi.VERSION` (`"2"`) and its core version to equal
+   the host option exactly. Each signed index entry must also declare that API and
+   admit the host within its minimum/maximum core bounds. A closure resolved for
+   another host is rejected even if an individual entry's range overlaps.
+5. Admit only the frozen bytes to the generic runtime. Classpath discovery is
+   disabled. Private admission-map paths are lookup keys, never filesystem inputs.
+   The existing runtime still rejects manifest `Class-Path`, enforces provider and
+   dependency origins, and checks provider descriptors and typed contributions.
+   Descriptor methods are plugin code: their checks do not precede provider
+   initialization, unlike the signed compatibility checks above.
+
+Activation downloads no catalog, trust revision, artifact or provenance resource;
+it works with the distribution transport closed. The external authority must
+still be readable, which may require a network connection for a remote provider.
+An authority failure, missing generation, damaged cache or verification failure
+rejects activation. There is no fallback to a previous usable catalog. The
+transaction overload reads current authority state; a historical `COMMITTED`
+receipt returned by `recover(operationId)` cannot activate its former generation.
+
+Contribution origins bind the actual provider JAR's `artifactSha256`, the selected
+installation's content hash as `trustEvidenceSha256`, and the stable reference
+`installed:<installationHash>/<artifactIdentityHash>`. These fields participate in
+the generic catalog's canonical identity. They record admitted provenance, not a
+proof of the contribution's mathematical correctness or arbitrary Java behavior.
+
+An absent genesis produces an empty catalog and `installation().isEmpty()`.
+A committed removal also produces an empty catalog, but retains its installation
+evidence. There is no refresh method: finish the current unit of work, close its
+runtime, then open again to observe an update, removal or retained rollback.
+`close()` is idempotent and releases owned classloaders and staged JARs;
+`catalog()` subsequently rejects access, while immutable `installation()` metadata
+remains readable. Finish all use of previously returned objects before closing.
+
+Authenticated Java executes with the host process's privileges. Classloader
+admission is not a sandbox. An already opened runtime is a snapshot, not an
+authority lease or continuous revocation subscription. Closing it does not revoke
+Java references already held by callers. The next open rechecks the trust state of
+the then-selected generation; accepting newer trust revisions still requires the
+existing install/update lifecycle. No background revocation feed is introduced.
+
+The overloads accepting `InstalledExtensionRuntime.Options` specify the actual
+host core version, parent classloader and immutable set of exact shared host types.
+Defaults use `ExtensionApi.CORE_COMPATIBILITY_VERSION` (currently `"1.0.0"`) and no
+additional host exports. This compatibility level is distinct from the product
+artifact version. Exporting a host type exports neither its package nor its
+resources; see [generic extensions](generic-extensions.md) for the underlying
+class-identity contract.
 
 ## Evidence and provenance formats
 
@@ -220,8 +297,15 @@ keys, trailing tokens, unknown properties and content-hash mismatches where pres
 The embedding operator obtains `checkpointAuthority`, `pinnedAuthorityRoots`, and
 `selectedSources` through its own trusted configuration. It must provide the real
 external authority described above; there is no copy-paste local fallback.
+For this example, the selected source contains an SPI v2 Java plugin that
+contributes `Runnable` values to the host-defined `operator.job` extension point.
+Use the point and contract agreed by your own host and provider.
 
 ```java
+import de.regelsuche.extension.ExtensionApi;
+import de.regelsuche.extension.ExtensionPoint;
+import de.regelsuche.plugin.InstalledExtensionRuntime;
+
 try (var transport = new PluginDistributionTransport(
         Set.of(URI.create("https://catalog.example.org"),
                URI.create("https://artifacts.example.org")),
@@ -233,12 +317,26 @@ try (var transport = new PluginDistributionTransport(
             2 * 1024 * 1024, 32 * 1024 * 1024, 128 * 1024 * 1024, 32, 128));
     var request = PluginArtifactResolver.ResolutionRequest.exact(
         "operator-install-1", PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN,
-        "algebra", "1.2.0", "0.5.0", "1", List.of("algebra"));
-    PluginInstallationEvidence installed = client.install(selectedSources, request);
-    byte[] admittedJar = client.readArtifact(installed.artifacts().getFirst().identityHash());
-    // Pass the snapshot through the embedding runtime's separate admission boundary.
+        "algebra", "1.2.0", ExtensionApi.CORE_COMPATIBILITY_VERSION,
+        ExtensionApi.VERSION, List.of("algebra"));
+    client.install(selectedSources, request);
+    var jobs = ExtensionPoint.of("operator.job", Runnable.class);
+    try (var runtime = InstalledExtensionRuntime.open(client)) {
+        for (var registration : runtime.catalog().registrations(jobs)) {
+            registration.implementation().run();
+        }
+        String installationHash = runtime.installation().orElseThrow().contentHash();
+    }
 }
 ```
+
+An operation-aware deployment uses the same activation call with its configured
+`PluginDistributionTransactions` instance: `InstalledExtensionRuntime.open(transactions)`.
+Both overloads read the current selected generation independently of earlier
+install or recovery results. The v2 service descriptor is
+`META-INF/services/de.regelsuche.extension.RegelsuchePlugin`. Existing v1
+`de.regelsuche.plugin.RegelsuchePlugin` JARs retain their separate runtime and
+cannot be activated as v2 plugins by changing an index declaration.
 
 The parent of the installation directory must already exist. A working-store change
 is accepted transactionally with a successful install/update; this slice does not
@@ -256,15 +354,25 @@ restart, corrupted/incorrectly bound signatures, revoked rollback, replay/fork/g
 wrong index pins, private filesystem/symlink mutation, unavailable authority and
 concurrent stale commit rejection. Canonical object ordering and installation-hash
 reconstruction are checked independently of the installation hash helper.
+`InstalledExtensionRuntimeTest` additionally compiles a real external v2 provider,
+installs its signed JAR over HTTPS, closes the transport, and invokes a typed
+contribution and its JAR resource through the resulting catalog. It exercises
+snapshot copying, authority selection, lifecycle transitions, admission origins
+and rejection before initialization for damaged bytes or incompatible signed
+metadata.
 
 Run the client-focused tests with Java 25:
 
 ```sh
-mvn -pl app -am -Dtest=PluginDistributionClientTest,PluginDistributionTransportTest,PluginArtifactProvenanceTest,PluginDistributionCanonicalJsonTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl app -am -Dtest=PluginDistributionClientTest,PluginDistributionTransactionsTest,InstalledExtensionRuntimeTest,PluginDistributionTransportTest,PluginArtifactProvenanceTest,PluginDistributionCanonicalJsonTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
 They are normal application tests and run in the existing Gradle `ciCheck` authority;
 there is no separate production npm or Python orchestrator. Issue #104 remains open
 for a real hosted/federated catalog, qualification and deployment of the externally
-protected checkpoint provider, substantiated source-to-binary provenance, runtime integration, separately
-published community examples and public service operations.
+protected checkpoint provider, substantiated source-to-binary provenance,
+separately published community examples and public service operations. The
+embedded installed-JAR-to-v2 activation path is implemented; migrating existing
+App commands, Discovery extension points and data-only rule/knowledge-pack
+installation remains separate work. Activation of a typed Java contribution does
+not establish those broader migrations.

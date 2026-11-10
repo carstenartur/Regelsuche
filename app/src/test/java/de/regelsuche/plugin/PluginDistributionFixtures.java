@@ -70,9 +70,15 @@ final class PluginDistributionFixtures implements AutoCloseable {
     }
 
     PluginArtifactIndex.Entry entry(String version, byte[] bytes) {
+        return entry(version, bytes, "1", "0.5.0", "");
+    }
+
+    PluginArtifactIndex.Entry entry(String version, byte[] bytes, String apiVersion,
+            String minimumCoreVersion, String maximumCoreVersion) {
         String file = "example-" + version + ".jar";
         return PluginArtifactIndex.Entry.create("example-" + version,
-            PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN, "example", version, "1", "0.5.0", "",
+            PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN, "example", version, apiVersion,
+            minimumCoreVersion, maximumCoreVersion,
             List.of("algebra"), List.of(), file, PluginArtifactVerifier.sha256(bytes),
             origin.resolve("/" + file).toString(), origin.resolve("/" + file + ".sig.json").toString(),
             origin.resolve("/" + file + ".provenance.json").toString(), "publisher");
