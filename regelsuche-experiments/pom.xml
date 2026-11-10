@@ -15,6 +15,16 @@
   <name>Regelsuche Experiments</name>
 
   <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>2.22</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-optimization-sdk</artifactId></dependency>
     <dependency>
       <groupId>de.regelsuche</groupId>

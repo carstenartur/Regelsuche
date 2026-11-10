@@ -2,7 +2,6 @@ package de.regelsuche.benchmark;
 
 import de.regelsuche.json.JsonWriter;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Renders {@link BenchmarkScenarioResult}s into the two artefacts
@@ -28,9 +27,11 @@ public final class BenchmarkReportRenderer {
         out.append("Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt ")
             .append("neben den klassischen Suchmetriken auch Qualitätsmetriken: ob das erwartete ")
             .append("Ergebnis getroffen wurde, wie viele Zustände geprunet wurden, e-Graph-Größe, ")
-            .append("Matcher-Scan-/Cache-Metriken, Saturation-Einsparungen, ob eine gelernte ")
+            .append("Matcher-Scan-/Cache-Metriken, ob eine gelernte ")
             .append("Makroregel beteiligt war und ob das ")
-            .append("Export-Bundle für diese Zeile gültig ist.\n\n");
+            .append("Export-Bundle für diese Zeile gültig ist.\n\n")
+            .append("**Sat-Sparung:** nicht gemessen. Ohne vergleichbaren Referenzlauf lassen sich ")
+            .append("aus Union- und Regelanwendungszahlen keine Einsparungen ableiten.\n\n");
         out.append("**Ampel:** ✅ OK · ⚠️ WARN · ❌ FAIL\n\n");
         for (BenchmarkScenarioResult scenario : scenarios) {
             out.append("## ").append(scenario.name()).append("\n\n");
@@ -55,7 +56,7 @@ public final class BenchmarkReportRenderer {
                     .append(" | ").append(row.matcherCacheMisses())
                     .append(" | ").append(row.saturationIterations())
                     .append(" | ").append(row.rulesFired())
-                    .append(" | ").append(String.format(Locale.ROOT, "%.2f", row.saturationSavings()))
+                    .append(" | ").append("nicht gemessen")
                     .append(" | ").append(row.learnedRuleUsed() ? "✓" : "–")
                     .append(" | ").append(row.proofStatus().name())
                     .append(" | ").append(row.exportBundleValid() ? "✓" : "✗")
@@ -96,7 +97,9 @@ public final class BenchmarkReportRenderer {
                         r.property("matcherCacheMisses", row.matcherCacheMisses());
                         r.property("saturationIterations", row.saturationIterations());
                         r.property("rulesFired", row.rulesFired());
-                        r.property("saturationSavings", row.saturationSavings());
+                        r.nullProperty("saturationSavings");
+                        r.property("saturationSavingsStatus", row.saturationSavingsStatus());
+                        r.property("saturationSavingsReason", row.saturationSavingsReason());
                         r.property("learnedRuleUsed", row.learnedRuleUsed());
                         r.property("proofStatus", row.proofStatus().name());
                         r.property("exportBundleValid", row.exportBundleValid());

@@ -135,6 +135,16 @@ rule application counts, stop reason, extracted form and matcher work
 additional congruence unions. Dirty worklists reduce repeated scans;
 full-scan mode remains available for comparison.
 
+Benchmark reports do not divide unions by applications to infer savings.
+Those counters do not measure duplicated work avoided against a comparable
+baseline. New reports and the workbench show savings as **not measured**;
+JSON keeps `saturationSavings: null` and adds `saturationSavingsStatus:
+"UNAVAILABLE"` plus an explanatory reason. The legacy Java primitive
+constructor/accessor remains compatible but returns `NaN` and is deprecated;
+Jackson and explicit JSON exporters expose null, never that sentinel.
+Raw graph size and rule-application counters remain available. Historical
+report files are unchanged.
+
 Focused regression coverage lives in `EqualitySaturationContractTest`,
 `EqualitySaturationSoundnessTest`, `EqualitySaturationScalabilityTest`
 and `EqualitySaturationStrategyTest`. Run the affected Maven reactor with:
