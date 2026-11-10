@@ -3226,6 +3226,7 @@ public class WebWorkbenchServer {
             sendStaticResource(exchange, resource, mimeFor(resource));
         } else if (path.startsWith("/vendor/")
             || path.equals("/app.js")
+            || path.equals("/workbench-entry.js")
             || path.equals("/style.css")
             || path.equals("/run-workspace-state.js")
             || path.equals("/candidate-dossier-state.js")
