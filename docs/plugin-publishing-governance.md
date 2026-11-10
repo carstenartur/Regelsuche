@@ -6,11 +6,12 @@ gebaut, versioniert, geprüft, kuratiert, veröffentlicht und im Sicherheitsfall
 gesperrt werden sollen.
 
 > Der Vertrag ist bereits für lokale, content-addressed Artefakte, signierte
-> Indexrevisionen und authentisierte Trust-State-Revisionen anwendbar. Ein
-> gehosteter Katalogtransport sowie Download, Installation, Update, Entfernung
-> und Rollback durch den Client sind noch nicht vollständig implementiert. Diese
-> Seite dokumentiert deshalb keinen bereits verfügbaren öffentlichen
-> Marktplatzdienst.
+> Indexrevisionen und authentisierte Trust-State-Revisionen anwendbar. Der
+> Java-JAR-Client implementiert authentisierten Download, Installation, Update,
+> Entfernung und Rollback; eine eingebettete API aktiviert diese installierten
+> JARs über die generische SPI v2. Ein betriebener öffentlicher Katalog und die
+> vollständige Produktintegration stehen weiterhin aus. Diese Seite dokumentiert
+> deshalb keinen bereits verfügbaren öffentlichen Marktplatzdienst.
 
 ## Status und Claim-Grenze
 
@@ -22,16 +23,25 @@ gesperrt werden sollen.
 | Signierte Indexrevisionen | `IMPLEMENTED` |
 | Signierte, replay-sichere Trust-State-Revisionen | `IMPLEMENTED` |
 | Gehosteter oder föderierter Katalogtransport | `BLOCKED` |
-| Clientseitiger Download- und Installationslebenszyklus | `PARTIAL` — [Java-JAR-Client](plugin-distribution-client.md), externe Checkpoint-Authority erforderlich |
+| Clientseitiger Download- und Installationslebenszyklus für Java-JARs | `IMPLEMENTED` — [Java-JAR-Client](plugin-distribution-client.md), externe Checkpoint-Authority erforderlich |
+| Eingebettete Aktivierung installierter Java-JARs über SPI v2 | `IMPLEMENTED` — [InstalledExtensionRuntime](plugin-distribution-client.md#activating-installed-extension-spi-v2), keine automatische CLI-/Workbench-Integration |
 | Öffentliche End-to-End-Distribution | `BLOCKED` |
 | Unabhängig veröffentlichte Community-Beispielprojekte | `NOT_EVALUATED` |
 
 Der Java-Client prüft reale HTTPS-Downloads und verwaltet atomare Generationen
 für Installation, Update, Entfernung und Rollback einer JAR-Dependency-Closure.
 Der additive [PostgreSQL-/CLI-Adapter](plugin-checkpoint-transactions.md) ergänzt
-Vorgangsbelege und explizite Recovery. Seine tatsächliche Containerqualifikation
-und externe Deployment-Grenze, öffentliche Katalogdienste, Runtime-Aktivierung
-sowie Regel-/Knowledge-Pack-Installation bleiben erforderlich.
+Vorgangsbelege und explizite Recovery. `InstalledExtensionRuntime.open(client)`
+und `open(transactions)` aktivieren den vollständig verifizierten Snapshot der
+aktuell ausgewählten Installation. Historische Vorgangsbelege wählen dabei keine
+alte Generation aus. Die Einbindung dieser API in konkrete CLI-, App- und
+Discovery-Abläufe, öffentliche Katalogdienste und die Installation reiner Regel-/
+Knowledge-Pack-Daten bleiben offen. Die externe Checkpoint-Authority benötigt
+weiterhin gesondert qualifizierten Betrieb und geschützte Rollen-/Backup-Grenzen.
+
+Die [Runtime-Dokumentation](generic-extensions.md#installed-package-activation)
+beschreibt Snapshot-Lebensdauer, erneute Aktivierung nach akzeptierten Änderungen
+und die Grenzen des Widerrufs bereits laufender Java-Beiträge.
 
 `IMPLEMENTED` bedeutet, dass der jeweilige Software- und Evidence-Vertrag im
 Checkout vorhanden und getestet ist. Es bedeutet nicht, dass bereits ein

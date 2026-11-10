@@ -60,6 +60,10 @@ public final class PluginDistributionTransactions {
     }
     public Optional<PluginInstallationEvidence> active() throws IOException { return client().active(); }
     public byte[] readArtifact(String identity) throws IOException { return client().readArtifact(identity); }
+    /** Selects current authority state, never a historical transaction receipt. */
+    public Optional<InstalledPluginSnapshot> installedSnapshot() throws IOException {
+        return client().installedSnapshot();
+    }
 
     private synchronized PluginDistributionClient client() throws IOException {
         // Remote receipt lookup must remain possible even when the local cache cannot be opened.

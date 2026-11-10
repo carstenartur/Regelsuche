@@ -61,6 +61,13 @@ wenn dafür ein eigener dokumentierter Vertrag existiert.
 
 Details: [Plugins](plugins.md) und [Plugin-API](plugin-api.md).
 
+Die generische SPI v2 in `de.regelsuche.extension` stellt daneben typisierte
+Extension Points und einen Headless-Runtime bereit. `InstalledExtensionRuntime`
+kann authentisiert installierte Java-JARs darüber aktivieren. Dieser eingebettete
+API-Pfad migriert die bestehenden App-Befehle und Discovery-Registries noch nicht
+auf v2. Details: [Generische Erweiterungen](generic-extensions.md) und
+[Aktivierung installierter Pakete](plugin-distribution-client.md#activating-installed-extension-spi-v2).
+
 ## Regeldateien und deklarative Makros
 
 Die `.regelsuche`-/`.rules`-DSL ist der niedrigschwellige Weg für lokale Regeln
@@ -154,7 +161,8 @@ keine mathematische Bestätigung. Siehe [Autopilot](autopilot-planner.md).
 
 ## Artefakt- und Indexvertrauen
 
-Die lokale Trust-Grundlage ist implementiert:
+Die kryptografischen Verträge und die darauf aufbauenden Bibliotheks-APIs sind
+implementiert:
 
 - Detached-Ed25519-Manifeste binden Artefaktbytes, Publisher und Key;
 - ein Publisher-Trust-Store modelliert aktive, rotierte und widerrufene Keys;
@@ -163,37 +171,69 @@ Die lokale Trust-Grundlage ist implementiert:
 - ein unveränderlicher Artifact Index bindet Versionen, Kompatibilität,
   Abhängigkeiten, Provenienz und Content-Hashes;
 - Indexrevisionen werden durch Curator-Signaturen authentisiert;
-- Trust-State-Revisionen bilden eine signierte monotone Hashkette mit lokalem
-  Checkpoint gegen Replay, Lücken und Forks;
-- Verifikation und Gate-Entscheidungen erzeugen kanonische Evidence.
+- Trust-State-Revisionen bilden eine signierte monotone Hashkette mit Checkpoint
+  gegen Replay, Lücken und Forks;
+- Verifikation und Gate-Entscheidungen erzeugen kanonische Evidence;
+- der Distribution Client authentisiert explizit gewählte Index- und Trust-State-
+  Revisionen und lädt exakt gebundene Artefakte unter HTTPS-, Zeit-, Größen- und
+  Redirect-Grenzen;
+- Installation, Update, Entfernung und Rollback verwenden vollständige
+  unveränderliche Generationen und eine externe Checkpoint-Authority;
+- ein operation-aware PostgreSQL-/CLI-Adapter unterstützt persistente
+  Entscheidungen und die Wiederaufnahme nach ungewissem Commit-Ausgang;
+- `InstalledExtensionRuntime` aktiviert die vollständig verifizierte Java-Closure
+  einer einzigen Authority-Auswahl über die generische SPI v2, einschließlich
+  gebundener Artefakt- und Installationsherkunft.
 
 Diese Fähigkeiten trennen Artefaktvertrauen von mathematischer Korrektheit. Ein
 korrekt signiertes Plugin ist nicht automatisch mathematisch richtig; eine
 mathematisch gültige Regel ist nicht automatisch aus einer vertrauenswürdigen
 Quelle installiert.
 
+Die Installation setzt eine unabhängig geschützte und korrekt betriebene externe
+Authority voraus; der lokale Paket-Cache allein schützt nicht vor Rollback.
+Aktivierung benötigt keinen erneuten Katalog- oder Artefakt-Download, aber einen
+erfolgreichen Authority-Read. Bereits laufende Java-Beiträge bleiben an ihren
+Snapshot gebunden; der Adapter bietet weder eine Sandbox noch sofortigen Widerruf
+bereits ausgegebener Objektreferenzen.
+
 Details:
 
 - [Plugin Artifact Trust](plugin-artifact-trust.md)
 - [Plugin Artifact Index](plugin-artifact-index.md)
 - [Plugin Trust Store Revisions](plugin-trust-store-revisions.md)
+- [Authenticated Plugin Distribution Client](plugin-distribution-client.md)
+- [Checkpoint-Transaktionen und PostgreSQL-Adapter](plugin-checkpoint-transactions.md)
 
 ## Was noch nicht als öffentliches Ökosystem qualifiziert ist
 
-`PUBLIC_PLUGIN_DISTRIBUTION` bleibt `BLOCKED`. Noch fehlen insbesondere:
+`PUBLIC_PLUGIN_DISTRIBUTION` bleibt `BLOCKED`. Die implementierten Client-,
+Checkpoint- und Runtime-APIs sind noch kein betriebenes öffentliches Ökosystem.
+Offen bleiben insbesondere:
 
-- ein real betriebener kuratierter oder föderierter Indextransport;
-- authentisierter Client-Abruf von Index- und Trust-State-Revisionen;
-- transaktional rollback-geschützte Übernahme lokaler Checkpoints;
-- Download exakt der indexgebundenen Bytes unter Zeit-, Größen- und
-  Redirect-Grenzen;
-- atomare Installation, Update, Entfernung und Rollback;
-- unabhängig baubare externe Beispielprojekte gegen veröffentlichte API-
-  Artefakte;
-- vollständige Publishing-, Review-, Incident- und Revocation-Prozesse.
+- ein real betriebener kuratierter oder föderierter Katalog mit Discovery und
+  nachvollziehbarer Auswahl veröffentlichter Revisionen;
+- Qualifikation und Betrieb der extern geschützten Checkpoint-Authority,
+  einschließlich Rollen, Backups und Wiederherstellung;
+- unabhängige Belege für die Beziehung zwischen veröffentlichtem Quellcode und
+  Binärartefakt über die signierte Publisher-Behauptung hinaus;
+- die Nutzung der v2-Aktivierung durch konkrete App- und Discovery-Abläufe sowie
+  die Installation reiner Regel- und Knowledge-Pack-Daten;
+- separat veröffentlichte Community-Pakete und eine öffentliche Ende-zu-Ende-
+  Distribution;
+- praktisch erprobte Publishing-, Review-, Incident- und Revocation-Prozesse
+  einschließlich der Verteilung neuer Trust-Revisionen.
 
-Die vorhandenen lokalen kryptografischen Verträge dürfen durch diese spätere
-Verteilungsschicht nicht permissiver werden.
+Unabhängige Java-25-Consumer-Beispiele gegen veröffentlichte API-Artefakte sind
+bereits vorhanden: [Anwendungs-API v1](../examples/external-consumers/hello-rule-java25/README.md)
+und [generische SPI v2](../examples/external-consumers/extension-runtime-java25/README.md).
+Sie belegen den jeweiligen Consumer-Pfad; der v2-Classpath-Consumer aktiviert
+keinen Download aus einem öffentlichen Community-Katalog. Der installierte
+v2-Runtime-Pfad ersetzt außerdem weder die bestehende v1-Anwendungsintegration
+noch die gesonderte Migration von Discovery und Datenpaketen.
+
+Die kryptografischen und externen Checkpoint-Verträge gelten auch für diese
+weiteren Produkt- und Betriebsintegrationen.
 
 ## Entscheidungsregel
 

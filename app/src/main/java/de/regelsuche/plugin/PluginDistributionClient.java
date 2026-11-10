@@ -185,6 +185,56 @@ public final class PluginDistributionClient {
         return Optional.ofNullable(snapshot == null ? null : snapshot.evidence());
     }
 
+    /**
+     * Freezes one complete closure selected by exactly one authority read. All
+     * retained index, signature, resolution and provenance relationships are
+     * rechecked offline before any bytes leave this boundary. Later authority
+     * changes apply to the next read; no live authority lease is implied.
+     */
+    public Optional<InstalledPluginSnapshot> installedSnapshot() throws IOException {
+        Snapshot snapshot = active(accepted());
+        if (snapshot == null) return Optional.empty();
+        var installation = snapshot.evidence();
+        try (var work = store.work()) {
+            PluginTrustStore trust = retainedTrust(snapshot, work.directory());
+            if (installation.artifacts().isEmpty()) {
+                return Optional.of(new InstalledPluginSnapshot(installation, null, List.of()));
+            }
+            PluginInstallationStore.write(work.directory(), "index.json", required(snapshot.files(), "index.json"));
+            PluginInstallationStore.write(work.directory(), "index.sig.json", required(snapshot.files(), "index.sig.json"));
+            VerifiedIndex verified = new PluginArtifactIndexVerifier(trust).requireTrusted(
+                work.directory().resolve("index.json"), work.directory().resolve("index.sig.json"));
+            var index = verified.index();
+            if (!installation.indexId().equals(index.indexId())
+                    || !installation.indexRevision().equals(index.revision())
+                    || !installation.indexContentHash().equals(index.contentHash())) {
+                throw new SecurityException("selected installation differs from its signed index");
+            }
+            var original = PluginDistributionJson.read(required(snapshot.files(), "resolution.json"),
+                ResolutionReceipt.class);
+            Map<String, byte[]> verifiedFiles = new LinkedHashMap<>();
+            Admission admission = admit(verified, original.request(), trust, verifiedFiles, work.directory(),
+                (entry, type) -> required(snapshot.files(), path(entry, type)));
+            if (!original.contentHash().equals(admission.resolution().contentHash())
+                    || !installation.resolutionContentHash().equals(admission.resolution().contentHash())
+                    || !installation.artifacts().equals(admission.artifacts())) {
+                throw new SecurityException("selected installation no longer reproduces its verified closure");
+            }
+            for (var file : verifiedFiles.entrySet()) {
+                if (!java.util.Arrays.equals(file.getValue(), required(snapshot.files(), file.getKey()))) {
+                    throw new SecurityException("selected installation verification evidence differs: " + file.getKey());
+                }
+            }
+            Map<String, Entry> entries = new LinkedHashMap<>();
+            index.entries().forEach(entry -> entries.put(entry.identityHash(), entry));
+            List<InstalledPluginSnapshot.Artifact> artifacts = admission.artifacts().stream()
+                .map(evidence -> new InstalledPluginSnapshot.Artifact(evidence, entries.get(evidence.identityHash()),
+                    required(verifiedFiles, evidence.path())))
+                .toList();
+            return Optional.of(new InstalledPluginSnapshot(installation, admission.resolution(), artifacts));
+        }
+    }
+
     /** Returns the exact verified retained snapshot, avoiding a path-based verify-then-swap race. */
     public byte[] readArtifact(String identityHash) throws IOException {
         PluginSignatureManifest.requireSha256(identityHash, "identityHash");
