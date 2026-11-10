@@ -164,6 +164,129 @@ class EqualitySaturationContractTest {
         assertEquals(List.of(), graph.representatives(root, node -> Integer.MAX_VALUE));
     }
 
+    @Test void unavailableStartRootCanBecomeFiniteThroughNativeRewrite() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x + 0"));
+        var rule = new PatternRewriteRule("add-zero",
+            PatternExpr.op(de.regelsuche.ast.BinaryOperator.ADD, a, PatternExpr.num(0)), a);
+        var result = new EqualitySaturation(List.of(rule), new EqualitySaturation.Config(2, 100))
+            .saturate(graph, root, node -> node.symbol().equals("op:ADD") ? Integer.MAX_VALUE : 1);
+        assertEquals(parser.parseTerm("x"), result.expression());
+        assertEquals(1, result.stats().totalApplications());
+        assertTrue(result.provenance().witnesses().getFirst().replay(rule));
+    }
+
+    @Test void trivialPatternSubclassMatchesEvenWhenTheObjectiveExcludesItsSource() {
+        var source = PatternExpr.op(de.regelsuche.ast.BinaryOperator.ADD, a, PatternExpr.num(0));
+        var nativeRule = new PatternRewriteRule("native-zero", source, a);
+        var subclassRule = new PatternRewriteRule("subclass-zero", source, a) {};
+        assertSimplifiesExcludedAddition("x + 0", nativeRule);
+        assertSimplifiesExcludedAddition("x + 0", subclassRule);
+    }
+
+    @Test void acPatternMatchesEvenWhenTheObjectiveExcludesItsSource() {
+        var nativeRule = new PatternRewriteRule("native-left-zero",
+            PatternExpr.op(de.regelsuche.ast.BinaryOperator.ADD, PatternExpr.num(0), a), a);
+        var acRule = new PatternRewriteRule("ac-right-zero",
+            PatternExpr.op(de.regelsuche.ast.BinaryOperator.ADD, a, PatternExpr.num(0)), a,
+            RecognitionProfile.arithmeticAc());
+        assertSimplifiesExcludedAddition("0 + x", nativeRule);
+        assertSimplifiesExcludedAddition("0 + x", acRule);
+    }
+
+    private void assertSimplifiesExcludedAddition(String expression, RewriteRule rule) {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm(expression));
+        var result = new EqualitySaturation(List.of(rule), new EqualitySaturation.Config(2, 100))
+            .saturate(graph, root, node -> node.symbol().equals("op:ADD") ? Integer.MAX_VALUE : 1);
+        assertEquals(parser.parseTerm("x"), result.expression());
+        assertEquals(1, result.stats().totalApplications());
+        assertEquals(0, result.diagnostics().count(SaturationDiagnostics.Outcome.RULE_FAILURE));
+        assertTrue(result.provenance().witnesses().getFirst().replay(rule));
+    }
+
+    @Test void nativeWitnessRetentionCannotChangeRewriteApplicability() {
+        for (int fillers : List.of(0, SaturationProvenance.MAX_WITNESSES)) {
+            var graph = new EGraph();
+            var root = graph.addExpression(parser.parseTerm("0 * x"));
+            graph.union(root, graph.addExpression(parser.parseTerm("0 + 0")));
+            for (int i = 0; i < fillers; i++) {
+                graph.addExpression(parser.parseTerm("v" + i + " * 1"));
+            }
+            graph.rebuild();
+            var unit = new PatternRewriteRule("unit",
+                PatternExpr.op(de.regelsuche.ast.BinaryOperator.MUL, a, PatternExpr.num(1)), a);
+            var zero = new PatternRewriteRule("zero-mul",
+                PatternExpr.op(de.regelsuche.ast.BinaryOperator.MUL, PatternExpr.num(0), a), PatternExpr.num(0));
+            var result = new EqualitySaturation(List.of(unit, zero), new EqualitySaturation.Config(2, 2000))
+                .saturate(graph, root, node -> node.symbol().equals("var:x") ? Integer.MAX_VALUE : 1);
+            assertEquals(parser.parseTerm("0"), result.expression());
+            assertEquals(1, result.stats().appliedRules().get("zero-mul"));
+            assertEquals(0, result.diagnostics().count(SaturationDiagnostics.Outcome.RULE_FAILURE));
+            if (fillers == 0) {
+                assertTrue(result.provenance().witnesses().getFirst().replay(zero));
+                assertEquals(1, result.provenance().nativeWitnessExtractions());
+            } else {
+                assertEquals(SaturationProvenance.MAX_WITNESSES, result.provenance().witnesses().size());
+                assertEquals(1, result.provenance().droppedWitnesses());
+                assertEquals(fillers, result.provenance().nativeWitnessExtractions());
+            }
+        }
+    }
+
+    @Test void unavailableWitnessExplanationDoesNotPreventANativeEquality() {
+        var graph = new EGraph();
+        var zeroId = graph.addExpression(parser.parseTerm("0"));
+        var large = graph.addExpression(parser.parseTerm("x"));
+        // A small DAG with a finite tree larger than the extractor's integer cost range.
+        // Uniform witness extraction must stop before attempting to materialize that tree.
+        for (int i = 0; i < 31; i++) large = graph.add(new ENode("op:ADD", List.of(large, large)));
+        var root = graph.add(new ENode("op:MUL", List.of(zeroId, large)));
+        graph.union(root, graph.addExpression(parser.parseTerm("0 + 0")));
+        graph.rebuild();
+        var rule = new PatternRewriteRule("zero-mul",
+            PatternExpr.op(de.regelsuche.ast.BinaryOperator.MUL, PatternExpr.num(0), a), PatternExpr.num(0));
+        var result = new EqualitySaturation(List.of(rule), new EqualitySaturation.Config(1, 100))
+            .saturate(graph, root, node -> 1);
+        assertEquals(parser.parseTerm("0"), result.expression());
+        assertEquals(1, result.stats().totalApplications());
+        assertEquals(1, result.provenance().nativeWitnessExtractions());
+        assertTrue(result.provenance().witnesses().isEmpty());
+        assertEquals(1, result.provenance().droppedWitnesses());
+        assertEquals(1, result.diagnostics().count(SaturationDiagnostics.Outcome.RULE_FAILURE));
+        assertEquals(SaturationDiagnostics.Stage.EXTRACTION, result.diagnostics().events().getFirst().stage());
+        assertTrue(graph.areEquivalent(root, zeroId));
+    }
+
+    @Test void alreadyEquivalentNativeMatchesDoNotExtractUnusedWitnesses() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x0"));
+        for (int i = 0; i < 16; i++) {
+            var variable = graph.addExpression(parser.parseTerm("x" + i));
+            graph.union(variable, graph.addExpression(parser.parseTerm("x" + i + " + 0")));
+        }
+        graph.rebuild();
+        var rule = new PatternRewriteRule("add-zero",
+            PatternExpr.op(de.regelsuche.ast.BinaryOperator.ADD, a, PatternExpr.num(0)), a);
+        var result = new EqualitySaturation(List.of(rule)).saturate(graph, root, node -> 1);
+        assertEquals(0, result.stats().totalApplications());
+        assertTrue(result.provenance().witnesses().isEmpty());
+        assertEquals(0, result.provenance().droppedWitnesses());
+        assertEquals(0, result.provenance().nativeWitnessExtractions());
+    }
+
+    @Test void negativeCostsAreRejectedBeforeAnyRewriteMutatesTheGraph() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x + 0"));
+        var rule = new PatternRewriteRule("add-zero",
+            PatternExpr.op(de.regelsuche.ast.BinaryOperator.ADD, a, PatternExpr.num(0)), a);
+        long version = graph.version();
+        assertThrows(IllegalArgumentException.class, () -> new EqualitySaturation(List.of(rule))
+            .saturate(graph, root, node -> node.symbol().equals("var:x") ? -1 : 1));
+        assertEquals(version, graph.version());
+        assertEquals(parser.parseTerm("x + 0"), graph.extract(root, node -> 1));
+    }
+
     @Test void negativeAdditiveCostsFailExplicitly() {
         var graph = new EGraph();
         var root = graph.addExpression(parser.parseTerm("x"));

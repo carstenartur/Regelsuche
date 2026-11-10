@@ -388,10 +388,23 @@ public final class EGraph {
         return new ExtractionChoices(bestCost, bestNode);
     }
 
+    /** Validate the objective without requiring an initially extractable root. */
+    void validateNodeCosts(java.util.function.ToIntFunction<ENode> costOfNode) {
+        Objects.requireNonNull(costOfNode, "costOfNode");
+        for (EClass eclass : classes()) {
+            for (ENode node : eclass.nodes()) validatedNodeCost(node, costOfNode);
+        }
+    }
+
+    private static int validatedNodeCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode) {
+        int cost = costOfNode.applyAsInt(node);
+        if (cost < 0) throw new IllegalArgumentException("Additive extraction requires non-negative node costs");
+        return cost;
+    }
+
     private int extractionCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode,
             Map<EClassId, Integer> bestCost) {
-        long total = costOfNode.applyAsInt(node);
-        if (total < 0) throw new IllegalArgumentException("Additive extraction requires non-negative node costs");
+        long total = validatedNodeCost(node, costOfNode);
         if (total == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         }
