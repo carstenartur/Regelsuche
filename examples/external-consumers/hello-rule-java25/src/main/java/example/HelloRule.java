@@ -33,11 +33,17 @@ public final class HelloRule implements RegelsuchePlugin {
         Expr before = new ExpressionParser().parseTerm("x + 0");
         if (!rule.matches(before)) throw new AssertionError("expected an exact match");
         Expr after = rule.apply(before);
+        if (!after.equals(new ExpressionParser().parseTerm("x")))
+            throw new AssertionError("expected x");
+        if (rule.matches(new ExpressionParser().parseTerm("x + 1")))
+            throw new AssertionError("different right operand must be rejected");
         // Replay the retained rule and input; equality alone does not prove arbitrary plugins.
         if (!after.equals(rule.apply(before))) throw new AssertionError("replay mismatch");
         System.out.println("rule=" + rule.id());
         System.out.println("before=" + ExpressionFormatter.format(before));
         System.out.println("after=" + ExpressionFormatter.format(after));
         System.out.println("replay=VERIFIED");
+        System.out.println("negative=REJECTED");
+        System.out.println("proof=AUTHOR_SUPPLIED_IDENTITY");
     }
 }

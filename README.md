@@ -21,6 +21,9 @@ strukturellen Aufgaben, kumulativem Lernen und geprüften Rechenoptimierungen.
 [Rechenpläne herleiten](#geprüfte-rechenpläne-herleiten) ·
 [Erweitern und integrieren](#in-wenigen-zeilen-erweitern)
 
+**English:** [Start here](docs/start-here.md) · [recorded browser demo](docs/demos/recorded-discovery.html)
+(no installation) · [released Java SDK 0.5.2](docs/java-sdk-quickstart.md).
+
 ## Für wen und wofür?
 
 | Zielgruppe | Unterstützter Einstieg | Ergebnis |
@@ -51,11 +54,18 @@ docker run --rm -p 127.0.0.1:8080:8080 regelsuche
 Danach `http://127.0.0.1:8080/` öffnen. Die Bindung an `127.0.0.1` hält die
 Demo lokal; sie verwendet HTTP ohne Anmeldung.
 
-Ohne Docker genügt mit JDK 25:
+Ohne Docker genügt für den vorhandenen Entwicklungslauncher JDK 25:
 
 ```bash
 ./gradlew run
 ```
+
+Der Java-Produktbuild besitzt inzwischen einen vollständigen Maven-Reaktor:
+`mvn --batch-mode --no-transfer-progress test` führt die normalen JUnit-Tests
+mit JDK 25 und Maven 3.9.9+ aus; `mvn package` erzeugt die Distributionen unter
+`app/target/`. Die bestehenden Gradle-/Reproduktions-Gates bleiben während der
+Migration zusätzlich erforderlich. [Build- und Modulstand](docs/module-structure.md)
+und [Testing](docs/testing.md) unterscheiden diese Prüfumfänge.
 
 Der vollständige Einstieg einschließlich Sicherheitshinweisen und
 Fehlerdiagnose steht in [Getting Started](docs/getting-started.md).
@@ -443,9 +453,14 @@ allgemeinen Aussage über unendliche Folgen. Das vollständige Beispiel testet
 auch `REFUTED`, `BUDGET_EXHAUSTED` und das Laden über `ServiceLoader`.
 
 [Java Discovery SDK](docs/java-discovery-sdk.md) erklärt Builder, Budgets,
-Assertions und Provider-SPI. Die SDK-Artefakte werden derzeit aus dem Checkout
-lokal veröffentlicht; eine dauerhaft öffentliche Maven-Veröffentlichung und
-eine stabile API über Releases werden noch nicht zugesagt.
+Assertions und Provider-SPI. Das **SDK 0.5.2 ist veröffentlicht**:
+[GitHub Release vom 7. November 2026](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.2).
+Der bevorzugte externe Weg verwendet das SDK-ZIP als Maven-Repository und das
+[ausführbare Maven-Beispiel](examples/external-consumers/hello-rule-java25/).
+Die API-Revisionen und Grenzen stehen im [API-Vertrag](docs/java-sdk-api-policy.md).
+`main` ist `0.5.3-SNAPSHOT`; spätere API-Ergänzungen und dieses neue Consumer-POM
+sind nicht rückwirkend Inhalt des 0.5.2-Archivs. Eine Veröffentlichung auf Maven
+Central wird nicht behauptet.
 
 ### Zusammenspiel mit Sandbox
 

@@ -19,6 +19,10 @@ class TaskKnowledgeSelfImproverTest {
     }
     private static CumulativeTaskKnowledge empty() { return CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory()); }
 
+    @Test void laterWinsMustRepayEarlierRejectedAttempts() {
+        TaskKnowledgeLifecycleCostContract.main(new String[0]);
+    }
+
     @Test void noOpLearningIsPaidAndCannotChangeActiveKnowledge() {
         var initial = empty();
         var batch = new TaskKnowledgeSelfImprover.Batch(List.of(task("x+13", 1), task("y+17", 1)),
@@ -27,7 +31,25 @@ class TaskKnowledgeSelfImproverTest {
         assertSame(initial, result.active()); assertEquals(1, result.attempts().size());
         assertEquals(KnowledgeCostGate.Decision.NO_CANDIDATE, result.attempts().getFirst().decision());
         assertTrue(result.knownWork() > 0); assertTrue(result.paid().wallNanos() > 0);
+        assertTrue(result.attempts().getFirst().adoptionCost().wallNanos() >= result.attempts().getFirst().paid().wallNanos());
         assertEquals(initial.id(), result.attempts().getFirst().parentId());
+    }
+
+    @Test void cumulativeReceiptsRetainEarlierNoOpCostsWhileLegacyReceiptsRemainIncremental() {
+        var noop = new TaskKnowledgeSelfImprover.Batch(List.of(task("x+13", 1), task("y+17", 1)),
+            List.of(task("z+19", 1)), List.of(task("q+23", 1)));
+        for (var scope : TaskKnowledgeSelfImprover.CostScope.values()) {
+            var result = scripted(0, 1, 2, 3, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007)
+                .improve(empty(), List.of(noop, noop), policy(5_000_000, 2), scope);
+            assertEquals(2, result.attempts().size());
+            var later = result.attempts().get(1);
+            assertEquals(KnowledgeCostGate.Decision.NO_CANDIDATE, later.decision());
+            if (scope == TaskKnowledgeSelfImprover.CostScope.LEGACY_ATTEMPT) assertEquals(later.paid(), later.adoptionCost());
+            else {
+                assertTrue(later.adoptionCost().wallNanos() >= result.attempts().getFirst().paid().wallNanos() + later.paid().wallNanos());
+                assertTrue(later.adoptionCost().cpuNanos() >= result.attempts().getFirst().paid().cpuNanos() + later.paid().cpuNanos());
+            }
+        }
     }
 
     @Test void promotionInputsMustBePolynomialDisjointBeforeLearning() {

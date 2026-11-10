@@ -17,7 +17,7 @@
         <h1>Regelsuche</h1>
         <p class="tagline">Mathematik-Workbench – Ausdrücke erkunden, Regeln entdecken, Beweise vorbereiten.</p>
     </div>
-    <nav class="tabs">
+    <nav class="tabs" aria-label="Werkzeuge">
         <button class="tab active" data-tab="workbench">Workbench</button>
         <button class="tab" data-tab="runs">Gespeicherte Runs</button>
         <button class="tab" data-tab="paths">Pfade</button>
@@ -44,6 +44,21 @@
 </aside>
 
 <main>
+    <section id="workflowEntry" class="workflow-entry" aria-labelledby="workflowTitle">
+        <h2 id="workflowTitle">Was möchtest du untersuchen?</h2>
+        <div class="workflow-grid">
+            <a id="workflowExplore" class="workflow-card" href="#tab=workbench" data-open-tab="workbench">
+                <strong>Ausdruck erkunden</strong><span>Einen Term eingeben und die gefundenen Schritte nachvollziehen.</span>
+            </a>
+            <a id="workflowLearn" class="workflow-card" href="#tab=compare" data-open-tab="compare">
+                <strong>Regeln lernen und vergleichen</strong><span>Suchwege, gelernte Strategien und ihren gemessenen Nutzen prüfen.</span>
+            </a>
+            <a id="workflowOptimize" class="workflow-card" href="/static/pair-reductions.html">
+                <strong>Berechnung optimieren</strong><span>Für Summenschleifen einen günstigeren, exakt geprüften Rechenplan finden.</span>
+            </a>
+        </div>
+        <button id="showAllTools" type="button">Alle Werkzeuge anzeigen</button>
+    </section>
     <section id="tab-runs" class="tab-panel" aria-labelledby="runsTitle">
         <h2 id="runsTitle">Gespeicherte Discovery-Runs</h2>
         <p>Öffne einen unveränderlichen Run, prüfe seine gebundenen Nachweise und vergleiche die gespeicherten Einstellungen.</p>
@@ -222,14 +237,15 @@
                 <button type="button" id="loadExample-eq">Beispiel: 2x+3 = 7</button>
             </div>
         </form>
-        <div id="searchStatus" class="status"></div>
+        <div id="searchStatus" class="status" role="status" aria-live="polite"></div>
+        <section id="searchResultSummary" class="card search-result-summary" aria-labelledby="searchResultTitle" hidden></section>
         <div id="runtimeSummary" role="status"></div>
         <ul id="runtimeCandidates"></ul>
         <div class="toolbar">
             <button type="button" id="runtimeExport" disabled>Runtime-Ergebnis exportieren</button>
             <label>Runtime-Ergebnis importieren und erneut prüfen <input type="file" id="runtimeImport" accept="application/json,.json"></label>
         </div>
-        <pre id="searchOutput" class="output"></pre>
+        <details id="searchResponseDetails"><summary>Technische Antwort (JSON)</summary><pre id="searchOutput" class="output"></pre></details>
     </section>
 
     <!-- ─────────── Paths tab ─────────── -->
@@ -385,6 +401,16 @@
 
     <!-- ─────────── Compare tab ─────────── -->
     <section id="tab-compare" class="tab-panel">
+        <div class="card">
+            <h2>Regeln lernen und vergleichen</h2>
+            <p>Beginne mit einer geführten Studie oder vergleiche die Pfade deiner aktuellen Suche. Lern- und Prüfaufwand gehören zur Bewertung des Nutzens.</p>
+            <div class="actions">
+                <a class="export-button" href="/static/strategy-demo.html">Geführte Lernstudie</a>
+                <a class="export-button" href="/static/representations.html">Darstellungen vergleichen</a>
+                <a class="export-button" href="#tab=inventory" data-open-tab="inventory">Regelinventar prüfen</a>
+                <a class="export-button" href="#tab=benchmark" data-open-tab="benchmark">Messwerte ansehen</a>
+            </div>
+        </div>
         <div class="card">
             <h2>Pfade vergleichen</h2>
             <div class="actions">
@@ -646,6 +672,7 @@
     <small>Regelsuche · lokales Web-Frontend · für Trial &amp; Discovery, nicht für Produktion.</small>
 </footer>
 
+<script src="workbench-entry.js"></script>
 <script src="app.js"></script>
 <script src="run-workspace-state.js"></script>
 <script src="candidate-dossier-state.js"></script>

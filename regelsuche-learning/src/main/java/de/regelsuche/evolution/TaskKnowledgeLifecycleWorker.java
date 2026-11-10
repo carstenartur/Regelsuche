@@ -21,6 +21,7 @@ public final class TaskKnowledgeLifecycleWorker implements AutoCloseable {
     private CumulativeTaskKnowledge knowledge;
     private TaskKnowledgeSession session;
     private String profile, seedId;
+    private String promotionWorkload = "SUPPLIED_LEGACY";
     private Path snapshot, directory;
     private List<TaskKnowledgeSelfImprover.Batch> improvements = List.of();
     private long futureQueries;
@@ -75,7 +76,13 @@ public final class TaskKnowledgeLifecycleWorker implements AutoCloseable {
         var result = common("SAVED"); result.put("steps", steps); return result;
     }
     private Map<String, Object> restore(JsonNode request) {
-        CheckedSchemaSupport.fields(request, "op", "profile", "snapshot", "directory", "improvementBatches", "futureQueries"); configure(request);
+        if (request.has("promotionWorkload")) {
+            CheckedSchemaSupport.fields(request, "op", "profile", "snapshot", "directory", "improvementBatches", "futureQueries", "promotionWorkload");
+            promotionWorkload = CheckedSchemaSupport.text(request, "promotionWorkload");
+            if (!promotionWorkload.equals(MixedTaskKnowledgeWorkload.REVISION))
+                throw new IllegalArgumentException("unknown promotion workload");
+        } else CheckedSchemaSupport.fields(request, "op", "profile", "snapshot", "directory", "improvementBatches", "futureQueries");
+        configure(request);
         if (profile.equals("PRIMITIVE")) throw new IllegalArgumentException("primitive profile does not restore");
         snapshot = Path.of(CheckedSchemaSupport.text(request, "snapshot"));
         directory = Path.of(CheckedSchemaSupport.text(request, "directory"));
@@ -85,7 +92,11 @@ public final class TaskKnowledgeLifecycleWorker implements AutoCloseable {
         var batches = new ArrayList<TaskKnowledgeSelfImprover.Batch>();
         for (var block : array(request.get("improvementBatches"))) {
             CheckedSchemaSupport.fields(block, "lessons", "validation", "promotion");
-            batches.add(new TaskKnowledgeSelfImprover.Batch(tasks(block.get("lessons")), tasks(block.get("validation")), tasks(block.get("promotion"))));
+            var supplied = tasks(block.get("promotion"));
+            if (!promotionWorkload.equals("SUPPLIED_LEGACY") && !supplied.isEmpty())
+                throw new IllegalArgumentException("named promotion workload requires an empty supplied promotion list");
+            batches.add(new TaskKnowledgeSelfImprover.Batch(tasks(block.get("lessons")), tasks(block.get("validation")),
+                promotionWorkload.equals("SUPPLIED_LEGACY") ? supplied : MixedTaskKnowledgeWorkload.promotionTasks()));
         }
         improvements = List.copyOf(batches);
         if (profile.equals("PREPARED_REUSE") || profile.equals("MEASURED_IMPROVEMENT"))
@@ -109,7 +120,9 @@ public final class TaskKnowledgeLifecycleWorker implements AutoCloseable {
         TaskKnowledgeSelfImprover.Result improvement = null;
         if (profile.equals("MEASURED_IMPROVEMENT") && !improved) {
             var policy = new TaskKnowledgeSelfImprover.Policy(5_000_000, 120_000_000_000L, 120_000_000_000L, 2, 3, futureQueries);
-            improvement = new TaskKnowledgeSelfImprover().improve(knowledge, improvements, policy);
+            improvement = new TaskKnowledgeSelfImprover().improve(knowledge, improvements, policy,
+                promotionWorkload.equals("SUPPLIED_LEGACY") ? TaskKnowledgeSelfImprover.CostScope.LEGACY_ATTEMPT
+                    : TaskKnowledgeSelfImprover.CostScope.IMPROVEMENT_RUN);
             knowledge = improvement.active();
             snapshot = knowledge.save(directory);
             lookup = Math.addExact(lookup, session.retainVerified(knowledge).lookupWork());
@@ -149,6 +162,11 @@ public final class TaskKnowledgeLifecycleWorker implements AutoCloseable {
         result.put("snapshot", snapshot == null ? "" : snapshot.toString());
         result.put("schemaCount", knowledge == null ? 0 : knowledge.schemaCount());
         result.put("cache", session == null ? null : session.statistics());
+        result.put("promotionWorkload", promotionWorkload);
+        result.put("improvementCostScope", promotionWorkload.equals("SUPPLIED_LEGACY")
+            ? TaskKnowledgeSelfImprover.CostScope.LEGACY_ATTEMPT.name() : TaskKnowledgeSelfImprover.CostScope.IMPROVEMENT_RUN.name());
+        result.put("promotionCases", promotionWorkload.equals(MixedTaskKnowledgeWorkload.REVISION)
+            ? MixedTaskKnowledgeWorkload.promotion() : List.of());
         result.put("nativeBudget", List.of(32, 32, 200_000, 512, 200_000));
         return result;
     }

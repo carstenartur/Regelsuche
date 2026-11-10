@@ -188,15 +188,7 @@
         el.className = 'status' + (level ? ' ' + level : '');
     };
 
-    /* ─── Tab navigation ─── */
-    document.querySelectorAll('.tab').forEach((tab) => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-            document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
-            tab.classList.add('active');
-            $('tab-' + tab.dataset.tab).classList.add('active');
-        });
-    });
+    // Accessible navigation and task entry are owned by workbench-entry.js.
 
     /* ─── Quick-load examples ─── */
     function loadExample(expression, type) {
@@ -655,6 +647,22 @@
 
     /* ─── Search form ─── */
     let runtimeArtifact = null;
+    let searchGeneration = 0;
+    let searchController = null;
+    let pathsRequestGeneration = 0;
+    function beginSearchRequest() {
+        searchGeneration++;
+        pathsRequestGeneration++;
+        const paths = $('pathsList');
+        delete paths.dataset.loaded;
+        delete paths.dataset.loading;
+        paths.innerHTML = '<div class="hint">Pfade noch nicht geladen.</div>';
+        if (searchController) searchController.abort();
+        searchController = new AbortController();
+        clearRuntimeArtifact();
+        $('searchOutput').textContent = '';
+        return {generation: searchGeneration, signal: searchController.signal};
+    }
     // Shared CLI/default-HTTP export cap, reserving the complete replay envelope.
     const runtimeArtifactMaxBytes = 1024 * 1024 - new Blob(['{"runtimeArtifact":}']).size;
     const runtimeWords = (value) => value.split(',').map((word) => word.trim()).filter(Boolean);
@@ -672,6 +680,7 @@
         if (new Blob([text]).size > runtimeArtifactMaxBytes) throw new Error('Runtime-Ergebnis überschreitet die Replay-Größengrenze');
         const artifact = JSON.parse(text);
         if (artifact.schema !== 'regelsuche.safe-runtime-artifact/v1') throw new Error('Unbekanntes Runtime-Ergebnis');
+        window.RegelsucheWorkbench.renderSearchResult(artifact, {replayed});
         runtimeArtifact = text;
         $('runtimeExport').disabled = false;
         const evidence = artifact.evidence;
@@ -699,6 +708,7 @@
 
     function clearRuntimeArtifact() {
         runtimeArtifact = null;
+        $('searchResultSummary').hidden = true;
         $('runtimeExport').disabled = true;
         $('runtimeSummary').textContent = '';
         $('runtimeCandidates').replaceChildren();
@@ -715,22 +725,26 @@
     $('runtimeImport').addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        clearRuntimeArtifact();
+        event.target.value = '';
+        const request = beginSearchRequest();
         setStatus('Runtime-Replay läuft …');
         try {
             if (file.size > runtimeArtifactMaxBytes) throw new Error('Runtime-Datei darf höchstens ' + runtimeArtifactMaxBytes + ' Bytes enthalten');
             const artifact = JSON.parse(await file.text());
+            if (request.generation !== searchGeneration) return;
             const response = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ runtimeArtifact: artifact }) });
+                body: JSON.stringify({ runtimeArtifact: artifact }), signal: request.signal });
             const text = await response.text();
+            if (request.generation !== searchGeneration) return;
             $('searchOutput').textContent = text;
             if (!response.ok) throw new Error(text);
             showRuntimeArtifact(text, true);
             setStatus('Runtime-Replay bestätigt.', 'ok');
         } catch (error) {
+            if (request.generation !== searchGeneration) return;
             setStatus('Prüfung fehlgeschlagen: ' + error.message, 'error');
+            window.RegelsucheWorkbench.renderSearchResult(null, {error: error.message});
         }
-        event.target.value = '';
     });
 
     $('searchForm').addEventListener('submit', async (event) => {
@@ -759,40 +773,57 @@
             } else { request.source = form.expression.value; }
             payload = { runtimeRequest: request };
         }
-        clearRuntimeArtifact();
+        const request = beginSearchRequest();
         setStatus('Suche läuft …');
-        $('searchOutput').textContent = '';
         try {
             const response = await fetch('/api/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: request.signal
             });
             const text = await response.text();
+            if (request.generation !== searchGeneration) return;
             $('searchOutput').textContent = text;
             if (response.ok) {
                 if (runtimeSelected) showRuntimeArtifact(text, false);
-                setStatus('Fertig. ' + text.length + ' Bytes Antwort.', 'ok');
+                else window.RegelsucheWorkbench.renderSearchResult(JSON.parse(text));
+                setStatus('Suche abgeschlossen. Ergebnis und Nachweise stehen unten.', 'ok');
                 // Refresh paths/candidates in the background.
-                loadPaths().catch(() => {});
+                loadPaths(request.generation).catch(() => {});
             } else {
                 setStatus('Fehler (HTTP ' + response.status + ')', 'error');
+                window.RegelsucheWorkbench.renderSearchResult(null, {error: text});
             }
         } catch (ex) {
-            setStatus('Netzwerkfehler: ' + ex, 'error');
+            if (request.generation !== searchGeneration) return;
+            setStatus('Suche konnte nicht abgeschlossen werden: ' + ex, 'error');
+            window.RegelsucheWorkbench.renderSearchResult(null, {error: String(ex)});
         }
     });
 
     /* ─── Paths tab ─── */
-    async function loadPaths() {
+    async function loadPaths(expectedGeneration = searchGeneration) {
+        // Event listeners pass their MouseEvent; capture the current generation
+        // for those callers as well as explicit post-search refreshes.
+        const generation = typeof expectedGeneration === 'number' ? expectedGeneration : searchGeneration;
+        const requestGeneration = ++pathsRequestGeneration;
         const out = $('pathsList');
+        delete out.dataset.loaded;
+        out.dataset.loading = '1';
         out.innerHTML = '<div class="hint">Lade …</div>';
         try {
             const response = await fetch('/api/paths');
             const text = await response.text();
+            if (generation !== searchGeneration || requestGeneration !== pathsRequestGeneration) return;
+            if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + text);
             renderPaths(text);
+            out.dataset.loaded = '1';
         } catch (ex) {
-            out.innerHTML = '<div class="status error">Fehler: ' + ex + '</div>';
+            if (generation !== searchGeneration || requestGeneration !== pathsRequestGeneration) return;
+            out.innerHTML = '<div class="status error">Fehler: ' + escapeHtml(String(ex)) + '</div>';
+        } finally {
+            if (requestGeneration === pathsRequestGeneration) delete out.dataset.loading;
         }
     }
 
@@ -2153,8 +2184,8 @@
         document.querySelectorAll('.tab').forEach((tab) => {
             tab.addEventListener('click', () => {
                 const which = tab.dataset.tab;
-                if (which === 'paths' && !$('pathsList').dataset.loaded) {
-                    loadPaths().finally(() => $('pathsList').dataset.loaded = '1');
+                if (which === 'paths' && !$('pathsList').dataset.loaded && !$('pathsList').dataset.loading) {
+                    loadPaths();
                 } else if (which === 'candidates' && !$('candidatesList').dataset.loaded) {
                     loadCandidates().finally(() => $('candidatesList').dataset.loaded = '1');
                 } else if (which === 'inventory' && !$('inventoryList').dataset.loaded) {

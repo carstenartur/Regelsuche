@@ -1,5 +1,9 @@
 # Getting Started
 
+Ohne Installation: [aufgezeichnete Browserdemo](demos/recorded-discovery.html).
+Externe Java-Integration: [veröffentlichtes SDK 0.5.2 mit Maven-Beispiel](java-sdk-quickstart.md).
+English overview: [Start here](start-here.md).
+
 Diese Anleitung führt von einem leeren Checkout zur ersten nachvollziehbaren
 Suche. Für die Standarddemo sind weder PostgreSQL noch Neo4j oder ein externer
 Solver erforderlich.
@@ -9,7 +13,12 @@ Solver erforderlich.
 Wähle einen der beiden unterstützten Einstiege:
 
 - **Docker:** aktueller Docker-Daemon; keine lokale Java-Installation nötig.
-- **Lokaler Build:** JDK 25; der Gradle Wrapper wird aus dem Repository benutzt.
+- **Lokaler Java-Produktbuild:** JDK 25 und Maven 3.9.9+ aus der 3.x-Linie;
+  `mvn test` prüft die normalen JUnit-Tests, `mvn package` erstellt die
+  ZIP-/TAR-Distributionen unter `app/target/`. Nach dem Entpacken startet
+  `bin/regelsuche` die Anwendung mit ihrem `lib`-Verzeichnis.
+- **Vorhandener Entwicklungslauncher:** `./gradlew run` mit JDK 25. Der Wrapper
+  und die zusätzlichen Gradle-Verifikationsgates bleiben während der Migration erhalten.
 
 Für `fullCheck`, Datenbanktests und vollständige Forschungsreproduktion werden
 zusätzlich Docker, Python-`venv` und die jeweils dokumentierten externen
