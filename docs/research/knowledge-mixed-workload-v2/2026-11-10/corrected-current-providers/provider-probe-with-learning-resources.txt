@@ -1,0 +1,11 @@
+DEPTH 1 decision=PROMOTED formation=[Attempt[observationIds=[task-0@sha256:597acd671d3b8a4fa72ba32636a16a18dcf7ee753665a295ff6d0435a6e98291:0-3, task-1@sha256:597acd671d3b8a4fa72ba32636a16a18dcf7ee753665a295ff6d0435a6e98291:0-3], status=PROVED, detail=checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d]]
+(p * q + v1) * (p * q - v1) + v1 * v1 profile=nodes:5:ADD(MUL(ADD,SUB),MUL(V,V))
+  BASELINE work=192 solved=true score=5 output=Optional[(p * q) ^ 2]
+  BASELINE work=181 solved=true score=5 output=Optional[(p * q) ^ 2]
+  KNOWLEDGE_FIRST work=176 solved=true score=5 output=Optional[(p * q) ^ 2]
+  KNOWLEDGE_FIRST work=176 solved=true score=5 output=Optional[(p * q) ^ 2]
+(z + w1) * (z - w1) + w1 * w1 + 7 profile=nodes:5:ADD(ADD(MUL,MUL),N)
+  BASELINE work=186 solved=true score=5 output=Optional[z ^ 2 + 7]
+  BASELINE work=177 solved=true score=5 output=Optional[z ^ 2 + 7]
+  KNOWLEDGE_FIRST work=165 solved=true score=5 output=Optional[z ^ 2 + 7]
+  KNOWLEDGE_FIRST work=165 solved=true score=5 output=Optional[z ^ 2 + 7]

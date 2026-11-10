@@ -14,6 +14,8 @@ import java.util.stream.Stream;
 
 /** Actual-cost adoption around the existing learner; all rejected work remains in the returned ledger. */
 public final class TaskKnowledgeSelfImprover {
+    /** Legacy scope is solely for replaying pre-v2 caller-supplied studies. */
+    public enum CostScope { IMPROVEMENT_RUN, LEGACY_ATTEMPT }
     public record Batch(List<CheckedSchemaTaskSolver.Task> lessons, List<CheckedSchemaTaskSolver.Task> validation,
             List<CheckedSchemaTaskSolver.Task> promotion) {
         public Batch {
@@ -31,8 +33,18 @@ public final class TaskKnowledgeSelfImprover {
     }
     public record Attempt(String parentId, String candidateId, CumulativeTaskKnowledge.Decision learnerDecision,
             Decision decision, long knownWork, Cost paid, List<Trial> trials, List<String> lessonGenerations,
-            boolean accountingComplete, String failure) {
-        public Attempt { trials = List.copyOf(trials); lessonGenerations = List.copyOf(lessonGenerations); }
+            boolean accountingComplete, String failure, Cost adoptionCost) {
+        public Attempt {
+            trials = List.copyOf(trials); lessonGenerations = List.copyOf(lessonGenerations);
+            Objects.requireNonNull(adoptionCost);
+        }
+        /** Source compatibility for callers constructing old per-attempt receipts. */
+        public Attempt(String parentId, String candidateId, CumulativeTaskKnowledge.Decision learnerDecision,
+                Decision decision, long knownWork, Cost paid, List<Trial> trials, List<String> lessonGenerations,
+                boolean accountingComplete, String failure) {
+            this(parentId, candidateId, learnerDecision, decision, knownWork, paid, trials, lessonGenerations,
+                accountingComplete, failure, paid);
+        }
     }
     public record Result(CumulativeTaskKnowledge active, List<Attempt> attempts, long knownWork,
             Cost paid, boolean accountingComplete, boolean budgetExhausted) {
@@ -46,6 +58,12 @@ public final class TaskKnowledgeSelfImprover {
 
     /** Promotion predicts future savings; an independently measured stream is still required to establish them. */
     public Result improve(CumulativeTaskKnowledge initial, List<Batch> batches, Policy policy) {
+        return improve(initial, batches, policy, CostScope.IMPROVEMENT_RUN);
+    }
+
+    /** New runs repay all attempts; explicit legacy mode retains historical selection semantics. */
+    public Result improve(CumulativeTaskKnowledge initial, List<Batch> batches, Policy policy, CostScope costScope) {
+        Objects.requireNonNull(costScope);
         Objects.requireNonNull(initial); Objects.requireNonNull(policy); batches = List.copyOf(batches);
         if (batches.size() > 32) throw new IllegalArgumentException("bounded improvement batches required");
         Cost start = meter.now();
@@ -57,7 +75,7 @@ public final class TaskKnowledgeSelfImprover {
         for (int i = 0; complete && i < Math.min(batches.size(), policy.maximumBatches()); i++) {
             Cost checkpoint = elapsed(start, meter.now());
             if (overBudget(policy, checkpoint, work)) { exhausted = true; break; }
-            var step = new Step(active, batches.get(i), examples, policy, start, work, i);
+            var step = new Step(active, batches.get(i), examples, policy, start, work, i, costScope);
             var attempt = step.execute();
             if (attempt.decision() == ADOPT) {
                 // Observe all inner gate work before committing a generation.
@@ -67,9 +85,10 @@ public final class TaskKnowledgeSelfImprover {
                 boolean accounted = attempt.accountingComplete() && paid.cpuNanos() >= 0;
                 Decision decision = !accounted ? INCOMPLETE
                     : overBudget(policy, elapsed(start, point), Math.addExact(work, attempt.knownWork())) ? BUDGET_EXHAUSTED
-                    : KnowledgeCostGate.evaluate(paid, attempt.trials(), policy.futureQueries());
+                    : adoptionDecision(costScope, paid, elapsed(start, point), attempt.trials(), policy.futureQueries());
                 attempt = new Attempt(attempt.parentId(), attempt.candidateId(), attempt.learnerDecision(), decision,
-                    attempt.knownWork(), paid, attempt.trials(), attempt.lessonGenerations(), accounted, attempt.failure());
+                    attempt.knownWork(), paid, attempt.trials(), attempt.lessonGenerations(), accounted, attempt.failure(),
+                    adoptionCost(costScope, paid, elapsed(start, point)));
             }
             attempts.add(attempt); work = Math.addExact(work, attempt.knownWork());
             complete &= attempt.accountingComplete();
@@ -89,6 +108,7 @@ public final class TaskKnowledgeSelfImprover {
         private final Cost overallStart, start;
         private final long previousWork;
         private final int sequence;
+        private final CostScope costScope;
         private final List<Trial> trials = new ArrayList<>();
         private List<String> lessons = List.of();
         private long work;
@@ -100,9 +120,10 @@ public final class TaskKnowledgeSelfImprover {
         private Cost lastSampleEnd;
 
         Step(CumulativeTaskKnowledge parent, Batch batch, List<CheckedSchemaTaskSolver.Task> examples,
-                Policy policy, Cost overallStart, long previousWork, int sequence) {
+                Policy policy, Cost overallStart, long previousWork, int sequence, CostScope costScope) {
             this.parent = parent; this.batch = batch; this.examples = examples; this.policy = policy;
             this.overallStart = overallStart; this.previousWork = previousWork; this.sequence = sequence;
+            this.costScope = costScope;
             start = meter.now();
         }
 
@@ -131,7 +152,7 @@ public final class TaskKnowledgeSelfImprover {
             if (complete && overBudget(policy, elapsed(overallStart, end), Math.addExact(previousWork, work))) decision = BUDGET_EXHAUSTED;
             complete &= paid.cpuNanos() >= 0 && trials.stream().allMatch(t -> t.previous().complete() && t.candidate().complete());
             return new Attempt(parent.id(), proposed == null ? "" : proposed.id(), learnerDecision, decision,
-                work, paid, trials, lessons, complete, failure);
+                work, paid, trials, lessons, complete, failure, adoptionCost(costScope, paid, elapsed(overallStart, end)));
         }
 
         private void learn() {
@@ -189,6 +210,13 @@ public final class TaskKnowledgeSelfImprover {
         }
 
         private void fail(RuntimeException error) { complete = false; decision = FAILED; failure = error.toString(); }
+    }
+
+    static Decision adoptionDecision(CostScope scope, Cost attemptPaid, Cost runPaid, List<Trial> trials, long horizon) {
+        return KnowledgeCostGate.evaluate(adoptionCost(scope, attemptPaid, runPaid), trials, horizon);
+    }
+    private static Cost adoptionCost(CostScope scope, Cost attemptPaid, Cost runPaid) {
+        return scope == CostScope.LEGACY_ATTEMPT ? attemptPaid : runPaid;
     }
 
     private static boolean overBudget(Policy policy, Cost elapsed, long work) {

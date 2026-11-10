@@ -1,0 +1,24 @@
+{
+  "qualification": "SUPPLEMENTAL_SOURCE_COMPILE_NOT_MAVEN_QUALIFICATION",
+  "baseCommit": "7e93793db04ab862792ae1a1bc5b32050bbc351a",
+  "javaVersion": "openjdk version \"25.0.5\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.5+8 (build 25.0.5+8-LTS, mixed mode, sharing)\n",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "externalDependencyJar": {
+    "path": "/workspace/scratch/743c18c2db2f/math-reach.4xbJwv/sandbox/sandbox_math_cleanup/lib/regelsuche-optimization-sdk.jar",
+    "sha256": "d5b078bbd4780278bb443be3610bcdad058c993a5b3b36ebf5902cb85d082b7a"
+  },
+  "sourceFilesSha256": {
+    "regelsuche-learning/src/main/java/de/regelsuche/evolution/MixedTaskKnowledgeWorkload.java": "1bcf80c153cd614d6c4f7a87c2ff5b2cfb778851110ff95c0aa38e703c7a7dc3",
+    "regelsuche-learning/src/main/java/de/regelsuche/evolution/MixedTaskKnowledgeStudy.java": "652dc0f8523678f87369399d450b514f8efccfabbec6dde9cea567e0eae2e5a7",
+    "regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeSelfImprover.java": "915a6344c50fcfd3804ead73e98c820e9a5b93d40c1aad9d3633bb201f769b29",
+    "regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeLifecycleWorker.java": "809a66a86ec54209ef6f4c63f53aedc50de4a414ca0054cc602500e45547c826"
+  },
+  "compiledClassCount": 1267,
+  "compiledClassManifestSha256": "5ae68fbf98750ed385fcd690e3d60a206ee6a5648af4cda608beaceecccf579a",
+  "compilerOptions": "javac -Xprefer:source -cp /tmp/task3-source-classes:<bundled-jar> -sourcepath regelsuche-learning/src/main/java:regelsuche-core/src/main/java:regelsuche-search/src/main/java:regelsuche-math-algorithms/src/main/java:regelsuche-validation/src/main/java:regelsuche-solver-ir/src/main/java:regelsuche-egraph/src/main/java -d /tmp/task3-source-classes <changed-production-sources>",
+  "runtimeOptions": "java -Xmx512m -cp /tmp/task3-source-classes:<bundled-jar> de.regelsuche.evolution.MixedTaskKnowledgeStudy /tmp/task3-mixed-v2-default",
+  "enclosingProcessMeasurement": "bash time -p; includes JVM startup/shutdown and stdout serialization; CPU=user+sys",
+  "stdoutNormalization": "Original stdout retained in supplemental-stdout.txt. Exactly one JSON-object line extracted unchanged to supplemental-report.json; JVM perfdata warning retained in raw stdout.",
+  "reportSha256": "8c02f22a68917c7c86fec712b0e7662b6c9e1732b8494617e938a6571b29b2bc",
+  "rawStdoutSha256": "ca851a341bca4f661761c1b19dd9281a831d935eeff4747cabae1e6fa4d1b179"
+}
