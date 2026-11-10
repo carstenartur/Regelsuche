@@ -136,3 +136,23 @@ The [distribution client guide](plugin-distribution-client.md#activating-install
 contains the complete verification boundary, lifecycle and Java integration
 example. The independent v2 greeting example remains a trusted-classpath consumer;
 it does not itself demonstrate authenticated installed-package activation.
+
+## Installed Discovery host command
+
+The App now consumes the standard typed `discovery.domain-provider` point through
+`DiscoveryDomainProvider.class`. Its `domains installed --config /absolute/package-config.json list`
+and `domains installed --config /absolute/package-config.json run provider-id domain-id@revision campaign-id seed.txt evidence.json [small|tiny]`
+commands activate one authenticated installed SPI `2` / core `1.0.0` closure.
+The App explicitly exports the Discovery builder, domain and public nested contract
+tokens; it does not export whole packages, App configuration or the runner.
+Before calling `domains()`, it checks every relevant external origin against that
+same runtime's selected installation hash. A provider implemented in dependency B
+and contributed by plugin A retains both artifact identities in evidence.
+
+One runtime stays open through evidence export, then closes before its package
+session. New commands observe current authority; failures never select an old
+receipt or fall back to classpath providers. The existing classpath command remains
+available. See [the command and evidence contract](java-discovery-sdk.md#installierte-spi-v2-domänen-ausführen-aktueller-quellstand).
+This source capability has not retroactively changed a published SDK ZIP.
+Workbench/HTTP, v1 runtime and data-pack migration remain separate. Signed Java is
+not sandboxed, and authenticated origin grants no mathematical authority.

@@ -135,6 +135,9 @@ Details stehen unter
   konkrete Web- und Persistenzadapter bleiben außen.
 - `:regelsuche-discovery-sdk` darf ausschließlich die portable Discovery-
   Schicht und deren innere Abhängigkeiten als äußere Java-Fassade exportieren.
+  Als einzige weitere direkte Kante darf es `:regelsuche-extension-api` für
+  typisierte Provider-Kataloge und Herkunftsmetadaten verwenden. Die generische
+  Extension-API und ihre Runtime bleiben unabhängig vom Discovery-SDK.
   Es darf weder `app`, Spring, Hibernate, Persistenz, Web noch Release-
   Orchestrierung transitiv einführen.
 - Das SDK darf Boilerplate reduzieren, aber keine Invariante erfinden, einen

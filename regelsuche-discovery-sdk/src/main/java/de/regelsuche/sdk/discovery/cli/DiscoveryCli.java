@@ -35,36 +35,8 @@ public final class DiscoveryCli {
                 return 0;
             }
             if ((args.length == 6 || args.length == 7) && args[0].equals("run")) {
-                var budget = args.length == 6 ? DiscoveryBudgets.small() : switch (args[6]) {
-                    case "small" -> DiscoveryBudgets.small();
-                    case "tiny" -> DiscoveryBudgets.tiny();
-                    default -> throw new IllegalArgumentException("budget must be small or tiny");
-                };
-                int separator = args[2].lastIndexOf('@');
-                if (separator < 1) throw new IllegalArgumentException("select domain-id@revision");
-                var registration = DiscoveryDomainCatalog.load(loader, Set.of(args[1]))
-                    .find(args[2].substring(0, separator), args[2].substring(separator + 1))
-                    .orElseThrow(() -> new IllegalArgumentException("domain revision is not installed"));
-                byte[] seedBytes;
-                try (var stream = Files.newInputStream(Path.of(args[4]))) {
-                    seedBytes = stream.readNBytes(1024 * 1024 + 1);
-                }
-                if (seedBytes.length > 1024 * 1024) throw new IllegalArgumentException("seed exceeds 1 MiB");
-                String seed = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(seedBytes)).toString();
-                var run = RegelsucheDiscovery.forRegistration(registration)
-                    .campaign(args[3]).seed("cli-seed", seed, "discovery-cli")
-                    .budget(budget).run();
-                run.writeEvidence(Path.of(args[5]));
-                out.println("outcome=" + run.outcome());
-                out.println("evidenceHash=" + run.evidence().contentHash());
-                return switch (run.outcome()) {
-                    case CONFIRMED -> 0;
-                    case REFUTED -> 2;
-                    case BUDGET_EXHAUSTED -> 3;
-                    case INCONCLUSIVE -> 4;
-                    case UNSUPPORTED -> 5;
-                    case INVALID_SEED -> 6;
-                };
+                budget(args); // Preserve rejection before service loading or provider callbacks.
+                return run(args, out, select(args[2], DiscoveryDomainCatalog.load(loader, Set.of(args[1]))));
             }
             out.println("Usage: list [provider.class] | run provider.class "
                 + "domain-id@revision campaign-id seed.txt evidence.json [small|tiny]");
@@ -75,5 +47,78 @@ public final class DiscoveryCli {
             out.println("Discovery request failed: " + ex.getMessage());
             return 1;
         }
+    }
+
+    /** Executes an explicitly supplied catalog; run selection uses its exact provider ID. */
+    public static int execute(String[] args, PrintStream out, DiscoveryDomainCatalog catalog) {
+        try {
+            if (args.length == 1 && args[0].equals("list")) {
+                for (var entry : catalog.registrations()) {
+                    String line = entry.domain().domainId() + "@" + entry.domain().revision()
+                        + " provider=" + entry.providerId() + " version=" + entry.providerVersion()
+                        + " artifact=" + entry.artifact().orElseThrow().artifactSha256();
+                    if (entry.extensionProvenance().isPresent()) {
+                        var provenance = entry.extensionProvenance().orElseThrow();
+                        line += " contribution=" + provenance.descriptor().id()
+                            + " contributorArtifact=" + provenance.origin().artifactSha256()
+                            + " trustEvidence=" + provenance.origin().trustEvidenceSha256();
+                    }
+                    out.println(line);
+                }
+                return 0;
+            }
+            if ((args.length == 6 || args.length == 7) && args[0].equals("run")) {
+                var registration = select(args[2], catalog);
+                if (!registration.providerId().equals(args[1])) {
+                    throw new IllegalArgumentException("provider does not supply the selected domain revision");
+                }
+                return run(args, out, registration);
+            }
+            out.println("Usage: list | run provider-id domain-id@revision campaign-id seed.txt evidence.json [small|tiny]");
+            return 1;
+        } catch (IOException | IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError ex) {
+            out.println("Discovery request failed: " + ex.getMessage());
+            return 1;
+        }
+    }
+
+    private static DiscoveryDomainCatalog.Registration select(String selector, DiscoveryDomainCatalog catalog) {
+        int separator = selector.lastIndexOf('@');
+        if (separator < 1) throw new IllegalArgumentException("select domain-id@revision");
+        return catalog.find(selector.substring(0, separator), selector.substring(separator + 1))
+            .orElseThrow(() -> new IllegalArgumentException("domain revision is not installed"));
+    }
+
+    private static de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget budget(String[] args) {
+        return args.length == 6 ? DiscoveryBudgets.small() : switch (args[6]) {
+            case "small" -> DiscoveryBudgets.small();
+            case "tiny" -> DiscoveryBudgets.tiny();
+            default -> throw new IllegalArgumentException("budget must be small or tiny");
+        };
+    }
+
+    private static int run(String[] args, PrintStream out, DiscoveryDomainCatalog.Registration registration)
+            throws IOException {
+        var budget = budget(args);
+        byte[] seedBytes;
+        try (var stream = Files.newInputStream(Path.of(args[4]))) {
+            seedBytes = stream.readNBytes(1024 * 1024 + 1);
+        }
+        if (seedBytes.length > 1024 * 1024) throw new IllegalArgumentException("seed exceeds 1 MiB");
+        String seed = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(seedBytes)).toString();
+        var run = RegelsucheDiscovery.forRegistration(registration)
+            .campaign(args[3]).seed("cli-seed", seed, "discovery-cli")
+            .budget(budget).run();
+        run.writeEvidence(Path.of(args[5]));
+        out.println("outcome=" + run.outcome());
+        out.println("evidenceHash=" + run.evidence().contentHash());
+        return switch (run.outcome()) {
+            case CONFIRMED -> 0;
+            case REFUTED -> 2;
+            case BUDGET_EXHAUSTED -> 3;
+            case INCONCLUSIVE -> 4;
+            case UNSUPPORTED -> 5;
+            case INVALID_SEED -> 6;
+        };
     }
 }

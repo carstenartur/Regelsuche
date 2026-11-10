@@ -128,8 +128,11 @@ public class CliRouter {
             String[] rest = Arrays.copyOfRange(args, 1, args.length);
             return switch (command) {
                 case "discover" -> runDiscover(rest);
-                case "domains" -> de.regelsuche.sdk.discovery.cli.DiscoveryCli.execute(
-                    rest, out, Thread.currentThread().getContextClassLoader());
+                case "domains" -> rest.length > 0 && rest[0].equals("installed")
+                    ? de.regelsuche.plugin.InstalledDiscoveryCommand.run(
+                        Arrays.copyOfRange(rest, 1, rest.length), out, System.getenv())
+                    : de.regelsuche.sdk.discovery.cli.DiscoveryCli.execute(
+                        rest, out, Thread.currentThread().getContextClassLoader());
                 case "transform" -> runTransform(rest);
                 case "inventory" -> runInventory(rest);
                 case "path" -> runPath(rest);

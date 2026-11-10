@@ -407,6 +407,25 @@ stehen unter [Java-internal Rewrite Programs](docs/java-rewrite-programs.md),
 [typsichere Java-Integration](docs/type-safe-java-integration.md) und
 [Plugin-API](docs/plugin-api.md).
 
+### Installierte Discovery-Erweiterungen (Quellstand)
+
+Die App kann authentifiziert installierte SPI-v2-Domänen mit einer bestehenden
+Package-Konfiguration auflisten und ausführen:
+
+```text
+domains installed --config /absolute/package-config.json list
+domains installed --config /absolute/package-config.json run provider-id domain-id@revision campaign-id seed.txt evidence.json [small|tiny]
+```
+
+Ein aktueller Authority-Snapshot bleibt bis zum kanonischen Evidence-Export
+gebunden; Provider-, Contributor- und Installationsherkunft bleiben unterscheidbar.
+Die Auswahl verwendet Provider-ID und exakte Domänenrevision. Der
+[SDK-Leitfaden](docs/java-discovery-sdk.md#installierte-spi-v2-domänen-ausführen-aktueller-quellstand)
+beschreibt Konfiguration, Budgets, Exitcodes und Java-Vertrauensgrenzen. Dies ist
+keine rückwirkende Erweiterung veröffentlichter SDK-ZIPs. Workbench/HTTP, v1-Runtime
+und Datenpakete bleiben eigenständige Migrationsschritte; signierter Code ist
+weder sandboxed noch mathematisch autorisiert.
+
 ### Eigene Discovery-Domänen mit dem Java-SDK
 
 [Java-Quickstart](docs/java-sdk-quickstart.md), [Domain-Tutorial](docs/java-sdk-domain-tutorial.md)

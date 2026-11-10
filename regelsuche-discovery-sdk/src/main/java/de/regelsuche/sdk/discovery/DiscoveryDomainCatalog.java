@@ -1,6 +1,7 @@
 package de.regelsuche.sdk.discovery;
 
 import de.regelsuche.discovery.domain.DiscoveryDomain;
+import de.regelsuche.extension.ExtensionCatalog;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -78,10 +79,32 @@ public final class DiscoveryDomainCatalog {
             Iterable<? extends DiscoveryDomainProvider> providers
     ) {
         Objects.requireNonNull(providers, "providers");
+        List<ProviderContribution> contributions = new ArrayList<>();
+        for (DiscoveryDomainProvider provider : providers) {
+            contributions.add(new ProviderContribution(provider, Optional.empty()));
+        }
+        return fromContributions(contributions);
+    }
+
+    /** Composes exact typed contributions; the caller owns catalog admission policy. */
+    public static DiscoveryDomainCatalog fromExtensions(ExtensionCatalog catalog) {
+        Objects.requireNonNull(catalog, "catalog");
+        String catalogHash = catalog.contentHash();
+        List<ProviderContribution> contributions = new ArrayList<>();
+        for (var entry : catalog.registrations(DiscoveryExtensionPoints.DOMAIN_PROVIDERS)) {
+            var provenance = new DiscoveryExtensionProvenance(
+                entry.point(), entry.descriptor(), entry.origin(), catalogHash);
+            contributions.add(new ProviderContribution(entry.implementation(), Optional.of(provenance)));
+        }
+        return fromContributions(contributions);
+    }
+
+    private static DiscoveryDomainCatalog fromContributions(List<ProviderContribution> contributions) {
         List<ProviderEntry> normalizedProviders = new ArrayList<>();
         Map<String, DiscoveryDomainProvider> providerIds = new LinkedHashMap<>();
 
-        for (DiscoveryDomainProvider provider : providers) {
+        for (ProviderContribution contribution : contributions) {
+            DiscoveryDomainProvider provider = contribution.provider();
             Objects.requireNonNull(provider, "provider");
             String providerId = requireIdentifier(provider.id(), "provider id");
             String providerVersion = requireIdentifier(
@@ -102,7 +125,8 @@ public final class DiscoveryDomainCatalog {
                 providerVersion,
                 normalizeProvenance(provider.provenance()),
                 ProviderProvenance.capture(provider.getClass()),
-                provider
+                provider,
+                contribution.extensionProvenance()
             ));
         }
         normalizedProviders.sort(Comparator.comparing(ProviderEntry::id));
@@ -131,7 +155,8 @@ public final class DiscoveryDomainCatalog {
                     provider.provenance(),
                     new ProviderDomain<>(domain, provider.artifact().properties(
                         provider.id(), provider.version(), provider.provenance()),
-                        () -> ProviderProvenance.capture(provider.provider().getClass()))
+                        () -> ProviderProvenance.capture(provider.provider().getClass()),
+                        provider.extensionProvenance())
                 );
                 Registration previous = domains.putIfAbsent(key, registration);
                 if (previous != null) {
@@ -174,12 +199,18 @@ public final class DiscoveryDomainCatalog {
         return value;
     }
 
+    private record ProviderContribution(
+        DiscoveryDomainProvider provider,
+        Optional<DiscoveryExtensionProvenance> extensionProvenance
+    ) { }
+
     private record ProviderEntry(
         String id,
         String version,
         String provenance,
         ProviderProvenance artifact,
-        DiscoveryDomainProvider provider
+        DiscoveryDomainProvider provider,
+        Optional<DiscoveryExtensionProvenance> extensionProvenance
     ) {
     }
 
@@ -194,6 +225,12 @@ public final class DiscoveryDomainCatalog {
         public Optional<ProviderProvenance> artifact() {
             return domain instanceof ProviderDomain<?, ?, ?> registered
                 ? Optional.of(registered.artifact()) : Optional.empty();
+        }
+
+        /** Retained contribution metadata; empty for legacy and manual entries. */
+        public Optional<DiscoveryExtensionProvenance> extensionProvenance() {
+            return domain instanceof ProviderDomain<?, ?, ?> registered
+                ? registered.extensionProvenance() : Optional.empty();
         }
 
         public Registration {

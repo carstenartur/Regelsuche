@@ -31,7 +31,7 @@ class PluginPackageCommandTest {
             String original = Files.readString(config);
             for (String invalid : List.of(original.replace("\"timeoutSeconds\":1", "\"timeoutSeconds\":\"1\""),
                     original.replace("\"timeoutSeconds\":1", "\"timeoutSeconds\":1,\"timeoutSeconds\":2"),
-                    original + " ".repeat(262144))) {
+                    original + " {}", original + " ".repeat(262144))) {
                 Files.writeString(config, invalid);
                 var output = new ByteArrayOutputStream();
                 assertEquals(2, PluginPackageCommand.run(new String[]{"recover", "--config", config.toString(),
@@ -54,6 +54,37 @@ class PluginPackageCommandTest {
         }
         assertThrows(IllegalArgumentException.class, () -> PostgresPluginCheckpointAuthority.connect(
             "jdbc:postgresql://host/db", "client", null, directory.resolve("root.crt"), scope, 1));
+    }
+
+    @Test void configuredSessionRetainsScopeTransactionsAndOwnedResourceLifetime() throws Exception {
+        try (var f = new PluginDistributionFixtures()) {
+            var config = PluginPackageCommand.readConfiguration(configuration(f));
+            var closed = new java.util.concurrent.atomic.AtomicInteger();
+            try (var production = PluginPackageSession.open(config, Map.of("SYNTHETIC_PG_PASSWORD", "dummy"))) {
+                assertEquals(new PluginCheckpointTransactions.Scope("cli-slot", "community",
+                    PluginDistributionJson.hash(f.roots.toCanonicalJson())), production.scope());
+                try (var session = new PluginPackageSession(production.scope(), production.transactions(),
+                        closed::incrementAndGet)) {
+                    assertSame(production.transactions(), session.transactions());
+                    assertEquals(PluginCheckpointTransactions.Outcome.OUTCOME_UNKNOWN,
+                        session.transactions().recover("session-recovery").outcome());
+                    assertEquals(0, closed.get());
+                }
+                assertEquals(1, closed.get());
+            }
+        }
+    }
+
+    @Test void sharedSessionRejectsMissingCredentialsAndJdbcPolicyOverrides() throws Exception {
+        try (var f = new PluginDistributionFixtures()) {
+            Path path = configuration(f);
+            var config = PluginPackageCommand.readConfiguration(path);
+            assertThrows(IllegalArgumentException.class, () -> PluginPackageSession.open(config, Map.of()));
+            Files.writeString(path, Files.readString(path).replace("127.0.0.1:1/unused", "host/db?sslmode=disable"));
+            var unsafe = PluginPackageCommand.readConfiguration(path);
+            assertThrows(IllegalArgumentException.class, () -> PluginPackageSession.open(unsafe,
+                Map.of("SYNTHETIC_PG_PASSWORD", "never-print-this-synthetic-secret")));
+        }
     }
 
     private Path configuration(PluginDistributionFixtures f) throws Exception {
