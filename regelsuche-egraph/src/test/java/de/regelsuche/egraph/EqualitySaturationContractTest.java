@@ -138,6 +138,32 @@ class EqualitySaturationContractTest {
         assertTrue(result.provenance().witnesses().getFirst().replay(rule));
     }
 
+    @Test void unavailableChildDoesNotHideFiniteConcreteRepresentatives() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x"));
+        graph.union(root, graph.addExpression(parser.parseTerm("x + 0")));
+        graph.rebuild();
+        java.util.function.ToIntFunction<ENode> cost = node ->
+            node.symbol().equals("num:0") ? Integer.MAX_VALUE : 1;
+        assertEquals(List.of(parser.parseTerm("x")), graph.representatives(root, cost));
+        var rule = new PatternRewriteRule("finite-alternative", a, a) {
+            @Override public boolean matches(Expr expression) { return expression.equals(parser.parseTerm("x")); }
+            @Override public Expr apply(Expr expression) { return parser.parseTerm("x * 1"); }
+        };
+        var result = new EqualitySaturation(List.of(rule), new EqualitySaturation.Config(2, 100))
+            .saturate(graph, root, cost);
+        assertTrue(result.stats().appliedRules().containsKey(rule.id()));
+        assertTrue(result.provenance().witnesses().stream().anyMatch(witness -> witness.replay(rule)));
+        assertEquals(0, result.diagnostics().count(SaturationDiagnostics.Outcome.RULE_FAILURE));
+        assertTrue(result.diagnostics().count(SaturationDiagnostics.Outcome.NON_APPLICABLE) > 0);
+    }
+
+    @Test void whollyUnavailableCandidateHasNoConcreteRepresentatives() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("0"));
+        assertEquals(List.of(), graph.representatives(root, node -> Integer.MAX_VALUE));
+    }
+
     @Test void negativeAdditiveCostsFailExplicitly() {
         var graph = new EGraph();
         var root = graph.addExpression(parser.parseTerm("x"));

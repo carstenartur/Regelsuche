@@ -335,22 +335,36 @@ public final class EGraph {
      * stabilises.</p>
      */
     public Expr extract(EClassId id, java.util.function.ToIntFunction<ENode> costOfNode) {
-        return buildExpression(unionFind.find(id), extractionChoices(id, costOfNode));
+        EClassId canonical = unionFind.find(id);
+        ExtractionChoices choices = extractionChoices(costOfNode);
+        if (!choices.nodes().containsKey(canonical)) {
+            throw new IllegalStateException("No extractable node in e-class " + canonical
+                + " — every node has unavailable cost or unresolved children");
+        }
+        return buildExpression(canonical, choices.nodes());
     }
 
     /**
      * One finite AST per root e-node, using cheapest child representatives.
      * This deliberately does not enumerate all combinations of child alternatives.
+     * Alternatives with unavailable node/child costs are skipped. A wholly
+     * unavailable class has an empty representative list.
      */
     public List<Expr> representatives(EClassId id, java.util.function.ToIntFunction<ENode> costOfNode) {
-        Map<EClassId, ENode> choices = extractionChoices(id, costOfNode);
+        EClass eclass = classOf(id);
+        ExtractionChoices choices = extractionChoices(costOfNode);
         LinkedHashSet<Expr> result = new LinkedHashSet<>();
-        for (ENode node : classOf(id).nodes()) result.add(nodeToExpr(node, choices));
+        for (ENode node : eclass.nodes()) {
+            if (extractionCost(node, costOfNode, choices.costs()) < Integer.MAX_VALUE) {
+                result.add(nodeToExpr(node, choices.nodes()));
+            }
+        }
         return List.copyOf(result);
     }
 
-    private Map<EClassId, ENode> extractionChoices(EClassId id,
-            java.util.function.ToIntFunction<ENode> costOfNode) {
+    private record ExtractionChoices(Map<EClassId, Integer> costs, Map<EClassId, ENode> nodes) {}
+
+    private ExtractionChoices extractionChoices(java.util.function.ToIntFunction<ENode> costOfNode) {
         Objects.requireNonNull(costOfNode, "costOfNode");
         Map<EClassId, Integer> bestCost = new HashMap<>();
         Map<EClassId, ENode> bestNode = new HashMap<>();
@@ -371,13 +385,7 @@ public final class EGraph {
                 }
             }
         }
-        EClassId canonical = unionFind.find(id);
-        ENode pick = bestNode.get(canonical);
-        if (pick == null) {
-            throw new IllegalStateException("No extractable node in e-class " + canonical
-                + " — every node has unresolved children (cyclic class with no base case?)");
-        }
-        return bestNode;
+        return new ExtractionChoices(bestCost, bestNode);
     }
 
     private int extractionCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode,

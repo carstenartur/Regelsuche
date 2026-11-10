@@ -110,6 +110,14 @@ public class InventoryBackedRewriteRuleProvider {
             try {
                 left = toPatternExpr(parser.parse(reusableRule.leftPattern()));
                 right = toPatternExpr(parser.parse(reusableRule.rightPattern()));
+                Set<String> sourceBindings = new HashSet<>();
+                Set<String> unboundTarget = new java.util.TreeSet<>();
+                collectPlaceholders(left, sourceBindings);
+                collectPlaceholders(right, unboundTarget);
+                unboundTarget.removeAll(sourceBindings);
+                if (!unboundTarget.isEmpty()) {
+                    throw new IllegalArgumentException("Unbound target placeholders: " + unboundTarget);
+                }
                 // Verify the actual parsed objects that will execute, not a
                 // second parser's interpretation or a persisted status label.
                 verification = verifier.verify(left, right);
@@ -156,6 +164,18 @@ public class InventoryBackedRewriteRuleProvider {
                 LOGGER.fine(() -> "Inventory rule " + decision.rule().id()
                     + " not activated: " + decision.reason());
             }
+        }
+    }
+
+    /** Mathematical identity alone does not guarantee an instantiable rewrite target. */
+    private static void collectPlaceholders(PatternExpr pattern, Set<String> names) {
+        if (pattern instanceof PatternExpr.Placeholder placeholder) {
+            names.add(placeholder.name());
+        } else if (pattern instanceof PatternExpr.Operation operation) {
+            collectPlaceholders(operation.left(), names);
+            collectPlaceholders(operation.right(), names);
+        } else if (pattern instanceof PatternExpr.Function function) {
+            for (PatternExpr argument : function.arguments()) collectPlaceholders(argument, names);
         }
     }
 

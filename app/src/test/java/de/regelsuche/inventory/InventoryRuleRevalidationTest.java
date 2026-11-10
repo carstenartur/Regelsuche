@@ -46,7 +46,7 @@ class InventoryRuleRevalidationTest {
             d.rule().id().equals("unsupported") && d.reason().contains("UNSUPPORTED")));
         assertTrue(provider.lastDecisions().stream().anyMatch(d ->
             d.rule().id().equals("malformed") && d.reason().contains("Invalid pattern")));
-        assertTrue(activated.getFirst().equivalencePreserving());
+        assertTrue(activated.getFirst().isEquivalencePreservingByConstruction());
     }
 
     @Test
@@ -56,6 +56,40 @@ class InventoryRuleRevalidationTest {
             rule("unconditional", "A + 0", "A", List.of(), List.of()));
 
         assertEquals("inventory_unconditional", provider.activatedRules().getFirst().id());
+    }
+
+    @Test
+    void unboundTargetPlaceholderIsRejectedWithoutBlockingTheFollowingValidRule() {
+        var provider = provider(
+            rule("a-unbound", "A + 0", "A + B - B", List.of(), List.of()),
+            rule("b-valid", "A + 0", "A", List.of(), List.of()));
+
+        var activated = provider.activatedRules();
+
+        assertEquals(1, activated.size());
+        assertEquals("inventory_b-valid", activated.getFirst().id());
+        assertEquals(2, provider.lastDecisions().size());
+        var rejected = provider.lastDecisions().getFirst();
+        assertTrue(!rejected.activated());
+        assertTrue(rejected.reason().contains("Unbound target placeholders"));
+        assertTrue(rejected.reason().contains("B"));
+        var parser = new de.regelsuche.parse.ExpressionParser();
+        var before = parser.parseTerm("x + 0");
+        assertTrue(activated.getFirst().matches(before));
+        assertEquals(parser.parseTerm("x"), activated.getFirst().apply(before));
+        assertTrue(!new de.regelsuche.transform.AstRewriteTransformationEngine(activated)
+            .transform("x + 0").isEmpty());
+    }
+
+    @Test
+    void placeholdersMayOccurOnlyOnTheLeftWhenTheIdentityEliminatesThem() {
+        var provider = provider(rule("eliminate", "A + B - B", "A", List.of(), List.of()));
+        var activated = provider.activatedRules();
+        assertEquals(1, activated.size());
+        var parser = new de.regelsuche.parse.ExpressionParser();
+        var before = parser.parseTerm("x + y - y");
+        assertTrue(activated.getFirst().matches(before));
+        assertEquals(parser.parseTerm("x"), activated.getFirst().apply(before));
     }
 
     private static InventoryBackedRewriteRuleProvider provider(ReusableRule... rules) {
