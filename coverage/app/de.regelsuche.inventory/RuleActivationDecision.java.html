@@ -7,7 +7,7 @@
  */
 <span class="fc" id="L8">public record RuleActivationDecision(ReusableRule rule, boolean activated, String reason) {</span>
     public static RuleActivationDecision activated(ReusableRule rule) {
-<span class="fc" id="L10">        return new RuleActivationDecision(rule, true, &quot;Activated&quot;);</span>
+<span class="nc" id="L10">        return new RuleActivationDecision(rule, true, &quot;Activated&quot;);</span>
     }
 
     public static RuleActivationDecision disabled(ReusableRule rule, String reason) {

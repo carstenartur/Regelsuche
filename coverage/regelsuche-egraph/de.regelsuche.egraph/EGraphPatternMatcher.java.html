@@ -224,8 +224,8 @@ public final class EGraphPatternMatcher {
 <span class="nc" id="L224">        } else {</span>
 <span class="fc" id="L225">            base = candidates;</span>
         }
-<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (signatureCandidates == null) {</span>
-<span class="nc" id="L228">            return canonicalize(base);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (signatureCandidates == null) {</span>
+<span class="fc" id="L228">            return canonicalize(base);</span>
         }
 <span class="fc" id="L230">        Set&lt;EClassId&gt; bySignature = new LinkedHashSet&lt;&gt;(canonicalize(signatureCandidates));</span>
 <span class="fc" id="L231">        List&lt;EClassId&gt; filtered = new ArrayList&lt;&gt;();</span>
@@ -248,8 +248,8 @@ public final class EGraphPatternMatcher {
     }
 
     private Collection&lt;EClassId&gt; candidatesForPatternRoot(PatternExpr pattern) {
-<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Placeholder) {</span>
-<span class="nc" id="L252">            return null;</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder) {</span>
+<span class="fc" id="L252">            return null;</span>
         }
 <span class="fc bfc" id="L254" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
 <span class="fc" id="L255">            return eGraph.classesWith(new ENodeSignature(&quot;op:&quot; + operation.operator().name(), 2));</span>
@@ -290,13 +290,13 @@ public final class EGraphPatternMatcher {
     }
 
     public void resetStats() {
-<span class="fc" id="L293">        classesScanned = 0L;</span>
-<span class="fc" id="L294">        nodesScanned = 0L;</span>
-<span class="fc" id="L295">        candidateClassesSkipped = 0L;</span>
-<span class="fc" id="L296">        matchesFound = 0L;</span>
-<span class="fc" id="L297">        matcherCacheHits = 0L;</span>
-<span class="fc" id="L298">        matcherCacheMisses = 0L;</span>
-<span class="fc" id="L299">    }</span>
+<span class="nc" id="L293">        classesScanned = 0L;</span>
+<span class="nc" id="L294">        nodesScanned = 0L;</span>
+<span class="nc" id="L295">        candidateClassesSkipped = 0L;</span>
+<span class="nc" id="L296">        matchesFound = 0L;</span>
+<span class="nc" id="L297">        matcherCacheHits = 0L;</span>
+<span class="nc" id="L298">        matcherCacheMisses = 0L;</span>
+<span class="nc" id="L299">    }</span>
 
     private void clearCacheIfVersionChanged() {
 <span class="fc" id="L302">        long currentVersion = eGraph.version();</span>

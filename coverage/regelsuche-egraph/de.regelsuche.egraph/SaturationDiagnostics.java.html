@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SaturationDiagnostics.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">SaturationDiagnostics.java</span></div><h1>SaturationDiagnostics.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+
+/** Bounded per-run observations; aggregate counts survive event truncation. */
+public record SaturationDiagnostics(Map&lt;Outcome, Long&gt; counts, List&lt;Event&gt; events, long droppedEvents) {
+    public static final int MAX_EVENTS = 128;
+    public static final int MAX_MESSAGE_LENGTH = 512;
+<span class="fc" id="L12">    public enum Outcome { NON_APPLICABLE, UNRESOLVED_CONDITIONS, NOT_EQUIVALENCE_PRESERVING, RULE_FAILURE }</span>
+<span class="fc" id="L13">    public enum Stage { ELIGIBILITY, EXTRACTION, MATCHES, ASSUMPTIONS, APPLY, INSERTION }</span>
+<span class="fc" id="L14">    public record Event(String ruleId, EClassId eclass, Outcome outcome, Stage stage,</span>
+                        String exceptionType, String message) {}
+
+<span class="fc" id="L17">    public SaturationDiagnostics {</span>
+<span class="fc" id="L18">        counts = Map.copyOf(counts);</span>
+<span class="fc" id="L19">        events = List.copyOf(events);</span>
+<span class="fc" id="L20">    }</span>
+<span class="fc" id="L21">    public long count(Outcome outcome) { return counts.getOrDefault(outcome, 0L); }</span>
+<span class="nc" id="L22">    public static SaturationDiagnostics empty() { return new SaturationDiagnostics(Map.of(), List.of(), 0); }</span>
+
+<span class="fc" id="L24">    static final class Collector {</span>
+<span class="fc" id="L25">        private final Map&lt;Outcome, Long&gt; counts = new EnumMap&lt;&gt;(Outcome.class);</span>
+<span class="fc" id="L26">        private final List&lt;Event&gt; events = new ArrayList&lt;&gt;();</span>
+        private long dropped;
+        void record(String rule, EClassId source, Outcome outcome, Stage stage, RuntimeException failure) {
+<span class="fc" id="L29">            counts.merge(outcome, 1L, Long::sum);</span>
+            // Ordinary misses are counted, not retained: they must not crowd out failures.
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (outcome == Outcome.NON_APPLICABLE) return;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            if (events.size() &gt;= MAX_EVENTS) { dropped++; return; }</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            String message = failure == null ? &quot;&quot; : String.valueOf(failure.getMessage());</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (message.length() &gt; MAX_MESSAGE_LENGTH) message = message.substring(0, MAX_MESSAGE_LENGTH);</span>
+<span class="fc" id="L35">            events.add(new Event(rule, source, outcome, stage,</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                failure == null ? &quot;&quot; : failure.getClass().getName(), message));</span>
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        SaturationDiagnostics snapshot() { return new SaturationDiagnostics(counts, events, dropped); }</span>
+<span class="fc" id="L39">        boolean hasFailures() { return counts.containsKey(Outcome.RULE_FAILURE); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

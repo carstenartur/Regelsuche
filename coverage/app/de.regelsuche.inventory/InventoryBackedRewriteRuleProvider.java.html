@@ -1,142 +1,308 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InventoryBackedRewriteRuleProvider.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">InventoryBackedRewriteRuleProvider.java</span></div><h1>InventoryBackedRewriteRuleProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
 
-import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.evolution.ExactPolynomialPatternIdentityVerifier;
 import de.regelsuche.mining.PatternBinary;
 import de.regelsuche.mining.PatternFunction;
 import de.regelsuche.mining.PatternNumber;
 import de.regelsuche.mining.PatternVariable;
 import de.regelsuche.mining.RulePatternNode;
 import de.regelsuche.mining.RulePatternParser;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.transform.EquivalenceAwarePatternMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
+/**
+ * Compatibility adapter for unconditional polynomial inventory rules.
+ *
+ * &lt;p&gt;Stored proof labels are metadata, not execution authority. Every accepted
+ * pattern is rechecked by the bounded exact polynomial verifier. Conditional
+ * patterns and other mathematical fragments require the condition-aware,
+ * replay-authorised learned runtime instead of this legacy adapter. Polynomial
+ * ring proofs do not authorize partial real-domain powers or the loss of an
+ * eliminated placeholder's domain; those boundaries are checked separately.&lt;/p&gt;
+ */
 public class InventoryBackedRewriteRuleProvider {
-<span class="fc" id="L21">    private static final Logger LOGGER = Logger.getLogger(InventoryBackedRewriteRuleProvider.class.getName());</span>
+<span class="fc" id="L43">    private static final Logger LOGGER = Logger.getLogger(InventoryBackedRewriteRuleProvider.class.getName());</span>
 
     private final RuleInventoryRepository repository;
     private final RuleInventoryConfiguration configuration;
     private final List&lt;RewriteRule&gt; existingRules;
-<span class="fc" id="L26">    private final RulePatternParser parser = new RulePatternParser();</span>
-<span class="fc" id="L27">    private final List&lt;RuleActivationDecision&gt; lastDecisions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L48">    private final RulePatternParser parser = new RulePatternParser();</span>
+<span class="fc" id="L49">    private final ExactPolynomialPatternIdentityVerifier verifier =</span>
+        new ExactPolynomialPatternIdentityVerifier();
+<span class="fc" id="L51">    private final List&lt;RuleActivationDecision&gt; lastDecisions = new ArrayList&lt;&gt;();</span>
 
     public InventoryBackedRewriteRuleProvider(
         RuleInventoryRepository repository,
         RuleInventoryConfiguration configuration,
         List&lt;RewriteRule&gt; existingRules
-<span class="fc" id="L33">    ) {</span>
-<span class="fc" id="L34">        this.repository = repository;</span>
-<span class="fc" id="L35">        this.configuration = configuration;</span>
-<span class="fc" id="L36">        this.existingRules = List.copyOf(existingRules);</span>
-<span class="fc" id="L37">    }</span>
+<span class="fc" id="L57">    ) {</span>
+<span class="fc" id="L58">        this.repository = repository;</span>
+<span class="fc" id="L59">        this.configuration = configuration;</span>
+<span class="fc" id="L60">        this.existingRules = List.copyOf(existingRules);</span>
+<span class="fc" id="L61">    }</span>
 
     public List&lt;RewriteRule&gt; activatedRules() {
-<span class="fc" id="L40">        lastDecisions.clear();</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (!configuration.enabled()) {</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (ReusableRule reusableRule : repository.findAll()) {</span>
-<span class="fc" id="L43">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule, &quot;Inventory disabled&quot;));</span>
-<span class="fc" id="L44">            }</span>
-<span class="fc" id="L45">            logDecisions();</span>
-<span class="fc" id="L46">            return List.of();</span>
+<span class="fc" id="L64">        lastDecisions.clear();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (!configuration.enabled()) {</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            for (ReusableRule reusableRule : repository.findAll()) {</span>
+<span class="fc" id="L67">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule, &quot;Inventory disabled&quot;));</span>
+<span class="fc" id="L68">            }</span>
+<span class="fc" id="L69">            logDecisions();</span>
+<span class="fc" id="L70">            return List.of();</span>
         }
-<span class="fc" id="L48">        Set&lt;String&gt; usedIds = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L49">        Set&lt;String&gt; usedPatterns = new HashSet&lt;&gt;();</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        for (RewriteRule existingRule : existingRules) {</span>
-<span class="nc" id="L51">            usedIds.add(existingRule.id());</span>
-<span class="nc" id="L52">        }</span>
+<span class="fc" id="L72">        Set&lt;String&gt; usedIds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L73">        Set&lt;String&gt; usedPatterns = new HashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        for (RewriteRule existingRule : existingRules) {</span>
+<span class="nc" id="L75">            usedIds.add(existingRule.id());</span>
+<span class="nc" id="L76">        }</span>
 
-<span class="fc" id="L54">        List&lt;RewriteRule&gt; activated = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (ReusableRule reusableRule : repository.findAll()) {</span>
-<span class="fc" id="L56">            String ruleId = &quot;inventory_&quot; + reusableRule.id();</span>
-<span class="fc" id="L57">            String patternKey = reusableRule.leftPattern() + &quot; -&gt; &quot; + reusableRule.rightPattern();</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">            if (reusableRule.proofStatus().ordinal() &lt; configuration.minProofStatus().ordinal()) {</span>
-<span class="fc" id="L59">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
-<span class="fc" id="L60">                    &quot;Proof status &quot; + reusableRule.proofStatus() + &quot; below minimum &quot;</span>
-<span class="fc" id="L61">                        + configuration.minProofStatus()));</span>
-<span class="fc" id="L62">                continue;</span>
+<span class="fc" id="L78">        List&lt;RewriteRule&gt; activated = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (ReusableRule reusableRule : repository.findAll()) {</span>
+<span class="fc" id="L80">            String ruleId = &quot;inventory_&quot; + reusableRule.id();</span>
+<span class="fc" id="L81">            String patternKey = reusableRule.leftPattern() + &quot; -&gt; &quot; + reusableRule.rightPattern();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (reusableRule.proofStatus().ordinal() &lt; configuration.minProofStatus().ordinal()) {</span>
+<span class="fc" id="L83">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="fc" id="L84">                    &quot;Proof status &quot; + reusableRule.proofStatus() + &quot; below minimum &quot;</span>
+<span class="fc" id="L85">                        + configuration.minProofStatus()));</span>
+<span class="fc" id="L86">                continue;</span>
             }
-<span class="pc bpc" id="L64" title="1 of 4 branches missed.">            if (!configuration.allows(reusableRule.id()) || !repository.isEnabled(reusableRule.id())) {</span>
-<span class="fc" id="L65">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
-<span class="fc" id="L66">                    &quot;Rule id &quot; + reusableRule.id() + &quot; not allowed by allow/deny/disabled list&quot;));</span>
-<span class="fc" id="L67">                continue;</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">            if (!configuration.allows(reusableRule.id()) || !repository.isEnabled(reusableRule.id())) {</span>
+<span class="fc" id="L89">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="fc" id="L90">                    &quot;Rule id &quot; + reusableRule.id() + &quot; not allowed by allow/deny/disabled list&quot;));</span>
+<span class="fc" id="L91">                continue;</span>
             }
-<span class="pc bpc" id="L69" title="2 of 4 branches missed.">            if (usedIds.contains(ruleId) || !usedPatterns.add(patternKey)) {</span>
-<span class="nc" id="L70">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">            if (usedIds.contains(ruleId) || usedPatterns.contains(patternKey)) {</span>
+<span class="nc" id="L94">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
                     &quot;Rule conflicts with an existing rewrite rule or duplicate pattern&quot;));
-<span class="nc" id="L72">                continue;</span>
+<span class="nc" id="L96">                continue;</span>
             }
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (reusableRule.averageImprovement() &lt;= 0) {</span>
-<span class="nc" id="L75">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
-<span class="nc" id="L76">                    &quot;Average improvement is non-positive (&quot; + reusableRule.averageImprovement() + &quot;)&quot;));</span>
-<span class="nc" id="L77">                continue;</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (reusableRule.averageImprovement() &lt;= 0) {</span>
+<span class="nc" id="L99">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="nc" id="L100">                    &quot;Average improvement is non-positive (&quot; + reusableRule.averageImprovement() + &quot;)&quot;));</span>
+<span class="nc" id="L101">                continue;</span>
             }
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (reusableRule.leftPattern().equals(reusableRule.rightPattern())) {</span>
-<span class="nc" id="L80">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            if (reusableRule.leftPattern().equals(reusableRule.rightPattern())) {</span>
+<span class="nc" id="L104">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
                     &quot;Left and right pattern are identical&quot;));
-<span class="nc" id="L82">                continue;</span>
+<span class="nc" id="L106">                continue;</span>
             }
-<span class="fc" id="L84">            int complexityIncrease = estimateComplexityIncrease(reusableRule);</span>
-<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (complexityIncrease &gt; configuration.maxComplexityIncrease()) {</span>
-<span class="nc" id="L86">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="fc" id="L108">            int complexityIncrease = estimateComplexityIncrease(reusableRule);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (complexityIncrease &gt; configuration.maxComplexityIncrease()) {</span>
+<span class="nc" id="L110">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
                     &quot;Estimated complexity increase &quot; + complexityIncrease
-<span class="nc" id="L88">                        + &quot; exceeds limit &quot; + configuration.maxComplexityIncrease()));</span>
-<span class="nc" id="L89">                continue;</span>
+<span class="nc" id="L112">                        + &quot; exceeds limit &quot; + configuration.maxComplexityIncrease()));</span>
+<span class="nc" id="L113">                continue;</span>
             }
-<span class="fc" id="L91">            activated.add(new PatternRewriteRule(</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (!reusableRule.assumptions().isEmpty()</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                    || !reusableRule.parameterRelations().isEmpty()) {</span>
+<span class="fc" id="L117">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+                    &quot;Assumptions and parameter relations require the condition-aware learned runtime&quot;));
+<span class="fc" id="L119">                continue;</span>
+            }
+            PatternExpr left;
+            PatternExpr right;
+            Set&lt;String&gt; eliminatedBindings;
+            ExactPolynomialPatternIdentityVerifier.Verification verification;
+            try {
+<span class="fc" id="L126">                left = toPatternExpr(parser.parse(reusableRule.leftPattern()));</span>
+<span class="fc" id="L127">                right = toPatternExpr(parser.parse(reusableRule.rightPattern()));</span>
+<span class="fc" id="L128">                Set&lt;String&gt; sourceBindings = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L129">                Set&lt;String&gt; targetBindings = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L130">                collectPlaceholders(left, sourceBindings);</span>
+<span class="fc" id="L131">                collectPlaceholders(right, targetBindings);</span>
+<span class="fc" id="L132">                Set&lt;String&gt; unboundTarget = new java.util.TreeSet&lt;&gt;(targetBindings);</span>
+<span class="fc" id="L133">                unboundTarget.removeAll(sourceBindings);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                if (!unboundTarget.isEmpty()) {</span>
+<span class="fc" id="L135">                    throw new IllegalArgumentException(&quot;Unbound target placeholders: &quot; + unboundTarget);</span>
+                }
+<span class="fc" id="L137">                requireUnconditionalPowers(left);</span>
+<span class="fc" id="L138">                requireUnconditionalPowers(right);</span>
+<span class="fc" id="L139">                eliminatedBindings = new java.util.TreeSet&lt;&gt;(sourceBindings);</span>
+<span class="fc" id="L140">                eliminatedBindings.removeAll(targetBindings);</span>
+                // Verify the actual parsed objects that will execute, not a
+                // second parser's interpretation or a persisted status label.
+<span class="fc" id="L143">                verification = verifier.verify(left, right);</span>
+<span class="fc" id="L144">            } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L145">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="fc" id="L146">                    &quot;Invalid pattern: &quot; + exception.getMessage()));</span>
+<span class="fc" id="L147">                continue;</span>
+<span class="fc" id="L148">            }</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (!verification.proved()) {</span>
+<span class="fc" id="L150">                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,</span>
+<span class="fc" id="L151">                    &quot;Fresh exact verification: &quot; + verification.status()</span>
+<span class="fc" id="L152">                        + &quot; (&quot; + verification.detailCode() + &quot;)&quot;));</span>
+<span class="fc" id="L153">                continue;</span>
+            }
+<span class="fc" id="L155">            var executable = new PatternRewriteRule(</span>
                 ruleId,
-<span class="fc" id="L93">                toPatternExpr(parser.parse(reusableRule.leftPattern())),</span>
-<span class="fc" id="L94">                toPatternExpr(parser.parse(reusableRule.rightPattern())),</span>
+                left,
+                right,
                 RewriteKind.NORMALIZE,
                 false,
                 0,
                 true
-            ));
-<span class="fc" id="L100">            usedIds.add(ruleId);</span>
-<span class="fc" id="L101">            lastDecisions.add(RuleActivationDecision.activated(reusableRule));</span>
-<span class="fc" id="L102">        }</span>
-<span class="fc" id="L103">        logDecisions();</span>
-<span class="fc" id="L104">        return activated;</span>
+            );
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            activated.add(eliminatedBindings.isEmpty() ? executable</span>
+<span class="fc" id="L165">                : new DomainPreservingInventoryRule(executable, List.copyOf(eliminatedBindings)));</span>
+<span class="fc" id="L166">            usedIds.add(ruleId);</span>
+<span class="fc" id="L167">            usedPatterns.add(patternKey);</span>
+<span class="fc" id="L168">            lastDecisions.add(new RuleActivationDecision(reusableRule, true,</span>
+<span class="fc" id="L169">                &quot;Activated after fresh exact polynomial verification: &quot; + verification.proofHash()</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                    + (eliminatedBindings.isEmpty() ? &quot;&quot;</span>
+<span class="fc" id="L171">                        : &quot;; concrete eliminated bindings must be total: &quot; + eliminatedBindings)));</span>
+<span class="fc" id="L172">        }</span>
+<span class="fc" id="L173">        logDecisions();</span>
+<span class="fc" id="L174">        return activated;</span>
     }
 
     public List&lt;RuleActivationDecision&gt; lastDecisions() {
-<span class="fc" id="L108">        return List.copyOf(lastDecisions);</span>
+<span class="fc" id="L178">        return List.copyOf(lastDecisions);</span>
     }
 
     private int estimateComplexityIncrease(ReusableRule rule) {
-<span class="fc" id="L112">        return rule.rightPattern().length() - rule.leftPattern().length();</span>
+<span class="fc" id="L182">        return rule.rightPattern().length() - rule.leftPattern().length();</span>
     }
 
     private void logDecisions() {
-<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (RuleActivationDecision decision : lastDecisions) {</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (!decision.activated()) {</span>
-<span class="pc" id="L118">                LOGGER.fine(() -&gt; &quot;Inventory rule &quot; + decision.rule().id()</span>
-<span class="nc" id="L119">                    + &quot; not activated: &quot; + decision.reason());</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (RuleActivationDecision decision : lastDecisions) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (!decision.activated()) {</span>
+<span class="pc" id="L188">                LOGGER.fine(() -&gt; &quot;Inventory rule &quot; + decision.rule().id()</span>
+<span class="nc" id="L189">                    + &quot; not activated: &quot; + decision.reason());</span>
             }
-<span class="fc" id="L121">        }</span>
-<span class="fc" id="L122">    }</span>
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">    }</span>
+
+    /** Mathematical identity alone does not guarantee an instantiable rewrite target. */
+    private static void collectPlaceholders(PatternExpr pattern, Set&lt;String&gt; names) {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L197">            names.add(placeholder.name());</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L199">            collectPlaceholders(operation.left(), names);</span>
+<span class="fc" id="L200">            collectPlaceholders(operation.right(), names);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            for (PatternExpr argument : function.arguments()) collectPlaceholders(argument, names);</span>
+        }
+<span class="fc" id="L204">    }</span>
+
+    /** The formal polynomial-ring convention x^0=1 is not our real-domain contract. */
+    private static void requireUnconditionalPowers(PatternExpr pattern) {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (operation.operator() == BinaryOperator.POW</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    &amp;&amp; operation.right() instanceof PatternExpr.LiteralNumber exponent</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                    &amp;&amp; exponent.value().equalsInteger(0)</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                    &amp;&amp; !(operation.left() instanceof PatternExpr.LiteralNumber base</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                        &amp;&amp; !base.value().equalsInteger(0))) {</span>
+<span class="fc" id="L214">                throw new IllegalArgumentException(</span>
+                    &quot;Domain-sensitive zero power requires a defined, nonzero base&quot;);
+            }
+<span class="fc" id="L217">            requireUnconditionalPowers(operation.left());</span>
+<span class="fc" id="L218">            requireUnconditionalPowers(operation.right());</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            for (PatternExpr argument : function.arguments()) requireUnconditionalPowers(argument);</span>
+        }
+<span class="fc" id="L222">    }</span>
+
+    /**
+     * Pattern placeholders can bind partial expressions, not just ring indeterminates.
+     * Keep a bounded concrete guard whenever an identity removes a whole binding.
+     * Composition deliberately prevents the native unguarded PatternRewriteRule path.
+     */
+    private record DomainPreservingInventoryRule(
+        PatternRewriteRule delegate, List&lt;String&gt; eliminatedBindings
+    ) implements RewriteRule, RetainedGraph.View {
+        private static final int MAX_ELISION_NODES = 512;
+
+<span class="fc" id="L234">        DomainPreservingInventoryRule {</span>
+<span class="fc" id="L235">            eliminatedBindings = List.copyOf(eliminatedBindings);</span>
+<span class="fc" id="L236">        }</span>
+
+<span class="fc" id="L238">        @Override public String id() { return delegate.id(); }</span>
+<span class="nc" id="L239">        @Override public RewriteKind kind() { return delegate.kind(); }</span>
+<span class="nc" id="L240">        @Override public boolean mayIncreaseComplexity() { return delegate.mayIncreaseComplexity(); }</span>
+<span class="nc" id="L241">        @Override public int estimatedCostDelta() { return delegate.estimatedCostDelta(); }</span>
+<span class="fc" id="L242">        @Override public boolean isEquivalencePreservingByConstruction() { return true; }</span>
+<span class="nc" id="L243">        @Override public de.regelsuche.knowledge.RuleDescriptor descriptor() { return delegate.descriptor(); }</span>
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L245">            visitor.reference(delegate);</span>
+<span class="fc" id="L246">            visitor.reference(eliminatedBindings);</span>
+<span class="fc" id="L247">        }</span>
+
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        @Override public boolean matches(Expr subtree) { return safeBindings(subtree) != null; }</span>
+
+        @Override public Expr apply(Expr subtree) {
+<span class="fc" id="L252">            Map&lt;String, Expr&gt; bindings = safeBindings(subtree);</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (bindings == null) throw new IllegalArgumentException(&quot;Rule does not match without domain loss&quot;);</span>
+<span class="fc" id="L254">            return delegate.target().instantiate(bindings);</span>
+        }
+
+        private Map&lt;String, Expr&gt; safeBindings(Expr subtree) {
+<span class="fc" id="L258">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (!EquivalenceAwarePatternMatcher.match(</span>
+<span class="fc" id="L260">                    delegate.source(), subtree, bindings, RecognitionProfile.exact())) return null;</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            for (String name : eliminatedBindings) {</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                if (!totalWithinBound(bindings.get(name))) return null;</span>
+<span class="fc" id="L263">            }</span>
+<span class="fc" id="L264">            return bindings;</span>
+        }
+
+        private static boolean totalWithinBound(Expr expression) {
+<span class="fc" id="L268">            var pending = new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L269">            pending.add(expression);</span>
+<span class="fc" id="L270">            int visited = 0;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            while (!pending.isEmpty()) {</span>
+<span class="fc" id="L272">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                if (++visited &gt; MAX_ELISION_NODES) return false;</span>
+<span class="fc" id="L274">                Expr current = pending.removeLast();</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                if (current instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L276">                    pending.add(binary.left());</span>
+<span class="fc" id="L277">                    pending.add(binary.right());</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                } else if (current instanceof FunctionExpr function) {</span>
+                    // The shared definedness checker accepts only unary functions.
+                    // Reject wider calls before their argument list can expand the queue.
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                    if (function.arguments().size() != 1) return false;</span>
+<span class="fc" id="L282">                    pending.add(function.argument());</span>
+                }
+<span class="fc" id="L284">            }</span>
+<span class="fc" id="L285">            RetainedOperation.work(visited);</span>
+<span class="fc" id="L286">            return ExpressionDefinedness.isTotal(expression);</span>
+        }
+    }
 
     private PatternExpr toPatternExpr(RulePatternNode node) {
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (node instanceof PatternNumber number) {</span>
-<span class="fc" id="L126">            return PatternExpr.num(number.value());</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (node instanceof PatternNumber number) {</span>
+<span class="fc" id="L292">            return PatternExpr.num(number.value());</span>
         }
-<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
-<span class="fc" id="L129">            return PatternExpr.var(variable.name());</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
+<span class="fc" id="L295">            return PatternExpr.var(variable.name());</span>
         }
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (node instanceof PatternFunction function) {</span>
-<span class="nc" id="L132">            PatternExpr[] converted = new PatternExpr[function.arguments().size()];</span>
-<span class="nc bnc" id="L133" title="All 2 branches missed.">            for (int i = 0; i &lt; converted.length; i++) {</span>
-<span class="nc" id="L134">                converted[i] = toPatternExpr(function.arguments().get(i));</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (node instanceof PatternFunction function) {</span>
+<span class="fc" id="L298">            PatternExpr[] converted = new PatternExpr[function.arguments().size()];</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            for (int i = 0; i &lt; converted.length; i++) {</span>
+<span class="fc" id="L300">                converted[i] = toPatternExpr(function.arguments().get(i));</span>
             }
-<span class="nc" id="L136">            return PatternExpr.fn(function.name(), converted);</span>
+<span class="fc" id="L302">            return PatternExpr.fn(function.name(), converted);</span>
         }
-<span class="fc" id="L138">        PatternBinary binary = (PatternBinary) node;</span>
-<span class="fc" id="L139">        return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));</span>
+<span class="fc" id="L304">        PatternBinary binary = (PatternBinary) node;</span>
+<span class="fc" id="L305">        return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

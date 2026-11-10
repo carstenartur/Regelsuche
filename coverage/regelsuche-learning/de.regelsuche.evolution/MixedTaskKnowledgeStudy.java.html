@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MixedTaskKnowledgeStudy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">MixedTaskKnowledgeStudy.java</span></div><h1>MixedTaskKnowledgeStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Stream;
+
+/** Preferred prospective learning evaluation; its public inputs are not a sealed holdout. */
+public final class MixedTaskKnowledgeStudy {
+    private final TaskKnowledgeSelfImprover.Meter meter;
+
+<span class="nc" id="L18">    private MixedTaskKnowledgeStudy() { this(TaskKnowledgeSelfImprover.systemMeter()); }</span>
+<span class="fc" id="L19">    MixedTaskKnowledgeStudy(TaskKnowledgeSelfImprover.Meter meter) {</span>
+<span class="fc" id="L20">        this.meter = java.util.Objects.requireNonNull(meter);</span>
+<span class="fc" id="L21">    }</span>
+<span class="fc" id="L22">    KnowledgeCostGate.Cost now() { return meter.now(); }</span>
+    KnowledgeCostGate.Cost elapsed(KnowledgeCostGate.Cost start) {
+<span class="fc" id="L24">        var end = now();</span>
+<span class="fc" id="L25">        return new KnowledgeCostGate.Cost(end.wallNanos() - start.wallNanos(),</span>
+<span class="pc bpc" id="L26" title="1 of 4 branches missed.">            start.cpuNanos() &lt; 0 || end.cpuNanos() &lt; 0 ? -1 : end.cpuNanos() - start.cpuNanos());</span>
+    }
+    /** Exact canonical split checks include seed acquisition, all later attempts, and their validation. */
+    public static long checkSeparation() {
+<span class="nc" id="L30">        var training = Stream.concat(MixedTaskKnowledgeWorkload.seedBatches().stream(),</span>
+<span class="nc" id="L31">            MixedTaskKnowledgeWorkload.improvementBatches().stream())</span>
+<span class="nc" id="L32">            .flatMap(b -&gt; Stream.concat(b.lessons().stream(), b.validation().stream())).toList();</span>
+<span class="nc" id="L33">        var promotion = MixedTaskKnowledgeWorkload.promotionTasks();</span>
+<span class="nc" id="L34">        var evaluation = MixedTaskKnowledgeWorkload.evaluation().stream().map(MixedTaskKnowledgeWorkload.Case::task).toList();</span>
+<span class="nc" id="L35">        return Math.addExact(Math.addExact(CumulativeTaskKnowledge.disjoint(training, promotion),</span>
+<span class="nc" id="L36">            CumulativeTaskKnowledge.disjoint(training, evaluation)), CumulativeTaskKnowledge.disjoint(promotion, evaluation));</span>
+    }
+    private Map&lt;String, Object&gt; arm(boolean improve, int blocks, Path directory) {
+<span class="nc" id="L39">        var start = now();</span>
+<span class="nc" id="L40">        var report = new TreeMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L41">        var acquisition = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc" id="L42">        var rows = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc" id="L43">        long knownWork = 0;</span>
+<span class="nc" id="L44">        boolean complete = true;</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        report.put(&quot;profile&quot;, improve ? &quot;MIXED_MEASURED_IMPROVEMENT&quot; : &quot;PREPARED_REUSE&quot;);</span>
+<span class="nc" id="L46">        report.put(&quot;acquisition&quot;, acquisition); report.put(&quot;queries&quot;, rows);</span>
+        try {
+<span class="nc" id="L48">            var knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory());</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            for (var batch : MixedTaskKnowledgeWorkload.seedBatches()) {</span>
+<span class="nc" id="L50">                var update = knowledge.learnBatch(batch.lessons(), batch.validation(), 1_000_000);</span>
+<span class="nc" id="L51">                knownWork = Math.addExact(knownWork, update.work().total());</span>
+<span class="nc" id="L52">                knowledge = update.next();</span>
+<span class="nc" id="L53">                acquisition.add(Map.of(&quot;decision&quot;, update.reason(), &quot;work&quot;, update.work(), &quot;generationId&quot;, knowledge.id()));</span>
+<span class="nc" id="L54">            }</span>
+<span class="nc" id="L55">            Path snapshot = knowledge.save(directory);</span>
+<span class="nc" id="L56">            try (var session = new TaskKnowledgeSession(TraceStrategyTransferExample.inventory(), 4, 4_000_000)) {</span>
+<span class="nc" id="L57">                var loaded = session.prepare(snapshot);</span>
+<span class="nc" id="L58">                knowledge = loaded.knowledge();</span>
+<span class="nc" id="L59">                knownWork = Math.addExact(knownWork, loaded.preparationWork() + loaded.lookupWork());</span>
+<span class="nc" id="L60">                report.put(&quot;seedId&quot;, knowledge.id());</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                if (improve) {</span>
+<span class="nc" id="L62">                    var policy = new TaskKnowledgeSelfImprover.Policy(5_000_000, 120_000_000_000L,</span>
+<span class="nc" id="L63">                        120_000_000_000L, 2, 3, (long) blocks * MixedTaskKnowledgeWorkload.evaluation().size());</span>
+<span class="nc" id="L64">                    var result = new TaskKnowledgeSelfImprover().improve(knowledge,</span>
+<span class="nc" id="L65">                        MixedTaskKnowledgeWorkload.improvementBatches(), policy);</span>
+<span class="nc" id="L66">                    knowledge = result.active();</span>
+<span class="nc" id="L67">                    knownWork = Math.addExact(knownWork, result.knownWork());</span>
+<span class="nc" id="L68">                    complete &amp;= result.accountingComplete();</span>
+<span class="nc" id="L69">                    report.put(&quot;improvement&quot;, Map.of(&quot;attempts&quot;, result.attempts(), &quot;knownWork&quot;, result.knownWork(),</span>
+<span class="nc" id="L70">                        &quot;paid&quot;, result.paid(), &quot;accountingComplete&quot;, result.accountingComplete(), &quot;budgetExhausted&quot;, result.budgetExhausted()));</span>
+<span class="nc" id="L71">                    snapshot = knowledge.save(directory);</span>
+<span class="nc" id="L72">                    knownWork = Math.addExact(knownWork, session.retainVerified(knowledge).lookupWork());</span>
+                }
+<span class="nc" id="L74">                report.put(&quot;activeId&quot;, knowledge.id());</span>
+<span class="nc" id="L75">                report.put(&quot;setupCost&quot;, elapsed(start));</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                for (int block = 0; block &lt; blocks; block++) {</span>
+<span class="nc" id="L77">                    var reused = session.prepare(snapshot);</span>
+<span class="nc" id="L78">                    knownWork = Math.addExact(knownWork, reused.preparationWork() + reused.lookupWork());</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                    for (var entry : MixedTaskKnowledgeWorkload.evaluation()) {</span>
+<span class="nc" id="L80">                        var begin = now();</span>
+<span class="nc" id="L81">                        var task = entry.task();</span>
+<span class="nc" id="L82">                        var execution = reused.knowledge().solve(task, CumulativeTaskKnowledge.Strategy.AUTOMATIC);</span>
+<span class="nc" id="L83">                        knownWork = Math.addExact(knownWork, execution.totalWork());</span>
+<span class="nc" id="L84">                        long[] auditWork = {0};</span>
+<span class="nc" id="L85">                        var row = new TreeMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L86">                        rows.add(row); row.put(&quot;block&quot;, block); row.put(&quot;case&quot;, entry);</span>
+<span class="nc" id="L87">                        row.put(&quot;nativeWork&quot;, execution.totalWork()); row.put(&quot;solved&quot;, execution.solved());</span>
+                        try {
+<span class="nc" id="L89">                            var evidence = execution.solution().orElseThrow().evidence();</span>
+<span class="nc" id="L90">                            var exact = new ExactPolynomialAnalysis(units -&gt; auditWork[0] = Math.addExact(auditWork[0], units));</span>
+<span class="nc" id="L91">                            String current = ExpressionFormatter.format(task.source());</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                            for (var edge : evidence.witness()) {</span>
+<span class="nc" id="L93">                                String source = ExpressionFormatter.format(edge.source().expression());</span>
+<span class="nc" id="L94">                                String target = ExpressionFormatter.format(edge.target().expression());</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                                if (!source.equals(current)) throw new IllegalStateException(&quot;disconnected witness&quot;);</span>
+<span class="nc" id="L96">                                exact.requireEquivalent(source, target); current = target;</span>
+<span class="nc" id="L97">                            }</span>
+<span class="nc" id="L98">                            String output = ExpressionFormatter.format(evidence.incumbent().expression());</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                            if (!current.equals(output)) throw new IllegalStateException(&quot;unbound output&quot;);</span>
+<span class="nc" id="L100">                            exact.requireEquivalent(entry.source(), output);</span>
+<span class="nc" id="L101">                            long nodes = nodes(evidence.incumbent().expression());</span>
+<span class="nc" id="L102">                            auditWork[0] = Math.addExact(auditWork[0], nodes);</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">                            if (nodes != evidence.outputScore() || execution.solved() != (nodes &lt;= entry.maximumNodes()</span>
+<span class="nc bnc" id="L104" title="All 6 branches missed.">                                    &amp;&amp; execution.totalWork() &lt;= task.budget().totalWork() &amp;&amp; evidence.withinBudget()))</span>
+<span class="nc" id="L105">                                throw new IllegalStateException(&quot;score/goal inconsistency&quot;);</span>
+<span class="nc" id="L106">                            complete &amp;= evidence.accountingComplete();</span>
+<span class="nc" id="L107">                            row.put(&quot;output&quot;, output); row.put(&quot;score&quot;, nodes); row.put(&quot;verified&quot;, true);</span>
+<span class="nc" id="L108">                        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L109">                            complete = false; row.put(&quot;verified&quot;, false); row.put(&quot;failure&quot;, failure.toString());</span>
+                        } finally {
+<span class="nc" id="L111">                            knownWork = Math.addExact(knownWork, auditWork[0]);</span>
+<span class="nc" id="L112">                            row.put(&quot;auditWork&quot;, auditWork[0]); row.put(&quot;paidIncludingAudit&quot;, elapsed(begin));</span>
+                        }
+<span class="nc" id="L114">                    }</span>
+                }
+            }
+<span class="nc" id="L117">        } catch (Exception failure) {</span>
+<span class="nc" id="L118">            complete = false; report.put(&quot;failure&quot;, failure.toString());</span>
+        } finally {
+<span class="nc" id="L120">            var paid = elapsed(start);</span>
+<span class="nc" id="L121">            report.put(&quot;paidIncludingSetupAndAudit&quot;, paid); report.put(&quot;knownWork&quot;, knownWork);</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">            report.put(&quot;accountingComplete&quot;, complete &amp;&amp; paid.cpuNanos() &gt;= 0);</span>
+        }
+<span class="nc" id="L124">        return report;</span>
+    }
+    private static long nodes(Expr expression) {
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        return switch (expression) {</span>
+<span class="nc" id="L128">            case BinaryExpr b -&gt; 1 + nodes(b.left()) + nodes(b.right());</span>
+<span class="nc" id="L129">            case FunctionExpr f -&gt; 1 + f.arguments().stream().mapToLong(MixedTaskKnowledgeStudy::nodes).sum();</span>
+<span class="nc" id="L130">            case NumberExpr ignored -&gt; 1;</span>
+<span class="nc" id="L131">            case VariableExpr ignored -&gt; 1;</span>
+        };
+    }
+    private static Map&lt;String, Object&gt; compare(int repetition, Map&lt;String, Object&gt; baseline, Map&lt;String, Object&gt; candidate) {
+<span class="nc" id="L135">        var before = CheckedSchemaSupport.JSON.valueToTree(baseline);</span>
+<span class="nc" id="L136">        var after = CheckedSchemaSupport.JSON.valueToTree(candidate);</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        boolean quality = before.path(&quot;accountingComplete&quot;).asBoolean() &amp;&amp; after.path(&quot;accountingComplete&quot;).asBoolean()</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            &amp;&amp; before.path(&quot;queries&quot;).size() == after.path(&quot;queries&quot;).size();</span>
+<span class="nc bnc" id="L139" title="All 4 branches missed.">        for (int i = 0; quality &amp;&amp; i &lt; before.path(&quot;queries&quot;).size(); i++) {</span>
+<span class="nc" id="L140">            var b = before.path(&quot;queries&quot;).get(i); var a = after.path(&quot;queries&quot;).get(i);</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">            quality &amp;= b.path(&quot;verified&quot;).asBoolean() &amp;&amp; a.path(&quot;verified&quot;).asBoolean()</span>
+<span class="nc bnc" id="L142" title="All 6 branches missed.">                &amp;&amp; b.path(&quot;case&quot;).equals(a.path(&quot;case&quot;)) &amp;&amp; (!b.path(&quot;solved&quot;).asBoolean() || a.path(&quot;solved&quot;).asBoolean())</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                &amp;&amp; a.path(&quot;score&quot;).asLong(Long.MAX_VALUE) &lt;= b.path(&quot;score&quot;).asLong(Long.MAX_VALUE);</span>
+        }
+<span class="nc" id="L145">        long wall = before.path(&quot;paidIncludingSetupAndAudit&quot;).path(&quot;wallNanos&quot;).asLong()</span>
+<span class="nc" id="L146">            - after.path(&quot;paidIncludingSetupAndAudit&quot;).path(&quot;wallNanos&quot;).asLong();</span>
+<span class="nc" id="L147">        long cpu = before.path(&quot;paidIncludingSetupAndAudit&quot;).path(&quot;cpuNanos&quot;).asLong()</span>
+<span class="nc" id="L148">            - after.path(&quot;paidIncludingSetupAndAudit&quot;).path(&quot;cpuNanos&quot;).asLong();</span>
+<span class="nc" id="L149">        return Map.of(&quot;repetition&quot;, repetition, &quot;qualityNonRegressing&quot;, quality,</span>
+<span class="nc bnc" id="L150" title="All 6 branches missed.">            &quot;observedWallSavingsNanos&quot;, wall, &quot;observedCpuSavingsNanos&quot;, cpu,</span>
+<span class="nc" id="L151">            &quot;observedBothResourcePayback&quot;, quality &amp;&amp; wall &gt; 0 &amp;&amp; cpu &gt; 0);</span>
+    }
+
+    /** CLI: output directory [blocks=16] [repetitions=3]; stdout is one JSON report. */
+    public static void main(String[] args) throws Exception {
+<span class="nc" id="L156">        new MixedTaskKnowledgeStudy().run(args);</span>
+<span class="nc" id="L157">    }</span>
+
+    private void run(String[] args) throws Exception {
+<span class="nc" id="L160">        var start = now();</span>
+<span class="nc bnc" id="L161" title="All 4 branches missed.">        if (args.length &lt; 1 || args.length &gt; 3) throw new IllegalArgumentException(&quot;directory [blocks] [repetitions]&quot;);</span>
+<span class="nc" id="L162">        Path directory = Path.of(args[0]);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        int blocks = args.length &gt; 1 ? Integer.parseInt(args[1]) : 16;</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        int repetitions = args.length &gt; 2 ? Integer.parseInt(args[2]) : 3;</span>
+<span class="nc bnc" id="L165" title="All 8 branches missed.">        if (blocks &lt; 1 || blocks &gt; 128 || repetitions &lt; 1 || repetitions &gt; 9)</span>
+<span class="nc" id="L166">            throw new IllegalArgumentException(&quot;bounded positive blocks/repetitions required&quot;);</span>
+<span class="nc" id="L167">        Files.createDirectory(directory);</span>
+<span class="nc" id="L168">        var report = new TreeMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L169">        report.put(&quot;revision&quot;, MixedTaskKnowledgeWorkload.REVISION);</span>
+<span class="nc" id="L170">        report.put(&quot;informationRegime&quot;, &quot;PUBLIC_PROSPECTIVE_WITHIN_FAMILY_ALPHA_POLYNOMIAL_DISJOINT&quot;);</span>
+<span class="nc" id="L171">        report.put(&quot;blocks&quot;, blocks); report.put(&quot;repetitions&quot;, repetitions);</span>
+<span class="nc" id="L172">        report.put(&quot;improvementCostScope&quot;, TaskKnowledgeSelfImprover.CostScope.IMPROVEMENT_RUN.name());</span>
+<span class="nc" id="L173">        report.put(&quot;promotion&quot;, MixedTaskKnowledgeWorkload.promotion()); report.put(&quot;evaluation&quot;, MixedTaskKnowledgeWorkload.evaluation());</span>
+<span class="nc" id="L174">        report.put(&quot;separationWork&quot;, checkSeparation());</span>
+<span class="nc" id="L175">        var arms = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        for (int repetition = 0; repetition &lt; repetitions; repetition++) {</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">            for (int index = 0; index &lt; 2; index++) {</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                boolean improve = ((repetition + index) &amp; 1) == 1;</span>
+<span class="nc" id="L179">                var result = arm(improve, blocks, directory.resolve(&quot;r&quot; + repetition + &quot;-&quot; + index));</span>
+<span class="nc" id="L180">                result.put(&quot;repetition&quot;, repetition); arms.add(result);</span>
+            }
+        }
+<span class="nc" id="L183">        report.put(&quot;arms&quot;, arms);</span>
+<span class="nc" id="L184">        var comparisons = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        for (int repetition = 0; repetition &lt; repetitions; repetition++) {</span>
+<span class="nc" id="L186">            var first = arms.get(2 * repetition); var second = arms.get(2 * repetition + 1);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            comparisons.add(compare(repetition, first.get(&quot;profile&quot;).equals(&quot;PREPARED_REUSE&quot;) ? first : second,</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                first.get(&quot;profile&quot;).equals(&quot;PREPARED_REUSE&quot;) ? second : first));</span>
+        }
+<span class="nc" id="L190">        report.put(&quot;comparisons&quot;, comparisons);</span>
+<span class="nc" id="L191">        report.put(&quot;studyPaidBeforeSerialization&quot;, elapsed(start));</span>
+<span class="nc" id="L192">        System.out.println(LearnedSchedulingArtifacts.json(report));</span>
+<span class="nc" id="L193">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

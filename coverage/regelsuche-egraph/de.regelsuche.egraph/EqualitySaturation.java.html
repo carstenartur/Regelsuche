@@ -2,6 +2,7 @@
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,286 +11,252 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.ToIntFunction;
+import static de.regelsuche.egraph.SaturationDiagnostics.Outcome.*;
+import static de.regelsuche.egraph.SaturationDiagnostics.Stage.*;
 
 /**
- * Egg-style equality saturation: apply a set of {@link RewriteRule}s to
- * an {@link EGraph} until no rule fires anymore, the iteration budget is
- * exhausted, or the graph hits a configured node-count guard.
- *
- * &lt;p&gt;The crucial difference to the existing path-based search strategies
- * is that &lt;em&gt;all&lt;/em&gt; matches of &lt;em&gt;all&lt;/em&gt; rules in a given iteration
- * are collected first, and only then applied/unioned. As a consequence
- * the saturated e-graph holds every reachable equivalent form
- * simultaneously, and the final {@link #saturate} step extracts the
- * cheapest representative according to a pluggable cost function — no
- * combinatorial explosion of separate search paths.&lt;/p&gt;
- *
- * &lt;p&gt;Bridging to the existing rule set:
- * &lt;ul&gt;
- *   &lt;li&gt;&lt;b&gt;Pattern-based rules&lt;/b&gt; ({@link PatternRewriteRule}) are
- *       matched directly on e-nodes / e-classes via {@link
- *       EGraphPatternMatcher}, and their target is instantiated directly
- *       into the e-graph via {@link EGraphPatternApplier} — no AST round
- *       trip.&lt;/li&gt;
- *   &lt;li&gt;&lt;b&gt;Custom rules&lt;/b&gt; (the {@code MetadataRule} subclasses living
- *       inside {@code AstRewriteTransformationEngine}) are not pattern
- *       based. For those we walk every e-class, materialise its
- *       &lt;em&gt;cheapest&lt;/em&gt; representative (using {@link
- *       EGraph#extract(EClassId, ToIntFunction)} with a uniform cost),
- *       and run the rule's {@code matches/apply} on that concrete AST.
- *       The rewritten AST is then re-added to the graph via {@link
- *       EGraph#addExpression(Expr)} and unioned with the source class.
- *       This handles the rules we already ship; richer concrete-side
- *       matching is intentionally out of scope for PR 2b.&lt;/li&gt;
- * &lt;/ul&gt;
- * &lt;/p&gt;
- *
- * &lt;p&gt;Only equivalence-preserving rules may merge classes. Concrete rule
- * applications must introduce no unresolved assumptions. Pattern subclasses
- * use concrete matching so their additional guards and apply semantics remain
- * authoritative; the direct e-node path is reserved for the base pattern rule.&lt;/p&gt;
+ * Bounded equality saturation for unconditional construction-preserving rules.
+ * Exact base patterns match natively; subclasses, guarded and AC-aware rules
+ * use concrete representatives. Local witnesses are not an extraction proof.
  */
 public final class EqualitySaturation {
-
-    /** Configuration tuning saturation behaviour. */
     public record Config(int maxIterations, int maxNodes, boolean useDirtyWorklist) {
-<span class="fc" id="L58">        public Config {</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (maxIterations &lt;= 0) {</span>
-<span class="nc" id="L60">                throw new IllegalArgumentException(&quot;maxIterations must be &gt; 0&quot;);</span>
-            }
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (maxNodes &lt;= 0) {</span>
-<span class="nc" id="L63">                throw new IllegalArgumentException(&quot;maxNodes must be &gt; 0&quot;);</span>
-            }
-<span class="fc" id="L65">        }</span>
-
-        public Config(int maxIterations, int maxNodes) {
-<span class="fc" id="L68">            this(maxIterations, maxNodes, true);</span>
-<span class="fc" id="L69">        }</span>
-
-        /** Default configuration: 12 iterations, ~10 000 node guard. */
-        public static Config defaults() {
-<span class="fc" id="L73">            return new Config(12, 10_000, true);</span>
-        }
+<span class="fc" id="L25">        public Config {</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (maxIterations &lt;= 0) throw new IllegalArgumentException(&quot;maxIterations must be &gt; 0&quot;);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            if (maxNodes &lt;= 0) throw new IllegalArgumentException(&quot;maxNodes must be &gt; 0&quot;);</span>
+<span class="fc" id="L28">        }</span>
+<span class="fc" id="L29">        public Config(int maxIterations, int maxNodes) { this(maxIterations, maxNodes, true); }</span>
+<span class="fc" id="L30">        public static Config defaults() { return new Config(12, 10_000, true); }</span>
     }
 
     private final List&lt;RewriteRule&gt; rules;
     private final Config config;
+<span class="fc" id="L35">    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules) { this(rules, Config.defaults()); }</span>
+<span class="fc" id="L36">    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules, Config config) {</span>
+<span class="fc" id="L37">        this.rules = List.copyOf(rules);</span>
+<span class="fc" id="L38">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
+<span class="fc" id="L39">    }</span>
+<span class="nc" id="L40">    public List&lt;RewriteRule&gt; rules() { return rules; }</span>
+<span class="nc" id="L41">    public Config config() { return config; }</span>
 
-    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules) {
-<span class="fc" id="L81">        this(rules, Config.defaults());</span>
-<span class="fc" id="L82">    }</span>
-
-<span class="fc" id="L84">    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules, Config config) {</span>
-<span class="fc" id="L85">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
-<span class="fc" id="L86">        this.rules = List.copyOf(rules);</span>
-<span class="fc" id="L87">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
-<span class="fc" id="L88">    }</span>
-
-    public List&lt;RewriteRule&gt; rules() {
-<span class="nc" id="L91">        return rules;</span>
-    }
-
-    public Config config() {
-<span class="nc" id="L95">        return config;</span>
-    }
-
-    /**
-     * Saturate {@code eGraph} starting from {@code root}, then extract the
-     * lowest-cost representative using {@code costOfNode} and return both
-     * the extracted AST and the run statistics.
-     */
-    public Result saturate(EGraph eGraph, EClassId root, ToIntFunction&lt;ENode&gt; costOfNode) {
-<span class="fc" id="L104">        Objects.requireNonNull(eGraph, &quot;eGraph&quot;);</span>
-<span class="fc" id="L105">        Objects.requireNonNull(root, &quot;root&quot;);</span>
-<span class="fc" id="L106">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
-<span class="fc" id="L107">        EGraphPatternMatcher matcher = new EGraphPatternMatcher(eGraph);</span>
-<span class="fc" id="L108">        EGraphPatternApplier applier = new EGraphPatternApplier(eGraph);</span>
-<span class="fc" id="L109">        matcher.resetStats();</span>
-
-<span class="fc" id="L111">        Map&lt;String, Integer&gt; appliedRules = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L112">        int merges = 0;</span>
-<span class="fc" id="L113">        int iterations = 0;</span>
-<span class="fc" id="L114">        SaturationStats.Reason stopReason = SaturationStats.Reason.FIX_POINT;</span>
-<span class="fc" id="L115">        boolean saturated = false;</span>
-<span class="fc" id="L116">        Collection&lt;EClassId&gt; dirtyClasses = eGraph.consumeDirtyClasses();</span>
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (dirtyClasses.isEmpty()) {</span>
-<span class="nc" id="L118">            List&lt;EClassId&gt; allClasses = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L119" title="All 2 branches missed.">            for (EClass eclass : eGraph.classes()) {</span>
-<span class="nc" id="L120">                allClasses.add(eclass.id());</span>
-<span class="nc" id="L121">            }</span>
-<span class="nc" id="L122">            dirtyClasses = allClasses;</span>
-        }
-
-<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        for (int i = 0; i &lt; config.maxIterations(); i++) {</span>
-<span class="fc" id="L126">            iterations = i + 1;</span>
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (eGraph.nodeCount() &gt; config.maxNodes()) {</span>
-<span class="nc" id="L128">                stopReason = SaturationStats.Reason.NODE_BUDGET;</span>
-<span class="nc" id="L129">                break;</span>
-            }
-
-<span class="fc" id="L132">            int classesBefore = eGraph.classCount();</span>
-<span class="fc" id="L133">            int nodesBefore = eGraph.nodeCount();</span>
-
-<span class="fc bfc" id="L135" title="All 2 branches covered.">            Collection&lt;EClassId&gt; classesToScan = config.useDirtyWorklist()</span>
-<span class="fc" id="L136">                ? dirtyClasses</span>
-<span class="fc" id="L137">                : allClasses(eGraph);</span>
-<span class="fc" id="L138">            int fired = applyAllRules(eGraph, matcher, applier, costOfNode, appliedRules, classesToScan);</span>
-<span class="fc" id="L139">            eGraph.rebuild();</span>
-<span class="fc" id="L140">            dirtyClasses = eGraph.consumeDirtyClasses();</span>
-<span class="fc" id="L141">            int classesAfter = eGraph.classCount();</span>
-<span class="fc" id="L142">            merges += Math.max(0, (classesBefore + (eGraph.nodeCount() - nodesBefore)) - classesAfter);</span>
-
-<span class="pc bpc" id="L144" title="1 of 6 branches missed.">            if (fired == 0 || (classesAfter == classesBefore &amp;&amp; eGraph.nodeCount() == nodesBefore)) {</span>
-<span class="fc" id="L145">                saturated = true;</span>
-<span class="fc" id="L146">                stopReason = SaturationStats.Reason.FIX_POINT;</span>
-<span class="fc" id="L147">                break;</span>
-            }
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (i == config.maxIterations() - 1) {</span>
-<span class="nc" id="L150">                stopReason = SaturationStats.Reason.ITERATION_BUDGET;</span>
-            }
-        }
-
-<span class="fc" id="L154">        Expr best = eGraph.extract(root, costOfNode);</span>
-<span class="fc" id="L155">        EGraphPatternMatcher.MatcherStats matcherStats = matcher.stats();</span>
-<span class="fc" id="L156">        SaturationStats stats = new SaturationStats(</span>
-<span class="fc" id="L157">            eGraph.classCount(),</span>
-<span class="fc" id="L158">            eGraph.nodeCount(),</span>
-            merges,
-            iterations,
-            appliedRules,
-<span class="fc" id="L162">            de.regelsuche.parse.ExpressionFormatter.format(best),</span>
-            saturated,
-            stopReason,
-<span class="fc" id="L165">            matcherStats.classesScanned(),</span>
-<span class="fc" id="L166">            matcherStats.nodesScanned(),</span>
-<span class="fc" id="L167">            matcherStats.candidateClassesSkipped(),</span>
-<span class="fc" id="L168">            matcherStats.matchesFound(),</span>
-<span class="fc" id="L169">            matcherStats.matcherCacheHits(),</span>
-<span class="fc" id="L170">            matcherStats.matcherCacheMisses(),</span>
-            iterations,
-<span class="fc" id="L172">            appliedRules.values().stream().mapToInt(Integer::intValue).sum()</span>
-        );
-<span class="fc" id="L174">        return new Result(best, stats);</span>
-    }
-
-    /**
-     * Apply every rule once across the entire graph. Pattern matches are
-     * collected first and rewrites are applied in a second pass so a
-     * rule's effect during iteration {@code i} cannot retroactively
-     * spawn new matches for itself within the same iteration — that's
-     * what makes saturation deterministic and explosion-free.
-     */
-    private int applyAllRules(
-        EGraph eGraph,
-        EGraphPatternMatcher matcher,
-        EGraphPatternApplier applier,
-        ToIntFunction&lt;ENode&gt; costOfNode,
-        Map&lt;String, Integer&gt; appliedRules,
-        Collection&lt;EClassId&gt; classSnapshot
-    ) {
-<span class="fc" id="L192">        int fired = 0;</span>
-<span class="fc" id="L193">        List&lt;EClassId&gt; deterministicSnapshot = canonicalSorted(eGraph, classSnapshot);</span>
-
-<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (!rule.isEquivalencePreservingByConstruction()) {</span>
-<span class="fc" id="L197">                continue;</span>
-            }
-            // Only the unmodified pattern implementation has no additional
-            // matching, assumption or apply semantics to preserve.
-<span class="fc bfc" id="L201" title="All 2 branches covered.">            int applications = rule.getClass() == PatternRewriteRule.class</span>
-<span class="fc" id="L202">                ? applyPattern(eGraph, matcher, applier, (PatternRewriteRule) rule, deterministicSnapshot)</span>
-<span class="fc" id="L203">                : applyConcrete(eGraph, rule, costOfNode, deterministicSnapshot);</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (applications &gt; 0) {</span>
-<span class="fc" id="L205">                appliedRules.merge(rule.id(), applications, Integer::sum);</span>
-<span class="fc" id="L206">                fired += applications;</span>
-            }
-<span class="fc" id="L208">        }</span>
-<span class="fc" id="L209">        return fired;</span>
-    }
-
-    private int applyPattern(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
-            PatternRewriteRule rule, List&lt;EClassId&gt; snapshot) {
-<span class="fc" id="L214">        int fired = 0;</span>
-<span class="fc" id="L215">        List&lt;EGraphPatternMatcher.Match&gt; matches = matcher.matchAll(rule.id(), rule.source(), snapshot);</span>
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (EGraphPatternMatcher.Match match : matches) {</span>
-<span class="fc" id="L217">            EClassId rhs = applier.instantiate(rule.target(), match.bindings());</span>
-<span class="fc" id="L218">            EClassId lhs = graph.find(match.root());</span>
-<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (!graph.areEquivalent(lhs, rhs)) {</span>
-<span class="fc" id="L220">                graph.union(lhs, rhs);</span>
-<span class="fc" id="L221">                fired++;</span>
-            }
-<span class="fc" id="L223">        }</span>
-<span class="fc" id="L224">        return fired;</span>
-    }
-
-    private int applyConcrete(EGraph graph, RewriteRule rule, ToIntFunction&lt;ENode&gt; costOfNode,
-            List&lt;EClassId&gt; snapshot) {
-<span class="fc" id="L229">        int fired = 0;</span>
-<span class="fc" id="L230">        Set&lt;EClassId&gt; seen = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (EClassId raw : snapshot) {</span>
-<span class="fc" id="L232">            EClassId canonical = graph.find(raw);</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (!seen.add(canonical)) {</span>
-<span class="fc" id="L234">                continue;</span>
-            }
-<span class="fc" id="L236">            Expr rewritten = rewriteConcrete(graph, canonical, rule, costOfNode);</span>
-<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (rewritten == null) {</span>
-<span class="fc" id="L238">                continue;</span>
-            }
-<span class="fc" id="L240">            EClassId rhs = graph.addExpression(rewritten);</span>
-<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (!graph.areEquivalent(canonical, rhs)) {</span>
-<span class="fc" id="L242">                graph.union(canonical, rhs);</span>
-<span class="fc" id="L243">                fired++;</span>
-            }
-<span class="fc" id="L245">        }</span>
-<span class="fc" id="L246">        return fired;</span>
-    }
-
-    private Expr rewriteConcrete(EGraph graph, EClassId source, RewriteRule rule,
-            ToIntFunction&lt;ENode&gt; costOfNode) {
-        Expr representative;
+    /** Exact extraction for additive, non-negative per-node costs. */
+    public Result saturate(EGraph graph, EClassId root, ToIntFunction&lt;ENode&gt; costOfNode) {
+<span class="fc" id="L45">        Objects.requireNonNull(graph, &quot;graph&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L47">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
+        // Validate costs before mutation, but allow rewriting to make the root finite.
+<span class="fc" id="L49">        graph.find(root);</span>
+<span class="fc" id="L50">        graph.validateNodeCosts(costOfNode);</span>
+<span class="fc" id="L51">        var matcher = new EGraphPatternMatcher(graph);</span>
+<span class="fc" id="L52">        var applier = new EGraphPatternApplier(graph);</span>
+<span class="fc" id="L53">        var run = new Run();</span>
+<span class="fc" id="L54">        int iterations = 0;</span>
+<span class="fc" id="L55">        int merges = 0;</span>
+<span class="fc" id="L56">        boolean saturated = false;</span>
+<span class="fc" id="L57">        var stopReason = SaturationStats.Reason.ITERATION_BUDGET;</span>
+<span class="fc" id="L58">        Collection&lt;EClassId&gt; dirty = graph.consumeDirtyClasses();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (dirty.isEmpty()) dirty = allClasses(graph);</span>
+<span class="fc" id="L60">        int previousLimit = graph.setInsertionLimit(config.maxNodes());</span>
         try {
-<span class="fc" id="L253">            representative = graph.extract(source, costOfNode);</span>
-<span class="nc" id="L254">        } catch (IllegalStateException ex) {</span>
-<span class="nc" id="L255">            return null;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (int i = 0; i &lt; config.maxIterations(); i++) {</span>
+<span class="fc" id="L63">                iterations = i + 1;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                if (graph.nodeCount() &gt;= config.maxNodes()) {</span>
+<span class="nc" id="L65">                    stopReason = SaturationStats.Reason.NODE_BUDGET;</span>
+<span class="nc" id="L66">                    break;</span>
+                }
+<span class="fc" id="L68">                long versionBefore = graph.version();</span>
+<span class="fc" id="L69">                int applicationsBefore = run.applications();</span>
+<span class="fc" id="L70">                boolean budgetStop = false;</span>
+                try {
+<span class="fc" id="L72">                    applyAllRules(graph, matcher, applier, run,</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                        config.useDirtyWorklist() ? dirty : allClasses(graph));</span>
+<span class="fc" id="L74">                } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L75">                    budgetStop = true;</span>
+                } finally {
+                    // Even partial passes have pending unions. Repair before returning.
+<span class="fc" id="L78">                    graph.rebuild();</span>
+                }
+<span class="fc" id="L80">                merges += run.applications() - applicationsBefore;</span>
+<span class="fc" id="L81">                dirty = graph.consumeDirtyClasses();</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">                if (budgetStop || graph.nodeCount() &gt;= config.maxNodes()) {</span>
+<span class="fc" id="L83">                    stopReason = SaturationStats.Reason.NODE_BUDGET;</span>
+<span class="fc" id="L84">                    break;</span>
+                }
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">                if (graph.version() == versionBefore || run.applications() == applicationsBefore) {</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                    saturated = !run.diagnostics.hasFailures();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                    stopReason = saturated ? SaturationStats.Reason.FIX_POINT : SaturationStats.Reason.RULE_FAILURES;</span>
+<span class="fc" id="L89">                    break;</span>
+                }
+            }
+        } finally {
+<span class="fc" id="L93">            graph.setInsertionLimit(previousLimit);</span>
+        }
+<span class="fc" id="L95">        Expr best = graph.extract(root, costOfNode);</span>
+<span class="fc" id="L96">        var metrics = matcher.stats();</span>
+<span class="fc" id="L97">        var stats = new SaturationStats(graph.classCount(), graph.nodeCount(), merges,</span>
+<span class="fc" id="L98">            iterations, run.appliedRules, de.regelsuche.parse.ExpressionFormatter.format(best),</span>
+<span class="fc" id="L99">            saturated, stopReason, metrics.classesScanned(), metrics.nodesScanned(),</span>
+<span class="fc" id="L100">            metrics.candidateClassesSkipped(), metrics.matchesFound(), metrics.matcherCacheHits(),</span>
+<span class="fc" id="L101">            metrics.matcherCacheMisses(), iterations, run.applications());</span>
+<span class="fc" id="L102">        return new Result(best, stats, run.diagnostics.snapshot(),</span>
+            new SaturationProvenance(run.witnesses, run.droppedWitnesses, run.nativeWitnessExtractions));
+    }
+
+    private void checkBudget(EGraph graph) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (graph.nodeCount() &gt;= config.maxNodes()) throw new EGraph.NodeBudgetExceeded();</span>
+<span class="fc" id="L108">    }</span>
+
+    private void applyAllRules(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
+            Run run, Collection&lt;EClassId&gt; candidates) {
+<span class="fc" id="L112">        List&lt;EClassId&gt; snapshot = canonicalSorted(graph, candidates);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc" id="L114">            checkBudget(graph);</span>
+            try {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                if (!rule.isEquivalencePreservingByConstruction()) {</span>
+<span class="fc" id="L117">                    run.diagnostics.record(rule.id(), null, NOT_EQUIVALENCE_PRESERVING, ELIGIBILITY, null);</span>
+<span class="fc" id="L118">                    continue;</span>
+                }
+<span class="nc" id="L120">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L121">                run.diagnostics.record(rule.id(), null, RULE_FAILURE, ELIGIBILITY, failure);</span>
+<span class="nc" id="L122">                continue;</span>
+<span class="fc" id="L123">            }</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (rule.getClass() == PatternRewriteRule.class</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                    &amp;&amp; ((PatternRewriteRule) rule).recognitionProfile().equals(RecognitionProfile.exact())) {</span>
+<span class="fc" id="L126">                applyPattern(graph, matcher, applier, (PatternRewriteRule) rule, snapshot, run);</span>
+            } else {
+<span class="fc" id="L128">                applyConcrete(graph, rule, snapshot, run);</span>
+            }
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">    }</span>
+
+    private void applyPattern(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
+            PatternRewriteRule rule, List&lt;EClassId&gt; snapshot, Run run) {
+        List&lt;EGraphPatternMatcher.Match&gt; matches;
+        try {
+<span class="fc" id="L137">            matches = matcher.matchAll(rule.id(), rule.source(), snapshot);</span>
+<span class="nc" id="L138">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L139">            run.diagnostics.record(rule.id(), null, RULE_FAILURE, MATCHES, failure);</span>
+<span class="nc" id="L140">            return;</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (matches.isEmpty()) run.diagnostics.record(rule.id(), null, NON_APPLICABLE, MATCHES, null);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (var match : matches) {</span>
+<span class="fc" id="L144">            checkBudget(graph);</span>
+            try {
+<span class="fc" id="L146">                EClassId rhs = applier.instantiate(rule.target(), match.bindings());</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if (graph.areEquivalent(match.root(), rhs)) continue;</span>
+                // Only new equalities need witnesses. Explanation work never gates the union.
+<span class="fc" id="L149">                SaturationProvenance.Witness witness = nativeWitness(graph, rule, match, run);</span>
+<span class="fc" id="L150">                graph.union(match.root(), rhs);</span>
+<span class="fc" id="L151">                run.applied(rule.id(), witness);</span>
+<span class="fc" id="L152">            } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L153">                throw exhausted;</span>
+<span class="nc" id="L154">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L155">                run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, INSERTION, failure);</span>
+<span class="fc" id="L156">            }</span>
+<span class="fc" id="L157">        }</span>
+<span class="fc" id="L158">    }</span>
+
+    private SaturationProvenance.Witness nativeWitness(EGraph graph, PatternRewriteRule rule,
+            EGraphPatternMatcher.Match match, Run run) {
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (run.witnesses.size() &gt;= SaturationProvenance.MAX_WITNESSES) return null;</span>
+        try {
+<span class="fc" id="L164">            Map&lt;String, Expr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for (var binding : match.bindings().entrySet()) {</span>
+<span class="fc" id="L166">                run.nativeWitnessExtractions++;</span>
+                // A witness needs finite syntax, independently of the optimization objective.
+<span class="fc" id="L168">                bindings.put(binding.getKey(), graph.extract(binding.getValue(), node -&gt; 1));</span>
+<span class="fc" id="L169">            }</span>
+<span class="fc" id="L170">            return new SaturationProvenance.Witness(rule.id(),</span>
+<span class="fc" id="L171">                rule.source().instantiate(bindings), rule.target().instantiate(bindings));</span>
+<span class="fc" id="L172">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L173">            run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, EXTRACTION, failure);</span>
+<span class="fc" id="L174">            return null;</span>
+        }
+    }
+
+    private void applyConcrete(EGraph graph, RewriteRule rule, List&lt;EClassId&gt; snapshot, Run run) {
+<span class="fc" id="L179">        var seen = new LinkedHashSet&lt;EClassId&gt;();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (EClassId raw : snapshot) {</span>
+<span class="fc" id="L181">            checkBudget(graph);</span>
+<span class="fc" id="L182">            EClassId source = graph.find(raw);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (!seen.add(source)) continue;</span>
+            List&lt;Expr&gt; representatives;
+            try {
+                // The optimization objective ranks results; it must not hide applicable rules.
+<span class="fc" id="L187">                representatives = graph.representatives(source, node -&gt; 1);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                if (representatives.isEmpty()) {</span>
+<span class="nc" id="L189">                    run.diagnostics.record(rule.id(), source, NON_APPLICABLE, EXTRACTION, null);</span>
+                }
+<span class="nc" id="L191">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L192">                run.diagnostics.record(rule.id(), source, RULE_FAILURE, EXTRACTION, failure);</span>
+<span class="nc" id="L193">                continue;</span>
+<span class="fc" id="L194">            }</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            for (Expr before : representatives) {</span>
+<span class="fc" id="L196">                checkBudget(graph);</span>
+<span class="fc" id="L197">                var stage = MATCHES;</span>
+                try {
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                    if (!rule.matches(before)) {</span>
+<span class="fc" id="L200">                        run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);</span>
+<span class="fc" id="L201">                        continue;</span>
+                    }
+<span class="fc" id="L203">                    stage = ASSUMPTIONS;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                    if (!rule.assumptions(before).isEmpty()) {</span>
+<span class="fc" id="L205">                        run.diagnostics.record(rule.id(), source, UNRESOLVED_CONDITIONS, stage, null);</span>
+<span class="fc" id="L206">                        continue;</span>
+                    }
+<span class="fc" id="L208">                    stage = APPLY;</span>
+<span class="fc" id="L209">                    Expr after = Objects.requireNonNull(rule.apply(before), &quot;rule returned null&quot;);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    if (before.equals(after)) {</span>
+<span class="nc" id="L211">                        run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);</span>
+<span class="nc" id="L212">                        continue;</span>
+                    }
+<span class="fc" id="L214">                    stage = INSERTION;</span>
+<span class="fc" id="L215">                    EClassId rhs = graph.addExpression(after);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                    if (!graph.areEquivalent(source, rhs)) {</span>
+<span class="fc" id="L217">                        graph.union(source, rhs);</span>
+<span class="fc" id="L218">                        run.applied(rule.id(), new SaturationProvenance.Witness(rule.id(), before, after));</span>
+                    }
+<span class="fc" id="L220">                } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L221">                    throw exhausted;</span>
+<span class="fc" id="L222">                } catch (RuntimeException failure) {</span>
+<span class="fc" id="L223">                    run.diagnostics.record(rule.id(), source, RULE_FAILURE, stage, failure);</span>
+<span class="fc" id="L224">                }</span>
+<span class="fc" id="L225">            }</span>
+<span class="fc" id="L226">        }</span>
+<span class="fc" id="L227">    }</span>
+
+    private static Collection&lt;EClassId&gt; allClasses(EGraph graph) {
+<span class="fc" id="L230">        return graph.classes().stream().map(EClass::id).toList();</span>
+    }
+    private static List&lt;EClassId&gt; canonicalSorted(EGraph graph, Collection&lt;EClassId&gt; ids) {
+<span class="fc" id="L233">        return ids.stream().map(graph::find).distinct().sorted().toList();</span>
+    }
+<span class="fc" id="L235">    private static final class Run {</span>
+<span class="fc" id="L236">        final Map&lt;String, Integer&gt; appliedRules = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L237">        final SaturationDiagnostics.Collector diagnostics = new SaturationDiagnostics.Collector();</span>
+<span class="fc" id="L238">        final List&lt;SaturationProvenance.Witness&gt; witnesses = new ArrayList&lt;&gt;();</span>
+        long droppedWitnesses;
+        long nativeWitnessExtractions;
+<span class="fc" id="L241">        int applications() { return appliedRules.values().stream().mapToInt(Integer::intValue).sum(); }</span>
+        void applied(String rule, SaturationProvenance.Witness witness) {
+<span class="fc" id="L243">            appliedRules.merge(rule, 1, Integer::sum);</span>
+<span class="fc bfc" id="L244" title="All 4 branches covered.">            if (witnesses.size() &lt; SaturationProvenance.MAX_WITNESSES &amp;&amp; witness != null) witnesses.add(witness);</span>
+<span class="fc" id="L245">            else droppedWitnesses++;</span>
+<span class="fc" id="L246">        }</span>
+    }
+
+    public record Result(Expr expression, SaturationStats stats,
+            SaturationDiagnostics diagnostics, SaturationProvenance provenance) {
+<span class="fc" id="L251">        public Result {</span>
+<span class="fc" id="L252">            Objects.requireNonNull(expression);</span>
+<span class="fc" id="L253">            Objects.requireNonNull(stats);</span>
+<span class="fc" id="L254">            Objects.requireNonNull(diagnostics);</span>
+<span class="fc" id="L255">            Objects.requireNonNull(provenance);</span>
 <span class="fc" id="L256">        }</span>
-<span class="fc bfc" id="L257" title="All 4 branches covered.">        if (!rule.matches(representative) || !rule.assumptions(representative).isEmpty()) {</span>
-            // An unconditional e-class cannot retain an undischarged guard.
-<span class="fc" id="L259">            return null;</span>
-        }
-        try {
-<span class="fc" id="L262">            Expr rewritten = rule.apply(representative);</span>
-<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            return representative.equals(rewritten) ? null : rewritten;</span>
-<span class="nc" id="L264">        } catch (RuntimeException ex) {</span>
-<span class="nc" id="L265">            return null;</span>
-        }
-    }
-
-    private static Collection&lt;EClassId&gt; allClasses(EGraph eGraph) {
-<span class="fc" id="L270">        List&lt;EClassId&gt; classes = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L271" title="All 2 branches covered.">        for (EClass eclass : eGraph.classes()) {</span>
-<span class="fc" id="L272">            classes.add(eclass.id());</span>
-<span class="fc" id="L273">        }</span>
-<span class="fc" id="L274">        return classes;</span>
-    }
-
-    private static List&lt;EClassId&gt; canonicalSorted(EGraph eGraph, Collection&lt;EClassId&gt; ids) {
-<span class="fc" id="L278">        LinkedHashSet&lt;EClassId&gt; canonical = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L279" title="All 2 branches covered.">        for (EClassId id : ids) {</span>
-<span class="fc" id="L280">            canonical.add(eGraph.find(id));</span>
-<span class="fc" id="L281">        }</span>
-<span class="fc" id="L282">        List&lt;EClassId&gt; sorted = new ArrayList&lt;&gt;(canonical);</span>
-<span class="fc" id="L283">        sorted.sort(EClassId::compareTo);</span>
-<span class="fc" id="L284">        return sorted;</span>
-    }
-
-    /** Result of a saturation run: the extracted best AST plus statistics. */
-    public record Result(Expr expression, SaturationStats stats) {
-<span class="fc" id="L289">        public Result {</span>
-<span class="fc" id="L290">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L291">            Objects.requireNonNull(stats, &quot;stats&quot;);</span>
-<span class="fc" id="L292">        }</span>
+        public Result(Expr expression, SaturationStats stats) {
+<span class="nc" id="L258">            this(expression, stats, SaturationDiagnostics.empty(), SaturationProvenance.empty());</span>
+<span class="nc" id="L259">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

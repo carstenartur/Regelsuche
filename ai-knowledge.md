@@ -157,16 +157,53 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
-### Accepted main before typed pair sums (2026-11-07)
+### Accepted main before the comparison follow-up (2026-11-10)
 
-The active baseline is the native v0.1.10 metrics snapshot of main
+The active baseline projects the native v0.1.10 measurements of accepted main
+`c267b7fa9c95cc14cfd53b00ceb5d0325908feda`, tree
+`a023dbc29cc3402d26b9e42e28d41ab2c3c450f4`. Its
+[complete main CI](https://github.com/carstenartur/Regelsuche/actions/runs/42752771954)
+passed all seven authorities and `Checkout-local ciCheck` on attempt 1 with the
+previous baseline and unchanged limits. Main measured 750870 context units:
++11200 against 739670, within the existing 15000 allowance.
+
+The downloaded `quality-acceptance-evidence` artifact has SHA-256
+`852a601689c9757b5924f46bdd6857446e2babed03211edc5a6ed9ac1e537519`;
+all 284 indexed files were checked for byte length and SHA-256. Its original
+[complexity report](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/main-native-complexity.json),
+[passing check](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/main-native-check.json),
+[index](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/original-index.json)
+and [qualification](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/source-qualification.json)
+are retained. The index binds collection to the clean main tree; the successful
+CI establishes execution of the existing gates on that source.
+
+This smaller artifact contains no `metrics-snapshot.json` or `trend.json`.
+The [projected baseline](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/projected-baseline.json)
+uses the unchanged `TrendAnalyzer.snapshot` implementation on the native
+complexity report, including the measured footprint model v3. It is byte-identical
+to the active baseline, SHA-256
+`8a5f0e2efa4673872858d6df4e62404724727a018940c6d7f3978d5c4bb5f95a`.
+[Provenance](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/provenance.json)
+records exact inputs and the projection. This is neither a downloaded original
+snapshot nor a fresh local full extractor run.
+
+The original [rejected combined trend](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/rejected-combined-trend.json)
+remains unchanged: 755575 units, +15905 against the old reference. Only 4705 of
+that increase belongs to the comparison follow-up beyond accepted main. These
+failed feature values supply no baseline input. Thresholds, selectors, tests,
+mathematical code and all existing gates are unchanged; the new feature head
+still requires its own complete canonical CI and review.
+
+### Earlier accepted main before typed pair sums (2026-11-07)
+
+The previous baseline was the native v0.1.10 metrics snapshot of main
 `902e4ea9710aebcd81c0c172f3154106db2a5c3b`, tree
 `abb85fd8918ad2cd0cdb46b3724b4552befe8ecf`. The
 [post-merge CI](https://github.com/carstenartur/Regelsuche/actions/runs/42339349253)
 passed. A clean source archive passed the native knowledge gate, eight coverage
 controls and the 17 hotspot checks against the preceding baseline. It measured
 739670 context tokens, an increase of 13360 within the 15000 allowance. The
-[baseline snapshot](../ai-knowledge/complexity-baseline.json) has SHA-256
+[previous baseline snapshot](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/previous-baseline.json) has SHA-256
 `d3348a8b61c041ec096b4b0e3753ea0dfcd6f33560ce209b77dfc0c82b6f0c1a`.
 
 ### Accepted predecessor for generic numeric domains (2026-10-11)

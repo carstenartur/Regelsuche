@@ -38,17 +38,17 @@ public final class EGraphPatternApplier {
 <span class="fc bfc" id="L38" title="All 2 branches covered.">        if (target instanceof PatternExpr.LiteralNumber literal) {</span>
 <span class="fc" id="L39">            return eGraph.add(ENode.leaf(&quot;num:&quot; + formatNumber(literal.value())));</span>
         }
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (target instanceof PatternExpr.Operation operation) {</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (target instanceof PatternExpr.Operation operation) {</span>
 <span class="fc" id="L42">            EClassId left = instantiate(operation.left(), bindings);</span>
 <span class="fc" id="L43">            EClassId right = instantiate(operation.right(), bindings);</span>
 <span class="fc" id="L44">            return eGraph.add(new ENode(&quot;op:&quot; + operation.operator().name(), List.of(left, right)));</span>
         }
-<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (target instanceof PatternExpr.Function function) {</span>
-<span class="nc" id="L47">            List&lt;EClassId&gt; arguments = new ArrayList&lt;&gt;(function.arguments().size());</span>
-<span class="nc bnc" id="L48" title="All 2 branches missed.">            for (PatternExpr argument : function.arguments()) {</span>
-<span class="nc" id="L49">                arguments.add(instantiate(argument, bindings));</span>
-<span class="nc" id="L50">            }</span>
-<span class="nc" id="L51">            return eGraph.add(new ENode(&quot;fn:&quot; + function.name(), arguments));</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (target instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L47">            List&lt;EClassId&gt; arguments = new ArrayList&lt;&gt;(function.arguments().size());</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (PatternExpr argument : function.arguments()) {</span>
+<span class="fc" id="L49">                arguments.add(instantiate(argument, bindings));</span>
+<span class="fc" id="L50">            }</span>
+<span class="fc" id="L51">            return eGraph.add(new ENode(&quot;fn:&quot; + function.name(), arguments));</span>
         }
 <span class="nc" id="L53">        throw new IllegalArgumentException(&quot;Unsupported pattern: &quot; + target.getClass());</span>
     }
