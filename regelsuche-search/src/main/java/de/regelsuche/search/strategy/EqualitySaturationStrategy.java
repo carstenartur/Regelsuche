@@ -6,6 +6,7 @@ import de.regelsuche.egraph.EGraph;
 import de.regelsuche.egraph.ENode;
 import de.regelsuche.egraph.EqualitySaturation;
 import de.regelsuche.egraph.SaturationStats;
+import de.regelsuche.egraph.proof.ProofOutcome;
 import de.regelsuche.egraph.SaturationDiagnostics;
 import de.regelsuche.egraph.SaturationProvenance;
 import de.regelsuche.scoring.cost.StructuralCostModel;
@@ -50,6 +51,8 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
     public static final String SATURATION_RULE_ID = "equality-saturation";
 
     private final EqualitySaturation.Config config;
+    private final EqualitySaturation.ProofOptions proofOptions;
+    private ProofOutcome lastProofOutcome = ProofOutcome.notRequested();
     private final ExpressionParser parser = new ExpressionParser();
     private SaturationStats lastStats;
     private SaturationDiagnostics lastDiagnostics = SaturationDiagnostics.empty();
@@ -59,6 +62,8 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
     /** Explicit objective dispatch; fallback still uses the requested cost model. */
     public record ExtractionSelection(String requestedObjective, String effectiveObjective,
             String strategy, boolean fallback, String reason) {}
+
+    public ProofOutcome lastProofOutcome() { return lastProofOutcome; }
 
     public SaturationDiagnostics lastDiagnostics() { return lastDiagnostics; }
     public SaturationProvenance lastProvenance() { return lastProvenance; }
@@ -71,6 +76,13 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
 
     public EqualitySaturationStrategy(EqualitySaturation.Config config) {
         this.config = Objects.requireNonNull(config, "config");
+        this.proofOptions = null;
+    }
+
+    /** Explicit proof-required mode; unavailable evidence preserves the original state. */
+    public EqualitySaturationStrategy(EqualitySaturation.Config config, EqualitySaturation.ProofOptions proofOptions) {
+        this.config = Objects.requireNonNull(config, "config");
+        this.proofOptions = Objects.requireNonNull(proofOptions, "proofOptions");
     }
 
     /**
@@ -83,12 +95,21 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
 
     @Override
     public List<SearchState> search(SearchProblem problem) {
+        lastProofOutcome = ProofOutcome.notRequested();
         lastStats = null;
         lastDiagnostics = SaturationDiagnostics.empty();
         lastProvenance = SaturationProvenance.empty();
         String objective = problem.costModel() == null ? "operator-count" : problem.costModel().id();
         // Identity check matters: a custom model can reuse a built-in ID with different semantics.
         if (problem.costModel() != null && problem.costModel() != StructuralCostModel.OPERATOR_COUNT) {
+            if (proofOptions != null) {
+                lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.UNSUPPORTED_OBJECTIVE,
+                    "Proof-required search supports only operator-count extraction.", 0, 0, 0);
+                lastExtractionSelection = new ExtractionSelection(objective, objective, "equality-saturation", false,
+                    lastProofOutcome.detail());
+                String original = problem.rootExpression().trim().replaceAll("\\s+", " ");
+                return List.of(rootState(original, problem.scorer().score(original), problem));
+            }
             lastExtractionSelection = new ExtractionSelection(objective, objective, "best-first", true,
                 "No exact e-graph extractor for this cost model; best-first search uses the requested objective.");
             return new BestFirstSearchStrategy().search(problem);
@@ -102,9 +123,16 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
         } catch (RuntimeException ex) {
             // Unparseable input: behave like the other strategies and
             // return just the root state with the input as-is.
+            if (proofOptions != null) {
+                lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.EXTRACTION_UNAVAILABLE,
+                    "Search input could not be parsed.", 0, 0, 0);
+                recordProofFailureSelection();
+            }
             ExpressionScore rootScore = problem.scorer().score(root);
             return List.of(rootState(root, rootScore, problem));
         }
+
+        if (proofOptions != null) return searchWithProof(problem, root, rootAst);
 
         EGraph eGraph = new EGraph();
         EClassId rootId = eGraph.addExpression(rootAst);
@@ -130,6 +158,11 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
             return List.of(rootState);
         }
 
+        return extractedStates(problem, root, extracted, rootScore, rootState);
+    }
+
+    private List<SearchState> extractedStates(SearchProblem problem, String root, String extracted,
+            ExpressionScore rootScore, SearchState rootState) {
         ExpressionScore extractedScore = problem.scorer().score(extracted);
         int improvement = rootScore.weightedTotal() - extractedScore.weightedTotal();
         SearchState extractedState = new SearchState(
@@ -153,6 +186,98 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
         );
         return List.of(rootState, extractedState);
     }
+
+    private List<SearchState> searchWithProof(SearchProblem problem, String root, Expr input) {
+        ExpressionScore rootScore = problem.scorer().score(root);
+        SearchState original = rootState(root, rootScore, problem);
+        var proved = new EqualitySaturation(resolveRules(problem), config)
+            .saturateWithProof(input, EqualitySaturationStrategy::nodeCost, proofOptions);
+        lastProofOutcome = proved.proof();
+        proved.diagnosticResult().ifPresent(result -> {
+            lastStats = result.stats();
+            lastDiagnostics = result.diagnostics();
+            lastProvenance = result.provenance();
+        });
+        if (!lastProofOutcome.complete()) {
+            recordProofFailureSelection();
+            return List.of(original);
+        }
+        String extracted;
+        long[] emitted = {0};
+        long[] ownWork = {0};
+        long remainingWork = proofOptions.captureLimits().maxWork()
+            - lastProofOutcome.captureWork() - lastProofOutcome.buildWork();
+        try {
+            requireRepresentableSymbols(proved.expression(), remainingWork, ownWork);
+            extracted = ExpressionFormatter.formatMeasured(proved.expression(), units -> {
+                if (units < 0 || units > proofOptions.captureLimits().maxCharacters() - emitted[0]
+                        || units > remainingWork - ownWork[0]) throw new SearchRenderingLimit();
+                ownWork[0] += units;
+                emitted[0] += units;
+            });
+        } catch (UnrepresentableSymbol ex) {
+            lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.EXTRACTION_UNAVAILABLE,
+                "Search output contains an unrepresentable symbol.",
+                lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork(), lastProofOutcome.replayWork());
+            recordProofFailureSelection();
+            return List.of(original);
+        } catch (RuntimeException ex) {
+            lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.LIMIT_EXCEEDED,
+                "Search output rendering unavailable within proof limits.",
+                lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork(), lastProofOutcome.replayWork());
+            recordProofFailureSelection();
+            return List.of(original);
+        }
+        lastProofOutcome = ProofOutcome.complete(lastProofOutcome.checked().orElseThrow(),
+            lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork());
+        if (extracted.equals(root)) return List.of(original);
+        return extractedStates(problem, root, extracted, rootScore, original);
+    }
+
+    private void recordProofFailureSelection() {
+        lastExtractionSelection = new ExtractionSelection(lastExtractionSelection.requestedObjective(),
+            lastExtractionSelection.effectiveObjective(), "equality-saturation", false, lastProofOutcome.detail());
+    }
+
+    private static void requireRepresentableSymbols(Expr expression, long work, long[] used) {
+        if (used[0] >= work) throw new SearchRenderingLimit();
+        used[0]++;
+        var pending = new java.util.ArrayDeque<Expr>();
+        pending.push(expression);
+        while (!pending.isEmpty()) {
+            if (used[0] >= work) throw new SearchRenderingLimit();
+            used[0]++;
+            Expr next = pending.pop();
+            String name = null;
+            if (next instanceof de.regelsuche.ast.VariableExpr variable) name = variable.name();
+            if (next instanceof de.regelsuche.ast.FunctionExpr function) {
+                name = function.name();
+                for (Expr child : function.arguments()) {
+                    if (used[0] >= work) throw new SearchRenderingLimit();
+                    used[0]++;
+                    pending.push(child);
+                }
+            } else if (next instanceof de.regelsuche.ast.BinaryExpr binary) {
+                if (work - used[0] < 2) throw new SearchRenderingLimit();
+                used[0] += 2;
+                pending.push(binary.left());
+                pending.push(binary.right());
+            }
+            if (name != null) {
+                if (name.isEmpty()) throw new UnrepresentableSymbol();
+                for (int i = 0; i < name.length(); i++) {
+                    if (used[0] >= work) throw new SearchRenderingLimit();
+                    used[0]++;
+                    char c = name.charAt(i);
+                    if (i == 0 ? !Character.isLetter(c) : !Character.isLetterOrDigit(c) && c != '_')
+                        throw new UnrepresentableSymbol();
+                }
+            }
+        }
+    }
+
+    private static final class UnrepresentableSymbol extends RuntimeException {}
+    private static final class SearchRenderingLimit extends RuntimeException {}
 
     private SearchState rootState(String root, ExpressionScore rootScore, SearchProblem problem) {
         return new SearchState(
