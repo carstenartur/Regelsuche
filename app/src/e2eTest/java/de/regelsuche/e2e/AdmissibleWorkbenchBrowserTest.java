@@ -10,6 +10,7 @@ import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Request;
+import com.microsoft.playwright.TimeoutError;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -34,6 +35,8 @@ class AdmissibleWorkbenchBrowserTest {
     private Page page;
     private final List<String> errors = new ArrayList<>();
     private final List<String> writes = new ArrayList<>();
+    private final List<String> lifecycle = new ArrayList<>();
+    private final List<String> requestFailures = new ArrayList<>();
     private final Consumer<Request> recordWrites = request -> {
         if (!request.method().equals("GET")) writes.add(request.url());
     };
@@ -52,7 +55,7 @@ class AdmissibleWorkbenchBrowserTest {
     @BeforeEach void open() {
         context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1440, 1050));
         page = context.newPage();
-        page.onPageError(errors::add);
+        observe(page);
         page.onRequest(recordWrites);
         page.navigate(app.baseUrl() + "/static/admissible-workbench.html");
     }
@@ -62,9 +65,58 @@ class AdmissibleWorkbenchBrowserTest {
             assertTrue(writes.isEmpty(), "Local import must not upload files: " + writes);
         } finally { if (context != null) context.close(); }
     }
+    private void observe(Page observed) {
+        observed.onPageError(errors::add);
+        observed.onRequestFailed(request -> record(requestFailures,
+            request.method() + " " + request.url() + ": " + request.failure()));
+        observed.onWorker(worker -> {
+            record(lifecycle, "worker created: " + worker.url());
+            worker.onClose(closed -> record(lifecycle, "worker closed: " + closed.url()));
+        });
+        observed.onLoad(loaded -> record(lifecycle, "page loaded: " + loaded.url()));
+        observed.onCrash(crashed -> record(lifecycle, "page crashed: " + crashed.url()));
+        observed.onClose(closed -> record(lifecycle, "page closed: " + closed.url()));
+    }
+    private static void record(List<String> events, String event) {
+        if (events.size() == 100) events.removeFirst();
+        events.add(java.time.Instant.now() + " " + event);
+    }
+    private void awaitCertificates(Page observed, int count) {
+        String expected = count + " Optimalitätszertifikate";
+        try {
+            observed.waitForFunction("""
+                expected => document.querySelector('#status').textContent.includes(expected)
+                    || !document.querySelector('#error').hidden
+                """, expected);
+        } catch (TimeoutError timeout) {
+            throw certificateFailure(observed, "Certificate completion timed out. ", timeout);
+        }
+        if (!observed.locator("#status").innerText().contains(expected)) {
+            throw certificateFailure(observed, "Expected " + expected + ". ", null);
+        }
+    }
+    private AssertionError certificateFailure(Page observed, String prefix, Throwable cause) {
+        String message = prefix + diagnostics(observed);
+        System.err.println(message);
+        return new AssertionError(message, cause);
+    }
+    private String diagnostics(Page observed) {
+        String state;
+        try {
+            state = String.valueOf(observed.evaluate("""
+                () => ({status: document.querySelector('#status').textContent,
+                    error: document.querySelector('#error').textContent,
+                    errorHidden: document.querySelector('#error').hidden})
+                """));
+        } catch (RuntimeException unavailable) {
+            state = "Page state unavailable: " + unavailable;
+        }
+        return state + "; pageErrors=" + errors + "; requestFailures=" + requestFailures
+            + "; lifecycle=" + lifecycle;
+    }
     private void example() {
         page.locator("#example").click();
-        page.waitForFunction("document.querySelector('#status').textContent.includes('1 Optimalitätszertifikate')");
+        awaitCertificates(page, 1);
     }
     private Path fixture() throws IOException {
         try (var raw = getClass().getResourceAsStream("/admissible/ci-window-128.json.gz")) {
@@ -78,7 +130,7 @@ class AdmissibleWorkbenchBrowserTest {
     }
     private void importFixture() throws IOException {
         page.locator("#bundle").setInputFiles(fixture());
-        page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+        awaitCertificates(page, 2);
     }
 
     @Test void opensFromMainWorkbenchWithoutDiscardingExpression() throws IOException {
@@ -87,7 +139,7 @@ class AdmissibleWorkbenchBrowserTest {
         page.offRequest(recordWrites);
         context.onPage(experiment -> {
             experiment.onRequest(recordWrites);
-            experiment.onPageError(errors::add);
+            observe(experiment);
         });
         page.navigate(app.baseUrl());
         page.locator("input[name=expression]").fill("x + 7");
@@ -97,9 +149,9 @@ class AdmissibleWorkbenchBrowserTest {
             assertTrue(experiment.url().endsWith("/static/admissible-workbench.html"));
             assertEquals(Boolean.TRUE, experiment.evaluate("window.opener === null"));
             experiment.locator("#example").click();
-            experiment.waitForFunction("document.querySelector('#status').textContent.includes('1 Optimalitätszertifikate')");
+            awaitCertificates(experiment, 1);
             experiment.locator("#bundle").setInputFiles(fixture());
-            experiment.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+            awaitCertificates(experiment, 2);
             assertEquals(2, experiment.locator("#comparisons tr").count());
             assertEquals("x + 7", page.locator("input[name=expression]").inputValue());
 
@@ -197,7 +249,7 @@ class AdmissibleWorkbenchBrowserTest {
     @Test void liveResultAndReimportPreserveExploratoryScope() throws IOException {
         String original = Files.readString(fixture());
         deliverLocal(original);
-        page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+        awaitCertificates(page, 2);
         assertTrue(page.locator("#summary").innerText().contains("Neue explorative Aufgabe"));
         assertTrue(page.locator("#proofStatus").innerText().contains("Maximum 28"));
         String live = (String) page.evaluate("""
@@ -209,7 +261,7 @@ class AdmissibleWorkbenchBrowserTest {
             """, original);
         Path file = temporary.resolve("live.json"); Files.writeString(file, live);
         page.locator("#clear").click(); page.locator("#bundle").setInputFiles(file);
-        page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+        awaitCertificates(page, 2);
         assertTrue(page.locator("#summary").innerText().contains("Kein Trainings- oder zurückgehaltener Testfall"));
         example();
         assertTrue(page.locator("#summary").innerText().startsWith("Lehrbeispiel:"));
@@ -217,7 +269,7 @@ class AdmissibleWorkbenchBrowserTest {
     @Test void localResultCannotBypassTheIndependentWorker() throws IOException {
         String original = Files.readString(fixture());
         deliverLocal(original);
-        page.waitForFunction("document.querySelector('#status').textContent.includes('2 Optimalitätszertifikate')");
+        awaitCertificates(page, 2);
         deliverLocal(original.replaceFirst("admissible-cardinality/v1", "wrong-proof/v1"));
         page.waitForFunction("!document.querySelector('#error').hidden");
         assertTrue(page.locator("#result").isHidden());
