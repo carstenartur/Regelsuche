@@ -36,14 +36,16 @@ public record SaturationStats(
 
     /** Why saturation stopped. */
     public enum Reason {
-        /** No rule fired in the last iteration — fix-point reached. */
+        /** No progress, rule failures or incomplete owned matches — relative fix-point reached. */
         FIX_POINT,
         /** Hit the configured iteration budget. */
         ITERATION_BUDGET,
         /** Hit the configured node-count guard. */
         NODE_BUDGET,
         /** No further progress, but rule failures prevented a certified fix-point. */
-        RULE_FAILURES
+        RULE_FAILURES,
+        /** No further progress, but an owned concrete matcher exhausted its search bound. */
+        MATCHER_LIMIT
     }
 
     public SaturationStats {

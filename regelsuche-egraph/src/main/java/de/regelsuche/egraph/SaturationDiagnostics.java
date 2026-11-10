@@ -9,7 +9,7 @@ import java.util.Map;
 public record SaturationDiagnostics(Map<Outcome, Long> counts, List<Event> events, long droppedEvents) {
     public static final int MAX_EVENTS = 128;
     public static final int MAX_MESSAGE_LENGTH = 512;
-    public enum Outcome { NON_APPLICABLE, UNRESOLVED_CONDITIONS, NOT_EQUIVALENCE_PRESERVING, RULE_FAILURE }
+    public enum Outcome { NON_APPLICABLE, UNRESOLVED_CONDITIONS, NOT_EQUIVALENCE_PRESERVING, RULE_FAILURE, MATCH_INCONCLUSIVE }
     public enum Stage { ELIGIBILITY, EXTRACTION, MATCHES, ASSUMPTIONS, APPLY, INSERTION }
     public record Event(String ruleId, EClassId eclass, Outcome outcome, Stage stage,
                         String exceptionType, String message) {}
@@ -26,16 +26,24 @@ public record SaturationDiagnostics(Map<Outcome, Long> counts, List<Event> event
         private final List<Event> events = new ArrayList<>();
         private long dropped;
         void record(String rule, EClassId source, Outcome outcome, Stage stage, RuntimeException failure) {
+            record(rule, source, outcome, stage, failure, "");
+        }
+        void recordInconclusiveMatch(String rule, EClassId source, String limitCode) {
+            record(rule, source, Outcome.MATCH_INCONCLUSIVE, Stage.MATCHES, null, limitCode);
+        }
+        private void record(String rule, EClassId source, Outcome outcome, Stage stage,
+                RuntimeException failure, String detail) {
             counts.merge(outcome, 1L, Long::sum);
             // Ordinary misses are counted, not retained: they must not crowd out failures.
             if (outcome == Outcome.NON_APPLICABLE) return;
             if (events.size() >= MAX_EVENTS) { dropped++; return; }
-            String message = failure == null ? "" : String.valueOf(failure.getMessage());
+            String message = failure == null ? detail : String.valueOf(failure.getMessage());
             if (message.length() > MAX_MESSAGE_LENGTH) message = message.substring(0, MAX_MESSAGE_LENGTH);
             events.add(new Event(rule, source, outcome, stage,
                 failure == null ? "" : failure.getClass().getName(), message));
         }
         SaturationDiagnostics snapshot() { return new SaturationDiagnostics(counts, events, dropped); }
         boolean hasFailures() { return counts.containsKey(Outcome.RULE_FAILURE); }
+        boolean hasInconclusiveMatches() { return counts.containsKey(Outcome.MATCH_INCONCLUSIVE); }
     }
 }
