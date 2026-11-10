@@ -240,40 +240,47 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
     }
 
     private static void requireRepresentableSymbols(Expr expression, long work, long[] used) {
-        if (used[0] >= work) throw new SearchRenderingLimit();
-        used[0]++;
+        chargeSearchWork(work, used, 1);
         var pending = new java.util.ArrayDeque<Expr>();
         pending.push(expression);
         while (!pending.isEmpty()) {
-            if (used[0] >= work) throw new SearchRenderingLimit();
-            used[0]++;
-            Expr next = pending.pop();
-            String name = null;
-            if (next instanceof de.regelsuche.ast.VariableExpr variable) name = variable.name();
-            if (next instanceof de.regelsuche.ast.FunctionExpr function) {
-                name = function.name();
-                for (Expr child : function.arguments()) {
-                    if (used[0] >= work) throw new SearchRenderingLimit();
-                    used[0]++;
-                    pending.push(child);
-                }
-            } else if (next instanceof de.regelsuche.ast.BinaryExpr binary) {
-                if (work - used[0] < 2) throw new SearchRenderingLimit();
-                used[0] += 2;
-                pending.push(binary.left());
-                pending.push(binary.right());
-            }
-            if (name != null) {
-                if (name.isEmpty()) throw new UnrepresentableSymbol();
-                for (int i = 0; i < name.length(); i++) {
-                    if (used[0] >= work) throw new SearchRenderingLimit();
-                    used[0]++;
-                    char c = name.charAt(i);
-                    if (i == 0 ? !Character.isLetter(c) : !Character.isLetterOrDigit(c) && c != '_')
-                        throw new UnrepresentableSymbol();
-                }
-            }
+            chargeSearchWork(work, used, 1);
+            String name = scheduleSymbolChildren(pending.pop(), pending, work, used);
+            if (name != null) requireRepresentableName(name, work, used);
         }
+    }
+
+    private static String scheduleSymbolChildren(Expr expression, java.util.Deque<Expr> pending,
+            long work, long[] used) {
+        if (expression instanceof de.regelsuche.ast.FunctionExpr function) {
+            for (Expr child : function.arguments()) {
+                chargeSearchWork(work, used, 1);
+                pending.push(child);
+            }
+            return function.name();
+        }
+        if (expression instanceof de.regelsuche.ast.BinaryExpr binary) {
+            chargeSearchWork(work, used, 2);
+            pending.push(binary.left());
+            pending.push(binary.right());
+        }
+        if (expression instanceof de.regelsuche.ast.VariableExpr variable) return variable.name();
+        return null;
+    }
+
+    private static void requireRepresentableName(String name, long work, long[] used) {
+        if (name.isEmpty()) throw new UnrepresentableSymbol();
+        for (int i = 0; i < name.length(); i++) {
+            chargeSearchWork(work, used, 1);
+            char c = name.charAt(i);
+            if (i == 0 ? !Character.isLetter(c) : !Character.isLetterOrDigit(c) && c != '_')
+                throw new UnrepresentableSymbol();
+        }
+    }
+
+    private static void chargeSearchWork(long work, long[] used, int units) {
+        if (work - used[0] < units) throw new SearchRenderingLimit();
+        used[0] += units;
     }
 
     private static final class UnrepresentableSymbol extends RuntimeException {}
