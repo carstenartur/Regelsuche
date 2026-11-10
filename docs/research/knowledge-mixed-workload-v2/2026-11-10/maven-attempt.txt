@@ -1,0 +1,24 @@
+[INFO] Scanning for projects...
+Downloading from central: https://repo.maven.apache.org/maven2/org/junit/junit-bom/6.1.3/junit-bom-6.1.3.pom
+Downloading from central: https://repo.maven.apache.org/maven2/org/testcontainers/testcontainers-bom/2.0.5/testcontainers-bom-2.0.5.pom
+Downloading from central: https://repo.maven.apache.org/maven2/io/netty/netty-bom/4.2.18.Final/netty-bom-4.2.18.Final.pom
+[ERROR] [ERROR] Some problems were encountered while processing the POMs:
+[ERROR] Non-resolvable import POM: The following artifacts could not be resolved: org.junit:junit-bom:pom:6.1.3 (absent): Could not transfer artifact org.junit:junit-bom:pom:6.1.3 from/to central (https://repo.maven.apache.org/maven2): repo.maven.apache.org: Temporary failure in name resolution @ line 86, column 19
+[ERROR] Non-resolvable import POM: The following artifacts could not be resolved: org.testcontainers:testcontainers-bom:pom:2.0.5 (absent): Could not transfer artifact org.testcontainers:testcontainers-bom:pom:2.0.5 from/to central (https://repo.maven.apache.org/maven2): repo.maven.apache.org @ line 93, column 19
+[ERROR] Non-resolvable import POM: The following artifacts could not be resolved: io.netty:netty-bom:pom:4.2.18.Final (absent): Could not transfer artifact io.netty:netty-bom:pom:4.2.18.Final from/to central (https://repo.maven.apache.org/maven2): repo.maven.apache.org @ line 101, column 19
+[ERROR] 'dependencies.dependency.version' for org.junit.jupiter:junit-jupiter:jar is missing. @ line 158, column 17
+ @ 
+[ERROR] The build could not read 1 project -> [Help 1]
+[ERROR]   
+[ERROR]   The project de.regelsuche:regelsuche-parent:0.5.3-SNAPSHOT (/workspace/scratch/750172ce4d66/Regelsuche-learning/pom.xml) has 4 errors
+[ERROR]     Non-resolvable import POM: The following artifacts could not be resolved: org.junit:junit-bom:pom:6.1.3 (absent): Could not transfer artifact org.junit:junit-bom:pom:6.1.3 from/to central (https://repo.maven.apache.org/maven2): repo.maven.apache.org: Temporary failure in name resolution @ line 86, column 19: Unknown host repo.maven.apache.org: Temporary failure in name resolution -> [Help 2]
+[ERROR]     Non-resolvable import POM: The following artifacts could not be resolved: org.testcontainers:testcontainers-bom:pom:2.0.5 (absent): Could not transfer artifact org.testcontainers:testcontainers-bom:pom:2.0.5 from/to central (https://repo.maven.apache.org/maven2): repo.maven.apache.org @ line 93, column 19: Unknown host repo.maven.apache.org -> [Help 2]
+[ERROR]     Non-resolvable import POM: The following artifacts could not be resolved: io.netty:netty-bom:pom:4.2.18.Final (absent): Could not transfer artifact io.netty:netty-bom:pom:4.2.18.Final from/to central (https://repo.maven.apache.org/maven2): repo.maven.apache.org @ line 101, column 19: Unknown host repo.maven.apache.org -> [Help 2]
+[ERROR]     'dependencies.dependency.version' for org.junit.jupiter:junit-jupiter:jar is missing. @ line 158, column 17
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/ProjectBuildingException
+[ERROR] [Help 2] http://cwiki.apache.org/confluence/display/MAVEN/UnresolvableModelException

@@ -39,6 +39,27 @@ class TaskKnowledgeLifecycleWorkerTest {
         }
     }
 
+    @Test void namedMixedWorkloadIsExplicitAndRejectsSuppliedSpecialistOverrides(@TempDir Path directory) {
+        var batch = Map.of("lessons", List.of(task("x+13", 1), task("y+17", 1)),
+            "validation", List.of(task("z+19", 1)), "promotion", List.of());
+        try (var worker = new TaskKnowledgeLifecycleWorker()) {
+            var response = send(worker, Map.of("op", "restore", "profile", "MEASURED_IMPROVEMENT",
+                "snapshot", directory.resolve("unused.json").toString(), "directory", directory.toString(),
+                "improvementBatches", List.of(batch), "futureQueries", 128,
+                "promotionWorkload", MixedTaskKnowledgeWorkload.REVISION));
+            assertEquals("CONFIGURED", response.get("status"));
+            assertEquals(MixedTaskKnowledgeWorkload.REVISION, response.get("promotionWorkload"));
+            assertEquals(MixedTaskKnowledgeWorkload.promotion(), response.get("promotionCases"));
+        }
+        var specialist = Map.of("lessons", batch.get("lessons"), "validation", batch.get("validation"),
+            "promotion", List.of(task("q+23", 1)));
+        try (var worker = new TaskKnowledgeLifecycleWorker()) {
+            assertEquals("ERROR", send(worker, Map.of("op", "restore", "profile", "MEASURED_IMPROVEMENT",
+                "snapshot", "unused.json", "directory", directory.toString(), "improvementBatches", List.of(specialist),
+                "futureQueries", 128, "promotionWorkload", MixedTaskKnowledgeWorkload.REVISION)).get("status"));
+        }
+    }
+
     @Test void producerCannotBeUsedAsTheFreshQueryConsumer(@TempDir Path directory) {
         var batch = Map.of("lessons", List.of(task("x+13", 1), task("y+17", 1)), "validation", List.of(task("z+19", 1)));
         try (var worker = new TaskKnowledgeLifecycleWorker()) {
