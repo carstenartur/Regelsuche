@@ -81,6 +81,24 @@ und wird für dieselbe Eingabe erneut ausgeführt. Die Ausgabe enthält
 Deterministischer Replay beweist nicht beliebigen Plugin-Code. Die algebraische
 Identität wird hier vom Autor verantwortet, ohne externen Beweisbackend-Claim.
 
+### Eigene typisierte Erweiterung: SPI v2 statt Regel-API v1
+
+Das Beispiel oben nutzt die ältere Anwendungs-Regel-API **v1**
+(`de.regelsuche.plugin.RegelsuchePlugin`). Für eigene typisierte Beiträge ohne
+Webanwendung verwende den vollständigen
+[SPI-v2-Consumer extension-runtime-java25](../examples/external-consumers/extension-runtime-java25/README.md).
+Er bindet `de.regelsuche:regelsuche-extension-runtime:0.5.2` über dieselbe BOM ein
+und verwendet `de.regelsuche.extension.RegelsuchePlugin` mit eigenem
+ServiceLoader-Deskriptor. Der Einstieg enthält Maven-, SDK-Wrapper- und direkte
+Java-Aufrufe sowie die tatsächlich aufgezeichnete Ausgabe `greeting=Hello Ada`
+und die Katalogidentität. Sein neues Maven-POM ist noch kein Bestandteil des
+unveränderten 0.5.2-ZIPs; Java-/Gradle-Beispiel und v2-Klassen sind dort enthalten.
+
+Der Consumer lädt vertrauenswürdigen Classpath-Code. Er demonstriert keine
+Admission eines fremden Plugin-JARs und keine automatische Installation im
+Workbench-Laufzeitkatalog. [Plugin-Index](plugin-index.md) und
+[generische Erweiterungen](generic-extensions.md) trennen diese Grenzen.
+
 ## 3. Eine Discovery-Domäne untersuchen
 
 Die veröffentlichten Gradle-Beispiele bleiben aus dem SDK-Wurzelverzeichnis
