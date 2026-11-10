@@ -73,6 +73,19 @@ public final class EGraph {
     private long version = 0L;
     /** Number of currently canonical e-classes. */
     private int canonicalClassCount = 0;
+    private int insertionLimit = Integer.MAX_VALUE;
+
+    /** Saturation-local insertion cap; restoring the previous limit is the caller's responsibility. */
+    int setInsertionLimit(int limit) {
+        int previous = insertionLimit;
+        insertionLimit = limit;
+        return previous;
+    }
+
+    static final class NodeBudgetExceeded extends RuntimeException {
+        NodeBudgetExceeded() { super("e-graph node budget exhausted"); }
+    }
+
 
     /**
      * Add an e-node. Children must already be present in the graph (use
@@ -86,6 +99,9 @@ public final class EGraph {
         if (existing != null) {
             return unionFind.find(existing);
         }
+        // Check before mutation. An interrupted RHS may leave valid disconnected
+        // subterms, but never an incomplete node or a union with that RHS.
+        if (nodeCount() >= insertionLimit) throw new NodeBudgetExceeded();
         EClassId id = unionFind.makeSet();
         EClass eclass = new EClass(id, canonical);
         classes.put(id, eclass);
@@ -319,6 +335,23 @@ public final class EGraph {
      * stabilises.</p>
      */
     public Expr extract(EClassId id, java.util.function.ToIntFunction<ENode> costOfNode) {
+        return buildExpression(unionFind.find(id), extractionChoices(id, costOfNode));
+    }
+
+    /**
+     * One finite AST per root e-node, using cheapest child representatives.
+     * This deliberately does not enumerate all combinations of child alternatives.
+     */
+    public List<Expr> representatives(EClassId id, java.util.function.ToIntFunction<ENode> costOfNode) {
+        Map<EClassId, ENode> choices = extractionChoices(id, costOfNode);
+        LinkedHashSet<Expr> result = new LinkedHashSet<>();
+        for (ENode node : classOf(id).nodes()) result.add(nodeToExpr(node, choices));
+        return List.copyOf(result);
+    }
+
+    private Map<EClassId, ENode> extractionChoices(EClassId id,
+            java.util.function.ToIntFunction<ENode> costOfNode) {
+        Objects.requireNonNull(costOfNode, "costOfNode");
         Map<EClassId, Integer> bestCost = new HashMap<>();
         Map<EClassId, ENode> bestNode = new HashMap<>();
         for (EClass eclass : classes()) {
@@ -344,12 +377,13 @@ public final class EGraph {
             throw new IllegalStateException("No extractable node in e-class " + canonical
                 + " — every node has unresolved children (cyclic class with no base case?)");
         }
-        return buildExpression(canonical, bestNode);
+        return bestNode;
     }
 
     private int extractionCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode,
             Map<EClassId, Integer> bestCost) {
         long total = costOfNode.applyAsInt(node);
+        if (total < 0) throw new IllegalArgumentException("Additive extraction requires non-negative node costs");
         if (total == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         }

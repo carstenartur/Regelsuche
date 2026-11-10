@@ -1,0 +1,153 @@
+package de.regelsuche.egraph;
+
+import static org.junit.jupiter.api.Assertions.*;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.*;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class EqualitySaturationContractTest {
+    private final ExpressionParser parser = new ExpressionParser();
+    private final PatternExpr.Placeholder a = new PatternExpr.Placeholder("a");
+
+    @Test void oversizedRhsStopsWithinIterationAndLeavesGraphUsable() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x"));
+        var rule = new PatternRewriteRule("grow", a,
+            new PatternExpr.Function("f", List.of(new PatternExpr.Function("g", List.of(a)))));
+        var result = new EqualitySaturation(List.of(rule), new EqualitySaturation.Config(1, 2))
+            .saturate(graph, root, node -> 1);
+        assertTrue(graph.nodeCount() <= 2);
+        assertEquals(SaturationStats.Reason.NODE_BUDGET, result.stats().stopReason());
+        assertFalse(result.stats().saturated());
+        assertEquals(parser.parseTerm("x"), result.expression());
+        graph.rebuild();
+        assertEquals(root, graph.addExpression(parser.parseTerm("x")));
+        graph.addExpression(parser.parseTerm("z")); // run's cap must be released
+    }
+
+    @Test void oversizedConcreteRhsAlsoStopsWithoutAnEquality() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x"));
+        var rule = new PatternRewriteRule("concrete-grow", a, a) {
+            @Override public Expr apply(Expr expression) { return parser.parseTerm("f(g(x))"); }
+        };
+        var result = new EqualitySaturation(List.of(rule), new EqualitySaturation.Config(1, 2))
+            .saturate(graph, root, node -> 1);
+        assertEquals(2, graph.nodeCount());
+        assertEquals(SaturationStats.Reason.NODE_BUDGET, result.stats().stopReason());
+        assertEquals(0, result.stats().totalApplications());
+        assertEquals(0, result.diagnostics().count(SaturationDiagnostics.Outcome.RULE_FAILURE));
+        assertEquals(parser.parseTerm("x"), result.expression());
+        graph.rebuild();
+        assertFalse(graph.areEquivalent(root, graph.addExpression(parser.parseTerm("g(x)"))));
+    }
+
+    @Test void reachingTheCapStopsBeforeCallingAnotherRule() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x"));
+        var grow = new PatternRewriteRule("grow", a, new PatternExpr.Function("f", List.of(a)));
+        var shouldNotRun = new PatternRewriteRule("later", a, a) {
+            @Override public boolean matches(Expr expression) { throw new AssertionError("rule after budget"); }
+        };
+        var result = new EqualitySaturation(List.of(grow, shouldNotRun), new EqualitySaturation.Config(1, 2))
+            .saturate(graph, root, node -> 1);
+        assertEquals(2, graph.nodeCount());
+        assertEquals(1, result.stats().totalApplications());
+        assertEquals(SaturationStats.Reason.NODE_BUDGET, result.stats().stopReason());
+    }
+
+    @Test void ruleFailuresAreStructuredForEachCallbackStage() {
+        for (var stage : List.of(SaturationDiagnostics.Stage.MATCHES,
+                SaturationDiagnostics.Stage.ASSUMPTIONS, SaturationDiagnostics.Stage.APPLY)) {
+            var rule = new PatternRewriteRule("broken", a, a) {
+                @Override public boolean matches(Expr expr) {
+                    if (stage == SaturationDiagnostics.Stage.MATCHES) throw new IllegalArgumentException("match failure");
+                    return true;
+                }
+                @Override public List<de.regelsuche.assumption.Assumption> assumptions(Expr expr) {
+                    if (stage == SaturationDiagnostics.Stage.ASSUMPTIONS) throw new IllegalArgumentException("guard failure");
+                    return List.of();
+                }
+                @Override public Expr apply(Expr expr) { throw new IllegalArgumentException("apply failure"); }
+            };
+            var result = run("x", rule);
+            assertEquals(1, result.diagnostics().count(SaturationDiagnostics.Outcome.RULE_FAILURE));
+            assertEquals(stage, result.diagnostics().events().getFirst().stage());
+            assertEquals(SaturationStats.Reason.RULE_FAILURES, result.stats().stopReason());
+            assertFalse(result.stats().saturated());
+        }
+    }
+
+    @Test void diagnosticRetentionIsBoundedWithoutLosingCounts() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x"));
+        var rules = java.util.stream.IntStream.range(0, 200).mapToObj(i -> (RewriteRule)
+            new PatternRewriteRule("broken" + i, a, a) {
+                @Override public Expr apply(Expr expr) { throw new IllegalStateException("broken"); }
+            }).toList();
+        var result = new EqualitySaturation(rules).saturate(graph, root, node -> 1);
+        assertEquals(200, result.diagnostics().count(SaturationDiagnostics.Outcome.RULE_FAILURE));
+        assertEquals(SaturationDiagnostics.MAX_EVENTS, result.diagnostics().events().size());
+        assertTrue(result.diagnostics().droppedEvents() > 0);
+    }
+
+    @Test void customRulesSeeAlternativeRootRepresentatives() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x + 0"));
+        graph.union(root, graph.addExpression(parser.parseTerm("x")));
+        graph.rebuild();
+        var rule = new PatternRewriteRule("alternative", a, a) {
+            @Override public boolean matches(Expr expr) { return expr.equals(parser.parseTerm("x + 0")); }
+            @Override public Expr apply(Expr expr) { return parser.parseTerm("0 + x"); }
+        };
+        var result = new EqualitySaturation(List.of(rule)).saturate(graph, root, node -> 1);
+        assertTrue(result.stats().appliedRules().containsKey("alternative"));
+        assertTrue(result.provenance().witnesses().stream().anyMatch(w ->
+            w.before().equals(parser.parseTerm("x + 0")) && w.replay(rule)));
+        assertFalse(result.provenance().hasExtractionProof());
+    }
+
+    @Test void guardedRulesRemainUnmergedAndDiagnoseConditions() {
+        var rule = AstRewriteTransformationEngine.defaultRules().stream()
+            .filter(r -> r.id().equals("ast_cancel_division_factor")).findFirst().orElseThrow();
+        var result = run("(x * y) / x", rule);
+        assertEquals(parser.parseTerm("(x * y) / x"), result.expression());
+        assertTrue(result.diagnostics().count(SaturationDiagnostics.Outcome.UNRESOLVED_CONDITIONS) > 0);
+        assertTrue(result.provenance().witnesses().isEmpty());
+    }
+
+    @Test void nativeWitnessReplaysActualRuleButDoesNotClaimCongruenceProof() {
+        var rule = new PatternRewriteRule("zero", new PatternExpr.Operation(
+            de.regelsuche.ast.BinaryOperator.ADD, a,
+            new PatternExpr.LiteralNumber(de.regelsuche.scalar.ExactRational.ZERO)), a);
+        var result = run("f(x + 0)", rule);
+        assertEquals(parser.parseTerm("f(x)"), result.expression());
+        assertTrue(result.provenance().witnesses().getFirst().replay(rule));
+        assertFalse(result.provenance().hasExtractionProof());
+    }
+
+    @Test void acRecognitionProfilesUseTheirConcreteMatchingContract() {
+        var rule = new PatternRewriteRule("ac-zero", new PatternExpr.Operation(
+            de.regelsuche.ast.BinaryOperator.ADD, a,
+            new PatternExpr.LiteralNumber(de.regelsuche.scalar.ExactRational.ZERO)), a,
+            RecognitionProfile.arithmeticAc());
+        var result = run("0 + x", rule);
+        assertEquals(parser.parseTerm("x"), result.expression());
+        assertTrue(result.provenance().witnesses().getFirst().replay(rule));
+    }
+
+    @Test void negativeAdditiveCostsFailExplicitly() {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("x"));
+        assertThrows(IllegalArgumentException.class, () -> graph.extract(root, node -> -1));
+    }
+
+    private EqualitySaturation.Result run(String expression, RewriteRule rule) {
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm(expression));
+        return new EqualitySaturation(List.of(rule), new EqualitySaturation.Config(3, 100))
+            .saturate(graph, root, node -> 1);
+    }
+}
