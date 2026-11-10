@@ -1,6 +1,6 @@
 package de.regelsuche.inventory;
 
-import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.evolution.ExactPolynomialPatternIdentityVerifier;
 import de.regelsuche.mining.PatternBinary;
 import de.regelsuche.mining.PatternFunction;
 import de.regelsuche.mining.PatternNumber;
@@ -17,6 +17,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 
+/**
+ * Compatibility adapter for unconditional polynomial inventory rules.
+ *
+ * <p>Stored proof labels are metadata, not execution authority. Every accepted
+ * pattern is rechecked by the bounded exact polynomial verifier. Conditional
+ * patterns and other mathematical fragments require the condition-aware,
+ * replay-authorised learned runtime instead of this legacy adapter.</p>
+ */
 public class InventoryBackedRewriteRuleProvider {
     private static final Logger LOGGER = Logger.getLogger(InventoryBackedRewriteRuleProvider.class.getName());
 
@@ -24,6 +32,8 @@ public class InventoryBackedRewriteRuleProvider {
     private final RuleInventoryConfiguration configuration;
     private final List<RewriteRule> existingRules;
     private final RulePatternParser parser = new RulePatternParser();
+    private final ExactPolynomialPatternIdentityVerifier verifier =
+        new ExactPolynomialPatternIdentityVerifier();
     private final List<RuleActivationDecision> lastDecisions = new ArrayList<>();
 
     public InventoryBackedRewriteRuleProvider(
@@ -66,7 +76,7 @@ public class InventoryBackedRewriteRuleProvider {
                     "Rule id " + reusableRule.id() + " not allowed by allow/deny/disabled list"));
                 continue;
             }
-            if (usedIds.contains(ruleId) || !usedPatterns.add(patternKey)) {
+            if (usedIds.contains(ruleId) || usedPatterns.contains(patternKey)) {
                 lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
                     "Rule conflicts with an existing rewrite rule or duplicate pattern"));
                 continue;
@@ -88,17 +98,45 @@ public class InventoryBackedRewriteRuleProvider {
                         + " exceeds limit " + configuration.maxComplexityIncrease()));
                 continue;
             }
+            if (!reusableRule.assumptions().isEmpty()
+                    || !reusableRule.parameterRelations().isEmpty()) {
+                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
+                    "Assumptions and parameter relations require the condition-aware learned runtime"));
+                continue;
+            }
+            PatternExpr left;
+            PatternExpr right;
+            ExactPolynomialPatternIdentityVerifier.Verification verification;
+            try {
+                left = toPatternExpr(parser.parse(reusableRule.leftPattern()));
+                right = toPatternExpr(parser.parse(reusableRule.rightPattern()));
+                // Verify the actual parsed objects that will execute, not a
+                // second parser's interpretation or a persisted status label.
+                verification = verifier.verify(left, right);
+            } catch (IllegalArgumentException exception) {
+                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
+                    "Invalid pattern: " + exception.getMessage()));
+                continue;
+            }
+            if (!verification.proved()) {
+                lastDecisions.add(RuleActivationDecision.disabled(reusableRule,
+                    "Fresh exact verification: " + verification.status()
+                        + " (" + verification.detailCode() + ")"));
+                continue;
+            }
             activated.add(new PatternRewriteRule(
                 ruleId,
-                toPatternExpr(parser.parse(reusableRule.leftPattern())),
-                toPatternExpr(parser.parse(reusableRule.rightPattern())),
+                left,
+                right,
                 RewriteKind.NORMALIZE,
                 false,
                 0,
                 true
             ));
             usedIds.add(ruleId);
-            lastDecisions.add(RuleActivationDecision.activated(reusableRule));
+            usedPatterns.add(patternKey);
+            lastDecisions.add(new RuleActivationDecision(reusableRule, true,
+                "Activated after fresh exact polynomial verification: " + verification.proofHash()));
         }
         logDecisions();
         return activated;

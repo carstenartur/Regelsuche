@@ -6,6 +6,9 @@ import de.regelsuche.egraph.EGraph;
 import de.regelsuche.egraph.ENode;
 import de.regelsuche.egraph.EqualitySaturation;
 import de.regelsuche.egraph.SaturationStats;
+import de.regelsuche.egraph.SaturationDiagnostics;
+import de.regelsuche.egraph.SaturationProvenance;
+import de.regelsuche.scoring.cost.StructuralCostModel;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -41,13 +44,26 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
     /**
      * Sentinel rule id used on the extracted {@link SearchState} so the
      * UI / report layer can detect that equality saturation produced the
-     * result rather than an ordered chain of rewrites.
+     * result rather than an ordered chain of rewrites. This is an observational
+     * provenance marker, never an executable or construction-proven rule step.
      */
     public static final String SATURATION_RULE_ID = "equality-saturation";
 
     private final EqualitySaturation.Config config;
     private final ExpressionParser parser = new ExpressionParser();
     private SaturationStats lastStats;
+    private SaturationDiagnostics lastDiagnostics = SaturationDiagnostics.empty();
+    private SaturationProvenance lastProvenance = SaturationProvenance.empty();
+    private ExtractionSelection lastExtractionSelection;
+
+    /** Explicit objective dispatch; fallback still uses the requested cost model. */
+    public record ExtractionSelection(String requestedObjective, String effectiveObjective,
+            String strategy, boolean fallback, String reason) {}
+
+    public SaturationDiagnostics lastDiagnostics() { return lastDiagnostics; }
+    public SaturationProvenance lastProvenance() { return lastProvenance; }
+    public ExtractionSelection lastExtractionSelection() { return lastExtractionSelection; }
+
 
     public EqualitySaturationStrategy() {
         this(EqualitySaturation.Config.defaults());
@@ -67,6 +83,18 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
 
     @Override
     public List<SearchState> search(SearchProblem problem) {
+        lastStats = null;
+        lastDiagnostics = SaturationDiagnostics.empty();
+        lastProvenance = SaturationProvenance.empty();
+        String objective = problem.costModel() == null ? "operator-count" : problem.costModel().id();
+        // Identity check matters: a custom model can reuse a built-in ID with different semantics.
+        if (problem.costModel() != null && problem.costModel() != StructuralCostModel.OPERATOR_COUNT) {
+            lastExtractionSelection = new ExtractionSelection(objective, objective, "best-first", true,
+                "No exact e-graph extractor for this cost model; best-first search uses the requested objective.");
+            return new BestFirstSearchStrategy().search(problem);
+        }
+        lastExtractionSelection = new ExtractionSelection(objective, "operator-count", "equality-saturation", false,
+            "Exact additive operator-count extraction.");
         String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
         Expr rootAst;
         try {
@@ -81,9 +109,6 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
         EGraph eGraph = new EGraph();
         EClassId rootId = eGraph.addExpression(rootAst);
 
-        // PR 2b uses a fixed 0/1 extraction cost (see nodeCost) so the
-        // strategy stays goal-agnostic; richer per-cost-model node costs
-        // can plug into the same hook in a follow-up.
         List<RewriteRule> rules = resolveRules(problem);
         EqualitySaturation saturation = new EqualitySaturation(rules, config);
         EqualitySaturation.Result result = saturation.saturate(
@@ -92,6 +117,8 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
             EqualitySaturationStrategy::nodeCost
         );
         lastStats = result.stats();
+        lastDiagnostics = result.diagnostics();
+        lastProvenance = result.provenance();
 
         String extracted = ExpressionFormatter.format(result.expression());
         ExpressionScore rootScore = problem.scorer().score(root);
@@ -119,10 +146,10 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
             RewriteKind.NORMALIZE,
             false,
             -Math.max(0, improvement),
-            true,
+            false,
             improvement,
             List.of(RewriteKind.NORMALIZE),
-            List.of(Boolean.TRUE)
+            List.of(Boolean.FALSE)
         );
         return List.of(rootState, extractedState);
     }
@@ -154,19 +181,8 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
         return AstRewriteTransformationEngine.defaultRules();
     }
 
-    /**
-     * Per-node extraction cost: 1 per inner node (operator, function),
-     * 0 per leaf (variable, number). This matches the historical
-     * {@link de.regelsuche.scoring.cost.StructuralCostModel#OPERATOR_COUNT} contract and
-     * is the most defensible "cheapest = smallest" baseline.
-     *
-     * <p>Goal-specific cost models attached to the {@link SearchProblem}
-     * still drive the surrounding path-based search comparator via {@link
-     * SearchProblem#costModel()} — extraction cost only re-orders nodes
-     * <em>inside</em> the saturated e-graph, where every alternative is
-     * already algebraically equivalent.</p>
-     */
+    /** Additive operator-count objective; other objectives use the explicit dispatch above. */
     static int nodeCost(ENode node) {
-        return node.isLeaf() ? 0 : 1;
+        return node.symbol().startsWith("op:") || node.symbol().startsWith("fn:") ? 1 : 0;
     }
 }
