@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExactLinearSolutionVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactLinearSolutionVerifier.java</span></div><h1>ExactLinearSolutionVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Independent, bounded solution-set checker; never validates route or execution work claims. */
+<span class="fc" id="L23">public final class ExactLinearSolutionVerifier {</span>
+    public static final String WORK_SCHEMA = &quot;regelsuche.linear-semantic-work/v1&quot;;
+    public static final int MAX_RATIONAL_BITS = 16_384;
+    public static final int MAX_OPERATIONS = 4_096;
+<span class="fc" id="L27">    public enum Status { VERIFIED, INVALID_CERTIFICATE, DOMAIN_UNSUPPORTED, BUDGET_INCONCLUSIVE }</span>
+<span class="fc" id="L28">    public enum Stage { SOURCE_BINDING, PROOF_VALIDATION, REPLAY, RANK, CONSEQUENCE }</span>
+<span class="fc" id="L29">    public record WorkProfile(int sourceBinding, int proofValidation, int replay, int rank, int consequence) {</span>
+<span class="fc" id="L30">        public int totalWork() { return sourceBinding + proofValidation + replay + rank + consequence; }</span>
+<span class="nc" id="L31">        public String schema() { return WORK_SCHEMA; }</span>
+    }
+<span class="fc" id="L33">    public record Ranks(int coefficient, int augmented) { }</span>
+<span class="fc" id="L34">    public record Verification(Status status, WorkProfile work, String detailCode, Optional&lt;Ranks&gt; ranks) {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        public boolean verified() { return status == Status.VERIFIED; }</span>
+    }
+
+    public Verification verify(List&lt;String&gt; source, ExactLinearSolutionConsequence claim,
+                               ExactLinearSolutionCertificate proof, Budget budget) {
+<span class="fc" id="L40">        Objects.requireNonNull(budget);</span>
+<span class="fc" id="L41">        Meter meter = new Meter(budget.maxWorkUnits());</span>
+        try {
+<span class="fc" id="L43">            SourceMatrix bound = bindSource(source, meter);</span>
+<span class="fc" id="L44">            meter.stage = Stage.PROOF_VALIDATION;</span>
+<span class="fc" id="L45">            validateProof(bound, claim, proof, meter);</span>
+<span class="fc" id="L46">            meter.stage = Stage.REPLAY;</span>
+<span class="fc" id="L47">            Rational[][] reduced = replay(bound, proof, meter);</span>
+<span class="fc" id="L48">            meter.stage = Stage.RANK;</span>
+<span class="fc" id="L49">            RankStructure rank = deriveRank(reduced, bound.variables().size(), meter);</span>
+<span class="fc" id="L50">            meter.stage = Stage.CONSEQUENCE;</span>
+<span class="fc" id="L51">            validateConsequence(bound, rank, claim, meter);</span>
+<span class="fc" id="L52">            return new Verification(Status.VERIFIED, meter.profile(), &quot;COMPLETE_EXACT_SOLUTION_SET&quot;,</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                Optional.of(new Ranks(rank.coefficient(), rank.coefficient() + (rank.inconsistent() ? 1 : 0))));</span>
+<span class="fc" id="L54">        } catch (Exhausted exception) {</span>
+<span class="fc" id="L55">            return new Verification(Status.BUDGET_INCONCLUSIVE, meter.profile(), &quot;WORK_BUDGET_EXHAUSTED&quot;,</span>
+<span class="fc" id="L56">                Optional.empty());</span>
+<span class="fc" id="L57">        } catch (Rejected exception) {</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            return new Verification(exception.domain ? Status.DOMAIN_UNSUPPORTED : Status.INVALID_CERTIFICATE,</span>
+<span class="fc" id="L59">                meter.profile(), exception.getMessage(), Optional.empty());</span>
+        }
+    }
+
+    private static SourceMatrix bindSource(List&lt;String&gt; source, Meter meter) {
+<span class="fc" id="L64">        meter.take(1);</span>
+<span class="pc bpc" id="L65" title="2 of 6 branches missed.">        require(source != null &amp;&amp; !source.isEmpty() &amp;&amp; source.size() &lt;= 16, &quot;SOURCE_SIZE&quot;, true);</span>
+<span class="fc" id="L66">        List&lt;Equation&gt; equations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L67">        Set&lt;String&gt; names = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L68">        ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (String text : source) {</span>
+<span class="fc" id="L70">            meter.take(1);</span>
+<span class="pc bpc" id="L71" title="3 of 6 branches missed.">            require(text != null &amp;&amp; !text.isEmpty() &amp;&amp; text.length() &lt;= 512, &quot;SOURCE_TEXT&quot;, true);</span>
+<span class="fc" id="L72">            meter.take(text.length()); // Bounds and charges parser/text validation traversal.</span>
+            try {
+<span class="fc" id="L74">                LinearRepresentationPlanner.validateText(text);</span>
+<span class="fc" id="L75">                Equation equation = parser.parseEquation(text);</span>
+<span class="fc" id="L76">                LinearRepresentationPlanner.powerWeight(equation.left(), 0);</span>
+<span class="fc" id="L77">                LinearRepresentationPlanner.powerWeight(equation.right(), 0);</span>
+<span class="fc" id="L78">                collect(equation.left(), names, meter, 0);</span>
+<span class="fc" id="L79">                collect(equation.right(), names, meter, 0);</span>
+<span class="fc" id="L80">                equations.add(equation);</span>
+<span class="fc" id="L81">            } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L82">                throw new Rejected(&quot;SOURCE_SYNTAX_OR_LIMIT&quot;, true);</span>
+<span class="fc" id="L83">            }</span>
+<span class="fc" id="L84">        }</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        require(!names.isEmpty() &amp;&amp; names.size() &lt;= 16, &quot;VARIABLE_COUNT&quot;, true);</span>
+<span class="fc" id="L86">        List&lt;String&gt; variables = List.copyOf(names);</span>
+<span class="fc" id="L87">        int n = variables.size(), m = equations.size();</span>
+<span class="fc" id="L88">        Rational[][] original = new Rational[m][n + 1];</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (int i = 0; i &lt; m; i++) {</span>
+<span class="fc" id="L90">            Rational[] left = affine(equations.get(i).left(), variables, meter);</span>
+<span class="fc" id="L91">            Rational[] right = affine(equations.get(i).right(), variables, meter);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (int j = 0; j &lt;= n; j++) {</span>
+<span class="fc" id="L93">                original[i][j] = meter.sub(left[j], right[j]);</span>
+            }
+<span class="fc" id="L95">            original[i][n] = meter.neg(original[i][n]);</span>
+        }
+<span class="fc" id="L97">        return new SourceMatrix(variables, original);</span>
+    }
+
+    private static void validateProof(SourceMatrix bound, ExactLinearSolutionConsequence claim,
+                                      ExactLinearSolutionCertificate proof, Meter meter) {
+<span class="fc" id="L102">        List&lt;String&gt; variables = bound.variables();</span>
+<span class="fc" id="L103">        int n = variables.size(), m = bound.rows().length;</span>
+<span class="fc" id="L104">        meter.take(1);</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">        require(claim != null &amp;&amp; proof != null, &quot;MISSING_STATEMENT_OR_PROOF&quot;, false);</span>
+<span class="fc" id="L106">        require(ExactLinearSolutionCertificate.SCHEMA.equals(proof.schema()), &quot;SCHEMA&quot;, false);</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">        require(proof.parts().size() &gt; 0 &amp;&amp; proof.parts().size() &lt;= m, &quot;PART_COUNT&quot;, false);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        require(claim.variables().size() == n, &quot;VARIABLE_BINDING&quot;, false);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L110">            meter.take(1 + variables.get(j).length());</span>
+<span class="fc" id="L111">            require(variables.get(j).equals(claim.variables().get(j)), &quot;VARIABLE_BINDING&quot;, false);</span>
+        }
+<span class="fc" id="L113">        boolean[] covered = new boolean[m];</span>
+<span class="fc" id="L114">        int count = 0;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (var part : proof.parts()) {</span>
+<span class="fc" id="L116">            meter.take(1);</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">            require(!part.sourceRows().isEmpty() &amp;&amp; part.sourceRows().size() &lt;= m, &quot;ROW_MAP_SIZE&quot;, false);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (int row : part.sourceRows()) {</span>
+<span class="fc" id="L119">                meter.take(1);</span>
+<span class="pc bpc" id="L120" title="1 of 6 branches missed.">                require(row &gt;= 0 &amp;&amp; row &lt; m &amp;&amp; !covered[row], &quot;ROW_COVERAGE&quot;, false);</span>
+<span class="fc" id="L121">                covered[row] = true;</span>
+<span class="fc" id="L122">            }</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            require(part.operations().size() &lt;= MAX_OPERATIONS - count, &quot;OPERATION_COUNT&quot;, false);</span>
+<span class="fc" id="L124">            count += part.operations().size();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (var op : part.operations()) {</span>
+<span class="fc" id="L126">                meter.take(1);</span>
+<span class="fc" id="L127">                meter.value(op.multiplier());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                require(op.targetRow() &lt; part.sourceRows().size()</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">                    &amp;&amp; (op.sourceRow() &lt; 0 || op.sourceRow() &lt; part.sourceRows().size()), &quot;OPERATION_ROW&quot;, false);</span>
+<span class="fc" id="L130">            }</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (boolean present : covered) {</span>
+<span class="fc" id="L133">            meter.take(1);</span>
+<span class="fc" id="L134">            require(present, &quot;ROW_COVERAGE&quot;, false);</span>
+        }
+<span class="fc" id="L136">    }</span>
+
+    private static Rational[][] replay(SourceMatrix bound, ExactLinearSolutionCertificate proof, Meter meter) {
+<span class="fc" id="L139">        Rational[][] original = bound.rows();</span>
+<span class="fc" id="L140">        int n = bound.variables().size(), m = original.length;</span>
+<span class="fc" id="L141">        Rational[][] reduced = new Rational[m][n + 1];</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int i = 0; i &lt; m; i++) {</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            for (int j = 0; j &lt;= n; j++) {</span>
+<span class="fc" id="L144">                meter.value(original[i][j]);</span>
+<span class="fc" id="L145">                reduced[i][j] = original[i][j];</span>
+            }
+        }
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (var part : proof.parts()) {</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            for (var op : part.operations()) {</span>
+<span class="fc" id="L150">                meter.take(1);</span>
+<span class="fc" id="L151">                int target = part.sourceRows().get(op.targetRow());</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                int other = op.sourceRow() &lt; 0 ? -1 : part.sourceRows().get(op.sourceRow());</span>
+<span class="pc bpc" id="L153" title="1 of 4 branches missed.">                switch (op.kind()) {</span>
+                    case SWAP_ROWS -&gt; {
+<span class="fc" id="L155">                        meter.take(1);</span>
+<span class="fc" id="L156">                        var row = reduced[target];</span>
+<span class="fc" id="L157">                        reduced[target] = reduced[other];</span>
+<span class="fc" id="L158">                        reduced[other] = row;</span>
+<span class="fc" id="L159">                    }</span>
+                    case SCALE_ROW -&gt; {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                        for (int j = 0; j &lt;= n; j++) {</span>
+<span class="fc" id="L162">                            reduced[target][j] = meter.mul(reduced[target][j], op.multiplier());</span>
+                        }
+<span class="fc" id="L164">                    }</span>
+                    case ADD_ROW_MULTIPLE -&gt; {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                        for (int j = 0; j &lt;= n; j++) {</span>
+<span class="fc" id="L167">                            reduced[target][j] = meter.add(reduced[target][j],</span>
+<span class="fc" id="L168">                                meter.mul(op.multiplier(), reduced[other][j]));</span>
+                        }
+                    }
+                }
+<span class="fc" id="L172">            }</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return reduced;</span>
+    }
+
+    private static RankStructure deriveRank(Rational[][] reduced, int n, Meter meter) {
+<span class="fc" id="L178">        int m = reduced.length;</span>
+<span class="fc" id="L179">        int[] pivotRows = new int[n];</span>
+<span class="fc" id="L180">        Arrays.fill(pivotRows, -1);</span>
+<span class="fc" id="L181">        int rank = 0;</span>
+<span class="fc" id="L182">        boolean inconsistent = false;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (int i = 0; i &lt; m; i++) {</span>
+<span class="fc" id="L184">            int pivot = -1;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L186">                meter.value(reduced[i][j]);</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">                if (pivot &lt; 0 &amp;&amp; !reduced[i][j].isZero()) {</span>
+<span class="fc" id="L188">                    pivot = j;</span>
+                }
+            }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (pivot &lt; 0) {</span>
+<span class="fc" id="L192">                meter.value(reduced[i][n]);</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                inconsistent |= !reduced[i][n].isZero();</span>
+<span class="fc" id="L194">                continue;</span>
+            }
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">            require(reduced[i][pivot].isOne() &amp;&amp; pivotRows[pivot] &lt; 0, &quot;COEFFICIENT_NORMAL_FORM&quot;, false);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            for (int k = 0; k &lt; m; k++) {</span>
+<span class="fc" id="L198">                meter.value(reduced[k][pivot]);</span>
+<span class="fc bfc" id="L199" title="All 4 branches covered.">                require(k == i || reduced[k][pivot].isZero(), &quot;PIVOT_COLUMN&quot;, false);</span>
+            }
+<span class="fc" id="L201">            pivotRows[pivot] = i;</span>
+<span class="fc" id="L202">            rank++;</span>
+        }
+<span class="fc" id="L204">        return new RankStructure(pivotRows, rank, inconsistent);</span>
+    }
+
+    private static void validateConsequence(SourceMatrix bound, RankStructure rank,
+                                            ExactLinearSolutionConsequence claim, Meter meter) {
+<span class="fc" id="L209">        int n = bound.variables().size();</span>
+<span class="fc" id="L210">        int[] pivotRows = rank.pivotRows();</span>
+<span class="fc" id="L211">        Rational[][] original = bound.rows();</span>
+<span class="fc" id="L212">        meter.take(1);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (rank.inconsistent()) {</span>
+<span class="pc bpc" id="L214" title="2 of 4 branches missed.">            require(claim.classification() == SolutionClassification.INCONSISTENT &amp;&amp; claim.particularSolution().isEmpty()</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">                &amp;&amp; claim.nullspaceBasis().isEmpty() &amp;&amp; claim.normalizedContradiction().isPresent(), &quot;CLASSIFICATION&quot;, false);</span>
+<span class="fc" id="L216">            meter.value(claim.normalizedContradiction().orElseThrow());</span>
+<span class="fc" id="L217">            require(claim.normalizedContradiction().orElseThrow().isOne(), &quot;CONTRADICTION&quot;, false);</span>
+        } else {
+<span class="fc" id="L219">            int nullity = n - rank.coefficient();</span>
+<span class="fc bfc" id="L220" title="All 4 branches covered.">            require(claim.classification() == (nullity == 0 ? SolutionClassification.UNIQUE : SolutionClassification.UNDERDETERMINED)</span>
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">                &amp;&amp; claim.particularSolution().isPresent() &amp;&amp; claim.nullspaceBasis().size() == nullity</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                &amp;&amp; claim.normalizedContradiction().isEmpty(), &quot;COMPLETE_FAMILY&quot;, false);</span>
+<span class="fc" id="L223">            int free = 0;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L225">                meter.take(1);</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                if (pivotRows[j] &gt;= 0) {</span>
+<span class="fc" id="L227">                    continue;</span>
+                }
+<span class="fc" id="L229">                var value = claim.particularSolution().orElseThrow().get(j);</span>
+<span class="fc" id="L230">                meter.value(value);</span>
+<span class="fc" id="L231">                require(value.isZero(), &quot;CANONICAL_PARTICULAR&quot;, false);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                for (int b = 0; b &lt; nullity; b++) {</span>
+<span class="fc" id="L233">                    value = claim.nullspaceBasis().get(b).get(j);</span>
+<span class="fc" id="L234">                    meter.value(value);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                    require(value.equals(b == free ? Rational.ONE : Rational.ZERO), &quot;CANONICAL_BASIS&quot;, false);</span>
+                }
+<span class="fc" id="L237">                free++;</span>
+            }
+<span class="fc" id="L239">            residual(original, claim.particularSolution().orElseThrow(), false, meter);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            for (var vector : claim.nullspaceBasis()) {</span>
+<span class="fc" id="L241">                residual(original, vector, true, meter);</span>
+<span class="fc" id="L242">            }</span>
+        }
+<span class="fc" id="L244">    }</span>
+
+<span class="fc" id="L246">    private record SourceMatrix(List&lt;String&gt; variables, Rational[][] rows) { }</span>
+
+<span class="fc" id="L248">    private record RankStructure(int[] pivotRows, int coefficient, boolean inconsistent) { }</span>
+
+    private static void residual(Rational[][] rows, ExactVector vector, boolean homogeneous, Meter meter) {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for(var row:rows) {</span>
+<span class="fc" id="L252">            Rational sum=Rational.ZERO;</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for(int j=0;j&lt;vector.dimension();j++) sum=meter.add(sum,meter.mul(row[j],vector.get(j)));</span>
+<span class="fc" id="L254">            meter.value(sum); meter.value(row[vector.dimension()]);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            require(sum.equals(homogeneous?Rational.ZERO:row[vector.dimension()]),&quot;ORIGINAL_RESIDUAL&quot;,false);</span>
+        }
+<span class="fc" id="L257">    }</span>
+    private static void collect(Expr expr, Set&lt;String&gt; names, Meter meter, int depth) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        meter.take(1); require(depth&lt;=64,&quot;SOURCE_DEPTH&quot;,true);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if(expr instanceof VariableExpr variable) { meter.take(variable.name().length()); names.add(variable.name()); }</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        else if(expr instanceof BinaryExpr binary) { collect(binary.left(),names,meter,depth+1); collect(binary.right(),names,meter,depth+1); }</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        else if(!(expr instanceof NumberExpr)) throw new Rejected(&quot;UNSUPPORTED_EXPRESSION&quot;,true);</span>
+<span class="fc" id="L263">    }</span>
+    private static Rational[] affine(Expr expr,List&lt;String&gt; vars,Meter meter) {
+<span class="fc" id="L265">        meter.take(1); int n=vars.size(); Rational[] result=new Rational[n+1];</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for(int i=0;i&lt;=n;i++) { meter.take(1); result[i]=Rational.ZERO; }</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        if(expr instanceof NumberExpr number) { result[n]=Rational.fromExact(number.value()); meter.value(result[n]); return result; }</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if(expr instanceof VariableExpr variable) {</span>
+<span class="fc bfc" id="L269" title="All 4 branches covered.">            for(int i=0;i&lt;n;i++) { meter.take(1); if(vars.get(i).equals(variable.name())) result[i]=Rational.ONE; }</span>
+<span class="fc" id="L270">            return result;</span>
+        }
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if(!(expr instanceof BinaryExpr binary)) throw new Rejected(&quot;UNSUPPORTED_EXPRESSION&quot;,true);</span>
+<span class="fc" id="L273">        Rational[] a=affine(binary.left(),vars,meter), b=affine(binary.right(),vars,meter);</span>
+<span class="fc" id="L274">        boolean ac=true,bc=true;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        for(int i=0;i&lt;n;i++) { meter.value(a[i]);meter.value(b[i]);ac &amp;= a[i].isZero();bc &amp;= b[i].isZero(); }</span>
+<span class="pc bpc" id="L276" title="1 of 5 branches missed.">        switch(binary.operator()) {</span>
+<span class="fc bfc" id="L277" title="All 4 branches covered.">            case ADD, SUB -&gt; { for(int i=0;i&lt;=n;i++) result[i]=binary.operator()==BinaryOperator.ADD?meter.add(a[i],b[i]):meter.sub(a[i],b[i]); }</span>
+            case MUL -&gt; {
+<span class="pc bpc" id="L279" title="1 of 4 branches missed.">                require(ac||bc,&quot;NONLINEAR_PRODUCT&quot;,true);</span>
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">                for(int i=0;i&lt;=n;i++) result[i]=ac?meter.mul(a[n],b[i]):meter.mul(a[i],b[n]);</span>
+<span class="fc" id="L281">            }</span>
+            case DIV -&gt; {
+<span class="pc bpc" id="L283" title="1 of 4 branches missed.">                require(bc&amp;&amp;!b[n].isZero(),&quot;NONCONSTANT_OR_ZERO_DIVISOR&quot;,true);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                for(int i=0;i&lt;=n;i++) result[i]=meter.div(a[i],b[n]);</span>
+<span class="fc" id="L285">            }</span>
+            case POW -&gt; {
+<span class="pc bpc" id="L287" title="2 of 4 branches missed.">                require(bc &amp;&amp; b[n].denominator().equals(java.math.BigInteger.ONE)</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                    &amp;&amp; b[n].numerator().abs().compareTo(java.math.BigInteger.valueOf(64))&lt;=0,&quot;EXPONENT&quot;,true);</span>
+<span class="fc" id="L289">                int power=b[n].numerator().intValue();</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">                if(power==1) return a;</span>
+<span class="fc" id="L291">                require(ac,&quot;NONLINEAR_POWER&quot;,true);</span>
+<span class="pc bpc" id="L292" title="1 of 4 branches missed.">                require(!a[n].isZero()||power&gt;0,&quot;UNDEFINED_ZERO_POWER&quot;,true);</span>
+<span class="fc" id="L293">                Rational value=Rational.ONE;</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                for(int i=0;i&lt;Math.abs(power);i++) value=meter.mul(value,a[n]);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                result[n]=power&lt;0?meter.div(Rational.ONE,value):value;</span>
+            }
+        }
+<span class="fc" id="L298">        return result;</span>
+    }
+<span class="fc bfc" id="L300" title="All 2 branches covered.">    private static void require(boolean condition,String detail,boolean domain) { if(!condition) throw new Rejected(detail,domain); }</span>
+    private static int rationalUnits(Rational value, boolean domain) {
+<span class="fc" id="L302">        int bits=Math.max(value.numerator().bitLength(),value.denominator().bitLength());</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        require(bits&lt;=MAX_RATIONAL_BITS,&quot;RATIONAL_SIZE_LIMIT&quot;,domain);</span>
+<span class="fc" id="L304">        return 1+(bits+31)/32;</span>
+    }
+    private static final class Meter {
+<span class="fc" id="L307">        final int limit; int used; Stage stage=Stage.SOURCE_BINDING; final int[] stages=new int[5];</span>
+<span class="fc" id="L308">        Meter(int limit) { this.limit=limit; }</span>
+        void take(int units) {
+<span class="fc" id="L310">            int charged=Math.min(units,limit-used);used+=charged;stages[stage.ordinal()]+=charged;</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if(charged&lt;units) throw new Exhausted();</span>
+<span class="fc" id="L312">        }</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        void value(Rational value) { take(1);take(rationalUnits(value, stage == Stage.SOURCE_BINDING)); }</span>
+<span class="fc" id="L314">        Rational add(Rational a,Rational b) { value(a);value(b);take(1);Rational r=a.add(b);value(r);return r; }</span>
+<span class="fc" id="L315">        Rational sub(Rational a,Rational b) { value(a);value(b);take(1);Rational r=a.subtract(b);value(r);return r; }</span>
+<span class="fc" id="L316">        Rational mul(Rational a,Rational b) { value(a);value(b);take(1);Rational r=a.multiply(b);value(r);return r; }</span>
+<span class="fc" id="L317">        Rational div(Rational a,Rational b) { value(a);value(b);take(1);Rational r=a.divide(b);value(r);return r; }</span>
+<span class="fc" id="L318">        Rational neg(Rational a) { value(a);take(1);Rational r=a.negate();value(r);return r; }</span>
+<span class="fc" id="L319">        WorkProfile profile() { return new WorkProfile(stages[0],stages[1],stages[2],stages[3],stages[4]); }</span>
+    }
+    private static final class Exhausted extends RuntimeException { private static final long serialVersionUID=1L; }
+    private static final class Rejected extends RuntimeException {
+        private static final long serialVersionUID=1L; final boolean domain;
+<span class="fc" id="L324">        Rejected(String message,boolean domain) { super(message);this.domain=domain; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

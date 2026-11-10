@@ -9,7 +9,7 @@ import java.util.Map;
 public record SaturationDiagnostics(Map&lt;Outcome, Long&gt; counts, List&lt;Event&gt; events, long droppedEvents) {
     public static final int MAX_EVENTS = 128;
     public static final int MAX_MESSAGE_LENGTH = 512;
-<span class="fc" id="L12">    public enum Outcome { NON_APPLICABLE, UNRESOLVED_CONDITIONS, NOT_EQUIVALENCE_PRESERVING, RULE_FAILURE }</span>
+<span class="fc" id="L12">    public enum Outcome { NON_APPLICABLE, UNRESOLVED_CONDITIONS, NOT_EQUIVALENCE_PRESERVING, RULE_FAILURE, MATCH_INCONCLUSIVE }</span>
 <span class="fc" id="L13">    public enum Stage { ELIGIBILITY, EXTRACTION, MATCHES, ASSUMPTIONS, APPLY, INSERTION }</span>
 <span class="fc" id="L14">    public record Event(String ruleId, EClassId eclass, Outcome outcome, Stage stage,</span>
                         String exceptionType, String message) {}
@@ -26,17 +26,25 @@ public record SaturationDiagnostics(Map&lt;Outcome, Long&gt; counts, List&lt;Eve
 <span class="fc" id="L26">        private final List&lt;Event&gt; events = new ArrayList&lt;&gt;();</span>
         private long dropped;
         void record(String rule, EClassId source, Outcome outcome, Stage stage, RuntimeException failure) {
-<span class="fc" id="L29">            counts.merge(outcome, 1L, Long::sum);</span>
+<span class="fc" id="L29">            record(rule, source, outcome, stage, failure, &quot;&quot;);</span>
+<span class="fc" id="L30">        }</span>
+        void recordInconclusiveMatch(String rule, EClassId source, String limitCode) {
+<span class="fc" id="L32">            record(rule, source, Outcome.MATCH_INCONCLUSIVE, Stage.MATCHES, null, limitCode);</span>
+<span class="fc" id="L33">        }</span>
+        private void record(String rule, EClassId source, Outcome outcome, Stage stage,
+                RuntimeException failure, String detail) {
+<span class="fc" id="L36">            counts.merge(outcome, 1L, Long::sum);</span>
             // Ordinary misses are counted, not retained: they must not crowd out failures.
-<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (outcome == Outcome.NON_APPLICABLE) return;</span>
-<span class="fc bfc" id="L32" title="All 2 branches covered.">            if (events.size() &gt;= MAX_EVENTS) { dropped++; return; }</span>
-<span class="fc bfc" id="L33" title="All 2 branches covered.">            String message = failure == null ? &quot;&quot; : String.valueOf(failure.getMessage());</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (message.length() &gt; MAX_MESSAGE_LENGTH) message = message.substring(0, MAX_MESSAGE_LENGTH);</span>
-<span class="fc" id="L35">            events.add(new Event(rule, source, outcome, stage,</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">                failure == null ? &quot;&quot; : failure.getClass().getName(), message));</span>
-<span class="fc" id="L37">        }</span>
-<span class="fc" id="L38">        SaturationDiagnostics snapshot() { return new SaturationDiagnostics(counts, events, dropped); }</span>
-<span class="fc" id="L39">        boolean hasFailures() { return counts.containsKey(Outcome.RULE_FAILURE); }</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (outcome == Outcome.NON_APPLICABLE) return;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (events.size() &gt;= MAX_EVENTS) { dropped++; return; }</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            String message = failure == null ? detail : String.valueOf(failure.getMessage());</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (message.length() &gt; MAX_MESSAGE_LENGTH) message = message.substring(0, MAX_MESSAGE_LENGTH);</span>
+<span class="fc" id="L42">            events.add(new Event(rule, source, outcome, stage,</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                failure == null ? &quot;&quot; : failure.getClass().getName(), message));</span>
+<span class="fc" id="L44">        }</span>
+<span class="fc" id="L45">        SaturationDiagnostics snapshot() { return new SaturationDiagnostics(counts, events, dropped); }</span>
+<span class="fc" id="L46">        boolean hasFailures() { return counts.containsKey(Outcome.RULE_FAILURE); }</span>
+<span class="fc" id="L47">        boolean hasInconclusiveMatches() { return counts.containsKey(Outcome.MATCH_INCONCLUSIVE); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

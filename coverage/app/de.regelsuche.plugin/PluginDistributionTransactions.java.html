@@ -60,73 +60,77 @@ public final class PluginDistributionTransactions {
     }
 <span class="fc" id="L61">    public Optional&lt;PluginInstallationEvidence&gt; active() throws IOException { return client().active(); }</span>
 <span class="fc" id="L62">    public byte[] readArtifact(String identity) throws IOException { return client().readArtifact(identity); }</span>
+    /** Selects current authority state, never a historical transaction receipt. */
+    public Optional&lt;InstalledPluginSnapshot&gt; installedSnapshot() throws IOException {
+<span class="fc" id="L65">        return client().installedSnapshot();</span>
+    }
 
     private synchronized PluginDistributionClient client() throws IOException {
         // Remote receipt lookup must remain possible even when the local cache cannot be opened.
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (localClient == null) localClient = clients.open();</span>
-<span class="fc" id="L67">        return localClient;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (localClient == null) localClient = clients.open();</span>
+<span class="fc" id="L71">        return localClient;</span>
     }
 
     private Result perform(String id, String action, Map&lt;String, ?&gt; inputs, Preparation preparation) throws IOException {
-<span class="fc" id="L71">        PluginCheckpointTransactions.identifier(id);</span>
-<span class="fc" id="L72">        String material = PluginDistributionJson.canonical(Map.of(</span>
+<span class="fc" id="L75">        PluginCheckpointTransactions.identifier(id);</span>
+<span class="fc" id="L76">        String material = PluginDistributionJson.canonical(Map.of(</span>
             &quot;schema&quot;, &quot;regelsuche.plugin-distribution-intent/v1&quot;, &quot;scope&quot;, scope, &quot;action&quot;, action, &quot;inputs&quot;, inputs));
         // URI permits unpaired UTF-16 code units; UTF-8 replacement must not alias a different retained intent.
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (!StandardCharsets.UTF_8.newEncoder().canEncode(material)) {</span>
-<span class="fc" id="L76">            throw new SecurityException(&quot;distribution intent must contain well-formed Unicode&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (!StandardCharsets.UTF_8.newEncoder().canEncode(material)) {</span>
+<span class="fc" id="L80">            throw new SecurityException(&quot;distribution intent must contain well-formed Unicode&quot;);</span>
         }
-<span class="fc" id="L78">        String intent = PluginDistributionJson.hash(material);</span>
+<span class="fc" id="L82">        String intent = PluginDistributionJson.hash(material);</span>
         Optional&lt;Decision&gt; prior;
         try {
-<span class="fc" id="L81">            prior = authority.lookup(id);</span>
-<span class="nc" id="L82">        } catch (IOException unavailable) {</span>
-<span class="nc" id="L83">            return unknown(id);</span>
-<span class="fc" id="L84">        }</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (prior.isPresent()) {</span>
-<span class="fc" id="L86">            var decision = checked(id, prior.orElseThrow());</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (!intent.equals(decision.operation().intentHash())) {</span>
-<span class="fc" id="L88">                throw new SecurityException(&quot;operation ID already belongs to another distribution intent&quot;);</span>
+<span class="fc" id="L85">            prior = authority.lookup(id);</span>
+<span class="nc" id="L86">        } catch (IOException unavailable) {</span>
+<span class="nc" id="L87">            return unknown(id);</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (prior.isPresent()) {</span>
+<span class="fc" id="L90">            var decision = checked(id, prior.orElseThrow());</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (!intent.equals(decision.operation().intentHash())) {</span>
+<span class="fc" id="L92">                throw new SecurityException(&quot;operation ID already belongs to another distribution intent&quot;);</span>
             }
-<span class="fc" id="L90">            return result(decision);</span>
+<span class="fc" id="L94">            return result(decision);</span>
         }
-<span class="fc" id="L92">        var prepared = preparation.run(); // Original native verifiers and immutable generation writer.</span>
-<span class="fc" id="L93">        var operation = new Operation(scope, id, intent, prepared.expected(), new AcceptedState(</span>
-<span class="fc" id="L94">            prepared.evidence().contentHash(), prepared.evidence().checkpoint()));</span>
+<span class="fc" id="L96">        var prepared = preparation.run(); // Original native verifiers and immutable generation writer.</span>
+<span class="fc" id="L97">        var operation = new Operation(scope, id, intent, prepared.expected(), new AcceptedState(</span>
+<span class="fc" id="L98">            prepared.evidence().contentHash(), prepared.evidence().checkpoint()));</span>
         Decision decision;
         try {
-<span class="fc" id="L97">            decision = checked(id, authority.submit(operation));</span>
-<span class="fc" id="L98">        } catch (IOException unavailable) {</span>
-<span class="fc" id="L99">            decision = new Decision(operation, Outcome.OUTCOME_UNKNOWN);</span>
-<span class="fc" id="L100">        }</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!operation.equals(decision.operation())) {</span>
-<span class="nc" id="L102">            throw new SecurityException(&quot;authority returned a different complete operation&quot;);</span>
+<span class="fc" id="L101">            decision = checked(id, authority.submit(operation));</span>
+<span class="fc" id="L102">        } catch (IOException unavailable) {</span>
+<span class="fc" id="L103">            decision = new Decision(operation, Outcome.OUTCOME_UNKNOWN);</span>
+<span class="fc" id="L104">        }</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!operation.equals(decision.operation())) {</span>
+<span class="nc" id="L106">            throw new SecurityException(&quot;authority returned a different complete operation&quot;);</span>
         }
-<span class="fc" id="L104">        return result(decision);</span>
+<span class="fc" id="L108">        return result(decision);</span>
     }
 
     private Decision checked(String id, Decision decision) {
-<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        if (decision == null || !scope.equals(decision.operation().scope())</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                || !id.equals(decision.operation().operationId())) {</span>
-<span class="nc" id="L110">            throw new SecurityException(&quot;authority returned a foreign operation&quot;);</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        if (decision == null || !scope.equals(decision.operation().scope())</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                || !id.equals(decision.operation().operationId())) {</span>
+<span class="nc" id="L114">            throw new SecurityException(&quot;authority returned a foreign operation&quot;);</span>
         }
-<span class="fc" id="L112">        return decision;</span>
+<span class="fc" id="L116">        return decision;</span>
     }
     private Result unknown(String id) {
-<span class="fc" id="L115">        return new Result(scope, id, Outcome.OUTCOME_UNKNOWN, null, null, &quot;NOT_CONFIRMED&quot;);</span>
+<span class="fc" id="L119">        return new Result(scope, id, Outcome.OUTCOME_UNKNOWN, null, null, &quot;NOT_CONFIRMED&quot;);</span>
     }
     private Result result(Decision decision) {
-<span class="fc" id="L118">        PluginInstallationEvidence installation = null;</span>
-<span class="fc" id="L119">        String local = &quot;NOT_CONFIRMED&quot;;</span>
-<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (decision.outcome() == Outcome.COMMITTED) {</span>
+<span class="fc" id="L122">        PluginInstallationEvidence installation = null;</span>
+<span class="fc" id="L123">        String local = &quot;NOT_CONFIRMED&quot;;</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (decision.outcome() == Outcome.COMMITTED) {</span>
             try {
-<span class="fc" id="L122">                installation = client().retainedEvidence(decision.operation().update());</span>
-<span class="fc" id="L123">                local = &quot;AVAILABLE&quot;;</span>
-<span class="fc" id="L124">            } catch (IOException | RuntimeException missingOrInvalid) {</span>
+<span class="fc" id="L126">                installation = client().retainedEvidence(decision.operation().update());</span>
+<span class="fc" id="L127">                local = &quot;AVAILABLE&quot;;</span>
+<span class="fc" id="L128">            } catch (IOException | RuntimeException missingOrInvalid) {</span>
                 // Cache failure cannot undo or misreport a durable authority commit.
-<span class="fc" id="L126">                local = &quot;MISSING_OR_INVALID&quot;;</span>
-<span class="fc" id="L127">            }</span>
+<span class="fc" id="L130">                local = &quot;MISSING_OR_INVALID&quot;;</span>
+<span class="fc" id="L131">            }</span>
         }
-<span class="fc" id="L129">        return new Result(scope, decision.operation().operationId(), decision.outcome(), decision, installation, local);</span>
+<span class="fc" id="L133">        return new Result(scope, decision.operation().operationId(), decision.outcome(), decision, installation, local);</span>
     }
     @FunctionalInterface private interface ClientFactory { PluginDistributionClient open() throws IOException; }
     @FunctionalInterface private interface Preparation { PluginDistributionClient.Prepared run() throws IOException; }
@@ -134,32 +138,32 @@ public final class PluginDistributionTransactions {
     /** Observational data; only the external authority selects the active generation. */
     public record Result(Scope scope, String operationId, Outcome outcome, Decision decision,
             PluginInstallationEvidence installation, String localEvidenceStatus) {
-<span class="fc" id="L137">        public Result {</span>
-<span class="fc" id="L138">            Objects.requireNonNull(scope, &quot;scope&quot;);</span>
-<span class="fc" id="L139">            PluginCheckpointTransactions.identifier(operationId);</span>
-<span class="fc" id="L140">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
-<span class="pc bpc" id="L141" title="1 of 6 branches missed.">            if (decision == null &amp;&amp; outcome != Outcome.OUTCOME_UNKNOWN</span>
-<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                    || decision != null &amp;&amp; (!scope.equals(decision.operation().scope())</span>
-<span class="pc bpc" id="L143" title="2 of 4 branches missed.">                        || !operationId.equals(decision.operation().operationId()) || outcome != decision.outcome())) {</span>
-<span class="nc" id="L144">                throw new IllegalArgumentException(&quot;result must bind the complete authority decision&quot;);</span>
+<span class="fc" id="L141">        public Result {</span>
+<span class="fc" id="L142">            Objects.requireNonNull(scope, &quot;scope&quot;);</span>
+<span class="fc" id="L143">            PluginCheckpointTransactions.identifier(operationId);</span>
+<span class="fc" id="L144">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="pc bpc" id="L145" title="1 of 6 branches missed.">            if (decision == null &amp;&amp; outcome != Outcome.OUTCOME_UNKNOWN</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                    || decision != null &amp;&amp; (!scope.equals(decision.operation().scope())</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">                        || !operationId.equals(decision.operation().operationId()) || outcome != decision.outcome())) {</span>
+<span class="nc" id="L148">                throw new IllegalArgumentException(&quot;result must bind the complete authority decision&quot;);</span>
             }
-<span class="fc bfc" id="L146" title="All 2 branches covered.">            String expectedLocal = outcome != Outcome.COMMITTED ? &quot;NOT_CONFIRMED&quot;</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">                : installation == null ? &quot;MISSING_OR_INVALID&quot; : &quot;AVAILABLE&quot;;</span>
-<span class="pc bpc" id="L148" title="2 of 6 branches missed.">            if (!expectedLocal.equals(localEvidenceStatus) || installation != null</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            String expectedLocal = outcome != Outcome.COMMITTED ? &quot;NOT_CONFIRMED&quot;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                : installation == null ? &quot;MISSING_OR_INVALID&quot; : &quot;AVAILABLE&quot;;</span>
+<span class="pc bpc" id="L152" title="2 of 6 branches missed.">            if (!expectedLocal.equals(localEvidenceStatus) || installation != null</span>
                     &amp;&amp; (outcome != Outcome.COMMITTED
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                        || !installation.contentHash().equals(decision.operation().update().installationHash())</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                        || !installation.checkpoint().equals(decision.operation().update().checkpoint())</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                        || !installation.rootTrustStoreHash().equals(scope.rootTrustStoreHash()))) {</span>
-<span class="nc" id="L153">                throw new IllegalArgumentException(&quot;local evidence differs from committed operation&quot;);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                        || !installation.contentHash().equals(decision.operation().update().installationHash())</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                        || !installation.checkpoint().equals(decision.operation().update().checkpoint())</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                        || !installation.rootTrustStoreHash().equals(scope.rootTrustStoreHash()))) {</span>
+<span class="nc" id="L157">                throw new IllegalArgumentException(&quot;local evidence differs from committed operation&quot;);</span>
             }
-<span class="fc" id="L155">        }</span>
+<span class="fc" id="L159">        }</span>
         public String toCanonicalJson() {
-<span class="fc" id="L157">            var payload = new java.util.LinkedHashMap&lt;String, Object&gt;();</span>
-<span class="fc" id="L158">            payload.put(&quot;schema&quot;, &quot;regelsuche.plugin-distribution-operation-result/v1&quot;);</span>
-<span class="fc" id="L159">            payload.put(&quot;scope&quot;, scope); payload.put(&quot;operationId&quot;, operationId); payload.put(&quot;outcome&quot;, outcome);</span>
-<span class="fc" id="L160">            payload.put(&quot;decision&quot;, decision); payload.put(&quot;installation&quot;, installation);</span>
-<span class="fc" id="L161">            payload.put(&quot;localEvidenceStatus&quot;, localEvidenceStatus);</span>
-<span class="fc" id="L162">            return PluginDistributionJson.canonical(payload);</span>
+<span class="fc" id="L161">            var payload = new java.util.LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L162">            payload.put(&quot;schema&quot;, &quot;regelsuche.plugin-distribution-operation-result/v1&quot;);</span>
+<span class="fc" id="L163">            payload.put(&quot;scope&quot;, scope); payload.put(&quot;operationId&quot;, operationId); payload.put(&quot;outcome&quot;, outcome);</span>
+<span class="fc" id="L164">            payload.put(&quot;decision&quot;, decision); payload.put(&quot;installation&quot;, installation);</span>
+<span class="fc" id="L165">            payload.put(&quot;localEvidenceStatus&quot;, localEvidenceStatus);</span>
+<span class="fc" id="L166">            return PluginDistributionJson.canonical(payload);</span>
         }
     }
 }

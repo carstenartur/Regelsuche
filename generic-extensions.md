@@ -11,8 +11,11 @@ The runnable external example is
 [`extension-runtime-java25`](../examples/external-consumers/extension-runtime-java25/README.md).
 The complete migration roadmap is in the
 [approved architecture](superpowers/specs/2026-09-11-generic-extension-program-discovery-design.md).
-The older application plugin and Discovery paths are not migrated by this first
-foundation slice. This is not a claim that both extension systems should remain.
+The app-owned `InstalledExtensionRuntime` now connects authenticated installed
+Java closures to this v2 runtime; see [installed package activation](#installed-package-activation).
+Existing App commands, the older application plugin interface, Discovery extension
+points and data-only rule/knowledge-pack installation are not migrated by this
+adapter. The architecture roadmap still governs their migration.
 
 ## Catalog identity
 
@@ -86,5 +89,50 @@ work; this foundation does not yet provide reference-counted catalog leases for
 indefinitely running hot-reload hosts.
 
 Admission is a provenance/trust boundary, not a sandbox for hostile Java code.
-Cryptographic admission implementation and application/Discovery migration remain
-subsequent architecture slices.
+
+## Installed package activation
+
+Hosts already using the app's authenticated distribution client can call
+`InstalledExtensionRuntime.open(client)` or `open(transactions)` from
+`de.regelsuche.plugin`. This adapter acquires one immutable verified installed
+closure and supplies the generic runtime's admission callback. It is app-owned;
+the headless runtime retains its dependency direction and does not acquire an app,
+transport or database dependency. Standalone hosts may continue providing their
+own explicit `PluginArtifactAdmission`.
+
+The adapter selects the external authority exactly once, revalidates the selected
+generation's retained index, dependency resolution, artifact signatures and
+provenance under its authenticated working store, then admits copied bytes.
+Activation performs no catalog/artifact download; the external authority must
+still be reachable. In a concurrent update, the selected generation supplies all
+metadata and JARs. Historical committed transaction receipts cannot select an old
+generation, and authority or verification failures do not open a stale catalog.
+
+Before provider loading, the signed closure must declare API `2`, be resolved for
+the exact host core compatibility version, and satisfy every signed entry's core
+bounds. `InstalledExtensionRuntime.Options` defaults to
+`ExtensionApi.CORE_COMPATIBILITY_VERSION` and no additional host exports. Its
+`sharedHostTypes` option uses the exact class-identity export contract above.
+Classpath discovery is disabled, and the adapter exposes no unmanaged path or
+caller-asserted trust shortcut. Descriptor checks still run in the generic runtime;
+descriptors are Java code and become available only after provider initialization.
+
+Each external contribution's origin contains its defining artifact hash, the
+selected installation hash as trust evidence, and a stable
+`installed:<installationHash>/<artifactIdentityHash>` source reference. The catalog
+hash therefore binds this admission metadata. Authenticated provenance does not
+prove mathematical correctness or sandbox executable Java.
+
+Use one installed runtime per bounded host unit of work. Finish contribution use
+before `close()`, then open a new runtime to observe updates, removal, rollback or
+newly accepted trust state. This adapter has no reload method; it does not change
+the generic runtime's reload semantics described above. An empty genesis and a
+committed removal both yield empty catalogs, but only the latter has installation
+evidence. Already returned Java objects cannot be revoked instantly by closing a
+runtime or changing the authority. Background trust refresh and automatic migration
+of the running Workbench are not provided.
+
+The [distribution client guide](plugin-distribution-client.md#activating-installed-extension-spi-v2)
+contains the complete verification boundary, lifecycle and Java integration
+example. The independent v2 greeting example remains a trusted-classpath consumer;
+it does not itself demonstrate authenticated installed-package activation.

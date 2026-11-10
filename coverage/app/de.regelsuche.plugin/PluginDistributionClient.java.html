@@ -185,281 +185,331 @@ public final class PluginDistributionClient {
 <span class="fc bfc" id="L185" title="All 2 branches covered.">        return Optional.ofNullable(snapshot == null ? null : snapshot.evidence());</span>
     }
 
+    /**
+     * Freezes one complete closure selected by exactly one authority read. All
+     * retained index, signature, resolution and provenance relationships are
+     * rechecked offline before any bytes leave this boundary. Later authority
+     * changes apply to the next read; no live authority lease is implied.
+     */
+    public Optional&lt;InstalledPluginSnapshot&gt; installedSnapshot() throws IOException {
+<span class="fc" id="L195">        Snapshot snapshot = active(accepted());</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (snapshot == null) return Optional.empty();</span>
+<span class="fc" id="L197">        var installation = snapshot.evidence();</span>
+<span class="fc" id="L198">        try (var work = store.work()) {</span>
+<span class="fc" id="L199">            PluginTrustStore trust = retainedTrust(snapshot, work.directory());</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (installation.artifacts().isEmpty()) {</span>
+<span class="fc" id="L201">                return Optional.of(new InstalledPluginSnapshot(installation, null, List.of()));</span>
+            }
+<span class="fc" id="L203">            PluginInstallationStore.write(work.directory(), &quot;index.json&quot;, required(snapshot.files(), &quot;index.json&quot;));</span>
+<span class="fc" id="L204">            PluginInstallationStore.write(work.directory(), &quot;index.sig.json&quot;, required(snapshot.files(), &quot;index.sig.json&quot;));</span>
+<span class="fc" id="L205">            VerifiedIndex verified = new PluginArtifactIndexVerifier(trust).requireTrusted(</span>
+<span class="fc" id="L206">                work.directory().resolve(&quot;index.json&quot;), work.directory().resolve(&quot;index.sig.json&quot;));</span>
+<span class="fc" id="L207">            var index = verified.index();</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (!installation.indexId().equals(index.indexId())</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                    || !installation.indexRevision().equals(index.revision())</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    || !installation.indexContentHash().equals(index.contentHash())) {</span>
+<span class="nc" id="L211">                throw new SecurityException(&quot;selected installation differs from its signed index&quot;);</span>
+            }
+<span class="fc" id="L213">            var original = PluginDistributionJson.read(required(snapshot.files(), &quot;resolution.json&quot;),</span>
+                ResolutionReceipt.class);
+<span class="fc" id="L215">            Map&lt;String, byte[]&gt; verifiedFiles = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L216">            Admission admission = admit(verified, original.request(), trust, verifiedFiles, work.directory(),</span>
+<span class="fc" id="L217">                (entry, type) -&gt; required(snapshot.files(), path(entry, type)));</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (!original.contentHash().equals(admission.resolution().contentHash())</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                    || !installation.resolutionContentHash().equals(admission.resolution().contentHash())</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                    || !installation.artifacts().equals(admission.artifacts())) {</span>
+<span class="nc" id="L221">                throw new SecurityException(&quot;selected installation no longer reproduces its verified closure&quot;);</span>
+            }
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            for (var file : verifiedFiles.entrySet()) {</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">                if (!java.util.Arrays.equals(file.getValue(), required(snapshot.files(), file.getKey()))) {</span>
+<span class="nc" id="L225">                    throw new SecurityException(&quot;selected installation verification evidence differs: &quot; + file.getKey());</span>
+                }
+<span class="fc" id="L227">            }</span>
+<span class="fc" id="L228">            Map&lt;String, Entry&gt; entries = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L229">            index.entries().forEach(entry -&gt; entries.put(entry.identityHash(), entry));</span>
+<span class="fc" id="L230">            List&lt;InstalledPluginSnapshot.Artifact&gt; artifacts = admission.artifacts().stream()</span>
+<span class="fc" id="L231">                .map(evidence -&gt; new InstalledPluginSnapshot.Artifact(evidence, entries.get(evidence.identityHash()),</span>
+<span class="fc" id="L232">                    required(verifiedFiles, evidence.path())))</span>
+<span class="fc" id="L233">                .toList();</span>
+<span class="fc" id="L234">            return Optional.of(new InstalledPluginSnapshot(installation, admission.resolution(), artifacts));</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        }</span>
+    }
+
     /** Returns the exact verified retained snapshot, avoiding a path-based verify-then-swap race. */
     public byte[] readArtifact(String identityHash) throws IOException {
-<span class="fc" id="L190">        PluginSignatureManifest.requireSha256(identityHash, &quot;identityHash&quot;);</span>
-<span class="fc" id="L191">        Snapshot snapshot = requireInstalled(active(accepted()));</span>
-<span class="fc" id="L192">        var artifact = snapshot.evidence().artifacts().stream()</span>
-<span class="fc" id="L193">            .filter(value -&gt; value.identityHash().equals(identityHash)).findFirst()</span>
-<span class="pc" id="L194">            .orElseThrow(() -&gt; new SecurityException(&quot;artifact is not part of the active installation&quot;));</span>
-<span class="fc" id="L195">        return required(snapshot.files(), artifact.path()).clone();</span>
+<span class="fc" id="L240">        PluginSignatureManifest.requireSha256(identityHash, &quot;identityHash&quot;);</span>
+<span class="fc" id="L241">        Snapshot snapshot = requireInstalled(active(accepted()));</span>
+<span class="fc" id="L242">        var artifact = snapshot.evidence().artifacts().stream()</span>
+<span class="fc" id="L243">            .filter(value -&gt; value.identityHash().equals(identityHash)).findFirst()</span>
+<span class="pc" id="L244">            .orElseThrow(() -&gt; new SecurityException(&quot;artifact is not part of the active installation&quot;));</span>
+<span class="fc" id="L245">        return required(snapshot.files(), artifact.path()).clone();</span>
     }
 
     private Admission admit(VerifiedIndex verified, ResolutionRequest request, PluginTrustStore trust,
             Map&lt;String, byte[]&gt; files, Path work, Fetch fetch) throws IOException {
-<span class="fc" id="L200">        var resolution = new PluginArtifactResolver().resolve(verified.index(), request);</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (resolution.status() != PluginArtifactResolver.ResolutionStatus.RESOLVED</span>
-<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                || resolution.plan().size() &gt; limits.maximumArtifacts()) {</span>
-<span class="nc" id="L203">            throw new SecurityException(&quot;package resolution failed or exceeds the artifact count budget&quot;);</span>
+<span class="fc" id="L250">        var resolution = new PluginArtifactResolver().resolve(verified.index(), request);</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (resolution.status() != PluginArtifactResolver.ResolutionStatus.RESOLVED</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                || resolution.plan().size() &gt; limits.maximumArtifacts()) {</span>
+<span class="nc" id="L253">            throw new SecurityException(&quot;package resolution failed or exceeds the artifact count budget&quot;);</span>
         }
-<span class="fc" id="L205">        Map&lt;String, Entry&gt; entries = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L206">        verified.index().entries().forEach(entry -&gt; entries.put(entry.identityHash(), entry));</span>
-<span class="fc" id="L207">        List&lt;Entry&gt; selected = resolution.plan().stream().map(step -&gt; entries.get(step.identityHash())).toList();</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (Entry entry : selected) {</span>
-<span class="pc bpc" id="L209" title="2 of 4 branches missed.">            if (entry == null || entry.kind() != ArtifactKind.JAVA_PLUGIN) {</span>
-<span class="nc" id="L210">                throw new SecurityException(&quot;network installation currently admits Java plugin JARs only&quot;);</span>
+<span class="fc" id="L255">        Map&lt;String, Entry&gt; entries = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L256">        verified.index().entries().forEach(entry -&gt; entries.put(entry.identityHash(), entry));</span>
+<span class="fc" id="L257">        List&lt;Entry&gt; selected = resolution.plan().stream().map(step -&gt; entries.get(step.identityHash())).toList();</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        for (Entry entry : selected) {</span>
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">            if (entry == null || entry.kind() != ArtifactKind.JAVA_PLUGIN) {</span>
+<span class="nc" id="L260">                throw new SecurityException(&quot;network installation currently admits Java plugin JARs only&quot;);</span>
             }
-<span class="fc" id="L212">            PluginInstallationEvidence.requirePath(entry.artifactFileName());</span>
-<span class="fc" id="L213">            https(URI.create(entry.artifactUri()));</span>
-<span class="fc" id="L214">            https(URI.create(entry.signatureManifestUri()));</span>
-<span class="fc" id="L215">            https(URI.create(entry.provenanceUri()));</span>
-<span class="fc" id="L216">        }</span>
-<span class="fc" id="L217">        put(files, &quot;index.json&quot;, verified.index().toCanonicalJson());</span>
-<span class="fc" id="L218">        put(files, &quot;index-verification.json&quot;, verified.verification().toCanonicalJson());</span>
-<span class="fc" id="L219">        put(files, &quot;resolution.json&quot;, resolution.toCanonicalJson());</span>
-<span class="fc" id="L220">        List&lt;PluginInstallationEvidence.Artifact&gt; artifacts = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (Entry entry : selected) {</span>
-<span class="fc" id="L222">            byte[] artifact = fetch.get(entry, Resource.ARTIFACT);</span>
-<span class="fc" id="L223">            byte[] signature = fetch.get(entry, Resource.SIGNATURE);</span>
-<span class="fc" id="L224">            byte[] provenanceBytes = fetch.get(entry, Resource.PROVENANCE);</span>
-<span class="fc" id="L225">            PluginDistributionJson.validate(signature);</span>
-<span class="fc" id="L226">            PluginDistributionJson.validate(provenanceBytes);</span>
-<span class="fc" id="L227">            PluginInstallationStore.write(work, path(entry, Resource.ARTIFACT), artifact);</span>
-<span class="fc" id="L228">            PluginInstallationStore.write(work, path(entry, Resource.SIGNATURE), signature);</span>
-<span class="fc" id="L229">            var snapshot = new PluginArtifactVerifier(trust, limits.artifactBytes())</span>
-<span class="fc" id="L230">                .snapshot(work.resolve(path(entry, Resource.ARTIFACT)));</span>
-<span class="fc" id="L231">            var verification = snapshot.verification();</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (!verification.permittedBy(PluginTrustPolicy.REQUIRE_VERIFIED)</span>
-<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                    || !entry.artifactSha256().equals(verification.artifactSha256())</span>
-<span class="fc bfc" id="L234" title="All 2 branches covered.">                    || !entry.publisherId().equals(verification.publisherId())) {</span>
-<span class="fc" id="L235">                throw new SecurityException(&quot;artifact admission failed: &quot; + verification.status());</span>
+<span class="fc" id="L262">            PluginInstallationEvidence.requirePath(entry.artifactFileName());</span>
+<span class="fc" id="L263">            https(URI.create(entry.artifactUri()));</span>
+<span class="fc" id="L264">            https(URI.create(entry.signatureManifestUri()));</span>
+<span class="fc" id="L265">            https(URI.create(entry.provenanceUri()));</span>
+<span class="fc" id="L266">        }</span>
+<span class="fc" id="L267">        put(files, &quot;index.json&quot;, verified.index().toCanonicalJson());</span>
+<span class="fc" id="L268">        put(files, &quot;index-verification.json&quot;, verified.verification().toCanonicalJson());</span>
+<span class="fc" id="L269">        put(files, &quot;resolution.json&quot;, resolution.toCanonicalJson());</span>
+<span class="fc" id="L270">        List&lt;PluginInstallationEvidence.Artifact&gt; artifacts = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        for (Entry entry : selected) {</span>
+<span class="fc" id="L272">            byte[] artifact = fetch.get(entry, Resource.ARTIFACT);</span>
+<span class="fc" id="L273">            byte[] signature = fetch.get(entry, Resource.SIGNATURE);</span>
+<span class="fc" id="L274">            byte[] provenanceBytes = fetch.get(entry, Resource.PROVENANCE);</span>
+<span class="fc" id="L275">            PluginDistributionJson.validate(signature);</span>
+<span class="fc" id="L276">            PluginDistributionJson.validate(provenanceBytes);</span>
+<span class="fc" id="L277">            PluginInstallationStore.write(work, path(entry, Resource.ARTIFACT), artifact);</span>
+<span class="fc" id="L278">            PluginInstallationStore.write(work, path(entry, Resource.SIGNATURE), signature);</span>
+<span class="fc" id="L279">            var snapshot = new PluginArtifactVerifier(trust, limits.artifactBytes())</span>
+<span class="fc" id="L280">                .snapshot(work.resolve(path(entry, Resource.ARTIFACT)));</span>
+<span class="fc" id="L281">            var verification = snapshot.verification();</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            if (!verification.permittedBy(PluginTrustPolicy.REQUIRE_VERIFIED)</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                    || !entry.artifactSha256().equals(verification.artifactSha256())</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                    || !entry.publisherId().equals(verification.publisherId())) {</span>
+<span class="fc" id="L285">                throw new SecurityException(&quot;artifact admission failed: &quot; + verification.status());</span>
             }
-<span class="fc" id="L237">            var provenance = PluginArtifactProvenance.read(provenanceBytes);</span>
-<span class="fc" id="L238">            provenance.requireTrusted(entry, trust);</span>
-<span class="fc" id="L239">            files.put(path(entry, Resource.ARTIFACT), snapshot.artifactBytes());</span>
-<span class="fc" id="L240">            put(files, path(entry, Resource.SIGNATURE), PluginSignatureManifest.read(</span>
-<span class="fc" id="L241">                work.resolve(path(entry, Resource.SIGNATURE))).toCanonicalJson());</span>
-<span class="fc" id="L242">            put(files, path(entry, Resource.PROVENANCE), provenance.toCanonicalJson());</span>
-<span class="fc" id="L243">            put(files, directory(entry) + &quot;/artifact-verification.json&quot;, verification.toCanonicalJson());</span>
-<span class="fc" id="L244">            artifacts.add(new PluginInstallationEvidence.Artifact(entry.kind().name(), entry.componentId(),</span>
-<span class="fc" id="L245">                entry.version(), entry.identityHash(), entry.artifactSha256(), entry.publisherId(),</span>
-<span class="fc" id="L246">                path(entry, Resource.ARTIFACT), provenance.contentHash(), verification.contentHash()));</span>
-<span class="fc" id="L247">        }</span>
-<span class="fc" id="L248">        return new Admission(resolution, artifacts);</span>
+<span class="fc" id="L287">            var provenance = PluginArtifactProvenance.read(provenanceBytes);</span>
+<span class="fc" id="L288">            provenance.requireTrusted(entry, trust);</span>
+<span class="fc" id="L289">            files.put(path(entry, Resource.ARTIFACT), snapshot.artifactBytes());</span>
+<span class="fc" id="L290">            put(files, path(entry, Resource.SIGNATURE), PluginSignatureManifest.read(</span>
+<span class="fc" id="L291">                work.resolve(path(entry, Resource.SIGNATURE))).toCanonicalJson());</span>
+<span class="fc" id="L292">            put(files, path(entry, Resource.PROVENANCE), provenance.toCanonicalJson());</span>
+<span class="fc" id="L293">            put(files, directory(entry) + &quot;/artifact-verification.json&quot;, verification.toCanonicalJson());</span>
+<span class="fc" id="L294">            artifacts.add(new PluginInstallationEvidence.Artifact(entry.kind().name(), entry.componentId(),</span>
+<span class="fc" id="L295">                entry.version(), entry.identityHash(), entry.artifactSha256(), entry.publisherId(),</span>
+<span class="fc" id="L296">                path(entry, Resource.ARTIFACT), provenance.contentHash(), verification.contentHash()));</span>
+<span class="fc" id="L297">        }</span>
+<span class="fc" id="L298">        return new Admission(resolution, artifacts);</span>
     }
 
     private Prepared prepare(AcceptedState previous, String operation, String rollbackSource,
             PluginTrustStoreRevisionVerifier.ChainCheckpoint checkpoint, PluginTrustStore trust,
             PluginArtifactIndex index, Admission admission, Map&lt;String, byte[]&gt; files) throws IOException {
-<span class="fc" id="L254">        long total = 0;</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (var entry : files.entrySet()) {</span>
-<span class="fc" id="L256">            boolean artifact = admission.artifacts().stream().anyMatch(value -&gt; value.path().equals(entry.getKey()));</span>
-<span class="pc bpc" id="L257" title="1 of 4 branches missed.">            if (entry.getValue().length &gt; (artifact ? limits.artifactBytes() : limits.metadataBytes())) {</span>
-<span class="nc" id="L258">                throw new SecurityException(&quot;retained file exceeds the installation byte limit&quot;);</span>
+<span class="fc" id="L304">        long total = 0;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (var entry : files.entrySet()) {</span>
+<span class="fc" id="L306">            boolean artifact = admission.artifacts().stream().anyMatch(value -&gt; value.path().equals(entry.getKey()));</span>
+<span class="pc bpc" id="L307" title="1 of 4 branches missed.">            if (entry.getValue().length &gt; (artifact ? limits.artifactBytes() : limits.metadataBytes())) {</span>
+<span class="nc" id="L308">                throw new SecurityException(&quot;retained file exceeds the installation byte limit&quot;);</span>
             }
-<span class="fc" id="L260">            total = Math.addExact(total, entry.getValue().length);</span>
-<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            if (total &gt; limits.totalBytes()) {</span>
-<span class="nc" id="L262">                throw new SecurityException(&quot;retained generation exceeds the total installation byte limit&quot;);</span>
+<span class="fc" id="L310">            total = Math.addExact(total, entry.getValue().length);</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (total &gt; limits.totalBytes()) {</span>
+<span class="nc" id="L312">                throw new SecurityException(&quot;retained generation exceeds the total installation byte limit&quot;);</span>
             }
-<span class="fc" id="L264">        }</span>
-<span class="fc" id="L265">        var evidence = PluginInstallationEvidence.create(operation, previous.installationHash(), rollbackSource,</span>
-<span class="fc" id="L266">            checkpoint, rootHash, PluginDistributionJson.hash(trust.toCanonicalJson()),</span>
-<span class="fc bfc" id="L267" title="All 4 branches covered.">            index == null ? &quot;&quot; : index.indexId(), index == null ? &quot;&quot; : index.revision(),</span>
-<span class="fc bfc" id="L268" title="All 2 branches covered.">            index == null ? &quot;&quot; : index.contentHash(),</span>
-<span class="fc bfc" id="L269" title="All 2 branches covered.">            admission.resolution() == null ? &quot;&quot; : admission.resolution().contentHash(),</span>
-<span class="fc" id="L270">            admission.artifacts(), PluginInstallationStore.hashes(files));</span>
-<span class="fc" id="L271">        int installationBytes = evidence.toCanonicalJson().getBytes(StandardCharsets.UTF_8).length;</span>
-<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (installationBytes &gt; limits.metadataBytes()) {</span>
-<span class="nc" id="L273">            throw new SecurityException(&quot;installation evidence exceeds the metadata byte limit&quot;);</span>
+<span class="fc" id="L314">        }</span>
+<span class="fc" id="L315">        var evidence = PluginInstallationEvidence.create(operation, previous.installationHash(), rollbackSource,</span>
+<span class="fc" id="L316">            checkpoint, rootHash, PluginDistributionJson.hash(trust.toCanonicalJson()),</span>
+<span class="fc bfc" id="L317" title="All 4 branches covered.">            index == null ? &quot;&quot; : index.indexId(), index == null ? &quot;&quot; : index.revision(),</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">            index == null ? &quot;&quot; : index.contentHash(),</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            admission.resolution() == null ? &quot;&quot; : admission.resolution().contentHash(),</span>
+<span class="fc" id="L320">            admission.artifacts(), PluginInstallationStore.hashes(files));</span>
+<span class="fc" id="L321">        int installationBytes = evidence.toCanonicalJson().getBytes(StandardCharsets.UTF_8).length;</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (installationBytes &gt; limits.metadataBytes()) {</span>
+<span class="nc" id="L323">            throw new SecurityException(&quot;installation evidence exceeds the metadata byte limit&quot;);</span>
         }
-<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (installationBytes &gt; limits.totalBytes() - total) {</span>
-<span class="fc" id="L276">            throw new SecurityException(&quot;retained generation exceeds the total installation byte limit&quot;);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        if (installationBytes &gt; limits.totalBytes() - total) {</span>
+<span class="fc" id="L326">            throw new SecurityException(&quot;retained generation exceeds the total installation byte limit&quot;);</span>
         }
-<span class="fc" id="L278">        store.persist(evidence, files);</span>
-<span class="fc" id="L279">        return new Prepared(previous, evidence);</span>
+<span class="fc" id="L328">        store.persist(evidence, files);</span>
+<span class="fc" id="L329">        return new Prepared(previous, evidence);</span>
     }
 
     private void requireDirectActivationAuthority() {
-<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (authority == null) {</span>
-<span class="fc" id="L284">            throw new IllegalStateException(&quot;operation-aware client requires transaction activation&quot;);</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (authority == null) {</span>
+<span class="fc" id="L334">            throw new IllegalStateException(&quot;operation-aware client requires transaction activation&quot;);</span>
         }
-<span class="fc" id="L286">    }</span>
+<span class="fc" id="L336">    }</span>
 
     private PluginInstallationEvidence activate(Prepared prepared) throws IOException {
-<span class="fc" id="L289">        requireDirectActivationAuthority();</span>
-<span class="fc" id="L290">        var evidence = prepared.evidence();</span>
-<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (!authority.compareAndSet(prepared.expected(), new AcceptedState(evidence.contentHash(), evidence.checkpoint()))) {</span>
-<span class="fc" id="L292">            throw new SecurityException(&quot;installation authority rejected a stale or concurrent transition&quot;);</span>
+<span class="fc" id="L339">        requireDirectActivationAuthority();</span>
+<span class="fc" id="L340">        var evidence = prepared.evidence();</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        if (!authority.compareAndSet(prepared.expected(), new AcceptedState(evidence.contentHash(), evidence.checkpoint()))) {</span>
+<span class="fc" id="L342">            throw new SecurityException(&quot;installation authority rejected a stale or concurrent transition&quot;);</span>
         }
-<span class="fc" id="L294">        return evidence;</span>
+<span class="fc" id="L344">        return evidence;</span>
     }
 
     @FunctionalInterface interface StateReader { AcceptedState read() throws IOException; }
-<span class="fc" id="L298">    record Prepared(AcceptedState expected, PluginInstallationEvidence evidence) { }</span>
+<span class="fc" id="L348">    record Prepared(AcceptedState expected, PluginInstallationEvidence evidence) { }</span>
 
     PluginInstallationEvidence retainedEvidence(AcceptedState accepted) throws IOException {
-<span class="fc" id="L301">        return active(accepted).evidence();</span>
+<span class="fc" id="L351">        return active(accepted).evidence();</span>
     }
 
     private AcceptedState accepted() throws IOException {
-<span class="fc" id="L305">        AcceptedState accepted = Objects.requireNonNull(stateReader.read(), &quot;authority cannot return null/genesis on failure&quot;);</span>
-<span class="pc bpc" id="L306" title="1 of 4 branches missed.">        if (accepted.checkpoint() != null &amp;&amp; !trustDomain.equals(accepted.checkpoint().trustDomainId())) {</span>
-<span class="nc" id="L307">            throw new SecurityException(&quot;authority belongs to another trust domain&quot;);</span>
+<span class="fc" id="L355">        AcceptedState accepted = Objects.requireNonNull(stateReader.read(), &quot;authority cannot return null/genesis on failure&quot;);</span>
+<span class="pc bpc" id="L356" title="1 of 4 branches missed.">        if (accepted.checkpoint() != null &amp;&amp; !trustDomain.equals(accepted.checkpoint().trustDomainId())) {</span>
+<span class="nc" id="L357">            throw new SecurityException(&quot;authority belongs to another trust domain&quot;);</span>
         }
-<span class="fc" id="L309">        return accepted;</span>
+<span class="fc" id="L359">        return accepted;</span>
     }
 
     private Snapshot active(AcceptedState accepted) throws IOException {
-<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (accepted.installationHash().isEmpty()) {</span>
-<span class="fc" id="L314">            return null;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (accepted.installationHash().isEmpty()) {</span>
+<span class="fc" id="L364">            return null;</span>
         }
-<span class="fc" id="L316">        Snapshot snapshot = store.load(accepted.installationHash());</span>
-<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (!accepted.checkpoint().equals(snapshot.evidence().checkpoint())</span>
-<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                || !rootHash.equals(snapshot.evidence().rootTrustStoreHash())) {</span>
-<span class="nc" id="L319">            throw new SecurityException(&quot;installation differs from trusted checkpoint or pinned authority roots&quot;);</span>
+<span class="fc" id="L366">        Snapshot snapshot = store.load(accepted.installationHash());</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (!accepted.checkpoint().equals(snapshot.evidence().checkpoint())</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                || !rootHash.equals(snapshot.evidence().rootTrustStoreHash())) {</span>
+<span class="nc" id="L369">            throw new SecurityException(&quot;installation differs from trusted checkpoint or pinned authority roots&quot;);</span>
         }
-<span class="fc" id="L321">        return snapshot;</span>
+<span class="fc" id="L371">        return snapshot;</span>
     }
 
     private Snapshot ancestor(Snapshot current, String hash) throws IOException {
-<span class="fc" id="L325">        String cursor = current.evidence().previousInstallationHash();</span>
-<span class="pc bpc" id="L326" title="1 of 4 branches missed.">        for (int count = 0; !cursor.isEmpty() &amp;&amp; count &lt; limits.maximumHistory(); count++) {</span>
-<span class="fc" id="L327">            Snapshot candidate = store.load(cursor);</span>
-<span class="fc bfc" id="L328" title="All 2 branches covered.">            if (cursor.equals(hash)) {</span>
-<span class="fc" id="L329">                return candidate;</span>
+<span class="fc" id="L375">        String cursor = current.evidence().previousInstallationHash();</span>
+<span class="pc bpc" id="L376" title="1 of 4 branches missed.">        for (int count = 0; !cursor.isEmpty() &amp;&amp; count &lt; limits.maximumHistory(); count++) {</span>
+<span class="fc" id="L377">            Snapshot candidate = store.load(cursor);</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            if (cursor.equals(hash)) {</span>
+<span class="fc" id="L379">                return candidate;</span>
             }
-<span class="fc" id="L331">            cursor = candidate.evidence().previousInstallationHash();</span>
+<span class="fc" id="L381">            cursor = candidate.evidence().previousInstallationHash();</span>
         }
-<span class="fc" id="L333">        throw new SecurityException(&quot;rollback target is not within the bounded retained ancestry&quot;);</span>
+<span class="fc" id="L383">        throw new SecurityException(&quot;rollback target is not within the bounded retained ancestry&quot;);</span>
     }
 
     private static Snapshot requireInstalled(Snapshot snapshot) {
-<span class="pc bpc" id="L337" title="2 of 4 branches missed.">        if (snapshot == null || snapshot.evidence().artifacts().isEmpty()) {</span>
-<span class="nc" id="L338">            throw new SecurityException(&quot;no package closure is installed&quot;);</span>
+<span class="pc bpc" id="L387" title="2 of 4 branches missed.">        if (snapshot == null || snapshot.evidence().artifacts().isEmpty()) {</span>
+<span class="nc" id="L388">            throw new SecurityException(&quot;no package closure is installed&quot;);</span>
         }
-<span class="fc" id="L340">        return snapshot;</span>
+<span class="fc" id="L390">        return snapshot;</span>
     }
 
     private static PluginTrustStore retainedTrust(Snapshot snapshot, Path work) throws IOException {
-<span class="fc" id="L344">        PluginInstallationStore.write(work, &quot;current-trust.json&quot;, required(snapshot.files(), &quot;trust-store.json&quot;));</span>
-<span class="fc" id="L345">        PluginTrustStore trust = PluginTrustStore.load(work.resolve(&quot;current-trust.json&quot;));</span>
-<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (!snapshot.evidence().trustStoreHash().equals(PluginDistributionJson.hash(trust.toCanonicalJson()))) {</span>
-<span class="nc" id="L347">            throw new SecurityException(&quot;retained working trust-store identity mismatch&quot;);</span>
+<span class="fc" id="L394">        PluginInstallationStore.write(work, &quot;current-trust.json&quot;, required(snapshot.files(), &quot;trust-store.json&quot;));</span>
+<span class="fc" id="L395">        PluginTrustStore trust = PluginTrustStore.load(work.resolve(&quot;current-trust.json&quot;));</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (!snapshot.evidence().trustStoreHash().equals(PluginDistributionJson.hash(trust.toCanonicalJson()))) {</span>
+<span class="nc" id="L397">            throw new SecurityException(&quot;retained working trust-store identity mismatch&quot;);</span>
         }
-<span class="fc" id="L349">        return trust;</span>
+<span class="fc" id="L399">        return trust;</span>
     }
 
     private static Map&lt;String, byte[]&gt; trustFiles(VerifiedTrustStoreRevision trust) {
-<span class="fc" id="L353">        Map&lt;String, byte[]&gt; files = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L354">        put(files, &quot;trust-store.json&quot;, trust.trustStore().toCanonicalJson());</span>
-<span class="fc" id="L355">        put(files, &quot;trust-revision.json&quot;, trust.revision().toCanonicalJson());</span>
-<span class="fc" id="L356">        put(files, &quot;trust-verification.json&quot;, trust.verification().toCanonicalJson());</span>
-<span class="fc" id="L357">        put(files, &quot;checkpoint.json&quot;, trust.checkpoint().toCanonicalJson());</span>
-<span class="fc" id="L358">        return files;</span>
+<span class="fc" id="L403">        Map&lt;String, byte[]&gt; files = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L404">        put(files, &quot;trust-store.json&quot;, trust.trustStore().toCanonicalJson());</span>
+<span class="fc" id="L405">        put(files, &quot;trust-revision.json&quot;, trust.revision().toCanonicalJson());</span>
+<span class="fc" id="L406">        put(files, &quot;trust-verification.json&quot;, trust.verification().toCanonicalJson());</span>
+<span class="fc" id="L407">        put(files, &quot;checkpoint.json&quot;, trust.checkpoint().toCanonicalJson());</span>
+<span class="fc" id="L408">        return files;</span>
     }
 
     private static Map&lt;String, byte[]&gt; retainedTrustFiles(Snapshot snapshot) {
-<span class="fc" id="L362">        Map&lt;String, byte[]&gt; files = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L363">        TRUST_FILES.forEach(name -&gt; files.put(name, required(snapshot.files(), name)));</span>
-<span class="fc" id="L364">        return files;</span>
+<span class="fc" id="L412">        Map&lt;String, byte[]&gt; files = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L413">        TRUST_FILES.forEach(name -&gt; files.put(name, required(snapshot.files(), name)));</span>
+<span class="fc" id="L414">        return files;</span>
     }
 
     private static byte[] required(Map&lt;String, byte[]&gt; files, String path) {
-<span class="fc" id="L368">        byte[] bytes = files.get(path);</span>
-<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (bytes == null) {</span>
-<span class="nc" id="L370">            throw new SecurityException(&quot;installation lacks retained metadata: &quot; + path);</span>
+<span class="fc" id="L418">        byte[] bytes = files.get(path);</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (bytes == null) {</span>
+<span class="nc" id="L420">            throw new SecurityException(&quot;installation lacks retained metadata: &quot; + path);</span>
         }
-<span class="fc" id="L372">        return bytes;</span>
+<span class="fc" id="L422">        return bytes;</span>
     }
 
     private static void put(Map&lt;String, byte[]&gt; files, String path, String json) {
-<span class="fc" id="L376">        files.put(path, json.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L377">    }</span>
+<span class="fc" id="L426">        files.put(path, json.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L427">    }</span>
 
     private static String directory(Entry entry) {
-<span class="fc" id="L380">        return &quot;artifacts/&quot; + entry.identityHash().substring(7);</span>
+<span class="fc" id="L430">        return &quot;artifacts/&quot; + entry.identityHash().substring(7);</span>
     }
 
     private static String path(Entry entry, Resource type) {
-<span class="fc" id="L384">        String artifact = directory(entry) + &quot;/&quot; + entry.artifactFileName();</span>
-<span class="fc bfc" id="L385" title="All 3 branches covered.">        return switch (type) {</span>
-<span class="fc" id="L386">            case ARTIFACT -&gt; artifact;</span>
-<span class="fc" id="L387">            case SIGNATURE -&gt; artifact + &quot;.sig.json&quot;;</span>
-<span class="fc" id="L388">            case PROVENANCE -&gt; directory(entry) + &quot;/provenance.json&quot;;</span>
+<span class="fc" id="L434">        String artifact = directory(entry) + &quot;/&quot; + entry.artifactFileName();</span>
+<span class="fc bfc" id="L435" title="All 3 branches covered.">        return switch (type) {</span>
+<span class="fc" id="L436">            case ARTIFACT -&gt; artifact;</span>
+<span class="fc" id="L437">            case SIGNATURE -&gt; artifact + &quot;.sig.json&quot;;</span>
+<span class="fc" id="L438">            case PROVENANCE -&gt; directory(entry) + &quot;/provenance.json&quot;;</span>
         };
     }
 
     private static URI https(URI uri) {
-<span class="fc" id="L393">        Objects.requireNonNull(uri, &quot;URI&quot;);</span>
-<span class="pc bpc" id="L394" title="2 of 4 branches missed.">        if (!&quot;https&quot;.equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null</span>
-<span class="pc bpc" id="L395" title="2 of 4 branches missed.">                || uri.getUserInfo() != null || uri.getFragment() != null</span>
-<span class="pc bpc" id="L396" title="2 of 4 branches missed.">                || uri.getPort() == 0 || uri.getPort() &gt; 65535) {</span>
-<span class="nc" id="L397">            throw new SecurityException(&quot;package installation requires an absolute HTTPS URI&quot;);</span>
+<span class="fc" id="L443">        Objects.requireNonNull(uri, &quot;URI&quot;);</span>
+<span class="pc bpc" id="L444" title="2 of 4 branches missed.">        if (!&quot;https&quot;.equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null</span>
+<span class="pc bpc" id="L445" title="2 of 4 branches missed.">                || uri.getUserInfo() != null || uri.getFragment() != null</span>
+<span class="pc bpc" id="L446" title="2 of 4 branches missed.">                || uri.getPort() == 0 || uri.getPort() &gt; 65535) {</span>
+<span class="nc" id="L447">            throw new SecurityException(&quot;package installation requires an absolute HTTPS URI&quot;);</span>
         }
-<span class="fc" id="L399">        return uri;</span>
+<span class="fc" id="L449">        return uri;</span>
     }
 
     /** Caller pins the immutable index identity as well as its retrieval locations. */
     public record Sources(URI trustStoreUri, URI trustRevisionUri, URI indexUri, URI indexSignatureUri,
         String indexId, String indexRevision, String indexContentHash) {
-<span class="fc" id="L405">        public Sources {</span>
-<span class="fc" id="L406">            https(trustStoreUri);</span>
-<span class="fc" id="L407">            https(trustRevisionUri);</span>
-<span class="fc" id="L408">            https(indexUri);</span>
-<span class="fc" id="L409">            https(indexSignatureUri);</span>
-<span class="fc" id="L410">            PluginSignatureManifest.requireIdentifier(indexId, &quot;indexId&quot;);</span>
-<span class="fc" id="L411">            PluginSignatureManifest.requireIdentifier(indexRevision, &quot;indexRevision&quot;);</span>
-<span class="fc" id="L412">            PluginSignatureManifest.requireSha256(indexContentHash, &quot;indexContentHash&quot;);</span>
-<span class="fc" id="L413">        }</span>
+<span class="fc" id="L455">        public Sources {</span>
+<span class="fc" id="L456">            https(trustStoreUri);</span>
+<span class="fc" id="L457">            https(trustRevisionUri);</span>
+<span class="fc" id="L458">            https(indexUri);</span>
+<span class="fc" id="L459">            https(indexSignatureUri);</span>
+<span class="fc" id="L460">            PluginSignatureManifest.requireIdentifier(indexId, &quot;indexId&quot;);</span>
+<span class="fc" id="L461">            PluginSignatureManifest.requireIdentifier(indexRevision, &quot;indexRevision&quot;);</span>
+<span class="fc" id="L462">            PluginSignatureManifest.requireSha256(indexContentHash, &quot;indexContentHash&quot;);</span>
+<span class="fc" id="L463">        }</span>
     }
 
     /** Finite memory, download, closure and ancestry budgets; endpoints have transport deadlines. */
     public record Limits(long metadataBytes, long artifactBytes, long totalBytes,
         int maximumArtifacts, int maximumHistory) {
-<span class="fc" id="L419">        public Limits {</span>
-<span class="pc bpc" id="L420" title="8 of 16 branches missed.">            if (metadataBytes &lt; 1 || artifactBytes &lt; 1 || totalBytes &lt; 1</span>
+<span class="fc" id="L469">        public Limits {</span>
+<span class="pc bpc" id="L470" title="8 of 16 branches missed.">            if (metadataBytes &lt; 1 || artifactBytes &lt; 1 || totalBytes &lt; 1</span>
                     || metadataBytes &gt; Integer.MAX_VALUE - 8 || artifactBytes &gt; Integer.MAX_VALUE - 8
                     || totalBytes &gt; Integer.MAX_VALUE - 8 || maximumArtifacts &lt; 1 || maximumHistory &lt; 1) {
-<span class="nc" id="L423">                throw new IllegalArgumentException(&quot;distribution budgets must be positive and finite&quot;);</span>
+<span class="nc" id="L473">                throw new IllegalArgumentException(&quot;distribution budgets must be positive and finite&quot;);</span>
             }
-<span class="fc" id="L425">        }</span>
+<span class="fc" id="L475">        }</span>
     }
 
-<span class="fc" id="L428">    private enum Resource { ARTIFACT, SIGNATURE, PROVENANCE }</span>
+<span class="fc" id="L478">    private enum Resource { ARTIFACT, SIGNATURE, PROVENANCE }</span>
     private interface Fetch { byte[] get(Entry entry, Resource type) throws IOException; }
-<span class="fc" id="L430">    private record Admission(ResolutionReceipt resolution, List&lt;PluginInstallationEvidence.Artifact&gt; artifacts) { }</span>
+<span class="fc" id="L480">    private record Admission(ResolutionReceipt resolution, List&lt;PluginInstallationEvidence.Artifact&gt; artifacts) { }</span>
 
-<span class="fc" id="L432">    private final class Budget {</span>
-<span class="fc" id="L433">        private long remaining = limits.totalBytes();</span>
-<span class="fc" id="L434">        private final List&lt;Map&lt;String, Object&gt;&gt; receipts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L482">    private final class Budget {</span>
+<span class="fc" id="L483">        private long remaining = limits.totalBytes();</span>
+<span class="fc" id="L484">        private final List&lt;Map&lt;String, Object&gt;&gt; receipts = new ArrayList&lt;&gt;();</span>
 
         byte[] json(URI uri) throws IOException {
-<span class="fc" id="L437">            byte[] bytes = download(uri, limits.metadataBytes());</span>
-<span class="fc" id="L438">            PluginDistributionJson.validate(bytes);</span>
-<span class="fc" id="L439">            return bytes;</span>
+<span class="fc" id="L487">            byte[] bytes = download(uri, limits.metadataBytes());</span>
+<span class="fc" id="L488">            PluginDistributionJson.validate(bytes);</span>
+<span class="fc" id="L489">            return bytes;</span>
         }
 
         byte[] download(URI uri, long limit) throws IOException {
-<span class="pc bpc" id="L443" title="2 of 4 branches missed.">            if (remaining &lt; 1 || receipts.size() &gt;= 4L + 3L * limits.maximumArtifacts()) {</span>
-<span class="nc" id="L444">                throw new SecurityException(&quot;distribution download budget exhausted&quot;);</span>
+<span class="pc bpc" id="L493" title="2 of 4 branches missed.">            if (remaining &lt; 1 || receipts.size() &gt;= 4L + 3L * limits.maximumArtifacts()) {</span>
+<span class="nc" id="L494">                throw new SecurityException(&quot;distribution download budget exhausted&quot;);</span>
             }
-<span class="fc" id="L446">            byte[] bytes = transport.download(https(uri), Math.min(limit, remaining));</span>
-<span class="fc" id="L447">            remaining -= bytes.length;</span>
-<span class="fc" id="L448">            Map&lt;String, Object&gt; receipt = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L449">            receipt.put(&quot;uri&quot;, uri.toString());</span>
-<span class="fc" id="L450">            receipt.put(&quot;bytes&quot;, bytes.length);</span>
-<span class="fc" id="L451">            receipt.put(&quot;sha256&quot;, PluginArtifactVerifier.sha256(bytes));</span>
-<span class="fc" id="L452">            receipts.add(receipt);</span>
-<span class="fc" id="L453">            return bytes;</span>
+<span class="fc" id="L496">            byte[] bytes = transport.download(https(uri), Math.min(limit, remaining));</span>
+<span class="fc" id="L497">            remaining -= bytes.length;</span>
+<span class="fc" id="L498">            Map&lt;String, Object&gt; receipt = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L499">            receipt.put(&quot;uri&quot;, uri.toString());</span>
+<span class="fc" id="L500">            receipt.put(&quot;bytes&quot;, bytes.length);</span>
+<span class="fc" id="L501">            receipt.put(&quot;sha256&quot;, PluginArtifactVerifier.sha256(bytes));</span>
+<span class="fc" id="L502">            receipts.add(receipt);</span>
+<span class="fc" id="L503">            return bytes;</span>
         }
 
         String evidence(Sources sources) {
-<span class="fc" id="L457">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L458">            payload.put(&quot;schema&quot;, &quot;regelsuche.plugin-distribution-retrieval/v1&quot;);</span>
-<span class="fc" id="L459">            payload.put(&quot;networkAccessStatus&quot;, &quot;PERFORMED&quot;);</span>
-<span class="fc" id="L460">            payload.put(&quot;sources&quot;, sources);</span>
-<span class="fc" id="L461">            payload.put(&quot;resources&quot;, receipts);</span>
-<span class="fc" id="L462">            return PluginDistributionJson.canonical(payload);</span>
+<span class="fc" id="L507">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L508">            payload.put(&quot;schema&quot;, &quot;regelsuche.plugin-distribution-retrieval/v1&quot;);</span>
+<span class="fc" id="L509">            payload.put(&quot;networkAccessStatus&quot;, &quot;PERFORMED&quot;);</span>
+<span class="fc" id="L510">            payload.put(&quot;sources&quot;, sources);</span>
+<span class="fc" id="L511">            payload.put(&quot;resources&quot;, receipts);</span>
+<span class="fc" id="L512">            return PluginDistributionJson.canonical(payload);</span>
         }
     }
 }

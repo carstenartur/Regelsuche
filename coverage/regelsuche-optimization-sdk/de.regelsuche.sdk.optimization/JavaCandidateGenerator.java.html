@@ -8,7 +8,7 @@ import java.util.*;
 /** Bounded proposals only. SemanticChecker is the authority, not rule labels or this generator. */
 final class JavaCandidateGenerator {
     // Signed-additive proposals now come exclusively from the shared core rule inventory.
-    static final String REVISION = &quot;java-core-algebra-proposals/v13-filtered-value-arithmetic&quot;;
+    static final String REVISION = &quot;java-core-algebra-proposals/v14-source-factor-position&quot;;
     private final OptimizationRequest request;
     private final VerificationWork work;
     private final JavaNumericBackend backend;
@@ -225,29 +225,39 @@ final class JavaCandidateGenerator {
     private static Expr factor(NumericKind kind, Expr left, Expr right) {
 <span class="fc bfc" id="L226" title="All 4 branches covered.">        if (operation(left) != NumericOperation.MULTIPLY || operation(right) != NumericOperation.MULTIPLY) return null;</span>
 <span class="fc" id="L227">        var a = children(left); var b = children(right);</span>
-<span class="fc bfc" id="L228" title="All 6 branches covered.">        for (int i=0;i&lt;2;i++) for (int j=0;j&lt;2;j++) if (a.get(i).equals(b.get(j)))</span>
-<span class="fc" id="L229">            return JavaExpressions.operation(kind, NumericOperation.MULTIPLY, a.get(i),</span>
-<span class="fc" id="L230">                JavaExpressions.operation(kind, NumericOperation.ADD, a.get(1-i), b.get(1-j)));</span>
-<span class="fc" id="L231">        return null;</span>
+        // Match equal positions first, including when a product repeats the factor.
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (int offset = 0; offset &lt; 2; offset++) {</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (int leftIndex = 0; leftIndex &lt; 2; leftIndex++) {</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                int rightIndex = offset == 0 ? leftIndex : 1 - leftIndex;</span>
+<span class="fc" id="L232">                Expr common = a.get(leftIndex);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                if (!common.equals(b.get(rightIndex))) continue;</span>
+<span class="fc" id="L234">                Expr sum = JavaExpressions.operation(kind, NumericOperation.ADD,</span>
+<span class="fc" id="L235">                        a.get(1 - leftIndex), b.get(1 - rightIndex));</span>
+<span class="fc bfc" id="L236" title="All 4 branches covered.">                return leftIndex == 1 &amp;&amp; rightIndex == 1</span>
+<span class="fc" id="L237">                        ? JavaExpressions.operation(kind, NumericOperation.MULTIPLY, sum, common)</span>
+<span class="fc" id="L238">                        : JavaExpressions.operation(kind, NumericOperation.MULTIPLY, common, sum);</span>
+            }
+        }
+<span class="fc" id="L241">        return null;</span>
     }
-<span class="fc" id="L233">    private static List&lt;Expr&gt; children(Expr expression) { return JavaExpressions.operands(expression); }</span>
-<span class="fc" id="L234">    private static NumericOperation operation(Expr expression) { return JavaExpressions.operationOf(expression).orElse(null); }</span>
+<span class="fc" id="L243">    private static List&lt;Expr&gt; children(Expr expression) { return JavaExpressions.operands(expression); }</span>
+<span class="fc" id="L244">    private static NumericOperation operation(Expr expression) { return JavaExpressions.operationOf(expression).orElse(null); }</span>
     private static boolean number(Expr expression, long value) {
-<span class="pc bpc" id="L236" title="1 of 4 branches missed.">        if (expression == null || !JavaExpressions.isLiteral(expression)) return false;</span>
-<span class="fc" id="L237">        Object literal = JavaExpressions.literalValue(expression);</span>
-<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (literal instanceof BigInteger b) return b.equals(BigInteger.valueOf(value));</span>
-<span class="pc bpc" id="L239" title="1 of 4 branches missed.">        return literal instanceof Number n &amp;&amp; n.doubleValue() == value;</span>
+<span class="pc bpc" id="L246" title="1 of 4 branches missed.">        if (expression == null || !JavaExpressions.isLiteral(expression)) return false;</span>
+<span class="fc" id="L247">        Object literal = JavaExpressions.literalValue(expression);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (literal instanceof BigInteger b) return b.equals(BigInteger.valueOf(value));</span>
+<span class="pc bpc" id="L249" title="1 of 4 branches missed.">        return literal instanceof Number n &amp;&amp; n.doubleValue() == value;</span>
     }
-<span class="pc bpc" id="L241" title="1 of 5 branches missed.">    private static Expr constant(NumericKind kind, long value) { return literalValue(kind, switch(kind) {</span>
-<span class="pc" id="L242">        case BIG_INTEGER -&gt; BigInteger.valueOf(value); case FLOAT -&gt; (float)value; case DOUBLE -&gt; (double)value;</span>
-<span class="fc" id="L243">        case LONG -&gt; value; default -&gt; (int)value;</span>
+<span class="pc bpc" id="L251" title="1 of 5 branches missed.">    private static Expr constant(NumericKind kind, long value) { return literalValue(kind, switch(kind) {</span>
+<span class="pc" id="L252">        case BIG_INTEGER -&gt; BigInteger.valueOf(value); case FLOAT -&gt; (float)value; case DOUBLE -&gt; (double)value;</span>
+<span class="fc" id="L253">        case LONG -&gt; value; default -&gt; (int)value;</span>
     }); }
     private static Expr literalValue(NumericKind kind, Object value) {
-<span class="pc bpc" id="L246" title="2 of 6 branches missed.">        return switch(kind) {</span>
-<span class="fc" id="L247">            case BIG_INTEGER -&gt; JavaExpressions.literal((BigInteger)value); case INT -&gt; JavaExpressions.literal(((Number)value).intValue());</span>
-<span class="pc" id="L248">            case LONG -&gt; JavaExpressions.literal(((Number)value).longValue()); case FLOAT -&gt; JavaExpressions.literal(((Number)value).floatValue());</span>
-<span class="fc" id="L249">            case DOUBLE -&gt; JavaExpressions.literal(((Number)value).doubleValue());</span>
-<span class="nc" id="L250">            default -&gt; throw new IllegalArgumentException(&quot;PROMOTED_LITERAL_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L256" title="2 of 6 branches missed.">        return switch(kind) {</span>
+<span class="fc" id="L257">            case BIG_INTEGER -&gt; JavaExpressions.literal((BigInteger)value); case INT -&gt; JavaExpressions.literal(((Number)value).intValue());</span>
+<span class="pc" id="L258">            case LONG -&gt; JavaExpressions.literal(((Number)value).longValue()); case FLOAT -&gt; JavaExpressions.literal(((Number)value).floatValue());</span>
+<span class="fc" id="L259">            case DOUBLE -&gt; JavaExpressions.literal(((Number)value).doubleValue());</span>
+<span class="nc" id="L260">            default -&gt; throw new IllegalArgumentException(&quot;PROMOTED_LITERAL_REQUIRED&quot;);</span>
         };
     }
 }

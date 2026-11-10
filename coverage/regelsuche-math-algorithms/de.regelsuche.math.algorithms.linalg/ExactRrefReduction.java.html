@@ -453,24 +453,24 @@ public record ExactRrefReduction(
             }
 <span class="pc bpc" id="L454" title="1 of 4 branches missed.">            switch (kind) {</span>
                 case SWAP_ROWS -&gt; {
-<span class="pc bpc" id="L456" title="2 of 4 branches missed.">                    if (sourceRow &lt; 0</span>
+<span class="pc bpc" id="L456" title="1 of 4 branches missed.">                    if (sourceRow &lt; 0</span>
                             || sourceRow == targetRow
 <span class="pc bpc" id="L458" title="1 of 2 branches missed.">                            || !multiplier.isOne()) {</span>
-<span class="nc" id="L459">                        throw new IllegalArgumentException(</span>
+<span class="fc" id="L459">                        throw new IllegalArgumentException(</span>
                             &quot;row swap requires two rows and multiplier one&quot;);
                     }
                 }
                 case SCALE_ROW -&gt; {
-<span class="pc bpc" id="L464" title="2 of 4 branches missed.">                    if (sourceRow != -1 || multiplier.isZero()) {</span>
-<span class="nc" id="L465">                        throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L464" title="1 of 4 branches missed.">                    if (sourceRow != -1 || multiplier.isZero()) {</span>
+<span class="fc" id="L465">                        throw new IllegalArgumentException(</span>
                             &quot;row scaling requires a non-zero multiplier&quot;);
                     }
                 }
                 case ADD_ROW_MULTIPLE -&gt; {
-<span class="pc bpc" id="L470" title="2 of 4 branches missed.">                    if (sourceRow &lt; 0</span>
+<span class="pc bpc" id="L470" title="1 of 4 branches missed.">                    if (sourceRow &lt; 0</span>
                             || sourceRow == targetRow
 <span class="pc bpc" id="L472" title="1 of 2 branches missed.">                            || multiplier.isZero()) {</span>
-<span class="nc" id="L473">                        throw new IllegalArgumentException(</span>
+<span class="fc" id="L473">                        throw new IllegalArgumentException(</span>
                             &quot;row addition requires distinct rows and non-zero multiplier&quot;);
                     }
                 }

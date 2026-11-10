@@ -63,7 +63,12 @@ Rule implementers remain responsible for the truth of that declaration.
   the caller's objective only for initial validation and final extraction.
 * Non-exact recognition profiles, including associative/commutative
   matching, take the concrete path so their recognition semantics are
-  honored. The native e-matcher does not implement complete AC matching.
+  honored. Unmodified base `PatternRewriteRule` instances use the detailed
+  matcher result and instantiate the target from its returned bindings.
+  A bounded, inconclusive match is retained as incomplete; it is not an
+  ordinary miss. The matcher keeps its existing limits, including eight
+  commutative operands and 10,000 backtracking branches per attempt.
+  The native e-matcher does not implement complete AC matching.
 * Every concrete application with unresolved assumptions is rejected.
   Conditional cancellation such as `(x*y)/x -> y` cannot become an
   unconditional equality. A rule that discharges the condition itself,
@@ -73,6 +78,8 @@ Rule implementers remain responsible for the truth of that declaration.
 
 A fix-point is therefore relative to these admitted rules and this
 representative policy; it is not complete mathematical normalization.
+Subclasses and custom rules retain their boolean callback contract. Limits
+hidden inside those callbacks cannot be inferred from a `false` return.
 
 ## Budgets and graph validity
 
@@ -103,8 +110,8 @@ and witness construction also allocate ASTs outside the e-node count.
 The strategy exposes the same records through `lastDiagnostics()` and
 `lastProvenance()`.
 
-Diagnostics distinguish ordinary misses, unresolved conditions, rejected
-non-equivalence rules and runtime failures. Failure stages identify
+Diagnostics distinguish ordinary misses, incomplete owned matches, unresolved
+conditions, rejected non-equivalence rules and runtime failures. Stages identify
 eligibility, extraction, matching, assumptions, application or insertion.
 Aggregate outcome counts are retained for the whole run. At most 128
 nontrivial events are retained; each contains rule ID, source class when
@@ -112,9 +119,29 @@ available, outcome, stage, exception type and a message truncated to 512
 characters. Ordinary misses increment counts without filling the event
 buffer. `droppedEvents()` makes truncation visible. Runtime exceptions from
 rule callbacks are observable and do not masquerade as non-applicability.
-If failures prevent a clean fix-point, the stop reason is `RULE_FAILURES`
-and `saturated` is false. Budget stop reasons take precedence when reached;
-the failure diagnostics remain available alongside them.
+
+`MATCH_INCONCLUSIVE` records an owned matcher limit at stage `MATCHES`, with
+the original limit code in `message` and an empty `exceptionType`. Examples
+include `COMMUTATIVE_OPERAND_LIMIT` and `COMMUTATIVE_BACKTRACKING_LIMIT`;
+algebraic matcher limits use the same outcome. These expected incomplete
+attempts are not runtime failures. Other representatives and rules continue
+to run, so useful rewrites can still be admitted. The aggregate incomplete
+count survives event truncation and later passes, even if a dirty worklist
+does not revisit the original representative.
+
+At a pass with no further progress, stop reasons have this priority:
+
+| Observed during the run | Stop reason | `saturated` |
+| --- | --- | --- |
+| At least one rule runtime failure | `RULE_FAILURES` | `false` |
+| No runtime failure, but at least one owned inconclusive match | `MATCHER_LIMIT` | `false` |
+| Neither of the above | `FIX_POINT` | `true` |
+
+Node and iteration budget stop reasons keep their precedence when reached;
+matching and failure diagnostics remain available alongside them. A later
+successful rewrite does not establish that every earlier incomplete match
+was resolved. The new outcome and reason are additive enum values; diagnostic
+event and result record components and compatibility constructors are unchanged.
 
 Provenance retains at most 256 concrete `(ruleId, before, after)` local
 witnesses, with `droppedWitnesses()` accounting for overflow. `Witness.replay`
@@ -157,8 +184,8 @@ Jackson and explicit JSON exporters expose null, never that sentinel.
 Raw graph size and rule-application counters remain available. Historical
 report files are unchanged.
 
-Focused regression coverage lives in `EqualitySaturationContractTest`,
-`EqualitySaturationSoundnessTest`, `EqualitySaturationScalabilityTest`
+Focused regression coverage lives in `EqualitySaturationMatchLimitTest`,
+`EqualitySaturationContractTest`, `EqualitySaturationSoundnessTest`, `EqualitySaturationScalabilityTest`
 and `EqualitySaturationStrategyTest`. Run the affected Maven reactor with:
 
 ```sh
