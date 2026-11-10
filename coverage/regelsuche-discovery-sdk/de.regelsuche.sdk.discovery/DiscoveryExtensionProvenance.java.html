@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryExtensionProvenance.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery</a> &gt; <span class="el_source">DiscoveryExtensionProvenance.java</span></div><h1>DiscoveryExtensionProvenance.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery;
+
+import de.regelsuche.extension.ExtensionDescriptor;
+import de.regelsuche.extension.ExtensionOrigin;
+import de.regelsuche.extension.ExtensionPoint;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Immutable contribution metadata, distinct from the observed provider artifact.
+ * Composition of this metadata does not authenticate a catalog or grant mathematical authority.
+ */
+public record DiscoveryExtensionProvenance(
+    ExtensionPoint&lt;DiscoveryDomainProvider&gt; point,
+    ExtensionDescriptor descriptor,
+    ExtensionOrigin origin,
+    String catalogSha256
+) {
+<span class="fc" id="L19">    public DiscoveryExtensionProvenance {</span>
+<span class="fc" id="L20">        Objects.requireNonNull(point, &quot;point&quot;);</span>
+<span class="fc" id="L21">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L22">        Objects.requireNonNull(origin, &quot;origin&quot;);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (!DiscoveryExtensionPoints.DOMAIN_PROVIDERS.equals(point)) {</span>
+<span class="fc" id="L24">            throw new IllegalArgumentException(&quot;not the standard Discovery provider point&quot;);</span>
+        }
+<span class="pc bpc" id="L26" title="1 of 4 branches missed.">        if (catalogSha256 == null || !catalogSha256.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L27">            throw new IllegalArgumentException(&quot;catalog SHA-256 is required&quot;);</span>
+        }
+<span class="fc" id="L29">    }</span>
+
+    Map&lt;String, String&gt; properties() {
+<span class="fc" id="L32">        return Map.of(</span>
+<span class="fc" id="L33">            &quot;sdk.provider.extension.pointId&quot;, point.id(),</span>
+<span class="fc" id="L34">            &quot;sdk.provider.extension.contributionId&quot;, descriptor.id(),</span>
+<span class="fc" id="L35">            &quot;sdk.provider.extension.sourceKind&quot;, origin.kind().name(),</span>
+<span class="fc" id="L36">            &quot;sdk.provider.extension.sourceId&quot;, origin.sourceId(),</span>
+<span class="fc" id="L37">            &quot;sdk.provider.extension.sourceVersion&quot;, origin.sourceVersion(),</span>
+<span class="fc" id="L38">            &quot;sdk.provider.extension.sourceReference&quot;, origin.sourceReference(),</span>
+<span class="fc" id="L39">            &quot;sdk.provider.extension.artifactSha256&quot;, origin.artifactSha256(),</span>
+<span class="fc" id="L40">            &quot;sdk.provider.extension.trustEvidenceSha256&quot;, origin.trustEvidenceSha256(),</span>
+            &quot;sdk.provider.extension.catalogSha256&quot;, catalogSha256);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

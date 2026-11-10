@@ -35,46 +35,91 @@ public final class DiscoveryCli {
 <span class="fc" id="L35">                return 0;</span>
             }
 <span class="pc bpc" id="L37" title="1 of 6 branches missed.">            if ((args.length == 6 || args.length == 7) &amp;&amp; args[0].equals(&quot;run&quot;)) {</span>
-<span class="pc bpc" id="L38" title="1 of 5 branches missed.">                var budget = args.length == 6 ? DiscoveryBudgets.small() : switch (args[6]) {</span>
-<span class="nc" id="L39">                    case &quot;small&quot; -&gt; DiscoveryBudgets.small();</span>
-<span class="fc" id="L40">                    case &quot;tiny&quot; -&gt; DiscoveryBudgets.tiny();</span>
-<span class="fc" id="L41">                    default -&gt; throw new IllegalArgumentException(&quot;budget must be small or tiny&quot;);</span>
-                };
-<span class="fc" id="L43">                int separator = args[2].lastIndexOf('@');</span>
-<span class="fc bfc" id="L44" title="All 2 branches covered.">                if (separator &lt; 1) throw new IllegalArgumentException(&quot;select domain-id@revision&quot;);</span>
-<span class="fc" id="L45">                var registration = DiscoveryDomainCatalog.load(loader, Set.of(args[1]))</span>
-<span class="fc" id="L46">                    .find(args[2].substring(0, separator), args[2].substring(separator + 1))</span>
-<span class="fc" id="L47">                    .orElseThrow(() -&gt; new IllegalArgumentException(&quot;domain revision is not installed&quot;));</span>
-                byte[] seedBytes;
-<span class="fc" id="L49">                try (var stream = Files.newInputStream(Path.of(args[4]))) {</span>
-<span class="fc" id="L50">                    seedBytes = stream.readNBytes(1024 * 1024 + 1);</span>
-                }
-<span class="fc bfc" id="L52" title="All 2 branches covered.">                if (seedBytes.length &gt; 1024 * 1024) throw new IllegalArgumentException(&quot;seed exceeds 1 MiB&quot;);</span>
-<span class="fc" id="L53">                String seed = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(seedBytes)).toString();</span>
-<span class="fc" id="L54">                var run = RegelsucheDiscovery.forRegistration(registration)</span>
-<span class="fc" id="L55">                    .campaign(args[3]).seed(&quot;cli-seed&quot;, seed, &quot;discovery-cli&quot;)</span>
-<span class="fc" id="L56">                    .budget(budget).run();</span>
-<span class="fc" id="L57">                run.writeEvidence(Path.of(args[5]));</span>
-<span class="fc" id="L58">                out.println(&quot;outcome=&quot; + run.outcome());</span>
-<span class="fc" id="L59">                out.println(&quot;evidenceHash=&quot; + run.evidence().contentHash());</span>
-<span class="pc bpc" id="L60" title="4 of 6 branches missed.">                return switch (run.outcome()) {</span>
-<span class="fc" id="L61">                    case CONFIRMED -&gt; 0;</span>
-<span class="nc" id="L62">                    case REFUTED -&gt; 2;</span>
-<span class="fc" id="L63">                    case BUDGET_EXHAUSTED -&gt; 3;</span>
-<span class="nc" id="L64">                    case INCONCLUSIVE -&gt; 4;</span>
-<span class="nc" id="L65">                    case UNSUPPORTED -&gt; 5;</span>
-<span class="nc" id="L66">                    case INVALID_SEED -&gt; 6;</span>
-                };
+<span class="fc" id="L38">                budget(args); // Preserve rejection before service loading or provider callbacks.</span>
+<span class="fc" id="L39">                return run(args, out, select(args[2], DiscoveryDomainCatalog.load(loader, Set.of(args[1]))));</span>
             }
-<span class="fc" id="L69">            out.println(&quot;Usage: list [provider.class] | run provider.class &quot;</span>
+<span class="fc" id="L41">            out.println(&quot;Usage: list [provider.class] | run provider.class &quot;</span>
                 + &quot;domain-id@revision campaign-id seed.txt evidence.json [small|tiny]&quot;);
-<span class="fc" id="L71">            out.println(&quot;From the Regelsuche app: domains list [provider.class] | domains run provider.class &quot;</span>
+<span class="fc" id="L43">            out.println(&quot;From the Regelsuche app: domains list [provider.class] | domains run provider.class &quot;</span>
                 + &quot;domain-id@revision campaign-id seed.txt evidence.json [small|tiny]&quot;);
-<span class="fc" id="L73">            return 1;</span>
-<span class="fc" id="L74">        } catch (IOException | IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError ex) {</span>
-<span class="fc" id="L75">            out.println(&quot;Discovery request failed: &quot; + ex.getMessage());</span>
-<span class="fc" id="L76">            return 1;</span>
+<span class="fc" id="L45">            return 1;</span>
+<span class="fc" id="L46">        } catch (IOException | IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError ex) {</span>
+<span class="fc" id="L47">            out.println(&quot;Discovery request failed: &quot; + ex.getMessage());</span>
+<span class="fc" id="L48">            return 1;</span>
         }
+    }
+
+    /** Executes an explicitly supplied catalog; run selection uses its exact provider ID. */
+    public static int execute(String[] args, PrintStream out, DiscoveryDomainCatalog catalog) {
+        try {
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">            if (args.length == 1 &amp;&amp; args[0].equals(&quot;list&quot;)) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                for (var entry : catalog.registrations()) {</span>
+<span class="fc" id="L57">                    String line = entry.domain().domainId() + &quot;@&quot; + entry.domain().revision()</span>
+<span class="fc" id="L58">                        + &quot; provider=&quot; + entry.providerId() + &quot; version=&quot; + entry.providerVersion()</span>
+<span class="fc" id="L59">                        + &quot; artifact=&quot; + entry.artifact().orElseThrow().artifactSha256();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                    if (entry.extensionProvenance().isPresent()) {</span>
+<span class="fc" id="L61">                        var provenance = entry.extensionProvenance().orElseThrow();</span>
+<span class="fc" id="L62">                        line += &quot; contribution=&quot; + provenance.descriptor().id()</span>
+<span class="fc" id="L63">                            + &quot; contributorArtifact=&quot; + provenance.origin().artifactSha256()</span>
+<span class="fc" id="L64">                            + &quot; trustEvidence=&quot; + provenance.origin().trustEvidenceSha256();</span>
+                    }
+<span class="fc" id="L66">                    out.println(line);</span>
+<span class="fc" id="L67">                }</span>
+<span class="fc" id="L68">                return 0;</span>
+            }
+<span class="pc bpc" id="L70" title="1 of 6 branches missed.">            if ((args.length == 6 || args.length == 7) &amp;&amp; args[0].equals(&quot;run&quot;)) {</span>
+<span class="fc" id="L71">                var registration = select(args[2], catalog);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                if (!registration.providerId().equals(args[1])) {</span>
+<span class="fc" id="L73">                    throw new IllegalArgumentException(&quot;provider does not supply the selected domain revision&quot;);</span>
+                }
+<span class="fc" id="L75">                return run(args, out, registration);</span>
+            }
+<span class="fc" id="L77">            out.println(&quot;Usage: list | run provider-id domain-id@revision campaign-id seed.txt evidence.json [small|tiny]&quot;);</span>
+<span class="fc" id="L78">            return 1;</span>
+<span class="fc" id="L79">        } catch (IOException | IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError ex) {</span>
+<span class="fc" id="L80">            out.println(&quot;Discovery request failed: &quot; + ex.getMessage());</span>
+<span class="fc" id="L81">            return 1;</span>
+        }
+    }
+
+    private static DiscoveryDomainCatalog.Registration select(String selector, DiscoveryDomainCatalog catalog) {
+<span class="fc" id="L86">        int separator = selector.lastIndexOf('@');</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (separator &lt; 1) throw new IllegalArgumentException(&quot;select domain-id@revision&quot;);</span>
+<span class="fc" id="L88">        return catalog.find(selector.substring(0, separator), selector.substring(separator + 1))</span>
+<span class="fc" id="L89">            .orElseThrow(() -&gt; new IllegalArgumentException(&quot;domain revision is not installed&quot;));</span>
+    }
+
+    private static de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget budget(String[] args) {
+<span class="pc bpc" id="L93" title="1 of 5 branches missed.">        return args.length == 6 ? DiscoveryBudgets.small() : switch (args[6]) {</span>
+<span class="nc" id="L94">            case &quot;small&quot; -&gt; DiscoveryBudgets.small();</span>
+<span class="fc" id="L95">            case &quot;tiny&quot; -&gt; DiscoveryBudgets.tiny();</span>
+<span class="fc" id="L96">            default -&gt; throw new IllegalArgumentException(&quot;budget must be small or tiny&quot;);</span>
+        };
+    }
+
+    private static int run(String[] args, PrintStream out, DiscoveryDomainCatalog.Registration registration)
+            throws IOException {
+<span class="fc" id="L102">        var budget = budget(args);</span>
+        byte[] seedBytes;
+<span class="fc" id="L104">        try (var stream = Files.newInputStream(Path.of(args[4]))) {</span>
+<span class="fc" id="L105">            seedBytes = stream.readNBytes(1024 * 1024 + 1);</span>
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (seedBytes.length &gt; 1024 * 1024) throw new IllegalArgumentException(&quot;seed exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L108">        String seed = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(seedBytes)).toString();</span>
+<span class="fc" id="L109">        var run = RegelsucheDiscovery.forRegistration(registration)</span>
+<span class="fc" id="L110">            .campaign(args[3]).seed(&quot;cli-seed&quot;, seed, &quot;discovery-cli&quot;)</span>
+<span class="fc" id="L111">            .budget(budget).run();</span>
+<span class="fc" id="L112">        run.writeEvidence(Path.of(args[5]));</span>
+<span class="fc" id="L113">        out.println(&quot;outcome=&quot; + run.outcome());</span>
+<span class="fc" id="L114">        out.println(&quot;evidenceHash=&quot; + run.evidence().contentHash());</span>
+<span class="fc bfc" id="L115" title="All 6 branches covered.">        return switch (run.outcome()) {</span>
+<span class="fc" id="L116">            case CONFIRMED -&gt; 0;</span>
+<span class="fc" id="L117">            case REFUTED -&gt; 2;</span>
+<span class="fc" id="L118">            case BUDGET_EXHAUSTED -&gt; 3;</span>
+<span class="fc" id="L119">            case INCONCLUSIVE -&gt; 4;</span>
+<span class="fc" id="L120">            case UNSUPPORTED -&gt; 5;</span>
+<span class="fc" id="L121">            case INVALID_SEED -&gt; 6;</span>
+        };
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

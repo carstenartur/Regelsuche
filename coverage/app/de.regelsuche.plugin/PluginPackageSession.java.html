@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PluginPackageSession.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginPackageSession.java</span></div><h1>PluginPackageSession.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.plugin.PluginCheckpointTransactions.Scope;
+import java.io.Closeable;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Map;
+import java.util.Objects;
+
+/** Owns the configured package transport for one synchronous command. */
+final class PluginPackageSession implements AutoCloseable {
+    private final Scope scope;
+    private final PluginDistributionTransactions transactions;
+    private final Closeable resource;
+
+    // Package-local composition seam: only external construction is replaced in fixtures.
+<span class="fc" id="L17">    PluginPackageSession(Scope scope, PluginDistributionTransactions transactions, Closeable resource) {</span>
+<span class="fc" id="L18">        this.scope = Objects.requireNonNull(scope, &quot;scope&quot;);</span>
+<span class="fc" id="L19">        this.transactions = Objects.requireNonNull(transactions, &quot;transactions&quot;);</span>
+<span class="fc" id="L20">        this.resource = Objects.requireNonNull(resource, &quot;owned resource&quot;);</span>
+<span class="fc" id="L21">    }</span>
+
+    static PluginPackageSession open(PluginPackageCommand.Config config, Map&lt;String, String&gt; environment) throws IOException {
+<span class="fc" id="L24">        String password = environment.get(config.authority().passwordEnvironment());</span>
+<span class="fc" id="L25">        var scope = new Scope(config.installationId(), config.trustDomain(),</span>
+<span class="fc" id="L26">            PluginDistributionJson.hash(config.pinnedRoots().toCanonicalJson()));</span>
+<span class="fc" id="L27">        var authority = PostgresPluginCheckpointAuthority.connect(config.authority().jdbcUrl(), config.authority().user(),</span>
+<span class="fc" id="L28">            password, PluginPackageCommand.absolute(config.authority().tlsRootCertificate()), scope,</span>
+<span class="fc" id="L29">            config.authority().timeoutSeconds());</span>
+<span class="fc" id="L30">        var transport = new PluginDistributionTransport(config.allowedOrigins(),</span>
+<span class="fc" id="L31">            Duration.ofSeconds(config.connectTimeoutSeconds()), Duration.ofSeconds(config.responseTimeoutSeconds()), false, null);</span>
+        try {
+<span class="fc" id="L33">            var transactions = new PluginDistributionTransactions(PluginPackageCommand.absolute(config.packageDirectory()),</span>
+<span class="fc" id="L34">                config.pinnedRoots(), authority, transport, config.limits());</span>
+<span class="fc" id="L35">            return new PluginPackageSession(scope, transactions, transport::close);</span>
+<span class="nc" id="L36">        } catch (IOException | RuntimeException | Error failure) {</span>
+<span class="nc" id="L37">            transport.close();</span>
+<span class="nc" id="L38">            throw failure;</span>
+        }
+    }
+
+<span class="fc" id="L42">    Scope scope() { return scope; }</span>
+<span class="fc" id="L43">    PluginDistributionTransactions transactions() { return transactions; }</span>
+<span class="fc" id="L44">    @Override public void close() throws IOException { resource.close(); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

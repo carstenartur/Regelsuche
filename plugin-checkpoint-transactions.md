@@ -11,7 +11,8 @@ Embedded Java hosts can separately call
 to activate the verified installed closure through SPI v2. That adapter reads the
 current authority selection; a historical `COMMITTED` recovery receipt does not
 select an older runtime generation. This API does not add activation to the
-`plugins package` command or migrate existing App and Discovery workflows.
+`plugins package` command. The separate App `domains installed` command below
+uses it for Discovery domains.
 
 The old `PluginCheckpointAuthority` boolean-CAS contract and all original
 trust/index/artifact/installation v1 encodings retain their meanings. The new
@@ -218,3 +219,26 @@ community packages, deployed role/backup operations and full public E2E CI still
 remain. The installed Java-closure handoff to the embedded v2 runtime is available
 through the adapter linked above. Every install/update continues to require the
 immediate successor trust revision. This slice does not close issue #104.
+
+## Discovery activation with the same configuration
+
+```text
+domains installed --config /absolute/package-config.json list
+domains installed --config /absolute/package-config.json run provider-id domain-id@revision campaign-id seed.txt evidence.json [small|tiny]
+```
+
+These read-only activation commands reuse this exact strict, bounded v1 config
+reader, pinned roots, PostgreSQL/TLS credentials, scope and deadlines. `sources`
+and `selection` may be null because no installation request is made. Each command
+selects current authority once and keeps that frozen runtime open through canonical
+Discovery evidence export. It never selects from `recover()` or mutates authority.
+A new command sees an update/removal; unavailable authority returns operational
+code `1`, never semantic REFUTED `2`. Diagnostics contain stable categories and
+exception classes rather than JDBC URLs, credentials or raw provider messages.
+
+The selected installed closure must be resolved for SPI `2` / core `1.0.0`.
+Provider-ID selection, protected origin fields, lifecycle and all exit codes are
+documented in the [SDK guide](java-discovery-sdk.md#installierte-spi-v2-domänen-ausführen-aktueller-quellstand).
+This current-source feature does not change already published SDK ZIPs or migrate
+Workbench/HTTP, v1 runtime or data-only packages. Executable signed Java is not a
+sandbox and does not receive mathematical authority.

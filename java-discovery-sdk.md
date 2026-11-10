@@ -265,3 +265,57 @@ Sie ersetzen nicht den separaten echten Java-25-Build des generierten Projekts.
 Der erste Slice belegt eine kleine, dokumentierte und aus einem unabhängigen
 Build verwendbare Java-Schnittstelle. Die weiteren Schritte bleiben in Issue
 #904 getrennt nachvollziehbar.
+
+## Installierte SPI-v2-Domänen ausführen (aktueller Quellstand)
+
+Die App bietet zusätzlich zum bisherigen Classpath-Einstieg diese beiden Befehle:
+
+```text
+domains installed --config /absolute/package-config.json list
+domains installed --config /absolute/package-config.json run provider-id domain-id@revision campaign-id seed.txt evidence.json [small|tiny]
+```
+
+`--config` steht unmittelbar nach `installed`. Die Datei ist dieselbe streng
+validierte `regelsuche.plugin-package-config/v1`-Konfiguration wie für
+[`plugins package`](plugin-checkpoint-transactions.md); `sources` und `selection`
+dürfen für die Aktivierung null sein. Eine vorher authentifiziert installierte
+Closure muss für SPI `2` und Host-Core `1.0.0` aufgelöst sein. Der Befehl installiert
+oder lädt keine Pakete herunter und benötigt weiterhin die aktuelle externe
+Authority. Ein Fehler führt nicht zu einem Classpath-Fallback.
+
+`list` zeigt die ausgewählte Installationsidentität sowie Provider-ID/-Version,
+exakte Domänenrevision, Contribution-ID, Contributor-Artefakt und Trust-Evidence.
+`installation=NONE (pre-genesis)` bedeutet noch keine Installation; nach einem
+committeten Entfernen bleibt dessen Installationshash sichtbar. `run` selektiert
+exakt **Provider-ID und Domänenrevision**, nicht den Java-Klassennamen. Die alten
+`domains list [provider.class]` und `domains run provider.class ...` bleiben erhalten.
+
+Eine Ausführung liest genau einen aktuellen Authority-Snapshot und hält dessen
+Runtime bis zum Ende des kanonischen Evidence-Exports offen. Erst danach werden
+Classloader/Staging und anschließend der Package-Transport geschlossen. Der
+nächste Aufruf sieht Updates oder Entfernung. Seeds bleiben strikt UTF-8 und auf
+1 MiB begrenzt; Evidence wird mit `CREATE_NEW` niemals überschrieben. Die bestehenden
+Budgets `small` (Standard) und `tiny` gelten unverändert. Exitcodes: `0` CONFIRMED,
+`2` REFUTED, `3` BUDGET_EXHAUSTED, `4` INCONCLUSIVE, `5` UNSUPPORTED, `6` INVALID_SEED;
+Konfigurations-, Authority-, Aktivierungs-, Provider-, Eingabe- und Exportfehler
+sind `1`. Fehlermeldungen enthalten Kategorie und Fehlerklasse, keine vertraulichen
+Konfigurations-/JDBC-/Providertexte. Vom SDK intern als Code 1 gemeldete Fehler
+erscheinen als `DiscoveryRequestFailure`.
+
+Der Standardpunkt ist `DiscoveryExtensionPoints.DOMAIN_PROVIDERS`
+(`discovery.domain-provider`, Vertrag `DiscoveryDomainProvider.class`).
+Die Evidence enthält unter `sdk.provider.extension.` die Felder `pointId`,
+`contributionId`, `sourceKind`, `sourceId`, `sourceVersion`, `sourceReference`,
+`artifactSha256`, `trustEvidenceSha256` und `catalogSha256`. Sie sind wie alle
+`sdk.provider.*`-Felder gegen Überschreiben durch Domänen geschützt.
+`sdk.provider.artifactSha256` bezeichnet die tatsächliche Provider-Implementierung;
+`sdk.provider.extension.artifactSha256` den beitragenden Plugin-Code. Bei einem
+Provider aus einer zugelassenen Abhängigkeit können die Hashes verschieden sein.
+Der Trust-Evidence-Hash bindet die ausgewählte Installation mit ihrer Closure.
+
+Signierter Java-Code behält Prozessprivilegien. Die explizite Liste freigegebener
+Discovery-Vertragstypen ist keine Sandbox, und Suchbudgets erzwingen keine harte
+CPU-/Speicherunterbrechung beliebiger Callbacks. `sdk.provider.authority` bleibt
+`NOT_EVALUATED`; eine Signatur ist kein mathematischer Beweis. Workbench-/HTTP-
+Transformationen, v1-PluginRuntime und reine Regel-/Wissenspakete sind nicht migriert.
+Dies ist eine Quellstand-Funktion, keine nachträgliche Erweiterung des SDK-ZIP 0.5.2.
