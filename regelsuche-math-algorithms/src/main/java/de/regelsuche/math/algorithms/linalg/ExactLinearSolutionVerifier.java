@@ -1,12 +1,23 @@
 package de.regelsuche.math.algorithms.linalg;
 
-import de.regelsuche.ast.*;
-import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.representation.RepresentationBridge.Budget;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 /** Independent, bounded solution-set checker; never validates route or execution work claims. */
 public final class ExactLinearSolutionVerifier {
@@ -29,123 +40,213 @@ public final class ExactLinearSolutionVerifier {
         Objects.requireNonNull(budget);
         Meter meter = new Meter(budget.maxWorkUnits());
         try {
-            meter.take(1);
-            require(source != null && !source.isEmpty() && source.size() <= 16, "SOURCE_SIZE", true);
-            List<Equation> equations = new ArrayList<>();
-            Set<String> names = new TreeSet<>();
-            ExpressionParser parser = new ExpressionParser();
-            for (String text : source) {
-                meter.take(1);
-                require(text != null && !text.isEmpty() && text.length() <= 512, "SOURCE_TEXT", true);
-                meter.take(text.length()); // Bounds and charges parser/text validation traversal.
-                try {
-                    LinearRepresentationPlanner.validateText(text);
-                    Equation equation = parser.parseEquation(text);
-                    LinearRepresentationPlanner.powerWeight(equation.left(), 0);
-                    LinearRepresentationPlanner.powerWeight(equation.right(), 0);
-                    collect(equation.left(), names, meter, 0);
-                    collect(equation.right(), names, meter, 0);
-                    equations.add(equation);
-                } catch (IllegalArgumentException exception) { throw new Rejected("SOURCE_SYNTAX_OR_LIMIT", true); }
-            }
-            require(!names.isEmpty() && names.size() <= 16, "VARIABLE_COUNT", true);
-            List<String> variables = List.copyOf(names);
-            int n = variables.size(), m = equations.size();
-            Rational[][] original = new Rational[m][n + 1];
-            for (int i = 0; i < m; i++) {
-                Rational[] left = affine(equations.get(i).left(), variables, meter);
-                Rational[] right = affine(equations.get(i).right(), variables, meter);
-                for (int j = 0; j <= n; j++) original[i][j] = meter.sub(left[j],right[j]);
-                original[i][n] = meter.neg(original[i][n]);
-            }
+            SourceMatrix bound = bindSource(source, meter);
             meter.stage = Stage.PROOF_VALIDATION;
-            meter.take(1);
-            require(claim != null && proof != null, "MISSING_STATEMENT_OR_PROOF", false);
-            require(ExactLinearSolutionCertificate.SCHEMA.equals(proof.schema()), "SCHEMA", false);
-            require(proof.parts().size() > 0 && proof.parts().size() <= m, "PART_COUNT", false);
-            require(claim.variables().size() == n, "VARIABLE_BINDING", false);
-            for (int j = 0; j < n; j++) {
-                meter.take(1 + variables.get(j).length());
-                require(variables.get(j).equals(claim.variables().get(j)), "VARIABLE_BINDING", false);
-            }
-            boolean[] covered = new boolean[m];
-            int count = 0;
-            for (var part : proof.parts()) {
-                meter.take(1);
-                require(!part.sourceRows().isEmpty() && part.sourceRows().size() <= m, "ROW_MAP_SIZE", false);
-                for (int row : part.sourceRows()) {
-                    meter.take(1);
-                    require(row >= 0 && row < m && !covered[row], "ROW_COVERAGE", false);
-                    covered[row] = true;
-                }
-                require(part.operations().size() <= MAX_OPERATIONS - count, "OPERATION_COUNT", false);
-                count += part.operations().size();
-                for (var op : part.operations()) {
-                    meter.take(1);
-                    meter.value(op.multiplier());
-                    require(op.targetRow() < part.sourceRows().size()
-                        && (op.sourceRow() < 0 || op.sourceRow() < part.sourceRows().size()), "OPERATION_ROW", false);
-                }
-            }
-            for (boolean present : covered) { meter.take(1); require(present, "ROW_COVERAGE", false); }
+            validateProof(bound, claim, proof, meter);
             meter.stage = Stage.REPLAY;
-            Rational[][] reduced = new Rational[m][n + 1];
-            for (int i=0;i<m;i++) for(int j=0;j<=n;j++) { meter.value(original[i][j]); reduced[i][j]=original[i][j]; }
-            for (var part : proof.parts()) for (var op : part.operations()) {
+            Rational[][] reduced = replay(bound, proof, meter);
+            meter.stage = Stage.RANK;
+            RankStructure rank = deriveRank(reduced, bound.variables().size(), meter);
+            meter.stage = Stage.CONSEQUENCE;
+            validateConsequence(bound, rank, claim, meter);
+            return new Verification(Status.VERIFIED, meter.profile(), "COMPLETE_EXACT_SOLUTION_SET",
+                Optional.of(new Ranks(rank.coefficient(), rank.coefficient() + (rank.inconsistent() ? 1 : 0))));
+        } catch (Exhausted exception) {
+            return new Verification(Status.BUDGET_INCONCLUSIVE, meter.profile(), "WORK_BUDGET_EXHAUSTED",
+                Optional.empty());
+        } catch (Rejected exception) {
+            return new Verification(exception.domain ? Status.DOMAIN_UNSUPPORTED : Status.INVALID_CERTIFICATE,
+                meter.profile(), exception.getMessage(), Optional.empty());
+        }
+    }
+
+    private static SourceMatrix bindSource(List<String> source, Meter meter) {
+        meter.take(1);
+        require(source != null && !source.isEmpty() && source.size() <= 16, "SOURCE_SIZE", true);
+        List<Equation> equations = new ArrayList<>();
+        Set<String> names = new TreeSet<>();
+        ExpressionParser parser = new ExpressionParser();
+        for (String text : source) {
+            meter.take(1);
+            require(text != null && !text.isEmpty() && text.length() <= 512, "SOURCE_TEXT", true);
+            meter.take(text.length()); // Bounds and charges parser/text validation traversal.
+            try {
+                LinearRepresentationPlanner.validateText(text);
+                Equation equation = parser.parseEquation(text);
+                LinearRepresentationPlanner.powerWeight(equation.left(), 0);
+                LinearRepresentationPlanner.powerWeight(equation.right(), 0);
+                collect(equation.left(), names, meter, 0);
+                collect(equation.right(), names, meter, 0);
+                equations.add(equation);
+            } catch (IllegalArgumentException exception) {
+                throw new Rejected("SOURCE_SYNTAX_OR_LIMIT", true);
+            }
+        }
+        require(!names.isEmpty() && names.size() <= 16, "VARIABLE_COUNT", true);
+        List<String> variables = List.copyOf(names);
+        int n = variables.size(), m = equations.size();
+        Rational[][] original = new Rational[m][n + 1];
+        for (int i = 0; i < m; i++) {
+            Rational[] left = affine(equations.get(i).left(), variables, meter);
+            Rational[] right = affine(equations.get(i).right(), variables, meter);
+            for (int j = 0; j <= n; j++) {
+                original[i][j] = meter.sub(left[j], right[j]);
+            }
+            original[i][n] = meter.neg(original[i][n]);
+        }
+        return new SourceMatrix(variables, original);
+    }
+
+    private static void validateProof(SourceMatrix bound, ExactLinearSolutionConsequence claim,
+                                      ExactLinearSolutionCertificate proof, Meter meter) {
+        List<String> variables = bound.variables();
+        int n = variables.size(), m = bound.rows().length;
+        meter.take(1);
+        require(claim != null && proof != null, "MISSING_STATEMENT_OR_PROOF", false);
+        require(ExactLinearSolutionCertificate.SCHEMA.equals(proof.schema()), "SCHEMA", false);
+        require(proof.parts().size() > 0 && proof.parts().size() <= m, "PART_COUNT", false);
+        require(claim.variables().size() == n, "VARIABLE_BINDING", false);
+        for (int j = 0; j < n; j++) {
+            meter.take(1 + variables.get(j).length());
+            require(variables.get(j).equals(claim.variables().get(j)), "VARIABLE_BINDING", false);
+        }
+        boolean[] covered = new boolean[m];
+        int count = 0;
+        for (var part : proof.parts()) {
+            meter.take(1);
+            require(!part.sourceRows().isEmpty() && part.sourceRows().size() <= m, "ROW_MAP_SIZE", false);
+            for (int row : part.sourceRows()) {
+                meter.take(1);
+                require(row >= 0 && row < m && !covered[row], "ROW_COVERAGE", false);
+                covered[row] = true;
+            }
+            require(part.operations().size() <= MAX_OPERATIONS - count, "OPERATION_COUNT", false);
+            count += part.operations().size();
+            for (var op : part.operations()) {
+                meter.take(1);
+                meter.value(op.multiplier());
+                require(op.targetRow() < part.sourceRows().size()
+                    && (op.sourceRow() < 0 || op.sourceRow() < part.sourceRows().size()), "OPERATION_ROW", false);
+            }
+        }
+        for (boolean present : covered) {
+            meter.take(1);
+            require(present, "ROW_COVERAGE", false);
+        }
+    }
+
+    private static Rational[][] replay(SourceMatrix bound, ExactLinearSolutionCertificate proof, Meter meter) {
+        Rational[][] original = bound.rows();
+        int n = bound.variables().size(), m = original.length;
+        Rational[][] reduced = new Rational[m][n + 1];
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j <= n; j++) {
+                meter.value(original[i][j]);
+                reduced[i][j] = original[i][j];
+            }
+        }
+        for (var part : proof.parts()) {
+            for (var op : part.operations()) {
                 meter.take(1);
                 int target = part.sourceRows().get(op.targetRow());
                 int other = op.sourceRow() < 0 ? -1 : part.sourceRows().get(op.sourceRow());
                 switch (op.kind()) {
-                    case SWAP_ROWS -> { meter.take(1); var row = reduced[target]; reduced[target]=reduced[other]; reduced[other]=row; }
-                    case SCALE_ROW -> { for(int j=0;j<=n;j++) reduced[target][j]=meter.mul(reduced[target][j],op.multiplier()); }
-                    case ADD_ROW_MULTIPLE -> { for(int j=0;j<=n;j++) reduced[target][j]=meter.add(reduced[target][j],meter.mul(op.multiplier(),reduced[other][j])); }
-                }
-            }
-            meter.stage = Stage.RANK;
-            int[] pivotRows = new int[n]; Arrays.fill(pivotRows,-1);
-            int rank=0; boolean inconsistent=false;
-            for(int i=0;i<m;i++) {
-                int pivot=-1;
-                for(int j=0;j<n;j++) { meter.value(reduced[i][j]); if(pivot<0 && !reduced[i][j].isZero()) pivot=j; }
-                if(pivot<0) { meter.value(reduced[i][n]); inconsistent |= !reduced[i][n].isZero(); continue; }
-                require(reduced[i][pivot].isOne() && pivotRows[pivot]<0,"COEFFICIENT_NORMAL_FORM",false);
-                for(int k=0;k<m;k++) { meter.value(reduced[k][pivot]); require(k==i || reduced[k][pivot].isZero(),"PIVOT_COLUMN",false); }
-                pivotRows[pivot]=i; rank++;
-            }
-            meter.stage=Stage.CONSEQUENCE;
-            meter.take(1);
-            if(inconsistent) {
-                require(claim.classification()==SolutionClassification.INCONSISTENT && claim.particularSolution().isEmpty()
-                    && claim.nullspaceBasis().isEmpty() && claim.normalizedContradiction().isPresent(),"CLASSIFICATION",false);
-                meter.value(claim.normalizedContradiction().orElseThrow());
-                require(claim.normalizedContradiction().orElseThrow().isOne(),"CONTRADICTION",false);
-            } else {
-                int nullity=n-rank;
-                require(claim.classification()==(nullity==0?SolutionClassification.UNIQUE:SolutionClassification.UNDERDETERMINED)
-                    && claim.particularSolution().isPresent() && claim.nullspaceBasis().size()==nullity
-                    && claim.normalizedContradiction().isEmpty(),"COMPLETE_FAMILY",false);
-                int free=0;
-                for(int j=0;j<n;j++) {
-                    meter.take(1);
-                    if(pivotRows[j]>=0) continue;
-                    var value=claim.particularSolution().orElseThrow().get(j); meter.value(value);
-                    require(value.isZero(),"CANONICAL_PARTICULAR",false);
-                    for(int b=0;b<nullity;b++) {
-                        value=claim.nullspaceBasis().get(b).get(j); meter.value(value);
-                        require(value.equals(b==free?Rational.ONE:Rational.ZERO),"CANONICAL_BASIS",false);
+                    case SWAP_ROWS -> {
+                        meter.take(1);
+                        var row = reduced[target];
+                        reduced[target] = reduced[other];
+                        reduced[other] = row;
                     }
-                    free++;
+                    case SCALE_ROW -> {
+                        for (int j = 0; j <= n; j++) {
+                            reduced[target][j] = meter.mul(reduced[target][j], op.multiplier());
+                        }
+                    }
+                    case ADD_ROW_MULTIPLE -> {
+                        for (int j = 0; j <= n; j++) {
+                            reduced[target][j] = meter.add(reduced[target][j],
+                                meter.mul(op.multiplier(), reduced[other][j]));
+                        }
+                    }
                 }
-                residual(original,claim.particularSolution().orElseThrow(),false,meter);
-                for(var vector:claim.nullspaceBasis()) residual(original,vector,true,meter);
             }
-            return new Verification(Status.VERIFIED,meter.profile(),"COMPLETE_EXACT_SOLUTION_SET",Optional.of(new Ranks(rank,rank+(inconsistent?1:0))));
-        } catch (Exhausted exception) {
-            return new Verification(Status.BUDGET_INCONCLUSIVE,meter.profile(),"WORK_BUDGET_EXHAUSTED",Optional.empty());
-        } catch (Rejected exception) {
-            return new Verification(exception.domain?Status.DOMAIN_UNSUPPORTED:Status.INVALID_CERTIFICATE,meter.profile(),exception.getMessage(),Optional.empty());
+        }
+        return reduced;
+    }
+
+    private static RankStructure deriveRank(Rational[][] reduced, int n, Meter meter) {
+        int m = reduced.length;
+        int[] pivotRows = new int[n];
+        Arrays.fill(pivotRows, -1);
+        int rank = 0;
+        boolean inconsistent = false;
+        for (int i = 0; i < m; i++) {
+            int pivot = -1;
+            for (int j = 0; j < n; j++) {
+                meter.value(reduced[i][j]);
+                if (pivot < 0 && !reduced[i][j].isZero()) {
+                    pivot = j;
+                }
+            }
+            if (pivot < 0) {
+                meter.value(reduced[i][n]);
+                inconsistent |= !reduced[i][n].isZero();
+                continue;
+            }
+            require(reduced[i][pivot].isOne() && pivotRows[pivot] < 0, "COEFFICIENT_NORMAL_FORM", false);
+            for (int k = 0; k < m; k++) {
+                meter.value(reduced[k][pivot]);
+                require(k == i || reduced[k][pivot].isZero(), "PIVOT_COLUMN", false);
+            }
+            pivotRows[pivot] = i;
+            rank++;
+        }
+        return new RankStructure(pivotRows, rank, inconsistent);
+    }
+
+    private static void validateConsequence(SourceMatrix bound, RankStructure rank,
+                                            ExactLinearSolutionConsequence claim, Meter meter) {
+        int n = bound.variables().size();
+        int[] pivotRows = rank.pivotRows();
+        Rational[][] original = bound.rows();
+        meter.take(1);
+        if (rank.inconsistent()) {
+            require(claim.classification() == SolutionClassification.INCONSISTENT && claim.particularSolution().isEmpty()
+                && claim.nullspaceBasis().isEmpty() && claim.normalizedContradiction().isPresent(), "CLASSIFICATION", false);
+            meter.value(claim.normalizedContradiction().orElseThrow());
+            require(claim.normalizedContradiction().orElseThrow().isOne(), "CONTRADICTION", false);
+        } else {
+            int nullity = n - rank.coefficient();
+            require(claim.classification() == (nullity == 0 ? SolutionClassification.UNIQUE : SolutionClassification.UNDERDETERMINED)
+                && claim.particularSolution().isPresent() && claim.nullspaceBasis().size() == nullity
+                && claim.normalizedContradiction().isEmpty(), "COMPLETE_FAMILY", false);
+            int free = 0;
+            for (int j = 0; j < n; j++) {
+                meter.take(1);
+                if (pivotRows[j] >= 0) {
+                    continue;
+                }
+                var value = claim.particularSolution().orElseThrow().get(j);
+                meter.value(value);
+                require(value.isZero(), "CANONICAL_PARTICULAR", false);
+                for (int b = 0; b < nullity; b++) {
+                    value = claim.nullspaceBasis().get(b).get(j);
+                    meter.value(value);
+                    require(value.equals(b == free ? Rational.ONE : Rational.ZERO), "CANONICAL_BASIS", false);
+                }
+                free++;
+            }
+            residual(original, claim.particularSolution().orElseThrow(), false, meter);
+            for (var vector : claim.nullspaceBasis()) {
+                residual(original, vector, true, meter);
+            }
         }
     }
+
+    private record SourceMatrix(List<String> variables, Rational[][] rows) { }
+
+    private record RankStructure(int[] pivotRows, int coefficient, boolean inconsistent) { }
+
     private static void residual(Rational[][] rows, ExactVector vector, boolean homogeneous, Meter meter) {
         for(var row:rows) {
             Rational sum=Rational.ZERO;

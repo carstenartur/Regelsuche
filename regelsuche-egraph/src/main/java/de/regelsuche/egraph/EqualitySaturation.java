@@ -1,6 +1,8 @@
 package de.regelsuche.egraph;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.transform.EquivalenceAwarePatternMatcher;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RewriteRule;
@@ -84,8 +86,8 @@ public final class EqualitySaturation {
                     break;
                 }
                 if (graph.version() == versionBefore || run.applications() == applicationsBefore) {
-                    saturated = !run.diagnostics.hasFailures();
-                    stopReason = saturated ? SaturationStats.Reason.FIX_POINT : SaturationStats.Reason.RULE_FAILURES;
+                    stopReason = run.noProgressReason();
+                    saturated = stopReason == SaturationStats.Reason.FIX_POINT;
                     break;
                 }
             }
@@ -194,35 +196,57 @@ public final class EqualitySaturation {
             }
             for (Expr before : representatives) {
                 checkBudget(graph);
-                var stage = MATCHES;
-                try {
-                    if (!rule.matches(before)) {
-                        run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);
-                        continue;
-                    }
-                    stage = ASSUMPTIONS;
-                    if (!rule.assumptions(before).isEmpty()) {
-                        run.diagnostics.record(rule.id(), source, UNRESOLVED_CONDITIONS, stage, null);
-                        continue;
-                    }
-                    stage = APPLY;
-                    Expr after = Objects.requireNonNull(rule.apply(before), "rule returned null");
-                    if (before.equals(after)) {
-                        run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);
-                        continue;
-                    }
-                    stage = INSERTION;
-                    EClassId rhs = graph.addExpression(after);
-                    if (!graph.areEquivalent(source, rhs)) {
-                        graph.union(source, rhs);
-                        run.applied(rule.id(), new SaturationProvenance.Witness(rule.id(), before, after));
-                    }
-                } catch (EGraph.NodeBudgetExceeded exhausted) {
-                    throw exhausted;
-                } catch (RuntimeException failure) {
-                    run.diagnostics.record(rule.id(), source, RULE_FAILURE, stage, failure);
-                }
+                applyConcreteRepresentative(graph, rule, source, before, run);
             }
+        }
+    }
+
+    private void applyConcreteRepresentative(EGraph graph, RewriteRule rule, EClassId source, Expr before, Run run) {
+        var stage = MATCHES;
+        try {
+            EquivalenceAwarePatternMatcher.MatchAttempt attempt = null;
+            boolean matched;
+            // Only the unmodified base rule has a matcher contract we can interpret directly.
+            if (rule.getClass() == PatternRewriteRule.class) {
+                var pattern = (PatternRewriteRule) rule;
+                attempt = EquivalenceAwarePatternMatcher.matchDetailed(
+                    pattern.source(), before, Map.of(), pattern.recognitionProfile());
+                // Returned attempts delegate this work; exceptional exits settle it themselves.
+                RetainedOperation.work(attempt.visitedBranches());
+                if (attempt.inconclusive()) {
+                    run.diagnostics.recordInconclusiveMatch(rule.id(), source, attempt.limitCode());
+                    return;
+                }
+                matched = attempt.matched();
+            } else {
+                matched = rule.matches(before);
+            }
+            if (!matched) {
+                run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);
+                return;
+            }
+            stage = ASSUMPTIONS;
+            if (!rule.assumptions(before).isEmpty()) {
+                run.diagnostics.record(rule.id(), source, UNRESOLVED_CONDITIONS, stage, null);
+                return;
+            }
+            stage = APPLY;
+            Expr after = Objects.requireNonNull(attempt == null ? rule.apply(before)
+                : ((PatternRewriteRule) rule).target().instantiate(attempt.bindings()), "rule returned null");
+            if (before.equals(after)) {
+                run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);
+                return;
+            }
+            stage = INSERTION;
+            EClassId rhs = graph.addExpression(after);
+            if (!graph.areEquivalent(source, rhs)) {
+                graph.union(source, rhs);
+                run.applied(rule.id(), new SaturationProvenance.Witness(rule.id(), before, after));
+            }
+        } catch (EGraph.NodeBudgetExceeded exhausted) {
+            throw exhausted;
+        } catch (RuntimeException failure) {
+            run.diagnostics.record(rule.id(), source, RULE_FAILURE, stage, failure);
         }
     }
 
@@ -239,6 +263,11 @@ public final class EqualitySaturation {
         long droppedWitnesses;
         long nativeWitnessExtractions;
         int applications() { return appliedRules.values().stream().mapToInt(Integer::intValue).sum(); }
+        SaturationStats.Reason noProgressReason() {
+            if (diagnostics.hasFailures()) return SaturationStats.Reason.RULE_FAILURES;
+            if (diagnostics.hasInconclusiveMatches()) return SaturationStats.Reason.MATCHER_LIMIT;
+            return SaturationStats.Reason.FIX_POINT;
+        }
         void applied(String rule, SaturationProvenance.Witness witness) {
             appliedRules.merge(rule, 1, Integer::sum);
             if (witnesses.size() < SaturationProvenance.MAX_WITNESSES && witness != null) witnesses.add(witness);
