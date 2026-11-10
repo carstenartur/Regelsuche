@@ -314,6 +314,56 @@ class EqualitySaturationStrategyTest {
         assertEquals(strategy.lastProofOutcome().detail(), strategy.lastExtractionSelection().reason());
     }
 
+    @Test
+    void proofRequiredRenderedEndpointRetainsExactAssociation() {
+        var a = new de.regelsuche.transform.PatternExpr.Placeholder("a");
+        List<de.regelsuche.transform.RewriteRule> rules = List.of(
+            new de.regelsuche.transform.PatternRewriteRule("unwrap",
+                new de.regelsuche.transform.PatternExpr.Function("f", List.of(a)), a));
+        var exact = new AstRewriteTransformationEngine(rules);
+        var parser = new de.regelsuche.parse.ExpressionParser();
+        for (String input : List.of("f(x + (y + z))", "f(x * (y * z))", "f(x + (y - z))",
+                "f(g(x + (y + z), 0.5))", "f((x ^ y) ^ z)", "f(x ^ (y ^ z))")) {
+            var strategy = new EqualitySaturationStrategy(
+                de.regelsuche.egraph.EqualitySaturation.Config.defaults(),
+                de.regelsuche.egraph.EqualitySaturation.ProofOptions.defaults());
+            var states = strategy.search(new SearchProblem(input, exact, scorer, canonicalizer, heuristic));
+            assertEquals(2, states.size());
+            assertTrue(strategy.lastProofOutcome().complete());
+            var token = strategy.lastProofOutcome().checked().orElseThrow();
+            var renderedEndpoint = parser.parseTerm(states.getLast().expression());
+            var received = de.regelsuche.egraph.proof.ExtractionProofChecker.check(
+                parser.parseTerm(input), renderedEndpoint, token.certificate(), rules,
+                de.regelsuche.egraph.proof.ProofLimits.defaults());
+            assertEquals(de.regelsuche.egraph.proof.ExtractionProofChecker.Status.ACCEPTED,
+                received.status(), input + " -> " + states.getLast().expression() + ": " + received.detail());
+            assertEquals(token.output(), renderedEndpoint);
+        }
+    }
+
+    @Test
+    void proofRequiredUnrepresentableScalarEndpointKeepsRoot() {
+        var a = new de.regelsuche.transform.PatternExpr.Placeholder("a");
+        for (var number : List.of(de.regelsuche.scalar.ExactRational.integer(-1),
+                de.regelsuche.scalar.ExactRational.fromCanonicalText("1/3"))) {
+            var exact = new AstRewriteTransformationEngine(List.of(
+                new de.regelsuche.transform.PatternRewriteRule("scalar",
+                    new de.regelsuche.transform.PatternExpr.Function("f", List.of(a)),
+                    new de.regelsuche.transform.PatternExpr.LiteralNumber(number))));
+            var strategy = new EqualitySaturationStrategy(
+                de.regelsuche.egraph.EqualitySaturation.Config.defaults(),
+                de.regelsuche.egraph.EqualitySaturation.ProofOptions.defaults());
+            var states = strategy.search(new SearchProblem("f(x)", exact, scorer, canonicalizer, heuristic));
+            assertEquals(1, states.size());
+            assertEquals("f(x)", states.getFirst().expression());
+            assertEquals(de.regelsuche.egraph.proof.ProofOutcome.Status.EXTRACTION_UNAVAILABLE,
+                strategy.lastProofOutcome().status());
+            assertEquals("Search output contains an unrepresentable scalar endpoint.",
+                strategy.lastProofOutcome().detail());
+            assertTrue(strategy.lastProvenance().hasExtractionProof());
+        }
+    }
+
     private SearchProblem exactProblem() {
         var a = new de.regelsuche.transform.PatternExpr.Placeholder("a");
         var zero = new de.regelsuche.transform.PatternExpr.LiteralNumber(de.regelsuche.scalar.ExactRational.ZERO);

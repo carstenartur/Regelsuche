@@ -314,6 +314,60 @@ class EqualitySaturationExtractionProofTest {
         assertDetached(input, expected, rules, result);
     }
 
+    @Test
+    void constructorPreflightReportsConsumedWorkWhenQuotaIsExhausted() {
+        Expr input = fn("f", X);
+        for (long budget : new long[] {0, 1, 2}) {
+            var result = new EqualitySaturation(List.of(rule("r", pattern("f", A), A)),
+                    new EqualitySaturation.Config(10, 100)).saturateWithProof(input, node -> 1,
+                    new EqualitySaturation.ProofOptions(withWork(ProofLimits.defaults(), budget), ProofLimits.defaults()));
+            assertEquals(ProofOutcome.Status.LIMIT_EXCEEDED, result.proof().status());
+            assertSame(input, result.expression());
+            assertEquals(budget, result.proof().captureWork());
+            assertEquals(0, result.proof().buildWork());
+            assertEquals(0, result.proof().replayWork());
+        }
+    }
+
+    @Test
+    void constructorPreflightCountsSpentWorkInsteadOfRejectedCharge() {
+        var result = new EqualitySaturation(List.of(rule("long-rule-id", A, A)),
+                new EqualitySaturation.Config(10, 100)).saturateWithProof(X, node -> 1,
+                new EqualitySaturation.ProofOptions(withWork(ProofLimits.defaults(), 5), ProofLimits.defaults()));
+        assertEquals(ProofOutcome.Status.LIMIT_EXCEEDED, result.proof().status());
+        assertEquals(1, result.proof().captureWork());
+    }
+
+    @Test
+    void unsupportedConstructorPreflightRetainsConsumedWork() {
+        var unsupported = new PatternRewriteRule("r", A, A) {};
+        var result = run(X, List.of(unsupported));
+        assertEquals(ProofOutcome.Status.UNSUPPORTED_RULE, result.proof().status());
+        assertEquals(1, result.proof().captureWork());
+    }
+
+    @Test
+    void malformedConstructorPreflightRetainsConsumedWork() {
+        var scalar = new OpaquePreflightInteger();
+        var rational = new ExactRational(scalar, BigInteger.ONE);
+        scalar.armed = true;
+        var result = run(X, List.of(rule("r", PatternExpr.num(rational), A)));
+        assertEquals(ProofOutcome.Status.REPLAY_REJECTED, result.proof().status());
+        assertEquals(3, result.proof().captureWork());
+        assertSame(X, result.expression());
+    }
+
+    private static final class OpaquePreflightInteger extends BigInteger {
+        private boolean armed;
+        OpaquePreflightInteger() { super("7"); }
+        @Override public BigInteger divide(BigInteger value) { return this; }
+        @Override public BigInteger gcd(BigInteger value) { return BigInteger.ONE; }
+        @Override public int bitLength() {
+            if (armed) throw new AssertionError("opaque scalar inspected");
+            return super.bitLength();
+        }
+    }
+
     private static ProofLimits withWork(ProofLimits limits, long work) {
         return new ProofLimits(limits.maxTerms(), limits.maxProofSteps(), limits.maxReferences(),
             limits.maxCharacters(), limits.maxRationalBits(), limits.maxDepth(), limits.maxExpandedNodes(), work);

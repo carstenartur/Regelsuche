@@ -14,22 +14,70 @@ public final class ExtractionProofBuilder {
 
     public ExtractionProofBuilder(Collection<? extends RewriteRule> rules, ProofLimits limits) {
         syntax = new ProofSupport(limits);
-        syntax.registry(ProofSupport.nonNull(rules));
+        try {
+            syntax.registry(ProofSupport.nonNull(rules));
+        } catch (LimitExceeded exhausted) {
+            throw new LimitExceeded(exhausted.getMessage(), syntax.work, exhausted);
+        } catch (UnsupportedRule unsupported) {
+            throw new UnsupportedRule(unsupported.getMessage(), syntax.work, unsupported);
+        } catch (IllegalArgumentException invalid) {
+            throw new InvalidInput(invalid.getMessage(), syntax.work, invalid);
+        }
     }
 
     public static final class LimitExceeded extends RuntimeException {
+        private final long workUsed;
+
         public LimitExceeded() {
-            super("proof limit exceeded");
+            this("proof limit exceeded");
         }
 
         public LimitExceeded(String detail) {
-            super(detail);
+            this(detail, 0, null);
+        }
+
+        private LimitExceeded(String detail, long workUsed, Throwable cause) {
+            super(detail, cause);
+            this.workUsed = workUsed;
+        }
+
+        /**
+         * Consumed registry work when construction failed; otherwise use the live builder counter.
+         */
+        public long workUsed() {
+            return workUsed;
         }
     }
 
     public static final class UnsupportedRule extends IllegalArgumentException {
+        private final long workUsed;
+
         public UnsupportedRule(String detail) {
-            super(detail);
+            this(detail, 0, null);
+        }
+
+        private UnsupportedRule(String detail, long workUsed, Throwable cause) {
+            super(detail, cause);
+            this.workUsed = workUsed;
+        }
+
+        /** Consumed registry work when construction failed. */
+        public long workUsed() {
+            return workUsed;
+        }
+    }
+
+    /** Malformed registry input, retaining work even though no builder was returned. */
+    public static final class InvalidInput extends IllegalArgumentException {
+        private final long workUsed;
+
+        private InvalidInput(String detail, long workUsed, Throwable cause) {
+            super(detail, cause);
+            this.workUsed = workUsed;
+        }
+
+        public long workUsed() {
+            return workUsed;
         }
     }
 

@@ -209,12 +209,18 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
             - lastProofOutcome.captureWork() - lastProofOutcome.buildWork();
         try {
             requireRepresentableSymbols(proved.expression(), remainingWork, ownWork);
-            extracted = ExpressionFormatter.formatMeasured(proved.expression(), units -> {
+            extracted = formatProofExpression(proved.expression(), remainingWork, ownWork, units -> {
                 if (units < 0 || units > proofOptions.captureLimits().maxCharacters() - emitted[0]
                         || units > remainingWork - ownWork[0]) throw new SearchRenderingLimit();
                 ownWork[0] += units;
                 emitted[0] += units;
             });
+        } catch (UnrepresentableScalar ex) {
+            lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.EXTRACTION_UNAVAILABLE,
+                "Search output contains an unrepresentable scalar endpoint.",
+                lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork(), lastProofOutcome.replayWork());
+            recordProofFailureSelection();
+            return List.of(original);
         } catch (UnrepresentableSymbol ex) {
             lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.EXTRACTION_UNAVAILABLE,
                 "Search output contains an unrepresentable symbol.",
@@ -232,6 +238,77 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
             lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork());
         if (extracted.equals(root)) return List.of(original);
         return extractedStates(problem, root, extracted, rootScore, original);
+    }
+
+    /** Parenthesize every binary node so text keeps the checker's exact endpoint tree. */
+    private static String formatProofExpression(Expr expression, long work, long[] used,
+            java.util.function.LongConsumer emitted) {
+        if (!(expression instanceof de.regelsuche.ast.BinaryExpr)
+                && !(expression instanceof de.regelsuche.ast.FunctionExpr)) {
+            return formatProofLeaf(expression, work, used, emitted);
+        }
+        chargeSearchWork(work, used, 1);
+        var pending = new java.util.ArrayDeque<Object>();
+        var output = new StringBuilder();
+        pending.push(expression);
+        while (!pending.isEmpty()) {
+            chargeSearchWork(work, used, 1);
+            Object action = pending.pop();
+            if (action instanceof String text) {
+                emitted.accept(text.length());
+                output.append(text);
+            } else {
+                scheduleProofExpression((Expr) action, pending, output, work, used, emitted);
+            }
+        }
+        chargeSearchWork(work, used, output.length());
+        return output.toString();
+    }
+
+    private static void scheduleProofExpression(Expr expression, java.util.Deque<Object> pending,
+            StringBuilder output, long work, long[] used, java.util.function.LongConsumer emitted) {
+        if (expression instanceof de.regelsuche.ast.BinaryExpr binary) {
+            chargeSearchWork(work, used, 5);
+            pending.push(")");
+            pending.push(binary.right());
+            pending.push(" " + binary.operator().symbol() + " ");
+            pending.push(binary.left());
+            pending.push("(");
+        } else if (expression instanceof de.regelsuche.ast.FunctionExpr function) {
+            scheduleProofFunction(function, pending, work, used);
+        } else {
+            String text = formatProofLeaf(expression, work, used, emitted);
+            chargeSearchWork(work, used, text.length());
+            output.append(text);
+        }
+    }
+
+    private static String formatProofLeaf(Expr expression, long work, long[] used,
+            java.util.function.LongConsumer emitted) {
+        String text = ExpressionFormatter.formatMeasured(expression, emitted);
+        if (expression instanceof de.regelsuche.ast.NumberExpr) {
+            // Unary minus and fraction syntax parse into binary nodes, not numeric leaves.
+            chargeSearchWork(work, used, text.length());
+            if (text.startsWith("-") || text.indexOf('/') >= 0) throw new UnrepresentableScalar();
+        }
+        return text;
+    }
+
+    private static void scheduleProofFunction(de.regelsuche.ast.FunctionExpr function,
+            java.util.Deque<Object> pending, long work, long[] used) {
+        chargeSearchWork(work, used, 1);
+        pending.push(")");
+        for (int i = function.arguments().size() - 1; i >= 0; i--) {
+            chargeSearchWork(work, used, 1);
+            pending.push(function.arguments().get(i));
+            if (i > 0) {
+                chargeSearchWork(work, used, 1);
+                pending.push(", ");
+            }
+        }
+        chargeSearchWork(work, used, 2);
+        pending.push("(");
+        pending.push(function.name());
     }
 
     private void recordProofFailureSelection() {
@@ -283,6 +360,7 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
         used[0] += units;
     }
 
+    private static final class UnrepresentableScalar extends RuntimeException {}
     private static final class UnrepresentableSymbol extends RuntimeException {}
     private static final class SearchRenderingLimit extends RuntimeException {}
 

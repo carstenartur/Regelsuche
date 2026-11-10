@@ -161,9 +161,14 @@ public final class EqualitySaturation {
             builder = new ExtractionProofBuilder(rules, options.captureLimits());
             source = builder.addExpression(input);
         } catch (ExtractionProofBuilder.UnsupportedRule unsupported) {
-            return unavailable(input, ProofOutcome.Status.UNSUPPORTED_RULE, unsupported.getMessage(), builder);
+            return unavailable(input, ProofOutcome.Status.UNSUPPORTED_RULE, unsupported.getMessage(),
+                builder == null ? unsupported.workUsed() : builder.workUsed());
         } catch (ExtractionProofBuilder.LimitExceeded exhausted) {
-            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED, "preflight: " + exhausted.getMessage(), builder);
+            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED, "preflight: " + exhausted.getMessage(),
+                builder == null ? exhausted.workUsed() : builder.workUsed());
+        } catch (ExtractionProofBuilder.InvalidInput invalid) {
+            return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, "unsupported proof input",
+                builder == null ? invalid.workUsed() : builder.workUsed());
         } catch (IllegalArgumentException invalid) {
             return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, "unsupported proof input", builder);
         }
@@ -257,8 +262,13 @@ public final class EqualitySaturation {
 
     private static ProvedResult unavailable(Expr input, ProofOutcome.Status status, String detail,
             ExtractionProofBuilder builder) {
+        return unavailable(input, status, detail, builder == null ? 0 : builder.workUsed());
+    }
+
+    private static ProvedResult unavailable(Expr input, ProofOutcome.Status status, String detail,
+            long captureWork) {
         return new ProvedResult(input, Optional.empty(), ProofOutcome.unavailable(status, detail,
-            builder == null ? 0 : builder.workUsed(), 0, 0));
+            captureWork, 0, 0));
     }
 
     private static void requireCheckedOutput(Expr output, ProofOutcome proof) {

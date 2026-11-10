@@ -77,9 +77,16 @@ text limits; diagnostic formatting may therefore be unavailable.
 Search opts in with `new EqualitySaturationStrategy(config, options)` and exposes
 `lastProofOutcome()`. Only the operator-count objective is supported in this
 mode; other objectives preserve the root. Bounded rendering and parser-compatible
-symbol checks are required before publishing a text state. A rendering failure
-preserves the original state with an explicit outcome. Checked diagnostic
-provenance may still describe an AST when its search text cannot be represented.
+symbol checks are required before publishing a text state. Proof-mode text
+parenthesizes every binary node and preserves function argument order, so parsing
+it retains the checker's exact endpoint tree, including right-nested addition
+and multiplication. Negative numeric leaves and fraction-form numeric leaves
+cannot be represented as the same leaf by the existing parser: unary minus and
+division produce binary nodes. Those cases preserve the original search state
+with `EXTRACTION_UNAVAILABLE`, as do other unrepresentable endpoints. A rendering
+limit also preserves the original state with an explicit outcome. Checked
+diagnostic provenance may still describe an AST when its search text cannot be
+represented. Existing non-proof formatting is unchanged.
 The synthetic `equality-saturation` path edge remains non-executable and is never
 marked construction-proven. A certificate is an equality DAG, not one primitive
 rewrite step.
@@ -109,7 +116,9 @@ for proof availability, and pending graph repair completes.
 
 Capture, reconstruction and detached replay are additional work.
 `captureWork`, `buildWork` and `replayWork` report separate phase counts; the first
-two share one monotone allowance. Search symbol checking and measured output
+two share one monotone allowance. Failed rule-registry preflight retains the
+work already consumed, even when the builder constructor does not return;
+rejected charges are not counted as completed work. Search symbol checking and measured output
 rendering use the remaining capture/build allowance, with traversal work and
 emitted character counts kept separately. `lastProofOutcome().captureWork()`
 includes this additional search work for complete and unavailable outcomes.
