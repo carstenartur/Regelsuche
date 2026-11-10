@@ -42,26 +42,26 @@ public final class ProofStatusDescription {
         map.put(CandidateProofStatus.VALIDATED_BY_EXAMPLES, new Description(
             CandidateProofStatus.VALIDATED_BY_EXAMPLES,
             "Durch Beispiele bestätigt",
-            "Regel ist auf einer Menge konkreter Beispiele gleichwertigkeitserhaltend.",
-            "Rule preserves equivalence on a set of concrete examples."
+            "Regel ist auf konkreten Beispielen gleichwertigkeitserhaltend. Das beweist keine allgemeine Gültigkeit.",
+            "Rule preserves equivalence on concrete examples; this does not prove general validity."
         ));
         map.put(CandidateProofStatus.SYMBOLICALLY_VERIFIED, new Description(
             CandidateProofStatus.SYMBOLICALLY_VERIFIED,
             "Symbolisch verifiziert",
-            "Regel wurde durch ein symbolisches Verfahren (SymPy/SMT) als allgemein gültig geprüft.",
-            "Rule has been verified as universally valid via a symbolic procedure (SymPy/SMT)."
+            "Regel wurde im angegebenen Modell unter seinen Voraussetzungen symbolisch geprüft. Verfahren und Beleg bestimmen die Beweiskraft.",
+            "Rule was checked symbolically in the stated model under its assumptions. The method and evidence determine the strength of the result."
         ));
         map.put(CandidateProofStatus.FORMALLY_PROVABLE, new Description(
             CandidateProofStatus.FORMALLY_PROVABLE,
-            "Formal beweisbar",
-            "Es existiert ein formaler Beweis-Pfad (z.B. Lean-Skizze), der noch nicht durchgeführt wurde.",
-            "A formal proof outline exists (e.g. a Lean sketch) but has not been completed yet."
+            "Beweis vorbereitet",
+            "Ein Beweis-Pfad oder eine Skizze ist vorbereitet, aber noch nicht erfolgreich geprüft. Der Status garantiert keinen Beweis.",
+            "A proof path or sketch is prepared but has not passed checking. This status does not guarantee a proof."
         ));
         map.put(CandidateProofStatus.FORMALLY_PROVED, new Description(
             CandidateProofStatus.FORMALLY_PROVED,
             "Formal bewiesen",
-            "Regel wurde formal in einem Beweissystem bewiesen (Lean/Isabelle/Coq).",
-            "Rule has been formally proved in a proof assistant (Lean/Isabelle/Coq)."
+            "Ein formaler Nachweis wurde akzeptiert. Prüfer, gebundene Aussage, Axiome und Voraussetzungen müssen dem Beleg entnommen werden; ein importiertes Statuslabel allein ist keine Autorisierung.",
+            "A formal proof was accepted. Consult the evidence for its checker, bound statement, axioms and assumptions; an imported status label alone is not authorization."
         ));
         return java.util.Collections.unmodifiableMap(map);
     }

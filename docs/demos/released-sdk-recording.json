@@ -1,0 +1,29 @@
+{
+  "schema": "regelsuche.public-entry-recording/v1",
+  "recordedAt": "2026-11-10",
+  "sdkVersion": "0.5.2",
+  "archiveUrl": "https://github.com/carstenartur/Regelsuche/releases/download/v0.5.2/regelsuche-sdk-0.5.2.zip",
+  "archiveSha256": "0746b8c6088539c6db3d228131952b30e8066ac8569215b6a508d08df601d9cb",
+  "verifiedInternalChecksums": 4034,
+  "sourceFile": "examples/external-consumers/hello-rule-java25/src/main/java/example/HelloRule.java",
+  "sourceSha256": "49b241303bf93e2cd10d390fed38f23a79c94bde183cf7e9d549e9eef9043109",
+  "javaVersion": "openjdk version \"25.0.5\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.5+8 (build 25.0.5+8-LTS, mixed mode, sharing)",
+  "execution": "javac and java against the four actual 0.5.2 SDK runtime JARs, plus the included ServiceLoader descriptor; no reactor classes",
+  "stdout": "rule=hello-add-zero\nbefore=x + 0\nafter=x\nreplay=VERIFIED\nnegative=REJECTED\nproof=AUTHOR_SUPPLIED_IDENTITY\n",
+  "mavenResult": "BLOCKED: Maven Central DNS resolution failed while loading imported JUnit, Testcontainers and Netty BOMs. Maven/JUnit success is not claimed.",
+  "compilerDiagnostic": "One javac warning: Jackson JsonCreator.Mode annotation class unavailable on the minimal four-JAR classpath. Compilation and runtime both exited 0.",
+  "scope": "Concrete positive, negative and deterministic replay assertions. The plugin author supplies the identity; no formal-proof backend was invoked.",
+  "standaloneOptimization": {
+    "archiveSha256": "0cba94576ca8a60f79ccd469a853ae0be10f0fa3f6aa20e07f8e98cc4b36f8f8",
+    "archiveUrl": "https://github.com/carstenartur/Regelsuche/releases/download/v0.5.2/regelsuche-optimization-sdk-0.5.2.zip",
+    "internalVersion": "0.5.2-issue1657-ca38d64cca3e",
+    "sourceRevision": "ca38d64cca3e415e7c7823e39cadbf762b908ef6",
+    "retainedPubliclyPublishedField": false,
+    "publicationEvidence": "GitHub v0.5.2 release published 2026-11-07T16:04:33Z; frozen qualification metadata is unchanged",
+    "standaloneJarSha256": "d7cdb5944d600dc8d24e251f602adf85ee2ee66a9d54b409018b86f82d91af97",
+    "execution": "javac and java using the unmodified consumer/ source and the actual -all.jar from the released ZIP in a separate directory",
+    "stdout": "optimization=VERIFIED\nderivation=REPLAYED_SELECTED_PATH\nchecked=ORIGINAL_OVERFLOW_DETECTED\ndomains=ORIGINAL_AND_CANDIDATE_VERIFIED\niteration=VERIFIED_TELESCOPING_5050\nseries=VERIFIED_RUNTIME_POLYNOMIAL_AND_AFFINE\npair=VERIFIED_ONE_PASS_54\n",
+    "exitCode": 0,
+    "scope": "Execution of that archive consumer only; no qualification of current main or source adapter integration"
+  }
+}

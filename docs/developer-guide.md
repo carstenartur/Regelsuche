@@ -10,7 +10,8 @@ Für die meisten Änderungen:
 
 - JDK 25;
 - Git;
-- der eingecheckte Gradle Wrapper.
+- Maven 3.9.9 oder neuer aus der 3.x-Linie;
+- für die zusätzlich bestehenden Gradle-Gates der eingecheckte Wrapper.
 
 Für Browser-, Container- und vollständige Evidence-Tests zusätzlich:
 
@@ -74,7 +75,10 @@ paper/                            evidenzgebundene Manuskriptartefakte
 .github/workflows/                dünne Plattformadapter
 ```
 
-`settings.gradle` ist das autoritative Modulverzeichnis. Fachliche
+Das Root-`pom.xml` und seine Profile sind das Maven-Modulverzeichnis.
+`mvn --batch-mode --no-transfer-progress test` prüft den normalen Java-Produktreaktor;
+`mvn package` erzeugt die Distributionen unter `app/target/`. `settings.gradle`
+bleibt das Modulverzeichnis des zusätzlich erforderlichen Gradle-Vertrags. Fachliche
 Abhängigkeitsrichtungen stehen in [Dependency-Regeln](dependency-rules.md).
 
 ## Empfohlener Arbeitsablauf
