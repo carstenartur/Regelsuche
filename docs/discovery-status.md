@@ -1,169 +1,238 @@
 # Discovery- und Forschungsstand
 
-**Stand: 9. September 2026**
+**Stand: 10. November 2026**
 
-Diese Übersicht trennt ausgelieferte Fähigkeiten, Entwicklungen nach dem
-Release, begrenzte Projektnachweise und noch nicht ausgeführte Studien.
-[Regelsuche 0.4.0](releases/0.4.0.md) ist veröffentlicht. Seine unveränderten
-Release-Artefakte enthalten nicht automatisch spätere Änderungen am Quellcode.
+Regelsuche untersucht symbolische Suche, den Erwerb und die Wiederverwendung
+geprüften Wissens sowie mathematisch geprüfte Optimierungen. Diese Übersicht
+trennt implementierte Verfahren, tatsächlich ausgeführte Entwicklungsversuche
+und wissenschaftliche Fragen, die weitere Studien benötigen. Die
+[Forschungsmethodik](research-methodology.md) beschreibt diese Trennung und die
+Rolle externer Referenzverfahren.
+
+[Regelsuche 0.5.2](releases/0.5.2.md) wurde am 7. November 2026 veröffentlicht.
+Diese Seite berücksichtigt auch den neueren Hauptzweig bis einschließlich
+8. November. Dessen Ergänzungen gehören nicht automatisch zu den unveränderten
+Release-Artefakten von 0.5.2.
 
 ## Zusammenfassung
 
-Regelsuche besitzt eine ausführbare Plattform für symbolische Suche,
-Regelvorbereitung, generationengetrenntes Lernen und unabhängige Prüfung.
-Gelernte Regeln können innerhalb größerer Ausdrücke und an ausgewählten
-Summandenpaaren wiederverwendet werden. Es existieren begrenzte historische
-Kompositionsnachweise und erste zielausdrucksfreie Restterm-Kombinationen.
+Die vorhandene Plattform verbindet symbolische Suche, exakte Konstruktionen,
+unabhängige Prüfung, persistiertes Wissen und ausdrücklich ausgelöste
+Lernbatches. Drei aufeinander aufbauende Wissensgenerationen wurden tatsächlich
+erworben und später verwendet. Zwei begrenzte Entwicklungsversuche zeigen
+weniger deklarierte logische Gesamtarbeit einschließlich Erwerb und erneutem
+Laden. Ein weiterer Versuch misst den vollständigen Lebenszyklus vorbereiteter
+Sitzungen und bezahlter Selbstverbesserung; dort wurde keine tatsächliche
+Amortisation gegenüber der bestehenden persistenten Sitzung nachgewiesen.
 
-Nicht abgeschlossen ist der stärkere Nachweis, dass das System die
-übergeordnete Beweisstrategie selbst lernt und mit dieser auf unberührten
-Aufgaben unter vergleichbarer Gesamtarbeit besser sucht. Eine grüne Software-CI
-ist kein Ersatz für dieses Experiment.
+Der Forschungsgegenstand reicht inzwischen über Polynomumformungen hinaus:
+endliche Summen, lineare Rekurrenzen, Paar- und Fensterreduktionen, geordnete
+Tupel und begrenzte Rechenpläne für Körperoperationen besitzen ausführbare
+Synthese- und Prüfpfade. Diese durch die Implementierung bereitgestellten Verfahren
+liefern Suchmöglichkeiten und überprüfbare Beobachtungen. Ihr Vorhandensein
+belegt noch nicht, dass das System die übergeordnete mathematische Strategie
+selbst erlernt oder auf unabhängige Aufgabenfamilien überträgt.
 
-## Status auf einen Blick
+## Implementierter Umfang
 
-| Bereich | Implementierung | Aussagegrenze |
-| --- | --- | --- |
-| Produkt | Web-Workbench, CLI, Docker, Full Mode, Proof-Jobs und reproduzierbare Exporte | Kein Produktions- oder Sicherheitszertifikat |
-| Exakte Polynome | Parsergebundene Literalprovenienz, native begrenzte univariate Faktorisierung über `Z[x]` und `Q[x]`, endliche Körper, Hensel-Lifting und Rekombination | Keine allgemeine multivariate Faktorisierung; Backend-Vollständigkeit ist nicht automatisch unabhängig zertifiziert |
-| Faktorisierung im AST | Verifier-gebundene Ersetzung auch ausgewählter verschachtelter Vorkommen mit Kontextprüfung | Ein Budgetabbruch ist kein Irreduzibilitätsbeweis |
-| Gleichungssysteme | Exaktes `A*x=b`, Blockzerlegung, RREF, Lösungsklassifikation und explizite Eigenproblemrollen | Keine Physik allein aus Symbolnamen, kein allgemeiner nichtlinearer Solver |
-| Automatische Darstellungswahl | Quellengestützte unabhängige Blöcke vor Eliminierung; direkter, Matrix- und Blockvergleich mit vollständigem Replay | Rund 6 % weniger gezählte Arbeit im öffentlichen Entwicklungssatz; keine Laufzeitmessung oder globale Optimalität |
-| Gelernte Darstellungsauswahl | Eingefrorene Bedingung aus 18 verifizierten Trainingstrials; 42 weitere Aufgaben und sechs Profile | Feste Auswahl schöpft gemessenen Spielraum aus; kein Test des Erwerbs mathematischer Verfahren, siehe [Ursachenanalyse](representation-learning-diagnosis.md) |
-| Externer linearer Client | Installierbares Python-Paket, Java-Beispiel, Browserdemo und unabhängiger rationaler Prüfer | Exakte begrenzte affine Lösungsmengen; keine PyPI-Veröffentlichung oder Lean-Kernprüfung behauptet |
-| Vorbereitung | Native Exact-Spezialisten, Guards, lokale Pattern-Bridges und Unified Coordinator | Allgemeines Defaultprofil und gemeinsame Multi-Principal-Ausführung bleiben gesondert zu qualifizieren |
-| Regelmining | Eingefrorene Generationen, exakte Patternprüfung und kumulativer Wiederverwendungsaudit | Experimentelle Schatteninventare; Tiefenbudget-Erfolg ist keine allgemeine Reduktion der Gesamtarbeit |
-| Historische Komposition | Elf-Schritt-Brahmagupta–Fibonacci-Pfad mit zweimaliger Anwendung derselben gelernten Ergänzungsregel | Deklarierte Phasenfolge; unrestricted Best-First blieb bei 20.000 Zuständen ohne Fund |
-| Resttermkomposition | Disjunkte Summandenpaare und Vorzeichen können über exakte Nullrestprüfung ohne Zielausdruck ausgewählt werden | Strategie und vorbereitende Strukturwahl sind noch nicht selbst gelernt |
-| Schematische Pläne | Typisierte Lücken, endliche Koeffizienten-/Vorzeichensuche und verifier-gebundene Kandidatenevidence | Vorgegebene Ansatzgrammatik ist keine autonom erfundene Taktik |
-| Gelernte Regelfolgen | Verzweigende Programme aus zielausdrucksfreien primitiven TRAIN-Spuren und getrennt trainierte Fortsetzungsauswahl | Auf 288 neuen Entwicklungsfällen 1,4 % weniger gezählte Anwendungsarbeit als Greedy, gleiche Scores; Lernkosten noch nicht amortisiert, keine unabhängig zurückgehaltenen Mathematikfamilien |
-| Java-SDK | Eigenständige Java-25-Domänen, Fassade, Assertions und Provider-SPI | Lokale Maven-Bereitstellung; öffentliche stabile Release-API noch nicht zugesagt |
-| Externe Neuheit | Eigener, noch offener Literatur-/Expertenprüfpfad | Keine weltweite Neuheitsbehauptung |
+| Bereich | Vorhandener Umfang und Grenze |
+| --- | --- |
+| Suche und Produkt | Web-Workbench, CLI, Docker, native Suchereignisse, gespeicherte Pfade, Replay, Proof-Jobs und Exporte; Softwareprüfung und mathematische Ergebnisprüfung haben getrennte Verträge. |
+| Exakte Algebra | Parsergebundene Literalprovenienz, begrenzte univariate Faktorisierung über `Z[x]` und `Q[x]`, endliche Körper, Hensel-Lifting, Rekombination und kontextgeprüfte AST-Ersetzungen. Ein Budgetabbruch ist kein Irreduzibilitätsbeweis. |
+| Strukturelle Konstruktion | Quadratergänzung, exakte Faktorteilung, Resttermkomposition und begrenzte koeffizientenbasierte binäre Quartikzerlegung im gemeinsamen Suchraum; keine allgemeine multivariate Faktorisierung oder Ferrari-Prozedur. |
+| Gleichungen und Darstellung | Exaktes `A*x=b`, Blockzerlegung, RREF, Lösungsklassifikation sowie explizite Eigenproblemrollen; Darstellungswahl und Solver haben gebundene Domänen. |
+| Kumulatives Wissen | Unveränderliche Generationen, exakte Schemaprüfung, bezahlte Validierung und Auswahl, persistierte Herkunft und erneuter Beweis beim Laden. Lernen ist ein expliziter Batch; eine Anfrage verändert das Wissen nicht. |
+| Vorbereitete Sitzungen | Begrenzte, ausdrücklich besessene Wiederverwendung bereits geprüfter Generationen und kostenpflichtige Verbesserungsversuche mit gemessener Übernahmeentscheidung; deren Prognose ersetzt keinen ausgeführten Gesamtkostennachweis. |
+| Endliche Reduktionen | Polynomiale Summen mit Laufzeitgrenzen, verschachtelte/periodische/stückweise Komposition, enges rationales Teleskopieren und affine beziehungsweise gekoppelte lineare Zustandsrekurrenzen. Synthese und unabhängige Prüfung bleiben getrennt. |
+| Paar- und geordnete Reduktionen | Ein-Pass-Paarsummen, rollende Paarfenster, geordnete Tupel mit zwei bis acht Zeilenpositionen und eingeschränkte Fenster mit geprüften Indexplänen. Mathematische Pläne erteilen keine pauschale Freigabe für Java-Quellcodeersetzungen. |
+| Körper-Rechenpläne | Begrenzte Festpotenz- und Inversionspläne sowie Batch-Inversion; Domänenannahmen und Kostenmodell gehören zum jeweiligen geprüften Plan. |
+| Externe Nutzung | Eigenständiges Java-25-Optimierungs-SDK, Standalone-Verteilung und gezählte-Summen-CLI; außerdem externer linearer Python-Client, Java-Beispiel und Browserdemo. Quelladapter müssen Effekte, Überläufe und Auswertungsreihenfolge gesondert absichern. |
+| Literaturbezüge | Versionierte Quellenzuordnungen in Replay/Export und private Prüfung bekannter Vorarbeit am gespeicherten Kandidaten; ein begrenzter Suchumfang entscheidet keine weltweite mathematische Neuheit. |
 
-Details zu den inzwischen vorhandenen Polynomschritten stehen unter
-[domänenbewusste Faktorisierung](domain-aware-polynomial-factorization.md),
-[verschachtelte Vorkommen](exact-nested-factorization-transformation.md) und
-[SymPy/GraalPy-Adapter](sympy-factorization-adapter.md). Die frühere Aussage,
-endliche Körper oder Hensel-Lifting seien noch gar nicht implementiert, ist
-überholt. Produktgleichheit, Vollständigkeit und Irreduzibilität bleiben
-unterschiedliche Aussagen.
+Einstiege sind die [domänenbewusste Faktorisierung](domain-aware-polynomial-factorization.md),
+[verschachtelten Vorkommen](exact-nested-factorization-transformation.md),
+[strukturelle Konstruktion](research/structural-construction-learning.md), das
+[Optimierungs-SDK](../regelsuche-optimization-sdk/README.md), sein
+[Vertrag für endliche Reduktionen](../regelsuche-optimization-sdk/FINITE_SERIES.md)
+und die [Literaturreferenzen](literature-references.md).
 
-## Entwicklung nach 0.4.0: budgettreue Programmkomposition
+Für Paarreduktionen prüft der Verifier die Beiträge einer und zweier symbolischer
+Zeilen. Fensterpläne bewahren ihre Invariante beim Entfernen und Einfügen;
+geordnete Pläne prüfen zusätzlich die Auswahlintervalle und die umgekehrte
+Entfernungsbedingung. Lineare Zustandspläne unterscheiden simultane und
+sequenzielle Zuweisungen und verwenden geprüfte Matrixpotenzierung. Die
+Batch-Inversion unterstützt zwei bis 64 Ausgaben mit einer Inversion und
+`3*(n-1)` Multiplikationen unter den erforderlichen Invertierbarkeitsannahmen.
+Diese Operationszahlen sind keine gemessenen Laufzeitfaktoren.
 
-Der neue Einstieg `RewriteProgramInterpreter.executeBudgeted` erweitert den
-isolierten `BudgetedSource`-Einstieg um `Choice`, `FirstApplicable`, `Sequence`,
-`Repeat` und explizites `Prune`. Jede Alternative erhält dasselbe eingehende
-Pfadbudget; Fortsetzungen und Wiederholungen erhalten nur den Rest nach der
-konkreten Präfixarbeit. Mathematische und mechanische Arbeit bleiben getrennt.
+## Ausgeführte begrenzte Lern- und Kostenversuche
 
-Die Ausführung bindet das vollständige Programm und seine Source-Identitäten,
-behält erfolglose und abgebrochene Source-Aufrufe sowie entfernte Pfade und
-unterscheidet vollständige/unvollständige Ergebnisse mit/ohne Kandidaten.
-Ein unvollständiges leeres Ergebnis darf in `FirstApplicable` keine spätere
-Alternative freigeben.
+### Drei kumulative Wissensgenerationen
 
-Dies ist Ausführungsinfrastruktur unter #906, noch keine gelernte Strategie
-oder gewöhnliche Suchkante. Die [Kompositionsdokumentation](budgeted-rewrite-program-composition.md)
-enthält Vertrag, Prüfungen und Reproduktionsbefehle. Testdefinitionen und lokale
-Teilprüfungen ersetzen nicht die vollständige CI zum jeweiligen Commit.
+[CumulativeTaskKnowledge](research/cumulative-task-knowledge.md) gewinnt jede
+Generation aus tatsächlich gelösten und unabhängig wiederholten Aufgaben.
+Spätere Lektionen verwenden frühere Schemata und primitive Restschritte; neue
+Regeln wirken erst nach Veröffentlichung des Nachfolgers. Nach drei Generationen
+enthält der Bestand drei Schemata. Auf demselben vierteiligen Transferstrom
+beträgt die automatische Anfragearbeit für Generation 0/1/2/3 jeweils
+**1.762 / 1.763 / 1.594 / 1.194**. Die erste Generation ist hier geringfügig
+teurer; eine Verbesserung jeder einzelnen Aufgabe oder Generation folgt daraus
+nicht.
 
-## Begrenzte Auswahl von Polynomstrategien
+Ein tatsächlich ausgeführter Strom aus **512 Anfragen** enthält drei
+Kompositionstiefen und einen nicht erreichten Negativfall, wechselnde Namen und
+zusammengesetzte Einsetzungen. Kein früheres Anfrageergebnis wird zwischengespeichert.
+Alle Vergleichsarme haben dieselben Erfolgsergebnisse.
 
-Der experimentelle Baustein `FinitePolynomialStrategySearch` erzeugt alle
-Ansatzfolgen innerhalb einer vorgegebenen endlichen Grammatik, bewertet sie
-auf TRAIN-Eingaben und friert die Auswahl vor weiteren Anwendungen ein.
-Neue Koeffizienten werden bei der Wiederverwendung neu gelöst und geprüft;
-die Trainingsdaten und ihre bloß umbenannten Äquivalente sind dabei gesperrt.
+| Arm | Deklarierte logische Gesamtarbeit |
+| --- | ---: |
+| Primitive Baseline | 225.536 |
+| Generation 1 erwerben und einfrieren | 229.264 |
+| Kumulativ bis Generation 3, einschließlich Erwerb und frischer Sitzung | 186.706 |
 
-Im Entwicklungsfall gewinnt direkte Faktorisierung gegen eine unnötige
-quadratische Ergänzung davor. Alle 18 Trainingszeilen und die Kosten der
-Auswahl bleiben erhalten. Andere Trainingsdaten können eine andere Vorlage
-wählen. Das ist datenabhängige Auswahl, nicht das Erlernen der Ansatzgrammatik,
-einer verzweigenden Taktik oder der allgemeinen Resttermstrategie. Neue
-Koeffizienten derselben Familie ersetzen keinen unberührten FINAL TEST.
-Reproduktion und Grenzen: [Polynomstrategien aus Trainingsaufgaben](finite-polynomial-strategy-selection.md).
+Die letzte Summe besteht aus **31.611** Erwerbs-/Validierungs-/Vorbereitungseinheiten,
+**2.263** Einheiten für erneutes Laden/Vorbereiten und **152.832** Anfrageeinheiten.
+Das sind rund **17,2 %** weniger deklarierte Arbeit als die primitive Baseline
+auf diesem Entwicklungsstrom. Es ist ein ausgeführtes Amortisationsbeispiel;
+Wall-Zeit, vollständige JVM-CPU, Speicher und Serialisierung werden durch dieses
+logische Modell nicht vollständig erfasst.
 
-## Gelernte Regelfolgen aus Suchspuren
+### Lernen mit denselben strukturellen Fähigkeiten
 
-Der zusätzliche [Strategievergleich](trace-strategy-transfer.md) bildet aus
-beobachteten Regelfolgen einen Präfixbaum mit `Sequence` und `Choice` im
-vorhandenen Programm-IR. Die Programmstruktur hängt tatsächlich vom Training
-ab; neue Ausdrücke erhalten frisch ausgeführte primitive Pfade. Acht öffentliche
-Entwicklungsaufgaben werden in drei Profilen einschließlich Negativ- und
-unveränderter Kontrollfälle ausgewertet. Im unterstützten Bestand findet jedes
-Profil dieselben Endausdrücke; das gelernte Programm kostet mehr Sucharbeit.
-Das ergänzt die Ausführungsinfrastruktur um begrenztes Lernen und eine
-reproduzierbare Demo. Es schließt den offenen Nachweis einer selbst erlernten
-familienübergreifenden Taktik unter vergleichbarer Gesamtarbeit nicht ab.
+Der [strukturelle Lernversuch](research/structural-construction-learning.md)
+verwendet dieselben Konstruktionen, Aufgabenbudgets und Erfolgskriterien in
+Baseline und Lernarmen. Nach zwei Lernbatches, Speichern und erneutem Laden
+werden **32 Aufgaben** ausgeführt: acht Runden aus zwei historischen Formen,
+einem bereits faktorisierten Ausdruck und einem erfolglosen Fall. Alle Arme
+lösen **24 von 32** Aufgaben; es sind vier Strukturvorlagen, keine 32 unabhängigen
+Mathematikfamilien.
 
-Die anschließende [bedingte Fortsetzungsauswahl](conditional-strategy-dispatch.md)
-verwendet vorhandene primitive Kandidaten erneut und führt eine kompilierte
-Fortsetzung nur bei einem auf getrenntem TRAIN akzeptierten Kontext aus. Die
-neue Fallserie wurde vor ihrer Anwendung festgelegt und enthält auch passende
-Regelhinweise mit unpassenden Bindungen. Gegenüber einer starken Greedy-Kontrolle
-sinkt die gezählte Anwendungsarbeit von 8.960 auf 8.832 bei unveränderten Scores.
-Alle 1.152 Vergleichszeilen bleiben erhalten. Die einmaligen 1.166 Einheiten
-Lernarbeit sind zusätzlich zu zahlen; dies ist noch kein positiver Gesamtkosten-
-oder Laufzeitnachweis. Der ursprüngliche negative Zusatzprogrammvergleich bleibt
-unverändert reproduzierbar.
+| Arm | Logische Gesamtarbeit einschließlich Erwerb und Sitzungsvorbereitung |
+| --- | ---: |
+| Konstruktionsbaseline | 506.872 |
+| Erste Fähigkeit lernen und einfrieren | 316.450 |
+| Beide Fähigkeiten lernen und erneut laden | 163.881 |
 
-Bei der [Bildung gelernter Folgen](primitive-trace-minimality.md) ist die Prüfung
-auf kürzere primitive Verbindungen jetzt verpflichtend. Der Nachweis bindet die
-konkreten TRAIN-Endpunkte und das atomare Inventar. Kürzere Wege ersetzen
-beobachtete Umwege; Ressourcenabbrüche ergeben keine Freigabe. Die zusätzlichen
-84 Prüfeinheiten sind in der Lernbilanz enthalten. Dies beweist keinen globalen
-Mindestabstand für jede spätere Variablenbelegung.
+**153.329** Erwerbs-/Validierungs-/Vorbereitungseinheiten, **1.424** Ladeeinheiten
+und **9.128** Anfrageeinheiten ergeben rund **67,7 %** weniger deklarierte Arbeit
+als die Baseline mit denselben Fähigkeiten. Ein zweiter JVM-Prozess verwendet
+beide gespeicherten Schemata auf zusammengesetzten Einsetzungen ohne erneutes
+Training. Die vorbereitende Resttermstrategie ist dabei weiterhin bereitgestellt;
+der Versuch zeigt ihren Wissenserwerb aus Ergebnissen, nicht die selbstständige
+Erfindung dieser Strategie.
 
-## Was historische Wiederentdeckung hier bedeutet
+### Vorbereitete Sitzungen und bezahlte Selbstverbesserung
 
-Sophie-Germain besitzt einen begrenzten Entwicklungsnachweis mit eingefrorenen
-gelernten Regeln. Für Brahmagupta–Fibonacci ist zunächst ein genau geprüfter
-Pfad unter vorgegebenen Phasen entstanden. Die spätere
-[Resttermkomposition](schematic-proof-plan-residual-composition.md) untersucht
-Paarungen und Vorzeichen und bildet die beiden klassischen Darstellungen aus
-einer unabhängig eingefrorenen Quadratergänzung. Historische Korrespondenz wird
-erst nach Kandidatenbildung und Freeze ausgewertet.
+[Vorbereitete Sitzungen](prepared-task-knowledge.md) vermeiden wiederholte volle
+Beweise identischer bereits geprüfter Generationen innerhalb ihrer eigenen
+begrenzten Lebensdauer. Der Verbesserungszyklus bezahlt Formation, alte und neue
+Vergleichsausführungen sowie erfolglose Versuche. Seine Übernahmeentscheidung
+verlangt eine prognostizierte Rückzahlung der aktuellen Versuchskosten in
+Wall-Zeit und gesamter JVM-CPU bei unveränderter individueller Ergebnisqualität.
+Frühere abgelehnte Versuche bleiben in der Gesamtbilanz bezahlt.
 
-Diese bekannten Entwicklungsfälle sind keine frischen FINAL-TEST-Aufgaben.
-Die allgemeine Resttermstrategie, die Wahl der Vorbereitung und die
-familienfremde Übertragung einer selbst gelernten Taktik sind weiterhin offen.
-Cassini mit Induktionszertifikat, Euklids Primzahlzeuge und eine quartische
-Resolventenkonstruktion sind keine bereits gelieferten allgemeinen Fähigkeiten.
+Der [Lebenszyklusversuch vom 7. November](research/knowledge-lifecycle-improvement-2026-11-07.md)
+führte **36 vollständige Lebenszyklen, 2.448 Anfragezeilen und 60 eigene Prozesse**
+aus. Er umfasst Erwerb, frischen ersten Lade-/Beweislauf, Dateizugriffe,
+Verbesserungsversuche, Anfragen, Transport, unabhängige Prüfung und Beenden.
+Die Längen betragen acht beziehungsweise 128 Anfragen; alle Profile erreichen
+7/8 beziehungsweise 112/128 Ziele. Eine vorhandene persistente Sitzung ist als
+Kontrolle enthalten.
 
-Ein unveränderter Ausgangsausdruck, der mathematisch zur Referenz äquivalent
-ist, zählt nicht als Wiederentdeckung der Faktorform bei Tiefe null.
-Strukturelle Korrespondenz, intrinsische Validierung, Erkennung und Ranking
-werden getrennt bewertet. Alte Atlas-/Diagnoseartefakte behalten ihre
-ursprüngliche Bedeutung und werden nicht nachträglich zu stärkeren Ergebnissen.
-Siehe [Salienz-Audit](representation-salience-audit.md).
+Die dritte Generation wird in allen drei langen Verbesserungsfolgen übernommen,
+in den kurzen abgelehnt. Trotzdem benötigt der vollständige gemischte Strom
+mehr mediane Wall-Zeit und CPU als die persistente Kontrolle. **Eine tatsächliche
+Amortisation ist hier nicht gezeigt.** Der prognostizierte Aufgabenumfang macht
+eine einseitige Übernahmestichprobe noch nicht repräsentativ für die spätere
+Mischung. Einzelne niedrigere Vorbereitungskosten werden deshalb nicht als
+vollständiger Effizienzgewinn ausgegeben. Der Bericht bewahrt Messgrenzen,
+Einzelwiederholungen, erfolglose Versuche und spätere Quellcodekorrekturen getrennt
+vom unveränderten gemessenen Runtime-Artefakt.
 
-## Begrenzte vorhandene Lernnachweise
+## Vergleichsverfahren und historische Aufgaben
 
-[Generationenbasiertes Regelmining](generational-rule-mining.md) friert jedes
-Inventar vor dem Lauf ein. Neue Regeln dürfen erst in einer späteren Generation
-wirken. Der kumulative Audit vergleicht `0+1` mit `0+1+2` unter demselben engen
-Tiefenbudget und verlangt tatsächliche Nutzung einer neuen Regel aus Generation
-2. Die Regeln werden ausschließlich in experimentellen Schatteninventaren
-aktiviert.
+Externe Verfahren sind austauschbare Referenzen für klar festgelegte Fragen.
+SymPy wurde praktisch gewählt, weil seine Nutzung keine Lizenzgebühren erfordert;
+andere geeignete Software kann diese Rolle ebenfalls erfüllen. Jede Aussage
+bezieht sich auf die eingefrorenen Aufrufe, Informationen, Domänen und Messgrenzen
+des jeweiligen [Vergleichsprotokolls](external-polynomial-comparison.md).
 
-Der bestehende [autonome Walkthrough](autonomous-discovery-walkthrough.md)
-verwendet den parametrisierten Kandidaten
+Im [nativen Polynomvergleich vom 6. November](research/native-polynomial-parity-2026-11-06.md)
+enthalten **72 unterstützte Fall-IDs 70 verschiedene Eingabezeichenketten**.
+Beide nativen Profile erreichen je Wiederholung bei **69** Fall-IDs dieselbe
+arithmetische Ausgabeoperationszahl wie das feste SymPy-1.14.0-Portfolio und
+bei **drei** eine niedrigere. Die drei nicht unterstützten Kontrollen bleiben
+außerhalb dieses Nenners. Die Zielfunktion zählt arithmetische Syntaxoperationen;
+sie misst weder Latenz noch globale mathematische Einfachheit. Die native
+Baseline und der Lernarm haben hier dieselben Qualitätswerte. Ihre vollständigen
+Sequenzen sind in dieser Messung langsamer als das Referenzportfolio; ein
+zusätzlicher Qualitäts- oder Gesamtkostennutzen durch Lernen folgt daraus nicht.
 
-```text
-(A + 2) * x + A * x -> (2 * A + 2) * x
-```
+Der separate [historische Vergleich](research/historical-sympy-comparison-2026-11-06.md)
+prüft Cassini, Pell, Brahmagupta–Fibonacci und Sophie Germain anhand ihrer
+jeweiligen mathematischen Ziele. Beide nativen Profile und das Referenzverfahren
+lösen alle **vier kanonischen Aufgaben**. Auf **zehn öffentlichen Varianten**
+steigt die native Erfolgszahl mit tatsächlich erworbenem Wissen von **sechs auf
+zehn**; das Referenzverfahren löst ebenfalls zehn. Die drei Negativ-/Budgetkontrollen
+bleiben ungelöst. Der gelernte vollständige Lebenszyklus ist bis zur gemessenen
+Länge von 72 Anfragen teurer als das Referenzverfahren, auch wenn einzelne
+Brahmagupta-Anfragen kürzere gemessene Latenzen haben.
 
-und bewertet seine Wiederverwendung getrennt. Das ist projektinterne,
-symbolisch geprüfte Wiederverwendung; keine Behauptung externer mathematischer
-Neuheit. Weniger äußere Suchschritte können durch komprimierte Makros entstehen.
-Lernkosten, primitive Expansion, Solver- und Überprüfungsarbeit müssen für einen
-Effizienzvergleich zusätzlich berücksichtigt werden.
+Für Cassini und die Pell-Transition werden nichtkonstante quadratische
+Invarianten aus dem angegebenen Übergang synthetisiert. Unabhängige Prüfung
+kontrolliert den universellen Übergangsschritt und den Anfangswert; daraus folgt
+die Invariantaussage für die deklarierte Rekurrenz. Das ist ein domänenspezifischer
+Induktionsnachweis, kein allgemeiner Pell-Gleichungslöser. Die kanonischen Fälle
+und Varianten sind bekannte Entwicklungsfamilien, teilweise mit Lehr- oder
+Validierungsüberlappung. Sie ersetzen keinen versiegelten Test auf unabhängigen
+Familien.
 
-Die ältere targetfreie Simplification-Referenz behält das negative Ergebnis
-Regelsuche 6/7 gegenüber SymPy `simplify` 7/7 für ihren eingefrorenen Bestand.
-Neue optionale Fähigkeiten dürfen diesen historischen Vergleich nicht
-rückwirkend verbessern. Information-Parität und weitere Baselines bleiben in
-#235 separat zu bearbeiten.
+## Frühere eingefrorene Ergebnisse und ihre Bedeutung
+
+Die älteren Experimente bleiben mit ihren ursprünglichen Verfahren und Grenzen
+reproduzierbar. Neue Fähigkeiten verändern ihre Ergebnisse nicht nachträglich.
+
+- [Generationenbasiertes Regelmining](generational-rule-mining.md) vergleicht
+  eingefrorene Schatteninventare `0+1` und `0+1+2` unter engem Tiefenbudget und
+  verlangt die tatsächliche Verwendung einer neuen Regel aus Generation 2.
+  Der [autonome Walkthrough](autonomous-discovery-walkthrough.md) untersucht
+  parametrisch geprüfte Wiederverwendung. Weniger äußere Makroschritte sind
+  allein kein vollständiger Arbeitskostennachweis.
+- Der ältere targetfreie Simplification-Vergleich behält **Regelsuche 6/7 und
+  SymPy `simplify` 7/7** auf seinem eingefrorenen Bestand. Der spätere native
+  Polynomversuch hat einen anderen Vertrag.
+- Der frühere Brahmagupta–Fibonacci-Pfad benötigt elf Schritte und verwendet
+  zweimal dieselbe gelernte Ergänzungsregel unter deklarierter Phasenfolge.
+  Best-First ohne diese Phasenvorgabe fand innerhalb von 20.000 Zuständen keinen
+  Pfad. Die spätere
+  [Resttermkomposition](schematic-proof-plan-residual-composition.md) wählt
+  disjunkte Paare und Vorzeichen durch exakte Nullrestprüfung ohne Zielausdruck.
+- [Budgettreue Programmkomposition](budgeted-rewrite-program-composition.md)
+  bewahrt Pfadbudgets, erfolglose Aufrufe und unvollständige Ergebnisse bei
+  `Choice`, `FirstApplicable`, `Sequence`, `Repeat` und `Prune`. Die
+  [gelernten Regelfolgen](trace-strategy-transfer.md) aus acht öffentlichen
+  Entwicklungsaufgaben erreichen dieselben Endausdrücke mit mehr Sucharbeit.
+- Die [bedingte Fortsetzungsauswahl](conditional-strategy-dispatch.md) senkt
+  auf 288 neuen Entwicklungsfällen die gezählte Anfragearbeit von **8.960 auf
+  8.832** bei gleichen Scores (rund 1,4 %; 1.152 Vergleichszeilen). Die
+  **1.166** zusätzlichen Lerneinheiten einschließlich **84** Einheiten für die
+  [Prüfung kürzerer primitiver Wege](primitive-trace-minimality.md) sind noch
+  nicht amortisiert. Dies bleibt vom späteren kumulativen Versuch getrennt.
+- [Spurbasierte Polynomvorlagen](trace-derived-polynomial-plans.md) und ihre
+  [endliche Auswahl](finite-polynomial-strategy-selection.md) bewahren
+  Formationssperren und lösen Koeffizienten bei jeder Anwendung erneut.
+  Zwölf Auswahlzeilen und zwei frisch geprüfte Theorieanwendungen belegen
+  diesen begrenzten Vertrag, nicht die Erfindung der Ansatzgrammatik.
+- Die automatische Darstellungswahl spart im öffentlichen Entwicklungssatz
+  rund 6 % gezählte Arbeit. Die [gelernte Auswahl](representation-learning-diagnosis.md)
+  verwendet 18 Trainingstrials und 42 weitere Aufgaben in sechs Profilen;
+  ihre feste Bedingung nutzt den gemessenen Spielraum, erwirbt dadurch aber
+  noch kein neues mathematisches Verfahren.
+
+Ein unveränderter, zur Referenz äquivalenter Ausgangsausdruck zählt weiterhin
+nicht als Wiederentdeckung einer verlangten Faktorform. Intrinsische Prüfung,
+strukturelle Korrespondenz, Erkennung und Ranking bleiben getrennt; siehe
+[Salienz-Audit](representation-salience-audit.md).
 
 <!-- capability-status:start -->
 ## Maschinengebundener Capability-Status
@@ -187,59 +256,56 @@ Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain-, Trust- und R
 `QUALIFIED` autorisiert nur den jeweils benannten Claim. Externe mathematische Neuheit, formaler Beweis, Promotion und Public Evidence werden nicht aus einem anderen erfolgreichen Profil abgeleitet.
 <!-- capability-status:end -->
 
-## Noch offene wissenschaftliche Strecke
+## Weitere wissenschaftliche Fragen
 
-#874 verfolgt das Lernen und die Übertragung schematischer Beweispläne.
-#750 behält die unerledigten historischen Studienpflichten aus den enger
-abgeschlossenen Liefer-Issues #747 und #863. Dazu gehören unabhängige
-Aufzählungs-/Zufallskontrollen, gemeinsame Arbeitsgrenzen, vollständige
-Fallmatrizen und unabhängige Reproduktion. Die Schließung eines Liefer-Issues
-bedeutet nicht, dass diese Studie stattgefunden hat.
+Die nächsten aussagekräftigen Studien müssen über neue Koeffizienten oder
+Variablennamen bekannter Formen hinausgehen. Relevant bleiben insbesondere:
 
-Das stärkere Flagship-Experiment #533/#220/#521 ist nicht durch die neuen
-Kompositionsbausteine freigegeben. Der reale `FROZEN_NOT_RUN`-Vertrag,
-TRAIN-Ergebnisse, VALIDATION-Auswahl und genau einmal verwendeter FINAL TEST
-müssen weiterhin gesondert nachgewiesen werden. Dieser Änderungsschritt führt
-keinen solchen Lauf aus und verändert keine zurückgehaltenen Aufgaben.
+- Übertragung erworbener Schemata und gelernter Pläne auf vorab getrennte
+  mathematische Familien, mit starken Kontrollen unter denselben Fähigkeiten,
+  Erfolgskriterien und Gesamtarbeitsgrenzen.
+- Vollständige Lebenszykluskosten bei repräsentativen Aufgabenmischungen,
+  einschließlich bezahlter Ablehnungen, Erwerb, Wiederherstellung und Prüfung;
+  logische Arbeit und tatsächlich gemessene Wall-Zeit/CPU getrennt ausweisen.
+- Lernen der vorbereitenden Strukturwahl oder der übergeordneten Beweisstrategie,
+  statt nur Auswahl und Wiederverwendung bereitgestellter Konstruktionen.
+- Unabhängige Aufzählungs-/Zufallskontrollen, vollständige Fallmatrizen und
+  unabhängige Reproduktion; die frühere Studienplanung unter #750/#874 bleibt
+  dafür ein historischer Bezug, ohne hier einen aktuellen Issue-Status festzulegen.
+- Ein gesondert nachgewiesenes Flagship-Protokoll mit realem `FROZEN_NOT_RUN`-Vertrag,
+  TRAIN, VALIDATION und genau einmal verwendetem FINAL TEST. Die früheren
+  Referenzen #533/#220/#521 werden durch diese Entwicklungsversuche nicht ersetzt.
 
-Externe Relevanz und mathematische Neuheit bleiben getrennte Entscheidungen in
-#389 und #391. Automatisierte Reviews, interne Tests und Repository-Fixtures
-ersetzen keine unabhängigen Expertenurteile.
+Euklids Primzahlzeuge und eine allgemeine quartische Resolventenkonstruktion
+sind durch die hier beschriebenen Nachweise nicht geliefert. Literaturbezug,
+externe Relevanz und mathematische Neuheit benötigen jeweils ihren eigenen
+Prüfumfang; die historischen Referenzen #389/#391 kennzeichnen diese getrennten
+Fragen. Interne Tests und automatisierte Reviews ersetzen keine unabhängige
+fachliche Bewertung.
 
 ## Build und Reproduktion
 
-Der Projektstand umfasst weiterhin die Gradle-Autorität und den vollständigen
-Maven-Produkt-/Docker-Vertrag auf JDK 25. #749 verfolgt die noch nicht
-abgeschlossene Umstellung auf ausschließlich Maven. Es werden keine neuen
-GitHub-spezifischen Testsemantiken durch diese Komposition eingeführt.
+Für eine neue Ausführung gelten die JDK-25-, Build- und Runtime-Vorgaben des
+jeweiligen Checkout und Versuchsberichts. Der umfassende Gradle-Prüfeinstieg ist:
 
 ```bash
 ./gradlew --no-configuration-cache ciCheck
 ```
 
-Die einzelnen mathematischen und technischen Dokumentationen geben die
-fokussierten Befehle an. Softwareprüfung, ausgeführtes Forschungsprotokoll,
-unabhängiger mathematischer Beweis und öffentliche Release-Artefakte bleiben
-getrennt nachzusehen.
+Die Seiten zu [kumulativem Wissen](research/cumulative-task-knowledge.md) und
+[strukturellem Lernen](research/structural-construction-learning.md) enthalten
+die fokussierten Testbefehle. Der vollständige Lebenszyklus hat einen eigenen
+Runner:
 
-## Aus Spuren abgeleitete Planvorlagen
+```bash
+bash gradle/run-knowledge-lifecycle-improvement.sh
+```
 
-`ExactFinitePolynomialTraceLearner` bildet aus mehreren vollständigen,
-verifier-gebundenen Trainingspfaden parametrisierte Ansatzfolgen. Die neue
-[Vorlagendokumentation](trace-derived-polynomial-plans.md) beschreibt die
-exakten Koeffizientenlücken, bewahrten Wiederholungsbeziehungen und erneute
-Prüfung jeder Anwendung. Semantisch gleiche Trainingspolynome zählen auch nach
-Umordnung oder Faktorisierung nicht mehrfach. Alle Anwendungsschritte weisen
-Eingaben ab, die einem beobachteten Formationszustand äquivalent sind.
-
-Der gemeinsame unveränderliche Vorlagenvertrag verbindet Lerner und Selektor:
-Formation, getrennte Auswahl-TRAIN-Matrix und neue Anwendung verwenden dieselbe
-exakte Polynomidentität. Herkunft, Quellform und endliche Domänen bleiben gebunden;
-die Auswahl trägt auch die Formationssperren nicht ausgewählter Vorlagen weiter.
-Der begrenzte Integrationstest erzeugt zwölf Auswahlzeilen und prüft jede der
-zwei späteren Theorieanwendungen frisch über die vorhandene Verifierpipeline.
-
-Die neuen Koeffizienteninstanzen sind bekannte Entwicklungsfälle derselben
-Familie, kein frischer FINAL TEST. Allgemeine Verzweigungsstrategien, unabhängige
-Kontrollen, vollständige Kostenbilanz und Produktionspromotion bleiben unter
-#874/#750 offen.
+Der [Lebenszyklusbericht](research/knowledge-lifecycle-improvement-2026-11-07.md)
+dokumentiert auch die Offline-Prüfung unveränderter Evidence. Für Polynom- und
+historische Vergleiche führen die jeweiligen Berichte zu Protokoll, gebundenen
+Quellständen, Runtime-Identitäten und Reproduktionsbefehlen. Beim
+[Standalone-SDK](../regelsuche-optimization-sdk/README.md) kommen dessen
+Distributions- und Verbraucherverträge hinzu. Eine bestandene Softwareprüfung,
+ein ausgeführtes Forschungsprotokoll, ein mathematischer Nachweis und ein
+veröffentlichtes Release-Artefakt sind jeweils gesondert nachzusehen.

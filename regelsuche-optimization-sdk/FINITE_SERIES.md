@@ -186,6 +186,22 @@ inversion and multiplication counts for a given number of selected rows.
 A source adapter must establish the arithmetic contract and preserve the
 evaluation of bindings, row selection, Java effects and exception behavior.
 
+## Batch inversion plans
+
+The shared mathematical kernel also exposes `FieldInversionBatch` and
+`FieldBatchInversionSearch` for a separate inverse output for each source operand.
+For two to 64 operands, the derived straight-line plan uses one inversion and
+`3*(n-1)` multiplications. All operands must belong to the same commutative group
+of units; a source adapter must establish these assumptions for its actual values.
+
+`FieldBatchInversionSearch.verify` checks a proposed schedule independently of
+synthesis. It replays products and inverses as symbolic exponent vectors, rejects
+invalid or forward slot references, and checks that output `i` is exactly the
+inverse of input `i`. This preserves the output correspondence as well as the
+product identity. Search and proof use the existing iteration budgets and
+cancellation checks. The exposed operation counts describe the plan, while
+runtime depends on the chosen arithmetic implementation and operand sizes.
+
 ## Ordered tuples and filtered pair windows
 
 `OrderedReduction` binds two to eight row slots in increasing input order.
@@ -209,3 +225,4 @@ uses Fenwick summaries with logarithmic query and update cost. Evaluation
 reports source row reads, Fenwick cell accesses and charged work.
 The Java source adapter must separately prove the arithmetic, effects and
 exception behavior of a program before applying a rewrite.
+

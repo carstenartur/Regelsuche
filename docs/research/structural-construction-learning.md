@@ -207,9 +207,10 @@ A second JVM loaded the saved generation and used both schemata on compound
 substitutions without retraining. The second generation preserves earlier
 knowledge but does not demonstrate an invented hierarchical residual tactic.
 
-These are development cases already discussed publicly in the project. There is
-no sealed holdout, broad CAS superiority claim or complete CPU/memory/serialization
-ledger. Per-operation weights are the existing logical model plus explicit new
+These are development cases already discussed publicly in the project, rather
+than a sealed holdout. The ledger counts logical work; it does not measure
+complete CPU/memory/serialization costs. Per-operation weights are the existing
+logical model plus explicit new
 construction charges. The old 512-query comparison remains unchanged at
 225,536 / 229,264 / 186,706; these different workloads must not be conflated.
 
@@ -643,3 +644,4 @@ mvn -pl regelsuche-autopilot -am -Dtest=HistoricalCatalogTaskCoverageTest \
 The [2026-11-06 direct historical comparison](historical-sympy-comparison-2026-11-06.md)
 tests the factorization and two-square goals against SymPy, with independent exact
 audits and measured acquisition/persistence/fresh-process costs.
+
