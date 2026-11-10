@@ -123,7 +123,12 @@ successful publication with the same hash.
 
 The independent Maven package attempt in this environment was blocked while
 resolving imported BOMs because Maven Central DNS was unavailable. A successful
-direct Java run is reported above; a successful Maven/JUnit run is not claimed.
+direct Java run is reported above; a successful Maven/JUnit run is not claimed
+by that local recording. The separate
+[released Maven qualification](../../../docs/released-sdk-maven-qualification.md)
+now builds both complete consumers in isolated directories and empty caches,
+requires actual JUnit reports, checks the exact runtime closure and invokes the
+CLI. Its CI receipt must pass independently of the earlier smoke run.
 
 ## Trust and integration boundary
 

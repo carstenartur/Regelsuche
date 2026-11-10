@@ -54,3 +54,9 @@ The Gradle verification additionally checks the four expected Regelsuche runtime
 modules. This new Maven POM is maintained in source after 0.5.2; it is not claimed
 to have been present in the immutable 0.5.2 ZIP. Download/copy the current example
 for the Maven route; the released SDK binaries remain 0.5.2.
+
+The checkout's [released Maven qualification](../../../docs/released-sdk-maven-qualification.md)
+builds this complete example outside the reactor with an empty Maven cache,
+requires its real JUnit cases, checks the four-module runtime closure and runs
+the CLI against the actual published ZIP. Its receipt is separate from the
+recorded direct-Java smoke execution.

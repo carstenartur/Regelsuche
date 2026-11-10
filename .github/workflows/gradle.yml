@@ -190,6 +190,11 @@ jobs:
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
       - name: Provision the pinned OSV Scanner
         run: bash gradle/provision-osv-scanner.sh
+      - name: Qualify current Maven consumers against the released SDK
+        timeout-minutes: 30
+        run: |
+          python3 -m unittest discover -s scripts -p test_released_sdk_maven_consumers.py -v
+          python3 scripts/verify-released-sdk-maven-consumers.py
       - name: Verify the complete Maven product and Docker contract
         run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
       - name: Retain Maven product verification evidence
@@ -198,6 +203,7 @@ jobs:
         with:
           name: maven-product-verification
           path: |
+            build/reports/released-sdk-maven-consumers/**
             build/reports/python-client/**
             app/target/reports/hidden-rule-pilot/**
             regelsuche-quality-aggregate/target/reports/release-readiness-qualified/**

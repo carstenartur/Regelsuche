@@ -119,6 +119,18 @@ Evaluator nicht. [Domain-Tutorial](java-sdk-domain-tutorial.md),
 [Discovery SDK](java-discovery-sdk.md) und [API-Vertrag](java-sdk-api-policy.md)
 beschreiben Builder, Provider-SPI und Statusgrenzen.
 
+## Den Maven-Einstieg unabhängig qualifizieren
+
+Der zusätzliche [Release-Maven-Prüfer](released-sdk-maven-qualification.md) lädt
+das tatsächliche 0.5.2-ZIP, prüft dessen Hash und alle 4.034 internen Prüfsummen
+und baut die aktuellen vollständigen v1-/v2-Consumer außerhalb des Checkouts in
+jeweils leerem Maven-Cache. Er verlangt echte JUnit-Berichte, die genaue
+Laufzeit-Modulmenge und die tatsächliche CLI-Ausgabe. Der vorhandene Maven-CI-Job
+führt diese Prüfung vor seinem unveränderten Produkt-Verify aus und bewahrt auch
+Fehlerausgaben auf. Das geht über die bisher aufgezeichnete direkte
+`javac`-/`java`-Ausführung hinaus; ein erfolgreicher Maven-Lauf wird erst durch
+ein vollständiges positives Qualification-Receipt belegt.
+
 ## Release und aktueller Entwicklungsstand
 
 Dieses Dokument beschreibt den heutigen Einstieg. Die unveränderlichen
