@@ -6,6 +6,7 @@ import de.regelsuche.egraph.EGraph;
 import de.regelsuche.egraph.ENode;
 import de.regelsuche.egraph.EqualitySaturation;
 import de.regelsuche.egraph.SaturationStats;
+import de.regelsuche.egraph.proof.ProofOutcome;
 import de.regelsuche.egraph.SaturationDiagnostics;
 import de.regelsuche.egraph.SaturationProvenance;
 import de.regelsuche.scoring.cost.StructuralCostModel;
@@ -50,120 +51,329 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
     public static final String SATURATION_RULE_ID = &quot;equality-saturation&quot;;
 
     private final EqualitySaturation.Config config;
-<span class="fc" id="L53">    private final ExpressionParser parser = new ExpressionParser();</span>
+    private final EqualitySaturation.ProofOptions proofOptions;
+<span class="fc" id="L55">    private ProofOutcome lastProofOutcome = ProofOutcome.notRequested();</span>
+<span class="fc" id="L56">    private final ExpressionParser parser = new ExpressionParser();</span>
     private SaturationStats lastStats;
-<span class="fc" id="L55">    private SaturationDiagnostics lastDiagnostics = SaturationDiagnostics.empty();</span>
-<span class="fc" id="L56">    private SaturationProvenance lastProvenance = SaturationProvenance.empty();</span>
+<span class="fc" id="L58">    private SaturationDiagnostics lastDiagnostics = SaturationDiagnostics.empty();</span>
+<span class="fc" id="L59">    private SaturationProvenance lastProvenance = SaturationProvenance.empty();</span>
     private ExtractionSelection lastExtractionSelection;
 
     /** Explicit objective dispatch; fallback still uses the requested cost model. */
-<span class="fc" id="L60">    public record ExtractionSelection(String requestedObjective, String effectiveObjective,</span>
+<span class="fc" id="L63">    public record ExtractionSelection(String requestedObjective, String effectiveObjective,</span>
             String strategy, boolean fallback, String reason) {}
 
-<span class="nc" id="L63">    public SaturationDiagnostics lastDiagnostics() { return lastDiagnostics; }</span>
-<span class="fc" id="L64">    public SaturationProvenance lastProvenance() { return lastProvenance; }</span>
-<span class="fc" id="L65">    public ExtractionSelection lastExtractionSelection() { return lastExtractionSelection; }</span>
+<span class="fc" id="L66">    public ProofOutcome lastProofOutcome() { return lastProofOutcome; }</span>
+
+<span class="nc" id="L68">    public SaturationDiagnostics lastDiagnostics() { return lastDiagnostics; }</span>
+<span class="fc" id="L69">    public SaturationProvenance lastProvenance() { return lastProvenance; }</span>
+<span class="fc" id="L70">    public ExtractionSelection lastExtractionSelection() { return lastExtractionSelection; }</span>
 
 
     public EqualitySaturationStrategy() {
-<span class="fc" id="L69">        this(EqualitySaturation.Config.defaults());</span>
-<span class="fc" id="L70">    }</span>
+<span class="fc" id="L74">        this(EqualitySaturation.Config.defaults());</span>
+<span class="fc" id="L75">    }</span>
 
-<span class="fc" id="L72">    public EqualitySaturationStrategy(EqualitySaturation.Config config) {</span>
-<span class="fc" id="L73">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
-<span class="fc" id="L74">    }</span>
+<span class="fc" id="L77">    public EqualitySaturationStrategy(EqualitySaturation.Config config) {</span>
+<span class="fc" id="L78">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
+<span class="fc" id="L79">        this.proofOptions = null;</span>
+<span class="fc" id="L80">    }</span>
+
+    /** Explicit proof-required mode; unavailable evidence preserves the original state. */
+<span class="fc" id="L83">    public EqualitySaturationStrategy(EqualitySaturation.Config config, EqualitySaturation.ProofOptions proofOptions) {</span>
+<span class="fc" id="L84">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
+<span class="fc" id="L85">        this.proofOptions = Objects.requireNonNull(proofOptions, &quot;proofOptions&quot;);</span>
+<span class="fc" id="L86">    }</span>
 
     /**
      * Statistics from the most recent {@link #search} invocation, or
      * {@code null} if the strategy has not been run yet.
      */
     public SaturationStats lastStats() {
-<span class="fc" id="L81">        return lastStats;</span>
+<span class="fc" id="L93">        return lastStats;</span>
     }
 
     @Override
     public List&lt;SearchState&gt; search(SearchProblem problem) {
-<span class="fc" id="L86">        lastStats = null;</span>
-<span class="fc" id="L87">        lastDiagnostics = SaturationDiagnostics.empty();</span>
-<span class="fc" id="L88">        lastProvenance = SaturationProvenance.empty();</span>
-<span class="fc bfc" id="L89" title="All 2 branches covered.">        String objective = problem.costModel() == null ? &quot;operator-count&quot; : problem.costModel().id();</span>
+<span class="fc" id="L98">        lastProofOutcome = ProofOutcome.notRequested();</span>
+<span class="fc" id="L99">        lastStats = null;</span>
+<span class="fc" id="L100">        lastDiagnostics = SaturationDiagnostics.empty();</span>
+<span class="fc" id="L101">        lastProvenance = SaturationProvenance.empty();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        String objective = problem.costModel() == null ? &quot;operator-count&quot; : problem.costModel().id();</span>
         // Identity check matters: a custom model can reuse a built-in ID with different semantics.
-<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        if (problem.costModel() != null &amp;&amp; problem.costModel() != StructuralCostModel.OPERATOR_COUNT) {</span>
-<span class="fc" id="L92">            lastExtractionSelection = new ExtractionSelection(objective, objective, &quot;best-first&quot;, true,</span>
+<span class="pc bpc" id="L104" title="1 of 4 branches missed.">        if (problem.costModel() != null &amp;&amp; problem.costModel() != StructuralCostModel.OPERATOR_COUNT) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (proofOptions != null) {</span>
+<span class="fc" id="L106">                lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.UNSUPPORTED_OBJECTIVE,</span>
+                    &quot;Proof-required search supports only operator-count extraction.&quot;, 0, 0, 0);
+<span class="fc" id="L108">                lastExtractionSelection = new ExtractionSelection(objective, objective, &quot;equality-saturation&quot;, false,</span>
+<span class="fc" id="L109">                    lastProofOutcome.detail());</span>
+<span class="fc" id="L110">                String original = problem.rootExpression().trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L111">                return List.of(rootState(original, problem.scorer().score(original), problem));</span>
+            }
+<span class="fc" id="L113">            lastExtractionSelection = new ExtractionSelection(objective, objective, &quot;best-first&quot;, true,</span>
                 &quot;No exact e-graph extractor for this cost model; best-first search uses the requested objective.&quot;);
-<span class="fc" id="L94">            return new BestFirstSearchStrategy().search(problem);</span>
+<span class="fc" id="L115">            return new BestFirstSearchStrategy().search(problem);</span>
         }
-<span class="fc" id="L96">        lastExtractionSelection = new ExtractionSelection(objective, &quot;operator-count&quot;, &quot;equality-saturation&quot;, false,</span>
+<span class="fc" id="L117">        lastExtractionSelection = new ExtractionSelection(objective, &quot;operator-count&quot;, &quot;equality-saturation&quot;, false,</span>
             &quot;Exact additive operator-count extraction.&quot;);
-<span class="fc" id="L98">        String root = problem.rootExpression().trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L119">        String root = problem.rootExpression().trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
         Expr rootAst;
         try {
-<span class="fc" id="L101">            rootAst = parser.parse(new InputRequest(InputType.TERM, root)).terms().getFirst();</span>
-<span class="fc" id="L102">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L122">            rootAst = parser.parse(new InputRequest(InputType.TERM, root)).terms().getFirst();</span>
+<span class="fc" id="L123">        } catch (RuntimeException ex) {</span>
             // Unparseable input: behave like the other strategies and
             // return just the root state with the input as-is.
-<span class="fc" id="L105">            ExpressionScore rootScore = problem.scorer().score(root);</span>
-<span class="fc" id="L106">            return List.of(rootState(root, rootScore, problem));</span>
-<span class="fc" id="L107">        }</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (proofOptions != null) {</span>
+<span class="fc" id="L127">                lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.EXTRACTION_UNAVAILABLE,</span>
+                    &quot;Search input could not be parsed.&quot;, 0, 0, 0);
+<span class="fc" id="L129">                recordProofFailureSelection();</span>
+            }
+<span class="fc" id="L131">            ExpressionScore rootScore = problem.scorer().score(root);</span>
+<span class="fc" id="L132">            return List.of(rootState(root, rootScore, problem));</span>
+<span class="fc" id="L133">        }</span>
 
-<span class="fc" id="L109">        EGraph eGraph = new EGraph();</span>
-<span class="fc" id="L110">        EClassId rootId = eGraph.addExpression(rootAst);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (proofOptions != null) return searchWithProof(problem, root, rootAst);</span>
 
-<span class="fc" id="L112">        List&lt;RewriteRule&gt; rules = resolveRules(problem);</span>
-<span class="fc" id="L113">        EqualitySaturation saturation = new EqualitySaturation(rules, config);</span>
-<span class="fc" id="L114">        EqualitySaturation.Result result = saturation.saturate(</span>
+<span class="fc" id="L137">        EGraph eGraph = new EGraph();</span>
+<span class="fc" id="L138">        EClassId rootId = eGraph.addExpression(rootAst);</span>
+
+<span class="fc" id="L140">        List&lt;RewriteRule&gt; rules = resolveRules(problem);</span>
+<span class="fc" id="L141">        EqualitySaturation saturation = new EqualitySaturation(rules, config);</span>
+<span class="fc" id="L142">        EqualitySaturation.Result result = saturation.saturate(</span>
             eGraph,
             rootId,
             EqualitySaturationStrategy::nodeCost
         );
-<span class="fc" id="L119">        lastStats = result.stats();</span>
-<span class="fc" id="L120">        lastDiagnostics = result.diagnostics();</span>
-<span class="fc" id="L121">        lastProvenance = result.provenance();</span>
+<span class="fc" id="L147">        lastStats = result.stats();</span>
+<span class="fc" id="L148">        lastDiagnostics = result.diagnostics();</span>
+<span class="fc" id="L149">        lastProvenance = result.provenance();</span>
 
-<span class="fc" id="L123">        String extracted = ExpressionFormatter.format(result.expression());</span>
-<span class="fc" id="L124">        ExpressionScore rootScore = problem.scorer().score(root);</span>
-<span class="fc" id="L125">        SearchState rootState = rootState(root, rootScore, problem);</span>
+<span class="fc" id="L151">        String extracted = ExpressionFormatter.format(result.expression());</span>
+<span class="fc" id="L152">        ExpressionScore rootScore = problem.scorer().score(root);</span>
+<span class="fc" id="L153">        SearchState rootState = rootState(root, rootScore, problem);</span>
 
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (extracted.equals(root)) {</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (extracted.equals(root)) {</span>
             // No useful rewrite — still return the root so callers see a
             // result. The lastStats() expose how much work was done.
-<span class="nc" id="L130">            return List.of(rootState);</span>
+<span class="nc" id="L158">            return List.of(rootState);</span>
         }
 
-<span class="fc" id="L133">        ExpressionScore extractedScore = problem.scorer().score(extracted);</span>
-<span class="fc" id="L134">        int improvement = rootScore.weightedTotal() - extractedScore.weightedTotal();</span>
-<span class="fc" id="L135">        SearchState extractedState = new SearchState(</span>
+<span class="fc" id="L161">        return extractedStates(problem, root, extracted, rootScore, rootState);</span>
+    }
+
+    private List&lt;SearchState&gt; extractedStates(SearchProblem problem, String root, String extracted,
+            ExpressionScore rootScore, SearchState rootState) {
+<span class="fc" id="L166">        ExpressionScore extractedScore = problem.scorer().score(extracted);</span>
+<span class="fc" id="L167">        int improvement = rootScore.weightedTotal() - extractedScore.weightedTotal();</span>
+<span class="fc" id="L168">        SearchState extractedState = new SearchState(</span>
             extracted,
             1,
             extractedScore,
-<span class="fc" id="L139">            List.of(root, extracted),</span>
-<span class="fc" id="L140">            List.of(SATURATION_RULE_ID),</span>
-<span class="fc" id="L141">            Set.of(SATURATION_RULE_ID + &quot;:&quot; + extracted),</span>
+<span class="fc" id="L172">            List.of(root, extracted),</span>
+<span class="fc" id="L173">            List.of(SATURATION_RULE_ID),</span>
+<span class="fc" id="L174">            Set.of(SATURATION_RULE_ID + &quot;:&quot; + extracted),</span>
             0,
-<span class="fc" id="L143">            problem.canonicalizer().stableHash(extracted),</span>
+<span class="fc" id="L176">            problem.canonicalizer().stableHash(extracted),</span>
             root,
             SATURATION_RULE_ID,
             RewriteKind.NORMALIZE,
             false,
-<span class="fc" id="L148">            -Math.max(0, improvement),</span>
+<span class="fc" id="L181">            -Math.max(0, improvement),</span>
             false,
             improvement,
-<span class="fc" id="L151">            List.of(RewriteKind.NORMALIZE),</span>
-<span class="fc" id="L152">            List.of(Boolean.FALSE)</span>
+<span class="fc" id="L184">            List.of(RewriteKind.NORMALIZE),</span>
+<span class="fc" id="L185">            List.of(Boolean.FALSE)</span>
         );
-<span class="fc" id="L154">        return List.of(rootState, extractedState);</span>
+<span class="fc" id="L187">        return List.of(rootState, extractedState);</span>
     }
 
+    private List&lt;SearchState&gt; searchWithProof(SearchProblem problem, String root, Expr input) {
+<span class="fc" id="L191">        ExpressionScore rootScore = problem.scorer().score(root);</span>
+<span class="fc" id="L192">        SearchState original = rootState(root, rootScore, problem);</span>
+<span class="fc" id="L193">        var proved = new EqualitySaturation(resolveRules(problem), config)</span>
+<span class="fc" id="L194">            .saturateWithProof(input, EqualitySaturationStrategy::nodeCost, proofOptions);</span>
+<span class="fc" id="L195">        lastProofOutcome = proved.proof();</span>
+<span class="fc" id="L196">        proved.diagnosticResult().ifPresent(result -&gt; {</span>
+<span class="fc" id="L197">            lastStats = result.stats();</span>
+<span class="fc" id="L198">            lastDiagnostics = result.diagnostics();</span>
+<span class="fc" id="L199">            lastProvenance = result.provenance();</span>
+<span class="fc" id="L200">        });</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (!lastProofOutcome.complete()) {</span>
+<span class="fc" id="L202">            recordProofFailureSelection();</span>
+<span class="fc" id="L203">            return List.of(original);</span>
+        }
+        String extracted;
+<span class="fc" id="L206">        long[] emitted = {0};</span>
+<span class="fc" id="L207">        long[] ownWork = {0};</span>
+<span class="fc" id="L208">        long remainingWork = proofOptions.captureLimits().maxWork()</span>
+<span class="fc" id="L209">            - lastProofOutcome.captureWork() - lastProofOutcome.buildWork();</span>
+        try {
+<span class="fc" id="L211">            requireRepresentableSymbols(proved.expression(), remainingWork, ownWork);</span>
+<span class="fc" id="L212">            extracted = formatProofExpression(proved.expression(), remainingWork, ownWork, units -&gt; {</span>
+<span class="pc bpc" id="L213" title="3 of 6 branches missed.">                if (units &lt; 0 || units &gt; proofOptions.captureLimits().maxCharacters() - emitted[0]</span>
+<span class="nc" id="L214">                        || units &gt; remainingWork - ownWork[0]) throw new SearchRenderingLimit();</span>
+<span class="fc" id="L215">                ownWork[0] += units;</span>
+<span class="fc" id="L216">                emitted[0] += units;</span>
+<span class="fc" id="L217">            });</span>
+<span class="fc" id="L218">        } catch (UnrepresentableScalar ex) {</span>
+<span class="fc" id="L219">            lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.EXTRACTION_UNAVAILABLE,</span>
+                &quot;Search output contains an unrepresentable scalar endpoint.&quot;,
+<span class="fc" id="L221">                lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork(), lastProofOutcome.replayWork());</span>
+<span class="fc" id="L222">            recordProofFailureSelection();</span>
+<span class="fc" id="L223">            return List.of(original);</span>
+<span class="fc" id="L224">        } catch (UnrepresentableSymbol ex) {</span>
+<span class="fc" id="L225">            lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.EXTRACTION_UNAVAILABLE,</span>
+                &quot;Search output contains an unrepresentable symbol.&quot;,
+<span class="fc" id="L227">                lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork(), lastProofOutcome.replayWork());</span>
+<span class="fc" id="L228">            recordProofFailureSelection();</span>
+<span class="fc" id="L229">            return List.of(original);</span>
+<span class="fc" id="L230">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L231">            lastProofOutcome = ProofOutcome.unavailable(ProofOutcome.Status.LIMIT_EXCEEDED,</span>
+                &quot;Search output rendering unavailable within proof limits.&quot;,
+<span class="fc" id="L233">                lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork(), lastProofOutcome.replayWork());</span>
+<span class="fc" id="L234">            recordProofFailureSelection();</span>
+<span class="fc" id="L235">            return List.of(original);</span>
+<span class="fc" id="L236">        }</span>
+<span class="fc" id="L237">        lastProofOutcome = ProofOutcome.complete(lastProofOutcome.checked().orElseThrow(),</span>
+<span class="fc" id="L238">            lastProofOutcome.captureWork() + ownWork[0], lastProofOutcome.buildWork());</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (extracted.equals(root)) return List.of(original);</span>
+<span class="fc" id="L240">        return extractedStates(problem, root, extracted, rootScore, original);</span>
+    }
+
+    /** Parenthesize every binary node so text keeps the checker's exact endpoint tree. */
+    private static String formatProofExpression(Expr expression, long work, long[] used,
+            java.util.function.LongConsumer emitted) {
+<span class="fc bfc" id="L246" title="All 4 branches covered.">        if (!(expression instanceof de.regelsuche.ast.BinaryExpr)</span>
+                &amp;&amp; !(expression instanceof de.regelsuche.ast.FunctionExpr)) {
+<span class="fc" id="L248">            return formatProofLeaf(expression, work, used, emitted);</span>
+        }
+<span class="fc" id="L250">        chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L251">        var pending = new java.util.ArrayDeque&lt;Object&gt;();</span>
+<span class="fc" id="L252">        var output = new StringBuilder();</span>
+<span class="fc" id="L253">        pending.push(expression);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L255">            chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L256">            Object action = pending.pop();</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (action instanceof String text) {</span>
+<span class="fc" id="L258">                emitted.accept(text.length());</span>
+<span class="fc" id="L259">                output.append(text);</span>
+            } else {
+<span class="fc" id="L261">                scheduleProofExpression((Expr) action, pending, output, work, used, emitted);</span>
+            }
+<span class="fc" id="L263">        }</span>
+<span class="fc" id="L264">        chargeSearchWork(work, used, output.length());</span>
+<span class="fc" id="L265">        return output.toString();</span>
+    }
+
+    private static void scheduleProofExpression(Expr expression, java.util.Deque&lt;Object&gt; pending,
+            StringBuilder output, long work, long[] used, java.util.function.LongConsumer emitted) {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (expression instanceof de.regelsuche.ast.BinaryExpr binary) {</span>
+<span class="fc" id="L271">            chargeSearchWork(work, used, 5);</span>
+<span class="fc" id="L272">            pending.push(&quot;)&quot;);</span>
+<span class="fc" id="L273">            pending.push(binary.right());</span>
+<span class="fc" id="L274">            pending.push(&quot; &quot; + binary.operator().symbol() + &quot; &quot;);</span>
+<span class="fc" id="L275">            pending.push(binary.left());</span>
+<span class="fc" id="L276">            pending.push(&quot;(&quot;);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        } else if (expression instanceof de.regelsuche.ast.FunctionExpr function) {</span>
+<span class="fc" id="L278">            scheduleProofFunction(function, pending, work, used);</span>
+        } else {
+<span class="fc" id="L280">            String text = formatProofLeaf(expression, work, used, emitted);</span>
+<span class="fc" id="L281">            chargeSearchWork(work, used, text.length());</span>
+<span class="fc" id="L282">            output.append(text);</span>
+        }
+<span class="fc" id="L284">    }</span>
+
+    private static String formatProofLeaf(Expr expression, long work, long[] used,
+            java.util.function.LongConsumer emitted) {
+<span class="fc" id="L288">        String text = ExpressionFormatter.formatMeasured(expression, emitted);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (expression instanceof de.regelsuche.ast.NumberExpr) {</span>
+            // Unary minus and fraction syntax parse into binary nodes, not numeric leaves.
+<span class="fc" id="L291">            chargeSearchWork(work, used, text.length());</span>
+<span class="fc bfc" id="L292" title="All 4 branches covered.">            if (text.startsWith(&quot;-&quot;) || text.indexOf('/') &gt;= 0) throw new UnrepresentableScalar();</span>
+        }
+<span class="fc" id="L294">        return text;</span>
+    }
+
+    private static void scheduleProofFunction(de.regelsuche.ast.FunctionExpr function,
+            java.util.Deque&lt;Object&gt; pending, long work, long[] used) {
+<span class="fc" id="L299">        chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L300">        pending.push(&quot;)&quot;);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (int i = function.arguments().size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L302">            chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L303">            pending.push(function.arguments().get(i));</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L305">                chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L306">                pending.push(&quot;, &quot;);</span>
+            }
+        }
+<span class="fc" id="L309">        chargeSearchWork(work, used, 2);</span>
+<span class="fc" id="L310">        pending.push(&quot;(&quot;);</span>
+<span class="fc" id="L311">        pending.push(function.name());</span>
+<span class="fc" id="L312">    }</span>
+
+    private void recordProofFailureSelection() {
+<span class="fc" id="L315">        lastExtractionSelection = new ExtractionSelection(lastExtractionSelection.requestedObjective(),</span>
+<span class="fc" id="L316">            lastExtractionSelection.effectiveObjective(), &quot;equality-saturation&quot;, false, lastProofOutcome.detail());</span>
+<span class="fc" id="L317">    }</span>
+
+    private static void requireRepresentableSymbols(Expr expression, long work, long[] used) {
+<span class="fc" id="L320">        chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L321">        var pending = new java.util.ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L322">        pending.push(expression);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L324">            chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L325">            String name = scheduleSymbolChildren(pending.pop(), pending, work, used);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            if (name != null) requireRepresentableName(name, work, used);</span>
+<span class="fc" id="L327">        }</span>
+<span class="fc" id="L328">    }</span>
+
+    private static String scheduleSymbolChildren(Expr expression, java.util.Deque&lt;Expr&gt; pending,
+            long work, long[] used) {
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (expression instanceof de.regelsuche.ast.FunctionExpr function) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            for (Expr child : function.arguments()) {</span>
+<span class="fc" id="L334">                chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L335">                pending.push(child);</span>
+<span class="fc" id="L336">            }</span>
+<span class="fc" id="L337">            return function.name();</span>
+        }
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (expression instanceof de.regelsuche.ast.BinaryExpr binary) {</span>
+<span class="fc" id="L340">            chargeSearchWork(work, used, 2);</span>
+<span class="fc" id="L341">            pending.push(binary.left());</span>
+<span class="fc" id="L342">            pending.push(binary.right());</span>
+        }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (expression instanceof de.regelsuche.ast.VariableExpr variable) return variable.name();</span>
+<span class="fc" id="L345">        return null;</span>
+    }
+
+    private static void requireRepresentableName(String name, long work, long[] used) {
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        if (name.isEmpty()) throw new UnrepresentableSymbol();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        for (int i = 0; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L351">            chargeSearchWork(work, used, 1);</span>
+<span class="fc" id="L352">            char c = name.charAt(i);</span>
+<span class="pc bpc" id="L353" title="3 of 8 branches missed.">            if (i == 0 ? !Character.isLetter(c) : !Character.isLetterOrDigit(c) &amp;&amp; c != '_')</span>
+<span class="fc" id="L354">                throw new UnrepresentableSymbol();</span>
+        }
+<span class="fc" id="L356">    }</span>
+
+    private static void chargeSearchWork(long work, long[] used, int units) {
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        if (work - used[0] &lt; units) throw new SearchRenderingLimit();</span>
+<span class="fc" id="L360">        used[0] += units;</span>
+<span class="fc" id="L361">    }</span>
+
+    private static final class UnrepresentableScalar extends RuntimeException {}
+    private static final class UnrepresentableSymbol extends RuntimeException {}
+    private static final class SearchRenderingLimit extends RuntimeException {}
+
     private SearchState rootState(String root, ExpressionScore rootScore, SearchProblem problem) {
-<span class="fc" id="L158">        return new SearchState(</span>
+<span class="fc" id="L368">        return new SearchState(</span>
             root,
             0,
             rootScore,
-<span class="fc" id="L162">            List.of(root),</span>
-<span class="fc" id="L163">            List.of(),</span>
-<span class="fc" id="L164">            Set.of(),</span>
+<span class="fc" id="L372">            List.of(root),</span>
+<span class="fc" id="L373">            List.of(),</span>
+<span class="fc" id="L374">            Set.of(),</span>
             0,
-<span class="fc" id="L166">            problem.canonicalizer().stableHash(root),</span>
+<span class="fc" id="L376">            problem.canonicalizer().stableHash(root),</span>
             null,
             null,
             RewriteKind.NORMALIZE,
@@ -175,15 +385,15 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
     }
 
     private List&lt;RewriteRule&gt; resolveRules(SearchProblem problem) {
-<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (problem.engine() instanceof AstRewriteTransformationEngine astEngine) {</span>
-<span class="fc" id="L179">            return astEngine.rules();</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">        if (problem.engine() instanceof AstRewriteTransformationEngine astEngine) {</span>
+<span class="fc" id="L389">            return astEngine.rules();</span>
         }
-<span class="nc" id="L181">        return AstRewriteTransformationEngine.defaultRules();</span>
+<span class="nc" id="L391">        return AstRewriteTransformationEngine.defaultRules();</span>
     }
 
     /** Additive operator-count objective; other objectives use the explicit dispatch above. */
     static int nodeCost(ENode node) {
-<span class="fc bfc" id="L186" title="All 4 branches covered.">        return node.symbol().startsWith(&quot;op:&quot;) || node.symbol().startsWith(&quot;fn:&quot;) ? 1 : 0;</span>
+<span class="fc bfc" id="L396" title="All 4 branches covered.">        return node.symbol().startsWith(&quot;op:&quot;) || node.symbol().startsWith(&quot;fn:&quot;) ? 1 : 0;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

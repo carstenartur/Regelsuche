@@ -157,7 +157,7 @@ Replaying a witness trusts the supplied rule implementation; it is not an indepe
 proof of that rule's mathematics.
 
 These witnesses do **not** connect the original input to the extracted
-expression through every union and congruence step. Consequently
+expression through every union and congruence step. Consequently, in the legacy API
 `hasExtractionProof()` is false and `explanationStatus()` explicitly says
 that a congruence/extraction proof is unavailable. Search states keep the
 `equality-saturation` provenance marker for compatibility, but its synthetic
@@ -195,3 +195,25 @@ and `EqualitySaturationStrategyTest`. Run the affected Maven reactor with:
 Historical benchmarks remain unchanged. Matcher/index microbenchmarks
 and complete workloads answer different performance questions; no new
 performance result is asserted by this contract repair.
+
+## Explicit extraction certificates
+
+`EqualitySaturation.saturateWithProof(input, costOfNode, ProofOptions)` owns a
+fresh graph and can return independently checked input/output equality evidence.
+`new EqualitySaturationStrategy(config, proofOptions)` opts search into this
+proof-required mode; existing constructors retain all behavior above, including
+BestFirst fallback. Explicit proof mode supports operator count only. Unsupported
+objectives return the original state and `UNSUPPORTED_OBJECTIVE`.
+
+`lastProofOutcome()` reports the actual outcome, including search symbol/render
+work in capture work. `lastExtractionSelection().reason()` explains why proof
+mode retains the original state when evidence or text is unavailable. A complete result exposes its
+checker token through provenance. Unsupported rules, proof quotas, replay or
+extraction failure preserve the original state. Output strings are constructed
+with bounded `formatMeasured`; unrepresentable symbols or rendering limits also
+preserve the root. An accepted diagnostic AST certificate can remain available
+when search text cannot be returned. The synthetic edge remains non-executable
+and non-construction-proven even with complete evidence.
+
+See [Bounded extraction certificates](eqsat-extraction-certificates.md) for the
+supported exact rule subset, receiving-side trust boundary, limits and example.

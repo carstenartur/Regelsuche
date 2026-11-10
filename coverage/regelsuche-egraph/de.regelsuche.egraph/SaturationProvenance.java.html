@@ -1,40 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SaturationProvenance.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">SaturationProvenance.java</span></div><h1>SaturationProvenance.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.egraph.proof.ProofOutcome;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Local rewrite witnesses, not an end-to-end congruence explanation.
+ * Diagnostic local witnesses and optional independently checked extraction evidence.
  * nativeWitnessExtractions counts actual binding extraction attempts, including failed ones.
  */
 public record SaturationProvenance(List&lt;Witness&gt; witnesses, long droppedWitnesses,
-        long nativeWitnessExtractions) {
+        long nativeWitnessExtractions, ProofOutcome proofOutcome) {
     public static final int MAX_WITNESSES = 256;
-<span class="fc" id="L15">    public SaturationProvenance { witnesses = List.copyOf(witnesses); }</span>
+<span class="fc" id="L16">    public SaturationProvenance {</span>
+<span class="fc" id="L17">        witnesses = List.copyOf(witnesses);</span>
+<span class="fc" id="L18">        Objects.requireNonNull(proofOutcome, &quot;proofOutcome&quot;);</span>
+<span class="fc" id="L19">    }</span>
+    /** Source-compatible constructor: local witnesses alone never prove extraction. */
+    public SaturationProvenance(List&lt;Witness&gt; witnesses, long droppedWitnesses, long nativeWitnessExtractions) {
+<span class="nc" id="L22">        this(witnesses, droppedWitnesses, nativeWitnessExtractions, ProofOutcome.notRequested());</span>
+<span class="nc" id="L23">    }</span>
     /** Source-compatible constructor for callers without extraction work accounting. */
     public SaturationProvenance(List&lt;Witness&gt; witnesses, long droppedWitnesses) {
-<span class="nc" id="L18">        this(witnesses, droppedWitnesses, 0);</span>
-<span class="nc" id="L19">    }</span>
-<span class="nc" id="L20">    public static SaturationProvenance empty() { return new SaturationProvenance(List.of(), 0); }</span>
-<span class="fc" id="L21">    public boolean hasExtractionProof() { return false; }</span>
-<span class="nc" id="L22">    public String explanationStatus() { return &quot;LOCAL_WITNESSES_ONLY; CONGRUENCE_EXTRACTION_PROOF_UNAVAILABLE&quot;; }</span>
+<span class="nc" id="L26">        this(witnesses, droppedWitnesses, 0);</span>
+<span class="nc" id="L27">    }</span>
+<span class="nc" id="L28">    public static SaturationProvenance empty() { return new SaturationProvenance(List.of(), 0); }</span>
+<span class="fc" id="L29">    public boolean hasExtractionProof() { return proofOutcome.complete(); }</span>
+    public String explanationStatus() {
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        return hasExtractionProof() ? &quot;CHECKED_INPUT_OUTPUT_EQUALITY&quot;</span>
+<span class="nc" id="L32">            : &quot;LOCAL_WITNESSES_ONLY; CONGRUENCE_EXTRACTION_PROOF_UNAVAILABLE&quot;;</span>
+    }
 
     public record Witness(String ruleId, Expr before, Expr after) {
-<span class="fc" id="L25">        public Witness {</span>
-<span class="fc" id="L26">            Objects.requireNonNull(ruleId);</span>
-<span class="fc" id="L27">            Objects.requireNonNull(before);</span>
-<span class="fc" id="L28">            Objects.requireNonNull(after);</span>
-<span class="fc" id="L29">        }</span>
+<span class="fc" id="L36">        public Witness {</span>
+<span class="fc" id="L37">            Objects.requireNonNull(ruleId);</span>
+<span class="fc" id="L38">            Objects.requireNonNull(before);</span>
+<span class="fc" id="L39">            Objects.requireNonNull(after);</span>
+<span class="fc" id="L40">        }</span>
         /** Replay against a caller-supplied trusted rule, including its guards. */
         public boolean replay(RewriteRule rule) {
             try {
-<span class="pc bpc" id="L33" title="2 of 4 branches missed.">                return ruleId.equals(rule.id()) &amp;&amp; rule.isEquivalencePreservingByConstruction()</span>
-<span class="pc bpc" id="L34" title="2 of 4 branches missed.">                    &amp;&amp; rule.matches(before) &amp;&amp; rule.assumptions(before).isEmpty()</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                    &amp;&amp; after.equals(rule.apply(before));</span>
-<span class="nc" id="L36">            } catch (RuntimeException failure) {</span>
-<span class="nc" id="L37">                return false;</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">                return ruleId.equals(rule.id()) &amp;&amp; rule.isEquivalencePreservingByConstruction()</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">                    &amp;&amp; rule.matches(before) &amp;&amp; rule.assumptions(before).isEmpty()</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">                    &amp;&amp; after.equals(rule.apply(before));</span>
+<span class="nc" id="L47">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L48">                return false;</span>
             }
         }
     }

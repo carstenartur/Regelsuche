@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProofSupport.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph.proof</a> &gt; <span class="el_source">ProofSupport.java</span></div><h1>ProofSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph.proof;
+
+import static de.regelsuche.egraph.proof.ExtractionCertificate.*;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.transform.*;
+
+import java.math.BigInteger;
+import java.util.*;
+
+/** Bounded syntax operations shared by producer and verifier, with no equality search. */
+final class ProofSupport {
+    final ProofLimits limits;
+    long work, references, characters, patternNodes;
+    boolean exhausted;
+<span class="fc" id="L17">    final List&lt;Term&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L18">    final Map&lt;Term, Integer&gt; indexes = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L19">    final List&lt;Long&gt; expanded = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L20">    final List&lt;Integer&gt; depths = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L21">    final List&lt;RuleIdentity&gt; identities = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L22">    final List&lt;RuleData&gt; rules = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L23">    final Map&lt;String, Integer&gt; ruleIds = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L24">    final List&lt;PNode&gt; patterns = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L25">    final Map&lt;PNode, Integer&gt; patternIds = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L27">    record PNode(String tag, String label, List&lt;Integer&gt; children) {}</span>
+
+<span class="fc" id="L29">    record RuleData(int source, int target, Set&lt;String&gt; placeholders) {}</span>
+
+<span class="fc" id="L31">    record Parts(String tag, String label, List&lt;?&gt; children) {}</span>
+
+<span class="fc" id="L33">    record Frame(Object node, boolean exit, int depth) {}</span>
+
+<span class="fc" id="L35">    ProofSupport(ProofLimits limits) {</span>
+<span class="fc" id="L36">        this.limits = nonNull(limits);</span>
+<span class="fc" id="L37">    }</span>
+
+    static &lt;T&gt; T nonNull(T value) {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (value == null) throw new IllegalArgumentException(&quot;null proof input&quot;);</span>
+<span class="fc" id="L41">        return value;</span>
+    }
+
+    void work(long n) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (n &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+<span class="pc bfc" id="L46" title="All 4 branches covered.">        if (exhausted || n &gt; limits.maxWork() - work) fail(&quot;work limit&quot;);</span>
+<span class="fc" id="L47">        work += n;</span>
+<span class="fc" id="L48">    }</span>
+
+    void fail(String reason) {
+<span class="fc" id="L51">        exhausted = true;</span>
+<span class="fc" id="L52">        throw new ExtractionProofBuilder.LimitExceeded(reason);</span>
+    }
+
+    void refs(long n) {
+<span class="fc" id="L56">        work(n);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (n &gt; limits.maxReferences() - references) fail(&quot;reference limit&quot;);</span>
+<span class="fc" id="L58">        references += n;</span>
+<span class="fc" id="L59">    }</span>
+
+    void chars(String s) {
+<span class="fc" id="L62">        nonNull(s);</span>
+<span class="fc" id="L63">        work(s.length());</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (s.length() &gt; limits.maxCharacters() - characters) fail(&quot;character limit&quot;);</span>
+<span class="fc" id="L65">        characters += s.length();</span>
+<span class="fc" id="L66">    }</span>
+
+    void size(long n, long max, String label) {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (n &gt; max) fail(label);</span>
+<span class="fc" id="L70">    }</span>
+
+    String rational(ExactRational r) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (r.numerator().getClass() != BigInteger.class</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                || r.denominator().getClass() != BigInteger.class)</span>
+<span class="fc" id="L75">            throw new IllegalArgumentException(&quot;opaque rational scalar&quot;);</span>
+<span class="fc" id="L76">        work(1);</span>
+<span class="fc" id="L77">        size(r.numerator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+<span class="fc" id="L78">        size(r.denominator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+        // A decimal rendering of b binary bits requires at most b/3+2 characters.
+<span class="fc" id="L80">        long estimate = (long) r.numerator().bitLength() / 3 + r.denominator().bitLength() / 3 + 5;</span>
+<span class="fc" id="L81">        size(estimate, 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L82">        size(estimate, limits.maxCharacters(), &quot;rational text limit&quot;);</span>
+<span class="fc" id="L83">        work(estimate);</span>
+<span class="fc" id="L84">        String text = r.toString();</span>
+<span class="fc" id="L85">        size(text.length(), 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L86">        return text;</span>
+    }
+
+    ExactRational number(String text) {
+<span class="fc" id="L90">        size(text.length(), 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L91">        work(text.length());</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (!text.matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;))</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(&quot;noncanonical rational grammar&quot;);</span>
+<span class="fc" id="L94">        int slash = text.indexOf('/');</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        int numeratorDigits = (slash &lt; 0 ? text.length() : slash) - (text.startsWith(&quot;-&quot;) ? 1 : 0);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        int denominatorDigits = slash &lt; 0 ? 1 : text.length() - slash - 1;</span>
+        // 30103/100000 strictly exceeds log10(2). Bound digit allocation before parsing.
+<span class="fc" id="L98">        long maxDigits = ((long) limits.maxRationalBits() * 30103) / 100000 + 1;</span>
+<span class="fc" id="L99">        size(numeratorDigits, maxDigits, &quot;rational bits&quot;);</span>
+<span class="fc" id="L100">        size(denominatorDigits, maxDigits, &quot;rational bits&quot;);</span>
+<span class="fc" id="L101">        var value = ExactRational.fromCanonicalText(text);</span>
+<span class="fc" id="L102">        size(value.numerator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+<span class="fc" id="L103">        size(value.denominator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+<span class="fc" id="L104">        return value;</span>
+    }
+
+    void registry(Collection&lt;? extends RewriteRule&gt; supplied) {
+<span class="fc" id="L108">        size(supplied.size(), limits.maxTerms(), &quot;rules limit&quot;);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (RewriteRule rule : supplied) {</span>
+<span class="fc" id="L110">            work(1);</span>
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">            if (rule == null || rule.getClass() != PatternRewriteRule.class)</span>
+<span class="fc" id="L112">                throw new ExtractionProofBuilder.UnsupportedRule(</span>
+                        &quot;only base pattern rules supported&quot;);
+<span class="fc" id="L114">            PatternRewriteRule p = (PatternRewriteRule) rule;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (!p.recognitionProfile().equals(RecognitionProfile.exact())</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                    || !p.isEquivalencePreservingByConstruction())</span>
+<span class="fc" id="L117">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;rule is not exact preserving&quot;);</span>
+<span class="fc" id="L118">            chars(p.id());</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (ruleIds.containsKey(p.id()))</span>
+<span class="fc" id="L120">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;duplicate rule ID&quot;);</span>
+<span class="fc" id="L121">            int source = pattern(p.source()), target = pattern(p.target());</span>
+<span class="fc" id="L122">            Set&lt;String&gt; names = placeholders(source);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (!names.containsAll(placeholders(target)))</span>
+<span class="fc" id="L124">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;unbound target placeholder&quot;);</span>
+<span class="fc" id="L125">            ruleIds.put(p.id(), rules.size());</span>
+<span class="fc" id="L126">            rules.add(new RuleData(source, target, Set.copyOf(names)));</span>
+<span class="fc" id="L127">            identities.add(new RuleIdentity(p.id(), p.source(), p.target()));</span>
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">    }</span>
+
+    Set&lt;String&gt; placeholders(int root) {
+<span class="fc" id="L132">        Set&lt;String&gt; result = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L133">        Set&lt;Integer&gt; seen = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L134">        var pending = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L135">        pending.push(root);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L137">            work(1);</span>
+<span class="fc" id="L138">            int i = pending.pop();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (!seen.add(i)) continue;</span>
+<span class="fc" id="L140">            var p = patterns.get(i);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (p.tag.equals(&quot;P&quot;)) result.add(p.label);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int c : p.children) {</span>
+<span class="fc" id="L143">                work(1);</span>
+<span class="fc" id="L144">                pending.push(c);</span>
+<span class="fc" id="L145">            }</span>
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        return result;</span>
+    }
+
+    Parts parts(Object o) {
+<span class="pc bpc" id="L151" title="1 of 9 branches missed.">        return switch (o) {</span>
+<span class="fc" id="L152">            case NumberExpr n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
+<span class="fc" id="L153">            case VariableExpr v -&gt; new Parts(&quot;VARIABLE&quot;, v.name(), List.of());</span>
+<span class="fc" id="L154">            case BinaryExpr b -&gt;</span>
+<span class="fc" id="L155">                    new Parts(&quot;BINARY&quot;, b.operator().name(), List.of(b.left(), b.right()));</span>
+<span class="fc" id="L156">            case FunctionExpr f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>
+<span class="fc" id="L157">            case PatternExpr.Placeholder p -&gt; new Parts(&quot;P&quot;, p.name(), List.of());</span>
+<span class="nc" id="L158">            case PatternExpr.LiteralNumber n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
+<span class="fc" id="L159">            case PatternExpr.Operation b -&gt;</span>
+<span class="fc" id="L160">                    new Parts(&quot;BINARY&quot;, b.operator().name(), List.of(b.left(), b.right()));</span>
+<span class="fc" id="L161">            case PatternExpr.Function f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>
+<span class="fc" id="L162">            default -&gt; throw new ExtractionProofBuilder.UnsupportedRule(&quot;unsupported syntax&quot;);</span>
+        };
+    }
+
+    int pattern(PatternExpr p) {
+<span class="fc" id="L167">        return inspect(p, true);</span>
+    }
+
+    int expression(Expr e) {
+<span class="fc" id="L171">        return inspect(e, false);</span>
+    }
+
+    int inspect(Object root, boolean pattern) {
+<span class="fc" id="L175">        nonNull(root);</span>
+<span class="fc" id="L176">        var ids = new IdentityHashMap&lt;Object, Integer&gt;();</span>
+<span class="fc" id="L177">        var facts = new IdentityHashMap&lt;Object, long[]&gt;();</span>
+<span class="fc" id="L178">        var descriptions = new IdentityHashMap&lt;Object, Parts&gt;();</span>
+<span class="fc" id="L179">        var stack = new ArrayDeque&lt;Frame&gt;();</span>
+<span class="fc" id="L180">        stack.push(new Frame(root, false, 1));</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L182">            work(1);</span>
+<span class="fc" id="L183">            var frame = stack.pop();</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (ids.containsKey(frame.node)) continue;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (!frame.exit) {</span>
+<span class="fc" id="L186">                scheduleSyntax(frame, descriptions, ids, stack);</span>
+            } else {
+<span class="fc" id="L188">                completeSyntax(frame.node, pattern, descriptions, ids, facts);</span>
+            }
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        return ids.get(root);</span>
+    }
+
+    private void scheduleSyntax(
+            Frame frame,
+            IdentityHashMap&lt;Object, Parts&gt; descriptions,
+            IdentityHashMap&lt;Object, Integer&gt; ids,
+            ArrayDeque&lt;Frame&gt; stack) {
+<span class="fc" id="L199">        size(frame.depth, limits.maxDepth(), &quot;syntax depth&quot;);</span>
+<span class="fc" id="L200">        var p = parts(frame.node);</span>
+<span class="fc" id="L201">        size(descriptions.size() + 1L, limits.maxTerms(), &quot;syntax nodes&quot;);</span>
+<span class="fc" id="L202">        descriptions.put(frame.node, p);</span>
+<span class="fc" id="L203">        size(</span>
+<span class="fc" id="L204">                stack.size() + p.children.size() + 1L,</span>
+<span class="fc" id="L205">                limits.maxReferences(),</span>
+                &quot;syntax pending references&quot;);
+<span class="fc" id="L207">        size(p.children.size(), limits.maxReferences(), &quot;syntax arity&quot;);</span>
+<span class="fc" id="L208">        stack.push(new Frame(frame.node, true, frame.depth));</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (int i = p.children.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L210">            work(1);</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (!ids.containsKey(p.children.get(i)))</span>
+<span class="fc" id="L212">                stack.push(new Frame(p.children.get(i), false, frame.depth + 1));</span>
+        }
+<span class="fc" id="L214">    }</span>
+
+    private void completeSyntax(
+            Object node,
+            boolean pattern,
+            IdentityHashMap&lt;Object, Parts&gt; descriptions,
+            IdentityHashMap&lt;Object, Integer&gt; ids,
+            IdentityHashMap&lt;Object, long[]&gt; facts) {
+
+<span class="fc" id="L223">        var p = descriptions.get(node);</span>
+<span class="fc" id="L224">        long count = 1, depth = 1;</span>
+<span class="fc" id="L225">        var children = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (Object child : p.children) {</span>
+<span class="fc" id="L227">            work(1);</span>
+<span class="fc" id="L228">            long[] f = facts.get(child);</span>
+<span class="fc" id="L229">            count += f[0];</span>
+<span class="fc" id="L230">            depth = Math.max(depth, 1 + f[1]);</span>
+<span class="fc" id="L231">            size(count, limits.maxExpandedNodes(), &quot;expanded syntax&quot;);</span>
+<span class="fc" id="L232">            children.add(ids.get(child));</span>
+<span class="fc" id="L233">        }</span>
+<span class="fc" id="L234">        size(count, limits.maxExpandedNodes(), &quot;expanded syntax&quot;);</span>
+<span class="fc" id="L235">        size(depth, limits.maxDepth(), &quot;syntax depth&quot;);</span>
+        int id;
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (pattern) {</span>
+<span class="fc" id="L238">            size(++patternNodes, limits.maxTerms(), &quot;pattern nodes&quot;);</span>
+<span class="fc" id="L239">            chars(p.label);</span>
+<span class="fc" id="L240">            refs(children.size());</span>
+<span class="fc" id="L241">            var key = new PNode(p.tag, p.label, List.copyOf(children));</span>
+<span class="fc" id="L242">            Integer old = patternIds.get(key);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (old == null) {</span>
+<span class="fc" id="L244">                id = patterns.size();</span>
+<span class="fc" id="L245">                patterns.add(key);</span>
+<span class="fc" id="L246">                patternIds.put(key, id);</span>
+<span class="fc" id="L247">            } else id = old;</span>
+<span class="fc" id="L248">        } else id = intern(new Term(Kind.valueOf(p.tag), p.label, children));</span>
+<span class="fc" id="L249">        ids.put(node, id);</span>
+<span class="fc" id="L250">        facts.put(node, new long[] {count, depth});</span>
+<span class="fc" id="L251">    }</span>
+
+    int requireTerm(int i) {
+<span class="pc bpc" id="L254" title="1 of 4 branches missed.">        if (i &lt; 0 || i &gt;= terms.size())</span>
+<span class="fc" id="L255">            throw new IllegalArgumentException(&quot;invalid term reference&quot;);</span>
+<span class="fc" id="L256">        return i;</span>
+    }
+
+    int intern(Term t) {
+<span class="fc" id="L260">        work(1);</span>
+<span class="fc" id="L261">        nonNull(t);</span>
+<span class="fc" id="L262">        nonNull(t.kind());</span>
+<span class="fc" id="L263">        nonNull(t.payload());</span>
+<span class="fc" id="L264">        size(t.children().size(), limits.maxReferences(), &quot;term arity&quot;);</span>
+<span class="fc" id="L265">        long count = 1;</span>
+<span class="fc" id="L266">        int depth = 1;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (int child : t.children()) {</span>
+<span class="fc" id="L268">            work(1);</span>
+<span class="fc" id="L269">            requireTerm(child);</span>
+<span class="fc" id="L270">            count += expanded.get(child);</span>
+<span class="fc" id="L271">            depth = Math.max(depth, depths.get(child) + 1);</span>
+<span class="fc" id="L272">            size(count, limits.maxExpandedNodes(), &quot;expanded term&quot;);</span>
+<span class="fc" id="L273">        }</span>
+<span class="fc" id="L274">        size(count, limits.maxExpandedNodes(), &quot;expanded term&quot;);</span>
+<span class="fc" id="L275">        size(depth, limits.maxDepth(), &quot;term depth&quot;);</span>
+<span class="pc bpc" id="L276" title="1 of 6 branches missed.">        if ((t.kind() == Kind.NUMBER || t.kind() == Kind.VARIABLE) &amp;&amp; !t.children().isEmpty()</span>
+<span class="pc bpc" id="L277" title="1 of 4 branches missed.">                || t.kind() == Kind.BINARY &amp;&amp; t.children().size() != 2)</span>
+<span class="nc" id="L278">            throw new IllegalArgumentException(&quot;term arity&quot;);</span>
+        // Debit text before any parser, hash or equality touches it.
+<span class="fc" id="L280">        size(t.payload().length(), limits.maxCharacters(), &quot;label length&quot;);</span>
+<span class="fc" id="L281">        work(t.payload().length());</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (t.kind() == Kind.NUMBER) {</span>
+<span class="fc" id="L283">            size(t.payload().length(), 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L284">            var r = number(t.payload());</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            if (!rational(r).equals(t.payload()))</span>
+<span class="nc" id="L286">                throw new IllegalArgumentException(&quot;noncanonical rational&quot;);</span>
+        }
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (t.kind() == Kind.BINARY) BinaryOperator.valueOf(t.payload());</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (t.kind() == Kind.VARIABLE) new VariableExpr(t.payload());</span>
+<span class="pc bpc" id="L290" title="1 of 4 branches missed.">        if (t.kind() == Kind.FUNCTION &amp;&amp; t.payload().isBlank())</span>
+<span class="nc" id="L291">            throw new IllegalArgumentException(&quot;blank function&quot;);</span>
+<span class="fc" id="L292">        Integer old = indexes.get(t);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (old != null) return old;</span>
+<span class="fc" id="L294">        size(terms.size() + 1L, limits.maxTerms(), &quot;terms limit&quot;);</span>
+<span class="fc" id="L295">        chars(t.payload());</span>
+<span class="fc" id="L296">        refs(t.children().size());</span>
+<span class="fc" id="L297">        int id = terms.size();</span>
+<span class="fc" id="L298">        terms.add(t);</span>
+<span class="fc" id="L299">        indexes.put(t, id);</span>
+<span class="fc" id="L300">        expanded.add(count);</span>
+<span class="fc" id="L301">        depths.add(depth);</span>
+<span class="fc" id="L302">        return id;</span>
+    }
+
+    void bindings(RuleData r, Map&lt;String, Integer&gt; bindings) {
+<span class="fc" id="L306">        nonNull(bindings);</span>
+<span class="fc" id="L307">        size(bindings.size(), limits.maxReferences(), &quot;bindings limit&quot;);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (bindings.size() != r.placeholders.size())</span>
+<span class="fc" id="L309">            throw new IllegalArgumentException(&quot;binding names&quot;);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        for (var e : bindings.entrySet()) {</span>
+<span class="fc" id="L311">            work(1);</span>
+<span class="fc" id="L312">            String name = nonNull(e.getKey());</span>
+<span class="fc" id="L313">            int term = nonNull(e.getValue());</span>
+<span class="fc" id="L314">            size(name.length(), limits.maxCharacters(), &quot;binding label&quot;);</span>
+<span class="fc" id="L315">            work(name.length());</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            if (!r.placeholders.contains(name)) throw new IllegalArgumentException(&quot;binding names&quot;);</span>
+<span class="fc" id="L317">            requireTerm(term);</span>
+<span class="fc" id="L318">        }</span>
+<span class="fc" id="L319">    }</span>
+
+    int instantiate(int root, Map&lt;String, Integer&gt; bindings, boolean create) {
+<span class="fc" id="L322">        var done = new HashMap&lt;Integer, Integer&gt;();</span>
+<span class="fc" id="L323">        var stack = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L324">        stack.push(root);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L326">            work(1);</span>
+<span class="fc" id="L327">            int id = stack.peek();</span>
+<span class="fc" id="L328">            var p = patterns.get(id);</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">            if (done.containsKey(id)) {</span>
+<span class="fc" id="L330">                stack.pop();</span>
+<span class="fc" id="L331">                continue;</span>
+            }
+<span class="fc" id="L333">            boolean ready = true;</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            for (int child : p.children) {</span>
+<span class="fc" id="L335">                work(1);</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                if (!done.containsKey(child)) {</span>
+<span class="fc" id="L337">                    stack.push(child);</span>
+<span class="fc" id="L338">                    ready = false;</span>
+                }
+<span class="fc" id="L340">            }</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">            if (!ready) continue;</span>
+            int value;
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (p.tag.equals(&quot;P&quot;)) value = bindings.get(p.label);</span>
+            else {
+<span class="fc" id="L345">                var children = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                for (int child : p.children) {</span>
+<span class="fc" id="L347">                    work(1);</span>
+<span class="fc" id="L348">                    children.add(done.get(child));</span>
+<span class="fc" id="L349">                }</span>
+<span class="fc" id="L350">                var term = new Term(Kind.valueOf(p.tag), p.label, children);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                if (create) value = intern(term);</span>
+                else {
+<span class="fc" id="L353">                    work(p.label.length() + children.size());</span>
+<span class="fc" id="L354">                    Integer found = indexes.get(term);</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">                    if (found == null) throw new IllegalArgumentException(&quot;instance term absent&quot;);</span>
+<span class="fc" id="L356">                    value = found;</span>
+                }
+            }
+<span class="fc" id="L359">            done.put(id, value);</span>
+<span class="fc" id="L360">            stack.pop();</span>
+<span class="fc" id="L361">        }</span>
+<span class="fc" id="L362">        return done.get(root);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

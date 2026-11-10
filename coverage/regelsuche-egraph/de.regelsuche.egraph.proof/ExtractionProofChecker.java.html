@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExtractionProofChecker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph.proof</a> &gt; <span class="el_source">ExtractionProofChecker.java</span></div><h1>ExtractionProofChecker.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph.proof;
+
+import static de.regelsuche.egraph.proof.ExtractionCertificate.*;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.transform.RewriteRule;
+
+import java.util.*;
+
+/** Detached inference interpreter; does not search for equality or consult a graph. */
+public final class ExtractionProofChecker {
+    private ExtractionProofChecker() {}
+
+<span class="fc" id="L14">    public enum Status {</span>
+<span class="fc" id="L15">        ACCEPTED,</span>
+<span class="fc" id="L16">        REJECTED,</span>
+<span class="fc" id="L17">        LIMIT_EXCEEDED</span>
+    }
+
+    public static final class CheckedCertificate {
+        private final ExtractionCertificate certificate;
+        private final Expr input, output;
+        private final long work;
+
+<span class="fc" id="L25">        private CheckedCertificate(ExtractionCertificate c, Expr in, Expr out, long work) {</span>
+<span class="fc" id="L26">            certificate = c;</span>
+<span class="fc" id="L27">            input = in;</span>
+<span class="fc" id="L28">            output = out;</span>
+<span class="fc" id="L29">            this.work = work;</span>
+<span class="fc" id="L30">        }</span>
+
+        public ExtractionCertificate certificate() {
+<span class="fc" id="L33">            return certificate;</span>
+        }
+
+        public Expr input() {
+<span class="fc" id="L37">            return input;</span>
+        }
+
+        public Expr output() {
+<span class="fc" id="L41">            return output;</span>
+        }
+
+        public long workUsed() {
+<span class="fc" id="L45">            return work;</span>
+        }
+    }
+
+    public static final class CheckResult {
+        private final Status status;
+        private final String detail;
+        private final long work;
+        private final CheckedCertificate checked;
+
+<span class="fc" id="L55">        private CheckResult(Status status, String detail, long work, CheckedCertificate checked) {</span>
+<span class="fc" id="L56">            this.status = status;</span>
+<span class="fc" id="L57">            this.detail = detail;</span>
+<span class="fc" id="L58">            this.work = work;</span>
+<span class="fc" id="L59">            this.checked = checked;</span>
+<span class="fc" id="L60">        }</span>
+
+        public Status status() {
+<span class="fc" id="L63">            return status;</span>
+        }
+
+        public String detail() {
+<span class="fc" id="L67">            return detail;</span>
+        }
+
+        public long workUsed() {
+<span class="fc" id="L71">            return work;</span>
+        }
+
+        public Optional&lt;CheckedCertificate&gt; checked() {
+<span class="fc" id="L75">            return Optional.ofNullable(checked);</span>
+        }
+    }
+
+<span class="fc" id="L79">    private record Equality(int left, int right) {}</span>
+
+    public static CheckResult check(
+            Expr expectedInput,
+            Expr expectedOutput,
+            ExtractionCertificate certificate,
+            Collection&lt;? extends RewriteRule&gt; trustedRules,
+            ProofLimits limits) {
+<span class="fc" id="L87">        var s = new ProofSupport(limits);</span>
+        try {
+<span class="fc" id="L89">            Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L90">            s.work(1);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            require(certificate.schemaVersion() == ExtractionCertificate.SCHEMA_VERSION, &quot;schema&quot;);</span>
+<span class="fc" id="L92">            s.registry(trustedRules);</span>
+<span class="fc" id="L93">            validateTerms(s, certificate, expectedInput, expectedOutput);</span>
+<span class="fc" id="L94">            var mapped = mapRules(s, certificate);</span>
+<span class="fc" id="L95">            s.size(certificate.steps().size(), limits.maxProofSteps(), &quot;proof steps&quot;);</span>
+<span class="fc" id="L96">            var checked = new ArrayList&lt;Equality&gt;();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (Step step : certificate.steps()) {</span>
+<span class="fc" id="L98">                s.work(1);</span>
+<span class="fc" id="L99">                checked.add(replayStep(s, step, checked, mapped));</span>
+<span class="fc" id="L100">            }</span>
+<span class="fc" id="L101">            var conclusion = premise(checked, certificate.conclusion());</span>
+<span class="fc" id="L102">            require(</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                    conclusion.left == certificate.inputTerm()</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                            &amp;&amp; conclusion.right == certificate.outputTerm(),</span>
+                    &quot;conclusion endpoints&quot;);
+<span class="fc" id="L106">            return new CheckResult(</span>
+                    Status.ACCEPTED,
+                    &quot;accepted&quot;,
+                    s.work,
+                    new CheckedCertificate(certificate, expectedInput, expectedOutput, s.work));
+<span class="fc" id="L111">        } catch (ExtractionProofBuilder.LimitExceeded e) {</span>
+<span class="fc" id="L112">            return new CheckResult(Status.LIMIT_EXCEEDED, e.getMessage(), s.work, null);</span>
+<span class="fc" id="L113">        } catch (IllegalArgumentException | NullPointerException e) {</span>
+<span class="fc" id="L114">            return new CheckResult(</span>
+                    Status.REJECTED,
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                    e.getMessage() == null ? &quot;malformed certificate&quot; : e.getMessage(),</span>
+                    s.work,
+                    null);
+        }
+    }
+
+    private static void validateTerms(
+            ProofSupport s,
+            ExtractionCertificate certificate,
+            Expr expectedInput,
+            Expr expectedOutput) {
+<span class="fc" id="L127">        s.size(certificate.terms().size(), s.limits.maxTerms(), &quot;terms limit&quot;);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (int i = 0; i &lt; certificate.terms().size(); i++) {</span>
+<span class="fc" id="L129">            s.work(1);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            require(s.intern(certificate.terms().get(i)) == i, &quot;duplicate term&quot;);</span>
+        }
+<span class="fc" id="L132">        int termCount = s.terms.size();</span>
+<span class="fc" id="L133">        s.requireTerm(certificate.inputTerm());</span>
+<span class="fc" id="L134">        s.requireTerm(certificate.outputTerm());</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        require(s.expression(expectedInput) == certificate.inputTerm(), &quot;expected input mismatch&quot;);</span>
+<span class="fc" id="L136">        require(</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                s.expression(expectedOutput) == certificate.outputTerm(),</span>
+                &quot;expected output mismatch&quot;);
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        require(s.terms.size() == termCount, &quot;endpoint absent&quot;);</span>
+<span class="fc" id="L140">    }</span>
+
+    private static List&lt;Integer&gt; mapRules(ProofSupport s, ExtractionCertificate certificate) {
+<span class="fc" id="L143">        s.size(certificate.rules().size(), s.limits.maxTerms(), &quot;rules limit&quot;);</span>
+<span class="fc" id="L144">        var mapped = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L145">        var seen = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (var identity : certificate.rules()) {</span>
+<span class="fc" id="L147">            s.work(1);</span>
+<span class="fc" id="L148">            s.chars(identity.id());</span>
+<span class="fc" id="L149">            require(seen.add(identity.id()), &quot;duplicate rule ID&quot;);</span>
+<span class="fc" id="L150">            Integer rule = s.ruleIds.get(identity.id());</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            require(rule != null, &quot;untrusted rule ID&quot;);</span>
+<span class="fc" id="L152">            var r = s.rules.get(rule);</span>
+<span class="fc" id="L153">            require(</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                    s.pattern(identity.source()) == r.source()</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                            &amp;&amp; s.pattern(identity.target()) == r.target(),</span>
+                    &quot;different rule definition&quot;);
+<span class="fc" id="L157">            mapped.add(rule);</span>
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        return mapped;</span>
+    }
+
+    private static Equality replayStep(
+            ProofSupport s, Step step, List&lt;Equality&gt; checked, List&lt;Integer&gt; mapped) {
+<span class="fc bfc" id="L164" title="All 5 branches covered.">        return switch (step) {</span>
+<span class="fc" id="L165">            case Reflexivity r -&gt; {</span>
+<span class="fc" id="L166">                s.refs(1);</span>
+<span class="fc" id="L167">                int t = s.requireTerm(r.term());</span>
+<span class="fc" id="L168">                yield new Equality(t, t);</span>
+            }
+<span class="fc" id="L170">            case Symmetry r -&gt; {</span>
+<span class="fc" id="L171">                s.refs(1);</span>
+<span class="fc" id="L172">                var p = premise(checked, r.premise());</span>
+<span class="fc" id="L173">                yield new Equality(p.right, p.left);</span>
+            }
+<span class="fc" id="L175">            case Transitivity r -&gt; {</span>
+<span class="fc" id="L176">                s.refs(2);</span>
+<span class="fc" id="L177">                var p = premise(checked, r.first());</span>
+<span class="fc" id="L178">                var q = premise(checked, r.second());</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                require(p.right == q.left, &quot;transitive middle&quot;);</span>
+<span class="fc" id="L180">                yield new Equality(p.left, q.right);</span>
+            }
+<span class="fc" id="L182">            case Congruence r -&gt; checkCongruence(s, r, checked);</span>
+<span class="fc" id="L183">            case PatternInstance r -&gt; checkInstance(s, r, mapped);</span>
+        };
+    }
+
+    private static Equality checkCongruence(ProofSupport s, Congruence r, List&lt;Equality&gt; checked) {
+<span class="fc" id="L188">        s.refs(r.childProofs().size() + 2L);</span>
+<span class="fc" id="L189">        var a = s.terms.get(s.requireTerm(r.left()));</span>
+<span class="fc" id="L190">        var b = s.terms.get(s.requireTerm(r.right()));</span>
+<span class="fc" id="L191">        s.work(a.payload().length());</span>
+<span class="fc" id="L192">        require(</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                a.kind() == b.kind()</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                        &amp;&amp; a.payload().equals(b.payload())</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                        &amp;&amp; a.children().size() == b.children().size()</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                        &amp;&amp; a.children().size() == r.childProofs().size(),</span>
+                &quot;congruence symbol or arity&quot;);
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (int k = 0; k &lt; a.children().size(); k++) {</span>
+<span class="fc" id="L199">            s.work(1);</span>
+<span class="fc" id="L200">            var p = premise(checked, r.childProofs().get(k));</span>
+<span class="fc" id="L201">            require(</span>
+<span class="pc bpc" id="L202" title="1 of 4 branches missed.">                    p.left == a.children().get(k) &amp;&amp; p.right == b.children().get(k),</span>
+                    &quot;congruence child endpoints&quot;);
+        }
+<span class="fc" id="L205">        return new Equality(r.left(), r.right());</span>
+    }
+
+    private static Equality checkInstance(ProofSupport s, PatternInstance r, List&lt;Integer&gt; mapped) {
+<span class="fc" id="L209">        s.refs(r.bindings().size() + 2L);</span>
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        require(r.rule() &gt;= 0 &amp;&amp; r.rule() &lt; mapped.size(), &quot;rule reference&quot;);</span>
+<span class="fc" id="L211">        var rule = s.rules.get(mapped.get(r.rule()));</span>
+<span class="fc" id="L212">        s.bindings(rule, r.bindings());</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (String name : r.bindings().keySet()) s.chars(name);</span>
+<span class="fc" id="L214">        require(</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                s.instantiate(rule.source(), r.bindings(), false) == r.before()</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                        &amp;&amp; s.instantiate(rule.target(), r.bindings(), false) == r.after(),</span>
+                &quot;pattern instance endpoints&quot;);
+<span class="fc" id="L218">        return new Equality(r.before(), r.after());</span>
+    }
+
+    private static Equality premise(List&lt;Equality&gt; checked, int index) {
+<span class="pc bpc" id="L222" title="1 of 4 branches missed.">        require(index &gt;= 0 &amp;&amp; index &lt; checked.size(), &quot;forward or missing premise&quot;);</span>
+<span class="fc" id="L223">        return checked.get(index);</span>
+    }
+
+    private static void require(boolean valid, String reason) {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (!valid) throw new IllegalArgumentException(reason);</span>
+<span class="fc" id="L228">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

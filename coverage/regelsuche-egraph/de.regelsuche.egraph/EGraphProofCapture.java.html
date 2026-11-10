@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EGraphProofCapture.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">EGraphProofCapture.java</span></div><h1>EGraphProofCapture.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.egraph.proof.ExtractionCertificate;
+import de.regelsuche.egraph.proof.ExtractionProofBuilder;
+import de.regelsuche.egraph.proof.ProofLimits;
+import de.regelsuche.egraph.proof.ProofOutcome;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Fresh-graph adapter. Only actual rule instances introduce equality axioms. */
+final class EGraphProofCapture {
+    private final ExtractionProofBuilder builder;
+    private final ProofLimits limits;
+<span class="fc" id="L21">    private final Map&lt;EClassId, Integer&gt; anchors = new HashMap&lt;&gt;();</span>
+    private ProofOutcome.Status failure;
+    private String detail;
+
+<span class="fc" id="L25">    EGraphProofCapture(ExtractionProofBuilder builder, ProofLimits limits) {</span>
+<span class="fc" id="L26">        this.builder = builder;</span>
+<span class="fc" id="L27">        this.limits = limits;</span>
+<span class="fc" id="L28">    }</span>
+
+<span class="fc bfc" id="L30" title="All 2 branches covered.">    boolean active() { return failure == null; }</span>
+
+    /** Insert the preflighted source DAG once per term, without recursive tree expansion. */
+    EClassId insertInput(EGraph graph, int source) {
+<span class="fc" id="L34">        Map&lt;Integer, EClassId&gt; inserted = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L35">        var pending = new ArrayDeque&lt;InputTerm&gt;();</span>
+<span class="fc" id="L36">        pending.push(new InputTerm(source, false));</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L38">            charge(1);</span>
+<span class="fc" id="L39">            InputTerm item = pending.pop();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (inserted.containsKey(item.term())) continue;</span>
+<span class="fc" id="L41">            var term = builder.term(item.term());</span>
+<span class="fc" id="L42">            charge(1L + term.children().size());</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (!item.expanded()) {</span>
+<span class="fc" id="L44">                pending.push(new InputTerm(item.term(), true));</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                for (int i = term.children().size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L46">                    pending.push(new InputTerm(term.children().get(i), false));</span>
+                }
+            } else {
+<span class="fc" id="L49">                var children = new ArrayList&lt;EClassId&gt;(term.children().size());</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                for (int child : term.children()) children.add(inserted.get(child));</span>
+<span class="fc bfc" id="L51" title="All 4 branches covered.">                String prefix = switch (term.kind()) {</span>
+<span class="fc" id="L52">                    case NUMBER -&gt; &quot;num:&quot;;</span>
+<span class="fc" id="L53">                    case VARIABLE -&gt; &quot;var:&quot;;</span>
+<span class="fc" id="L54">                    case BINARY -&gt; &quot;op:&quot;;</span>
+<span class="fc" id="L55">                    case FUNCTION -&gt; &quot;fn:&quot;;</span>
+                };
+<span class="fc" id="L57">                inserted.put(item.term(), graph.add(new ENode(prefix + term.payload(), children)));</span>
+            }
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        return inserted.get(source);</span>
+    }
+
+<span class="fc" id="L63">    private record InputTerm(int term, boolean expanded) {}</span>
+
+    /** Never throw owned proof exhaustion into graph insertion or pending repair. */
+    void allocated(EGraph graph, EClassId id, ENode node) {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (!active()) return;</span>
+        try {
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (anchors.size() &gt;= limits.maxTerms()) throw new ExtractionProofBuilder.LimitExceeded(&quot;anchor limit&quot;);</span>
+<span class="fc" id="L70">            var children = childTerms(graph, node.children());</span>
+<span class="fc" id="L71">            anchors.put(id, builder.addTerm(term(node, children)));</span>
+<span class="nc" id="L72">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="nc" id="L73">            fail(ProofOutcome.Status.LIMIT_EXCEEDED, &quot;capture: &quot; + exhausted.getMessage());</span>
+<span class="nc" id="L74">        } catch (IllegalArgumentException | IllegalStateException invalid) {</span>
+<span class="nc" id="L75">            fail(ProofOutcome.Status.REPLAY_REJECTED, &quot;invalid finite class anchor&quot;);</span>
+<span class="pc" id="L76">        }</span>
+<span class="fc" id="L77">    }</span>
+
+    ExtractionProofBuilder.GroundInstance prepare(EGraph graph, String rule,
+            Map&lt;String, EClassId&gt; bindings) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!active()) return null;</span>
+        try {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (bindings.size() &gt; limits.maxReferences()) {</span>
+<span class="nc" id="L84">                throw new ExtractionProofBuilder.LimitExceeded(&quot;binding reference limit&quot;);</span>
+            }
+<span class="fc" id="L86">            Map&lt;String, Integer&gt; terms = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (var binding : bindings.entrySet()) {</span>
+<span class="fc" id="L88">                charge(1);</span>
+<span class="fc" id="L89">                terms.put(binding.getKey(), anchor(graph, binding.getValue()));</span>
+<span class="fc" id="L90">            }</span>
+<span class="fc" id="L91">            return builder.prepareInstance(rule, terms);</span>
+<span class="nc" id="L92">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="nc" id="L93">            fail(ProofOutcome.Status.LIMIT_EXCEEDED, &quot;capture: &quot; + exhausted.getMessage());</span>
+<span class="nc" id="L94">        } catch (IllegalArgumentException | IllegalStateException invalid) {</span>
+<span class="nc" id="L95">            fail(ProofOutcome.Status.REPLAY_REJECTED, &quot;invalid captured native instance&quot;);</span>
+<span class="nc" id="L96">        }</span>
+<span class="nc" id="L97">        return null;</span>
+    }
+
+    void recorded(ExtractionProofBuilder.GroundInstance instance) {
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        if (!active() || instance == null) return;</span>
+        try {
+<span class="fc" id="L103">            builder.recordInstance(instance);</span>
+<span class="fc" id="L104">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="fc" id="L105">            fail(ProofOutcome.Status.LIMIT_EXCEEDED, &quot;capture: &quot; + exhausted.getMessage());</span>
+<span class="nc" id="L106">        } catch (IllegalArgumentException invalid) {</span>
+<span class="nc" id="L107">            fail(ProofOutcome.Status.REPLAY_REJECTED, &quot;invalid captured native equality&quot;);</span>
+<span class="fc" id="L108">        }</span>
+<span class="fc" id="L109">    }</span>
+
+    private List&lt;Integer&gt; childTerms(EGraph graph, List&lt;EClassId&gt; children) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (children.size() &gt; limits.maxReferences()) {</span>
+<span class="nc" id="L113">            throw new ExtractionProofBuilder.LimitExceeded(&quot;child reference limit&quot;);</span>
+        }
+<span class="fc" id="L115">        charge(1L + children.size());</span>
+<span class="fc" id="L116">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(children.size());</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (EClassId child : children) result.add(anchor(graph, child));</span>
+<span class="fc" id="L118">        return result;</span>
+    }
+
+    private int anchor(EGraph graph, EClassId id) {
+<span class="fc" id="L122">        Integer term = anchors.get(graph.find(id));</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (term == null) throw new IllegalStateException(&quot;missing finite class anchor&quot;);</span>
+<span class="fc" id="L124">        return term;</span>
+    }
+
+    /** Reconstruct exactly the existing extractor's selected nodes, without recursive expansion. */
+    int selectedTerm(EGraph graph, EClassId root, Map&lt;EClassId, ENode&gt; choices) {
+<span class="fc" id="L129">        Map&lt;EClassId, Integer&gt; terms = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L130">        var visiting = new HashSet&lt;EClassId&gt;();</span>
+<span class="fc" id="L131">        var pending = new ArrayDeque&lt;Selection&gt;();</span>
+<span class="fc" id="L132">        pending.push(new Selection(graph.find(root), false, 1));</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L134">            charge(1);</span>
+<span class="fc" id="L135">            Selection item = pending.pop();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (terms.containsKey(item.id())) continue;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (item.depth() &gt; limits.maxDepth()) {</span>
+<span class="nc" id="L138">                throw new ExtractionProofBuilder.LimitExceeded(&quot;selected expression depth&quot;);</span>
+            }
+<span class="fc" id="L140">            ENode node = choices.get(item.id());</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (node == null) throw new IllegalStateException(&quot;selected class has no finite node&quot;);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (item.expanded()) {</span>
+<span class="fc" id="L143">                finishSelection(graph, node, item.id(), terms);</span>
+<span class="fc" id="L144">                visiting.remove(item.id());</span>
+            } else {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                if (!visiting.add(item.id())) throw new IllegalStateException(&quot;cyclic selected expression&quot;);</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                if (visiting.size() + terms.size() &gt; limits.maxTerms()</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                        || node.children().size() &gt; limits.maxReferences()) {</span>
+<span class="nc" id="L149">                    throw new ExtractionProofBuilder.LimitExceeded(&quot;selected expression workspace&quot;);</span>
+                }
+<span class="fc" id="L151">                charge(1L + node.children().size());</span>
+<span class="fc" id="L152">                pending.push(new Selection(item.id(), true, item.depth()));</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                for (int i = node.children().size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L154">                    pending.push(new Selection(graph.find(node.children().get(i)), false, item.depth() + 1));</span>
+                }
+            }
+<span class="fc" id="L157">        }</span>
+        // addTerm validates expanded occurrence count; materialize enforces it again.
+<span class="fc" id="L159">        return terms.get(graph.find(root));</span>
+    }
+
+    private void finishSelection(EGraph graph, ENode node, EClassId id, Map&lt;EClassId, Integer&gt; terms) {
+<span class="fc" id="L163">        charge(1L + node.children().size());</span>
+<span class="fc" id="L164">        List&lt;Integer&gt; children = new ArrayList&lt;&gt;(node.children().size());</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (EClassId child : node.children()) {</span>
+<span class="fc" id="L166">            Integer term = terms.get(graph.find(child));</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            if (term == null) throw new IllegalStateException(&quot;cyclic selected expression&quot;);</span>
+<span class="fc" id="L168">            children.add(term);</span>
+<span class="fc" id="L169">        }</span>
+<span class="fc" id="L170">        terms.put(id, builder.addTerm(term(node, children)));</span>
+<span class="fc" id="L171">    }</span>
+
+<span class="fc" id="L173">    private record Selection(EClassId id, boolean expanded, int depth) {}</span>
+
+    private static ExtractionCertificate.Term term(ENode node, List&lt;Integer&gt; children) {
+<span class="fc" id="L176">        String symbol = node.symbol();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (symbol.startsWith(&quot;num:&quot;)) return new ExtractionCertificate.Term(</span>
+<span class="fc" id="L178">            ExtractionCertificate.Kind.NUMBER, symbol.substring(4), children);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (symbol.startsWith(&quot;var:&quot;)) return new ExtractionCertificate.Term(</span>
+<span class="fc" id="L180">            ExtractionCertificate.Kind.VARIABLE, symbol.substring(4), children);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (symbol.startsWith(&quot;op:&quot;)) return new ExtractionCertificate.Term(</span>
+<span class="fc" id="L182">            ExtractionCertificate.Kind.BINARY, symbol.substring(3), children);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (symbol.startsWith(&quot;fn:&quot;)) return new ExtractionCertificate.Term(</span>
+<span class="fc" id="L184">            ExtractionCertificate.Kind.FUNCTION, symbol.substring(3), children);</span>
+<span class="nc" id="L185">        throw new IllegalArgumentException(&quot;unsupported e-node symbol&quot;);</span>
+    }
+
+    String format(Expr expression) {
+<span class="fc" id="L189">        long[] remaining = {limits.maxCharacters()};</span>
+<span class="fc" id="L190">        return ExpressionFormatter.formatMeasured(expression, units -&gt; {</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (units &gt; remaining[0]) throw new ExtractionProofBuilder.LimitExceeded(&quot;diagnostic character limit&quot;);</span>
+<span class="fc" id="L192">            charge(units + 1);</span>
+<span class="fc" id="L193">            remaining[0] -= units;</span>
+<span class="fc" id="L194">        });</span>
+    }
+
+<span class="fc" id="L197">    void charge(long units) { builder.chargeWork(units); }</span>
+
+    ProofOutcome unavailable() {
+<span class="fc" id="L200">        return ProofOutcome.unavailable(failure, detail, builder.workUsed(), 0, 0);</span>
+    }
+
+    private void fail(ProofOutcome.Status status, String reason) {
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (failure == null) {</span>
+<span class="fc" id="L205">            failure = status;</span>
+<span class="fc" id="L206">            detail = reason;</span>
+        }
+<span class="fc" id="L208">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

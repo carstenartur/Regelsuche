@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExtractionProofBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph.proof</a> &gt; <span class="el_source">ExtractionProofBuilder.java</span></div><h1>ExtractionProofBuilder.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph.proof;
+
+import static de.regelsuche.egraph.proof.ExtractionCertificate.*;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.transform.RewriteRule;
+
+import java.util.*;
+
+/** Finite ground congruence producer. Its output still requires independent replay. */
+public final class ExtractionProofBuilder {
+    private final ProofSupport syntax;
+<span class="fc" id="L13">    private final List&lt;GroundInstance&gt; instances = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L15">    public ExtractionProofBuilder(Collection&lt;? extends RewriteRule&gt; rules, ProofLimits limits) {</span>
+<span class="fc" id="L16">        syntax = new ProofSupport(limits);</span>
+        try {
+<span class="fc" id="L18">            syntax.registry(ProofSupport.nonNull(rules));</span>
+<span class="fc" id="L19">        } catch (LimitExceeded exhausted) {</span>
+<span class="fc" id="L20">            throw new LimitExceeded(exhausted.getMessage(), syntax.work, exhausted);</span>
+<span class="fc" id="L21">        } catch (UnsupportedRule unsupported) {</span>
+<span class="fc" id="L22">            throw new UnsupportedRule(unsupported.getMessage(), syntax.work, unsupported);</span>
+<span class="fc" id="L23">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L24">            throw new InvalidInput(invalid.getMessage(), syntax.work, invalid);</span>
+<span class="fc" id="L25">        }</span>
+<span class="fc" id="L26">    }</span>
+
+    public static final class LimitExceeded extends RuntimeException {
+        private final long workUsed;
+
+        public LimitExceeded() {
+<span class="nc" id="L32">            this(&quot;proof limit exceeded&quot;);</span>
+<span class="nc" id="L33">        }</span>
+
+        public LimitExceeded(String detail) {
+<span class="fc" id="L36">            this(detail, 0, null);</span>
+<span class="fc" id="L37">        }</span>
+
+        private LimitExceeded(String detail, long workUsed, Throwable cause) {
+<span class="fc" id="L40">            super(detail, cause);</span>
+<span class="fc" id="L41">            this.workUsed = workUsed;</span>
+<span class="fc" id="L42">        }</span>
+
+        /**
+         * Consumed registry work when construction failed; otherwise use the live builder counter.
+         */
+        public long workUsed() {
+<span class="fc" id="L48">            return workUsed;</span>
+        }
+    }
+
+    public static final class UnsupportedRule extends IllegalArgumentException {
+        private final long workUsed;
+
+        public UnsupportedRule(String detail) {
+<span class="fc" id="L56">            this(detail, 0, null);</span>
+<span class="fc" id="L57">        }</span>
+
+        private UnsupportedRule(String detail, long workUsed, Throwable cause) {
+<span class="fc" id="L60">            super(detail, cause);</span>
+<span class="fc" id="L61">            this.workUsed = workUsed;</span>
+<span class="fc" id="L62">        }</span>
+
+        /** Consumed registry work when construction failed. */
+        public long workUsed() {
+<span class="fc" id="L66">            return workUsed;</span>
+        }
+    }
+
+    /** Malformed registry input, retaining work even though no builder was returned. */
+    public static final class InvalidInput extends IllegalArgumentException {
+        private final long workUsed;
+
+        private InvalidInput(String detail, long workUsed, Throwable cause) {
+<span class="fc" id="L75">            super(detail, cause);</span>
+<span class="fc" id="L76">            this.workUsed = workUsed;</span>
+<span class="fc" id="L77">        }</span>
+
+        public long workUsed() {
+<span class="fc" id="L80">            return workUsed;</span>
+        }
+    }
+
+    public record GroundInstance(int rule, Map&lt;String, Integer&gt; bindings, int before, int after) {
+<span class="fc" id="L85">        public GroundInstance {</span>
+<span class="fc" id="L86">            bindings = Map.copyOf(bindings);</span>
+<span class="fc" id="L87">        }</span>
+    }
+
+<span class="fc" id="L90">    public enum BuildStatus {</span>
+<span class="fc" id="L91">        BUILT,</span>
+<span class="fc" id="L92">        LIMIT_EXCEEDED,</span>
+<span class="fc" id="L93">        NO_DERIVATION</span>
+    }
+
+    public record BuildResult(
+            BuildStatus status,
+            Optional&lt;ExtractionCertificate&gt; certificate,
+            String detail,
+            long workUsed) {
+<span class="fc" id="L101">        public BuildResult {</span>
+<span class="fc" id="L102">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L103">            Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L104">            Objects.requireNonNull(detail);</span>
+<span class="pc bpc" id="L105" title="2 of 6 branches missed.">            if ((status == BuildStatus.BUILT) != certificate.isPresent() || workUsed &lt; 0)</span>
+<span class="nc" id="L106">                throw new IllegalArgumentException(&quot;inconsistent build result&quot;);</span>
+<span class="fc" id="L107">        }</span>
+    }
+
+    public long workUsed() {
+<span class="fc" id="L111">        return syntax.work;</span>
+    }
+
+    /** Shares this producer's work envelope with its bounded integration adapter. */
+    public void chargeWork(long units) {
+<span class="fc" id="L116">        syntax.work(units);</span>
+<span class="fc" id="L117">    }</span>
+
+    public int addTerm(Term term) {
+<span class="fc" id="L120">        return syntax.intern(term);</span>
+    }
+
+    public int addExpression(Expr expression) {
+<span class="fc" id="L124">        return syntax.expression(expression);</span>
+    }
+
+    public Term term(int term) {
+<span class="fc" id="L128">        syntax.work(1);</span>
+<span class="fc" id="L129">        return syntax.terms.get(syntax.requireTerm(term));</span>
+    }
+
+    public Expr materialize(int term) {
+<span class="fc" id="L133">        syntax.requireTerm(term);</span>
+<span class="fc" id="L134">        syntax.work(syntax.expanded.get(term));</span>
+<span class="fc" id="L135">        var values = new HashMap&lt;Integer, Expr&gt;();</span>
+<span class="fc" id="L136">        var stack = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L137">        stack.push(term);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L139">            syntax.work(1);</span>
+<span class="fc" id="L140">            int id = stack.peek();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (values.containsKey(id)) {</span>
+<span class="fc" id="L142">                stack.pop();</span>
+<span class="fc" id="L143">                continue;</span>
+            }
+<span class="fc" id="L145">            var t = syntax.terms.get(id);</span>
+<span class="fc" id="L146">            boolean ready = true;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            for (int c : t.children()) {</span>
+<span class="fc" id="L148">                syntax.work(1);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                if (!values.containsKey(c)) {</span>
+<span class="fc" id="L150">                    stack.push(c);</span>
+<span class="fc" id="L151">                    ready = false;</span>
+                }
+<span class="fc" id="L153">            }</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (!ready) continue;</span>
+<span class="fc" id="L155">            var children = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (int c : t.children()) {</span>
+<span class="fc" id="L157">                syntax.work(1);</span>
+<span class="fc" id="L158">                children.add(values.get(c));</span>
+<span class="fc" id="L159">            }</span>
+<span class="fc" id="L160">            syntax.work(t.payload().length());</span>
+<span class="fc" id="L161">            Expr e =</span>
+<span class="fc bfc" id="L162" title="All 4 branches covered.">                    switch (t.kind()) {</span>
+<span class="fc" id="L163">                        case NUMBER -&gt; new NumberExpr(syntax.number(t.payload()));</span>
+<span class="fc" id="L164">                        case VARIABLE -&gt; new VariableExpr(t.payload());</span>
+                        case BINARY -&gt;
+<span class="fc" id="L166">                                new BinaryExpr(</span>
+<span class="fc" id="L167">                                        children.get(0),</span>
+<span class="fc" id="L168">                                        BinaryOperator.valueOf(t.payload()),</span>
+<span class="fc" id="L169">                                        children.get(1));</span>
+<span class="fc" id="L170">                        case FUNCTION -&gt; new FunctionExpr(t.payload(), children);</span>
+                    };
+<span class="fc" id="L172">            values.put(id, e);</span>
+<span class="fc" id="L173">            stack.pop();</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        return values.get(term);</span>
+    }
+
+    public GroundInstance prepareInstance(String ruleId, Map&lt;String, Integer&gt; bindings) {
+<span class="fc" id="L179">        syntax.work(1);</span>
+<span class="fc" id="L180">        ProofSupport.nonNull(ruleId);</span>
+<span class="fc" id="L181">        syntax.work(ruleId.length());</span>
+<span class="fc" id="L182">        Integer index = syntax.ruleIds.get(ruleId);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (index == null) throw new IllegalArgumentException(&quot;unknown rule&quot;);</span>
+<span class="fc" id="L184">        var r = syntax.rules.get(index);</span>
+<span class="fc" id="L185">        syntax.bindings(r, bindings);</span>
+<span class="fc" id="L186">        syntax.refs(bindings.size());</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (String name : bindings.keySet()) syntax.chars(name);</span>
+<span class="fc" id="L188">        return new GroundInstance(</span>
+<span class="fc" id="L189">                index,</span>
+                bindings,
+<span class="fc" id="L191">                syntax.instantiate(r.source(), bindings, true),</span>
+<span class="fc" id="L192">                syntax.instantiate(r.target(), bindings, true));</span>
+    }
+
+    public void recordInstance(GroundInstance instance) {
+<span class="fc" id="L196">        syntax.work(1);</span>
+<span class="fc" id="L197">        ProofSupport.nonNull(instance);</span>
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        if (instance.rule() &lt; 0 || instance.rule() &gt;= syntax.rules.size())</span>
+<span class="nc" id="L199">            throw new IllegalArgumentException(&quot;unknown rule&quot;);</span>
+<span class="fc" id="L200">        var r = syntax.rules.get(instance.rule());</span>
+<span class="fc" id="L201">        syntax.bindings(r, instance.bindings());</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (syntax.instantiate(r.source(), instance.bindings(), false) != instance.before()</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                || syntax.instantiate(r.target(), instance.bindings(), false) != instance.after())</span>
+<span class="nc" id="L204">            throw new IllegalArgumentException(&quot;invalid ground instance&quot;);</span>
+<span class="fc" id="L205">        syntax.size(instances.size() + 1L, syntax.limits.maxProofSteps(), &quot;instances limit&quot;);</span>
+<span class="fc" id="L206">        syntax.refs(instance.bindings().size() + 2L);</span>
+        // Public instances need not have passed through prepareInstance. Charge every retained map.
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (String name : instance.bindings().keySet()) syntax.chars(name);</span>
+<span class="fc" id="L209">        instances.add(instance);</span>
+<span class="fc" id="L210">    }</span>
+
+    public BuildResult build(int inputTerm, int outputTerm) {
+<span class="fc" id="L213">        syntax.requireTerm(inputTerm);</span>
+<span class="fc" id="L214">        syntax.requireTerm(outputTerm);</span>
+        try {
+<span class="fc" id="L216">            return new Closure().build(inputTerm, outputTerm);</span>
+<span class="fc" id="L217">        } catch (LimitExceeded limit) {</span>
+<span class="fc" id="L218">            return new BuildResult(</span>
+<span class="fc" id="L219">                    BuildStatus.LIMIT_EXCEEDED, Optional.empty(), limit.getMessage(), workUsed());</span>
+        }
+    }
+
+    private final class Closure {
+<span class="fc" id="L224">        final List&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
+        final int[] parent;
+<span class="fc" id="L226">        final List&lt;List&lt;Edge&gt;&gt; forest = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L228">        record Edge(int to, int proof, boolean reverse) {}</span>
+
+<span class="fc" id="L230">        Closure() {</span>
+<span class="fc" id="L231">            syntax.work(syntax.terms.size());</span>
+<span class="fc" id="L232">            parent = new int[syntax.terms.size()];</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            for (int i = 0; i &lt; parent.length; i++) {</span>
+<span class="fc" id="L234">                parent[i] = i;</span>
+<span class="fc" id="L235">                forest.add(new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L237">        }</span>
+
+        int root(int i) {
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            while (parent[i] != i) {</span>
+<span class="fc" id="L241">                syntax.work(1);</span>
+<span class="fc" id="L242">                i = parent[i];</span>
+            }
+<span class="fc" id="L244">            syntax.work(1);</span>
+<span class="fc" id="L245">            return i;</span>
+        }
+
+        int emit(Step step, int references) {
+<span class="fc" id="L249">            syntax.work(1);</span>
+<span class="fc" id="L250">            syntax.size(steps.size() + 1L, syntax.limits.maxProofSteps(), &quot;proof steps&quot;);</span>
+<span class="fc" id="L251">            syntax.refs(references);</span>
+<span class="fc" id="L252">            steps.add(step);</span>
+<span class="fc" id="L253">            return steps.size() - 1;</span>
+        }
+
+        boolean connect(int a, int b, int proof) {
+<span class="fc" id="L257">            int x = root(a), y = root(b);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (x == y) return false;</span>
+<span class="fc" id="L259">            syntax.refs(2);</span>
+<span class="fc" id="L260">            parent[x] = y;</span>
+<span class="fc" id="L261">            forest.get(a).add(new Edge(b, proof, false));</span>
+<span class="fc" id="L262">            forest.get(b).add(new Edge(a, proof, true));</span>
+<span class="fc" id="L263">            return true;</span>
+        }
+
+        int explain(int a, int b) {
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (a == b) return emit(new Reflexivity(a), 1);</span>
+<span class="fc" id="L268">            syntax.work(parent.length);</span>
+<span class="fc" id="L269">            var previous = new int[parent.length];</span>
+<span class="fc" id="L270">            Arrays.fill(previous, -1);</span>
+<span class="fc" id="L271">            var via = new Edge[parent.length];</span>
+<span class="fc" id="L272">            var queue = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L273">            queue.add(a);</span>
+<span class="fc" id="L274">            previous[a] = a;</span>
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">            while (!queue.isEmpty() &amp;&amp; previous[b] &lt; 0) {</span>
+<span class="fc" id="L276">                syntax.work(1);</span>
+<span class="fc" id="L277">                int x = queue.remove();</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                for (Edge e : forest.get(x)) {</span>
+<span class="fc" id="L279">                    syntax.work(1);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">                    if (previous[e.to] &lt; 0) {</span>
+<span class="fc" id="L281">                        previous[e.to] = x;</span>
+<span class="fc" id="L282">                        via[e.to] = e;</span>
+<span class="fc" id="L283">                        queue.add(e.to);</span>
+                    }
+<span class="fc" id="L285">                }</span>
+<span class="fc" id="L286">            }</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">            if (previous[b] &lt; 0) throw new IllegalArgumentException(&quot;missing congruence premise&quot;);</span>
+<span class="fc" id="L288">            var path = new ArrayList&lt;Edge&gt;();</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            for (int x = b; x != a; x = previous[x]) {</span>
+<span class="fc" id="L290">                syntax.work(1);</span>
+<span class="fc" id="L291">                path.add(via[x]);</span>
+            }
+<span class="fc" id="L293">            int result = -1;</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            for (int i = path.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L295">                syntax.work(1);</span>
+<span class="fc" id="L296">                var e = path.get(i);</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">                int step = e.reverse ? emit(new Symmetry(e.proof), 1) : e.proof;</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                result = result &lt; 0 ? step : emit(new Transitivity(result, step), 2);</span>
+            }
+<span class="fc" id="L300">            return result;</span>
+        }
+
+        private boolean mergeCongruentTerms() {
+<span class="fc" id="L304">            boolean changed = false;</span>
+<span class="fc" id="L305">            var signatures = new HashMap&lt;Term, Integer&gt;();</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            for (int id = 0; id &lt; syntax.terms.size(); id++) {</span>
+<span class="fc" id="L307">                syntax.work(1);</span>
+<span class="fc" id="L308">                var term = syntax.terms.get(id);</span>
+<span class="fc" id="L309">                var children = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">                for (int c : term.children()) {</span>
+<span class="fc" id="L311">                    syntax.work(1);</span>
+<span class="fc" id="L312">                    children.add(root(c));</span>
+<span class="fc" id="L313">                }</span>
+<span class="fc" id="L314">                syntax.refs(children.size());</span>
+<span class="fc" id="L315">                syntax.work(term.payload().length() + children.size());</span>
+<span class="fc" id="L316">                var signature = new Term(term.kind(), term.payload(), children);</span>
+<span class="fc" id="L317">                Integer other = signatures.putIfAbsent(signature, id);</span>
+<span class="fc bfc" id="L318" title="All 4 branches covered.">                if (other != null &amp;&amp; root(id) != root(other)) {</span>
+<span class="fc" id="L319">                    var proofs = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L320">                    var rhs = syntax.terms.get(other);</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                    for (int k = 0; k &lt; term.children().size(); k++) {</span>
+<span class="fc" id="L322">                        syntax.work(1);</span>
+<span class="fc" id="L323">                        proofs.add(explain(term.children().get(k), rhs.children().get(k)));</span>
+                    }
+<span class="fc" id="L325">                    int proof = emit(new Congruence(id, other, proofs), proofs.size() + 2);</span>
+<span class="fc" id="L326">                    changed |= connect(id, other, proof);</span>
+                }
+            }
+<span class="fc" id="L329">            return changed;</span>
+        }
+
+        BuildResult build(int input, int output) {
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            for (var instance : instances) {</span>
+<span class="fc" id="L334">                syntax.work(1);</span>
+<span class="fc" id="L335">                int proof =</span>
+<span class="fc" id="L336">                        emit(</span>
+                                new PatternInstance(
+<span class="fc" id="L338">                                        instance.rule(),</span>
+<span class="fc" id="L339">                                        instance.bindings(),</span>
+<span class="fc" id="L340">                                        instance.before(),</span>
+<span class="fc" id="L341">                                        instance.after()),</span>
+<span class="fc" id="L342">                                instance.bindings().size() + 2);</span>
+<span class="fc" id="L343">                connect(instance.before(), instance.after(), proof);</span>
+<span class="fc" id="L344">            }</span>
+            boolean changed;
+            do {
+<span class="fc" id="L347">                changed = mergeCongruentTerms();</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            } while (changed);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (root(input) != root(output))</span>
+<span class="fc" id="L350">                return new BuildResult(</span>
+                        BuildStatus.NO_DERIVATION,
+<span class="fc" id="L352">                        Optional.empty(),</span>
+                        &quot;ground closure does not entail endpoints&quot;,
+<span class="fc" id="L354">                        workUsed());</span>
+<span class="fc" id="L355">            int conclusion = explain(input, output);</span>
+<span class="fc" id="L356">            syntax.work(syntax.terms.size() + syntax.identities.size() + steps.size());</span>
+<span class="fc" id="L357">            var certificate =</span>
+                    new ExtractionCertificate(
+                            ExtractionCertificate.SCHEMA_VERSION,
+                            syntax.terms,
+                            syntax.identities,
+                            steps,
+                            input,
+                            output,
+                            conclusion);
+<span class="fc" id="L366">            return new BuildResult(</span>
+<span class="fc" id="L367">                    BuildStatus.BUILT, Optional.of(certificate), &quot;built&quot;, workUsed());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

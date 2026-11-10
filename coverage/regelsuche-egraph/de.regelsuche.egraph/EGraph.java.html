@@ -52,7 +52,7 @@ import java.util.Set;
  * expose an {@code EqualitySaturationStrategy}. See
  * {@code docs/search-intelligence-roadmap.md}.&lt;/p&gt;
  */
-<span class="fc" id="L55">public final class EGraph {</span>
+public final class EGraph {
 
 <span class="fc" id="L57">    private final UnionFind unionFind = new UnionFind();</span>
     /** Map id → e-class. Stale ids (post-union) point to the merged class. */
@@ -74,16 +74,22 @@ import java.util.Set;
     /** Number of currently canonical e-classes. */
 <span class="fc" id="L75">    private int canonicalClassCount = 0;</span>
 <span class="fc" id="L76">    private int insertionLimit = Integer.MAX_VALUE;</span>
+    private final EGraphProofCapture proofCapture;
+
+<span class="fc" id="L79">    public EGraph() { this(null); }</span>
+
+    /** Only a fresh owned runner can request capture; existing graphs cannot acquire proofs. */
+<span class="fc" id="L82">    EGraph(EGraphProofCapture proofCapture) { this.proofCapture = proofCapture; }</span>
 
     /** Saturation-local insertion cap; restoring the previous limit is the caller's responsibility. */
     int setInsertionLimit(int limit) {
-<span class="fc" id="L80">        int previous = insertionLimit;</span>
-<span class="fc" id="L81">        insertionLimit = limit;</span>
-<span class="fc" id="L82">        return previous;</span>
+<span class="fc" id="L86">        int previous = insertionLimit;</span>
+<span class="fc" id="L87">        insertionLimit = limit;</span>
+<span class="fc" id="L88">        return previous;</span>
     }
 
     static final class NodeBudgetExceeded extends RuntimeException {
-<span class="fc" id="L86">        NodeBudgetExceeded() { super(&quot;e-graph node budget exhausted&quot;); }</span>
+<span class="fc" id="L92">        NodeBudgetExceeded() { super(&quot;e-graph node budget exhausted&quot;); }</span>
     }
 
 
@@ -93,27 +99,28 @@ import java.util.Set;
      * canonical id of the class that now contains this node.
      */
     public EClassId add(ENode node) {
-<span class="fc" id="L96">        Objects.requireNonNull(node, &quot;node&quot;);</span>
-<span class="fc" id="L97">        ENode canonical = node.canonicalize(unionFind);</span>
-<span class="fc" id="L98">        EClassId existing = hashCons.get(canonical);</span>
-<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (existing != null) {</span>
-<span class="fc" id="L100">            return unionFind.find(existing);</span>
+<span class="fc" id="L102">        Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc" id="L103">        ENode canonical = node.canonicalize(unionFind);</span>
+<span class="fc" id="L104">        EClassId existing = hashCons.get(canonical);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L106">            return unionFind.find(existing);</span>
         }
         // Check before mutation. An interrupted RHS may leave valid disconnected
         // subterms, but never an incomplete node or a union with that RHS.
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (nodeCount() &gt;= insertionLimit) throw new NodeBudgetExceeded();</span>
-<span class="fc" id="L105">        EClassId id = unionFind.makeSet();</span>
-<span class="fc" id="L106">        EClass eclass = new EClass(id, canonical);</span>
-<span class="fc" id="L107">        classes.put(id, eclass);</span>
-<span class="fc" id="L108">        canonicalClassCount++;</span>
-<span class="fc" id="L109">        putHashCons(canonical, id);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (nodeCount() &gt;= insertionLimit) throw new NodeBudgetExceeded();</span>
+<span class="fc" id="L111">        EClassId id = unionFind.makeSet();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (proofCapture != null) proofCapture.allocated(this, id, canonical);</span>
+<span class="fc" id="L113">        EClass eclass = new EClass(id, canonical);</span>
+<span class="fc" id="L114">        classes.put(id, eclass);</span>
+<span class="fc" id="L115">        canonicalClassCount++;</span>
+<span class="fc" id="L116">        putHashCons(canonical, id);</span>
         // record this node as a parent of each child class.
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (EClassId child : canonical.children()) {</span>
-<span class="fc" id="L112">            classOf(child).addParent(canonical);</span>
-<span class="fc" id="L113">        }</span>
-<span class="fc" id="L114">        markDirty(id);</span>
-<span class="fc" id="L115">        bumpVersion();</span>
-<span class="fc" id="L116">        return id;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (EClassId child : canonical.children()) {</span>
+<span class="fc" id="L119">            classOf(child).addParent(canonical);</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        markDirty(id);</span>
+<span class="fc" id="L122">        bumpVersion();</span>
+<span class="fc" id="L123">        return id;</span>
     }
 
     /**
@@ -121,7 +128,7 @@ import java.util.Set;
      * returned id is the e-class for the whole expression.
      */
     public EClassId addExpression(Expr expression) {
-<span class="fc" id="L124">        return addExpression(expression, List.of());</span>
+<span class="fc" id="L131">        return addExpression(expression, List.of());</span>
     }
 
     /**
@@ -133,50 +140,50 @@ import java.util.Set;
      * distinct assumption-gated identities.&lt;/p&gt;
      */
     public EClassId addExpression(Expr expression, List&lt;String&gt; assumptions) {
-<span class="fc" id="L136">        EClassId id = addExpressionInternal(expression);</span>
-<span class="fc" id="L137">        EClassId canonical = unionFind.find(id);</span>
-<span class="fc" id="L138">        AssumptionSignature newSig = AssumptionSignature.ofExpressions(assumptions);</span>
-<span class="fc" id="L139">        AssumptionSignature existing = assumptionsByClass.get(canonical);</span>
-<span class="fc bfc" id="L140" title="All 4 branches covered.">        if (existing != null &amp;&amp; !existing.fingerprint().isEmpty()</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">                &amp;&amp; !existing.fingerprint().equals(newSig.fingerprint())) {</span>
-<span class="fc" id="L142">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L143">        EClassId id = addExpressionInternal(expression);</span>
+<span class="fc" id="L144">        EClassId canonical = unionFind.find(id);</span>
+<span class="fc" id="L145">        AssumptionSignature newSig = AssumptionSignature.ofExpressions(assumptions);</span>
+<span class="fc" id="L146">        AssumptionSignature existing = assumptionsByClass.get(canonical);</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (existing != null &amp;&amp; !existing.fingerprint().isEmpty()</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                &amp;&amp; !existing.fingerprint().equals(newSig.fingerprint())) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(</span>
                 &quot;Cannot add expression under a different assumption context: &quot;
-<span class="fc" id="L144">                    + existing.fingerprint() + &quot; vs &quot; + newSig.fingerprint());</span>
+<span class="fc" id="L151">                    + existing.fingerprint() + &quot; vs &quot; + newSig.fingerprint());</span>
         }
-<span class="fc" id="L146">        assumptionsByClass.put(canonical, newSig);</span>
-<span class="fc" id="L147">        return id;</span>
+<span class="fc" id="L153">        assumptionsByClass.put(canonical, newSig);</span>
+<span class="fc" id="L154">        return id;</span>
     }
 
     private EClassId addExpressionInternal(Expr expression) {
-<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L152">            return add(ENode.leaf(&quot;num:&quot; + format(number.value())));</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L159">            return add(ENode.leaf(&quot;num:&quot; + format(number.value())));</span>
         }
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L155">            return add(ENode.leaf(&quot;var:&quot; + variable.name()));</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L162">            return add(ENode.leaf(&quot;var:&quot; + variable.name()));</span>
         }
-<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L158">            EClassId left = addExpressionInternal(binary.left());</span>
-<span class="fc" id="L159">            EClassId right = addExpressionInternal(binary.right());</span>
-<span class="fc" id="L160">            return add(new ENode(&quot;op:&quot; + binary.operator().name(), List.of(left, right)));</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L165">            EClassId left = addExpressionInternal(binary.left());</span>
+<span class="fc" id="L166">            EClassId right = addExpressionInternal(binary.right());</span>
+<span class="fc" id="L167">            return add(new ENode(&quot;op:&quot; + binary.operator().name(), List.of(left, right)));</span>
         }
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="fc" id="L163">            List&lt;EClassId&gt; arguments = new ArrayList&lt;&gt;(function.arguments().size());</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
-<span class="fc" id="L165">                arguments.add(addExpressionInternal(argument));</span>
-<span class="fc" id="L166">            }</span>
-<span class="fc" id="L167">            return add(new ENode(&quot;fn:&quot; + function.name(), arguments));</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L170">            List&lt;EClassId&gt; arguments = new ArrayList&lt;&gt;(function.arguments().size());</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L172">                arguments.add(addExpressionInternal(argument));</span>
+<span class="fc" id="L173">            }</span>
+<span class="fc" id="L174">            return add(new ENode(&quot;fn:&quot; + function.name(), arguments));</span>
         }
-<span class="nc" id="L169">        throw new IllegalArgumentException(&quot;Unsupported expression: &quot; + expression.getClass());</span>
+<span class="nc" id="L176">        throw new IllegalArgumentException(&quot;Unsupported expression: &quot; + expression.getClass());</span>
     }
 
     /** Canonical id for {@code id} (i.e. the surviving root after merges). */
     public EClassId find(EClassId id) {
-<span class="fc" id="L174">        return unionFind.find(id);</span>
+<span class="fc" id="L181">        return unionFind.find(id);</span>
     }
 
     /** {@code true} iff {@code a} and {@code b} are in the same e-class. */
     public boolean areEquivalent(EClassId a, EClassId b) {
-<span class="fc" id="L179">        return unionFind.inSameSet(a, b);</span>
+<span class="fc" id="L186">        return unionFind.inSameSet(a, b);</span>
     }
 
     /**
@@ -185,26 +192,26 @@ import java.util.Set;
      * closure afterward. Returns the surviving canonical id.
      */
     public EClassId union(EClassId a, EClassId b) {
-<span class="fc" id="L188">        EClassId rootA = unionFind.find(a);</span>
-<span class="fc" id="L189">        EClassId rootB = unionFind.find(b);</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (rootA.equals(rootB)) {</span>
-<span class="nc" id="L191">            return rootA;</span>
+<span class="fc" id="L195">        EClassId rootA = unionFind.find(a);</span>
+<span class="fc" id="L196">        EClassId rootB = unionFind.find(b);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (rootA.equals(rootB)) {</span>
+<span class="nc" id="L198">            return rootA;</span>
         }
-<span class="fc" id="L193">        AssumptionSignature assumptionsA = assumptionsFor(rootA);</span>
-<span class="fc" id="L194">        AssumptionSignature assumptionsB = assumptionsFor(rootB);</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (!assumptionsA.fingerprint().equals(assumptionsB.fingerprint())) {</span>
-<span class="fc" id="L196">            throw new IllegalArgumentException(&quot;Cannot merge e-classes with incompatible assumptions: &quot;</span>
-<span class="fc" id="L197">                + assumptionsA.fingerprint() + &quot; vs &quot; + assumptionsB.fingerprint());</span>
+<span class="fc" id="L200">        AssumptionSignature assumptionsA = assumptionsFor(rootA);</span>
+<span class="fc" id="L201">        AssumptionSignature assumptionsB = assumptionsFor(rootB);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (!assumptionsA.fingerprint().equals(assumptionsB.fingerprint())) {</span>
+<span class="fc" id="L203">            throw new IllegalArgumentException(&quot;Cannot merge e-classes with incompatible assumptions: &quot;</span>
+<span class="fc" id="L204">                + assumptionsA.fingerprint() + &quot; vs &quot; + assumptionsB.fingerprint());</span>
         }
-<span class="fc" id="L199">        EClassId survivor = mergeClasses(rootA, rootB);</span>
-<span class="fc" id="L200">        assumptionsByClass.put(survivor, assumptionsA);</span>
-<span class="fc" id="L201">        worklist.add(survivor);</span>
-<span class="fc" id="L202">        return survivor;</span>
+<span class="fc" id="L206">        EClassId survivor = mergeClasses(rootA, rootB);</span>
+<span class="fc" id="L207">        assumptionsByClass.put(survivor, assumptionsA);</span>
+<span class="fc" id="L208">        worklist.add(survivor);</span>
+<span class="fc" id="L209">        return survivor;</span>
     }
 
     /** Assumptions attached to the canonical e-class for {@code id}. */
     public AssumptionSignature assumptionsFor(EClassId id) {
-<span class="fc" id="L207">        return assumptionsByClass.getOrDefault(unionFind.find(id), new AssumptionSignature(List.of(), &quot;&quot;));</span>
+<span class="fc" id="L214">        return assumptionsByClass.getOrDefault(unionFind.find(id), new AssumptionSignature(List.of(), &quot;&quot;));</span>
     }
 
     /**
@@ -213,70 +220,70 @@ import java.util.Set;
      * twice in a row is a no-op the second time.
      */
     public void rebuild() {
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        while (!worklist.isEmpty()) {</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        while (!worklist.isEmpty()) {</span>
             // De-duplicate by canonical id — multiple unions may target
             // the same class.
-<span class="fc" id="L219">            LinkedHashSet&lt;EClassId&gt; todo = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">            while (!worklist.isEmpty()) {</span>
-<span class="fc" id="L221">                todo.add(unionFind.find(worklist.pop()));</span>
+<span class="fc" id="L226">            LinkedHashSet&lt;EClassId&gt; todo = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            while (!worklist.isEmpty()) {</span>
+<span class="fc" id="L228">                todo.add(unionFind.find(worklist.pop()));</span>
             }
-<span class="fc bfc" id="L223" title="All 2 branches covered.">            for (EClassId id : todo) {</span>
-<span class="fc" id="L224">                repair(id);</span>
-<span class="fc" id="L225">            }</span>
-<span class="fc" id="L226">        }</span>
-<span class="fc" id="L227">    }</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (EClassId id : todo) {</span>
+<span class="fc" id="L231">                repair(id);</span>
+<span class="fc" id="L232">            }</span>
+<span class="fc" id="L233">        }</span>
+<span class="fc" id="L234">    }</span>
 
     /** Snapshot of every &lt;em&gt;canonical&lt;/em&gt; e-class. */
     public Collection&lt;EClass&gt; classes() {
-<span class="fc" id="L231">        LinkedHashSet&lt;EClassId&gt; seen = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L232">        List&lt;EClass&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (EClassId raw : classes.keySet()) {</span>
-<span class="fc" id="L234">            EClassId canonical = unionFind.find(raw);</span>
-<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (seen.add(canonical)) {</span>
-<span class="fc" id="L236">                result.add(classes.get(canonical));</span>
+<span class="fc" id="L238">        LinkedHashSet&lt;EClassId&gt; seen = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L239">        List&lt;EClass&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (EClassId raw : classes.keySet()) {</span>
+<span class="fc" id="L241">            EClassId canonical = unionFind.find(raw);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (seen.add(canonical)) {</span>
+<span class="fc" id="L243">                result.add(classes.get(canonical));</span>
             }
-<span class="fc" id="L238">        }</span>
-<span class="fc" id="L239">        return Collections.unmodifiableList(result);</span>
+<span class="fc" id="L245">        }</span>
+<span class="fc" id="L246">        return Collections.unmodifiableList(result);</span>
     }
 
     /** Direct O(1) lookup of the canonical e-class for {@code id}. */
     public EClass classOrThrow(EClassId id) {
-<span class="fc" id="L244">        return classOf(id);</span>
+<span class="fc" id="L251">        return classOf(id);</span>
     }
 
     /** E-graph change counter used to invalidate matcher memoization. */
     public long version() {
-<span class="fc" id="L249">        return version;</span>
+<span class="fc" id="L256">        return version;</span>
     }
 
     /** Signature index lookup for candidate selection in pattern matching. */
     public Collection&lt;EClassId&gt; classesWith(ENodeSignature signature) {
-<span class="fc" id="L254">        Objects.requireNonNull(signature, &quot;signature&quot;);</span>
-<span class="fc" id="L255">        LinkedHashSet&lt;EClassId&gt; indexed = signatureIndex.get(signature);</span>
-<span class="pc bpc" id="L256" title="1 of 4 branches missed.">        if (indexed == null || indexed.isEmpty()) {</span>
-<span class="fc" id="L257">            return List.of();</span>
+<span class="fc" id="L261">        Objects.requireNonNull(signature, &quot;signature&quot;);</span>
+<span class="fc" id="L262">        LinkedHashSet&lt;EClassId&gt; indexed = signatureIndex.get(signature);</span>
+<span class="pc bpc" id="L263" title="1 of 4 branches missed.">        if (indexed == null || indexed.isEmpty()) {</span>
+<span class="fc" id="L264">            return List.of();</span>
         }
-<span class="fc" id="L259">        return dedupeCanonical(indexed);</span>
+<span class="fc" id="L266">        return dedupeCanonical(indexed);</span>
     }
 
     /** Prefix lookup (e.g. {@code num:*}) for pattern candidate selection. */
     public Collection&lt;EClassId&gt; classesWithSymbolPrefix(String symbolPrefix, int arity) {
-<span class="nc" id="L264">        Objects.requireNonNull(symbolPrefix, &quot;symbolPrefix&quot;);</span>
-<span class="nc" id="L265">        LinkedHashSet&lt;EClassId&gt; hits = new LinkedHashSet&lt;&gt;();</span>
-<span class="nc bnc" id="L266" title="All 2 branches missed.">        for (Map.Entry&lt;ENodeSignature, LinkedHashSet&lt;EClassId&gt;&gt; entry : signatureIndex.entrySet()) {</span>
-<span class="nc" id="L267">            ENodeSignature signature = entry.getKey();</span>
-<span class="nc bnc" id="L268" title="All 4 branches missed.">            if (signature.arity() == arity &amp;&amp; signature.symbol().startsWith(symbolPrefix)) {</span>
-<span class="nc" id="L269">                hits.addAll(entry.getValue());</span>
+<span class="nc" id="L271">        Objects.requireNonNull(symbolPrefix, &quot;symbolPrefix&quot;);</span>
+<span class="nc" id="L272">        LinkedHashSet&lt;EClassId&gt; hits = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        for (Map.Entry&lt;ENodeSignature, LinkedHashSet&lt;EClassId&gt;&gt; entry : signatureIndex.entrySet()) {</span>
+<span class="nc" id="L274">            ENodeSignature signature = entry.getKey();</span>
+<span class="nc bnc" id="L275" title="All 4 branches missed.">            if (signature.arity() == arity &amp;&amp; signature.symbol().startsWith(symbolPrefix)) {</span>
+<span class="nc" id="L276">                hits.addAll(entry.getValue());</span>
             }
-<span class="nc" id="L271">        }</span>
-<span class="nc" id="L272">        return dedupeCanonical(hits);</span>
+<span class="nc" id="L278">        }</span>
+<span class="nc" id="L279">        return dedupeCanonical(hits);</span>
     }
 
     /** Consume and clear the set of classes changed since the last call. */
     public Collection&lt;EClassId&gt; consumeDirtyClasses() {
-<span class="fc" id="L277">        Collection&lt;EClassId&gt; snapshot = dedupeCanonical(dirtyClasses);</span>
-<span class="fc" id="L278">        dirtyClasses.clear();</span>
-<span class="fc" id="L279">        return snapshot;</span>
+<span class="fc" id="L284">        Collection&lt;EClassId&gt; snapshot = dedupeCanonical(dirtyClasses);</span>
+<span class="fc" id="L285">        dirtyClasses.clear();</span>
+<span class="fc" id="L286">        return snapshot;</span>
     }
 
     /**
@@ -286,41 +293,41 @@ import java.util.Set;
      * fine-grained cache invalidation without stealing the saturation worklist.&lt;/p&gt;
      */
     public Collection&lt;EClassId&gt; affectedClassesChangedAfter(long versionExclusive) {
-<span class="fc" id="L289">        LinkedHashSet&lt;EClassId&gt; changed = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L290" title="All 2 branches covered.">        for (Map.Entry&lt;EClassId, Long&gt; entry : classChangeVersions.entrySet()) {</span>
-<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (entry.getValue() &gt; versionExclusive) {</span>
-<span class="fc" id="L292">                changed.add(unionFind.find(entry.getKey()));</span>
+<span class="fc" id="L296">        LinkedHashSet&lt;EClassId&gt; changed = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (Map.Entry&lt;EClassId, Long&gt; entry : classChangeVersions.entrySet()) {</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (entry.getValue() &gt; versionExclusive) {</span>
+<span class="fc" id="L299">                changed.add(unionFind.find(entry.getKey()));</span>
             }
-<span class="fc" id="L294">        }</span>
-<span class="fc" id="L295">        LinkedHashSet&lt;EClassId&gt; affected = new LinkedHashSet&lt;&gt;(dedupeCanonical(changed));</span>
-<span class="fc" id="L296">        ArrayDeque&lt;EClassId&gt; queue = new ArrayDeque&lt;&gt;(affected);</span>
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        while (!queue.isEmpty()) {</span>
-<span class="fc" id="L298">            EClassId id = queue.removeFirst();</span>
-<span class="fc" id="L299">            EClass eclass = classes.get(unionFind.find(id));</span>
-<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (eclass == null) {</span>
-<span class="nc" id="L301">                continue;</span>
+<span class="fc" id="L301">        }</span>
+<span class="fc" id="L302">        LinkedHashSet&lt;EClassId&gt; affected = new LinkedHashSet&lt;&gt;(dedupeCanonical(changed));</span>
+<span class="fc" id="L303">        ArrayDeque&lt;EClassId&gt; queue = new ArrayDeque&lt;&gt;(affected);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        while (!queue.isEmpty()) {</span>
+<span class="fc" id="L305">            EClassId id = queue.removeFirst();</span>
+<span class="fc" id="L306">            EClass eclass = classes.get(unionFind.find(id));</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (eclass == null) {</span>
+<span class="nc" id="L308">                continue;</span>
             }
-<span class="fc bfc" id="L303" title="All 2 branches covered.">            for (ENode parent : eclass.parents()) {</span>
-<span class="fc" id="L304">                EClassId owner = hashCons.get(parent.canonicalize(unionFind));</span>
-<span class="fc bfc" id="L305" title="All 2 branches covered.">                if (owner != null) {</span>
-<span class="fc" id="L306">                    EClassId canonicalOwner = unionFind.find(owner);</span>
-<span class="fc bfc" id="L307" title="All 2 branches covered.">                    if (affected.add(canonicalOwner)) {</span>
-<span class="fc" id="L308">                        queue.addLast(canonicalOwner);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (ENode parent : eclass.parents()) {</span>
+<span class="fc" id="L311">                EClassId owner = hashCons.get(parent.canonicalize(unionFind));</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                if (owner != null) {</span>
+<span class="fc" id="L313">                    EClassId canonicalOwner = unionFind.find(owner);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">                    if (affected.add(canonicalOwner)) {</span>
+<span class="fc" id="L315">                        queue.addLast(canonicalOwner);</span>
                     }
                 }
-<span class="fc" id="L311">            }</span>
-<span class="fc" id="L312">        }</span>
-<span class="fc" id="L313">        return dedupeCanonical(affected);</span>
+<span class="fc" id="L318">            }</span>
+<span class="fc" id="L319">        }</span>
+<span class="fc" id="L320">        return dedupeCanonical(affected);</span>
     }
 
     /** Number of distinct e-classes (after rebuild). */
     public int classCount() {
-<span class="fc" id="L318">        return canonicalClassCount;</span>
+<span class="fc" id="L325">        return canonicalClassCount;</span>
     }
 
     /** Number of distinct e-nodes currently hash-consed. */
     public int nodeCount() {
-<span class="fc" id="L323">        return hashCons.size();</span>
+<span class="fc" id="L330">        return hashCons.size();</span>
     }
 
     /**
@@ -335,13 +342,18 @@ import java.util.Set;
      * stabilises.&lt;/p&gt;
      */
     public Expr extract(EClassId id, java.util.function.ToIntFunction&lt;ENode&gt; costOfNode) {
-<span class="fc" id="L338">        EClassId canonical = unionFind.find(id);</span>
-<span class="fc" id="L339">        ExtractionChoices choices = extractionChoices(costOfNode);</span>
-<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (!choices.nodes().containsKey(canonical)) {</span>
-<span class="fc" id="L341">            throw new IllegalStateException(&quot;No extractable node in e-class &quot; + canonical</span>
+<span class="fc" id="L345">        EClassId canonical = unionFind.find(id);</span>
+<span class="fc" id="L346">        ExtractionChoices choices = extractionChoices(costOfNode);</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (!choices.nodes().containsKey(canonical)) {</span>
+<span class="fc" id="L348">            throw new IllegalStateException(&quot;No extractable node in e-class &quot; + canonical</span>
                 + &quot; — every node has unavailable cost or unresolved children&quot;);
         }
-<span class="fc" id="L344">        return buildExpression(canonical, choices.nodes());</span>
+<span class="fc" id="L351">        return buildExpression(canonical, choices.nodes());</span>
+    }
+
+    int extractProofTerm(EClassId id, java.util.function.ToIntFunction&lt;ENode&gt; costOfNode) {
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        if (proofCapture == null) throw new IllegalStateException(&quot;proof capture was not requested&quot;);</span>
+<span class="fc" id="L356">        return proofCapture.selectedTerm(this, id, extractionChoices(costOfNode).nodes());</span>
     }
 
     /**
@@ -351,84 +363,106 @@ import java.util.Set;
      * unavailable class has an empty representative list.
      */
     public List&lt;Expr&gt; representatives(EClassId id, java.util.function.ToIntFunction&lt;ENode&gt; costOfNode) {
-<span class="fc" id="L354">        EClass eclass = classOf(id);</span>
-<span class="fc" id="L355">        ExtractionChoices choices = extractionChoices(costOfNode);</span>
-<span class="fc" id="L356">        LinkedHashSet&lt;Expr&gt; result = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L357" title="All 2 branches covered.">        for (ENode node : eclass.nodes()) {</span>
-<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (extractionCost(node, costOfNode, choices.costs()) &lt; Integer.MAX_VALUE) {</span>
-<span class="fc" id="L359">                result.add(nodeToExpr(node, choices.nodes()));</span>
+<span class="fc" id="L366">        EClass eclass = classOf(id);</span>
+<span class="fc" id="L367">        ExtractionChoices choices = extractionChoices(costOfNode);</span>
+<span class="fc" id="L368">        LinkedHashSet&lt;Expr&gt; result = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        for (ENode node : eclass.nodes()) {</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">            if (extractionCost(node, costOfNode, choices.costs()) &lt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L371">                result.add(nodeToExpr(node, choices.nodes()));</span>
             }
-<span class="fc" id="L361">        }</span>
-<span class="fc" id="L362">        return List.copyOf(result);</span>
+<span class="fc" id="L373">        }</span>
+<span class="fc" id="L374">        return List.copyOf(result);</span>
     }
 
-<span class="fc" id="L365">    private record ExtractionChoices(Map&lt;EClassId, Integer&gt; costs, Map&lt;EClassId, ENode&gt; nodes) {}</span>
+<span class="fc" id="L377">    private record ExtractionChoices(Map&lt;EClassId, Integer&gt; costs, Map&lt;EClassId, ENode&gt; nodes) {}</span>
 
     private ExtractionChoices extractionChoices(java.util.function.ToIntFunction&lt;ENode&gt; costOfNode) {
-<span class="fc" id="L368">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
-<span class="fc" id="L369">        Map&lt;EClassId, Integer&gt; bestCost = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L370">        Map&lt;EClassId, ENode&gt; bestNode = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L371" title="All 2 branches covered.">        for (EClass eclass : classes()) {</span>
-<span class="fc" id="L372">            bestCost.put(eclass.id(), Integer.MAX_VALUE);</span>
-<span class="fc" id="L373">        }</span>
-<span class="fc" id="L374">        boolean changed = true;</span>
-<span class="fc bfc" id="L375" title="All 2 branches covered.">        while (changed) {</span>
-<span class="fc" id="L376">            changed = false;</span>
-<span class="fc bfc" id="L377" title="All 2 branches covered.">            for (EClass eclass : classes()) {</span>
-<span class="fc bfc" id="L378" title="All 2 branches covered.">                for (ENode node : eclass.nodes()) {</span>
-<span class="fc" id="L379">                    int totalInt = extractionCost(node, costOfNode, bestCost);</span>
-<span class="fc bfc" id="L380" title="All 2 branches covered.">                    if (totalInt &lt; bestCost.get(eclass.id())) {</span>
-<span class="fc" id="L381">                        bestCost.put(eclass.id(), totalInt);</span>
-<span class="fc" id="L382">                        bestNode.put(eclass.id(), node);</span>
-<span class="fc" id="L383">                        changed = true;</span>
+<span class="fc" id="L380">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
+<span class="fc" id="L381">        Map&lt;EClassId, Integer&gt; bestCost = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L382">        Map&lt;EClassId, ENode&gt; bestNode = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (EClass eclass : extractionClasses()) {</span>
+<span class="fc" id="L384">            chargeExtraction(1);</span>
+<span class="fc" id="L385">            bestCost.put(eclass.id(), Integer.MAX_VALUE);</span>
+<span class="fc" id="L386">        }</span>
+<span class="fc" id="L387">        boolean changed = true;</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        while (changed) {</span>
+<span class="fc" id="L389">            changed = false;</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">            for (EClass eclass : extractionClasses()) {</span>
+<span class="fc" id="L391">                chargeExtraction(1);</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">                for (ENode node : eclass.nodes()) {</span>
+<span class="fc" id="L393">                    int totalInt = extractionCost(node, costOfNode, bestCost);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">                    if (totalInt &lt; bestCost.get(eclass.id())) {</span>
+<span class="fc" id="L395">                        bestCost.put(eclass.id(), totalInt);</span>
+<span class="fc" id="L396">                        bestNode.put(eclass.id(), node);</span>
+<span class="fc" id="L397">                        changed = true;</span>
                     }
-<span class="fc" id="L385">                }</span>
-<span class="fc" id="L386">            }</span>
+<span class="fc" id="L399">                }</span>
+<span class="fc" id="L400">            }</span>
         }
-<span class="fc" id="L388">        return new ExtractionChoices(bestCost, bestNode);</span>
+<span class="fc" id="L402">        return new ExtractionChoices(bestCost, bestNode);</span>
     }
 
     /** Validate the objective without requiring an initially extractable root. */
     void validateNodeCosts(java.util.function.ToIntFunction&lt;ENode&gt; costOfNode) {
-<span class="fc" id="L393">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
-<span class="fc bfc" id="L394" title="All 2 branches covered.">        for (EClass eclass : classes()) {</span>
-<span class="fc bfc" id="L395" title="All 2 branches covered.">            for (ENode node : eclass.nodes()) validatedNodeCost(node, costOfNode);</span>
-<span class="fc" id="L396">        }</span>
-<span class="fc" id="L397">    }</span>
+<span class="fc" id="L407">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        for (EClass eclass : extractionClasses()) {</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">            for (ENode node : eclass.nodes()) {</span>
+<span class="fc" id="L410">                chargeExtraction(1);</span>
+<span class="fc" id="L411">                validatedNodeCost(node, costOfNode);</span>
+<span class="fc" id="L412">            }</span>
+<span class="fc" id="L413">        }</span>
+<span class="fc" id="L414">    }</span>
+
+    private Collection&lt;EClass&gt; extractionClasses() {
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (proofCapture == null) return classes();</span>
+<span class="fc" id="L418">        var seen = new LinkedHashSet&lt;EClassId&gt;();</span>
+<span class="fc" id="L419">        List&lt;EClass&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        for (EClassId raw : classes.keySet()) {</span>
+<span class="fc" id="L421">            chargeExtraction(1);</span>
+<span class="fc" id="L422">            EClassId canonical = unionFind.find(raw);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (seen.add(canonical)) result.add(classes.get(canonical));</span>
+<span class="fc" id="L424">        }</span>
+<span class="fc" id="L425">        return result;</span>
+    }
 
     private static int validatedNodeCost(ENode node, java.util.function.ToIntFunction&lt;ENode&gt; costOfNode) {
-<span class="fc" id="L400">        int cost = costOfNode.applyAsInt(node);</span>
-<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (cost &lt; 0) throw new IllegalArgumentException(&quot;Additive extraction requires non-negative node costs&quot;);</span>
-<span class="fc" id="L402">        return cost;</span>
+<span class="fc" id="L429">        int cost = costOfNode.applyAsInt(node);</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        if (cost &lt; 0) throw new IllegalArgumentException(&quot;Additive extraction requires non-negative node costs&quot;);</span>
+<span class="fc" id="L431">        return cost;</span>
     }
 
     private int extractionCost(ENode node, java.util.function.ToIntFunction&lt;ENode&gt; costOfNode,
             Map&lt;EClassId, Integer&gt; bestCost) {
-<span class="fc" id="L407">        long total = validatedNodeCost(node, costOfNode);</span>
-<span class="fc bfc" id="L408" title="All 2 branches covered.">        if (total == Integer.MAX_VALUE) {</span>
-<span class="fc" id="L409">            return Integer.MAX_VALUE;</span>
+<span class="fc" id="L436">        chargeExtraction(1L + node.children().size());</span>
+<span class="fc" id="L437">        long total = validatedNodeCost(node, costOfNode);</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        if (total == Integer.MAX_VALUE) {</span>
+<span class="fc" id="L439">            return Integer.MAX_VALUE;</span>
         }
-<span class="fc bfc" id="L411" title="All 2 branches covered.">        for (EClassId child : node.children()) {</span>
-<span class="fc" id="L412">            Integer cost = bestCost.get(unionFind.find(child));</span>
-<span class="pc bpc" id="L413" title="1 of 4 branches missed.">            if (cost == null || cost == Integer.MAX_VALUE) {</span>
-<span class="fc" id="L414">                return Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        for (EClassId child : node.children()) {</span>
+<span class="fc" id="L442">            Integer cost = bestCost.get(unionFind.find(child));</span>
+<span class="pc bpc" id="L443" title="1 of 4 branches missed.">            if (cost == null || cost == Integer.MAX_VALUE) {</span>
+<span class="fc" id="L444">                return Integer.MAX_VALUE;</span>
             }
-<span class="fc" id="L416">            total += cost;</span>
-<span class="fc bfc" id="L417" title="All 2 branches covered.">            if (total &gt;= Integer.MAX_VALUE) {</span>
-<span class="fc" id="L418">                return Integer.MAX_VALUE;</span>
+<span class="fc" id="L446">            total += cost;</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">            if (total &gt;= Integer.MAX_VALUE) {</span>
+<span class="fc" id="L448">                return Integer.MAX_VALUE;</span>
             }
-<span class="fc" id="L420">        }</span>
-<span class="fc" id="L421">        return (int) Math.min(total, Integer.MAX_VALUE - 1);</span>
+<span class="fc" id="L450">        }</span>
+<span class="fc" id="L451">        return (int) Math.min(total, Integer.MAX_VALUE - 1);</span>
     }
+
+    private void chargeExtraction(long units) {
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (proofCapture != null) proofCapture.charge(units);</span>
+<span class="fc" id="L456">    }</span>
 
     // --- internal -----------------------------------------------------------
 
     private EClass classOf(EClassId id) {
-<span class="fc" id="L427">        EClass eclass = classes.get(unionFind.find(id));</span>
-<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        if (eclass == null) {</span>
-<span class="nc" id="L429">            throw new IllegalStateException(&quot;Unknown e-class &quot; + id);</span>
+<span class="fc" id="L461">        EClass eclass = classes.get(unionFind.find(id));</span>
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">        if (eclass == null) {</span>
+<span class="nc" id="L463">            throw new IllegalStateException(&quot;Unknown e-class &quot; + id);</span>
         }
-<span class="fc" id="L431">        return eclass;</span>
+<span class="fc" id="L465">        return eclass;</span>
     }
 
     /**
@@ -437,189 +471,189 @@ import java.util.Set;
      * uniqueness is restored.
      */
     private void repair(EClassId id) {
-<span class="fc" id="L440">        EClass eclass = classOf(id);</span>
+<span class="fc" id="L474">        EClass eclass = classOf(id);</span>
         // 1. re-canonicalize the parents, looking for new congruences.
-<span class="fc" id="L442">        Map&lt;ENode, EClassId&gt; newParents = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L443" title="All 2 branches covered.">        for (ENode parent : new ArrayList&lt;&gt;(eclass.parents())) {</span>
-<span class="fc" id="L444">            ENode parentCanonical = parent.canonicalize(unionFind);</span>
-<span class="fc" id="L445">            EClassId hit = removeHashCons(parent);</span>
-<span class="fc bfc" id="L446" title="All 2 branches covered.">            if (hit != null) {</span>
-<span class="fc" id="L447">                putHashCons(parentCanonical, unionFind.find(hit));</span>
-<span class="fc" id="L448">                markDirty(hit);</span>
+<span class="fc" id="L476">        Map&lt;ENode, EClassId&gt; newParents = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        for (ENode parent : new ArrayList&lt;&gt;(eclass.parents())) {</span>
+<span class="fc" id="L478">            ENode parentCanonical = parent.canonicalize(unionFind);</span>
+<span class="fc" id="L479">            EClassId hit = removeHashCons(parent);</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">            if (hit != null) {</span>
+<span class="fc" id="L481">                putHashCons(parentCanonical, unionFind.find(hit));</span>
+<span class="fc" id="L482">                markDirty(hit);</span>
             }
-<span class="fc" id="L450">            EClassId alreadyOwned = newParents.get(parentCanonical);</span>
-<span class="fc bfc" id="L451" title="All 2 branches covered.">            if (alreadyOwned != null) {</span>
+<span class="fc" id="L484">            EClassId alreadyOwned = newParents.get(parentCanonical);</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">            if (alreadyOwned != null) {</span>
                 // Same parent shape, different ids before canonicalization —
                 // congruence! merge.
-<span class="fc bfc" id="L454" title="All 2 branches covered.">                EClassId here = unionFind.find(hit == null ? alreadyOwned : hit);</span>
-<span class="fc" id="L455">                EClassId there = unionFind.find(alreadyOwned);</span>
-<span class="fc bfc" id="L456" title="All 2 branches covered.">                if (!here.equals(there)) {</span>
-<span class="fc" id="L457">                    EClassId survivor = mergeClasses(here, there);</span>
-<span class="fc" id="L458">                    worklist.add(survivor);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">                EClassId here = unionFind.find(hit == null ? alreadyOwned : hit);</span>
+<span class="fc" id="L489">                EClassId there = unionFind.find(alreadyOwned);</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">                if (!here.equals(there)) {</span>
+<span class="fc" id="L491">                    EClassId survivor = mergeClasses(here, there);</span>
+<span class="fc" id="L492">                    worklist.add(survivor);</span>
                 }
-<span class="fc" id="L460">                newParents.put(parentCanonical, unionFind.find(here));</span>
-<span class="fc" id="L461">            } else {</span>
-<span class="fc bfc" id="L462" title="All 2 branches covered.">                newParents.put(parentCanonical, hit == null ? null : unionFind.find(hit));</span>
+<span class="fc" id="L494">                newParents.put(parentCanonical, unionFind.find(here));</span>
+<span class="fc" id="L495">            } else {</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">                newParents.put(parentCanonical, hit == null ? null : unionFind.find(hit));</span>
             }
-<span class="fc" id="L464">        }</span>
-<span class="fc" id="L465">        eclass.clearParents();</span>
-<span class="fc bfc" id="L466" title="All 2 branches covered.">        for (ENode parent : newParents.keySet()) {</span>
-<span class="fc" id="L467">            eclass.addParent(parent);</span>
-<span class="fc" id="L468">        }</span>
+<span class="fc" id="L498">        }</span>
+<span class="fc" id="L499">        eclass.clearParents();</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        for (ENode parent : newParents.keySet()) {</span>
+<span class="fc" id="L501">            eclass.addParent(parent);</span>
+<span class="fc" id="L502">        }</span>
         // 2. re-canonicalize this class' own nodes so each canonical node
         // appears exactly once across the whole graph.
-<span class="fc" id="L471">        LinkedHashSet&lt;ENode&gt; dedup = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L472" title="All 2 branches covered.">        for (ENode node : eclass.nodes()) {</span>
-<span class="fc" id="L473">            ENode canonical = node.canonicalize(unionFind);</span>
-<span class="fc" id="L474">            dedup.add(canonical);</span>
-<span class="fc" id="L475">            EClassId owner = hashCons.get(canonical);</span>
-<span class="fc bfc" id="L476" title="All 2 branches covered.">            if (owner == null) {</span>
-<span class="fc" id="L477">                putHashCons(canonical, eclass.id());</span>
-<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            } else if (!unionFind.find(owner).equals(eclass.id())) {</span>
+<span class="fc" id="L505">        LinkedHashSet&lt;ENode&gt; dedup = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        for (ENode node : eclass.nodes()) {</span>
+<span class="fc" id="L507">            ENode canonical = node.canonicalize(unionFind);</span>
+<span class="fc" id="L508">            dedup.add(canonical);</span>
+<span class="fc" id="L509">            EClassId owner = hashCons.get(canonical);</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">            if (owner == null) {</span>
+<span class="fc" id="L511">                putHashCons(canonical, eclass.id());</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">            } else if (!unionFind.find(owner).equals(eclass.id())) {</span>
                 // Two classes claim the same canonical node → congruence.
-<span class="nc" id="L480">                EClassId survivor = mergeClasses(eclass.id(), owner);</span>
-<span class="nc" id="L481">                worklist.add(survivor);</span>
+<span class="nc" id="L514">                EClassId survivor = mergeClasses(eclass.id(), owner);</span>
+<span class="nc" id="L515">                worklist.add(survivor);</span>
             }
-<span class="fc" id="L483">        }</span>
-<span class="fc" id="L484">        eclass.replaceNodes(dedup);</span>
-<span class="fc" id="L485">        markDirty(eclass.id());</span>
-<span class="fc" id="L486">    }</span>
+<span class="fc" id="L517">        }</span>
+<span class="fc" id="L518">        eclass.replaceNodes(dedup);</span>
+<span class="fc" id="L519">        markDirty(eclass.id());</span>
+<span class="fc" id="L520">    }</span>
 
     private Expr buildExpression(EClassId canonical, Map&lt;EClassId, ENode&gt; bestNode) {
-<span class="fc" id="L489">        ENode node = bestNode.get(canonical);</span>
-<span class="fc" id="L490">        return nodeToExpr(node, bestNode);</span>
+<span class="fc" id="L523">        ENode node = bestNode.get(canonical);</span>
+<span class="fc" id="L524">        return nodeToExpr(node, bestNode);</span>
     }
 
     private Expr nodeToExpr(ENode node, Map&lt;EClassId, ENode&gt; bestNode) {
-<span class="fc" id="L494">        String symbol = node.symbol();</span>
-<span class="fc bfc" id="L495" title="All 2 branches covered.">        if (symbol.startsWith(&quot;num:&quot;)) {</span>
-<span class="fc" id="L496">            return new NumberExpr(de.regelsuche.scalar.ExactRational.fromCanonicalText(symbol.substring(4)));</span>
+<span class="fc" id="L528">        String symbol = node.symbol();</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        if (symbol.startsWith(&quot;num:&quot;)) {</span>
+<span class="fc" id="L530">            return new NumberExpr(de.regelsuche.scalar.ExactRational.fromCanonicalText(symbol.substring(4)));</span>
         }
-<span class="fc bfc" id="L498" title="All 2 branches covered.">        if (symbol.startsWith(&quot;var:&quot;)) {</span>
-<span class="fc" id="L499">            return new VariableExpr(symbol.substring(4));</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">        if (symbol.startsWith(&quot;var:&quot;)) {</span>
+<span class="fc" id="L533">            return new VariableExpr(symbol.substring(4));</span>
         }
-<span class="fc bfc" id="L501" title="All 2 branches covered.">        if (symbol.startsWith(&quot;op:&quot;)) {</span>
-<span class="fc" id="L502">            de.regelsuche.ast.BinaryOperator operator = de.regelsuche.ast.BinaryOperator.valueOf(symbol.substring(3));</span>
-<span class="fc" id="L503">            Expr left = buildExpression(unionFind.find(node.children().get(0)), bestNode);</span>
-<span class="fc" id="L504">            Expr right = buildExpression(unionFind.find(node.children().get(1)), bestNode);</span>
-<span class="fc" id="L505">            return new BinaryExpr(left, operator, right);</span>
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        if (symbol.startsWith(&quot;op:&quot;)) {</span>
+<span class="fc" id="L536">            de.regelsuche.ast.BinaryOperator operator = de.regelsuche.ast.BinaryOperator.valueOf(symbol.substring(3));</span>
+<span class="fc" id="L537">            Expr left = buildExpression(unionFind.find(node.children().get(0)), bestNode);</span>
+<span class="fc" id="L538">            Expr right = buildExpression(unionFind.find(node.children().get(1)), bestNode);</span>
+<span class="fc" id="L539">            return new BinaryExpr(left, operator, right);</span>
         }
-<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (symbol.startsWith(&quot;fn:&quot;)) {</span>
-<span class="fc" id="L508">            String name = symbol.substring(3);</span>
-<span class="fc" id="L509">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(node.children().size());</span>
-<span class="fc bfc" id="L510" title="All 2 branches covered.">            for (EClassId argument : node.children()) {</span>
-<span class="fc" id="L511">                arguments.add(buildExpression(unionFind.find(argument), bestNode));</span>
-<span class="fc" id="L512">            }</span>
-<span class="fc" id="L513">            return new FunctionExpr(name, arguments);</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        if (symbol.startsWith(&quot;fn:&quot;)) {</span>
+<span class="fc" id="L542">            String name = symbol.substring(3);</span>
+<span class="fc" id="L543">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(node.children().size());</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">            for (EClassId argument : node.children()) {</span>
+<span class="fc" id="L545">                arguments.add(buildExpression(unionFind.find(argument), bestNode));</span>
+<span class="fc" id="L546">            }</span>
+<span class="fc" id="L547">            return new FunctionExpr(name, arguments);</span>
         }
-<span class="nc" id="L515">        throw new IllegalStateException(&quot;Unknown e-node symbol: &quot; + symbol);</span>
+<span class="nc" id="L549">        throw new IllegalStateException(&quot;Unknown e-node symbol: &quot; + symbol);</span>
     }
 
     private static String format(de.regelsuche.scalar.ExactRational value) {
-<span class="fc" id="L519">        return value.canonicalText();</span>
+<span class="fc" id="L553">        return value.canonicalText();</span>
     }
 
     /** Diagnostic dump — useful in tests. */
     @Override
     public String toString() {
-<span class="nc" id="L525">        StringBuilder builder = new StringBuilder(&quot;EGraph{classes=&quot;).append(classCount())</span>
-<span class="nc" id="L526">            .append(&quot;, nodes=&quot;).append(nodeCount()).append('}');</span>
-<span class="nc bnc" id="L527" title="All 2 branches missed.">        for (EClass eclass : classes()) {</span>
-<span class="nc" id="L528">            builder.append(&quot;\n  &quot;).append(eclass);</span>
-<span class="nc" id="L529">        }</span>
-<span class="nc" id="L530">        return builder.toString();</span>
+<span class="nc" id="L559">        StringBuilder builder = new StringBuilder(&quot;EGraph{classes=&quot;).append(classCount())</span>
+<span class="nc" id="L560">            .append(&quot;, nodes=&quot;).append(nodeCount()).append('}');</span>
+<span class="nc bnc" id="L561" title="All 2 branches missed.">        for (EClass eclass : classes()) {</span>
+<span class="nc" id="L562">            builder.append(&quot;\n  &quot;).append(eclass);</span>
+<span class="nc" id="L563">        }</span>
+<span class="nc" id="L564">        return builder.toString();</span>
     }
 
     private EClassId mergeClasses(EClassId left, EClassId right) {
-<span class="fc" id="L534">        EClassId rootLeft = unionFind.find(left);</span>
-<span class="fc" id="L535">        EClassId rootRight = unionFind.find(right);</span>
-<span class="pc bpc" id="L536" title="1 of 2 branches missed.">        if (rootLeft.equals(rootRight)) {</span>
-<span class="nc" id="L537">            return rootLeft;</span>
+<span class="fc" id="L568">        EClassId rootLeft = unionFind.find(left);</span>
+<span class="fc" id="L569">        EClassId rootRight = unionFind.find(right);</span>
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">        if (rootLeft.equals(rootRight)) {</span>
+<span class="nc" id="L571">            return rootLeft;</span>
         }
         // Read assumptions BEFORE the union-find merge; after unionFind.union() the
         // &quot;merged&quot; id resolves to the survivor via find(), so a post-merge read would
         // always return the survivor's assumptions and the check would be vacuous.
-<span class="fc" id="L542">        AssumptionSignature leftAssumptions = assumptionsFor(rootLeft);</span>
-<span class="fc" id="L543">        AssumptionSignature rightAssumptions = assumptionsFor(rootRight);</span>
-<span class="fc bfc" id="L544" title="All 2 branches covered.">        if (!leftAssumptions.fingerprint().equals(rightAssumptions.fingerprint())) {</span>
-<span class="fc" id="L545">            throw new IllegalStateException(</span>
+<span class="fc" id="L576">        AssumptionSignature leftAssumptions = assumptionsFor(rootLeft);</span>
+<span class="fc" id="L577">        AssumptionSignature rightAssumptions = assumptionsFor(rootRight);</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">        if (!leftAssumptions.fingerprint().equals(rightAssumptions.fingerprint())) {</span>
+<span class="fc" id="L579">            throw new IllegalStateException(</span>
                 &quot;Congruence closure attempted to merge e-classes with incompatible assumptions: &quot;
-<span class="fc" id="L547">                    + leftAssumptions.fingerprint() + &quot; vs &quot; + rightAssumptions.fingerprint());</span>
+<span class="fc" id="L581">                    + leftAssumptions.fingerprint() + &quot; vs &quot; + rightAssumptions.fingerprint());</span>
         }
-<span class="fc" id="L549">        EClassId survivor = unionFind.union(rootLeft, rootRight);</span>
-<span class="fc bfc" id="L550" title="All 2 branches covered.">        EClassId merged = survivor.equals(rootLeft) ? rootRight : rootLeft;</span>
-<span class="fc" id="L551">        EClass survivorClass = classes.get(survivor);</span>
-<span class="fc" id="L552">        EClass mergedClass = classes.get(merged);</span>
-<span class="pc bpc" id="L553" title="2 of 4 branches missed.">        if (survivorClass == null || mergedClass == null) {</span>
-<span class="nc" id="L554">            throw new IllegalStateException(&quot;Unknown merge classes: &quot; + survivor + &quot; / &quot; + merged);</span>
+<span class="fc" id="L583">        EClassId survivor = unionFind.union(rootLeft, rootRight);</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        EClassId merged = survivor.equals(rootLeft) ? rootRight : rootLeft;</span>
+<span class="fc" id="L585">        EClass survivorClass = classes.get(survivor);</span>
+<span class="fc" id="L586">        EClass mergedClass = classes.get(merged);</span>
+<span class="pc bpc" id="L587" title="2 of 4 branches missed.">        if (survivorClass == null || mergedClass == null) {</span>
+<span class="nc" id="L588">            throw new IllegalStateException(&quot;Unknown merge classes: &quot; + survivor + &quot; / &quot; + merged);</span>
         }
-<span class="pc bpc" id="L556" title="1 of 2 branches missed.">        if (survivorClass != mergedClass) {</span>
-<span class="fc" id="L557">            survivorClass.absorb(mergedClass);</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">        if (survivorClass != mergedClass) {</span>
+<span class="fc" id="L591">            survivorClass.absorb(mergedClass);</span>
         }
-<span class="fc" id="L559">        classes.put(merged, survivorClass);</span>
-<span class="fc bfc" id="L560" title="All 2 branches covered.">        AssumptionSignature survivorAssumptions = survivor.equals(rootLeft) ? leftAssumptions : rightAssumptions;</span>
-<span class="fc" id="L561">        assumptionsByClass.put(survivor, survivorAssumptions);</span>
-<span class="fc" id="L562">        assumptionsByClass.put(merged, survivorAssumptions);</span>
-<span class="fc" id="L563">        canonicalClassCount--;</span>
-<span class="fc" id="L564">        markDirty(survivor);</span>
-<span class="fc" id="L565">        markDirty(merged);</span>
-<span class="fc" id="L566">        bumpVersion();</span>
-<span class="fc" id="L567">        return survivor;</span>
+<span class="fc" id="L593">        classes.put(merged, survivorClass);</span>
+<span class="fc bfc" id="L594" title="All 2 branches covered.">        AssumptionSignature survivorAssumptions = survivor.equals(rootLeft) ? leftAssumptions : rightAssumptions;</span>
+<span class="fc" id="L595">        assumptionsByClass.put(survivor, survivorAssumptions);</span>
+<span class="fc" id="L596">        assumptionsByClass.put(merged, survivorAssumptions);</span>
+<span class="fc" id="L597">        canonicalClassCount--;</span>
+<span class="fc" id="L598">        markDirty(survivor);</span>
+<span class="fc" id="L599">        markDirty(merged);</span>
+<span class="fc" id="L600">        bumpVersion();</span>
+<span class="fc" id="L601">        return survivor;</span>
     }
 
     private EClassId removeHashCons(ENode node) {
-<span class="fc" id="L571">        EClassId owner = hashCons.remove(node);</span>
-<span class="fc bfc" id="L572" title="All 2 branches covered.">        if (owner != null) {</span>
-<span class="fc" id="L573">            removeSignatureMembership(node, owner);</span>
+<span class="fc" id="L605">        EClassId owner = hashCons.remove(node);</span>
+<span class="fc bfc" id="L606" title="All 2 branches covered.">        if (owner != null) {</span>
+<span class="fc" id="L607">            removeSignatureMembership(node, owner);</span>
         }
-<span class="fc" id="L575">        return owner;</span>
+<span class="fc" id="L609">        return owner;</span>
     }
 
     private void putHashCons(ENode node, EClassId owner) {
-<span class="fc" id="L579">        EClassId previous = hashCons.put(node, owner);</span>
-<span class="fc bfc" id="L580" title="All 2 branches covered.">        if (previous != null) {</span>
-<span class="fc" id="L581">            removeSignatureMembership(node, previous);</span>
+<span class="fc" id="L613">        EClassId previous = hashCons.put(node, owner);</span>
+<span class="fc bfc" id="L614" title="All 2 branches covered.">        if (previous != null) {</span>
+<span class="fc" id="L615">            removeSignatureMembership(node, previous);</span>
         }
-<span class="fc" id="L583">        addSignatureMembership(node, owner);</span>
-<span class="fc" id="L584">    }</span>
+<span class="fc" id="L617">        addSignatureMembership(node, owner);</span>
+<span class="fc" id="L618">    }</span>
 
     private void addSignatureMembership(ENode node, EClassId owner) {
-<span class="fc" id="L587">        ENodeSignature signature = ENodeSignature.of(node);</span>
-<span class="fc" id="L588">        signatureIndex.computeIfAbsent(signature, ignored -&gt; new LinkedHashSet&lt;&gt;())</span>
-<span class="fc" id="L589">            .add(unionFind.find(owner));</span>
-<span class="fc" id="L590">    }</span>
+<span class="fc" id="L621">        ENodeSignature signature = ENodeSignature.of(node);</span>
+<span class="fc" id="L622">        signatureIndex.computeIfAbsent(signature, ignored -&gt; new LinkedHashSet&lt;&gt;())</span>
+<span class="fc" id="L623">            .add(unionFind.find(owner));</span>
+<span class="fc" id="L624">    }</span>
 
     private void removeSignatureMembership(ENode node, EClassId owner) {
-<span class="fc" id="L593">        ENodeSignature signature = ENodeSignature.of(node);</span>
-<span class="fc" id="L594">        LinkedHashSet&lt;EClassId&gt; owners = signatureIndex.get(signature);</span>
-<span class="fc bfc" id="L595" title="All 2 branches covered.">        if (owners == null) {</span>
-<span class="fc" id="L596">            return;</span>
+<span class="fc" id="L627">        ENodeSignature signature = ENodeSignature.of(node);</span>
+<span class="fc" id="L628">        LinkedHashSet&lt;EClassId&gt; owners = signatureIndex.get(signature);</span>
+<span class="fc bfc" id="L629" title="All 2 branches covered.">        if (owners == null) {</span>
+<span class="fc" id="L630">            return;</span>
         }
-<span class="fc" id="L598">        owners.remove(unionFind.find(owner));</span>
-<span class="fc" id="L599">        owners.remove(owner);</span>
-<span class="fc bfc" id="L600" title="All 2 branches covered.">        if (owners.isEmpty()) {</span>
-<span class="fc" id="L601">            signatureIndex.remove(signature);</span>
+<span class="fc" id="L632">        owners.remove(unionFind.find(owner));</span>
+<span class="fc" id="L633">        owners.remove(owner);</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">        if (owners.isEmpty()) {</span>
+<span class="fc" id="L635">            signatureIndex.remove(signature);</span>
         }
-<span class="fc" id="L603">    }</span>
+<span class="fc" id="L637">    }</span>
 
     private Collection&lt;EClassId&gt; dedupeCanonical(Collection&lt;EClassId&gt; ids) {
-<span class="fc" id="L606">        LinkedHashSet&lt;EClassId&gt; canonical = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L607" title="All 2 branches covered.">        for (EClassId id : ids) {</span>
-<span class="fc" id="L608">            canonical.add(unionFind.find(id));</span>
-<span class="fc" id="L609">        }</span>
-<span class="fc" id="L610">        List&lt;EClassId&gt; sorted = new ArrayList&lt;&gt;(canonical);</span>
-<span class="fc" id="L611">        Collections.sort(sorted);</span>
-<span class="fc" id="L612">        return Collections.unmodifiableList(sorted);</span>
+<span class="fc" id="L640">        LinkedHashSet&lt;EClassId&gt; canonical = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L641" title="All 2 branches covered.">        for (EClassId id : ids) {</span>
+<span class="fc" id="L642">            canonical.add(unionFind.find(id));</span>
+<span class="fc" id="L643">        }</span>
+<span class="fc" id="L644">        List&lt;EClassId&gt; sorted = new ArrayList&lt;&gt;(canonical);</span>
+<span class="fc" id="L645">        Collections.sort(sorted);</span>
+<span class="fc" id="L646">        return Collections.unmodifiableList(sorted);</span>
     }
 
     private void markDirty(EClassId id) {
-<span class="fc" id="L616">        EClassId canonical = unionFind.find(id);</span>
-<span class="fc" id="L617">        dirtyClasses.add(canonical);</span>
-<span class="fc" id="L618">        classChangeVersions.put(canonical, version + 1);</span>
-<span class="fc" id="L619">    }</span>
+<span class="fc" id="L650">        EClassId canonical = unionFind.find(id);</span>
+<span class="fc" id="L651">        dirtyClasses.add(canonical);</span>
+<span class="fc" id="L652">        classChangeVersions.put(canonical, version + 1);</span>
+<span class="fc" id="L653">    }</span>
 
     private void bumpVersion() {
-<span class="fc" id="L622">        version++;</span>
-<span class="fc" id="L623">    }</span>
+<span class="fc" id="L656">        version++;</span>
+<span class="fc" id="L657">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

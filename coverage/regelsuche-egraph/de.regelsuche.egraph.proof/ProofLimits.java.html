@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProofLimits.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph.proof</a> &gt; <span class="el_source">ProofLimits.java</span></div><h1>ProofLimits.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph.proof;
+
+/** Separate producer and replay resource envelopes. */
+public record ProofLimits(
+        int maxTerms,
+        int maxProofSteps,
+        int maxReferences,
+        int maxCharacters,
+        int maxRationalBits,
+        int maxDepth,
+        int maxExpandedNodes,
+        long maxWork) {
+<span class="fc" id="L13">    public ProofLimits {</span>
+<span class="pc bpc" id="L14" title="8 of 16 branches missed.">        if (maxTerms &lt; 0</span>
+                || maxProofSteps &lt; 0
+                || maxReferences &lt; 0
+                || maxCharacters &lt; 0
+                || maxRationalBits &lt; 0
+                || maxDepth &lt; 0
+                || maxExpandedNodes &lt; 0
+<span class="nc" id="L21">                || maxWork &lt; 0) throw new IllegalArgumentException(&quot;negative proof limit&quot;);</span>
+<span class="fc" id="L22">    }</span>
+
+    public static ProofLimits defaults() {
+<span class="fc" id="L25">        return new ProofLimits(50_000, 100_000, 500_000, 1_000_000, 4096, 256, 100_000, 5_000_000L);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
