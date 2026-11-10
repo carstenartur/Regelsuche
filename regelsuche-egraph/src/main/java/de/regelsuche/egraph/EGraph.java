@@ -74,6 +74,12 @@ public final class EGraph {
     /** Number of currently canonical e-classes. */
     private int canonicalClassCount = 0;
     private int insertionLimit = Integer.MAX_VALUE;
+    private final EGraphProofCapture proofCapture;
+
+    public EGraph() { this(null); }
+
+    /** Only a fresh owned runner can request capture; existing graphs cannot acquire proofs. */
+    EGraph(EGraphProofCapture proofCapture) { this.proofCapture = proofCapture; }
 
     /** Saturation-local insertion cap; restoring the previous limit is the caller's responsibility. */
     int setInsertionLimit(int limit) {
@@ -103,6 +109,7 @@ public final class EGraph {
         // subterms, but never an incomplete node or a union with that RHS.
         if (nodeCount() >= insertionLimit) throw new NodeBudgetExceeded();
         EClassId id = unionFind.makeSet();
+        if (proofCapture != null) proofCapture.allocated(this, id, canonical);
         EClass eclass = new EClass(id, canonical);
         classes.put(id, eclass);
         canonicalClassCount++;
@@ -344,6 +351,11 @@ public final class EGraph {
         return buildExpression(canonical, choices.nodes());
     }
 
+    int extractProofTerm(EClassId id, java.util.function.ToIntFunction<ENode> costOfNode) {
+        if (proofCapture == null) throw new IllegalStateException("proof capture was not requested");
+        return proofCapture.selectedTerm(this, id, extractionChoices(costOfNode).nodes());
+    }
+
     /**
      * One finite AST per root e-node, using cheapest child representatives.
      * This deliberately does not enumerate all combinations of child alternatives.
@@ -368,13 +380,15 @@ public final class EGraph {
         Objects.requireNonNull(costOfNode, "costOfNode");
         Map<EClassId, Integer> bestCost = new HashMap<>();
         Map<EClassId, ENode> bestNode = new HashMap<>();
-        for (EClass eclass : classes()) {
+        for (EClass eclass : extractionClasses()) {
+            chargeExtraction(1);
             bestCost.put(eclass.id(), Integer.MAX_VALUE);
         }
         boolean changed = true;
         while (changed) {
             changed = false;
-            for (EClass eclass : classes()) {
+            for (EClass eclass : extractionClasses()) {
+                chargeExtraction(1);
                 for (ENode node : eclass.nodes()) {
                     int totalInt = extractionCost(node, costOfNode, bestCost);
                     if (totalInt < bestCost.get(eclass.id())) {
@@ -391,9 +405,24 @@ public final class EGraph {
     /** Validate the objective without requiring an initially extractable root. */
     void validateNodeCosts(java.util.function.ToIntFunction<ENode> costOfNode) {
         Objects.requireNonNull(costOfNode, "costOfNode");
-        for (EClass eclass : classes()) {
-            for (ENode node : eclass.nodes()) validatedNodeCost(node, costOfNode);
+        for (EClass eclass : extractionClasses()) {
+            for (ENode node : eclass.nodes()) {
+                chargeExtraction(1);
+                validatedNodeCost(node, costOfNode);
+            }
         }
+    }
+
+    private Collection<EClass> extractionClasses() {
+        if (proofCapture == null) return classes();
+        var seen = new LinkedHashSet<EClassId>();
+        List<EClass> result = new ArrayList<>();
+        for (EClassId raw : classes.keySet()) {
+            chargeExtraction(1);
+            EClassId canonical = unionFind.find(raw);
+            if (seen.add(canonical)) result.add(classes.get(canonical));
+        }
+        return result;
     }
 
     private static int validatedNodeCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode) {
@@ -404,6 +433,7 @@ public final class EGraph {
 
     private int extractionCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode,
             Map<EClassId, Integer> bestCost) {
+        chargeExtraction(1L + node.children().size());
         long total = validatedNodeCost(node, costOfNode);
         if (total == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
@@ -419,6 +449,10 @@ public final class EGraph {
             }
         }
         return (int) Math.min(total, Integer.MAX_VALUE - 1);
+    }
+
+    private void chargeExtraction(long units) {
+        if (proofCapture != null) proofCapture.charge(units);
     }
 
     // --- internal -----------------------------------------------------------

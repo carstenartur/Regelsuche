@@ -1,6 +1,10 @@
 package de.regelsuche.egraph;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.egraph.proof.ExtractionProofBuilder;
+import de.regelsuche.egraph.proof.ExtractionProofChecker;
+import de.regelsuche.egraph.proof.ProofLimits;
+import de.regelsuche.egraph.proof.ProofOutcome;
 import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.transform.EquivalenceAwarePatternMatcher;
 import de.regelsuche.transform.PatternRewriteRule;
@@ -13,6 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.ToIntFunction;
 import static de.regelsuche.egraph.SaturationDiagnostics.Outcome.*;
 import static de.regelsuche.egraph.SaturationDiagnostics.Stage.*;
@@ -23,6 +28,8 @@ import static de.regelsuche.egraph.SaturationDiagnostics.Stage.*;
  * use concrete representatives. Local witnesses are not an extraction proof.
  */
 public final class EqualitySaturation {
+    // Existing native pattern matcher/applier helpers are recursive.
+    private static final int PROOF_NATIVE_MAX_DEPTH = 256;
     public record Config(int maxIterations, int maxNodes, boolean useDirtyWorklist) {
         public Config {
             if (maxIterations <= 0) throw new IllegalArgumentException("maxIterations must be > 0");
@@ -47,12 +54,18 @@ public final class EqualitySaturation {
         Objects.requireNonNull(graph, "graph");
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(costOfNode, "costOfNode");
+        Execution execution = saturateGraph(graph, root, costOfNode, new Run(null));
+        Expr best = graph.extract(root, costOfNode);
+        return execution.result(best, de.regelsuche.parse.ExpressionFormatter.format(best), ProofOutcome.notRequested());
+    }
+
+    private Execution saturateGraph(EGraph graph, EClassId root,
+            ToIntFunction<ENode> costOfNode, Run run) {
         // Validate costs before mutation, but allow rewriting to make the root finite.
         graph.find(root);
         graph.validateNodeCosts(costOfNode);
         var matcher = new EGraphPatternMatcher(graph);
         var applier = new EGraphPatternApplier(graph);
-        var run = new Run();
         int iterations = 0;
         int merges = 0;
         boolean saturated = false;
@@ -94,15 +107,174 @@ public final class EqualitySaturation {
         } finally {
             graph.setInsertionLimit(previousLimit);
         }
-        Expr best = graph.extract(root, costOfNode);
-        var metrics = matcher.stats();
-        var stats = new SaturationStats(graph.classCount(), graph.nodeCount(), merges,
-            iterations, run.appliedRules, de.regelsuche.parse.ExpressionFormatter.format(best),
-            saturated, stopReason, metrics.classesScanned(), metrics.nodesScanned(),
-            metrics.candidateClassesSkipped(), metrics.matchesFound(), metrics.matcherCacheHits(),
-            metrics.matcherCacheMisses(), iterations, run.applications());
-        return new Result(best, stats, run.diagnostics.snapshot(),
-            new SaturationProvenance(run.witnesses, run.droppedWitnesses, run.nativeWitnessExtractions));
+        return new Execution(graph, matcher, run, iterations, merges, saturated, stopReason);
+    }
+
+    private record Execution(EGraph graph, EGraphPatternMatcher matcher, Run run,
+            int iterations, int merges, boolean saturated, SaturationStats.Reason stopReason) {
+        Result result(Expr best, String formatted, ProofOutcome proof) {
+            var metrics = matcher.stats();
+            var stats = new SaturationStats(graph.classCount(), graph.nodeCount(), merges,
+                iterations, run.appliedRules, formatted,
+                saturated, stopReason, metrics.classesScanned(), metrics.nodesScanned(),
+                metrics.candidateClassesSkipped(), metrics.matchesFound(), metrics.matcherCacheHits(),
+                metrics.matcherCacheMisses(), iterations, run.applications());
+            return new Result(best, stats, run.diagnostics.snapshot(),
+                new SaturationProvenance(run.witnesses, run.droppedWitnesses,
+                    run.nativeWitnessExtractions, proof));
+        }
+    }
+
+    /** Separate owned capture/build and receiving-side replay allowances. */
+    public record ProofOptions(ProofLimits captureLimits, ProofLimits replayLimits) {
+        public ProofOptions {
+            Objects.requireNonNull(captureLimits, "captureLimits");
+            Objects.requireNonNull(replayLimits, "replayLimits");
+        }
+        public static ProofOptions defaults() {
+            return new ProofOptions(ProofLimits.defaults(), ProofLimits.defaults());
+        }
+    }
+
+    /** The returned expression changes only after independent exact-endpoint acceptance. */
+    public record ProvedResult(Expr expression, Optional<Result> diagnosticResult, ProofOutcome proof) {
+        public ProvedResult {
+            Objects.requireNonNull(expression, "expression");
+            Objects.requireNonNull(diagnosticResult, "diagnosticResult");
+            Objects.requireNonNull(proof, "proof");
+            requireCheckedOutput(expression, proof);
+        }
+    }
+
+    /**
+     * Fresh-graph exact-native proof mode. Unsupported rules or unavailable proof
+     * return the original input; diagnostic candidates, when present, are separate.
+     */
+    public ProvedResult saturateWithProof(Expr input, ToIntFunction<ENode> costOfNode, ProofOptions options) {
+        Objects.requireNonNull(input, "input");
+        Objects.requireNonNull(costOfNode, "costOfNode");
+        Objects.requireNonNull(options, "options");
+        options = nativeProofOptions(options);
+        ExtractionProofBuilder builder = null;
+        int source;
+        try {
+            builder = new ExtractionProofBuilder(rules, options.captureLimits());
+            source = builder.addExpression(input);
+        } catch (ExtractionProofBuilder.UnsupportedRule unsupported) {
+            return unavailable(input, ProofOutcome.Status.UNSUPPORTED_RULE, unsupported.getMessage(),
+                builder == null ? unsupported.workUsed() : builder.workUsed());
+        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {
+            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED, "preflight: " + exhausted.getMessage(),
+                builder == null ? exhausted.workUsed() : builder.workUsed());
+        } catch (ExtractionProofBuilder.InvalidInput invalid) {
+            return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, "unsupported proof input",
+                builder == null ? invalid.workUsed() : builder.workUsed());
+        } catch (IllegalArgumentException invalid) {
+            return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, "unsupported proof input", builder);
+        }
+        return runProved(input, source, costOfNode, options, builder);
+    }
+
+    private static ProofOptions nativeProofOptions(ProofOptions options) {
+        ProofLimits limits = options.captureLimits();
+        if (limits.maxDepth() <= PROOF_NATIVE_MAX_DEPTH) return options;
+        return new ProofOptions(new ProofLimits(limits.maxTerms(), limits.maxProofSteps(),
+            limits.maxReferences(), limits.maxCharacters(), limits.maxRationalBits(),
+            PROOF_NATIVE_MAX_DEPTH, limits.maxExpandedNodes(), limits.maxWork()), options.replayLimits());
+    }
+
+    private ProvedResult runProved(Expr input, int source, ToIntFunction<ENode> costOfNode,
+            ProofOptions options, ExtractionProofBuilder builder) {
+        var capture = new EGraphProofCapture(builder, options.captureLimits());
+        var graph = new EGraph(capture);
+        // Unlike the existing-graph API, even initial source insertion belongs to this cap.
+        graph.setInsertionLimit(config.maxNodes());
+        EClassId root;
+        try {
+            root = capture.insertInput(graph, source);
+        } catch (EGraph.NodeBudgetExceeded exhausted) {
+            return unavailable(input, ProofOutcome.Status.EXTRACTION_UNAVAILABLE,
+                "input exceeds the graph node budget", builder);
+        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {
+            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED,
+                "input insertion: " + exhausted.getMessage(), builder);
+        }
+        if (!capture.active()) return new ProvedResult(input, Optional.empty(), capture.unavailable());
+        try {
+            Execution execution = saturateGraph(graph, root, costOfNode, new Run(capture));
+            if (!capture.active()) return new ProvedResult(input, Optional.empty(), capture.unavailable());
+            int target = graph.extractProofTerm(root, costOfNode);
+            Expr selected = builder.materialize(target);
+            String formatted = diagnosticText(capture, selected);
+            return checkedResult(input, source, selected, target, formatted, execution, options, builder);
+        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {
+            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED,
+                "extraction/rendering: " + exhausted.getMessage(), builder);
+        } catch (IllegalStateException unavailable) {
+            return unavailable(input, ProofOutcome.Status.EXTRACTION_UNAVAILABLE,
+                "no finite bounded extraction", builder);
+        }
+    }
+
+    private static String diagnosticText(EGraphProofCapture capture, Expr selected) {
+        try {
+            return capture.format(selected);
+        } catch (IllegalArgumentException notRepresentableByParser) {
+            // Exact AST equality can still be checked when text syntax has a smaller numeric envelope.
+            return null;
+        }
+    }
+
+    private ProvedResult checkedResult(Expr input, int source, Expr selected, int target,
+            String formatted, Execution execution, ProofOptions options, ExtractionProofBuilder builder) {
+        long captureWork = builder.workUsed();
+        var built = builder.build(source, target);
+        long buildWork = builder.workUsed() - captureWork;
+        ProofOutcome proof;
+        if (built.status() != ExtractionProofBuilder.BuildStatus.BUILT) {
+            var status = built.status() == ExtractionProofBuilder.BuildStatus.LIMIT_EXCEEDED
+                ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.REPLAY_REJECTED;
+            proof = ProofOutcome.unavailable(status, "build: " + built.detail(), captureWork, buildWork, 0);
+        } else {
+            var checked = ExtractionProofChecker.check(input, selected, built.certificate().orElseThrow(),
+                rules, options.replayLimits());
+            proof = checkedOutcome(input, selected, checked, captureWork, buildWork);
+        }
+        Optional<Result> diagnostic = formatted == null ? Optional.empty()
+            : Optional.of(execution.result(selected, formatted, proof));
+        return new ProvedResult(proof.complete() ? selected : input, diagnostic, proof);
+    }
+
+    private static ProofOutcome checkedOutcome(Expr input, Expr selected,
+            ExtractionProofChecker.CheckResult checked, long captureWork, long buildWork) {
+        if (checked.status() == ExtractionProofChecker.Status.ACCEPTED) {
+            var token = checked.checked().orElseThrow();
+            if (token.input() != input || token.output() != selected) {
+                throw new IllegalStateException("checker token belongs to different invocation endpoints");
+            }
+            return ProofOutcome.complete(token, captureWork, buildWork);
+        }
+        var status = checked.status() == ExtractionProofChecker.Status.LIMIT_EXCEEDED
+            ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.REPLAY_REJECTED;
+        return ProofOutcome.unavailable(status, "replay: " + checked.detail(),
+            captureWork, buildWork, checked.workUsed());
+    }
+
+    private static ProvedResult unavailable(Expr input, ProofOutcome.Status status, String detail,
+            ExtractionProofBuilder builder) {
+        return unavailable(input, status, detail, builder == null ? 0 : builder.workUsed());
+    }
+
+    private static ProvedResult unavailable(Expr input, ProofOutcome.Status status, String detail,
+            long captureWork) {
+        return new ProvedResult(input, Optional.empty(), ProofOutcome.unavailable(status, detail,
+            captureWork, 0, 0));
+    }
+
+    private static void requireCheckedOutput(Expr output, ProofOutcome proof) {
+        if (proof.complete() && proof.checked().orElseThrow().output() != output) {
+            throw new IllegalArgumentException("checked certificate belongs to another output object");
+        }
     }
 
     private void checkBudget(EGraph graph) {
@@ -145,11 +317,16 @@ public final class EqualitySaturation {
         for (var match : matches) {
             checkBudget(graph);
             try {
+                // Freeze one finite term per binding before any graph mutation.
+                var instance = run.capture == null ? null
+                    : run.capture.prepare(graph, rule.id(), match.bindings());
                 EClassId rhs = applier.instantiate(rule.target(), match.bindings());
                 if (graph.areEquivalent(match.root(), rhs)) continue;
-                // Only new equalities need witnesses. Explanation work never gates the union.
-                SaturationProvenance.Witness witness = nativeWitness(graph, rule, match, run);
+                // Proof mode never calls the legacy recursive witness extractor.
+                SaturationProvenance.Witness witness = run.capture == null
+                    ? nativeWitness(graph, rule, match, run) : null;
                 graph.union(match.root(), rhs);
+                if (run.capture != null) run.capture.recorded(instance);
                 run.applied(rule.id(), witness);
             } catch (EGraph.NodeBudgetExceeded exhausted) {
                 throw exhausted;
@@ -257,6 +434,8 @@ public final class EqualitySaturation {
         return ids.stream().map(graph::find).distinct().sorted().toList();
     }
     private static final class Run {
+        final EGraphProofCapture capture;
+        Run(EGraphProofCapture capture) { this.capture = capture; }
         final Map<String, Integer> appliedRules = new LinkedHashMap<>();
         final SaturationDiagnostics.Collector diagnostics = new SaturationDiagnostics.Collector();
         final List<SaturationProvenance.Witness> witnesses = new ArrayList<>();
@@ -282,6 +461,7 @@ public final class EqualitySaturation {
             Objects.requireNonNull(stats);
             Objects.requireNonNull(diagnostics);
             Objects.requireNonNull(provenance);
+            requireCheckedOutput(expression, provenance.proofOutcome());
         }
         public Result(Expr expression, SaturationStats stats) {
             this(expression, stats, SaturationDiagnostics.empty(), SaturationProvenance.empty());
