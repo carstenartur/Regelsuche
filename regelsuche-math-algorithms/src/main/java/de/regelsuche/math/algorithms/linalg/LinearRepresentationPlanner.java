@@ -149,7 +149,26 @@ public final class LinearRepresentationPlanner {
         return execute(prepare(source, budget), route, budget);
     }
 
+    /** Additional evidence budget is separate from frozen v1 construction accounting. */
+    public record CertificateWork(String schema, String status, int configuredWork, int consumedWork) { }
+    public record CertifiedResult(Result result, Optional<ExactLinearSolutionCertificate> certificate,
+                                  CertificateWork certificateWork) { }
+
+    public CertifiedResult solveCertified(List<String> source, Route route, int budget, Budget certificateBudget) {
+        return executeCertified(prepare(source, budget), route, budget, certificateBudget);
+    }
+
+    public CertifiedResult executeCertified(Plan plan, Route route, int budget, Budget certificateBudget) {
+        Evidence evidence = new Evidence(Objects.requireNonNull(certificateBudget).maxWorkUnits());
+        Result result = execute(plan, route, budget, evidence);
+        return evidence.finish(result);
+    }
+
     public Result execute(Plan plan, Route route, int budget) {
+        return execute(plan, route, budget, null);
+    }
+
+    private Result execute(Plan plan, Route route, int budget, Evidence evidence) {
         Objects.requireNonNull(plan);
         Objects.requireNonNull(route);
         checkBudget(budget);
@@ -169,7 +188,9 @@ public final class LinearRepresentationPlanner {
                 : List.of(java.util.stream.IntStream.range(0, plan.source.size()).boxed().toList());
             for (List<Integer> rows : groups) {
                 List<Equation> equations = rows.stream().map(plan.equations::get).toList();
-                Local local = run(equations, plan.variables, selected == Route.DIRECT, work.remaining());
+                if (evidence != null) evidence.start(rows);
+                Local local = run(equations, plan.variables, selected == Route.DIRECT, work.remaining(), evidence);
+                if (evidence != null) evidence.end();
                 work.consume(local.work);
                 execution += local.work;
                 steps.add(new Step(rows, selected == Route.DIRECT ? "DIRECT" : "MATRIX",
@@ -211,10 +232,11 @@ public final class LinearRepresentationPlanner {
 
     private record Local(String status, int work, Optional<ExactLinearSolutionConsequence> solution,
                          List<String> freeVariables, List<String> operations) { }
-    private static Local run(List<Equation> equations, List<String> variables, boolean direct, int budget) {
+    private static Local run(List<Equation> equations, List<String> variables, boolean direct, int budget, Evidence evidence) {
         if (direct) {
-            var result = new DirectScalarEliminationSolver().solve(
-                new DirectScalarEliminationSolver.Source(equations, variables), new Budget(budget));
+            var result = new DirectScalarEliminationSolver().solveWithEvidence(
+                new DirectScalarEliminationSolver.Source(equations, variables), new Budget(budget),
+                evidence == null ? null : evidence::operation);
             return new Local(result.status().name(), result.work().consumedWorkUnits(), result.consequence(),
                 List.of(), result.certificate().map(c -> c.canonicalOperations()).orElse(List.of()));
         }
@@ -225,6 +247,11 @@ public final class LinearRepresentationPlanner {
         spent += result.work().consumedWorkUnits();
         if (result.reduction().isEmpty()) return new Local(result.status().name(), spent, Optional.empty(), List.of(), List.of());
         var reduction = result.reduction().orElseThrow();
+        if (evidence != null) {
+            for (var operation : reduction.rowOperations()) {
+                if (!evidence.operation(() -> operation)) break;
+            }
+        }
         return new Local("SOLVED", spent, Optional.of(ExactLinearSolutionConsequence.fromRref(reduction)),
             reduction.freeVariableColumns().stream().map(reduction.variables()::get).toList(),
             reduction.rowOperations().stream().map(Object::toString).toList());
@@ -277,7 +304,7 @@ public final class LinearRepresentationPlanner {
         while (parent[i] != i) i = parent[i];
         return i;
     }
-    private static void validateText(String text) {
+    static void validateText(String text) {
         if (text == null || text.isBlank() || text.length() > 512)
             throw new IllegalArgumentException("Each equation must contain 1 to 512 characters");
         int depth = 0;
@@ -297,7 +324,7 @@ public final class LinearRepresentationPlanner {
         }
     }
     // Syntactic input bound: nested constant powers must not evade a mechanical operation budget.
-    private static int powerWeight(Expr expression, int depth) {
+    static int powerWeight(Expr expression, int depth) {
         if (depth > 64) throw new IllegalArgumentException("Expression depth exceeds 64");
         if (expression instanceof BinaryExpr binary) {
             int left = powerWeight(binary.left(), depth + 1);
@@ -321,6 +348,51 @@ public final class LinearRepresentationPlanner {
     private static void checkBudget(int budget) {
         if (budget < 0 || budget > MAX_BUDGET) throw new IllegalArgumentException("Budget must be between 0 and 1000000");
     }
+    private static final class Evidence {
+        private final Counter work;
+        private final List<ExactLinearSolutionCertificate.Part> parts = new ArrayList<>();
+        private List<Integer> rows;
+        private List<ExactRrefReduction.RowOperation> operations;
+        private String status = "EXPORTED";
+        private int operationCount;
+        Evidence(int limit) { work = new Counter(limit); }
+        boolean charge(int units) {
+            if (!status.equals("EXPORTED")) return false;
+            try { work.consume(units); return true; }
+            catch (Exhausted exhausted) { status = "BUDGET_INCONCLUSIVE"; return false; }
+        }
+        void start(List<Integer> sourceRows) {
+            if (!charge(1 + sourceRows.size())) return;
+            rows = List.copyOf(sourceRows);
+            operations = new ArrayList<>();
+        }
+        boolean operation(java.util.function.Supplier<ExactRrefReduction.RowOperation> supplier) {
+            if (!charge(1)) return false;
+            if (++operationCount > ExactLinearSolutionVerifier.MAX_OPERATIONS) {
+                status = "CERTIFICATE_LIMIT"; return false;
+            }
+            var operation = supplier.get();
+            int bits = Math.max(operation.multiplier().numerator().bitLength(), operation.multiplier().denominator().bitLength());
+            if (bits > ExactLinearSolutionVerifier.MAX_RATIONAL_BITS) { status = "CERTIFICATE_LIMIT"; return false; }
+            if (!charge(1 + (bits + 31) / 32)) return false;
+            operations.add(operation);
+            return true;
+        }
+        void end() {
+            if (!status.equals("EXPORTED")) return;
+            if (!charge(1 + rows.size() + operations.size())) return;
+            parts.add(new ExactLinearSolutionCertificate.Part(rows, operations));
+        }
+        CertifiedResult finish(Result result) {
+            Optional<ExactLinearSolutionCertificate> certificate = Optional.empty();
+            if (!result.status().equals("SOLVED")) status = "NOT_SOLVED";
+            else if (charge(1 + parts.size())) certificate = Optional.of(
+                new ExactLinearSolutionCertificate(ExactLinearSolutionCertificate.SCHEMA, parts));
+            return new CertifiedResult(result, certificate, new CertificateWork(
+                "regelsuche.linear-certificate-export-work/v1", status, work.limit, work.used));
+        }
+    }
+
     private static final class Counter {
         private final int limit;
         private int used;

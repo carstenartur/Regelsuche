@@ -123,7 +123,7 @@ public record Assumption(Kind kind, String expression, List<String> symbols) imp
             return AssumptionTruthValue.UNKNOWN;
         }
         for (Assumption known : knownAssumptions) {
-            if (known == null || !sameSymbols(known)) {
+            if (known == null || known.kind() == Kind.UNKNOWN || !sameSymbols(known)) {
                 continue;
             }
             if (known.expression().equals(expression())) {
@@ -145,9 +145,10 @@ public record Assumption(Kind kind, String expression, List<String> symbols) imp
 
     private static boolean implies(Kind known, Kind required) {
         if (known == required) {
-            // Unlike numeric kinds, custom predicates carry their meaning in
-            // the expression. Exact identity was already checked by the caller.
-            return required != Kind.CUSTOM_PREDICATE && required != Kind.CUSTOM;
+            // Domain and custom predicates carry their meaning in the
+            // expression. Exact identity was already checked by the caller.
+            return required != Kind.DOMAIN_MEMBERSHIP && required != Kind.DOMAIN
+                && required != Kind.CUSTOM_PREDICATE && required != Kind.CUSTOM;
         }
         return switch (required) {
             case NON_ZERO -> known == Kind.POSITIVE;
