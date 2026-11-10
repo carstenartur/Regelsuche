@@ -1,0 +1,112 @@
+{
+  "sourceRevision": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+  "sourceTree": "a023dbc29cc3402d26b9e42e28d41ab2c3c450f4",
+  "run": {
+    "id": 42752771954,
+    "name": "CI",
+    "event": "push",
+    "head_branch": "main",
+    "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954",
+    "created_at": "2026-11-10T03:57:46Z",
+    "updated_at": "2026-11-10T04:43:03Z"
+  },
+  "requiredAuthoritiesAndConvergence": [
+    {
+      "id": 129620034556,
+      "name": "Checkout-local Gradle authority",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T03:57:50Z",
+      "completed_at": "2026-11-10T04:40:27Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129620034556"
+    },
+    {
+      "id": 129620034247,
+      "name": "Isolated JMH authority",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T03:57:49Z",
+      "completed_at": "2026-11-10T04:17:14Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129620034247"
+    },
+    {
+      "id": 129620034591,
+      "name": "Isolated SymPy runtime authority",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T03:57:50Z",
+      "completed_at": "2026-11-10T04:03:12Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129620034591"
+    },
+    {
+      "id": 129620034572,
+      "name": "Complete Maven product and Docker authority",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T03:57:51Z",
+      "completed_at": "2026-11-10T04:20:54Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129620034572"
+    },
+    {
+      "id": 129620034608,
+      "name": "External polynomial comparison",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T03:57:51Z",
+      "completed_at": "2026-11-10T04:00:12Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129620034608"
+    },
+    {
+      "id": 129620034502,
+      "name": "Typed source-only learning comparison",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T03:57:50Z",
+      "completed_at": "2026-11-10T04:05:53Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129620034502"
+    },
+    {
+      "id": 129620034501,
+      "name": "Checked Lean and SMT proof authority",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T03:57:50Z",
+      "completed_at": "2026-11-10T04:02:25Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129620034501"
+    },
+    {
+      "id": 129634663490,
+      "name": "Checkout-local ciCheck",
+      "head_sha": "c267b7fa9c95cc14cfd53b00ceb5d0325908feda",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-10T04:41:16Z",
+      "completed_at": "2026-11-10T04:42:15Z",
+      "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/42752771954/job/129634663490"
+    }
+  ],
+  "conditionalJobsSkipped": [
+    "JMH precision study v2 replica ${{ matrix.replicate }}",
+    "JMH precision study replica ${{ matrix.replicate }}",
+    "Retained JMH precision study v2 analysis",
+    "Retained JMH precision study analysis"
+  ],
+  "sourceApiHashes": {
+    "runs-api.json": "af2b03e7d9a55ea048fee666ac8ac47a0a361ca2aa791b2417946f5b42ad5fb3",
+    "jobs-api.json": "2eec8a63b37a82164b2a475f37a598138cc28798e0620b9b93607efc3bd08ebb",
+    "artifacts-api.json": "1940813a8a6b650b631aaac335f33bed3e039606bf652ff634f80fb879736332",
+    "baseline-history-api.json": "e74363745317fb7c0e44a61e40c9abca5c33c4cd315969839a07886547aa4527"
+  },
+  "scope": "Historical complete canonical CI of accepted main, independently checked. No feature qualification or fresh local full extractor run is claimed."
+}
