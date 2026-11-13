@@ -71,55 +71,81 @@ public final class DomainDownstreamValidation {
                 || !"NOT_PRODUCED".equals(value.path("universalProofStatus").asText())) {
             throw new IllegalArgumentException("invalid retained validation receipt shape");
         }
-        JsonNode budget = value.path("checkBudget");
-        if (budget.size() != 3 || !budget.path("maxTermChecks").isIntegralNumber()
-                || !budget.path("maxScalarOperations").isIntegralNumber()
-                || !budget.path("maxScalarBits").isIntegralNumber()
-                || !budget.path("maxTermChecks").canConvertToInt()
-                || !budget.path("maxScalarOperations").canConvertToInt()
-                || !budget.path("maxScalarBits").canConvertToInt()) {
+        requireRetainedBudget(value.path("checkBudget"));
+        requireRetainedClaimBoundary(value);
+        JsonNode check = value.path("check");
+        String status = value.path("status").asText();
+        if (check.isNull()) {
+            if (!NO_CHECK_STATUSES.contains(status)) {
+                throw new IllegalArgumentException("validation status requires a finite check");
+            }
+            requireRetainedOutcome(value, "NOT_EVALUATED", "NOT_EVALUATED", null);
+            return;
+        }
+        requireRetainedCheck(value, check, status);
+    }
+
+    private static void requireRetainedBudget(JsonNode budget) {
+        if (budget.size() != 3) {
             throw new IllegalArgumentException("invalid retained finite check budget");
         }
-        new DomainFiniteDataCheck.Budget(budget.path("maxTermChecks").intValue(),
-            budget.path("maxScalarOperations").intValue(), budget.path("maxScalarBits").intValue());
+        new DomainFiniteDataCheck.Budget(
+            budgetLimit(budget.path("maxTermChecks")),
+            budgetLimit(budget.path("maxScalarOperations")),
+            budgetLimit(budget.path("maxScalarBits")));
+    }
+
+    private static int budgetLimit(JsonNode limit) {
+        if (!limit.isIntegralNumber() || !limit.canConvertToInt()) {
+            throw new IllegalArgumentException("invalid retained finite check budget");
+        }
+        return limit.intValue();
+    }
+
+    private static void requireRetainedClaimBoundary(ObjectNode value) {
         for (String field : new String[]{"proofStatus", "externalNoveltyStatus", "promotionStatus", "publicEvidenceStatus"}) {
             if (!"NOT_EVALUATED".equals(value.path(field).asText())) {
                 throw new IllegalArgumentException("invalid retained validation claim boundary");
             }
         }
-        JsonNode check = value.path("check");
-        String status = value.path("status").asText();
-        String checkHash = null;
-        String expectedEvaluation = "NOT_EVALUATED";
-        String expectedCounterexample = "NOT_EVALUATED";
-        if (check.isNull()) {
-            if (!NO_CHECK_STATUSES.contains(status)) throw new IllegalArgumentException("validation status requires a finite check");
-        } else {
-            if (!(check instanceof ObjectNode object) || !DomainFiniteDataCheck.SCHEMA.equals(check.path("schema").asText())
-                    || !status.equals(check.path("status").asText()) || !check.path("complete").isBoolean()
-                    || !check.path("rows").isArray() || !check.path("work").isObject()
-                    || !"IDENTICAL_CANONICAL_EVIDENCE".equals(value.at("/replay/status").asText())
-                    || !value.at("/source/evidenceHash").equals(value.at("/replay/actualEvidenceHash"))
-                    || !matchesSelectedBinding(value, "verifiedCandidateHash", "selectedCandidateHash")
-                    || !matchesSelectedBinding(value, "verifiedCertificateObjectHash", "certificateObjectHash")
-                    || !matchesSelectedBinding(value, "verifiedRenderedCertificateHash", "renderedCertificateHash")) {
-                throw new IllegalArgumentException("invalid retained finite check");
-            }
-            expectedEvaluation = evaluationStatus(DomainFiniteDataCheck.Status.valueOf(status));
-            expectedCounterexample = check.path("counterexampleStatus").asText();
-            if (!Set.of("FOUND", "NONE_FOUND", "INCONCLUSIVE").contains(expectedCounterexample)
-                    || ("CONFIRMED_FINITE_DATA".equals(status) && (!check.path("complete").asBoolean()
-                        || !"CONFIRMED".equals(value.path("sourceOutcome").asText())
-                        || !"NONE_FOUND".equals(expectedCounterexample)))) {
-                throw new IllegalArgumentException("invalid retained finite check outcome");
-            }
-            checkHash = DomainCanonical.requireSha256(check.path("contentHash").asText(), "finite check hash");
-            ObjectNode material = object.deepCopy();
-            material.remove("contentHash");
-            if (!checkHash.equals(DomainCanonical.sha256(DomainExportWorkspace.write(material)))) {
-                throw new IllegalArgumentException("retained finite check hash differs from its content");
-            }
+    }
+
+    private static void requireRetainedCheck(ObjectNode value, JsonNode check, String status) {
+        if (!(check instanceof ObjectNode object) || !DomainFiniteDataCheck.SCHEMA.equals(check.path("schema").asText())
+                || !status.equals(check.path("status").asText()) || !check.path("complete").isBoolean()
+                || !check.path("rows").isArray() || !check.path("work").isObject()) {
+            throw new IllegalArgumentException("invalid retained finite check");
         }
+        requireRetainedReplayBinding(value);
+        String expectedEvaluation = evaluationStatus(DomainFiniteDataCheck.Status.valueOf(status));
+        String expectedCounterexample = check.path("counterexampleStatus").asText();
+        if (!Set.of("FOUND", "NONE_FOUND", "INCONCLUSIVE").contains(expectedCounterexample)
+                || ("CONFIRMED_FINITE_DATA".equals(status) && (!check.path("complete").asBoolean()
+                    || !"CONFIRMED".equals(value.path("sourceOutcome").asText())
+                    || !"NONE_FOUND".equals(expectedCounterexample)))) {
+            throw new IllegalArgumentException("invalid retained finite check outcome");
+        }
+        String checkHash = DomainCanonical.requireSha256(check.path("contentHash").asText(), "finite check hash");
+        ObjectNode material = object.deepCopy();
+        material.remove("contentHash");
+        if (!checkHash.equals(DomainCanonical.sha256(DomainExportWorkspace.write(material)))) {
+            throw new IllegalArgumentException("retained finite check hash differs from its content");
+        }
+        requireRetainedOutcome(value, expectedEvaluation, expectedCounterexample, checkHash);
+    }
+
+    private static void requireRetainedReplayBinding(ObjectNode value) {
+        if (!"IDENTICAL_CANONICAL_EVIDENCE".equals(value.at("/replay/status").asText())
+                || !value.at("/source/evidenceHash").equals(value.at("/replay/actualEvidenceHash"))
+                || !matchesSelectedBinding(value, "verifiedCandidateHash", "selectedCandidateHash")
+                || !matchesSelectedBinding(value, "verifiedCertificateObjectHash", "certificateObjectHash")
+                || !matchesSelectedBinding(value, "verifiedRenderedCertificateHash", "renderedCertificateHash")) {
+            throw new IllegalArgumentException("invalid retained finite check");
+        }
+    }
+
+    private static void requireRetainedOutcome(
+            ObjectNode value, String expectedEvaluation, String expectedCounterexample, String checkHash) {
         if (!expectedEvaluation.equals(value.path("evaluationStatus").asText())
                 || !expectedCounterexample.equals(value.path("counterexampleStatus").asText())
                 || !artifacts(value.at("/source/handoffHash").asText(), checkHash).equals(value.path("artifacts"))) {
