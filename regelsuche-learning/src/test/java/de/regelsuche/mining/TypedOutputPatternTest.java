@@ -2,12 +2,16 @@ package de.regelsuche.mining;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RecognitionProfile;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -94,6 +98,77 @@ class TypedOutputPatternTest {
         assertTrue(exact.complete(), "using the last permitted attempt need not imply truncation");
         assertEquals(2, exact.assignmentAttempts());
         assertEquals(1, exact.applications().size());
+    }
+
+    @Test void reportsDelegatedMatcherWorkForEveryAttemptedAssignment() {
+        var a = PatternExpr.var("A");
+        var b = PatternExpr.var("B");
+        var product = PatternExpr.op(BinaryOperator.MUL, a, b);
+        var source = PatternExpr.fn("bundle", PatternExpr.fn("f", product), PatternExpr.fn("keep", b));
+        var target = PatternExpr.fn("bundle", PatternExpr.fn("g", b, a), PatternExpr.fn("keep", b));
+        var profile = RecognitionProfile.arithmeticAc();
+        var matcher = ExprMatcher.pattern(source, profile);
+        var pattern = new TypedOutputPattern(candidate(source, target), profile);
+        Expr x = v("x");
+        Expr y = v("y");
+        Expr first = f("f", new BinaryExpr(x, BinaryOperator.MUL, y));
+        Expr second = f("keep", x);
+        var input = f("bundle", first, second);
+        var accepted = matcher.match(input);
+        var rejected = matcher.match(f("bundle", second, first));
+
+        assertTrue(accepted.matched());
+        assertTrue(accepted.patternBranches() > 0);
+        assertFalse(rejected.matched());
+        var bounded = pattern.findWithMatchWork(input, 1);
+        assertFalse(bounded.result().complete());
+        assertEquals(accepted.patternBranches(), bounded.patternBranches());
+        assertEquals((long) accepted.evaluatedSteps() + accepted.patternBranches(), bounded.matcherWork());
+        assertSame(second, only(bounded.result()).target().arguments().get(1));
+
+        var complete = pattern.findWithMatchWork(input, 2);
+        assertTrue(complete.result().complete());
+        assertEquals(pattern.find(input, 2), complete.result());
+        assertEquals(accepted.patternBranches() + rejected.patternBranches(), complete.patternBranches());
+        assertEquals(bounded.matcherWork() + rejected.evaluatedSteps() + rejected.patternBranches(),
+            complete.matcherWork());
+
+        var noMatch = f("bundle", first, f("keep", v("missing")));
+        var failedAttempt = matcher.match(noMatch);
+        assertFalse(failedAttempt.matched());
+        assertTrue(failedAttempt.patternBranches() > 0);
+        var rejectedAndTruncated = pattern.findWithMatchWork(noMatch, 1);
+        assertFalse(rejectedAndTruncated.result().complete());
+        assertTrue(rejectedAndTruncated.result().applications().isEmpty());
+        assertEquals(failedAttempt.patternBranches(), rejectedAndTruncated.patternBranches());
+        assertEquals((long) failedAttempt.evaluatedSteps() + failedAttempt.patternBranches(),
+            rejectedAndTruncated.matcherWork());
+    }
+
+    @Test void includesTheWorkOfAMatcherThatStopsAtItsOwnLimit() {
+        var a = PatternExpr.var("A");
+        var b = PatternExpr.var("B");
+        var product = PatternExpr.op(BinaryOperator.MUL, a, b);
+        PatternExpr wide = PatternExpr.var("P0");
+        Expr wideInput = v("p0");
+        for (int index = 1; index < 9; index++) {
+            wide = PatternExpr.op(BinaryOperator.MUL, wide, PatternExpr.var("P" + index));
+            wideInput = new BinaryExpr(wideInput, BinaryOperator.MUL, v("p" + index));
+        }
+        var source = PatternExpr.fn("bundle", PatternExpr.fn("f", product, wide), PatternExpr.fn("keep", b));
+        var target = PatternExpr.fn("bundle", PatternExpr.fn("g", a, wide), PatternExpr.fn("keep", b));
+        var profile = RecognitionProfile.arithmeticAc();
+        var input = f("bundle", f("f", new BinaryExpr(v("x"), BinaryOperator.MUL, v("y")), wideInput),
+            f("keep", v("x")));
+        var stopped = ExprMatcher.pattern(source, profile).match(input);
+        assertEquals(ExprMatcher.MatchStatus.INCONCLUSIVE, stopped.status());
+        assertTrue(stopped.patternBranches() > 0);
+
+        var measured = new TypedOutputPattern(candidate(source, target), profile).findWithMatchWork(input, 1);
+        assertFalse(measured.result().complete());
+        assertTrue(measured.result().applications().isEmpty());
+        assertEquals(stopped.patternBranches(), measured.patternBranches());
+        assertEquals((long) stopped.evaluatedSteps() + stopped.patternBranches(), measured.matcherWork());
     }
 
     @Test void rejectsUnsupportedHypothesesRatherThanDroppingSlotsOrInventingBindings() {

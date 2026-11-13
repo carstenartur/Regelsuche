@@ -101,7 +101,30 @@ public final class TypedOutputPattern {
         }
     }
 
+    /** Matcher counters for all attempted tuples, including unsuccessful and incomplete matches. */
+    public record MeasuredResult(Result result, long patternBranches) {
+        public MeasuredResult {
+            Objects.requireNonNull(result, "result");
+            if (patternBranches < 0) throw new IllegalArgumentException("negative pattern branch counter");
+        }
+
+        /** Delegated matcher work, excluding tuple construction, substitution and verification. */
+        public long matcherWork() {
+            return Math.addExact(result.matcherSteps(), patternBranches);
+        }
+    }
+
     public Result find(FunctionExpr program, int maximumAssignments) {
+        return execute(program, maximumAssignments).result();
+    }
+
+    /** Measures the same search and assignment limit as {@link #find(FunctionExpr, int)}. */
+    public MeasuredResult findWithMatchWork(FunctionExpr program, int maximumAssignments) {
+        Run run = execute(program, maximumAssignments);
+        return new MeasuredResult(run.result(), run.patternBranches);
+    }
+
+    private Run execute(FunctionExpr program, int maximumAssignments) {
         Objects.requireNonNull(program, "program");
         if (maximumAssignments < 1 || maximumAssignments > MAXIMUM_ASSIGNMENTS) {
             throw new IllegalArgumentException("assignment budget outside supported bounds");
@@ -116,7 +139,7 @@ public final class TypedOutputPattern {
             enumerate(program, maximumAssignments, new ArrayList<>(),
                 new boolean[program.arguments().size()], run);
         }
-        return new Result(run.applications, run.complete, run.attempts, run.matcherSteps);
+        return run;
     }
 
     private static final class Run {
@@ -125,6 +148,11 @@ public final class TypedOutputPattern {
         boolean stopped;
         int attempts;
         long matcherSteps;
+        long patternBranches;
+
+        Result result() {
+            return new Result(applications, complete, attempts, matcherSteps);
+        }
     }
 
     private void enumerate(FunctionExpr program, int maximumAssignments,
@@ -142,6 +170,7 @@ public final class TypedOutputPattern {
                 .map(index -> program.arguments().get(index)).toList());
             var outcome = matcher.match(selected);
             run.matcherSteps = Math.addExact(run.matcherSteps, outcome.evaluatedSteps());
+            run.patternBranches = Math.addExact(run.patternBranches, outcome.patternBranches());
             run.complete &= outcome.complete();
             for (var match : outcome.matches()) {
                 var bindings = match.bindings();
