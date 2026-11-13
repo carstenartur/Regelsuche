@@ -22,6 +22,8 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final String PLAYWRIGHT_VERSION = "1.64.0";
   private static final String FULL_MAVEN_COMMAND =
       "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify";
+  private static final String COVERAGE_MAIN =
+      "de.regelsuche.quality.coverage.CoverageRegressionMain";
 
   @Test
   void independentAuthoritiesRunInParallelAndConvergeFailClosed()
@@ -189,9 +191,19 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(coverageConvergence.contains(
         "shutil.copyfile(isolated_report, canonical_report)"));
     assertTrue(coverageConvergence.contains(
-        "COVERAGE_VERIFIER = Path(\"scripts/verify-coverage-regression.py\")"));
-    assertTrue(coverageConvergence.contains("subprocess.run("));
-    assertTrue(coverageConvergence.contains("check=True"));
+        "if canonical_hash != source_hash:"),
+        "convergence must verify that it copied the exact isolated measurement");
+    assertTrue(coverageGate.contains("mainClass = '" + COVERAGE_MAIN + "'"));
+    assertTrue(coverageConvergence.contains("COVERAGE_MAIN = \"" + COVERAGE_MAIN + "\""),
+        "local and converged coverage must use the same Java decision");
+    assertTrue(coverageConvergence.contains(
+        "COVERAGE_RUNTIME = Path(\"build/reports/quality/coverage-report-runtime\")"));
+    assertTrue(coverageConvergence.contains(
+        "classpath = _coverage_classpath(root)"));
+    assertTrue(compact(coverageConvergence).contains(
+        "subprocess.run( [ \"java\", \"-cp\", classpath, COVERAGE_MAIN,"
+            + " \"--root\", str(root), ], cwd=root, check=True, )"),
+        "convergence must run the retained Java runtime and propagate a failing decision");
     assertTrue(convergence.contains("name: coverage-verification"));
     assertTrue(convergence.contains(
         "needs.sympy-runtime-verification.result == 'success'"),
