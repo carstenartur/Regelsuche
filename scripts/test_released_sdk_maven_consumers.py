@@ -166,6 +166,29 @@ class ReleasedConsumerContracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.verifier.check_cli_output('hello-rule-java25', hello.replace('negative=REJECTED', 'negative=ACCEPTED'))
 
+    def test_discovery_output_requires_result_counterexample_and_stable_evidence(self):
+        name = 'geometric-sequence-domain-java25'
+        prefix = (
+            'provider=example-geometric-sequence-provider\n'
+            'outcome=CONFIRMED\n'
+            'candidate=Plan[multiplier=2, input=Input[observed=[2, 4, 8, 16], holdout=[32, 64], maxMultiplier=6]]\n'
+            'counterexamples=[multiplier 1 predicts 2 but observed 4]\n'
+        )
+        digest = 'sha256:' + 'a' * 64
+        output = prefix + 'evidenceHash=' + digest + '\n'
+        checked = self.verifier.check_cli_output(name, output, output)
+        self.assertEqual(digest, checked['evidenceHash'])
+        self.assertTrue(checked['repeatVerified'])
+
+        for invalid in [prefix, output.replace('CONFIRMED', 'REFUTED'),
+                        output.replace('multiplier=2', 'multiplier=3'),
+                        output.replace('observed 4', 'observed 5'),
+                        output.replace(digest, 'sha256:' + 'A' * 64)]:
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                self.verifier.check_cli_output(name, invalid, invalid)
+        with self.assertRaises(ValueError):
+            self.verifier.check_cli_output(name, output, output.replace(digest, 'sha256:' + 'b' * 64))
+
     def test_failed_command_preserves_original_output_and_exit_status(self):
         log = self.root / 'failure.log'
         record = self.verifier.run_command(

@@ -188,12 +188,25 @@ class StudentDiscoveryStarterTest(unittest.TestCase):
         self.write(self.source / "build/stale.txt", "stale")
         self.write(self.source / ".gradle/stale.txt", "stale")
         self.write(self.source / "repository/stale.txt", "stale")
+        self.write(self.source / "target/stale.txt", "stale")
         before = {str(path): path.read_bytes() for path in self.source.rglob("*") if path.is_file()}
         self.generate()
         after = {str(path): path.read_bytes() for path in self.source.rglob("*") if path.is_file()}
         self.assertEqual(before, after)
-        for path in ("build", ".gradle", "repository"):
+        for path in ("build", ".gradle", "repository", "target"):
             self.assertFalse((self.output / path).exists())
+
+    def test_maven_template_uses_generated_coordinates_and_local_repository(self):
+        self.write(self.source / "pom.xml", """<project>
+<groupId>example</groupId><artifactId>geometric-sequence-domain</artifactId>
+<regelsuche.repository>file://${project.basedir}/../../../repository</regelsuche.repository>
+</project>
+""")
+        self.generate(package="org.example.discovery", project="my-domain")
+        pom = (self.output / "pom.xml").read_text()
+        self.assertIn("<groupId>org.example.discovery</groupId>", pom)
+        self.assertIn("<artifactId>my-domain</artifactId>", pom)
+        self.assertIn("file://${project.basedir}/repository", pom)
 
 class DiscoveryRuntimeContractTest(unittest.TestCase):
     """Check real maintained consumer contracts against both build dependency graphs."""

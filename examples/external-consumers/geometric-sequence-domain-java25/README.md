@@ -1,9 +1,8 @@
 # Geometric sequence discovery domain
 
-Dieses Verzeichnis ist absichtlich ein eigenständiges Java-25-Gradle-Projekt.
-Es verwendet ausschließlich das veröffentlichte
-`de.regelsuche:regelsuche-discovery-sdk`-Artefakt und keine Regelsuche-
-Projektabhängigkeit.
+Dieses eigenständige Java-25-Projekt verwendet
+`de.regelsuche:regelsuche-discovery-sdk` aus dem veröffentlichten SDK.
+Kopiere das Verzeichnis für einen eigenen Build an einen beliebigen Ort.
 
 Der Provider sucht einen ganzzahligen Multiplikator für eine geometrische
 Folge. Die Tests decken ab:
@@ -29,13 +28,29 @@ Dadurch bleiben Status-, Zertifikats- und Evidence-Semantik sichtbar, ohne dass
 ein externer Autor die internen Evidence-Records einzeln prüfen muss.
 Domänenspezifische Aussagen bleiben normale Java-Assertions.
 
-Nach Veröffentlichung der SDK-Artefakte in ein lokales Maven-Repository:
+Mit JDK 25, Maven 3.9.9 oder neuer aus der 3.x-Linie und dem entpackten
+[SDK 0.5.2](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.2):
+
+```bash
+mvn --batch-mode --no-transfer-progress \
+  -Dregelsuche.repository=file:///pfad/regelsuche-sdk-0.5.2/repository \
+  clean package
+java -cp "target/classes:target/dependency/*" example.GeometricSequenceExample
+```
+
+Unter Windows trennt `;` die Classpath-Einträge. Die Ausgabe enthält den
+bestätigten Multiplikator, das Gegenbeispiel für den ersten Kandidaten und
+den Hash der Evidenz.
+
+Für Gradle mit SDK 0.5.2 führe den Befehl im Beispielverzeichnis des entpackten
+ZIPs aus. Der Checkout verwendet für seinen Gradle-Build die API-Artefakte des
+entsprechenden Quellstands:
 
 ```bash
 gradle clean test run \
-  -PregelsucheRepository=/pfad/zum/repository \
-  -PregelsucheVersion=0.4.0-SNAPSHOT
+  -PregelsucheRepository=/pfad/regelsuche-sdk-0.5.2/repository \
+  -PregelsucheVersion=0.5.2
 ```
 
-Die autoritative Checkout-Reproduktion übernimmt
-`scripts/verify-student-java-sdk-consumer.py`.
+Die [SDK-Anleitung](https://github.com/carstenartur/Regelsuche/blob/main/docs/java-sdk-quickstart.md)
+beschreibt den Aufbau des ZIPs und die Verifikation der Prüfsummen.
