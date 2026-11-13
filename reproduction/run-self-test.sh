@@ -53,11 +53,11 @@ fi
 
 log "Validate frozen wrapper, container and executable inputs"
 grep -qx \
-  'distributionSha256Sum=84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae' \
+  'distributionSha256Sum=d8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228' \
   gradle/wrapper/gradle-wrapper.properties
 grep -qx \
   'FROM eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617 AS build' \
-  reproduction/Dockerfile.reproduction
+  reproduction/environments/v2/Dockerfile.reproduction
 bash -n reproduction/reproduce.sh
 python3 -m py_compile \
   scripts/build-independent-reproduction-artifact.py \
@@ -120,7 +120,7 @@ assert manifest["declaredEnvironment"]["javaImageIndexDigest"] == (
     "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
 assert manifest["declaredEnvironment"]["gradleDistributionSha256"] == (
-    "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae"
+    "d8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228"
 )
 with tarfile.open(archive, "r:gz") as bundle:
     names = [member.name for member in bundle.getmembers()]

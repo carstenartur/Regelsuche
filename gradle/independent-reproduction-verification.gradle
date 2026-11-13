@@ -32,6 +32,15 @@ def reproductionBuilder = reproductionRepositoryRoot.file(
     'scripts/build-independent-reproduction-artifact.py')
 def reproductionVerifier = reproductionRepositoryRoot.file(
     'scripts/verify-independent-reproduction.py')
+def reproductionEnvironmentInputs = files(
+    'scripts/independent_reproduction_environment.py',
+    'reproduction/environments/v2/environment.json',
+    'reproduction/environments/v2/Dockerfile.reproduction',
+    'docs/schemas/regelsuche-independent-reproduction-artifact-v2.schema.json',
+    'docs/schemas/regelsuche-independent-reproduction-receipt-v2.schema.json',
+    'gradle/wrapper/gradle-wrapper.properties',
+    'gradle/wrapper/gradle-wrapper.jar'
+)
 def reproductionLifecycleVerifier = reproductionRepositoryRoot.file(
     'scripts/verify-independent-reproduction-lifecycle.py')
 
@@ -42,6 +51,7 @@ def configureArtifactBuild = { task, outputDirectory, archiveOutput ->
     task.workingDir reproductionRepositoryRoot
     task.inputs.file reproductionBuilder
     task.inputs.file reproductionVerifier
+    task.inputs.files reproductionEnvironmentInputs
     task.inputs.dir reproductionWalkthrough
     task.inputs.property 'sourceRevision', reproductionSourceRevision
     task.inputs.property 'releaseTag', reproductionReleaseTag
@@ -86,6 +96,7 @@ def verifyIndependentReproductionArtifact = tasks.register(
     inputs.file reproductionLifecycleVerifier
     inputs.file reproductionVerifier
     inputs.file reproductionBuilder
+    inputs.files reproductionEnvironmentInputs
     inputs.dir reproductionArtifactA
     inputs.dir reproductionArtifactB
     inputs.file reproductionArchiveA

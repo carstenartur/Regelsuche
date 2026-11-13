@@ -111,7 +111,9 @@ Work-Ledger.
 | [`regelsuche-amortization-report-v1`](schemas/regelsuche-amortization-report-v1.schema.json) | Amortisations- und Break-even-Auswertung |
 | [`regelsuche-autonomous-discovery-result-card-v1`](schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json) | Evidence-abgeleitete Ergebnisdarstellung |
 | [`regelsuche-independent-reproduction-artifact-v1`](schemas/regelsuche-independent-reproduction-artifact-v1.schema.json) | Inhalt und Identität des Reproduktionspakets |
+| [`regelsuche-independent-reproduction-artifact-v2`](schemas/regelsuche-independent-reproduction-artifact-v2.schema.json) | Inhalt und Identität des Reproduktionspakets |
 | [`regelsuche-independent-reproduction-receipt-v1`](schemas/regelsuche-independent-reproduction-receipt-v1.schema.json) | Ergebnis eines Reproduktionslaufs |
+| [`regelsuche-independent-reproduction-receipt-v2`](schemas/regelsuche-independent-reproduction-receipt-v2.schema.json) | Ergebnis eines Reproduktionslaufs |
 
 ## Solver und Proof
 

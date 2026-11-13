@@ -16,19 +16,19 @@ import tarfile
 from typing import Any, Iterable
 
 
-MANIFEST_SCHEMA = "regelsuche.independent-reproduction-artifact/v1"
+from independent_reproduction_environment import (
+    ARTIFACT_SCHEMA_V2,
+    ARTIFACT_V2,
+    DESCRIPTOR_BUNDLE,
+    DESCRIPTOR_SHA256,
+    DESCRIPTOR_SOURCE,
+    DOCKERFILE_V2,
+    ENVIRONMENT_MODULE,
+    RECEIPT_SCHEMA_V2,
+    repository_descriptor,
+)
+
 CLAIM_POLICY = "REPRODUCTION_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"
-BASE_IMAGE = (
-    "eclipse-temurin:25.0.3_9-jdk-noble@"
-    "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
-)
-BASE_IMAGE_INDEX_DIGEST = (
-    "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
-)
-GRADLE_DISTRIBUTION = "gradle-9.7.1-bin.zip"
-GRADLE_DISTRIBUTION_SHA256 = (
-    "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
-)
 REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 MANAGED_OUTPUT_MARKER = ".regelsuche-independent-reproduction-output"
@@ -209,34 +209,25 @@ def parse_properties(path: Path) -> dict[str, str]:
     return result
 
 
-def validate_gradle_wrapper(repository: Path) -> dict[str, str]:
-    path = repository / "gradle/wrapper/gradle-wrapper.properties"
-    properties = parse_properties(path)
-    expected_url = (
-        "https\\://services.gradle.org/distributions/" + GRADLE_DISTRIBUTION
+def validate_environment(repository: Path, environment: dict[str, Any]) -> None:
+    properties = parse_properties(
+        repository / "gradle/wrapper/gradle-wrapper.properties"
     )
+    expected_url = environment["gradleDistributionUrl"].replace(":", r"\:", 1)
     if properties.get("distributionUrl") != expected_url:
-        raise ValueError("Gradle distribution URL differs from the frozen contract")
-    if properties.get("distributionSha256Sum") != GRADLE_DISTRIBUTION_SHA256:
-        raise ValueError("Gradle distribution checksum differs from the frozen contract")
-    return properties
+        raise ValueError("Gradle distribution URL differs from the v2 contract")
+    if properties.get("distributionSha256Sum") != environment["gradleDistributionSha256"]:
+        raise ValueError("Gradle distribution checksum differs from the v2 contract")
 
-
-def validate_container_definition(repository: Path) -> None:
-    path = repository / "reproduction/Dockerfile.reproduction"
-    text = path.read_text(encoding="utf-8")
-    expected = f"FROM {BASE_IMAGE} AS build"
-    if text.splitlines()[0].strip() != expected:
-        raise ValueError("reproduction Dockerfile does not use the frozen base digest")
-    external_from = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip().startswith("FROM ") and "FROM build " not in line
-    ]
-    if external_from != [expected]:
-        raise ValueError(
-            "reproduction Dockerfile must have exactly one digest-pinned external base"
-        )
+    for relative, field in (
+        ("gradle/wrapper/gradle-wrapper.jar", "gradleWrapperJarSha256"),
+        (DOCKERFILE_V2, "containerDefinitionSha256"),
+        (ARTIFACT_SCHEMA_V2, "artifactSchemaSha256"),
+        (RECEIPT_SCHEMA_V2, "receiptSchemaSha256"),
+    ):
+        path = repository / relative
+        if path.is_symlink() or not path.is_file() or sha256_file(path) != environment[field]:
+            raise ValueError(f"v2 reproduction environment file differs: {relative}")
 
 
 def create_source_archive(repository: Path, revision: str, output: Path) -> None:
@@ -409,8 +400,10 @@ def main() -> None:
     validate_source_identity(
         repository, revision, release_tag, args.release_tag_status
     )
-    wrapper = validate_gradle_wrapper(repository)
-    validate_container_definition(repository)
+    environment = repository_descriptor(repository)
+    validate_environment(repository, environment)
+    if args.architecture not in environment["architectures"]:
+        raise ValueError("architecture is outside the v2 reproduction environment")
 
     card = load_unique(walkthrough / "result-card.json")
     validate_result_card(card, revision)
@@ -430,8 +423,13 @@ def main() -> None:
 
     create_source_archive(repository, revision, bundle / "source/regelsuche-source.tar.gz")
     copy_required(
-        repository / "reproduction/Dockerfile.reproduction",
+        repository / DOCKERFILE_V2,
         bundle / "environment/Dockerfile.reproduction",
+    )
+    copy_required(repository / DESCRIPTOR_SOURCE, bundle / DESCRIPTOR_BUNDLE)
+    copy_required(
+        repository / ENVIRONMENT_MODULE,
+        bundle / ENVIRONMENT_MODULE,
     )
     copy_required(
         repository / "reproduction/reproduce.sh",
@@ -449,13 +447,11 @@ def main() -> None:
         executable=True,
     )
     copy_required(
-        repository
-        / "docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json",
+        repository / ARTIFACT_SCHEMA_V2,
         bundle / "schemas/artifact-manifest.schema.json",
     )
     copy_required(
-        repository
-        / "docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json",
+        repository / RECEIPT_SCHEMA_V2,
         bundle / "schemas/reproduction-receipt.schema.json",
     )
     copy_required(
@@ -509,7 +505,7 @@ def main() -> None:
         else "DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION"
     )
     manifest: dict[str, Any] = {
-        "schema": MANIFEST_SCHEMA,
+        "schema": ARTIFACT_V2,
         "artifactId": (
             "regelsuche-autonomous-discovery-reproduction/"
             f"{release_tag}/{revision}"
@@ -527,11 +523,12 @@ def main() -> None:
             ),
         },
         "declaredEnvironment": {
-            "javaImage": BASE_IMAGE,
-            "javaImageIndexDigest": BASE_IMAGE_INDEX_DIGEST,
-            "gradleDistribution": GRADLE_DISTRIBUTION,
-            "gradleDistributionUrl": wrapper["distributionUrl"].replace("\\:", ":"),
-            "gradleDistributionSha256": GRADLE_DISTRIBUTION_SHA256,
+            "environmentDescriptorSha256": DESCRIPTOR_SHA256,
+            "javaImage": environment["javaImage"],
+            "javaImageIndexDigest": environment["javaImage"].split("@", 1)[1],
+            "gradleDistribution": environment["gradleDistribution"],
+            "gradleDistributionUrl": environment["gradleDistributionUrl"],
+            "gradleDistributionSha256": environment["gradleDistributionSha256"],
             "operatingSystem": "ubuntu-24.04-noble-container",
             "architecture": args.architecture,
             "containerDefinitionPath": "environment/Dockerfile.reproduction",
@@ -539,9 +536,9 @@ def main() -> None:
                 bundle / "environment/Dockerfile.reproduction"
             ),
             "containerTarget": "independent-reproduction",
-            "runtimeUser": "reproducer:10001",
-            "evaluatedRunNetworkPolicy": "DISABLED",
-            "buildNetworkPolicy": "DEPENDENCY_RESOLUTION_ONLY",
+            "runtimeUser": environment["runtimeUser"],
+            "evaluatedRunNetworkPolicy": environment["evaluatedRunNetworkPolicy"],
+            "buildNetworkPolicy": environment["buildNetworkPolicy"],
             "containerImagePolicy": "BUILD_FROM_DIGEST_PINNED_DEFINITION",
             "launcherRequirements": {
                 "python": ">=3.11",

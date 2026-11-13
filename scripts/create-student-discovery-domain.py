@@ -18,7 +18,7 @@ WRAPPER_FILES = (
     Path("gradle/wrapper/gradle-wrapper.jar"),
     Path("gradle/wrapper/gradle-wrapper.properties"),
 )
-GRADLE_WRAPPER_VERSION = "9.7.1"
+GRADLE_WRAPPER_VERSION = "9.9.1"
 PACKAGE_SEGMENT = re.compile(r"[a-z][a-z0-9_]*\Z")
 SLUG = re.compile(r"[a-z][a-z0-9-]*\Z")
 JAVA_KEYWORDS = {

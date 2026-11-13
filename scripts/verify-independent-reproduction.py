@@ -16,8 +16,22 @@ import tarfile
 from typing import Any, Iterable
 
 
-MANIFEST_SCHEMA = "regelsuche.independent-reproduction-artifact/v1"
-RECEIPT_SCHEMA = "regelsuche.independent-reproduction-receipt/v1"
+# Import the bundled contract without writing unlisted files into the artifact.
+sys.dont_write_bytecode = True
+from independent_reproduction_environment import (
+    ARTIFACT_SCHEMA_V2,
+    ARTIFACT_V1,
+    ARTIFACT_V2,
+    DESCRIPTOR_BUNDLE,
+    DESCRIPTOR_SHA256,
+    DESCRIPTOR_SOURCE,
+    DOCKERFILE_V2,
+    ENVIRONMENT_MODULE,
+    RECEIPT_SCHEMA_V2,
+    RECEIPT_V1,
+    RECEIPT_V2,
+    checked_descriptor,
+)
 CLAIM_POLICY = "REPRODUCTION_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"
 BASE_IMAGE = (
     "eclipse-temurin:25.0.3_9-jdk-noble@"
@@ -26,6 +40,14 @@ BASE_IMAGE = (
 BASE_IMAGE_INDEX_DIGEST = (
     "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
+ARTIFACT_SCHEMA_V1_SHA256 = (
+    "sha256:e7e353cc1e3ea0996ba4d2e88bdbeb2b6ea123ae8da4bffd7ad209a8741878bd"
+)
+# Receipt schemas also identify a damaged bundle when its manifest is unreadable.
+RECEIPT_SCHEMA_SHA256 = {
+    RECEIPT_V1: "sha256:074943b4dfc5882ff88aec976b2f0018231904d8d9f5256611aa18510de976ea",
+    RECEIPT_V2: "sha256:b267a2fc555551820163b0e028458532ae2108fff177599bfca3d90c7b2c63cd",
+}
 GRADLE_DISTRIBUTION = "gradle-9.7.1-bin.zip"
 GRADLE_DISTRIBUTION_SHA256 = (
     "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
@@ -158,7 +180,10 @@ def parse_properties_text(text: str, source: str) -> dict[str, str]:
     return result
 
 
-def inspect_source_archive(path: Path, manifest: dict[str, Any]) -> list[str]:
+def inspect_source_archive(
+    path: Path, manifest: dict[str, Any], descriptor: dict | None,
+    refs: dict[str, dict[str, Any]],
+) -> list[str]:
     failures: list[str] = []
     required_members = {
         "regelsuche-source/gradlew",
@@ -171,6 +196,17 @@ def inspect_source_archive(path: Path, manifest: dict[str, Any]) -> list[str]:
         "regelsuche-source/scripts/verify-independent-reproduction.py",
         "regelsuche-source/regelsuche-release/src/main/java/de/regelsuche/release/AutonomousDiscoveryWalkthroughRunner.java",
     }
+    bound_members = {}
+    if descriptor is not None:
+        bound_members = {
+            DESCRIPTOR_SOURCE: DESCRIPTOR_SHA256,
+            DOCKERFILE_V2: descriptor["containerDefinitionSha256"],
+            ARTIFACT_SCHEMA_V2: descriptor["artifactSchemaSha256"],
+            RECEIPT_SCHEMA_V2: descriptor["receiptSchemaSha256"],
+            ENVIRONMENT_MODULE: refs.get(ENVIRONMENT_MODULE, {}).get("sha256"),
+            "gradle/wrapper/gradle-wrapper.jar": descriptor["gradleWrapperJarSha256"],
+        }
+        required_members.update(f"regelsuche-source/{name}" for name in bound_members)
     try:
         with tarfile.open(path, "r:gz") as archive:
             members = archive.getmembers()
@@ -192,6 +228,14 @@ def inspect_source_archive(path: Path, manifest: dict[str, Any]) -> list[str]:
             for required in sorted(required_members - set(by_name)):
                 failures.append(f"source archive missing required member: {required}")
 
+            for relative, expected in bound_members.items():
+                member = by_name.get(f"regelsuche-source/{relative}")
+                if member is not None and member.isfile():
+                    with archive.extractfile(member) as handle:
+                        if sha256_bytes(handle.read()) == expected:
+                            continue
+                failures.append(f"source archive v2 environment file differs: {relative}")
+
             properties_member = by_name.get(
                 "regelsuche-source/gradle/wrapper/gradle-wrapper.properties"
             )
@@ -205,15 +249,16 @@ def inspect_source_archive(path: Path, manifest: dict[str, Any]) -> list[str]:
                         "source archive Gradle wrapper properties",
                     )
                     expected_url = (
-                        "https\\://services.gradle.org/distributions/"
-                        + GRADLE_DISTRIBUTION
+                        descriptor["gradleDistributionUrl"] if descriptor is not None
+                        else "https://services.gradle.org/distributions/" + GRADLE_DISTRIBUTION
+                    ).replace(":", r"\:", 1)
+                    expected_digest = (
+                        descriptor["gradleDistributionSha256"] if descriptor is not None
+                        else GRADLE_DISTRIBUTION_SHA256
                     )
                     if properties.get("distributionUrl") != expected_url:
                         failures.append("source archive Gradle URL is not frozen")
-                    if (
-                        properties.get("distributionSha256Sum")
-                        != GRADLE_DISTRIBUTION_SHA256
-                    ):
+                    if properties.get("distributionSha256Sum") != expected_digest:
                         failures.append(
                             "source archive Gradle distribution checksum is not frozen"
                         )
@@ -348,6 +393,35 @@ def container_definition_failures(root: Path, manifest: dict[str, Any]) -> list[
     return failures
 
 
+def v2_environment_failures(
+    manifest: dict[str, Any], refs: dict[str, dict[str, Any]], descriptor: dict
+) -> list[str]:
+    failures: list[str] = []
+    environment = manifest.get("declaredEnvironment", {})
+    for field in (
+        "javaImage", "gradleDistribution", "gradleDistributionUrl",
+        "gradleDistributionSha256", "containerDefinitionSha256", "runtimeUser",
+        "evaluatedRunNetworkPolicy", "buildNetworkPolicy",
+    ):
+        if environment.get(field) != descriptor[field]:
+            failures.append(f"manifest v2 environment differs: {field}")
+    if environment.get("architecture") not in descriptor["architectures"]:
+        failures.append("manifest architecture is outside the v2 environment")
+    if ENVIRONMENT_MODULE not in refs:
+        failures.append(f"manifest v2 environment file is missing: {ENVIRONMENT_MODULE}")
+    if environment.get("environmentDescriptorSha256") != DESCRIPTOR_SHA256:
+        failures.append("manifest v2 environment descriptor checksum differs")
+    for relative, expected in (
+        (DESCRIPTOR_BUNDLE, DESCRIPTOR_SHA256),
+        ("environment/Dockerfile.reproduction", descriptor["containerDefinitionSha256"]),
+        ("schemas/artifact-manifest.schema.json", descriptor["artifactSchemaSha256"]),
+        ("schemas/reproduction-receipt.schema.json", descriptor["receiptSchemaSha256"]),
+    ):
+        if refs.get(relative, {}).get("sha256") != expected:
+            failures.append(f"manifest v2 environment file differs: {relative}")
+    return failures
+
+
 def identity_failures(
     root: Path, manifest: dict[str, Any], card: dict[str, Any]
 ) -> list[str]:
@@ -410,8 +484,15 @@ def backend_identity_failures(root: Path, manifest: dict[str, Any]) -> list[str]
 
 def verify_artifact(root: Path, manifest: dict[str, Any]) -> list[str]:
     failures: list[str] = []
-    if manifest.get("schema") != MANIFEST_SCHEMA:
-        failures.append("unsupported artifact manifest schema")
+    version = manifest.get("schema")
+    if version not in (ARTIFACT_V1, ARTIFACT_V2):
+        return ["unsupported artifact manifest schema"]
+    descriptor = None
+    if version == ARTIFACT_V2:
+        try:
+            descriptor = checked_descriptor(resolve(root, DESCRIPTOR_BUNDLE).read_bytes())
+        except (OSError, ValueError) as exc:
+            return [f"invalid v2 reproduction environment descriptor: {exc}"]
     if expected_hash(manifest) != manifest.get("contentHash"):
         failures.append("artifact manifest contentHash mismatch")
     if manifest.get("claimPolicy") != CLAIM_POLICY:
@@ -466,22 +547,35 @@ def verify_artifact(root: Path, manifest: dict[str, Any]) -> list[str]:
             failures.append(f"artifact SHA-256 mismatch: {value}")
 
     failures.extend(specialized_reference_failures(manifest, refs))
+    if descriptor is not None:
+        failures.extend(v2_environment_failures(manifest, refs, descriptor))
     for item in manifest.get("schemas", []):
         if not isinstance(item, dict) or not isinstance(item.get("path"), str):
             continue
         try:
-            schema_check(resolve(root, item["path"]))
+            path = resolve(root, item["path"])
+            if path == root / "schemas/artifact-manifest.schema.json":
+                continue  # Checked against the frozen bytes when validating the manifest.
+            if path == root / "schemas/reproduction-receipt.schema.json":
+                identity = RECEIPT_V2 if version == ARTIFACT_V2 else RECEIPT_V1
+                if sha256_file(path) != RECEIPT_SCHEMA_SHA256[identity]:
+                    raise ValueError("receipt schema bytes differ from the frozen contract")
+            schema_check(path)
         except Exception as exc:  # noqa: BLE001 - retained diagnostic
             failures.append(f"schema is invalid: {item.get('path')}: {exc}")
 
     source_path = source.get("archivePath", "")
+    if version == ARTIFACT_V2:
+        source_path = "source/regelsuche-source.tar.gz"
+        if source_path not in refs:
+            failures.append("v2 source archive is absent from the file inventory")
     if isinstance(source_path, str) and source_path in refs:
         if refs[source_path].get("sha256") != source.get("archiveSha256"):
             failures.append("source archive hash disagrees with file inventory")
         try:
             archive_path = resolve(root, source_path)
             if archive_path.is_file():
-                failures.extend(inspect_source_archive(archive_path, manifest))
+                failures.extend(inspect_source_archive(archive_path, manifest, descriptor, refs))
         except ValueError as exc:
             failures.append(str(exc))
 
@@ -761,6 +855,7 @@ def make_receipt(
     execution_exit_code: int,
     platform_value: str,
     docker_value: str,
+    receipt_schema: str,
 ) -> dict[str, Any]:
     if semantic["allSemanticRootsMatch"] and exact["allDesignatedBytesMatch"]:
         status = "EXACT_BYTE_REPRODUCED"
@@ -772,7 +867,7 @@ def make_receipt(
         manifest, manifest_file_sha256
     )
     receipt: dict[str, Any] = {
-        "schema": RECEIPT_SCHEMA,
+        "schema": receipt_schema,
         "artifactManifestHash": manifest_hash,
         "artifactManifestHashSource": manifest_hash_source,
         "artifactManifestFileSha256": manifest_file_sha256,
@@ -819,9 +914,12 @@ def expected_reproduction_status(receipt: dict[str, Any]) -> str:
 
 
 def verify_receipt_value(
-    receipt: dict[str, Any], manifest: dict[str, Any], manifest_file_sha256: str
+    receipt: dict[str, Any], manifest: dict[str, Any], manifest_file_sha256: str,
+    receipt_schema: str,
 ) -> list[str]:
     failures: list[str] = []
+    if receipt.get("schema") != receipt_schema:
+        failures.append("receipt schema does not match the artifact version")
     if expected_hash(receipt) != receipt.get("contentHash"):
         failures.append("reproduction receipt contentHash mismatch")
     expected_semantic = sha256_bytes(
@@ -863,9 +961,9 @@ def verify_receipt_value(
     return sorted(set(failures))
 
 
-def fallback_manifest(manifest_file_sha256: str) -> dict[str, Any]:
+def fallback_manifest(schema: str) -> dict[str, Any]:
     return {
-        "schema": MANIFEST_SCHEMA,
+        "schema": schema,
         "artifactId": "unresolved-reproduction-artifact",
         "contentHash": "NOT_AVAILABLE",
         "source": {"revision": "0" * 40},
@@ -880,29 +978,54 @@ def fallback_manifest(manifest_file_sha256: str) -> dict[str, Any]:
     }
 
 
+def fallback_artifact_schema(root: Path) -> str:
+    path = resolve(root, "schemas/reproduction-receipt.schema.json")
+    digest = sha256_file(path)
+    if digest == RECEIPT_SCHEMA_SHA256[RECEIPT_V2]:
+        return ARTIFACT_V2
+    if digest == RECEIPT_SCHEMA_SHA256[RECEIPT_V1]:
+        return ARTIFACT_V1
+    raise ValueError("cannot determine artifact version from frozen receipt schema bytes")
+
+
 def load_manifest_for_receipt(
     root: Path,
-) -> tuple[dict[str, Any], str, list[str]]:
+) -> tuple[dict[str, Any] | None, str, list[str]]:
     path = root / "artifact-manifest.json"
     if not path.is_file():
-        file_sha = sha256_bytes(b"")
-        return fallback_manifest(file_sha), file_sha, ["artifact manifest is missing"]
+        return None, sha256_bytes(b""), ["artifact manifest is missing"]
     raw = path.read_bytes()
     file_sha = sha256_bytes(raw)
     try:
         manifest = load_unique(path)
+        if not isinstance(manifest, dict):
+            raise ValueError("expected an artifact manifest object")
     except Exception as exc:  # noqa: BLE001 - retained diagnostic
-        return (
-            fallback_manifest(file_sha),
-            file_sha,
-            [f"artifact manifest is unreadable: {exc}"],
-        )
-    failures: list[str] = []
-    try:
-        schema_validate(root / "schemas/artifact-manifest.schema.json", manifest)
-    except Exception as exc:  # noqa: BLE001 - retained diagnostic
-        failures.append(f"artifact manifest schema validation failed: {exc}")
-    return manifest, file_sha, failures
+        return None, file_sha, [f"artifact manifest is unreadable: {exc}"]
+    return manifest, file_sha, []
+
+
+def validate_artifact_schema(root: Path, manifest: dict[str, Any]) -> None:
+    identity = manifest.get("schema")
+    path = resolve(root, "schemas/artifact-manifest.schema.json")
+    expected = ARTIFACT_SCHEMA_V1_SHA256
+    if identity == ARTIFACT_V2:
+        descriptor = checked_descriptor(resolve(root, DESCRIPTOR_BUNDLE).read_bytes())
+        expected = descriptor["artifactSchemaSha256"]
+    validate_frozen_schema(path, manifest, identity, expected)
+
+
+def validate_frozen_schema(path: Path, value: dict[str, Any], identity: str, expected: str) -> None:
+    if sha256_file(path) != expected:
+        raise ValueError("schema bytes differ from the frozen contract")
+    if load_unique(path).get("$id") != identity:
+        raise ValueError("schema file does not match the artifact version")
+    schema_validate(path, value)
+
+
+def validate_receipt_schema(root: Path, receipt: dict[str, Any], identity: str) -> None:
+    path = resolve(root, "schemas/reproduction-receipt.schema.json")
+    validate_frozen_schema(path, receipt, identity, RECEIPT_SCHEMA_SHA256[identity])
 
 
 def write_receipt(path: Path, receipt: dict[str, Any]) -> None:
@@ -944,6 +1067,20 @@ def main() -> None:
     )
     root = root_input.resolve()
     manifest, manifest_file_sha, load_failures = load_manifest_for_receipt(root)
+    if manifest is None:
+        if args.command == "verify-artifact":
+            raise SystemExit("ERROR: " + load_failures[0])
+        try:
+            manifest = fallback_manifest(fallback_artifact_schema(root))
+        except (OSError, ValueError) as exc:
+            raise SystemExit(f"ERROR: {load_failures[0]}\nERROR: {exc}") from exc
+    elif manifest.get("schema") not in (ARTIFACT_V1, ARTIFACT_V2):
+        raise SystemExit("ERROR: unsupported artifact manifest schema")
+    else:
+        try:
+            validate_artifact_schema(root, manifest)
+        except Exception as exc:  # noqa: BLE001 - retained diagnostic
+            load_failures.append(f"artifact manifest schema validation failed: {exc}")
     artifact_failures = sorted(
         set(root_failures + load_failures + verify_artifact(root, manifest))
     )
@@ -957,10 +1094,13 @@ def main() -> None:
         print(manifest_file_sha)
         return
 
+    receipt_schema = RECEIPT_V2 if manifest.get("schema") == ARTIFACT_V2 else RECEIPT_V1
     if args.command == "verify-receipt":
         receipt = load_unique(args.receipt.resolve())
-        schema_validate(root / "schemas/reproduction-receipt.schema.json", receipt)
-        failures = verify_receipt_value(receipt, manifest, manifest_file_sha)
+        validate_receipt_schema(root, receipt, receipt_schema)
+        failures = verify_receipt_value(receipt, manifest, manifest_file_sha, receipt_schema)
+        if receipt.get("reproductionStatus") != "NOT_REPRODUCED":
+            failures.extend(artifact_failures)
         if failures:
             for failure in failures:
                 print(f"ERROR: {failure}")
@@ -995,18 +1135,17 @@ def main() -> None:
         max(0, args.execution_exit_code),
         args.platform or platform.platform(),
         args.docker_version or docker_version(),
+        receipt_schema,
     )
     write_receipt(args.receipt.resolve(), receipt)
 
     receipt_failures: list[str] = []
     try:
-        schema_validate(
-            root / "schemas/reproduction-receipt.schema.json", receipt
-        )
+        validate_receipt_schema(root, receipt, receipt_schema)
     except Exception as exc:  # noqa: BLE001 - receipt remains retained
         receipt_failures.append(f"receipt schema validation failed: {exc}")
     receipt_failures.extend(
-        verify_receipt_value(receipt, manifest, manifest_file_sha)
+        verify_receipt_value(receipt, manifest, manifest_file_sha, receipt_schema)
     )
     for failure in sorted(set(receipt_failures)):
         print(f"ERROR: {failure}", file=sys.stderr)

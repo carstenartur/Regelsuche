@@ -1,0 +1,28 @@
+{
+  "schema": "regelsuche.independent-reproduction-environment/v2",
+  "artifactSchema": "regelsuche.independent-reproduction-artifact/v2",
+  "artifactSchemaSha256": "sha256:03c074c716eeac7602cdd7dbdfe6afb195b4d132df784039cd6a12235c992fc6",
+  "receiptSchema": "regelsuche.independent-reproduction-receipt/v2",
+  "receiptSchemaSha256": "sha256:b267a2fc555551820163b0e028458532ae2108fff177599bfca3d90c7b2c63cd",
+  "javaImage": "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617",
+  "gradleDistribution": "gradle-9.9.1-bin.zip",
+  "gradleDistributionUrl": "https://services.gradle.org/distributions/gradle-9.9.1-bin.zip",
+  "gradleDistributionSha256": "d8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228",
+  "gradleWrapperJarSha256": "sha256:621008afc4f5d59357fcf06ffa644dd5aade5e091bdc363742710445f73cdaf8",
+  "architectures": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "containerDefinitionSha256": "sha256:a6724aeb057058ad36302bffbea5c76005a3a255791f0b46ef9a4caf2c172675",
+  "runtimeUser": "reproducer:10001",
+  "evaluatedRunNetworkPolicy": "DISABLED",
+  "buildNetworkPolicy": "DEPENDENCY_RESOLUTION_ONLY",
+  "predecessor": {
+    "sourceRevision": "d7cff4f31aa4fb9c20f78ff6fd5fe3fdda1be213",
+    "artifactSchema": "regelsuche.independent-reproduction-artifact/v1",
+    "artifactSchemaSha256": "sha256:e7e353cc1e3ea0996ba4d2e88bdbeb2b6ea123ae8da4bffd7ad209a8741878bd",
+    "receiptSchema": "regelsuche.independent-reproduction-receipt/v1",
+    "receiptSchemaSha256": "sha256:074943b4dfc5882ff88aec976b2f0018231904d8d9f5256611aa18510de976ea",
+    "containerDefinitionSha256": "sha256:a7c3724ac5f679be9ae9d90f141da5fe60befd74b768a123d737f0ea56c441cf"
+  }
+}

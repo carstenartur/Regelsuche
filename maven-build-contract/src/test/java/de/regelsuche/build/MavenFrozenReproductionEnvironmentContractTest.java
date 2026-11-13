@@ -39,9 +39,11 @@ class MavenFrozenReproductionEnvironmentContractTest {
     private static final String IMAGE_POLICY = "config/quality/container-image-policy.json";
     private static final String V1_IMAGE = "eclipse-temurin:25.0.3_9-jdk-noble@sha256:"
         + "3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617";
+    private static final String INDEPENDENT_V2_DOCKERFILE =
+        "reproduction/environments/v2/Dockerfile.reproduction";
     private static final Set<String> FROZEN_DOCKERFILES = Set.of(
         "Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction",
-        "Dockerfile.safe-runtime-qualification");
+        "Dockerfile.safe-runtime-qualification", INDEPENDENT_V2_DOCKERFILE);
     // Original five v1 identities retained at 8afeda1a538c6726b0f6b8a6c8014dfcced0fbe2.
     // Additive public runtime definition/schema retained at fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812.
     // Future environments add a new version; they never replace these identities.
@@ -61,6 +63,16 @@ class MavenFrozenReproductionEnvironmentContractTest {
         "docs/schemas/regelsuche-safe-runtime-product-qualification-v1.schema.json",
         "d00f99bdda32a1cc32c62a5314252b98021b2632a73b57c62bbc25a3466a80e2");
 
+    private static final Map<String, String> V2_SHA256 = Map.of(
+        "reproduction/environments/v2/Dockerfile.reproduction",
+        "a6724aeb057058ad36302bffbea5c76005a3a255791f0b46ef9a4caf2c172675",
+        "reproduction/environments/v2/environment.json",
+        "5bef9ba990903fc48eea7aa18955bc7d87d16c1278712459285a9f4138cab348",
+        "docs/schemas/regelsuche-independent-reproduction-artifact-v2.schema.json",
+        "03c074c716eeac7602cdd7dbdfe6afb195b4d132df784039cd6a12235c992fc6",
+        "docs/schemas/regelsuche-independent-reproduction-receipt-v2.schema.json",
+        "b267a2fc555551820163b0e028458532ae2108fff177599bfca3d90c7b2c63cd");
+
     @Test
     void repositorySeparatesRoutineImagesFromFrozenV1Evidence() throws IOException {
         var result = evaluate(repositoryRoot());
@@ -72,7 +84,7 @@ class MavenFrozenReproductionEnvironmentContractTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction",
-        "Dockerfile.safe-runtime-qualification"})
+        "Dockerfile.safe-runtime-qualification", INDEPENDENT_V2_DOCKERFILE})
     void removingAnyFrozenExclusionFailsClosed(String removed, @TempDir Path temporary)
             throws IOException {
         fixture(temporary);
@@ -120,6 +132,20 @@ class MavenFrozenReproductionEnvironmentContractTest {
         assertEquals(JSON.readTree(original), JSON.readTree(path.toFile()));
 
         assertViolation(temporary, "v1 bytes changed: " + relative);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        INDEPENDENT_V2_DOCKERFILE, "reproduction/environments/v2/environment.json",
+        "docs/schemas/regelsuche-independent-reproduction-artifact-v2.schema.json",
+        "docs/schemas/regelsuche-independent-reproduction-receipt-v2.schema.json"})
+    void v2EnvironmentBytesAreFrozen(String relative, @TempDir Path temporary)
+            throws IOException {
+        fixture(temporary);
+        Path path = temporary.resolve(relative);
+        Files.writeString(path, Files.readString(path) + "\n");
+
+        assertViolation(temporary, "v2 bytes changed: " + relative);
     }
 
     @ParameterizedTest
@@ -209,22 +235,31 @@ class MavenFrozenReproductionEnvironmentContractTest {
         });
         for (String path : FROZEN_DOCKERFILES) {
             if (!policy.path(path).equals(JSON.createArrayNode().add(V1_IMAGE))) {
-                violations.add("v1 image policy changed: " + path);
+                String version = INDEPENDENT_V2_DOCKERFILE.equals(path) ? "v2" : "v1";
+                violations.add(version + " image policy changed: " + path);
             }
         }
-        for (var entry : V1_SHA256.entrySet()) {
+        checkFrozenBytes(root, V1_SHA256, "v1", violations);
+        checkFrozenBytes(root, V2_SHA256, "v2", violations);
+        return new Evaluation(Set.copyOf(routine), List.copyOf(violations));
+    }
+
+    private static void checkFrozenBytes(
+            Path root, Map<String, String> expected, String version, List<String> violations)
+            throws IOException {
+        for (var entry : expected.entrySet()) {
             Path path = root.resolve(entry.getKey());
             if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
                     || !entry.getValue().equals(sha256(Files.readAllBytes(path)))) {
-                violations.add("v1 bytes changed: " + entry.getKey());
+                violations.add(version + " bytes changed: " + entry.getKey());
             }
         }
-        return new Evaluation(Set.copyOf(routine), List.copyOf(violations));
     }
 
     private static void fixture(Path destination) throws IOException {
         Path root = repositoryRoot();
         Set<String> paths = new TreeSet<>(V1_SHA256.keySet());
+        paths.addAll(V2_SHA256.keySet());
         paths.addAll(List.of(DEPENDABOT, IMAGE_POLICY, "Dockerfile"));
         for (String relative : paths) {
             Path target = destination.resolve(relative);
