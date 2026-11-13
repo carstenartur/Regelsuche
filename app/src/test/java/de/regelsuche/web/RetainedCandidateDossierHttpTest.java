@@ -9,10 +9,14 @@ import de.regelsuche.discovery.representation.*;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -135,7 +139,7 @@ class RetainedCandidateDossierHttpTest {
             assertEquals(403, blocked.statusCode());
             assertTrue(blocked.body().contains("THEOREMSEARCH_DISABLED"), blocked.body());
             assertEquals(403, literature("GET", suffix, null, true).statusCode());
-            assertEquals(413, literature("PUT", suffix, "x".repeat(128 * 1024 + 1), false).statusCode());
+            assertDeclaredOversizeLiteratureRequest(suffix, json);
             try (var socket = new java.net.Socket("127.0.0.1", server.boundPort())) {
                 socket.setSoTimeout(5000);
                 socket.getOutputStream().write(("GET /api/discovery-runs" + suffix + " HTTP/1.1\r\n"
@@ -162,6 +166,41 @@ class RetainedCandidateDossierHttpTest {
         } finally {
             if (previous == null) System.clearProperty("regelsuche.literature.theoremsearch.enabled");
             else System.setProperty("regelsuche.literature.theoremsearch.enabled", previous);
+        }
+    }
+
+    private void assertDeclaredOversizeLiteratureRequest(String suffix, JsonMapper json) throws Exception {
+        int limit = 128 * 1024;
+        try (var socket = new Socket("127.0.0.1", server.boundPort())) {
+            socket.setSoTimeout(5000);
+            // The server can reject from the headers before the client uploads any bytes.
+            String headers = "PUT /api/discovery-runs" + suffix + " HTTP/1.1\r\n"
+                + "Host: localhost\r\nContent-Type: application/json\r\n"
+                + "X-Regelsuche-Literature: workbench\r\nSec-Fetch-Site: same-origin\r\n"
+                + "Content-Length: " + (limit + 1) + "\r\nConnection: close\r\n\r\n";
+            socket.getOutputStream().write(headers.getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().flush();
+
+            var response = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+            String status = response.readLine();
+            assertNotNull(status);
+            assertTrue(status.startsWith("HTTP/1.1 413 "), status);
+            int length = -1;
+            for (String header = response.readLine(); header != null && !header.isEmpty(); header = response.readLine()) {
+                if (header.regionMatches(true, 0, "Content-Length:", 0, "Content-Length:".length())) {
+                    length = Integer.parseInt(header.substring("Content-Length:".length()).trim());
+                }
+            }
+            assertTrue(length > 0 && length <= 1024, "unexpected response length: " + length);
+            var body = new StringBuilder(length);
+            for (int i = 0; i < length; i++) {
+                int character = response.read();
+                assertNotEquals(-1, character, "truncated 413 response");
+                body.append((char) character);
+            }
+            var payload = json.readTree(body.toString());
+            assertEquals("PAYLOAD_TOO_LARGE", payload.path("code").asText());
+            assertEquals(limit, payload.path("limitBytes").intValue());
         }
     }
 
