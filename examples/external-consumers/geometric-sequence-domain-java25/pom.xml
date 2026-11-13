@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <!-- Independent consumer: deliberately no Regelsuche parent or reactor dependency. -->
+  <groupId>example</groupId><artifactId>geometric-sequence-domain</artifactId><version>1.0.0</version>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>25</maven.compiler.release>
+    <regelsuche.version>0.5.2</regelsuche.version>
+    <regelsuche.repository>file://${project.basedir}/../../../repository</regelsuche.repository>
+  </properties>
+  <repositories><repository>
+    <id>regelsuche-sdk</id><url>${regelsuche.repository}</url>
+    <snapshots><enabled>false</enabled></snapshots>
+  </repository></repositories>
+  <dependencyManagement><dependencies><dependency>
+    <groupId>de.regelsuche</groupId><artifactId>regelsuche-bom</artifactId>
+    <version>${regelsuche.version}</version><type>pom</type><scope>import</scope>
+  </dependency></dependencies></dependencyManagement>
+  <dependencies>
+    <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery-sdk</artifactId></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>6.1.3</version><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-clean-plugin</artifactId><version>3.5.0</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.5.0</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.15.0</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.4</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.5.1</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId><version>3.8.1</version>
+      <executions><execution><id>runtime</id><phase>package</phase><goals><goal>copy-dependencies</goal></goals>
+        <configuration><includeScope>runtime</includeScope></configuration>
+      </execution></executions>
+    </plugin>
+  </plugins></build>
+</project>

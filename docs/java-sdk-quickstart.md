@@ -101,8 +101,18 @@ Workbench-Laufzeitkatalog. [Plugin-Index](plugin-index.md) und
 
 ## 3. Eine Discovery-Domäne untersuchen
 
-Die veröffentlichten Gradle-Beispiele bleiben aus dem SDK-Wurzelverzeichnis
-benutzbar; sie werden nicht durch den neuen Maven-Einstieg entfernt:
+Kopiere das aktuelle [geometric-sequence-domain-java25](../examples/external-consumers/geometric-sequence-domain-java25/README.md)
+für den Maven-Build. Das POM liegt im Checkout und verwendet die SDK-Artefakte
+des veröffentlichten 0.5.2-ZIPs. Im kopierten Verzeichnis:
+
+```bash
+mvn --batch-mode --no-transfer-progress \
+  -Dregelsuche.repository=file:///absoluter/pfad/regelsuche-sdk-0.5.2/repository \
+  clean package
+java -cp "target/classes:target/dependency/*" example.GeometricSequenceExample
+```
+
+Aus dem entpackten SDK-ZIP funktioniert auch der Gradle-Aufruf:
 
 ```bash
 ./gradlew --project-dir examples/external-consumers/geometric-sequence-domain-java25 \
