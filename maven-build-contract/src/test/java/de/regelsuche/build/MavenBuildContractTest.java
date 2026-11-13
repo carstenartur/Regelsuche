@@ -68,7 +68,7 @@ class MavenBuildContractTest {
         Map.entry("maven.minimum.version", "3.9.9"),
         Map.entry("maven.maximum.exclusive.version", "4.0.0"),
         Map.entry("junit.version", "6.1.3"),
-        Map.entry("graalpy.version", "25.1.3"),
+        Map.entry("graalpy.version", "25.5.5.0.3"),
         Map.entry("maven.clean.plugin.version", "3.5.0"),
         Map.entry("maven.resources.plugin.version", "3.5.0"),
         Map.entry("maven.compiler.plugin.version", "3.15.0"),

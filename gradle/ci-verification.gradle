@@ -213,7 +213,7 @@ def runComparativeBenchmarkImage = tasks.register(
     outputs.upToDateWhen { false }
     doFirst {
         def output = comparativeDockerOutput.get().asFile
-        delete output
+        // The benchmark writer verifies the run before replacing retained evidence.
         output.mkdirs()
         output.setReadable(true, false)
         output.setWritable(true, false)

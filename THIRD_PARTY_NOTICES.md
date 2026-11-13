@@ -14,7 +14,7 @@ Javadoc and distribution archives. The source is available in this repository.
 The optional `regelsuche-math-sympy` module embeds the following pinned runtime
 components and Python packages:
 
-- GraalPy / GraalPy Extensions 25.1.3 — Universal Permissive License 1.0;
+- GraalPy / GraalPy Extensions 25.5.5.0.3 — Universal Permissive License 1.0;
 - SymPy 1.14.0 — BSD 3-Clause (New BSD) License;
 - mpmath 1.3.0 — BSD 3-Clause (New BSD) License.
 

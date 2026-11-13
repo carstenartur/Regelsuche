@@ -99,15 +99,28 @@ or comparative efficiency claim follows.
 The body requires `application/json`, strict duplicate-free JSON and at most
 4096 bytes. Both identities must match the loaded immutable workspace before
 execution; mismatch returns `409 SOURCE_BINDING_MISMATCH`. Unknown fields,
-missing hashes and malformed JSON return structured `400`. Only `POST` is
-registered. HTTP `200` means a receipt was produced; clients must inspect its
+missing hashes and malformed JSON return structured `400`. HTTP `200` means
+a receipt was produced and retained. Clients must inspect its
 status, including inconclusive, unsupported, replay mismatch and technical
 failure outcomes.
 
-The response carries its content hash as an ETag, the source run ID and an
-attachment filename. It is a separately downloadable result. It does not add
-files to the retained source directory or change its exact four downloads.
-There is no server receipt catalogue in this slice.
+The response carries its content hash as an ETag, the source run ID, an
+attachment filename and a `Location` for
+`GET /api/discovery-domains/exports/{runDigest}/validate/{receiptDigest}`.
+Both path digests use 64 lowercase hexadecimal characters. The server stores
+the canonical receipt separately from the source, with a 1 MiB read limit and
+at most 16 distinct receipts per export. Repeating a validation that produces
+the same bytes keeps one receipt. The workspace and its four original files
+retain their exact bytes.
+
+Retrieval re-verifies the source export, the receipt's exact source binding
+and its canonical content hash. It checks the receipt's required top-level
+fields, finite-check budget and content hash, selected object identities,
+outcome bindings, artifact roles and claim boundaries. The release module
+tests live receipts against the full offline schemas. A missing receipt
+returns `404`, and invalid retained receipts return `500`. Retrieval returns
+historical evidence. Only live validation replays the source and checks the
+mathematics. There is no receipt catalogue.
 
 | Role | Actual binding |
 |---|---|
@@ -126,8 +139,8 @@ promotion and Public Evidence statuses stay `NOT_EVALUATED`.
 
 Agreement on the retained finite data does not prove a unique infinite
 continuation, minimal recurrence order, universal theorem, external novelty or
-release qualification. Generic proof/novelty/promotion/release consumers,
-receipt retention and comparative multi-domain qualification remain open under
+release qualification. Generic proof/novelty/promotion/release consumers and
+comparative multi-domain qualification remain open under
 #224. No campaign, protected corpus or study is executed by this API.
 
 ## Ordinary controls
@@ -142,9 +155,10 @@ receipt retention and comparative multi-domain qualification remain open under
   coefficient in `{-1,0,1}`, 360 models with 10 terms each. Advancing-difference
   reference plus original evaluator witness versus Newton sum; additionally
   one changed first holdout for each model (720 checker executions).
-- Actual Java HTTP import/validate/download for both domains, foreign binding,
-  malformed body, method restriction, deterministic receipt and unchanged
-  source bytes/directory membership. Existing OpenAPI route/media/413 controls
+- Actual Java HTTP import, validation and receipt retrieval for both domains,
+  foreign binding, corrupt or oversized retained bytes, malformed requests,
+  method restriction, deterministic retries and unchanged source bytes and
+  directory membership. Existing OpenAPI route/media/413 controls
   include the one additional JSON POST. The complete existing request-limit
   matrix retains its 1024-byte control limit and checks fixed and chunked
   oversized requests before lookup, including an unknown validation run.
