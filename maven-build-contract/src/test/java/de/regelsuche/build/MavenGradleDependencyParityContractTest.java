@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.w3c.dom.Element;
 
 class MavenGradleDependencyParityContractTest {
   private static final List<String> JACKSON_DATABIND_BUILD_FILES = List.of(
@@ -38,6 +39,34 @@ class MavenGradleDependencyParityContractTest {
         "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version);
     assertDependency(root, "app/build.gradle",
         "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version);
+  }
+
+  @Test
+  void neo4jTransportBomStaysAlignedAcrossMavenAndGradle()
+      throws Exception {
+    Path root = repositoryRoot();
+    String version = mavenProperty(root, "netty.version");
+    assertDependency(root, "app/build.gradle", "io.netty:netty-bom", version);
+
+    var pom = MavenPomTestSupport.parse(root.resolve("pom.xml")).getDocumentElement();
+    var management = MavenPomTestSupport.directChild(pom, "dependencyManagement");
+    var dependencies = MavenPomTestSupport.directChild(management, "dependencies");
+    assertNotNull(dependencies, "Maven dependency management must declare its BOMs");
+    Element bom = null;
+    for (var child = dependencies.getFirstChild(); child != null; child = child.getNextSibling()) {
+      if (child instanceof Element dependency
+          && "dependency".equals(dependency.getLocalName())
+          && "io.netty".equals(MavenPomTestSupport.directChildText(dependency, "groupId"))
+          && "netty-bom".equals(MavenPomTestSupport.directChildText(dependency, "artifactId"))) {
+        assertTrue(bom == null, "Maven must import a single Netty BOM");
+        bom = dependency;
+      }
+    }
+    assertNotNull(bom, "Maven must import the Netty BOM");
+    assertEquals(List.of("${netty.version}"),
+        MavenPomTestSupport.directChildTexts(bom, "version"));
+    assertEquals(List.of("pom"), MavenPomTestSupport.directChildTexts(bom, "type"));
+    assertEquals(List.of("import"), MavenPomTestSupport.directChildTexts(bom, "scope"));
   }
 
   @Test

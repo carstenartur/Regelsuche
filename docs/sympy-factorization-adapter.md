@@ -42,7 +42,7 @@ Standard noch zur mathematischen Autorität.
 ## Gepinnte Runtime und Abhängigkeiten
 
 ```text
-GraalPy / Polyglot  25.1.3
+GraalPy / Polyglot  25.5.5.0.3
 SymPy               1.14.0
 mpmath               1.3.0
 ```
@@ -59,7 +59,7 @@ aufgelöste Python-Paketliste. Ein Maven-/Gradle-Paritätstest prüft Versionen,
 Pfade, Paketpins und Lockinhalt. Ein normaler Build verändert die Lockdatei
 nicht.
 
-Bei einer beabsichtigten Paketänderung wird sie mit einem der beiden
+Bei einer beabsichtigten GraalPy- oder Paketänderung wird sie mit einem der beiden
 checkout-eigenen Wege neu erzeugt und im selben Pull Request eingecheckt:
 
 ```bash
