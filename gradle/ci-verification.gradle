@@ -224,6 +224,29 @@ def runComparativeBenchmarkImage = tasks.register(
     }
 }
 
+def sharedRewriteCheckout = layout.buildDirectory.file(
+    'reports/comparative-ci/shared-fragment/checkout.json')
+def sharedRewriteContainer = layout.buildDirectory.file(
+    'reports/comparative-ci/shared-fragment/container/report.json')
+def runSharedRewriteFragmentImage = tasks.register('runSharedRewriteFragmentImage', Exec) {
+    group = 'verification'
+    description = 'Reproduces the shared rewrite benchmark in the pinned image.'
+    dependsOn buildComparativeBenchmarkImage
+    workingDir repositoryRoot
+    outputs.file sharedRewriteContainer
+    outputs.upToDateWhen { false }
+    doFirst {
+        def output = sharedRewriteContainer.get().asFile.parentFile
+        output.mkdirs()
+        output.setReadable(true, false)
+        output.setWritable(true, false)
+        output.setExecutable(true, false)
+        commandLine 'docker', 'run', '--rm',
+            '-v', "${output.absolutePath}:/output",
+            comparativeImage, '--shared-rewrite-fragment', '/output/report.json'
+    }
+}
+
 def verifyComparativeBenchmarks = tasks.register(
     'verifyComparativeBenchmarks', Exec) {
     group = 'verification'
@@ -233,7 +256,9 @@ def verifyComparativeBenchmarks = tasks.register(
         ':regelsuche-benchmarks:test',
         ':regelsuche-benchmarks:writeComparativeBenchmarkRunA',
         ':regelsuche-benchmarks:writeComparativeBenchmarkRunB',
-        runComparativeBenchmarkImage
+        ':regelsuche-benchmarks:writeSharedRewriteFragment',
+        runComparativeBenchmarkImage,
+        runSharedRewriteFragmentImage
     workingDir repositoryRoot
     inputs.file repositoryRoot.file(
         'scripts/verify-comparative-benchmark-reproducibility.py')
@@ -241,6 +266,8 @@ def verifyComparativeBenchmarks = tasks.register(
     inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-a')
     inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-b')
     inputs.dir comparativeDockerOutput
+    inputs.file sharedRewriteCheckout
+    inputs.file sharedRewriteContainer
     outputs.upToDateWhen { false }
     doFirst {
         commandLine verificationPython.get().absolutePath,
@@ -249,6 +276,13 @@ def verifyComparativeBenchmarks = tasks.register(
             '--run-a', 'build/reports/comparative-ci/run-a',
             '--run-b', 'build/reports/comparative-ci/run-b',
             '--container-run', 'build/reports/comparative-ci/run-docker'
+    }
+    doLast {
+        def checkout = sharedRewriteCheckout.get().asFile.toPath()
+        def container = sharedRewriteContainer.get().asFile.toPath()
+        if (java.nio.file.Files.mismatch(checkout, container) != -1L) {
+            throw new GradleException('Shared rewrite evidence differs between the checkout and pinned image.')
+        }
     }
 }
 

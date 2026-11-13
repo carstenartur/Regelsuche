@@ -82,11 +82,11 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             return List.of();
         }
 
-        String formattedInput = ExpressionFormatter.format(root);
+        String formattedInput = formatState(root);
         int originalSize = canonicalizer.astNodeCount(formattedInput);
         Set<Transformation> transformations = new LinkedHashSet<>();
         for (RewriteResult result : rewriteEverywhere(root, observer == null ? null : List.of())) {
-            String formatted = ExpressionFormatter.format(result.expression());
+            String formatted = formatState(result.expression());
             if (formatted.equals(formattedInput)) {
                 continue;
             }
@@ -117,6 +117,11 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             }
         }
         return new ArrayList<>(transformations);
+    }
+
+    /** Renders search states before comparing and returning successors. */
+    protected String formatState(Expr expression) {
+        return ExpressionFormatter.format(expression);
     }
 
     private List<RewriteResult> rewriteEverywhere(Expr subtree, List<Integer> path) {

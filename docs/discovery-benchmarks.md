@@ -174,6 +174,57 @@ Unmeasured work is not omitted. The report currently retains machine-readable ga
 
 The randomized-valid simplification control and the six named native SymPy operation baselines are no longer coverage gaps: each is a configured seven-case matrix whose operation or scheduling policy is content-bound. A remaining gap disappears only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
 
+## Shared-fragment rewriting and equality saturation
+
+This opt-in comparison covers the unconditional part of #235 Track E2. BestFirst
+and the proof-required EqSat strategy receive the same source, the same ordered
+inventory of eight built-in exact pattern rules, and the operator-count objective.
+Both use Regelsuche's parser. The shared fragment has variables, integer leaves,
+ordered addition, subtraction and multiplication, and literal powers from 1 to 4.
+Three controls retain the reason that guarded division, symbolic powers or
+function calls cannot enter this lane. The guarded control retains its supplied
+assumption alongside the two unsupported results.
+
+The reference operator count is used after extraction. The judge checks exact
+polynomial equality and requires that the selected result introduced no assumptions.
+BestFirst preserves binary grouping and retains a concrete path. Replay applies
+each named rule to the recorded occurrence and checks the resulting ordered AST.
+Each available EqSat proof is retained as encoded certificate bytes with a SHA-256
+hash and checked after decoding against independently supplied endpoints and rule
+definitions. The proof-object flag refers to this certificate. A checked equality
+certificate and a miss on the cost target can occur in the same result. An EqSat
+fallback without a certificate receives a separate proof-unavailable verdict.
+
+| Input | Reference operator count | BestFirst | EqSat |
+| --- | ---: | ---: | ---: |
+| `(x + 0) * (1 * (y + 0))` | 1 | 1 | 1 |
+| `(x + 0) * 0 + y` | 0 | 0 | 1 |
+| `(x - 0) - (y - 0)` | 1 | 1 | 1 |
+| `(x + 0) * (x + 0)` | 1 | 1 | 1 |
+| `x + (y + z)` | 2 | 2 | 2 |
+| `(x - x) + y` | 0 | 2 | 2 |
+
+BestFirst reaches five of the six reference costs. EqSat reaches four and retains
+valid equality certificates for all six outputs. On the annihilation case EqSat
+extracts `0 + y` under this configuration. The selected expression is correct
+and has one more operator than the reference. The report retains path depth,
+state and successor counts separately from e-nodes, scans and proof work.
+Each system has a separately declared budget in its native units. These results
+support a comparison of qualified outputs on the fixed cases.
+
+Write the report with:
+
+```bash
+./gradlew :regelsuche-benchmarks:run \
+  --args='--shared-rewrite-fragment build/reports/shared-rewrite-fragment.json'
+```
+
+The path is relative to the Java process working directory. The single report
+uses `regelsuche.shared-fragment-rewrite-benchmark/v1`. The complete verification
+command below also retains a checkout and a pinned-container copy under
+`build/reports/comparative-ci/shared-fragment` and compares their bytes.
+Assumption-aware EqSat and cross-system matched work remain open.
+
 ## Reproduction and verification
 
 The complete benchmark contract currently runs from a normal checkout with:
