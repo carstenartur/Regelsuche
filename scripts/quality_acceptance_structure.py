@@ -53,7 +53,7 @@ POLICIES = {
             "knowledgeDensity", "contextLocality", "compressionRatio", "aiCognitiveComplexity",
             "aiCognitiveDebt", "aiContextDebt")}}),
     "app/src/e2eTest/resources/screenshots/visual-regression-policy.json": ("regelsuche.visual-regression-policy/v1", {
-        "environment": {"containerImage": str, "playwrightVersion": str, "browser": str,
+        "environment": {"containerImage": str, "playwrightVersion": str, "browser": str, "browserVersion": str,
             "viewportWidth": int, "viewportHeight": int, "deviceScaleFactor": float,
             "locale": str, "timezoneId": str},
         "comparison": {"channelTolerance": int, "maxDiffRatio": float, "changedPixelArgb": str},

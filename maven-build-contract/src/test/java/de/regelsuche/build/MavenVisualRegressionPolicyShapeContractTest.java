@@ -34,6 +34,7 @@ class MavenVisualRegressionPolicyShapeContractTest {
         "containerImage",
         "playwrightVersion",
         "browser",
+        "browserVersion",
         "viewportWidth",
         "viewportHeight",
         "deviceScaleFactor",
@@ -68,6 +69,10 @@ class MavenVisualRegressionPolicyShapeContractTest {
         ((ObjectNode) missingEnvironment.get("environment"))
             .remove("timezoneId");
         expectFailure(missingEnvironment, "missing=[timezoneId]");
+
+        ObjectNode missingBrowserVersion = validPolicy();
+        ((ObjectNode) missingBrowserVersion.get("environment")).remove("browserVersion");
+        expectFailure(missingBrowserVersion, "missing=[browserVersion]");
 
         ObjectNode wrongSchema = validPolicy();
         wrongSchema.put("schema", "unsupported");
@@ -149,6 +154,7 @@ class MavenVisualRegressionPolicyShapeContractTest {
         environment.put("containerImage", "example/image:v1.2.3");
         environment.put("playwrightVersion", "1.2.3");
         environment.put("browser", "chromium");
+        environment.put("browserVersion", "1.2.3.4");
         environment.put("viewportWidth", 1400);
         environment.put("viewportHeight", 900);
         environment.put("deviceScaleFactor", 1.0);
