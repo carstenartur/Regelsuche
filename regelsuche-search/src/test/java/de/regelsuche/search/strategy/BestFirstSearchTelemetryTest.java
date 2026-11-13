@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class BestFirstSearchTelemetryTest {
@@ -68,6 +69,53 @@ class BestFirstSearchTelemetryTest {
 
         assertEquals(withoutObserver, withObserver);
         assertFalse(observer.events().isEmpty());
+    }
+
+    @Test
+    void visitedStatesPreserveDistinctAccumulatedAssumptions() {
+        TransformationEngine engine = expression -> switch (expression) {
+            case "x" -> List.of(
+                new Transformation("conditional", "y", RewriteKind.NORMALIZE,
+                    false, 0, true, "conditional:x", List.of("x > 0", "x != 0")),
+                new Transformation("conditional", "y", RewriteKind.NORMALIZE,
+                    false, 0, true, "conditional:x", List.of(" x  !=  0 ", "x > 0")),
+                new Transformation("conditional", "y", RewriteKind.NORMALIZE,
+                    false, 0, true, "conditional:x", List.of("x < 0", "x != 0")));
+            case "y" -> List.of(new Transformation("continue", "z"));
+            default -> List.of();
+        };
+        SearchProblem problem = new SearchProblem("x", engine, new ExpressionScorer(),
+            new ExpressionCanonicalizer(), new SearchHeuristic(2, 10, 1, 2, 4, 8));
+
+        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
+
+        for (String expression : List.of("y", "z")) {
+            List<List<String>> assumptions = states.stream()
+                .filter(state -> state.expression().equals(expression))
+                .map(SearchState::assumptions).toList();
+            assertEquals(2, assumptions.size());
+            assertTrue(assumptions.containsAll(List.of(List.of("x != 0", "x < 0"), List.of("x != 0", "x > 0"))));
+        }
+    }
+
+    @Test
+    void visitedStatesKeepApplicationKeyBoundaries() {
+        TransformationEngine engine = expression -> switch (expression) {
+            case "x" -> List.of(
+                new Transformation("direct", "y", RewriteKind.NORMALIZE, false, 0, true, "a,b"),
+                new Transformation("first", "q", RewriteKind.NORMALIZE, false, 0, true, "a"));
+            case "q" -> List.of(
+                new Transformation("second", "y", RewriteKind.NORMALIZE, false, 0, true, "b"));
+            default -> List.of();
+        };
+        SearchProblem problem = new SearchProblem("x", engine, new ExpressionScorer(),
+            new ExpressionCanonicalizer(), new SearchHeuristic(2, 10, 1, 2, 4, 8));
+
+        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
+
+        assertEquals(Set.of(Set.of("a,b"), Set.of("a", "b")), states.stream()
+            .filter(state -> state.expression().equals("y"))
+            .map(SearchState::appliedRuleApplications).collect(Collectors.toSet()));
     }
 
     @Test

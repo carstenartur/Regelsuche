@@ -392,9 +392,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return problem.costModel() == null ? priority(state) : SearchPriority.bestFirst(state, problem);
     }
 
-    private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":" + String.join(",", sortedValues(state.appliedRuleApplications()));
+    private VisitedStateKey stateKey(SearchState state) {
+        return new VisitedStateKey(state.canonicalHash(), state.appliedRuleApplications(), state.assumptions());
     }
+
+    private record VisitedStateKey(String canonicalHash, Set<String> appliedRuleApplications,
+                                   List<String> assumptions) {}
 
     private List<String> sortedValues(Set<String> values) {
         return values.stream().sorted().toList();
@@ -407,7 +410,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     private record SearchFrame(
         PriorityQueue<SearchState> frontier,
         List<SearchState> explored,
-        Set<String> visited,
+        Set<VisitedStateKey> visited,
         SearchTelemetry telemetry,
         ValueIdentitySession identity,
         TargetSession target,
