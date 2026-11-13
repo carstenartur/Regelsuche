@@ -16,9 +16,15 @@ import tarfile
 import tempfile
 from typing import Any
 
-EXPECTED_WRAPPER_SHA256 = (
-    "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
+from independent_reproduction_environment import (
+    ARTIFACT_V2,
+    DESCRIPTOR_SHA256,
+    DOCKERFILE_V2,
+    ENVIRONMENT_MODULE,
+    RECEIPT_V2,
+    repository_descriptor,
 )
+
 EXPECTED_IMAGE_DIGEST = (
     "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
@@ -163,21 +169,26 @@ def require_safe_archive(path: Path) -> list[str]:
 
 
 def verify_frozen_sources(repository: Path) -> None:
+    descriptor = repository_descriptor(repository)
     wrapper = require_regular_file(
         repository / "gradle/wrapper/gradle-wrapper.properties",
         "Gradle wrapper properties",
     )
     wrapper_lines = wrapper.read_text(encoding="utf-8").splitlines()
     require(
-        f"distributionSha256Sum={EXPECTED_WRAPPER_SHA256}" in wrapper_lines,
+        "distributionSha256Sum=" + descriptor["gradleDistributionSha256"] in wrapper_lines,
         "Gradle wrapper digest differs from the frozen contract",
     )
 
     dockerfile = require_regular_file(
-        repository / "reproduction/Dockerfile.reproduction",
+        repository / DOCKERFILE_V2,
         "reproduction Dockerfile",
     )
     dockerfile_lines = dockerfile.read_text(encoding="utf-8").splitlines()
+    require(
+        sha256_file(dockerfile) == descriptor["containerDefinitionSha256"],
+        "v2 reproduction Dockerfile bytes differ from the frozen contract",
+    )
     require(bool(dockerfile_lines), "reproduction Dockerfile is empty")
     require(
         dockerfile_lines[0].strip() == EXPECTED_IMAGE_FROM,
@@ -243,7 +254,10 @@ def verify_artifact(
         "manifest Java image digest differs from frozen contract",
     )
     require(
-        environment.get("gradleDistributionSha256") == EXPECTED_WRAPPER_SHA256,
+        manifest.get("schema") == ARTIFACT_V2
+        and environment.get("environmentDescriptorSha256") == DESCRIPTOR_SHA256
+        and environment.get("gradleDistributionSha256")
+        == repository_descriptor(repository)["gradleDistributionSha256"],
         "manifest Gradle digest differs from frozen contract",
     )
     require(
@@ -384,6 +398,28 @@ def reproduction_environment() -> dict[str, str]:
     return environment
 
 
+def verify_packaged_launcher(
+    repository: Path, archive_path: Path, manifest: dict[str, Any], temporary: Path
+) -> None:
+    extracted = temporary / "public-launcher"
+    with tarfile.open(archive_path, "r:gz") as archive:
+        archive.extractall(extracted, filter="data")
+    artifact = extracted / "regelsuche-independent-reproduction"
+    result = run(
+        [str(artifact / "reproduce.sh"), "--verify-only"],
+        cwd=repository,
+        environment=reproduction_environment(),
+    )
+    require(
+        manifest["contentHash"] in result.stdout.splitlines(),
+        "public launcher did not verify the extracted manifest identity",
+    )
+    require(
+        not (artifact / "scripts/__pycache__").exists(),
+        "public launcher wrote unlisted files into the extracted artifact",
+    )
+
+
 def verify_marker_negatives(repository: Path, artifact: Path, temporary: Path) -> None:
     environment = reproduction_environment()
     for label, symbolic in (("wrong", False), ("symlink", True)):
@@ -478,6 +514,102 @@ def verify_receipt(repository: Path, artifact: Path, receipt: Path) -> dict[str,
     return load_unique(receipt)
 
 
+def verify_environment_negatives(repository: Path, artifact: Path, temporary: Path) -> None:
+    negative_root = temporary / "environment-negatives"
+    shutil.copytree(artifact, negative_root)
+    manifest_path = negative_root / "artifact-manifest.json"
+    manifest_bytes = manifest_path.read_bytes()
+    command = [
+        sys.executable,
+        str(repository / "scripts/verify-independent-reproduction.py"),
+        "verify-artifact", "--root", str(negative_root),
+    ]
+
+    manifest = json.loads(manifest_bytes)
+    manifest["schema"] = "regelsuche.independent-reproduction-artifact/v3"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    result = run(command, cwd=repository, expect_success=False)
+    require("unsupported artifact manifest schema" in result.stdout, "unknown version passed")
+    receipt = temporary / "unknown-version-receipt.json"
+    result = run(
+        compare_command(
+            repository, negative_root, artifact / "expected", receipt,
+            environment_id="checkout-local-unknown-version",
+            started_at="2034-01-01T00:00:00Z",
+            finished_at="2034-01-01T00:00:01Z",
+            execution_exit_code=125,
+        ),
+        cwd=repository,
+        expect_success=False,
+    )
+    require("unsupported artifact manifest schema" in result.stdout,
+            "compare did not reject the unknown artifact version")
+    require(not receipt.exists(), "compare created a receipt for an unknown artifact version")
+    result = run(
+        [*command[:2], "verify-receipt", "--root", str(negative_root),
+         "--receipt", str(receipt)],
+        cwd=repository,
+        expect_success=False,
+    )
+    require("unsupported artifact manifest schema" in result.stdout,
+            "receipt verification did not reject the unknown artifact version")
+    manifest_path.write_bytes(manifest_bytes)
+
+    descriptor_path = negative_root / "environment/environment.json"
+    descriptor_bytes = descriptor_path.read_bytes()
+    descriptor_path.write_bytes(descriptor_bytes + b"\n")
+    result = run(command, cwd=repository, expect_success=False)
+    require("descriptor bytes differ" in result.stdout, "descriptor mismatch passed")
+    descriptor_path.write_bytes(descriptor_bytes)
+
+    artifact_schema_path = negative_root / "schemas/artifact-manifest.schema.json"
+    artifact_schema_bytes = artifact_schema_path.read_bytes()
+    artifact_schema_path.write_bytes(b"{malformed schema")
+    result = run(command, cwd=repository, expect_success=False)
+    require(
+        "artifact manifest schema validation failed: schema bytes differ from the frozen contract"
+        in result.stdout,
+        "changed artifact schema was interpreted before the byte-identity check",
+    )
+    artifact_schema_path.write_bytes(artifact_schema_bytes)
+
+    receipt_schema_path = negative_root / "schemas/reproduction-receipt.schema.json"
+    receipt_schema_path.write_bytes((repository / (
+        "docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json"
+    )).read_bytes())
+    result = run(command, cwd=repository, expect_success=False)
+    require("artifact SHA-256 mismatch: schemas/reproduction-receipt.schema.json"
+            in result.stdout, "receipt schema substitution passed")
+    receipt_schema_path.write_bytes((artifact / "schemas/reproduction-receipt.schema.json").read_bytes())
+
+    for relative, verify_command, diagnostic in (
+        (
+            ENVIRONMENT_MODULE, command,
+            f"manifest v2 environment file is missing: {ENVIRONMENT_MODULE}",
+        ),
+        (
+            "source/regelsuche-source.tar.gz",
+            [str(negative_root / "reproduce.sh"), "--verify-only"],
+            "v2 source archive is absent from the file inventory",
+        ),
+    ):
+        original = artifact / relative
+        omitted = negative_root / relative
+        omitted.unlink()
+        manifest = json.loads(manifest_bytes)
+        manifest["files"] = [item for item in manifest["files"] if item["path"] != relative]
+        del manifest["contentHash"]
+        material = json.dumps(manifest, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        manifest["contentHash"] = "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        result = run(
+            verify_command, cwd=repository, expect_success=False,
+            environment=reproduction_environment(),
+        )
+        require(diagnostic in result.stdout, f"omitted bundle file passed: {relative}")
+        shutil.copy2(original, omitted)
+
+
 def verify_receipt_semantics(
     repository: Path,
     artifact: Path,
@@ -518,6 +650,7 @@ def verify_receipt_semantics(
     )
     first = verify_receipt(repository, artifact, first_path)
     second = verify_receipt(repository, artifact, second_path)
+    require(first["schema"] == second["schema"] == RECEIPT_V2, "receipt schema is not v2")
     require(
         first["reproductionStatus"] == "EXACT_BYTE_REPRODUCED",
         "first receipt is not exact",
@@ -595,6 +728,7 @@ def verify_receipt_semantics(
         expect_success=False,
     )
     corrupt = verify_receipt(repository, corrupt_root, corrupt_receipt)
+    require(corrupt["schema"] == RECEIPT_V2, "corrupt artifact lost v2 receipt identity")
     require(
         corrupt["reproductionStatus"] == "NOT_REPRODUCED",
         "unreadable manifest did not retain NOT_REPRODUCED",
@@ -602,6 +736,30 @@ def verify_receipt_semantics(
     require(
         corrupt["artifactManifestHashSource"] == "FILE_SHA256_FALLBACK",
         "unreadable manifest did not retain fallback file identity",
+    )
+
+    (corrupt_root / "environment/environment.json").unlink()
+    missing_descriptor_receipt = reports / "reproduction-receipt-missing-descriptor.json"
+    run(
+        compare_command(
+            repository, corrupt_root, observed, missing_descriptor_receipt,
+            environment_id="checkout-local-negative",
+            started_at="2032-01-01T00:00:00Z",
+            finished_at="2032-01-01T00:00:01Z",
+            execution_exit_code=125,
+        ),
+        cwd=repository,
+        expect_success=False,
+    )
+    damaged = verify_receipt(repository, corrupt_root, missing_descriptor_receipt)
+    require(
+        damaged["schema"] == RECEIPT_V2 and damaged["reproductionStatus"] == "NOT_REPRODUCED",
+        "missing descriptor must preserve the frozen v2 negative receipt",
+    )
+    require(
+        any(message.startswith("invalid v2 reproduction environment descriptor:")
+            for message in damaged["semanticComparison"]["inputArtifactFailures"]),
+        "missing descriptor diagnostic was lost",
     )
 
     extra_observed = temporary / "extra-observed"
@@ -717,7 +875,9 @@ def main() -> None:
             args.source_revision,
             temporary,
         )
+        verify_packaged_launcher(repository, archive_a, manifest_a, temporary)
         verify_marker_negatives(repository, artifact_a, temporary)
+        verify_environment_negatives(repository, artifact_a, temporary)
         receipt_hashes = verify_receipt_semantics(
             repository,
             artifact_a,

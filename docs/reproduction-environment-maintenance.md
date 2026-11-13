@@ -11,14 +11,13 @@ it cannot change the meaning of existing v1 artifacts or receipts.
 | --- | --- |
 | `Dockerfile`, `Dockerfile.autopilot`, `Dockerfile.comparative-benchmarks`, `Dockerfile.proof`, `Dockerfile.release-readiness` | Routine Dependabot Docker updates, with the existing Java-major restriction and exact image-policy review |
 | `Dockerfile.visual-regression` | Routine Docker updates, with the existing Playwright dependency/image equality contract |
-| `Dockerfile.target-free-held-out-reproduction`, `reproduction/Dockerfile.reproduction` | Explicit versioned reproduction-environment migration |
+| `Dockerfile.target-free-held-out-reproduction`, `reproduction/Dockerfile.reproduction`, `reproduction/environments/v2/Dockerfile.reproduction` | Explicit versioned reproduction-environment migration |
 | `Dockerfile.safe-runtime-qualification` | Explicit versioned public runtime reproduction migration; same pinned base image, separate public qualification authority |
 
 The current v1 reproduction image is
 `eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617`.
 Both definitions, all three reproduction v1 schemas and their paths remain
-unchanged. The v1 Java verifier, Python builder/verifiers and receipt checks
-retain their existing image and schema identities. Existing artifacts continue
+unchanged. The v1 Java verifier and receipt checks retain their existing image and schema identities. Existing artifacts continue
 to carry their original source archive, schemas, commands and provenance.
 
 The additive public DIRECT/V4 qualification also retains its own Dockerfile and
@@ -26,7 +25,7 @@ schema byte identities from `fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812`. This add
 two identities without editing any of the five earlier retained files. It does
 not reopen the historical experiments or change the fixed public case manifest.
 
-`.github/dependabot.yml` excludes the three frozen definitions through literal
+`.github/dependabot.yml` excludes the four frozen definitions through literal
 `exclude-paths` entries on the root Docker job. GitHub documents these as file
 or directory exclusions relative to the update entry's directory, distinct
 from dependency-name `ignore` rules. Its Docker fetcher reads matching files
@@ -49,7 +48,7 @@ entries in `config/quality/container-image-policy.json` before qualification.
 
 `MavenFrozenReproductionEnvironmentContractTest` verifies the actual parsed
 Dependabot configuration and the declared Docker inventory. The current contract
-deliberately accepts one root Docker job and three literal exclusions. Additional
+deliberately accepts one root Docker job and four literal exclusions. Additional
 jobs, broader exclusions, dependency allow-lists, redirected targets or disabled
 routine Temurin updates require an explicit ownership review. The six ordinary
 Dockerfiles remain eligible for maintenance.
@@ -84,18 +83,32 @@ inputs. They do not execute Dependabot's hosted service or regenerate scientific
 evidence. Full Gradle/`ciCheck`, Maven/product/Docker, JMH and SymPy qualification
 remain separate required authorities.
 
-## Future intentional v2 migration
+## Gradle 9.9.1 toolchain transition
 
-No v2 image, descriptor, schema, receipt or evidence run is selected by this
-maintenance change. When a reproduction-environment refresh is explicitly
-selected, carry out the following as one reviewed migration:
+New independent-reproduction artifacts use [v2](../reproduction/environments/v2/environment.json).
+The v2 descriptor pins the wrapper distribution and JAR, Dockerfile, schemas,
+Temurin base image, supported architectures and execution policies. The builder
+archives exact `HEAD`. The verifier compares the environment bytes in that
+archive with the descriptor and checks the bundled Dockerfile and schemas.
+Receipt validation dispatches by artifact version. Retained v1 artifacts and
+receipts keep their original environment, Dockerfile and schema identities.
+Replay of a v1 artifact requires its original bundle or the matching source
+checkout and recorded inputs. The predecessor descriptor records the source and
+contract identities for v1 without assigning an identity to an unavailable bundle.
+The current held-out receipt already binds the Git revision, exact Gradle
+checksum, image ID and Dockerfile/schema hashes for every run. Its v1 schema
+allows a new checksum per revision, and its Gradle and Docker gates still run.
+
+## Future environment migrations
+
+When an image or another frozen environment input changes, carry out the
+following as one reviewed migration.
 
 1. Record the reason and select the exact new Temurin tag and index digest.
-   Introduce a versioned environment descriptor, for example under
-   `reproduction/environments/v2/`, with a new environment identity and content
+   Introduce a versioned environment descriptor with a new identity and content
    hash. Bind the image, supported platforms, Gradle distribution/checksum,
    runtime user and build/evaluation network policies in that descriptor.
-2. Add versioned v2 definitions for both reproduction lanes. Generate their
+2. Add new versioned definitions for the affected reproduction lanes. Generate their
    pinned image references from the descriptor, or validate every reference
    against it before execution. Have the Java verifier, Python builder and both
    verifiers, schemas and self-tests consume or validate the same descriptor and
@@ -104,14 +117,14 @@ selected, carry out the following as one reviewed migration:
 3. Introduce new environment/artifact/receipt schema identities and explicit
    version dispatch. A v1 receipt must continue to validate against its original
    schema bytes and image contract; never select the newest environment merely
-   because it is the current default. Bind the v2 schema bytes in new artifacts
+   because it is the current default. Bind the new schema bytes in new artifacts
    and receipts using the new version's contracts.
 4. Retain an explicit predecessor link containing the v1 environment, schema and
    retained artifact identities plus their source revision. Describe any
    cross-version result comparison as a comparison between environments. Do not
-   assert byte identity between v1 and v2.
+   assert byte identity across environment versions.
 5. Under the explicitly selected migration, regenerate the current evidence in
-   v2, verify repeated runs within that same environment and retain independent
+   the new environment, verify repeated runs within that same environment and retain independent
    verification receipts. Preserve historical v1 evidence. Evidence generation,
    held-out use and FINAL TEST execution remain governed by their existing
    authorizations and exposure rules.

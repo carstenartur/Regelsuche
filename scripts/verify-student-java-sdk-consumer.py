@@ -48,7 +48,7 @@ GENERATED_PACKAGE = "org.example.generated"
 GENERATED_PROJECT = "generated-regelsuche-domain"
 GENERATED_DOMAIN = "generated-geometric-sequence"
 GENERATED_PROVIDER = "generated-geometric-sequence-provider"
-GENERATED_GRADLE_WRAPPER = "9.7.1"
+GENERATED_GRADLE_WRAPPER = "9.9.1"
 
 
 def run(
