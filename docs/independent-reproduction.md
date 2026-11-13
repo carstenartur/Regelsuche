@@ -63,9 +63,11 @@ By default the checkout tasks create a
 only when the named Git tag resolves to the exact checked-out commit; the
 builder then emits `FROZEN_PUBLIC_RELEASE`.
 
-These v1 environment definitions are excluded from routine Dependabot updates.
-See [reproduction environment maintenance](reproduction-environment-maintenance.md)
-for ownership, immutable schema bytes and the future versioned v2 migration path.
+Current builds use the [v2 environment descriptor](../reproduction/environments/v2/environment.json).
+It binds the Gradle 9.9.1 wrapper, the existing Temurin base digest, the v2
+Dockerfile and both v2 schema hashes. The predecessor entry identifies the v1
+contract. Retained v1 artifacts carry Gradle 9.7.1 and their original schema and
+Dockerfile bytes. See [reproduction environment maintenance](reproduction-environment-maintenance.md).
 
 ## Determinism and source-state guarantees
 
@@ -131,7 +133,8 @@ success and failure.
 
 ## Receipt semantics
 
-`regelsuche.independent-reproduction-receipt/v1` retains:
+The v1 and v2 receipt schemas each bind the corresponding artifact manifest.
+Receipts retain the following fields.
 
 - semantic and complete hashes of the artifact manifest;
 - expected and observed exact-byte roots;
