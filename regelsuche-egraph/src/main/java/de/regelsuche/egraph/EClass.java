@@ -56,8 +56,8 @@ public final class EClass {
         this.parents.addAll(other.parents);
     }
 
-    void clearParents() {
-        parents.clear();
+    void removeParent(ENode parent) {
+        parents.remove(parent);
     }
 
     void replaceNodes(Set<ENode> replacement) {

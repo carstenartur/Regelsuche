@@ -198,17 +198,18 @@ fallback without a certificate receives a separate proof-unavailable verdict.
 | Input | Reference operator count | BestFirst | EqSat |
 | --- | ---: | ---: | ---: |
 | `(x + 0) * (1 * (y + 0))` | 1 | 1 | 1 |
-| `(x + 0) * 0 + y` | 0 | 0 | 1 |
+| `(x + 0) * 0 + y` | 0 | 0 | 0 |
 | `(x - 0) - (y - 0)` | 1 | 1 | 1 |
 | `(x + 0) * (x + 0)` | 1 | 1 | 1 |
 | `x + (y + z)` | 2 | 2 | 2 |
 | `(x - x) + y` | 0 | 2 | 2 |
 
-BestFirst reaches five of the six reference costs. EqSat reaches four and retains
-valid equality certificates for all six outputs. On the annihilation case EqSat
-extracts `0 + y` under this configuration. The selected expression is correct
-and has one more operator than the reference. The report retains path depth,
-state and successor counts separately from e-nodes, scans and proof work.
+Both systems reach five of the six reference costs. EqSat retains valid equality
+certificates for all six outputs. The annihilation case now extracts `y` after a
+fix for cached parent matches invalidated by child unions. Both miss the
+cancellation case because the shared inventory does not include that rule.
+The report retains path depth, state and successor counts separately from
+e-nodes, scans and proof work.
 Each system has a separately declared budget in its native units. These results
 support a comparison of qualified outputs on the fixed cases.
 

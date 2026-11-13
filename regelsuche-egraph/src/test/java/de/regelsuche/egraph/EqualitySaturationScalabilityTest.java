@@ -103,6 +103,50 @@ class EqualitySaturationScalabilityTest {
     }
 
     @Test
+    void cachedParentMissInvalidatesBeforeRebuildRekeysTheParent() {
+        EGraph graph = new EGraph();
+        EClassId root = graph.addExpression(parse("(x + 0) * 0 + y"));
+        EClassId zero = graph.addExpression(parse("0"));
+        EClassId child = graph.addExpression(parse("(x + 0) * 0"));
+        EClassId x = graph.addExpression(parse("x"));
+        EClassId add = graph.addExpression(parse("x + 0"));
+        var pattern = PatternExpr.op(BinaryOperator.ADD, PatternExpr.num(0), PatternExpr.var("A"));
+        var matcher = new EGraphPatternMatcher(graph);
+        graph.union(add, x);
+        assertTrue(matcher.matchAll("left-zero", pattern, List.of(root)).isEmpty());
+
+        graph.union(child, zero);
+        assertEquals(1, matcher.matchInClass(pattern, root).size());
+        assertEquals(1, matcher.matchAll("left-zero", pattern, List.of(root)).size());
+        graph.rebuild();
+        assertEquals(1, matcher.matchAll("left-zero", pattern, List.of(root)).size());
+    }
+
+    @Test
+    void successiveSiblingUnionsInvalidateTheOuterMatchAcrossRebuilds() {
+        EGraph graph = new EGraph();
+        EClassId x = graph.addExpression(parse("x"));
+        EClassId one = graph.addExpression(parse("1"));
+        EClassId zero = graph.addExpression(parse("0"));
+        EClassId y = graph.addExpression(parse("y"));
+        EClassId root = graph.addExpression(parse("f(1 + y)"));
+        graph.union(x, one);
+        graph.rebuild();
+        graph.addExpression(parse("z"));
+
+        var pattern = PatternExpr.fn("f",
+            PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("A"), PatternExpr.num(0)));
+        var matcher = new EGraphPatternMatcher(graph);
+        assertTrue(matcher.matchAll("right-zero", pattern, List.of(root)).isEmpty());
+
+        graph.union(y, zero);
+        assertEquals(1, matcher.matchInClass(pattern, root).size());
+        assertEquals(1, matcher.matchAll("right-zero", pattern, List.of(root)).size());
+        graph.rebuild();
+        assertEquals(1, matcher.matchAll("right-zero", pattern, List.of(root)).size());
+    }
+
+    @Test
     void memoizationDoesNotAliasDifferentPatternsWithSameId() {
         EGraph eGraph = new EGraph();
         eGraph.addExpression(parse("a + b"));
