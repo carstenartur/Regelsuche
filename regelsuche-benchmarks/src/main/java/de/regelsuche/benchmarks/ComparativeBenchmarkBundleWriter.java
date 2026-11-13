@@ -21,6 +21,7 @@ public final class ComparativeBenchmarkBundleWriter {
         Objects.requireNonNull(outputDirectory, "outputDirectory");
         Objects.requireNonNull(report, "report");
         requireCompleteTrackMatrices(report);
+        ComparativeBenchmarkMain.verify(report);
         try {
             clearContents(outputDirectory);
             Files.createDirectories(outputDirectory);

@@ -7,7 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
 import de.regelsuche.benchmarks.ComparativeBenchmark.ClaimStatus;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
+import de.regelsuche.benchmarks.ComparativeBenchmark.EvidenceMetrics;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ObservedVerdict;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ResourceMetrics;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
@@ -15,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -69,6 +75,41 @@ class ComparativeBenchmarkBundleWriterTest {
         assertEquals("retained", Files.readString(sentinel));
         assertEquals(complete.toCanonicalJson(),
             Files.readString(directory.resolve("report.json")));
+    }
+
+    @Test
+    void unavailableBackendCannotReplacePreviouslyRetainedEvidence(
+        @TempDir Path directory
+    ) throws Exception {
+        Report complete = singleResultReport();
+        ComparativeBenchmarkBundleWriter writer = new ComparativeBenchmarkBundleWriter();
+        writer.write(directory, complete);
+        Path sentinel = directory.resolve("retained-sentinel.txt");
+        Files.writeString(sentinel, "retained");
+
+        var configuration = complete.configurations().getFirst();
+        var benchmarkCase = complete.cases().getFirst();
+        Result unavailable = Result.create(
+            configuration, benchmarkCase, Disposition.FILTERED_UNSUPPORTED,
+            ObservedVerdict.UNSUPPORTED,
+            new ResourceMetrics(1, 0, 1, 0, 0, 0, -1, 0, 1, 0),
+            new EvidenceMetrics("BACKEND_UNAVAILABLE", "NOT_REQUESTED",
+                "NOT_REQUESTED", "", List.of("BACKEND_UNAVAILABLE")),
+            Map.of(), List.of());
+        CapabilityClaim claim = CapabilityClaim.create(
+            "unavailable-search", Track.TARGET_DIRECTED_SEARCH,
+            ClaimStatus.INSUFFICIENT_EVIDENCE, "The backend could not run.",
+            List.of(unavailable.contentHash()), List.of("SINGLE_CASE_TEST"));
+        Report replacement = Report.create(
+            complete.suiteId(), complete.parityManifests(), complete.configurations(),
+            complete.cases(), List.of(unavailable), List.of(claim), List.of());
+
+        IllegalStateException failure = assertThrows(
+            IllegalStateException.class, () -> writer.write(directory, replacement));
+
+        assertTrue(failure.getMessage().contains("did not execute every configured system"));
+        assertEquals("retained", Files.readString(sentinel));
+        assertEquals(complete.toCanonicalJson(), Files.readString(directory.resolve("report.json")));
     }
 
     @Test

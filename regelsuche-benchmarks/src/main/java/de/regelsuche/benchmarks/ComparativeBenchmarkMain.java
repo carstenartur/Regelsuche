@@ -30,7 +30,6 @@ public final class ComparativeBenchmarkMain {
             : Path.of(args[0]);
         Report report = ComparativeBenchmarkRunner.system().run();
         new ComparativeBenchmarkBundleWriter().write(output, report);
-        verify(report);
     }
 
     static void verify(Report report) {
