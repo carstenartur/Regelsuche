@@ -1,6 +1,7 @@
 package de.regelsuche.discovery.domain;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -11,6 +12,8 @@ public final class DomainExportWorkspaceRepository {
     public static final String UPLOAD_SCHEMA = "regelsuche.domain-export-upload/v1";
     public static final int MAX_UPLOAD_BYTES = 1_048_576;
     public static final int MAX_EXPORTS = 256;
+    private static final int MAX_VALIDATION_BYTES = MAX_UPLOAD_BYTES;
+    private static final int MAX_VALIDATIONS_PER_EXPORT = 16;
     private static final Set<String> FILES = Set.of("domain.json", "evidence.json", "lifecycle-handoff.json", "export-manifest.json");
     private final Path directory;
 
@@ -93,6 +96,99 @@ public final class DomainExportWorkspaceRepository {
             }
         }
         return Optional.of(workspace);
+    }
+
+    /** Retains the bytes of a live validation without changing any original export file. */
+    public void retainValidation(DomainExportWorkspace workspace, DomainDownstreamValidation.Receipt receipt) {
+        byte[] bytes = receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8);
+        String hash = receipt.contentHash();
+        requireValidationBytes(workspace, hash, bytes);
+        synchronized (DomainExportWorkspaceRepository.class) {
+            try {
+                requireSame(find(workspace.runId()).orElseThrow(() ->
+                    new IllegalStateException("domain export is not retained")), workspace);
+                Path target = validationTarget(workspace, hash);
+                Path parent = target.getParent();
+                Files.createDirectories(parent);
+                rejectLinks(parent);
+                var existing = readValidation(workspace, hash);
+                if (existing.isPresent()) {
+                    requireSameValidation(existing.orElseThrow(), bytes);
+                    return;
+                }
+                try (var entries = Files.list(parent)) {
+                    if (entries.filter(path -> path.getFileName().toString().endsWith(".json"))
+                            .limit(MAX_VALIDATIONS_PER_EXPORT).count() >= MAX_VALIDATIONS_PER_EXPORT) {
+                        throw new IllegalStateException("domain validation receipt limit exceeded");
+                    }
+                }
+                Path staged = Files.createTempFile(parent, ".pending-", ".tmp");
+                try {
+                    Files.write(staged, bytes);
+                    try {
+                        Files.createLink(target, staged);
+                    } catch (FileAlreadyExistsException exception) {
+                        requireSameValidation(readValidation(workspace, hash).orElseThrow(), bytes);
+                    }
+                } finally {
+                    Files.deleteIfExists(staged);
+                }
+            } catch (IOException | IllegalArgumentException exception) {
+                throw new IllegalStateException("cannot retain domain validation receipt", exception);
+            }
+        }
+    }
+
+    /** Re-verifies the retained source and reads historical bytes without issuing a live receipt. */
+    public Optional<byte[]> findValidation(String runId, String hash) throws IOException {
+        DomainCanonical.requireSha256(hash, "validation receipt hash");
+        var workspace = find(runId);
+        return workspace.isEmpty() ? Optional.empty() : readValidation(workspace.orElseThrow(), hash);
+    }
+
+    private Optional<byte[]> readValidation(DomainExportWorkspace workspace, String hash) {
+        try {
+            Path target = validationTarget(workspace, hash);
+            if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();
+            if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.size(target) > MAX_VALIDATION_BYTES) {
+                throw new IllegalArgumentException("invalid retained domain validation file");
+            }
+            try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {
+                byte[] bytes = input.readNBytes(MAX_VALIDATION_BYTES + 1);
+                requireValidationBytes(workspace, hash, bytes);
+                return Optional.of(bytes);
+            }
+        } catch (IOException | IllegalArgumentException exception) {
+            throw new IllegalStateException("invalid retained domain validation receipt", exception);
+        }
+    }
+
+    private Path validationTarget(DomainExportWorkspace workspace, String hash) {
+        Path parent = directory.resolveSibling(directory.getFileName() + "-validations").resolve(workspace.runId().substring(7));
+        rejectLinks(parent);
+        return parent.resolve(hash.substring(7) + ".json");
+    }
+
+    private static void requireValidationBytes(DomainExportWorkspace workspace, String hash, byte[] bytes) {
+        if (bytes.length > MAX_VALIDATION_BYTES) throw new IllegalArgumentException("domain validation receipt exceeds 1 MiB");
+        var value = (ObjectNode) DomainExportWorkspace.read(bytes);
+        DomainDownstreamValidation.requireRetainedShape(value);
+        if (!DomainDownstreamValidation.SCHEMA.equals(value.path("schema").asText())
+                || !DomainDownstreamValidation.CONTRACT.equals(value.path("consumerContract").asText())
+                || !hash.equals(value.path("contentHash").asText())
+                || !workspace.evidence().outcome().name().equals(value.path("sourceOutcome").asText())
+                || !DomainDownstreamValidation.sourceBinding(workspace).equals(value.path("source"))
+                || !Arrays.equals(bytes, DomainExportWorkspace.write(value).getBytes(StandardCharsets.UTF_8))) {
+            throw new IllegalArgumentException("retained validation receipt differs from its canonical source binding");
+        }
+        value.remove("contentHash");
+        if (!hash.equals(DomainCanonical.sha256(DomainExportWorkspace.write(value)))) {
+            throw new IllegalArgumentException("retained validation receipt hash differs from its content");
+        }
+    }
+
+    private static void requireSameValidation(byte[] retained, byte[] supplied) {
+        if (!Arrays.equals(retained, supplied)) throw new IllegalStateException("immutable domain validation receipt conflict");
     }
 
     public Page list(int offset, int limit) throws IOException {

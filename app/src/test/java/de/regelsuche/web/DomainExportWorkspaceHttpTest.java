@@ -3,6 +3,7 @@ package de.regelsuche.web;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.regelsuche.discovery.domain.*;
 import de.regelsuche.discovery.domain.DiscoveryDomain.*;
 import de.regelsuche.export.DefaultTransformationExportService;
@@ -12,6 +13,7 @@ import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.security.MessageDigest;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -164,7 +166,22 @@ class DomainExportWorkspaceHttpTest {
             assertTrue(response.headers().firstValue("Content-Disposition").orElseThrow().contains(receipt.path("contentHash").asText().substring(7)));
             assertEquals("\""+receipt.path("contentHash").asText().substring(7)+"\"",response.headers().firstValue("ETag").orElseThrow());
             assertEquals(runId,response.headers().firstValue("X-Regelsuche-Run-Id").orElseThrow());
-            assertEquals(response.body(),request("POST",path()+"/validate",replayRequest(workspaceHash,evidence.contentHash())).body());
+            String receiptDigest = receipt.path("contentHash").asText().substring(7);
+            String receiptPath = path() + "/validate/" + receiptDigest;
+            assertEquals("/api/discovery-domains/exports" + receiptPath,
+                response.headers().firstValue("Location").orElse(""));
+            var loaded = request("GET", receiptPath, null);
+            assertEquals(200, loaded.statusCode(), loaded.body());
+            assertEquals(response.body(), loaded.body());
+            for (String header : List.of("Content-Disposition", "ETag", "X-Regelsuche-Run-Id")) {
+                assertEquals(response.headers().firstValue(header), loaded.headers().firstValue(header));
+            }
+            var retry = request("POST",path()+"/validate",replayRequest(workspaceHash,evidence.contentHash()));
+            assertEquals(200, retry.statusCode(), retry.body());
+            assertEquals(response.body(), retry.body());
+            try (var retained = Files.list(validationDirectory())) {
+                assertEquals(List.of(receiptDigest + ".json"), retained.map(p -> p.getFileName().toString()).toList());
+            }
             assertEquals(imported.body(),request("GET",path(),null).body());
             for (var file : files.entrySet()) assertArrayEquals(Base64.getDecoder().decode(file.getValue()),
                 request("GET",path()+"/files/"+file.getKey(),null).body().getBytes(StandardCharsets.UTF_8));
@@ -172,6 +189,84 @@ class DomainExportWorkspaceHttpTest {
                 assertEquals(Set.of("export","workspace.json"),retained.map(p -> p.getFileName().toString()).collect(java.util.stream.Collectors.toSet()));
             }
         }
+    }
+
+    @Test void refusesMissingForeignAndCorruptRetainedReceipts() throws Exception {
+        var imported = request("POST", "", upload());
+        assertEquals(201, imported.statusCode(), imported.body());
+        String workspaceHash = json.readTree(imported.body()).path("contentHash").asText();
+        var receipt = request("POST", path() + "/validate", replayRequest(workspaceHash, evidence.contentHash()));
+        assertEquals(200, receipt.statusCode(), receipt.body());
+        String digest = json.readTree(receipt.body()).path("contentHash").asText().substring(7);
+        String receiptPath = path() + "/validate/" + digest;
+        Path retained = validationDirectory().resolve(digest + ".json");
+        assertEquals(404, request("GET", path() + "/validate/" + "f".repeat(64), null).statusCode());
+        assertEquals(400, request("GET", path() + "/validate/invalid", null).statusCode());
+        assertEquals(405, request("POST", receiptPath, "{}").statusCode());
+
+        var domain = new FiniteDifferenceSequenceDomain();
+        var foreign = new DomainDiscoveryRunner().run("foreign-source", domain, evidence.seed(),
+            evidence.budget()).evidence();
+        Path source = temporary.resolve("foreign");
+        String foreignRun = new DomainDiscoveryExport().write(source, foreign).contentHash().substring(7);
+        for (String name : files.keySet()) {
+            files.put(name, Base64.getEncoder().encodeToString(Files.readAllBytes(source.resolve(name))));
+        }
+        assertEquals(201, request("POST", "", upload()).statusCode());
+        String foreignPath = "/" + foreignRun + "/validate/" + digest;
+        assertEquals(404, request("GET", foreignPath, null).statusCode());
+        Path foreignDirectory = validationDirectory().resolveSibling(foreignRun);
+        Files.createDirectories(foreignDirectory);
+        Files.copy(retained, foreignDirectory.resolve(retained.getFileName()));
+        assertEquals(500, request("GET", foreignPath, null).statusCode());
+
+        for (String corrupt : List.of(receipt.body() + "\n",
+                receipt.body().replace("CONFIRMED_FINITE_DATA", "REFUTED_FINITE_DATA"),
+                " ".repeat(1_048_577))) {
+            Files.writeString(retained, corrupt);
+            assertEquals(500, request("GET", receiptPath, null).statusCode());
+        }
+        var retry = request("POST", path() + "/validate", replayRequest(workspaceHash, evidence.contentHash()));
+        assertEquals(500, retry.statusCode(), retry.body());
+        assertEquals(1_048_577, Files.size(retained));
+
+        Files.delete(retained);
+        Path linked = Files.writeString(temporary.resolve("linked-receipt.json"), receipt.body());
+        Files.createSymbolicLink(retained, linked);
+        assertEquals(500, request("GET", receiptPath, null).statusCode());
+        Files.delete(retained);
+        Files.writeString(retained, receipt.body());
+        assertEquals(200, request("GET", receiptPath, null).statusCode());
+
+        for (String field : List.of("check", "artifacts", "status", "promotionStatus", "checkBudget",
+                "rows", "work", "counterexampleStatus")) {
+            var malformed = (ObjectNode) json.readTree(receipt.body());
+            if (field.equals("status")) malformed.put(field, "FUTURE_STATUS");
+            else if (field.equals("promotionStatus")) malformed.put(field, "APPROVED");
+            else if (field.equals("checkBudget")) malformed.putObject(field);
+            else if (Set.of("rows", "work", "counterexampleStatus").contains(field)) {
+                var check = (ObjectNode) malformed.path("check");
+                if (field.equals("counterexampleStatus")) {
+                    check.put(field, "FOUND").put("firstCounterexampleIndex", 0);
+                    malformed.put(field, "FOUND");
+                } else check.remove(field);
+                String checkHash = rehash(check);
+                for (var role : malformed.path("artifacts")) {
+                    if (Set.of("VALIDATION_EVIDENCE", "FINITE_COUNTEREXAMPLE_CHECK").contains(role.path("role").asText())) {
+                        ((ObjectNode) role).put("targetContentHash", "sha256:" + checkHash);
+                    }
+                }
+            }
+            else malformed.remove(field);
+            String mutatedDigest = rehash(malformed);
+            Files.writeString(validationDirectory().resolve(mutatedDigest + ".json"), json.writeValueAsString(malformed));
+            assertEquals(500, request("GET", path() + "/validate/" + mutatedDigest, null).statusCode(), field);
+        }
+
+        Path original = temporary.resolve("runs-domain-exports").resolve(runId.substring(7))
+            .resolve("export/evidence.json");
+        Files.writeString(original, " ", StandardOpenOption.APPEND);
+        assertEquals(400, request("GET", receiptPath, null).statusCode());
     }
 
     @Test void validationRequiresExactRequestBindingsAndThePostMethod() throws Exception {
@@ -194,6 +289,15 @@ class DomainExportWorkspaceHttpTest {
     }
 
     private String path() { return "/" + runId.substring(7); }
+    private String rehash(ObjectNode value) throws Exception {
+        value.remove("contentHash");
+        String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(value)));
+        value.put("contentHash", "sha256:" + digest);
+        return digest;
+    }
+    private Path validationDirectory() {
+        return temporary.resolve("runs-domain-exports-validations").resolve(runId.substring(7));
+    }
     private String upload() throws Exception { return json.writeValueAsString(Map.of("schema", "regelsuche.domain-export-upload/v1", "files", files)); }
     private String replayRequest(String workspaceHash, String evidenceHash) throws Exception {
         return json.writeValueAsString(Map.of("expectedWorkspaceHash", workspaceHash, "expectedEvidenceHash", evidenceHash));
