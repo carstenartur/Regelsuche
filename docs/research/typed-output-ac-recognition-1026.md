@@ -110,3 +110,16 @@ a new theorem, automatic promotion or a measured runtime improvement. Generalize
 premises, the frozen model/corpus and fair fixed-budget utility remain separate
 work. No original benchmark ceiling, proof/promotion gate, primitive baseline,
 dependency or branch protection is changed.
+
+## Opt-in matcher work measurement
+
+`TypedOutputPattern.findWithMatchWork` returns the ordinary application result
+and the accumulated pattern branches reported by `ExprMatcher`. Its
+`matcherWork()` sums evaluated matcher steps and visited pattern branches for
+every attempted assignment, including matches that fail or finish incomplete.
+Unvisited assignments consume no matcher work. The existing `find` method
+and the frozen v1 transfer report retain their original counters and semantics.
+
+These counters describe delegated logical matcher work. A matched-budget study
+still needs to account for output enumeration, substitution, search, learning,
+and independent verification. This measurement establishes no search gain.
