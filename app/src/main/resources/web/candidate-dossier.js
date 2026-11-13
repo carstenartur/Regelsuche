@@ -412,6 +412,12 @@
             });
             const status = text('p', undefined, host); status.id = 'candidateDossierStatus'; status.setAttribute('role', 'status');
             const state = store.state();
+            if (state.status === 'NOT_RETAINED' && state.runId === active.workspace.runId) {
+                text('span', 'Das im Manifest gebundene Kandidatenartefakt ist lokal noch nicht gespeichert. Importiere die Datei mit dem Hash ', status);
+                text('code', reference.targetContentHash, status);
+                text('span', '.', status);
+                return;
+            }
             if (state.status !== 'READY' || state.runId !== active.workspace.runId) {
                 status.textContent = state.status === 'ERROR' ? 'Dossier konnte nicht geöffnet werden: ' + state.error : 'Gebundenes Kandidatenartefakt laden …';
                 return;

@@ -29,9 +29,13 @@
     async function responseReply(response) {
         const raw = await response.text();
         if (!response.ok) {
-            let detail = '';
-            try { const error = JSON.parse(raw); detail = [error.code, error.message].filter(Boolean).join(': '); } catch (_) { /* HTTP status remains visible. */ }
-            throw new Error('HTTP ' + response.status + (detail ? ' · ' + detail : ''));
+            let problem;
+            try { problem = JSON.parse(raw); } catch (_) { /* HTTP status remains visible. */ }
+            const detail = [problem?.code, problem?.message].filter(Boolean).join(': ');
+            const error = new Error('HTTP ' + response.status + (detail ? ' · ' + detail : ''));
+            error.httpStatus = response.status;
+            error.code = problem?.code;
+            throw error;
         }
         return {raw, etag: response.headers.get('ETag'), runId: response.headers.get('X-Regelsuche-Run-Id')};
     }
