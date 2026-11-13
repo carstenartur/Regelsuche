@@ -116,16 +116,18 @@
         return Object.freeze({
             state: () => current,
             clear: () => { generation++; publish({status: 'EMPTY', runId: '', artifact: null, error: ''}); },
-            open: async (workspace, loader = () => load(workspace)) => {
+            open: async (workspace, importArtifact) => {
                 const token = ++generation;
                 publish({status: 'LOADING', runId: workspace.runId, artifact: null, error: ''});
                 try {
-                    const reply = await loader();
+                    const reply = await (importArtifact ? importArtifact() : load(workspace));
                     if (generation !== token) return;
                     publish({status: 'READY', runId: workspace.runId, artifact: decode(workspace, reply), error: ''});
                 } catch (error) {
                     if (generation !== token) return;
-                    publish({status: 'ERROR', runId: workspace.runId, artifact: null, error: error.message || String(error)});
+                    const missing = !importArtifact && error?.httpStatus === 404 && error.code === 'DOSSIER_NOT_RETAINED';
+                    publish({status: missing ? 'NOT_RETAINED' : 'ERROR', runId: workspace.runId, artifact: null,
+                        error: missing ? '' : error?.message || String(error)});
                 }
             }
         });

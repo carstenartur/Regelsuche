@@ -60,6 +60,26 @@ class CandidateDossierBrowserTest {
         }
     }
 
+    @Test void explainsMissingLocalDossierAndKeepsTheRequestedRunWhenImported() {
+        page.navigate(url("/#run=" + digest() + "&artifact=PATH_REPLAY"));
+        var status = page.locator("#candidateDossierStatus");
+        page.waitForFunction("() => /DOSSIER_NOT_RETAINED|lokal noch nicht gespeichert/.test("
+            + "document.querySelector('#candidateDossierStatus')?.textContent || '')");
+        assertTrue(status.textContent().contains("lokal noch nicht gespeichert"), status.textContent());
+        assertTrue(status.textContent().contains(BUNDLE.scenario().contentHash()), status.textContent());
+        assertFalse(status.textContent().contains("HTTP 404"), status.textContent());
+        assertEquals(0, page.locator("#candidateDossierDetail").count());
+        assertTrue(page.locator("#importCandidateDossier").isEnabled());
+        assertEquals("true", page.locator("[data-artifact-role='PATH_REPLAY']").getAttribute("aria-current"));
+
+        page.locator("#importCandidateDossier").setInputFiles(new FilePayload("scenario.json", "application/json",
+            BUNDLE.scenario().toCanonicalJson().getBytes(StandardCharsets.UTF_8)));
+        page.waitForSelector("#candidateDossierDetail");
+        assertEquals(BUNDLE.workspace().runId(), page.locator("#retainedRunId").textContent());
+        assertEquals("true", page.locator("[data-artifact-role='PATH_REPLAY']").getAttribute("aria-current"));
+        assertTrue(status.textContent().contains("Gespeicherter Beleg geöffnet"), status.textContent());
+    }
+
     @ParameterizedTest @ValueSource(strings = {"/", "/index.html", "/static/index.html"})
     void reviewsExactCandidateAndGraphEvidenceAcrossReloadAndKeyboardSelection(String entry) throws Exception {
         page.navigate(url(entry + "#run=" + digest()));
