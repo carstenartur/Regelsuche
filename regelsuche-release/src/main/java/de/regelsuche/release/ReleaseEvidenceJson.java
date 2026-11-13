@@ -17,7 +17,7 @@ import java.util.Properties;
 
 /** Strict JSON and offline Draft 2020-12 validation of checkout-owned schemas. */
 final class ReleaseEvidenceJson {
-    static final String VALIDATOR_VERSION = "3.0.8";
+    static final String VALIDATOR_VERSION = "3.0.9";
     private static final String DIALECT = "https://json-schema.org/draft/2020-12/schema";
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())
