@@ -27,12 +27,21 @@ final class DomainExportWorkspaceActions {
             }
             String[] path = suffix.substring(1).split("/", -1);
             if (!path[0].matches("[0-9a-f]{64}")) throw new IllegalArgumentException("invalid export digest");
+            if (path.length == 3 && path[1].equals("validate")) {
+                var receipt = repository.findValidation("sha256:" + path[0], "sha256:" + path[2]);
+                if (receipt.isEmpty()) {
+                    error(exchange, 404, "DOMAIN_VALIDATION_NOT_FOUND", "retained export or validation receipt not found");
+                    return;
+                }
+                sendValidation(exchange, "sha256:" + path[0], path[2], receipt.orElseThrow());
+                return;
+            }
             var found = repository.find("sha256:" + path[0]);
             if (found.isEmpty()) { error(exchange, 404, "DOMAIN_EXPORT_NOT_FOUND", "retained export not found"); return; }
             var workspace = found.get();
             if (path.length == 1) sendWorkspace(exchange, 200, workspace);
             else if (path.length == 2 && (path[1].equals("replay") || path[1].equals("validate"))) {
-                handleBoundAction(exchange, workspace, boundRequest, path[1]);
+                handleBoundAction(exchange, repository, workspace, boundRequest, path[1]);
             } else if (path.length == 3 && path[1].equals("files")) {
                 sendOriginalFile(exchange, workspace, path[2]);
             } else error(exchange, 404, "DOMAIN_EXPORT_ROUTE_NOT_FOUND", "unsupported export action");
@@ -47,7 +56,8 @@ final class DomainExportWorkspaceActions {
         }
     }
 
-    private static void handleBoundAction(HttpExchange exchange, DomainExportWorkspace workspace,
+    private static void handleBoundAction(HttpExchange exchange, DomainExportWorkspaceRepository repository,
+            DomainExportWorkspace workspace,
             Map<String, Object> boundRequest, String action) throws IOException {
         if (!workspace.contentHash().equals(boundRequest.get("expectedWorkspaceHash"))
                 || !workspace.evidence().contentHash().equals(boundRequest.get("expectedEvidenceHash"))) {
@@ -55,11 +65,10 @@ final class DomainExportWorkspaceActions {
         }
         if (action.equals("validate")) {
             var receipt = DomainDownstreamValidation.validate(workspace);
-            exchange.getResponseHeaders().set("X-Regelsuche-Run-Id", workspace.runId());
-            exchange.getResponseHeaders().set("ETag", "\"" + receipt.contentHash().substring(7) + "\"");
-            exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"domain-validation-"
-                + receipt.contentHash().substring(7) + ".json\"");
-            send(exchange, 200, receipt.toCanonicalJson());
+            repository.retainValidation(workspace, receipt);
+            String digest = receipt.contentHash().substring(7);
+            exchange.getResponseHeaders().set("Location", BASE + "/" + workspace.runId().substring(7) + "/validate/" + digest);
+            sendValidation(exchange, workspace.runId(), digest, receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
             return;
         }
         try {
@@ -72,6 +81,14 @@ final class DomainExportWorkspaceActions {
             exchange.getResponseHeaders().set("X-Regelsuche-Run-Id", workspace.runId());
             send(exchange, 200, json.writeValueAsString(result));
         } catch (IllegalStateException exception) { error(exchange, 409, "REPLAY_NOT_REPRODUCED", exception.getMessage()); }
+    }
+
+    private static void sendValidation(HttpExchange exchange, String runId,
+            String digest, byte[] bytes) throws IOException {
+        exchange.getResponseHeaders().set("X-Regelsuche-Run-Id", runId);
+        exchange.getResponseHeaders().set("ETag", "\"" + digest + "\"");
+        exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"domain-validation-" + digest + ".json\"");
+        send(exchange, 200, bytes);
     }
 
     private static void sendOriginalFile(HttpExchange exchange, DomainExportWorkspace workspace,

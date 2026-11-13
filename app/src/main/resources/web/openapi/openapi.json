@@ -418,7 +418,13 @@
         },
         "responses": {
           "200": {
-            "description": "Separater Receipt mit ursprünglicher Identität, vollständigem Replay, endlichem Check oder expliziter Ablehnung; keine universelle Proof- oder Lifecycle-Freigabe",
+            "description": "Separat gespeicherter Receipt mit ursprünglicher Identität, vollständigem Replay, endlichem Check oder expliziter Ablehnung; keine universelle Proof- oder Lifecycle-Freigabe",
+            "headers": {
+              "Location": {
+                "description": "Pfad zum gespeicherten Receipt",
+                "schema": {"type": "string"}
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -455,6 +461,45 @@
           },
           "413": {
             "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        }
+      }
+    },
+    "/api/discovery-domains/exports/{runDigest}/validate/{receiptDigest}": {
+      "get": {
+        "tags": ["Plugins"],
+        "operationId": "loadDomainValidationReceipt",
+        "summary": "Gebundenen historischen Validierungsbeleg laden",
+        "description": "Prüft die gespeicherten Bytes und ihre Bindung an den Export. Führt weder Replay noch eine neue Validierung aus und autorisiert keine späteren Schritte.",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          },
+          {
+            "name": "receiptDigest",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exakte Bytes des gespeicherten Validierungsbelegs",
+            "content": {"application/json": {"schema": {"type": "object"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
+          "404": {
+            "description": "Export oder zugehöriger Validierungsbeleg fehlt",
+            "content": {"application/json": {"schema": {"type": "object"}}}
+          },
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"},
+          "500": {
+            "description": "Gespeicherter Validierungsbeleg ist ungültig",
+            "content": {"application/json": {"schema": {"type": "object"}}}
           }
         }
       }

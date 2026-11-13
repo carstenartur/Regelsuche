@@ -1,15 +1,25 @@
 package de.regelsuche.discovery.domain;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain.*;
 import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain.*;
 import java.util.Objects;
+import java.util.Set;
 
 /** Productive, bounded consumer of an immutable verified export. Never authorizes a later lifecycle stage. */
 public final class DomainDownstreamValidation {
     public static final String SCHEMA = "regelsuche.domain-downstream-validation/v1";
     public static final String CONTRACT = "regelsuche.builtin-sequence-export-validation/v1";
+    private static final Set<String> RECEIPT_FIELDS = Set.of(
+        "schema", "consumerContract", "status", "detail", "failureClass", "sourceOutcome", "source",
+        "verifiedCandidateHash", "verifiedCertificateObjectHash", "verifiedRenderedCertificateHash",
+        "replay", "checkBudget", "check", "evaluationStatus", "counterexampleStatus", "proofStatus",
+        "universalProofStatus", "externalNoveltyStatus", "promotionStatus", "publicEvidenceStatus",
+        "artifacts", "claimBoundary", "contentHash");
+    private static final Set<String> NO_CHECK_STATUSES = Set.of("INCONCLUSIVE", "UNSUPPORTED", "TECHNICAL_FAILURE",
+        "NOT_EVALUATED_NO_SELECTED_CANDIDATE", "REPLAY_MISMATCH");
     private DomainDownstreamValidation() { }
 
     public record Budget(int maxReplayAttempts, int maxPayloadCharacters, DomainFiniteDataCheck.Budget check) {
@@ -34,6 +44,93 @@ public final class DomainDownstreamValidation {
     }
 
     public static Receipt validate(DomainExportWorkspace workspace) { return validate(workspace, Budget.defaults()); }
+
+    static ObjectNode sourceBinding(DomainExportWorkspace workspace) {
+        var snapshot = workspace.snapshot();
+        var manifest = snapshot.manifest();
+        var source = workspace.evidence();
+        ObjectNode binding = DomainExportWorkspace.JSON.createObjectNode();
+        binding.put("runId", workspace.runId()).put("domainId", manifest.domainId()).put("domainRevision", manifest.domainRevision())
+            .put("manifestHash", manifest.contentHash()).put("manifestByteHash", snapshot.verification().manifestByteHash())
+            .put("verificationHash", snapshot.verification().contentHash()).put("workspaceHash", workspace.contentHash())
+            .put("descriptorHash", manifest.domainDescriptorHash()).put("seedHash", source.seed().contentHash())
+            .put("evidenceHash", source.contentHash()).put("handoffHash", manifest.lifecycleHandoffHash());
+        binding.set("artifactBytes", DomainExportWorkspace.read(manifest.toCanonicalJson()).required("artifacts"));
+        nullable(binding, "selectedCandidateHash", source.selectedCandidateHash().isEmpty() ? null : source.selectedCandidateHash());
+        nullable(binding, "certificateObjectHash", source.certificate() == null ? null : source.certificate().certificateObjectHash());
+        nullable(binding, "renderedCertificateHash", source.certificate() == null ? null : source.certificate().contentHash());
+        return binding;
+    }
+
+    /** Structural checks only. The retained observation does not authorize a mathematical claim. */
+    static void requireRetainedShape(ObjectNode value) {
+        if (value.size() != RECEIPT_FIELDS.size() || !RECEIPT_FIELDS.stream().allMatch(value::has)
+                || !value.path("replay").isObject() || !value.path("checkBudget").isObject()
+                || !value.path("detail").isTextual() || !value.path("failureClass").isTextual()
+                || !value.path("claimBoundary").isTextual()
+                || !"NOT_PRODUCED".equals(value.path("universalProofStatus").asText())) {
+            throw new IllegalArgumentException("invalid retained validation receipt shape");
+        }
+        JsonNode budget = value.path("checkBudget");
+        if (budget.size() != 3 || !budget.path("maxTermChecks").isIntegralNumber()
+                || !budget.path("maxScalarOperations").isIntegralNumber()
+                || !budget.path("maxScalarBits").isIntegralNumber()
+                || !budget.path("maxTermChecks").canConvertToInt()
+                || !budget.path("maxScalarOperations").canConvertToInt()
+                || !budget.path("maxScalarBits").canConvertToInt()) {
+            throw new IllegalArgumentException("invalid retained finite check budget");
+        }
+        new DomainFiniteDataCheck.Budget(budget.path("maxTermChecks").intValue(),
+            budget.path("maxScalarOperations").intValue(), budget.path("maxScalarBits").intValue());
+        for (String field : new String[]{"proofStatus", "externalNoveltyStatus", "promotionStatus", "publicEvidenceStatus"}) {
+            if (!"NOT_EVALUATED".equals(value.path(field).asText())) {
+                throw new IllegalArgumentException("invalid retained validation claim boundary");
+            }
+        }
+        JsonNode check = value.path("check");
+        String status = value.path("status").asText();
+        String checkHash = null;
+        String expectedEvaluation = "NOT_EVALUATED";
+        String expectedCounterexample = "NOT_EVALUATED";
+        if (check.isNull()) {
+            if (!NO_CHECK_STATUSES.contains(status)) throw new IllegalArgumentException("validation status requires a finite check");
+        } else {
+            if (!(check instanceof ObjectNode object) || !DomainFiniteDataCheck.SCHEMA.equals(check.path("schema").asText())
+                    || !status.equals(check.path("status").asText()) || !check.path("complete").isBoolean()
+                    || !check.path("rows").isArray() || !check.path("work").isObject()
+                    || !"IDENTICAL_CANONICAL_EVIDENCE".equals(value.at("/replay/status").asText())
+                    || !value.at("/source/evidenceHash").equals(value.at("/replay/actualEvidenceHash"))
+                    || !matchesSelectedBinding(value, "verifiedCandidateHash", "selectedCandidateHash")
+                    || !matchesSelectedBinding(value, "verifiedCertificateObjectHash", "certificateObjectHash")
+                    || !matchesSelectedBinding(value, "verifiedRenderedCertificateHash", "renderedCertificateHash")) {
+                throw new IllegalArgumentException("invalid retained finite check");
+            }
+            expectedEvaluation = evaluationStatus(DomainFiniteDataCheck.Status.valueOf(status));
+            expectedCounterexample = check.path("counterexampleStatus").asText();
+            if (!Set.of("FOUND", "NONE_FOUND", "INCONCLUSIVE").contains(expectedCounterexample)
+                    || ("CONFIRMED_FINITE_DATA".equals(status) && (!check.path("complete").asBoolean()
+                        || !"CONFIRMED".equals(value.path("sourceOutcome").asText())
+                        || !"NONE_FOUND".equals(expectedCounterexample)))) {
+                throw new IllegalArgumentException("invalid retained finite check outcome");
+            }
+            checkHash = DomainCanonical.requireSha256(check.path("contentHash").asText(), "finite check hash");
+            ObjectNode material = object.deepCopy();
+            material.remove("contentHash");
+            if (!checkHash.equals(DomainCanonical.sha256(DomainExportWorkspace.write(material)))) {
+                throw new IllegalArgumentException("retained finite check hash differs from its content");
+            }
+        }
+        if (!expectedEvaluation.equals(value.path("evaluationStatus").asText())
+                || !expectedCounterexample.equals(value.path("counterexampleStatus").asText())
+                || !artifacts(value.at("/source/handoffHash").asText(), checkHash).equals(value.path("artifacts"))) {
+            throw new IllegalArgumentException("invalid retained validation outcome or artifact roles");
+        }
+    }
+
+    private static boolean matchesSelectedBinding(ObjectNode value, String verifiedField, String sourceField) {
+        JsonNode verified = value.path(verifiedField);
+        return verified.isTextual() && verified.equals(value.path("source").path(sourceField));
+    }
 
     public static Receipt validate(DomainExportWorkspace workspace, Budget budget) {
         Objects.requireNonNull(workspace, "workspace"); Objects.requireNonNull(budget, "budget");
@@ -80,20 +177,11 @@ public final class DomainDownstreamValidation {
         Execution(DomainExportWorkspace workspace, Budget budget) { this.workspace = workspace; this.budget = budget; }
 
         Receipt receipt(String status, String detail) {
-            var snapshot = workspace.snapshot(); var manifest = snapshot.manifest(); var source = workspace.evidence();
+            var source = workspace.evidence();
             ObjectNode value = DomainExportWorkspace.JSON.createObjectNode();
             value.put("schema", SCHEMA).put("consumerContract", CONTRACT).put("status", status).put("detail", detail)
                 .put("failureClass", failureClass).put("sourceOutcome", source.outcome().name());
-            ObjectNode binding = value.putObject("source");
-            binding.put("runId", workspace.runId()).put("domainId", manifest.domainId()).put("domainRevision", manifest.domainRevision())
-                .put("manifestHash", manifest.contentHash()).put("manifestByteHash", snapshot.verification().manifestByteHash())
-                .put("verificationHash", snapshot.verification().contentHash()).put("workspaceHash", workspace.contentHash())
-                .put("descriptorHash", manifest.domainDescriptorHash()).put("seedHash", source.seed().contentHash())
-                .put("evidenceHash", source.contentHash()).put("handoffHash", manifest.lifecycleHandoffHash());
-            binding.set("artifactBytes", DomainExportWorkspace.read(manifest.toCanonicalJson()).required("artifacts"));
-            nullable(binding, "selectedCandidateHash", source.selectedCandidateHash().isEmpty() ? null : source.selectedCandidateHash());
-            nullable(binding, "certificateObjectHash", source.certificate() == null ? null : source.certificate().certificateObjectHash());
-            nullable(binding, "renderedCertificateHash", source.certificate() == null ? null : source.certificate().contentHash());
+            value.set("source", sourceBinding(workspace));
             nullable(value, "verifiedCandidateHash", selectedBound ? source.selectedCandidateHash() : null);
             nullable(value, "verifiedCertificateObjectHash", selectedBound ? source.certificate().certificateObjectHash() : null);
             nullable(value, "verifiedRenderedCertificateHash", selectedBound ? source.certificate().contentHash() : null);
@@ -111,26 +199,37 @@ public final class DomainDownstreamValidation {
                 .put("maxScalarOperations", budget.check().maxScalarOperations()).put("maxScalarBits", budget.check().maxScalarBits());
             if (check == null) value.putNull("check");
             else value.set("check", DomainExportWorkspace.read(check.toCanonicalJson()));
-            value.put("evaluationStatus", check == null ? "NOT_EVALUATED" : switch (check.status()) {
-                case CONFIRMED_FINITE_DATA -> "CONFIRMED"; case REFUTED_FINITE_DATA -> "REFUTED";
-                case UNSUPPORTED -> "UNSUPPORTED"; default -> "INCONCLUSIVE";
-            });
+            value.put("evaluationStatus", check == null ? "NOT_EVALUATED" : evaluationStatus(check.status()));
             value.put("counterexampleStatus", check == null ? "NOT_EVALUATED"
                 : DomainExportWorkspace.read(check.toCanonicalJson()).required("counterexampleStatus").asText());
             value.put("proofStatus", "NOT_EVALUATED").put("universalProofStatus", "NOT_PRODUCED")
                 .put("externalNoveltyStatus", "NOT_EVALUATED").put("promotionStatus", "NOT_EVALUATED").put("publicEvidenceStatus", "NOT_EVALUATED");
-            ArrayNode roles = value.putArray("artifacts");
-            role(roles, "SOURCE_LIFECYCLE_HANDOFF", "AVAILABLE", DiscoveryLifecycleHandoff.SCHEMA, manifest.lifecycleHandoffHash());
-            for (String name : new String[]{"VALIDATION_EVIDENCE", "FINITE_COUNTEREXAMPLE_CHECK"}) {
-                role(roles, name, check == null ? "NOT_EVALUATED" : "AVAILABLE", check == null ? null : DomainFiniteDataCheck.SCHEMA,
-                    check == null ? null : check.contentHash());
-            }
-            for (String name : new String[]{"PROOF_OBLIGATIONS", "UNIVERSAL_PROOF"}) role(roles, name, "NOT_PRODUCED", null, null);
-            for (String name : new String[]{"EXTERNAL_NOVELTY", "PROMOTION", "PUBLIC_EVIDENCE"}) role(roles, name, "NOT_EVALUATED", null, null);
+            value.set("artifacts", artifacts(workspace.snapshot().manifest().lifecycleHandoffHash(), check == null ? null : check.contentHash()));
             value.put("claimBoundary", "Source identity, deterministic replay and independent retained finite-data checking only. "
                 + "No universal proof, external novelty, promotion, Public Evidence or later lifecycle authorization; total work remains unavailable.");
             return new Receipt(value);
         }
+    }
+
+    private static String evaluationStatus(DomainFiniteDataCheck.Status status) {
+        return switch (status) {
+            case CONFIRMED_FINITE_DATA -> "CONFIRMED";
+            case REFUTED_FINITE_DATA -> "REFUTED";
+            case UNSUPPORTED -> "UNSUPPORTED";
+            default -> "INCONCLUSIVE";
+        };
+    }
+
+    private static ArrayNode artifacts(String handoffHash, String checkHash) {
+        ArrayNode roles = DomainExportWorkspace.JSON.createArrayNode();
+        role(roles, "SOURCE_LIFECYCLE_HANDOFF", "AVAILABLE", DiscoveryLifecycleHandoff.SCHEMA, handoffHash);
+        for (String name : new String[]{"VALIDATION_EVIDENCE", "FINITE_COUNTEREXAMPLE_CHECK"}) {
+            role(roles, name, checkHash == null ? "NOT_EVALUATED" : "AVAILABLE",
+                checkHash == null ? null : DomainFiniteDataCheck.SCHEMA, checkHash);
+        }
+        for (String name : new String[]{"PROOF_OBLIGATIONS", "UNIVERSAL_PROOF"}) role(roles, name, "NOT_PRODUCED", null, null);
+        for (String name : new String[]{"EXTERNAL_NOVELTY", "PROMOTION", "PUBLIC_EVIDENCE"}) role(roles, name, "NOT_EVALUATED", null, null);
+        return roles;
     }
 
     private static void nullable(ObjectNode value, String key, String text) { if (text == null) value.putNull(key); else value.put(key, text); }
