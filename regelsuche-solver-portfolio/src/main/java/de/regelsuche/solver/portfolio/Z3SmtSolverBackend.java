@@ -71,7 +71,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         this.processRunner = Objects.requireNonNull(processRunner, "processRunner");
         this.configurationHash = SolverIr.sha256(
             "command=" + this.command + "\ntimeoutMillis=" + this.timeoutMillis
-                + "\nproduceProofs=true");
+                + "\nproduceProofs=true\ncheckResponseVersion=2");
         this.descriptor = new BackendDescriptor(
             "z3-smt-proof",
             backendVersion,
@@ -133,7 +133,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
                 "Z3 check-sat failed: " + normalize(check.stdout() + ' ' + check.stderr()),
                 Map.of(), "");
         } else {
-            result = switch (status(check.stdout())) {
+            result = switch (checkStatus(check)) {
                 case "unsat" -> proofResult(obligation, material);
                 case "sat" -> modelResult(obligation, material);
                 case "unknown" -> result(obligation, ResultStatus.UNKNOWN,
@@ -215,7 +215,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         }
         String payload = payloadAfterStatus(proof.stdout(), "unsat");
         if (proof.exitCode() != 0
-                || !"unsat".equals(status(proof.stdout()))
+                || hasSmtError(proof.stderr())
                 || !validProofPayload(payload)) {
             return result(obligation, ResultStatus.ERROR,
                 "Z3 confirmed unsat but returned no valid proof object: "
@@ -236,7 +236,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             material.scriptPrefix() + "(check-sat)\n(get-model)\n",
             timeoutMillis);
         String payload = model.available() && !model.timedOut()
-                && model.exitCode() == 0
+                && model.exitCode() == 0 && !hasSmtError(model.stderr())
             ? payloadAfterStatus(model.stdout(), "sat") : "";
         Map<String, String> counterexample = validModelPayload(payload)
             ? Map.of("smtModel", payload) : Map.of();
@@ -316,13 +316,14 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         return normalized.startsWith("(model");
     }
 
-    private static String status(String output) {
-        return output == null ? "" : output.lines()
-            .map(String::trim)
-            .map(value -> value.toLowerCase(Locale.ROOT))
-            .filter(value -> value.equals("sat") || value.equals("unsat")
-                || value.equals("unknown"))
-            .findFirst().orElse("");
+    private static String checkStatus(ProcessOutput check) {
+        return hasSmtError(check.stderr()) ? "" : check.stdout().strip();
+    }
+
+    private static boolean hasSmtError(String output) {
+        return output.lines()
+            .map(line -> line.stripLeading().toLowerCase(Locale.ROOT))
+            .anyMatch(line -> line.startsWith("(error") || line.startsWith("error:"));
     }
 
     private static String payloadAfterStatus(String output, String expectedStatus) {
@@ -333,11 +334,15 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             .map(String::trim)
             .filter(line -> !line.isBlank())
             .toList();
-        int index = lines.indexOf(expectedStatus);
-        if (index < 0 || index + 1 >= lines.size()) {
+        if (lines.size() < 2 || !lines.getFirst().equals(expectedStatus)) {
             return "";
         }
-        return String.join("\n", lines.subList(index + 1, lines.size())).trim();
+        List<String> payload = lines.subList(1, lines.size());
+        if (payload.stream().anyMatch(line ->
+                line.equals("sat") || line.equals("unsat") || line.equals("unknown"))) {
+            return "";
+        }
+        return String.join("\n", payload);
     }
 
     private static String normalize(String value) {

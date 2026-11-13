@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import de.regelsuche.solver.ir.SolverExecution;
 import de.regelsuche.solver.ir.SolverIr;
@@ -11,6 +12,7 @@ import de.regelsuche.solver.ir.SolverIr.Call;
 import de.regelsuche.solver.ir.SolverIr.Goal;
 import de.regelsuche.solver.ir.SolverIr.Literal;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Predicate;
 import de.regelsuche.solver.ir.SolverIr.Relation;
 import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
 import de.regelsuche.solver.ir.SolverIr.ResultStatus;
@@ -21,6 +23,7 @@ import de.regelsuche.solver.ir.SolverIr.SymbolDeclaration;
 import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SolverObligationVerifier;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -91,6 +94,117 @@ class Z3SmtSolverBackendTest {
     }
 
     @Test
+    void checkSatRejectsMixedResponsesBeforeRetrievingEvidence() {
+        for (String response : List.of("(error \"bad input\")\nsat\n", "unsat\nsat\n")) {
+            assertCheckResult(
+                new Z3SmtSolverBackend.ProcessOutput(true, false, 0, response, ""),
+                ResultStatus.ERROR, "unrecognized Z3 output");
+        }
+        assertCheckResult(
+            new Z3SmtSolverBackend.ProcessOutput(
+                true, false, 0, "sat\n", "(error \"bad input\")\n"),
+            ResultStatus.ERROR, "unrecognized Z3 output");
+    }
+
+    @Test
+    void realZ3ChecksExactPremisesIndependentlyOfTheGoal() {
+        var detection = Z3SmtSolverBackend.detectSystemZ3();
+        assumeTrue(detection.availability() == BackendAvailability.AVAILABLE, detection.detail());
+        var analyzer = new AssumptionConsistencyAnalyzer(detection, PortfolioBudget.standard());
+        var x = new Symbol("x");
+        var zero = new Literal("0");
+        var positive = new Predicate("positive", Relation.GREATER_THAN, x, zero);
+        var nonpositive = new Predicate("nonpositive", Relation.LESS_OR_EQUAL, x, zero);
+        var unsupportedGoal = new Goal(Relation.EQUALS, new Call("sin", List.of(x)), zero);
+        var arbitraryGoal = new Goal(Relation.EQUALS, x, zero);
+        Obligation satisfiable = premiseTestObligation(List.of(positive), unsupportedGoal);
+        Obligation contradictory = premiseTestObligation(List.of(positive, nonpositive), arbitraryGoal);
+
+        assertEquals(ResultStatus.UNSUPPORTED, detection.backend().execute(satisfiable).result().status());
+        assertEquals(ResultStatus.CONFIRMED, detection.backend().execute(contradictory).result().status());
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.SAT, analyzer.analyze(satisfiable).verdict());
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.SAT,
+            analyzer.analyze(premiseTestObligation(List.of(positive), arbitraryGoal)).verdict());
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.SAT,
+            analyzer.analyze(premiseTestObligation(List.of(), arbitraryGoal)).verdict());
+
+        var analysis = analyzer.analyze(contradictory);
+        var query = analysis.request().obligation();
+        var result = analysis.run().selectedExecution().result();
+        var verifier = new SolverObligationVerifier();
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.UNSAT, analysis.verdict());
+        assertEquals(contradictory, analysis.original());
+        assertEquals(contradictory.assumptions(), query.assumptions());
+        assertEquals(contradictory.assumptionsHash(), query.assumptionsHash());
+        assertEquals(contradictory.theories(), query.theories());
+        assertEquals(contradictory.declarations(), query.declarations());
+        assertEquals(contradictory.provenance(), query.provenance());
+        assertFalse(result.certificateHash().isEmpty());
+        assertTrue(verifier.resultBelongsTo(query, result));
+        assertFalse(verifier.resultBelongsTo(contradictory, result));
+        assertFalse(verifier.resultBelongsTo(analyzer.analyze(satisfiable).request().obligation(), result));
+    }
+
+    @Test
+    void premiseAnalysisCanOnlyBeCreatedByTheAnalyzer() throws NoSuchMethodException {
+        var constructor = AssumptionConsistencyAnalyzer.Analysis.class.getDeclaredConstructor(
+            Obligation.class, PortfolioRequest.class, PortfolioRun.class);
+        assertTrue(java.lang.reflect.Modifier.isPrivate(constructor.getModifiers()));
+        assertEquals(0, AssumptionConsistencyAnalyzer.Analysis.class.getConstructors().length);
+    }
+
+    @Test
+    void premiseAnalysisReportsSolverFailuresWithoutAConsistencyVerdict() {
+        assertInconclusivePremiseAnalysis(new Z3SmtSolverBackend.ProcessOutput(
+            true, false, 0, "unknown\n", ""), ResultStatus.UNKNOWN);
+        assertInconclusivePremiseAnalysis(new Z3SmtSolverBackend.ProcessOutput(
+            true, true, -1, "", ""), ResultStatus.TIMEOUT);
+        assertInconclusivePremiseAnalysis(new Z3SmtSolverBackend.ProcessOutput(
+            true, false, 0, "(error \"bad input\")\nsat\n", ""), ResultStatus.ERROR);
+        assertInconclusivePremiseAnalysis(new Z3SmtSolverBackend.ProcessOutput(
+            false, false, -1, "", "not installed"), ResultStatus.ERROR);
+    }
+
+    @Test
+    void premiseAnalysisCanRetryAfterATransientFailure() {
+        AtomicInteger calls = new AtomicInteger();
+        var backend = new Z3SmtSolverBackend("test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> calls.getAndIncrement() == 0
+                ? new Z3SmtSolverBackend.ProcessOutput(false, false, -1, "", "not installed")
+                : new Z3SmtSolverBackend.ProcessOutput(true, false, 0, "sat\n", ""));
+        var analyzer = premiseAnalyzer(backend, BackendAvailability.AVAILABLE);
+        Obligation obligation = referenceObligation();
+
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.INCONCLUSIVE, analyzer.analyze(obligation).verdict());
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.SAT, analyzer.analyze(obligation).verdict());
+    }
+
+    @Test
+    void premiseAnalysisPreservesUnsupportedAndUnavailableAttemptDiagnostics() {
+        var backend = new Z3SmtSolverBackend("test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> { throw new AssertionError("must not run"); });
+        var available = premiseAnalyzer(backend, BackendAvailability.AVAILABLE);
+        var unsupported = new Predicate("sine", Relation.EQUALS,
+            new Call("sin", List.of(new Symbol("x"))), new Literal("0"));
+        var analysis = available.analyze(premiseTestObligation(
+            List.of(unsupported), referenceObligation().goal()));
+
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.INCONCLUSIVE, analysis.verdict());
+        assertEquals(PortfolioOutcome.UNSUPPORTED, analysis.run().report().outcome());
+        var rejected = analysis.run().report().attempts().getFirst();
+        assertEquals(AttemptDisposition.FILTERED_UNSUPPORTED, rejected.disposition());
+        assertTrue(rejected.issues().contains("UNSUPPORTED_CALL_EXPRESSION"));
+        assertTrue(analysis.run().executions().isEmpty());
+
+        var unavailable = premiseAnalyzer(backend, BackendAvailability.UNAVAILABLE)
+            .analyze(referenceObligation());
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.INCONCLUSIVE, unavailable.verdict());
+        assertEquals(AttemptDisposition.SKIPPED_UNAVAILABLE,
+            unavailable.run().report().attempts().getFirst().disposition());
+        assertTrue(unavailable.run().executions().isEmpty());
+    }
+
+    @Test
     void proofRetrievalAvailabilityAndTimeoutRemainTyped() {
         SolverExecution unavailable = executeWithProofOutput(
             new Z3SmtSolverBackend.ProcessOutput(
@@ -121,6 +235,11 @@ class Z3SmtSolverBackendTest {
 
         assertEquals(ResultStatus.REFUTED, execution.result().status());
         assertTrue(execution.result().counterexample().isEmpty());
+
+        var analysis = premiseAnalyzer(backend, BackendAvailability.AVAILABLE)
+            .analyze(referenceObligation());
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.SAT, analysis.verdict());
+        assertTrue(analysis.run().selectedExecution().result().counterexample().isEmpty());
     }
 
     @Test
@@ -154,6 +273,15 @@ class Z3SmtSolverBackendTest {
         assertEquals(ResultStatus.ERROR, execution.result().status());
         assertTrue(execution.result().certificateHash().isEmpty());
         assertTrue(execution.result().message().contains("no valid proof object"));
+    }
+
+    @Test
+    void proofRetrievalRejectsConflictingStatuses() {
+        SolverExecution execution = executeWithProofOutput(new Z3SmtSolverBackend.ProcessOutput(
+            true, false, 0, "unsat\n(proof (asserted false))\nsat\n", ""));
+
+        assertEquals(ResultStatus.ERROR, execution.result().status());
+        assertTrue(execution.result().certificateHash().isEmpty());
     }
 
     @Test
@@ -317,6 +445,33 @@ class Z3SmtSolverBackendTest {
             "z3-x-plus-zero", "x + 0", "x", List.of(),
             RequestedEvidence.FORMAL_PROOF,
             provenance("x-plus-zero"));
+    }
+
+    private static Obligation premiseTestObligation(List<Predicate> premises, Goal goal) {
+        return Obligation.create("premise-test", List.of(new SymbolDeclaration("x", Sort.REAL)),
+            List.of(Theory.REAL_ARITHMETIC), premises, goal, RequestedEvidence.FORMAL_PROOF,
+            provenance("premise-test"));
+    }
+
+    private static AssumptionConsistencyAnalyzer premiseAnalyzer(
+        Z3SmtSolverBackend backend,
+        BackendAvailability availability
+    ) {
+        return new AssumptionConsistencyAnalyzer(
+            new Z3SmtSolverBackend.Detection(backend, availability, ""), PortfolioBudget.standard());
+    }
+
+    private static void assertInconclusivePremiseAnalysis(
+        Z3SmtSolverBackend.ProcessOutput output,
+        ResultStatus expectedStatus
+    ) {
+        var backend = new Z3SmtSolverBackend("test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> output);
+        var analysis = premiseAnalyzer(backend, BackendAvailability.AVAILABLE)
+            .analyze(referenceObligation());
+
+        assertEquals(AssumptionConsistencyAnalyzer.Verdict.INCONCLUSIVE, analysis.verdict());
+        assertEquals(expectedStatus, analysis.run().executions().getFirst().result().status());
     }
 
     private static SourceProvenance provenance(String sourceId) {
