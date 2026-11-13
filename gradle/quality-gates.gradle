@@ -27,24 +27,29 @@ def deferCoverageToWorkflowConvergence =
     separateSympyRuntimeCoverageAuthority &&
         separateSympyRuntimeCoverageAuthorization == 'required-by-workflow'
 
-def verifyCoverageRegression = tasks.register('verifyCoverageRegression', Exec) {
+def coverageQualityProject = project(':regelsuche-quality')
+def coverageRuntimeClasspath = coverageQualityProject.providers.provider {
+    coverageQualityProject.extensions.getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+def verifyCoverageRegression = tasks.register('verifyCoverageRegression', JavaExec) {
     group = 'verification'
     description = 'Fails when aggregate/module JaCoCo floors regress or a covered module disappears.'
-    dependsOn 'prepareVerificationEnvironment', 'test'
+    dependsOn ':regelsuche-quality:classes', 'test'
     mustRunAfter 'test'
     workingDir qualityRepositoryRoot
+    classpath = coverageQualityProject.files(coverageRuntimeClasspath)
+    mainClass = 'de.regelsuche.quality.coverage.CoverageRegressionMain'
+    javaLauncher = coverageQualityProject.extensions.getByType(JavaToolchainService).launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    args '--root', qualityRepositoryRoot.asFile.absolutePath
     inputs.file qualityRepositoryRoot.file('config/quality/coverage-policy.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-coverage-regression.py')
     outputs.file layout.buildDirectory.file('reports/quality/coverage-report.json')
     outputs.file layout.buildDirectory.file('reports/quality/coverage-report.md')
     outputs.upToDateWhen { false }
     onlyIf {
         !deferCoverageToWorkflowConvergence
-    }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/verify-coverage-regression.py',
-            '--root', qualityRepositoryRoot.asFile.absolutePath
     }
 }
 

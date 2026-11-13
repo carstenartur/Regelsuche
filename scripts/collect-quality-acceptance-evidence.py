@@ -35,7 +35,10 @@ SECTIONS = {
                          "scripts/release_readiness_files.py"]},
     "coverage": {
         "policyFiles": ["config/quality/coverage-policy.json"],
-        "supportFiles": ["scripts/verify-coverage-regression.py"]},
+        "supportFiles": ["gradle/quality-gates.gradle", "regelsuche-quality/build.gradle",
+                         "scripts/verify-cross-authority-coverage.py",
+                         "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/CoverageRegression.java",
+                         "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/CoverageRegressionMain.java"]},
     "jmh": {
         "policyFiles": ["config/quality/jmh-regression-policy-v2.json",
                         "config/quality/jmh-regression-decision-policy-v3.json",

@@ -26,7 +26,15 @@ assembly adapter uses a separate execution-data store per module: tests of an
 application must not silently change a dependency module's canonical coverage.
 JaCoCo itself owns analysis and all HTML/XML rendering. The renderer runtime is
 retained under `build/reports/quality/coverage-report-runtime` in the existing
-verification artifact; convergence does not repeat tests or resolve dependencies.
+verification artifact alongside the Java coverage decision. Local Gradle and
+cross-authority CI invoke the same decision and write the v1 JSON and Markdown
+reports. Convergence uses the retained runtime without repeating tests or
+resolving dependencies.
+
+The decision requires one top-level line counter and one branch counter in
+each unnamespaced JaCoCo `report`, with explicit nonnegative counts. Invalid
+inputs invalidate the canonical gate reports. A completed decision that finds
+coverage violations writes a fresh `FAILED` report for diagnosis.
 
 The publisher checks all six counters against every canonical module XML and
 checks line/branch counts against the unchanged successful coverage gate. Missing,

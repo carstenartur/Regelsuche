@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Join isolated SymPy JaCoCo evidence and run the unchanged coverage gate."""
+"""Join isolated SymPy JaCoCo evidence and run the checkout coverage gate."""
 
 from __future__ import annotations
 
@@ -14,7 +14,8 @@ from pathlib import Path
 CANONICAL_SYMPY_REPORT = Path(
     "regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml"
 )
-COVERAGE_VERIFIER = Path("scripts/verify-coverage-regression.py")
+COVERAGE_RUNTIME = Path("build/reports/quality/coverage-report-runtime")
+COVERAGE_MAIN = "de.regelsuche.quality.coverage.CoverageRegressionMain"
 
 
 class CoverageConvergenceError(RuntimeError):
@@ -49,6 +50,18 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _coverage_classpath(root: Path) -> str:
+    runtime = _inside(root, COVERAGE_RUNTIME, "coverage verifier runtime")
+    if runtime.is_symlink() or not runtime.is_dir():
+        raise CoverageConvergenceError(f"coverage verifier runtime is missing: {runtime}")
+    jars = sorted(runtime.glob("*.jar"))
+    quality_jar = any(jar.stem == "regelsuche-quality" or jar.stem.startswith("regelsuche-quality-")
+                      for jar in jars)
+    if not quality_jar or any(jar.is_symlink() or not jar.is_file() for jar in jars):
+        raise CoverageConvergenceError(f"coverage verifier runtime does not contain regular JARs: {runtime}")
+    return os.pathsep.join(str(jar) for jar in jars)
+
+
 def converge(root: Path, isolated: Path) -> None:
     root = root.resolve()
     if not root.is_dir():
@@ -56,7 +69,6 @@ def converge(root: Path, isolated: Path) -> None:
 
     isolated_report = _inside(root, isolated, "isolated report")
     canonical_report = _inside(root, CANONICAL_SYMPY_REPORT, "canonical report")
-    verifier = _inside(root, COVERAGE_VERIFIER, "coverage verifier")
 
     if isolated_report.is_symlink() or not isolated_report.is_file():
         raise CoverageConvergenceError(
@@ -68,11 +80,7 @@ def converge(root: Path, isolated: Path) -> None:
             f"canonical SymPy JaCoCo report already exists; refusing stale or "
             f"ambiguous evidence: {canonical_report}"
         )
-    if verifier.is_symlink() or not verifier.is_file():
-        raise CoverageConvergenceError(
-            f"checkout-owned coverage verifier is missing or not a regular file: "
-            f"{verifier}"
-        )
+    classpath = _coverage_classpath(root)
 
     canonical_report.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(isolated_report, canonical_report)
@@ -86,9 +94,10 @@ def converge(root: Path, isolated: Path) -> None:
     print(f"crossAuthorityCoverageSymPyReport=sha256:{canonical_hash}")
     subprocess.run(
         [
-            sys.executable,
-            "-B",
-            str(verifier),
+            "java",
+            "-cp",
+            classpath,
+            COVERAGE_MAIN,
             "--root",
             str(root),
         ],
