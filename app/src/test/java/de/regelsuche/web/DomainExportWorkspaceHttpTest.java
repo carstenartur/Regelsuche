@@ -238,35 +238,54 @@ class DomainExportWorkspaceHttpTest {
         Files.writeString(retained, receipt.body());
         assertEquals(200, request("GET", receiptPath, null).statusCode());
 
-        for (String field : List.of("check", "artifacts", "status", "promotionStatus", "checkBudget",
-                "rows", "work", "counterexampleStatus")) {
-            var malformed = (ObjectNode) json.readTree(receipt.body());
-            if (field.equals("status")) malformed.put(field, "FUTURE_STATUS");
-            else if (field.equals("promotionStatus")) malformed.put(field, "APPROVED");
-            else if (field.equals("checkBudget")) malformed.putObject(field);
-            else if (Set.of("rows", "work", "counterexampleStatus").contains(field)) {
-                var check = (ObjectNode) malformed.path("check");
-                if (field.equals("counterexampleStatus")) {
-                    check.put(field, "FOUND").put("firstCounterexampleIndex", 0);
-                    malformed.put(field, "FOUND");
-                } else check.remove(field);
-                String checkHash = rehash(check);
-                for (var role : malformed.path("artifacts")) {
-                    if (Set.of("VALIDATION_EVIDENCE", "FINITE_COUNTEREXAMPLE_CHECK").contains(role.path("role").asText())) {
-                        ((ObjectNode) role).put("targetContentHash", "sha256:" + checkHash);
-                    }
-                }
-            }
-            else malformed.remove(field);
-            String mutatedDigest = rehash(malformed);
-            Files.writeString(validationDirectory().resolve(mutatedDigest + ".json"), json.writeValueAsString(malformed));
-            assertEquals(500, request("GET", path() + "/validate/" + mutatedDigest, null).statusCode(), field);
-        }
+        assertRehashedReceiptTamperingIsRejected(receipt.body());
 
         Path original = temporary.resolve("runs-domain-exports").resolve(runId.substring(7))
             .resolve("export/evidence.json");
         Files.writeString(original, " ", StandardOpenOption.APPEND);
         assertEquals(400, request("GET", receiptPath, null).statusCode());
+    }
+
+
+    private void assertRehashedReceiptTamperingIsRejected(String receiptBody) throws Exception {
+        for (String field : List.of("check", "artifacts", "status", "promotionStatus", "checkBudget",
+                "rows", "work", "counterexampleStatus", "checkerContract", "firstCounterexampleIndex")) {
+            var malformed = (ObjectNode) json.readTree(receiptBody);
+            corruptRetainedReceiptField(malformed, field);
+            String mutatedDigest = rehash(malformed);
+            Files.writeString(validationDirectory().resolve(mutatedDigest + ".json"), json.writeValueAsString(malformed));
+            assertEquals(500, request("GET", path() + "/validate/" + mutatedDigest, null).statusCode(), field);
+        }
+    }
+
+    private void corruptRetainedReceiptField(ObjectNode malformed, String field) throws Exception {
+        switch (field) {
+            case "status" -> malformed.put(field, "FUTURE_STATUS");
+            case "promotionStatus" -> malformed.put(field, "APPROVED");
+            case "checkBudget" -> malformed.putObject(field);
+            case "rows", "work", "counterexampleStatus", "checkerContract", "firstCounterexampleIndex" ->
+                corruptFiniteCheckField(malformed, field);
+            default -> malformed.remove(field);
+        }
+    }
+
+    private void corruptFiniteCheckField(ObjectNode malformed, String field) throws Exception {
+        var check = (ObjectNode) malformed.path("check");
+        switch (field) {
+            case "counterexampleStatus" -> {
+                check.put(field, "FOUND").put("firstCounterexampleIndex", 0);
+                malformed.put(field, "FOUND");
+            }
+            case "checkerContract" -> check.put(field, DomainFiniteDataCheck.RESIDUAL_CONTRACT);
+            case "firstCounterexampleIndex" -> check.put(field, 1);
+            default -> check.remove(field);
+        }
+        String checkHash = rehash(check);
+        for (var role : malformed.path("artifacts")) {
+            if (Set.of("VALIDATION_EVIDENCE", "FINITE_COUNTEREXAMPLE_CHECK").contains(role.path("role").asText())) {
+                ((ObjectNode) role).put("targetContentHash", "sha256:" + checkHash);
+            }
+        }
     }
 
     @Test void validationRequiresExactRequestBindingsAndThePostMethod() throws Exception {

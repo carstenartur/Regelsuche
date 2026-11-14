@@ -63,7 +63,7 @@ public final class DomainDownstreamValidation {
     }
 
     /** Structural checks only. The retained observation does not authorize a mathematical claim. */
-    static void requireRetainedShape(ObjectNode value) {
+    static void requireRetainedShape(DomainDiscoveryEvidence source, ObjectNode value) {
         if (value.size() != RECEIPT_FIELDS.size() || !RECEIPT_FIELDS.stream().allMatch(value::has)
                 || !value.path("replay").isObject() || !value.path("checkBudget").isObject()
                 || !value.path("detail").isTextual() || !value.path("failureClass").isTextual()
@@ -83,6 +83,7 @@ public final class DomainDownstreamValidation {
             return;
         }
         requireRetainedCheck(value, check, status);
+        RetainedFiniteCheck.verify(source, check, value.path("checkBudget").path("maxTermChecks").intValue());
     }
 
     private static void requireRetainedBudget(JsonNode budget) {
