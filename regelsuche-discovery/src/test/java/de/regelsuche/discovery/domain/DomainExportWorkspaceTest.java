@@ -131,6 +131,39 @@ class DomainExportWorkspaceTest {
         Files.writeString(directory.resolve(DomainDiscoveryExport.MANIFEST_FILE_NAME), changed.toCanonicalJson());
     }
 
+    @Test void issuedResourceCountsMustMatchTheirTraceAndBudget() {
+        var source = sequence("observed=1,4,9,16;holdout=25,36");
+        var rows = new java.util.ArrayList<>(source.resources());
+        int index = 0;
+        while (rows.get(index).resource() != DomainDiscoveryEvidence.Resource.EXPLORED_STATES) index++;
+        var original = rows.get(index);
+        rows.set(index,new DomainDiscoveryEvidence.ResourceLine(original.resource(),original.configured(),
+            original.executed()-1,original.skipped(),original.remaining()+1));
+        assertThrows(IllegalArgumentException.class, () -> withResources(source,rows));
+        rows.set(index,original);
+        rows.add(original);
+        assertThrows(IllegalArgumentException.class, () -> withResources(source,rows));
+        rows.remove(index);
+        rows.remove(original);
+        assertThrows(IllegalArgumentException.class, () -> withResources(source,rows));
+    }
+
+    @Test void resourceRowsEnforceBalanceAtConstruction() {
+        var dim = DomainDiscoveryEvidence.Resource.EXPLORED_STATES;
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.ResourceLine(dim,2,0,0,0));
+        assertThrows(IllegalArgumentException.class, () ->
+            new DomainDiscoveryEvidence.ResourceLine(dim,0,Integer.MAX_VALUE,Integer.MAX_VALUE,2));
+        assertEquals(Integer.MAX_VALUE, new DomainDiscoveryEvidence.ResourceLine(
+            dim,Integer.MAX_VALUE,Integer.MAX_VALUE-1,1,0).configured());
+    }
+
+    private static DomainDiscoveryEvidence withResources(DomainDiscoveryEvidence source,
+                                                        java.util.List<DomainDiscoveryEvidence.ResourceLine> rows) {
+        return new DomainDiscoveryEvidence(source.campaignId(),source.descriptor(),source.seed(),source.budget(),
+            source.outcome(),source.states(),source.transitions(),source.candidateAttempts(),rows,
+            source.selectedCandidateHash(),source.certificate(),source.domainEvidence());
+    }
+
     static DomainDiscoveryEvidence sequence(String payload) {
         var domain = new FiniteDifferenceSequenceDomain();
         return new DomainDiscoveryRunner().run("same-export-name", domain,

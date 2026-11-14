@@ -7,6 +7,7 @@ import de.regelsuche.discovery.domain.DiscoveryDomain.DomainPayload;
 import de.regelsuche.discovery.domain.DiscoveryDomain.RenderedCertificate;
 import de.regelsuche.json.JsonWriter;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -100,8 +101,29 @@ public final class DomainDiscoveryEvidence {
         if (uniqueStates != states.size()) {
             throw new IllegalArgumentException("state traces must be unique by stateHash");
         }
-        for (ResourceLine line : resources) {
-            line.validateBalance();
+        validateResources();
+    }
+
+    private void validateResources() {
+        var dimensions = EnumSet.noneOf(Resource.class);
+        long evaluations = candidateAttempts.stream()
+            .filter(attempt -> attempt.evaluationStatus() != EvaluationDisposition.NOT_RUN).count();
+        long certificates = candidateAttempts.stream().filter(attempt -> !attempt.certificateHash().isEmpty()).count();
+        long counterexamples = candidateAttempts.stream().mapToLong(CandidateAttempt::counterexampleAttempts).sum();
+        for (ResourceLine row : resources) {
+            if (!dimensions.add(row.resource())) throw new IllegalArgumentException("duplicate resource dimension");
+            switch (row.resource()) {
+                case EXPLORED_STATES -> row.requireCounts(budget.maxExploredStates(), states.size(), 0);
+                case GENERATED_SUCCESSORS -> row.requireCounts(budget.maxGeneratedSuccessors(), transitions.size(), 0);
+                case COUNTEREXAMPLE_ATTEMPTS -> row.requireCounts(budget.maxCounterexampleAttempts(), counterexamples, 0);
+                case CANDIDATE_EVALUATIONS ->
+                    row.requireCounts(budget.maxCandidateAttempts(), evaluations, candidateAttempts.size() - evaluations);
+                case CERTIFICATE_ATTEMPTS ->
+                    row.requireCounts(budget.maxCandidateAttempts(), certificates, evaluations - certificates);
+            }
+        }
+        if (!dimensions.equals(EnumSet.allOf(Resource.class))) {
+            throw new IllegalArgumentException("source resource dimensions are incomplete");
         }
     }
 
@@ -473,13 +495,15 @@ public final class DomainDiscoveryEvidence {
                 throw new IllegalArgumentException(
                     "resource counts must be non-negative");
             }
-            validateBalance();
-        }
-
-        void validateBalance() {
-            if (configured != executed + skipped + remaining) {
+            if (configured != (long) executed + skipped + remaining) {
                 throw new IllegalArgumentException(
                     resource + " resource line is unbalanced");
+            }
+        }
+
+        private void requireCounts(int expectedBudget, long expectedExecuted, long expectedSkipped) {
+            if (configured != expectedBudget || executed != expectedExecuted || skipped != expectedSkipped) {
+                throw new IllegalArgumentException(resource + " resource counts differ from the budget or execution trace");
             }
         }
     }
