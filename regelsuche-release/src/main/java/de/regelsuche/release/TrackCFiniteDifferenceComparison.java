@@ -121,71 +121,14 @@ public final class TrackCFiniteDifferenceComparison {
             int campaign, Arm arm, String seed, List<Prefix> inputs, JsonNode plan)
             throws Exception {
         Random random = new Random(Long.parseUnsignedLong(seed.substring(7, 23), 16));
-        int low = plan.required("minimumCoefficient").intValue(),
-                high = plan.required("maximumCoefficient").intValue();
-        int cap = plan.required("proposalsPerTrainPrefix").intValue();
+        var grammar = new Grammar(
+                plan.required("minimumCoefficient").intValue(),
+                plan.required("maximumCoefficient").intValue(),
+                plan.required("proposalsPerTrainPrefix").intValue());
         var models = new LinkedHashSet<List<Long>>();
         var evidence = new ArrayList<Map<String, Object>>();
         for (Prefix input : inputs) {
-            var attempts = new ArrayList<Map<String, Object>>();
-            var degrees = new ArrayList<Integer>();
-            var proposed = new ArrayList<List<Long>>();
-            int grammarSize = grammarSize(input.degreeLimit(), high - low + 1);
-            if (arm == Arm.PRODUCTION_DIFFERENCE_DOMAIN) {
-                proposed.addAll(production(input, degrees));
-            } else {
-                int count =
-                        arm == Arm.ENUMERATE_VALID_GRAMMAR
-                                ? Math.min(grammarSize, cap)
-                                : (grammarSize == 0 ? 0 : cap);
-                for (int i = 0; i < count; i++) {
-                    int rank = arm == Arm.ENUMERATE_VALID_GRAMMAR ? i : random.nextInt(grammarSize);
-                    proposed.add(unrank(input.terms().getFirst(), rank, low, high));
-                }
-            }
-            var seen = new LinkedHashSet<List<Long>>();
-            for (var model : proposed) {
-                boolean valid =
-                        model.size() >= 2
-                                && model.size() - 1 <= input.degreeLimit()
-                                && model.getLast() != 0
-                                && model.getFirst().equals(input.terms().getFirst())
-                                && model.subList(1, model.size()).stream()
-                                        .allMatch(a -> low <= a && a <= high);
-                var predicted = predictions(model, input.terms().size());
-                boolean duplicate = !seen.add(model) || models.contains(model);
-                boolean matches = matches(predicted, input.terms());
-                if (valid && matches) models.add(model);
-                attempts.add(
-                        Map.of(
-                                "coefficients",
-                                model,
-                                "predictions",
-                                predicted,
-                                "duplicate",
-                                duplicate,
-                                "disposition",
-                                !valid ? "OUTSIDE_GRAMMAR" : matches ? "SUPPORTED" : "REJECTED"));
-            }
-            int subtractions = degrees.stream().mapToInt(d -> input.terms().size() - d).sum();
-            evidence.add(
-                    Map.of(
-                            "prefix",
-                            input.terms(),
-                            "maximumOrder",
-                            input.maximumOrder(),
-                            "grammarSize",
-                            grammarSize,
-                            "domainLevels",
-                            degrees,
-                            "domainSubtractions",
-                            subtractions,
-                            "attempts",
-                            attempts,
-                            "unusedSlots",
-                            cap - attempts.size(),
-                            "prefixChecks",
-                            attempts.size() * input.terms().size()));
+            evidence.add(formPrefix(input, arm, grammar, random, models));
         }
         var frozen = Map.<String, Object>of("inputs", evidence, "models", List.copyOf(models));
         return new Frozen(
@@ -195,6 +138,60 @@ public final class TrackCFiniteDifferenceComparison {
                 List.copyOf(models),
                 frozen,
                 hash(JSON.writeValueAsString(frozen)));
+    }
+
+    private record Grammar(int low, int high, int cap) {
+        int size(Prefix input) {
+            return grammarSize(input.degreeLimit(), high - low + 1);
+        }
+
+        boolean admits(Prefix input, List<Long> model) {
+            return model.size() >= 2
+                    && model.size() - 1 <= input.degreeLimit()
+                    && model.getLast() != 0
+                    && model.getFirst().equals(input.terms().getFirst())
+                    && model.subList(1, model.size()).stream().allMatch(a -> low <= a && a <= high);
+        }
+
+        List<List<Long>> propose(Arm arm, Prefix input, Random random, List<Integer> levels) {
+            if (arm == Arm.PRODUCTION_DIFFERENCE_DOMAIN) return production(input, levels);
+            int size = size(input);
+            if (size == 0) return List.of();
+            boolean enumerate = arm == Arm.ENUMERATE_VALID_GRAMMAR;
+            int count = enumerate ? Math.min(size, cap) : cap;
+            var proposed = new ArrayList<List<Long>>();
+            for (int i = 0; i < count; i++) {
+                int rank = enumerate ? i : random.nextInt(size);
+                proposed.add(unrank(input.terms().getFirst(), rank, low, high));
+            }
+            return proposed;
+        }
+    }
+
+    private static Map<String, Object> formPrefix(
+            Prefix input, Arm arm, Grammar grammar, Random random, LinkedHashSet<List<Long>> models) {
+        var levels = new ArrayList<Integer>();
+        var seen = new LinkedHashSet<List<Long>>();
+        var attempts = new ArrayList<Map<String, Object>>();
+        for (var model : grammar.propose(arm, input, random, levels)) {
+            boolean duplicate = !seen.add(model) || models.contains(model);
+            var predicted = predictions(model, input.terms().size());
+            boolean matchesPrefix = matches(predicted, input.terms());
+            String disposition = "OUTSIDE_GRAMMAR";
+            if (grammar.admits(input, model)) {
+                disposition = matchesPrefix ? "SUPPORTED" : "REJECTED";
+                if (matchesPrefix) models.add(model);
+            }
+            attempts.add(Map.of("coefficients", model, "predictions", predicted,
+                    "duplicate", duplicate, "disposition", disposition));
+        }
+        int subtractions = levels.stream().mapToInt(d -> input.terms().size() - d).sum();
+        return Map.of(
+                "prefix", input.terms(), "maximumOrder", input.maximumOrder(),
+                "grammarSize", grammar.size(input), "domainLevels", levels,
+                "domainSubtractions", subtractions, "attempts", attempts,
+                "unusedSlots", grammar.cap() - attempts.size(),
+                "prefixChecks", attempts.size() * input.terms().size());
     }
 
     private static List<List<Long>> production(Prefix input, List<Integer> degrees) {
