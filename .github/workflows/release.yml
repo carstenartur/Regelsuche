@@ -776,7 +776,7 @@ jobs:
 
       - name: Open next development metadata PR
         if: steps.next-development.outputs.required == 'true'
-        uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # v8
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8
         with:
           path: .release-follow-up
           branch: release/prepare-next-${{ steps.release-state.outputs.next_version }}

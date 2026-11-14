@@ -1,5 +1,6 @@
 package de.regelsuche.e2e;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -56,6 +57,8 @@ class MathRenderingVisualTest {
         playwright = Playwright.create();
         browser = playwright.chromium().launch(
             new BrowserType.LaunchOptions().setHeadless(true));
+        assertEquals(VisualRegressionContractTest.expectedChromiumVersion(), browser.version(),
+            "requires the Chromium version in the visual regression policy");
     }
 
     @AfterAll

@@ -43,6 +43,31 @@ CONSUMERS = {
         'modules': {'regelsuche-core', 'regelsuche-extension-api', 'regelsuche-extension-runtime'},
         'tests': {'example.ExtensionRuntimeConsumerTest#classpathPluginContributesTypedExtensionWithStableReloadIdentity'},
         'stdoutPrefix': 'extension=hello\norigin=greeting-plugin\ngreeting=Hello Ada\n',
+        'repeatHash': ('catalog', 'catalogHash', 'CANONICAL_CATALOGUE_AND_STABLE_REPEAT'),
+    },
+    'geometric-sequence-domain-java25': {
+        'main': 'example.GeometricSequenceExample',
+        'modules': {'regelsuche-core', 'regelsuche-egraph', 'regelsuche-search', 'regelsuche-validation',
+                    'regelsuche-discovery', 'regelsuche-discovery-sdk'},
+        'tests': {
+            'example.GeometricSequenceDomainTest#confirmsTheHeldOutMultiplierAndRetainsEarlierCounterexamples',
+            'example.GeometricSequenceDomainTest#refutesAnIncompatibleHoldout',
+            'example.GeometricSequenceDomainTest#exposesBudgetExhaustionInsteadOfReturningAPartialSuccess',
+            'example.GeometricSequenceDomainTest#providerIsDiscoveredWithoutApplicationInternals',
+            'example.GeometricSequenceTypedInputTest#typedAndSerializedInputsHaveIdenticalEvidence',
+            'example.GeometricSequenceTypedInputTest#typedInputRetainsRefutationAndBudgetSemantics',
+            'example.GeometricSequenceTypedInputTest#codecPreservesLegacyPayloadAndTheDocumentedDefault',
+            'example.GeometricSequenceTypedInputTest#rejectsUnknownMalformedDuplicateAndTruncatedFields',
+            'example.GeometricSequenceTypedInputTest#rejectsTrailingEmptyFields',
+        },
+        'stdoutPrefix': (
+            'provider=example-geometric-sequence-provider\n'
+            'outcome=CONFIRMED\n'
+            'candidate=Plan[multiplier=2, input=Input[observed=[2, 4, 8, 16], '
+            'holdout=[32, 64], maxMultiplier=6]]\n'
+            'counterexamples=[multiplier 1 predicts 2 but observed 4]\n'
+        ),
+        'repeatHash': ('evidenceHash', 'evidenceHash', 'CANONICAL_DISCOVERY_EVIDENCE_AND_STABLE_REPEAT'),
     },
 }
 
@@ -261,17 +286,16 @@ def check_cli_output(name, stdout, repeat_stdout=None):
         if stdout != contract['stdout']:
             raise ValueError('actual CLI output differs from expected released consumer contract')
         return {'policy': 'EXACT_OUTPUT'}
-    # Classpath origins include their absolute CodeSource URL in the catalogue
-    # manifest. Require canonical identity and same-build stability, not a hash
-    # copied from a different private compilation/runtime directory.
-    match = re.fullmatch(re.escape(contract['stdoutPrefix'])
-                         + r'catalog=(sha256:[0-9a-f]{64})\n', stdout)
+    # Classpath origins can depend on the build directory. Compare two runs
+    # from the same build and require a canonical digest in the reported output.
+    label, evidence_key, policy = contract['repeatHash']
+    match = re.fullmatch(re.escape(contract['stdoutPrefix'] + label + '=')
+                         + r'(sha256:[0-9a-f]{64})\n', stdout)
     if not match:
-        raise ValueError('actual extension CLI output lacks the exact greeting/canonical catalogue hash')
+        raise ValueError(f'actual {name} CLI output lacks the expected result and canonical {label}')
     if repeat_stdout is None or repeat_stdout != stdout:
-        raise ValueError('extension CLI catalogue identity is not stable across actual same-build runs')
-    return {'policy': 'CANONICAL_CATALOGUE_AND_STABLE_REPEAT',
-            'catalogHash': match[1], 'repeatVerified': True}
+        raise ValueError(f'{name} CLI output is not stable across actual same-build runs')
+    return {'policy': policy, evidence_key: match[1], 'repeatVerified': True}
 
 
 def run_command(command, cwd, log, timeout=1200):
@@ -385,7 +409,7 @@ def qualify(root, evidence, maven):
                     stdout = (output / 'cli.log').read_text(encoding='utf-8')
                     result['stdout'] = stdout
                     repeated = None
-                    if 'stdoutPrefix' in contract:
+                    if 'repeatHash' in contract:
                         execute(cli, consumer, output / 'cli-repeat.log', result['commands'])
                         repeated = (output / 'cli-repeat.log').read_text(encoding='utf-8')
                         result['repeatStdout'] = repeated

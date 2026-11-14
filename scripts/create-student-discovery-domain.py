@@ -157,7 +157,7 @@ def generate(
 
     output.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, output,
-                    ignore=shutil.ignore_patterns("build", ".gradle", "repository"))
+                    ignore=shutil.ignore_patterns("build", ".gradle", "repository", "target"))
     copy_wrapper(repository_root, output)
     for source_set in ("main", "test"):
         relocate_package(output, source_set, package_name)
@@ -170,6 +170,10 @@ def generate(
         ("package example;", f"package {package_name};"),
         ("example.GeometricSequenceExample", f"{package_name}.GeometricSequenceExample"),
         ("example.GeometricSequenceDomainProvider", f"{package_name}.GeometricSequenceDomainProvider"),
+        ("<groupId>example</groupId>", f"<groupId>{package_name}</groupId>"),
+        ("<artifactId>geometric-sequence-domain</artifactId>",
+         f"<artifactId>{project_name}</artifactId>"),
+        ("file://${project.basedir}/../../../repository", "file://${project.basedir}/repository"),
         ("rootProject.name = 'regelsuche-geometric-sequence-example'",
          f"rootProject.name = '{project_name}'"),
         ("# Geometric sequence discovery domain", f"# {project_name} — Regelsuche discovery starter"),
@@ -177,6 +181,8 @@ def generate(
     )
     text_files = [output / "build.gradle", output / "settings.gradle",
                   output / "README.md", *sorted((output / "src").rglob("*.java"))]
+    if (output / "pom.xml").is_file():
+        text_files.append(output / "pom.xml")
     for path in text_files:
         replace_text(path, replacements)
     service = output / ("src/main/resources/META-INF/services/"
