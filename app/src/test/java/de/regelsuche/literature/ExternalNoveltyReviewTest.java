@@ -17,11 +17,11 @@ class ExternalNoveltyReviewTest {
         Disclosure.POST_FREEZE_ONLY,"2026-11-01T12:00:00Z");
     final Catalogue catalog = new Catalogue("fixture/v1",List.of(new Source("fixture","v1","2026-10-30",
         List.of("text search"),"offline","single synthetic record")));
-    final Map<String,String> forms = NoveltyQueryForms.forEquation(plan.equation());
+    final Map<String,String> forms = NoveltyQueryForms.forEquation(plan.equation(), plan.assumptions());
     Packet packet(Status status, Access access, boolean hit, boolean unresolved) {
         var observed=hits(hit,unresolved);
         var rows=access==Access.INACCESSIBLE ? List.<Query>of() : forms.entrySet().stream().map(e->
-            new Query(0,e.getKey(),e.getValue(),"2026-11-01T13:00:00Z",observed)).toList();
+            new Query(0,e.getKey(),e.getValue(),"fixture: " + e.getValue(),"2026-11-01T13:00:00Z",observed.size(),observed)).toList();
         var log=new QueryLog(review.freeze(plan),review.catalogueRoot(catalog),rows);
         var scope=new Scope("fixture","v1",new Coverage(access,"scope bound",
             unresolved?List.of(new UnresolvedHit("ref2","full text missing")):List.of()));
@@ -50,7 +50,7 @@ class ExternalNoveltyReviewTest {
         return review.evaluate(review.freeze(plan),review.catalogueRoot(catalog),p,new Intake(review.packetRoot(p),List.of(votes)),elig);
     }
     @Test void detachedReceiverBindsFourOfflineQueryFormsAndFullCandidate() {
-        assertEquals(Set.of("EXACT","ALPHA","STRUCTURAL","EQUIVALENT"),forms.keySet());
+        assertEquals(Set.of("EXACT","ALPHA","STRUCTURAL","EQUIVALENT","POLYNOMIAL_NORMAL_FORM","CLASSIFICATION","ASSUMPTIONS"),forms.keySet());
         assertEquals("((v0+v1)=(v1+v0))",forms.get("ALPHA"));
         assertEquals("y + x = x + y",forms.get("EQUIVALENT"));
         var p=packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
@@ -86,6 +86,24 @@ class ExternalNoveltyReviewTest {
                 sign(p,a,Vote.SUPPORT_SCOPED_NOVELTY),sign(p,b,Vote.SUPPORT_SCOPED_NOVELTY)).outcome().decision());
         }
     }
+    @Test void datedCatalogueAndIncompleteResultPagesAreChecked() throws Exception {
+        var supplied = ExternalNoveltyReview.scalarCatalogue();
+        assertEquals(List.of("NIST DLMF", "mathlib4"), supplied.sources().stream().map(Source::name).toList());
+        assertEquals("x+y=x+y", forms.get("POLYNOMIAL_NORMAL_FORM").replace(" ", ""));
+        assertTrue(forms.get("ASSUMPTIONS").contains("real x,y"));
+        var packet = packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
+        var first = packet.log().entries().getFirst();
+        var rows = new ArrayList<>(packet.log().entries());
+        rows.set(0, new Query(0,first.family(),first.expression(),first.submittedText(),first.executedAt(),12,List.of()));
+        var log = new QueryLog(packet.log().planRoot(),packet.log().catalogueRoot(),rows);
+        var dossier = packet.dossier().assessment();
+        assertThrows(IllegalArgumentException.class, () -> review.packetRoot(
+            new Packet(plan,catalog,log,new Dossier(review.logRoot(log),dossier))));
+        var future = new Catalogue("future",List.of(new Source("fixture","v1","2026-11-02", List.of("text"),"offline","fixture")));
+        var retro = new QueryLog(packet.log().planRoot(),review.catalogueRoot(future),packet.log().entries());
+        assertThrows(IllegalArgumentException.class, () -> review.packetRoot(
+            new Packet(plan,future,retro,new Dossier(review.logRoot(retro),dossier))));
+    }
     @Test void packetKeyConflictsChangedTrustOrDuplicatedPersonsAreRejected() throws Exception {
         var p=packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
         var s=signer("6");var member=s.eligible();var signed=sign(p,s,Vote.SUPPORT_SCOPED_NOVELTY);
@@ -105,8 +123,8 @@ class ExternalNoveltyReviewTest {
         var p=packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
         var first=p.log().entries().getFirst();
         var badRows=new ArrayList<>(p.log().entries());
-        for(var wrong:List.of(new Query(0,first.family(),first.expression(),first.executedAt(),List.of("omitted hit")),
-                new Query(0,first.family(),first.expression(),"2026-10-31T23:59:59Z",List.of()))) {
+        for(var wrong:List.of(new Query(0,first.family(),first.expression(),first.submittedText(),first.executedAt(),1,List.of("omitted hit")),
+                new Query(0,first.family(),first.expression(),first.submittedText(),"2026-10-31T23:59:59Z",0,List.of()))) {
             badRows.set(0,wrong);var log=new QueryLog(p.log().planRoot(),p.log().catalogueRoot(),badRows);
             var badPacket=new Packet(plan,catalog,log,new Dossier(review.logRoot(log),p.dossier().assessment()));
             assertThrows(IllegalArgumentException.class,()->review.packetRoot(badPacket));

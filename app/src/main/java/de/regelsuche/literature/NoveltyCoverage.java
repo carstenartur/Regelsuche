@@ -20,7 +20,7 @@ final class NoveltyCoverage {
             throw bad("cross-bound review chain");
         if(!CandidateLiteratureAssessments.COVERAGE_SCHEMA.equals(a.schema())||p.catalogue().sources().size()!=a.scope().size())
             throw bad("invalid subject-bound source scope");
-        var forms=NoveltyQueryForms.forEquation(p.plan().equation());
+        var forms=NoveltyQueryForms.forEquation(p.plan().equation(), p.plan().assumptions());
         var logged=new HashSet<String>();
         for(var q:p.log().entries()) {
             if(q.sourceIndex()>=a.scope().size()||!q.expression().equals(forms.get(q.family()))) throw bad("unknown query form or source");
@@ -38,11 +38,15 @@ final class NoveltyCoverage {
         var hits=new HashSet<String>();
         var frozen=Instant.parse(p.plan().frozenAt());
         var reviewed=LocalDate.parse(a.reviewedOn());
+        var catalogued = LocalDate.parse(src.cataloguedOn());
         for(Query q:p.log().entries()) {
             if(q.sourceIndex()!=i) continue;
             var when=Instant.parse(q.executedAt());
-            if(when.isBefore(frozen)||when.atZone(ZoneOffset.UTC).toLocalDate().isAfter(reviewed)||!queried.add(q.family()))
+            var date = when.atZone(ZoneOffset.UTC).toLocalDate();
+            if(when.isBefore(frozen)||date.isBefore(catalogued)||date.isAfter(reviewed)||!queried.add(q.family()))
                 throw bad("invalid query chronology or duplicate family");
+            if (scope.coverage().status() == Access.SEARCHED && q.resultCount() != q.hitIds().size())
+                throw bad("uninspected search results require partial coverage");
             hits.addAll(q.hitIds());
         }
         if(scope.coverage().status()==Access.INACCESSIBLE&&!queried.isEmpty()) throw bad("searched inaccessible source");

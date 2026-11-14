@@ -36,7 +36,7 @@ public final class ExternalNoveltyReview {
                        String exposureLedgerRoot, Disclosure formationAccess, String frozenAt) {
         public Plan {
             Objects.requireNonNull(subject); Objects.requireNonNull(formationAccess); Instant.parse(frozenAt);
-            NoveltyQueryForms.forEquation(equation); assumptions = texts(assumptions,0,32);
+            assumptions = texts(assumptions,0,32); NoveltyQueryForms.forEquation(equation, assumptions);
             root(formationEvidenceRoot); root(exposureLedgerRoot);
         }
     }
@@ -53,15 +53,18 @@ public final class ExternalNoveltyReview {
             if(sources.stream().map(Source::name).distinct().count()!=sources.size()) throw bad("duplicate source");
         }
     }
-    public record Query(@com.fasterxml.jackson.annotation.JsonProperty(required=true) int sourceIndex,String family,String expression,String executedAt,List<String> hitIds) {
+    public record Query(@com.fasterxml.jackson.annotation.JsonProperty(required=true) int sourceIndex,String family,String expression,
+                        String submittedText,String executedAt,
+                        @com.fasterxml.jackson.annotation.JsonProperty(required=true) int resultCount,List<String> hitIds) {
         public Query {
             if(sourceIndex<0) throw bad("negative source index");
-            text(family); text(expression); Instant.parse(executedAt); hitIds=texts(hitIds,0,128);
+            text(family); text(expression); text(submittedText); Instant.parse(executedAt); hitIds=texts(hitIds,0,128);
+            if (resultCount < hitIds.size()) throw bad("reported fewer results than observed identifiers");
             if(new HashSet<>(hitIds).size()!=hitIds.size()) throw bad("duplicate hit");
         }
     }
     public record QueryLog(String planRoot,String catalogueRoot,List<Query> entries) {
-        public QueryLog { root(planRoot); root(catalogueRoot); entries=bounded(entries,0,128); }
+        public QueryLog { root(planRoot); root(catalogueRoot); entries=bounded(entries,0,192); }
     }
     public record Dossier(String logRoot,Assessment assessment) {
         public Dossier { root(logRoot); Objects.requireNonNull(assessment); }
@@ -87,6 +90,13 @@ public final class ExternalNoveltyReview {
     public record Outcome(String packetRoot,String intakeRoot,Decision decision) { }
     public record Run(String schema,Packet packet,Intake intake,Outcome outcome) { }
     public static final String SCHEMA="regelsuche.external-novelty-run/v1";
+
+    public static Catalogue scalarCatalogue() throws IOException {
+        try (var input = ExternalNoveltyReview.class.getResourceAsStream("/literature/scalar-source-catalogue-v1.json")) {
+            if (input == null) throw new IOException("missing scalar source catalogue");
+            return JSON.readValue(input, Catalogue.class);
+        }
+    }
 
     public String freeze(Plan plan) { return identity("external-novelty-review-plan/v1",Objects.requireNonNull(plan)); }
     public String catalogueRoot(Catalogue catalogue) { return identity("external-source-catalog/v1",Objects.requireNonNull(catalogue)); }
