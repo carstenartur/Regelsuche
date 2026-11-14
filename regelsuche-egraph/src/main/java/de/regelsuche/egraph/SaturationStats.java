@@ -45,7 +45,11 @@ public record SaturationStats(
         /** No further progress, but rule failures prevented a certified fix-point. */
         RULE_FAILURES,
         /** No further progress, but an owned concrete matcher exhausted its search bound. */
-        MATCHER_LIMIT
+        MATCHER_LIMIT,
+        /** A guard remained undecided in the run's fixed assumption context. */
+        UNDECIDED_GUARDS,
+        /** A conditional application would exceed the retained guard decision budget. */
+        GUARD_BUDGET
     }
 
     public SaturationStats {

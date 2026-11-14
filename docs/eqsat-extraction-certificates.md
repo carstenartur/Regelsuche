@@ -170,3 +170,25 @@ They do not include every congruence bridge from original input to extracted
 output. Their replay trusts rule callbacks. Only explicit complete evidence
 changes `hasExtractionProof()` to true. The storage format covers the same
 exact native base-pattern fragment as the detached checker.
+
+## Conditional factor cancellation
+
+`saturateUnderAssumptions(input, assumptions, costOfNode)` takes an immutable
+snapshot of the caller's assumptions and owns a fresh ordered graph for that
+invocation. With the core `ast_cancel_division_factor` rule selected, the
+native matcher joins the two occurrences of the divisor by e-class identity
+in either product position. For instance, `(y*x)/x` extracts `y` when the
+context declares `x > 0`. A run with an empty context keeps the division.
+
+The rule accepts exact rational literals and individual variable identifiers
+as guard subjects. It records local evidence with each ground decision,
+including the evaluator profile digest, context signature and truth value.
+Zero is rejected. Missing or conflicting evidence and compound or otherwise
+unsupported subjects remain undecided. Once 256 decisions are retained, further
+conditional unions are blocked. The stop reason distinguishes undecided guards
+and exhausted guard evidence from an attained fixpoint.
+
+Use the returned expression together with its assumption list. These decisions
+authorize local unions in the fixed context. Independent extraction replay for
+conditional derivations and solver-certificate references are tracked in
+[#662](https://github.com/carstenartur/Regelsuche/issues/662).
