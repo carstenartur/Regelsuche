@@ -681,6 +681,8 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
 
 ## Mitwirken
 
+Offene [GitHub-Issues](https://github.com/carstenartur/Regelsuche/issues) verfolgen eigenständig ausführbare Arbeit. Aufgaben, die Teilnehmende, unabhängige Prüfungen, geschützte Studiendaten oder eine Betriebsfreigabe brauchen, stehen in der [TODO-Liste für externe Beiträge](docs/TODO-extern.md).
+
 Änderungen sollen lokal reproduzierbar bleiben. Der
 [Developer Guide](docs/developer-guide.md) enthält den empfohlenen Ablauf; die
 [Dokumentationskonventionen](docs/documentation-conventions.md) und die
