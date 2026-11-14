@@ -160,9 +160,9 @@ def generateHistoricalRewriteArchitectureDecision = tasks.register(
     group = 'verification'
     description = 'Derives the evidence-bound rewrite architecture decision from retained historical diagnostics.'
     dependsOn generateHistoricalRediscoveryAtlas
-    dependsOn tasks.named('testClasses')
+    dependsOn tasks.named('classes')
     timeout = java.time.Duration.ofMinutes(1)
-    classpath = sourceSets.test.runtimeClasspath
+    classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision'
     argumentProviders.add({
         [
