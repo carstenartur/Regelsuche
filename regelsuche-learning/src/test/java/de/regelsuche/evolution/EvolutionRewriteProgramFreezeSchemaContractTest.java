@@ -16,7 +16,7 @@ class EvolutionRewriteProgramFreezeSchemaContractTest {
         String performance = readSchema(
             "regelsuche-evolution-rewrite-program-performance-plan-v1.schema.json");
         String receipt = readSchema(
-            "regelsuche-evolution-rewrite-program-freeze-receipt-v1.schema.json");
+            "regelsuche-evolution-rewrite-program-freeze-receipt-v2.schema.json");
 
         assertTrue(heldOut.contains(
             "regelsuche.evolution-rewrite-program-held-out-commitment/v1"));
@@ -67,7 +67,7 @@ class EvolutionRewriteProgramFreezeSchemaContractTest {
         }
 
         assertTrue(receipt.contains(
-            "regelsuche.evolution-rewrite-program-freeze-receipt/v1"));
+            "regelsuche.evolution-rewrite-program-freeze-receipt/v2"));
         assertTrue(receipt.contains("\"const\": \"FROZEN_NOT_RUN\""));
         assertTrue(receipt.contains("\"const\": \"NOT_EVALUATED\""));
         assertTrue(receipt.contains("\"additionalProperties\": false"));

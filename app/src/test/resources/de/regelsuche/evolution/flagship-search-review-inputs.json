@@ -1,0 +1,25 @@
+{
+  "primary": "SEARCH_WORK",
+  "thresholds": {
+    "schema": "regelsuche.evolution-rewrite-program-acceptance-thresholds/v1",
+    "minimumImprovedFinalTestCases": 2,
+    "minimumDistinctImprovedFamilies": 2,
+    "minimumNewlyReachedCases": 1,
+    "allowMaterialWorkReductionRoute": true,
+    "minimumMechanicalWorkReductionPermille": 100,
+    "minimumRetainedProgramPrimitiveSteps": 3,
+    "requireCompositionTopology": true,
+    "requireDecisionTopology": true,
+    "maximumCorrectnessRegressions": 0,
+    "maximumHiddenAssumptionRegressions": 0,
+    "maximumUnexpectedUnsupportedCases": 0,
+    "maximumTechnicalFailures": 0,
+    "maximumProgramNodes": 24,
+    "maximumGenomeRules": 12,
+    "requiredCleanReproductions": 2,
+    "requirePinnedContainerReproduction": true,
+    "successRoute": "NEWLY_REACHED_OR_MATERIAL_WORK_REDUCTION",
+    "nullResultPolicy": "TRANSPARENT_COMPLETE_NULL_RESULT",
+    "contentHash": "sha256:ab84996502faf10ec6046f3b81617e5413dc9f5198f8c701c3220d75371f5d8f"
+  }
+}

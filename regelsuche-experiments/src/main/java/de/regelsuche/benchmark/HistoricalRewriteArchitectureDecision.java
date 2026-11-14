@@ -36,6 +36,54 @@ public final class HistoricalRewriteArchitectureDecision {
     private static final String CORPUS_SCHEMA =
         "regelsuche.historical-rediscovery-corpus/v1";
 
+    /** Verified public #620 output, including the disposition of each architecture track. */
+    public static final class VerifiedDecision {
+        private final Report report;
+
+        private VerifiedDecision(Report report) { this.report = report; }
+
+        public String contentHash() { return report.contentHash(); }
+        public String canonicalJson() { return report.json(); }
+        public Map<String, String> dispositions() {
+            var values = new LinkedHashMap<String, String>();
+            report.decisions().forEach(item -> values.put(item.track(), item.disposition().name()));
+            return Map.copyOf(values);
+        }
+    }
+
+    public static VerifiedDecision readFrozenDecision(String json) {
+        View root = View.parse(json, "architecture decision");
+        View sources = root.object("sourceIdentities");
+        View counts = root.object("measuredDistribution");
+        List<Decision> matrix = root.array("decisions").stream().map(raw -> {
+            View entry = View.of(raw, "decision");
+            List<String> codes = entry.array("evidenceCodes").stream().map(String.class::cast).toList();
+            if (codes.stream().anyMatch(code -> !code.matches("[A-Z0-9_]+"))) {
+                throw new IllegalArgumentException("invalid architecture evidence code");
+            }
+            return new Decision(entry.text("track"), Disposition.valueOf(entry.text("disposition")),
+                entry.text("relatedIssue"), codes, entry.text("reason"));
+        }).toList();
+        Report report = new Report(root.text("repositoryRevision"), root.text("corpusSha256"),
+            root.text("inventoryRevision"), new Sources(sources.text("atlasRunContentHash"),
+                sources.text("atlasSha256"), sources.text("witnessDiagnosticContentHash"),
+                sources.text("productionComparisonContentHash"), sources.text("equalWorkComparisonContentHash")),
+            new Distribution(counts.integer("caseCount"), counts.integer("noProductionWitnessCount"),
+                counts.integer("scalarAlreadyReachedCount"), counts.integer("oracleWitnessScalarMissCount"),
+                counts.integer("witnessPrefixLostCount"), counts.integer("diversityRecoveredCompleteWitnessCount"),
+                counts.integer("checkpointCount"), counts.integer("equalConsumedWorkCheckpointCount"),
+                counts.integer("equalWorkDiversityAdvantageCount"), counts.integer("equalWorkDiversityCompleteWitnessCount")),
+            matrix, root.text("contentHash"));
+        if ("WORKTREE".equals(report.repositoryRevision())) {
+            throw new IllegalArgumentException("a frozen architecture decision needs an exact revision");
+        }
+        var verified = new VerifiedDecision(report);
+        requireEqual(Set.copyOf(decisions().stream().map(Decision::track).toList()), verified.dispositions().keySet(),
+            "architecture tracks");
+        requireEqual(report.json(), json, "canonical architecture decision");
+        return verified;
+    }
+
     public static void main(String[] args) {
         if (args.length != 8
                 || !"rewrite-architecture-decision".equals(args[0])) {

@@ -1,6 +1,8 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.assumption.Assumption;
+import de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision.VerifiedDecision;
+import de.regelsuche.evolution.FlagshipStudyPreregistration.Component;
 import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
 import de.regelsuche.evolution.DeterministicRewriteProgramMutator.RepeatBounds;
 import de.regelsuche.evolution.EvolutionGenome.AssumptionTemplate;
@@ -45,7 +47,7 @@ import java.util.Objects;
  * concrete held-out expressions or assumptions.</p>
  */
 public final class FlagshipRewriteProgramFreezeAssembler {
-    public static final String FREEZE_ID = "flagship_rewrite_program_freeze_v1";
+    public static final String FREEZE_ID = "flagship_rewrite_program_freeze_v2";
     public static final String STATIC_CONTRACT_SCHEMA =
         "regelsuche.flagship-rewrite-program-static-contract/v1";
 
@@ -58,10 +60,13 @@ public final class FlagshipRewriteProgramFreezeAssembler {
     public static FreezeInputs assemble(
         String repositoryCommit,
         EvolutionRewriteProgramHeldOutRevealBundle validation,
-        EvolutionRewriteProgramHeldOutRevealBundle finalTest
+        EvolutionRewriteProgramHeldOutRevealBundle finalTest,
+        FlagshipStudyPreregistration review,
+        VerifiedDecision decision
     ) {
         EvolutionSplitManifest manifest =
             FlagshipRewriteProgramSplitManifest.create(validation, finalTest);
+        review.requireInputs(decision, validation.commitment(), finalTest.commitment());
         EvolutionRewriteProgramTrainSuite train =
             FlagshipRewriteProgramTrainCorpus.create();
         EvolutionRewriteProgramEvaluationProtocol protocol =
@@ -82,18 +87,7 @@ public final class FlagshipRewriteProgramFreezeAssembler {
                 new PopulationPolicy(24, 12, 4, 8, 3, 4, 20260802L),
                 fitnessWeights(),
                 new StudyBudget(4_096, 4_096, 24, 3, 16));
-        EvolutionRewriteProgramAcceptanceThresholds thresholds =
-            EvolutionRewriteProgramAcceptanceThresholds.create(
-                2,
-                2,
-                1,
-                true,
-                100,
-                3,
-                0,
-                24,
-                12,
-                2);
+        FlagshipEndpointThresholds thresholds = review.endpoint().thresholds();
 
         String primitiveInventoryJson = primitiveInventoryJson(genome.rewrites());
         String programGrammarJson = programGrammarJson();
@@ -113,19 +107,12 @@ public final class FlagshipRewriteProgramFreezeAssembler {
                 programGrammarHash,
                 mutationCatalog.contentHash(),
                 workBudgetPolicyHash,
-                seeds.getLast().contentHash());
+                seeds.getLast().contentHash(), review);
         EvolutionRewriteProgramPerformancePlan performance =
             EvolutionRewriteProgramPerformancePlan.create(
-                EvolutionGenome.hash(
-                    "regelsuche.jmh-benchmark-revision/v1\n"
-                        + "allocation-and-search-baseline=5b904d6d1d0d1488353a2d28445c9ec9d3e5fc51"),
-                EvolutionGenome.hash(
-                    "regelsuche.jmh-benchmark-suite/v2\n"
-                        + "primary-benchmark-count=29\n"
-                        + "units=us/op,ms/op"),
-                EvolutionGenome.hash(
-                    "regelsuche.flagship-runtime-environment/v1\n"
-                        + "jdk=21\nos=ubuntu-22.04\njmh=1.36"),
+                review.components().get(Component.BENCHMARK_SUITE).implementationHash(),
+                review.components().get(Component.BENCHMARK_SUITE).characterizationHash(),
+                review.components().get(Component.RUNTIME_ENVIRONMENT).implementationHash(),
                 2,
                 3,
                 1,
@@ -151,6 +138,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
                 programGrammarHash,
                 baselineAblation.contentHash(),
                 performance,
+                decision.contentHash(),
+                review.contentHash(),
                 schemaBundleHash);
 
         receipt.requireInputs(
@@ -165,6 +154,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
             programGrammarHash,
             baselineAblation.contentHash(),
             performance,
+            decision.contentHash(),
+            review.contentHash(),
             schemaBundleHash);
         baselineAblation.requireInputs(
             manifest,
@@ -200,6 +191,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
             mutationCatalogJson,
             workBudgetPolicyJson,
             schemaBundleJson,
+            review,
+            decision,
             receipt);
     }
 
@@ -207,18 +200,24 @@ public final class FlagshipRewriteProgramFreezeAssembler {
         Path outputDirectory,
         String repositoryCommit,
         Path validationPrivateBundle,
-        Path finalTestPrivateBundle
+        Path finalTestPrivateBundle,
+        Path preregistrationFile,
+        Path decisionFile
     ) {
         EvolutionRewriteProgramHeldOutRevealCodec codec =
             new EvolutionRewriteProgramHeldOutRevealCodec();
         FreezeInputs inputs = assemble(
             repositoryCommit,
             codec.readPrivate(validationPrivateBundle),
-            codec.readPrivate(finalTestPrivateBundle));
+            codec.readPrivate(finalTestPrivateBundle),
+            FlagshipStudyPreregistration.read(preregistrationFile),
+            FlagshipStudyPreregistration.readDecision(decisionFile));
         Path output = Objects.requireNonNull(outputDirectory, "outputDirectory")
             .toAbsolutePath()
             .normalize();
         LinkedHashMap<String, String> artifacts = new LinkedHashMap<>();
+        artifacts.put("preregistration.json", inputs.review().canonicalJson());
+        artifacts.put("architecture-decision.json", inputs.decision().canonicalJson());
         artifacts.put("evolution-split-manifest.json",
             inputs.manifest().toCanonicalJson());
         artifacts.put("train-suite.json", inputs.train().toCanonicalJson());
@@ -258,6 +257,11 @@ public final class FlagshipRewriteProgramFreezeAssembler {
 
         try {
             Files.createDirectories(output);
+            try (var existing = Files.list(output)) {
+                if (existing.findAny().isPresent()) {
+                    throw new IllegalArgumentException("flagship freeze output must be empty");
+                }
+            }
             for (Map.Entry<String, String> artifact : artifacts.entrySet()) {
                 writeAtomic(output.resolve(artifact.getKey()), artifact.getValue());
             }
@@ -275,16 +279,18 @@ public final class FlagshipRewriteProgramFreezeAssembler {
     }
 
     public static void main(String[] arguments) {
-        if (arguments.length != 4) {
+        if (arguments.length != 6) {
             throw new IllegalArgumentException(
                 "usage: <repository-commit> <validation-private.json> "
-                    + "<final-test-private.json> <public-output-directory>");
+                    + "<final-test-private.json> <preregistration.json> <architecture-decision.json> <public-output-directory>");
         }
         WrittenFreeze result = write(
-            Path.of(arguments[3]),
+            Path.of(arguments[5]),
             arguments[0],
             Path.of(arguments[1]),
-            Path.of(arguments[2]));
+            Path.of(arguments[2]),
+            Path.of(arguments[3]),
+            Path.of(arguments[4]));
         System.out.println("flagshipFreezeStatus=FROZEN_NOT_RUN");
         System.out.println("flagshipFreezeReceiptHash=" + result.receiptHash());
         System.out.println("flagshipFreezeOutput=" + result.outputDirectory());
@@ -486,7 +492,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
         String programGrammarHash,
         String mutationCatalogHash,
         String workBudgetPolicyHash,
-        String handWrittenProgramHash
+        String handWrittenProgramHash,
+        FlagshipStudyPreregistration review
     ) {
         return EvolutionRewriteProgramBaselineAblationPlan.create(
             "flagship_baseline_ablation_v1",
@@ -498,13 +505,14 @@ public final class FlagshipRewriteProgramFreezeAssembler {
             mutationCatalogHash,
             workBudgetPolicyHash,
             Arrays.stream(TrackKind.values())
-                .map(kind -> track(kind, handWrittenProgramHash))
+                .map(kind -> track(kind, handWrittenProgramHash, review.baselines().get(kind)))
                 .toList());
     }
 
     private static Track track(
         TrackKind kind,
-        String handWrittenProgramHash
+        String handWrittenProgramHash,
+        FlagshipStudyPreregistration.ComparatorIdentity comparator
     ) {
         String id = switch (kind) {
             case FIXED_PRIMITIVE_BEST_FIRST -> "fixed_primitive_best_first";
@@ -521,12 +529,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
         return new Track(
             kind,
             id,
-            EvolutionGenome.hash(
-                "regelsuche.flagship-baseline-implementation/v1\nkind="
-                    + kind.name()),
-            EvolutionGenome.hash(
-                "regelsuche.flagship-baseline-configuration/v1\nkind="
-                    + kind.name()),
+            comparator.implementationHash(),
+            comparator.configurationHash(),
             kind == TrackKind.RANDOMIZED_VALID_PROGRAM ? 20260802L : null,
             kind == TrackKind.HAND_WRITTEN_PROGRAM
                 ? handWrittenProgramHash
@@ -641,6 +645,7 @@ public final class FlagshipRewriteProgramFreezeAssembler {
             EvolutionRewriteProgramBaselineAblationPlan.SCHEMA,
             EvolutionRewriteProgramPerformancePlan.SCHEMA,
             EvolutionRewriteProgramFreezeReceipt.SCHEMA,
+            FlagshipStudyPreregistration.SCHEMA,
             STATIC_CONTRACT_SCHEMA);
         JsonWriter json = new JsonWriter().beginObject()
             .property("schema", STATIC_CONTRACT_SCHEMA)
@@ -710,7 +715,7 @@ public final class FlagshipRewriteProgramFreezeAssembler {
         List<EvolutionRewriteProgramCandidate> seeds,
         MutationCatalog mutationCatalog,
         EvolutionRewriteProgramStudyPlan study,
-        EvolutionRewriteProgramAcceptanceThresholds thresholds,
+        FlagshipEndpointThresholds thresholds,
         EvolutionRewriteProgramBaselineAblationPlan baselineAblation,
         EvolutionRewriteProgramPerformancePlan performance,
         String primitiveInventoryJson,
@@ -718,6 +723,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
         String mutationCatalogJson,
         String workBudgetPolicyJson,
         String schemaBundleJson,
+        FlagshipStudyPreregistration review,
+        VerifiedDecision decision,
         EvolutionRewriteProgramFreezeReceipt receipt
     ) {
         public FreezeInputs {
@@ -741,6 +748,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
             Objects.requireNonNull(mutationCatalogJson, "mutationCatalogJson");
             Objects.requireNonNull(workBudgetPolicyJson, "workBudgetPolicyJson");
             Objects.requireNonNull(schemaBundleJson, "schemaBundleJson");
+            Objects.requireNonNull(review, "review");
+            Objects.requireNonNull(decision, "decision");
             Objects.requireNonNull(receipt, "receipt");
         }
     }
