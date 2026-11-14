@@ -20,7 +20,7 @@ import java.util.Map;
 /** CLI used by the local Gradle gate and by split CI after coverage converges. */
 public final class CoverageRegressionMain {
     private static final String USAGE = "Usage: CoverageRegressionMain [--root PATH] [--policy PATH] "
-        + "[--json-output PATH] [--markdown-output PATH]";
+        + "[--json-output PATH] [--markdown-output PATH] [--isolated-report PATH]";
     private static final String JSON_OUTPUT = "build/reports/quality/coverage-report.json";
     private static final String MARKDOWN_OUTPUT = "build/reports/quality/coverage-report.md";
     private static final DefaultIndenter INDENT = new DefaultIndenter("  ", "\n");
@@ -58,6 +58,10 @@ public final class CoverageRegressionMain {
         List<Path> inputs = null;
         try {
             root = options.root().toRealPath();
+            if (options.isolatedReport() != null) {
+                String digest = IsolatedCoverageInput.install(root, options.isolatedReport());
+                out.println("crossAuthorityCoverageSymPyReport=sha256:" + digest);
+            }
             Path policy = root.resolve(options.policy()).normalize();
             List<Path> reports = CoverageRegression.reportPaths(root);
             inputs = new ArrayList<>(reports);
@@ -161,13 +165,14 @@ public final class CoverageRegressionMain {
         }
     }
 
-    private record Options(Path root, Path policy, Path jsonOutput, Path markdownOutput) {
+    private record Options(Path root, Path policy, Path jsonOutput, Path markdownOutput, Path isolatedReport) {
         private static final Map<String, String> DEFAULTS = Map.of(
             "--root", ".", "--policy", "config/quality/coverage-policy.json",
             "--json-output", JSON_OUTPUT, "--markdown-output", MARKDOWN_OUTPUT);
 
         private static Options parse(String[] args) {
             Map<String, String> values = new HashMap<>(DEFAULTS);
+            values.put("--isolated-report", null);
             for (int index = 0; index < args.length; index += 2) {
                 String option = args[index];
                 if (!values.containsKey(option) || index + 1 == args.length || args[index + 1].startsWith("--")) {
@@ -176,7 +181,8 @@ public final class CoverageRegressionMain {
                 values.put(option, args[index + 1]);
             }
             return new Options(Path.of(values.get("--root")), Path.of(values.get("--policy")),
-                Path.of(values.get("--json-output")), Path.of(values.get("--markdown-output")));
+                Path.of(values.get("--json-output")), Path.of(values.get("--markdown-output")),
+                values.get("--isolated-report") == null ? null : Path.of(values.get("--isolated-report")));
         }
     }
 }
