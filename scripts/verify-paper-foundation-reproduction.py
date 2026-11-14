@@ -281,6 +281,7 @@ def main() -> int:
     verify_claim_boundaries(root)
     print(f"jsonschema={installed}")
     print("paper-foundation=VERIFIED")
+    subprocess.run([sys.executable, "-B", str(root / "scripts/test-paper-archive.py")], check=True)
     print(f"generated-files={len(EXPECTED_OUTPUT_FILES)}")
     return 0
 

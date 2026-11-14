@@ -33,6 +33,10 @@ def verifyPaperFoundation = tasks.register(
     dependsOn 'prepareVerificationEnvironment'
     workingDir paperRepositoryRoot
     inputs.file(paperReproductionVerifier)
+    inputs.file(paperRepositoryRoot.file('scripts/build-paper-archive.py'))
+    inputs.file(paperRepositoryRoot.file('scripts/test-paper-archive.py'))
+    inputs.file(paperRepositoryRoot.file('scripts/render-paper-pdf.py'))
+    inputs.file(paperRepositoryRoot.file('paper/archive-toolchain.json'))
     inputs.file(paperFoundationVerifier)
     inputs.file(paperRepositoryRoot.file('scripts/paper_controller_figure.py'))
     inputs.file(paperRepositoryRoot.file('scripts/paper_corpus_splits.py'))
