@@ -20,6 +20,7 @@ final class NoveltyCoverage {
             throw bad("cross-bound review chain");
         if(!CandidateLiteratureAssessments.COVERAGE_SCHEMA.equals(a.schema())||p.catalogue().sources().size()!=a.scope().size())
             throw bad("invalid subject-bound source scope");
+        checkInspectedMatches(p);
         var forms=NoveltyQueryForms.forEquation(p.plan().equation(), p.plan().assumptions());
         var logged=new HashSet<String>();
         for(var q:p.log().entries()) {
@@ -29,6 +30,21 @@ final class NoveltyCoverage {
         if(!Set.copyOf(a.queries()).equals(logged)) throw bad("assessment queries do not match the log");
         for(int i=0;i<a.scope().size();i++) checkSource(p,i,forms.keySet());
     }
+    private static void checkInspectedMatches(Packet packet) {
+        var matches = packet.dossier().assessment().matches();
+        var inspected = packet.dossier().inspected();
+        if (matches.size() != inspected.size()) throw bad("each reviewed match requires inspected evidence");
+        var seen = new HashSet<ExternalNoveltyReview.InspectedHit>();
+        for (int index = 0; index < matches.size(); index++) {
+            var match = matches.get(index);
+            var hit = inspected.get(index);
+            if (hit.sourceIndex() != match.scopeIndex() || !hit.identifier().equals(match.source().identifier())
+                    || hit.relation().assessmentRelation != match.relation() || !seen.add(hit)) {
+                throw bad("inspected evidence differs from its dossier match");
+            }
+        }
+    }
+
     private static void checkSource(Packet p,int i,Set<String> families) {
         var src=p.catalogue().sources().get(i);
         var a=p.dossier().assessment();

@@ -30,7 +30,9 @@ class ExternalNoveltyReviewTest {
             "The same equation with the sides reversed.",null,0)):List.<Match>of();
         var a=new Assessment(CandidateLiteratureAssessments.COVERAGE_SCHEMA,subject,"2026-11-01","test intake",
             List.of(scope),rows.stream().map(Query::expression).distinct().toList(),status,matches);
-        return new Packet(plan,catalog,log,new Dossier(review.logRoot(log),a));
+        var inspected = hit ? List.of(new InspectedHit(0,"ref1",PriorArtRelation.SEMANTICALLY_EQUIVALENT_PRIOR_ART,
+            "p.1, Example: for real x and y, addition commutes.", hash("c"))) : List.<InspectedHit>of();
+        return new Packet(plan,catalog,log,new Dossier(review.logRoot(log),a,inspected));
     }
     static List<String> hits(boolean hit,boolean gap) {
         var result=new ArrayList<String>();if(hit) result.add("ref1");if(gap) result.add("ref2");return result;
@@ -98,11 +100,11 @@ class ExternalNoveltyReviewTest {
         var log = new QueryLog(packet.log().planRoot(),packet.log().catalogueRoot(),rows);
         var dossier = packet.dossier().assessment();
         assertThrows(IllegalArgumentException.class, () -> review.packetRoot(
-            new Packet(plan,catalog,log,new Dossier(review.logRoot(log),dossier))));
+            new Packet(plan,catalog,log,new Dossier(review.logRoot(log),dossier,packet.dossier().inspected()))));
         var future = new Catalogue("future",List.of(new Source("fixture","v1","2026-11-02", List.of("text"),"offline","fixture")));
         var retro = new QueryLog(packet.log().planRoot(),review.catalogueRoot(future),packet.log().entries());
         assertThrows(IllegalArgumentException.class, () -> review.packetRoot(
-            new Packet(plan,future,retro,new Dossier(review.logRoot(retro),dossier))));
+            new Packet(plan,future,retro,new Dossier(review.logRoot(retro),dossier,packet.dossier().inspected()))));
     }
     @Test void packetKeyConflictsChangedTrustOrDuplicatedPersonsAreRejected() throws Exception {
         var p=packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
@@ -119,6 +121,24 @@ class ExternalNoveltyReviewTest {
         var other=packet(Status.UNRESOLVED,Access.INACCESSIBLE,false,false);
         assertThrows(IllegalArgumentException.class,()->decide(other,eligible,signed));
     }
+    @Test void everyReviewedReferenceRequiresItsOwnInspectedContextAndRelation() {
+        var p = packet(Status.PRIOR_ART_FOUND,Access.SEARCHED,true,false);
+        var dossier = p.dossier();
+        var hit = dossier.inspected().getFirst();
+        var wrongRelation = new InspectedHit(0,"ref1",PriorArtRelation.RELATED_NOT_EQUIVALENT,
+            hit.inspectedContext(),hit.evidenceRoot());
+        var wrongSource = new InspectedHit(0,"different",hit.relation(),hit.inspectedContext(),hit.evidenceRoot());
+        for (List<InspectedHit> entries : List.of(List.<InspectedHit>of(),List.of(wrongRelation),
+                List.of(wrongSource),List.of(hit,hit))) {
+            var changed = new Dossier(dossier.logRoot(),dossier.assessment(),entries);
+            assertThrows(IllegalArgumentException.class, () -> review.packetRoot(new Packet(plan,catalog,p.log(),changed)));
+        }
+        var alpha = new InspectedHit(0,"ref1",PriorArtRelation.ALPHA_EQUIVALENT_PRIOR_ART,
+            "The cited variables are renamed consistently.",hash("d"));
+        var recoded = new Dossier(dossier.logRoot(),dossier.assessment(),List.of(alpha));
+        assertNotEquals(review.packetRoot(p),review.packetRoot(new Packet(plan,catalog,p.log(),recoded)));
+    }
+
     @Test void droppedOrSubstitutedHitsAndPreFreezeLookupsFail() {
         var p=packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
         var first=p.log().entries().getFirst();
@@ -126,11 +146,11 @@ class ExternalNoveltyReviewTest {
         for(var wrong:List.of(new Query(0,first.family(),first.expression(),first.submittedText(),first.executedAt(),1,List.of("omitted hit")),
                 new Query(0,first.family(),first.expression(),first.submittedText(),"2026-10-31T23:59:59Z",0,List.of()))) {
             badRows.set(0,wrong);var log=new QueryLog(p.log().planRoot(),p.log().catalogueRoot(),badRows);
-            var badPacket=new Packet(plan,catalog,log,new Dossier(review.logRoot(log),p.dossier().assessment()));
+            var badPacket=new Packet(plan,catalog,log,new Dossier(review.logRoot(log),p.dossier().assessment(),p.dossier().inspected()));
             assertThrows(IllegalArgumentException.class,()->review.packetRoot(badPacket));
         }
         var partialLog=new QueryLog(p.log().planRoot(),p.log().catalogueRoot(),p.log().entries().subList(1,3));
         assertThrows(IllegalArgumentException.class,()->review.packetRoot(new Packet(plan,catalog,partialLog,
-            new Dossier(review.logRoot(partialLog),p.dossier().assessment()))));
+            new Dossier(review.logRoot(partialLog),p.dossier().assessment(),p.dossier().inspected()))));
     }
 }

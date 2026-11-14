@@ -66,8 +66,40 @@ public final class ExternalNoveltyReview {
     public record QueryLog(String planRoot,String catalogueRoot,List<Query> entries) {
         public QueryLog { root(planRoot); root(catalogueRoot); entries=bounded(entries,0,192); }
     }
-    public record Dossier(String logRoot,Assessment assessment) {
-        public Dossier { root(logRoot); Objects.requireNonNull(assessment); }
+    public enum PriorArtRelation {
+        EXACT_PRIOR_ART(RuleLiteratureCatalog.Relation.EXACT),
+        ALPHA_EQUIVALENT_PRIOR_ART(RuleLiteratureCatalog.Relation.EQUIVALENT),
+        SEMANTICALLY_EQUIVALENT_PRIOR_ART(RuleLiteratureCatalog.Relation.EQUIVALENT),
+        STRICT_GENERALIZATION_PRIOR_ART(RuleLiteratureCatalog.Relation.SOURCE_GENERALIZATION),
+        STRICT_SPECIAL_CASE_PRIOR_ART(RuleLiteratureCatalog.Relation.SOURCE_SPECIAL_CASE),
+        RELATED_NOT_EQUIVALENT(RuleLiteratureCatalog.Relation.RELATED);
+
+        final RuleLiteratureCatalog.Relation assessmentRelation;
+
+        PriorArtRelation(RuleLiteratureCatalog.Relation assessmentRelation) {
+            this.assessmentRelation = assessmentRelation;
+        }
+    }
+
+    /** Context inspected at the cited locator, with a commitment to the source evidence. */
+    public record InspectedHit(@com.fasterxml.jackson.annotation.JsonProperty(required=true) int sourceIndex,
+                               String identifier, PriorArtRelation relation, String inspectedContext,
+                               String evidenceRoot) {
+        public InspectedHit {
+            if (sourceIndex < 0) throw bad("invalid inspected source");
+            text(identifier);
+            Objects.requireNonNull(relation);
+            text(inspectedContext);
+            root(evidenceRoot);
+        }
+    }
+
+    public record Dossier(String logRoot, Assessment assessment, List<InspectedHit> inspected) {
+        public Dossier {
+            root(logRoot);
+            Objects.requireNonNull(assessment);
+            inspected = bounded(inspected, 0, 32);
+        }
     }
     /** Provided independently by the receiving custodian; private evidence stays outside the run. */
     public record Reviewer(String identityRoot,String publicKey,String qualificationRoot,String conflictClearanceRoot) {
