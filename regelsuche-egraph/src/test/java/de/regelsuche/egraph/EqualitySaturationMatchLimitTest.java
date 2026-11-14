@@ -133,6 +133,7 @@ class EqualitySaturationMatchLimitTest {
             event.outcome() == SaturationDiagnostics.Outcome.MATCH_INCONCLUSIVE));
         assertEquals(1, result.diagnostics().count(SaturationDiagnostics.Outcome.MATCH_INCONCLUSIVE));
         assertEquals(1, result.diagnostics().droppedEvents());
+        assertEquals(List.of("limited"), result.diagnostics().referenceBridgeRules());
         assertFalse(result.stats().saturated());
         assertEquals(SaturationStats.Reason.MATCHER_LIMIT, result.stats().stopReason());
     }
@@ -222,8 +223,8 @@ class EqualitySaturationMatchLimitTest {
 
         var result = new EqualitySaturation(List.of(opaque)).saturate(graph, root, node -> 1);
 
-        assertTrue(result.stats().saturated());
-        assertEquals(SaturationStats.Reason.FIX_POINT, result.stats().stopReason());
+        assertFalse(result.stats().saturated());
+        assertEquals(SaturationStats.Reason.INCOMPLETE_REFERENCE_BRIDGE, result.stats().stopReason());
         assertEquals(0, result.diagnostics().count(SaturationDiagnostics.Outcome.MATCH_INCONCLUSIVE));
         assertTrue(result.diagnostics().events().isEmpty());
     }
@@ -254,8 +255,8 @@ class EqualitySaturationMatchLimitTest {
         assertEquals(status == EquivalenceAwarePatternMatcher.AttemptStatus.INCONCLUSIVE ? 1 : 0,
             result.diagnostics().count(SaturationDiagnostics.Outcome.MATCH_INCONCLUSIVE));
         if (status == EquivalenceAwarePatternMatcher.AttemptStatus.NOT_MATCHED) {
-            assertTrue(result.stats().saturated());
-            assertEquals(SaturationStats.Reason.FIX_POINT, result.stats().stopReason());
+            assertFalse(result.stats().saturated());
+            assertEquals(SaturationStats.Reason.INCOMPLETE_REFERENCE_BRIDGE, result.stats().stopReason());
         } else if (status == EquivalenceAwarePatternMatcher.AttemptStatus.MATCHED) {
             assertEquals(parser.parseTerm("f(x6 + x1 + x2 + x3 + x4 + x5 + x7, x6)"),
                 result.provenance().witnesses().getFirst().after());
