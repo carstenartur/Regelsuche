@@ -137,8 +137,20 @@ actual attempt count under that job ID. Its admission and stop records belong
 to the proof job. A retained discovery run needs a source reference to
 associate that job with its candidate.
 
+In the ordinary Workbench search form, **Formel bearbeiten und Vorschau öffnen**
+can wrap a selected expression, square it or insert a fraction. The same text
+field remains editable and supplies the search request. **Parser-Vorschau**
+renders the term or equation as MathML and exposes its exact AST, including
+the zero introduced by unary minus. On syntax errors the parser returns the
+offending half-open UTF-16 interval in the original input. Use **Fehlerstelle
+im Ausdruck auswählen** to select it or move the caret to a missing character.
+For example, `2x` selects the unexpected `x`; enter `2*x` to multiply.
+The read-only preview accepts up to 256
+characters, uses the Java search parser and does not start a search. The
+separate runtime and system profiles use their own input contracts.
+
 This is a bounded product slice of #669. Broader dossier artifact schemas,
 occurrence-local evidence, exact replay/radar/proof correlations, live discovery
-search controls, navigation consolidation and an optional mathematical editor remain
+search controls, navigation consolidation and structured assumption/domain editing remain
 open. No new discovery evaluation, mathematical-proof, novelty or search-quality
 claim follows from this view.

@@ -40,7 +40,7 @@ class OpenApiRouteRegistryTest {
     void loadsEveryCanonicalOperationAndContext() {
         OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
 
-        assertEquals(79, registry.routes().size());
+        assertEquals(80, registry.routes().size());
         assertEquals(26, registry.contexts().size());
         assertTrue(registry.contexts().containsAll(Set.of(
             "/api/search",
@@ -58,6 +58,7 @@ class OpenApiRouteRegistryTest {
     void resolvesStaticParameterizedAndEmbeddedSuffixTemplates() {
         OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
 
+        assertAllowed(registry, "/api/inspect", "/api/inspect/formula", "POST", "previewFormulaAst");
         assertAllowed(registry, "/api/paths", "/api/paths/compare", "GET", "comparePaths");
         assertAllowed(registry, "/api/paths", "/api/paths/path-42/replay", "GET", "replayPath");
         assertAllowed(registry, "/api/proof/jobs", "/api/proof/jobs/job-7/artifacts/stdout.txt", "GET",

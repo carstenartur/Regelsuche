@@ -43,10 +43,12 @@ public class ExpressionParser implements RetainedGraph.View {
         }
 
         List<Equation> equations = new ArrayList<>();
-        for (String candidate : input.rawInput().split("[;\\n]+")) {
-            String trimmed = candidate.trim();
+        var segments = java.util.regex.Pattern.compile("[^;\n]+").matcher(input.rawInput());
+        while (segments.find()) {
+            String segment = segments.group();
+            String trimmed = segment.trim();
             if (!trimmed.isEmpty()) {
-                equations.add(parseEquation(trimmed));
+                equations.add(parseEquation(trimmed, segments.start() + segment.indexOf(trimmed)));
             }
         }
         return new ParsedInput(List.of(), equations);
@@ -60,7 +62,11 @@ public class ExpressionParser implements RetainedGraph.View {
      */
     public Expr parseTerm(String term) {
         String source = Objects.requireNonNull(term, "term");
-        Cursor cursor = Cursor.ordinary(source);
+        return parseTerm(source, 0);
+    }
+
+    private Expr parseTerm(String source, int offset) {
+        Cursor cursor = new Cursor(source, false, offset);
         Expr expr = parseExpression(cursor);
         requireEnd(cursor);
         return expr;
@@ -87,24 +93,41 @@ public class ExpressionParser implements RetainedGraph.View {
     private static void requireEnd(Cursor cursor) {
         cursor.skipWhitespace();
         if (!cursor.isAtEnd()) {
-            throw new IllegalArgumentException(
-                "Unexpected token at position " + cursor.position());
+            throw cursor.atCurrent("Unexpected token at position ");
         }
     }
 
     public Equation parseEquation(String equation) {
-        int idx = equation.indexOf('=');
-        if (idx < 1 || idx == equation.length() - 1) {
-            throw new IllegalArgumentException(
-                "Equation must contain exactly one '=' with both sides present");
+        return parseEquation(equation, 0);
+    }
+
+    private Equation parseEquation(String equation, int offset) {
+        int separator = equation.indexOf('=');
+        if (separator <= 0 || separator == equation.length() - 1) {
+            int missing = separator == 0 ? offset : offset + equation.length();
+            throw new Diagnostic("Equation must contain exactly one '=' with both sides present", missing, missing, null);
         }
-        String left = equation.substring(0, idx);
-        String right = equation.substring(idx + 1);
-        if (equation.indexOf('=', idx + 1) >= 0) {
-            throw new IllegalArgumentException(
-                "Equation must contain exactly one '='");
+        int extra = equation.indexOf('=', separator + 1);
+        if (extra >= 0) {
+            throw new Diagnostic("Equation must contain exactly one '='", offset + extra, offset + extra + 1, null);
         }
-        return new Equation(parseTerm(left), parseTerm(right));
+        return new Equation(parseTerm(equation.substring(0, separator), offset),
+            parseTerm(equation.substring(separator + 1), offset + separator + 1));
+    }
+
+    /** Parser-issued half-open UTF-16 interval in the original input. End-of-input is an empty interval. */
+    public static final class Diagnostic extends IllegalArgumentException {
+        private final int startInclusive;
+        private final int endExclusive;
+
+        private Diagnostic(String message, int startInclusive, int endExclusive, Throwable cause) {
+            super(message, cause);
+            this.startInclusive = startInclusive;
+            this.endExclusive = endExclusive;
+        }
+
+        public int startInclusive() { return startInclusive; }
+        public int endExclusive() { return endExclusive; }
     }
 
     private Expr parseExpression(Cursor cursor) {
@@ -207,15 +230,12 @@ public class ExpressionParser implements RetainedGraph.View {
             Expr inner = parseExpression(cursor);
             cursor.skipWhitespace();
             if (!cursor.consume(')')) {
-                throw new IllegalArgumentException(
-                    "Missing closing ')' at position " + cursor.position());
+                throw cursor.atCurrent("Missing closing ')' at position ");
             }
             return cursor.retainRange(inner, start, cursor.position());
         }
         if (cursor.peek('.')) {
-            throw new IllegalArgumentException(
-                "Decimal point must be preceded by a digit at position "
-                    + cursor.position());
+            throw cursor.atCurrent("Decimal point must be preceded by a digit at position ");
         }
         if (cursor.peekDigit()) {
             return parseNumber(cursor);
@@ -223,8 +243,7 @@ public class ExpressionParser implements RetainedGraph.View {
         if (cursor.peekLetter()) {
             return parseVariable(cursor);
         }
-        throw new IllegalArgumentException(
-            "Unexpected token at position " + cursor.position());
+        throw cursor.atCurrent("Unexpected token at position ");
     }
 
     private Expr parseNumber(Cursor cursor) {
@@ -236,9 +255,8 @@ public class ExpressionParser implements RetainedGraph.View {
             int decimalPoint = cursor.position();
             cursor.advance();
             if (!cursor.peekDigit()) {
-                throw new IllegalArgumentException(
-                    "Decimal point must be followed by a digit at position "
-                        + decimalPoint);
+                throw cursor.diagnostic("Decimal point must be followed by a digit at position "
+                    + (cursor.offset + decimalPoint), decimalPoint, decimalPoint + 1, null);
             }
             while (cursor.peekDigit()) {
                 cursor.advance();
@@ -251,16 +269,15 @@ public class ExpressionParser implements RetainedGraph.View {
             try {
                 return new NumberExpr(exactRationalDomain.parseValue(sourceLexeme));
             } catch (IllegalArgumentException invalid) {
-                throw new IllegalArgumentException(
-                    "Numeric literal at position " + start + ": " + invalid.getMessage(), invalid);
+                throw cursor.diagnostic("Numeric literal at position " + (cursor.offset + start)
+                    + ": " + invalid.getMessage(), start, end, invalid);
             }
         }
         ExactRationalParseEvidence evidence =
             exactRationalDomain.parse(sourceLexeme);
         if (!evidence.exact()) {
-            throw new IllegalArgumentException(
-                "Numeric literal is outside the exact rational domain at "
-                    + "position " + start + ": " + evidence.detailCode());
+            throw cursor.diagnostic("Numeric literal is outside the exact rational domain at position "
+                + (cursor.offset + start) + ": " + evidence.detailCode(), start, end, null);
         }
 
         NumberExpr number = cursor.retainRange(
@@ -299,19 +316,20 @@ public class ExpressionParser implements RetainedGraph.View {
                 }
             }
             if (!cursor.consume(')')) {
-                throw new IllegalArgumentException(
-                    "Missing closing ')' after function arguments at position "
-                        + cursor.position());
+                throw cursor.atCurrent("Missing closing ')' after function arguments at position ");
             }
             return cursor.retainRange(
                 new FunctionExpr(name, arguments),
                 start,
                 cursor.position());
         }
-        return cursor.retainRange(
-            new VariableExpr(name),
-            start,
-            nameEnd);
+        VariableExpr variable;
+        try {
+            variable = new VariableExpr(name);
+        } catch (IllegalArgumentException invalid) {
+            throw cursor.diagnostic(invalid.getMessage(), start, nameEnd, invalid);
+        }
+        return cursor.retainRange(variable, start, nameEnd);
     }
 
     private static final class Cursor {
@@ -320,8 +338,11 @@ public class ExpressionParser implements RetainedGraph.View {
         private final Map<Expr, ExactParsedTerm.SourceRange> exactSourceRanges;
         private int position;
 
-        private Cursor(String value, boolean retainExactEvidence) {
+        private final int offset;
+
+        private Cursor(String value, boolean retainExactEvidence, int offset) {
             this.value = value;
+            this.offset = offset;
             this.exactLiterals = retainExactEvidence
                 ? new ArrayList<>()
                 : null;
@@ -331,12 +352,17 @@ public class ExpressionParser implements RetainedGraph.View {
             this.position = 0;
         }
 
-        private static Cursor ordinary(String value) {
-            return new Cursor(value, false);
+        private static Cursor exact(String value) {
+            return new Cursor(value, true, 0);
         }
 
-        private static Cursor exact(String value) {
-            return new Cursor(value, true);
+        private Diagnostic atCurrent(String message) {
+            int end = isAtEnd() ? position : value.offsetByCodePoints(position, 1);
+            return diagnostic(message + (offset + position), position, end, null);
+        }
+
+        private Diagnostic diagnostic(String message, int start, int end, Throwable cause) {
+            return new Diagnostic(message, offset + start, offset + end, cause);
         }
 
         private int position() {

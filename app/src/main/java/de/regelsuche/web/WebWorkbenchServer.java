@@ -1903,6 +1903,20 @@ public class WebWorkbenchServer {
     private void handleInspect(HttpExchange exchange) throws IOException {
         String apiPath = exchange.getRequestURI().getPath();
         String suffix = apiPath.substring("/api/inspect".length()).replaceFirst("^/", "");
+        if ("formula".equals(suffix)) {
+            var input = requestBodies.readSearch(exchange);
+            try {
+                sendJson(exchange, 200, FormulaPreview.parse(input.expression(), input.type()));
+            } catch (de.regelsuche.parse.ExpressionParser.Diagnostic diagnostic) {
+                sendJson(exchange, 422, new JsonWriter().beginObject()
+                    .property("message", diagnostic.getMessage())
+                    .property("startInclusive", diagnostic.startInclusive())
+                    .property("endExclusive", diagnostic.endExclusive()).endObject().toString());
+            } catch (IllegalArgumentException invalid) {
+                sendStatus(exchange, 400, invalid.getMessage());
+            }
+            return;
+        }
         if ("tree/apply".equals(suffix)) {
             handleInspectApply(exchange);
             return;
@@ -3235,6 +3249,7 @@ public class WebWorkbenchServer {
         } else if (path.startsWith("/vendor/")
             || path.equals("/app.js")
             || path.equals("/workbench-entry.js")
+            || path.equals("/formula-input.js")
             || path.equals("/style.css")
             || path.equals("/run-workspace-state.js")
             || path.equals("/candidate-dossier-state.js")
