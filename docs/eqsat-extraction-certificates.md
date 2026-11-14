@@ -54,6 +54,29 @@ require the identical output object retained by the token; the fresh runner also
 binds the identical invocation input. To attach evidence to a separately rebuilt
 expression, run the checker again with that expression as expected output.
 
+## Native scalar AC representation
+
+`EGraph.exactScalarAcV1()` selects the versioned exact-scalar laws for addition
+and multiplication. Insert an AST with `addExpression` or insert a canonical
+`ExprValue` through `ENode.ExprValueAdapter`. Both store a whole associative
+product or sum as one e-node whose children are sorted canonical class IDs.
+The children list preserves repeated operands. Subtraction, division, powers
+and arguments of functions retain their positions. Supplied value operators
+must agree with the scalar profile, including their arity and laws.
+
+For `a + b + a + c` this yields four e-nodes, including the three distinct
+leaves. A product of 1,024 occurrences of `x` uses two e-nodes and 1,024
+child references. These counts measure graph structure. Extraction charges
+the chosen per-node cost plus each child occurrence and materializes a
+left-associated binary AST in class-ID order. Within one graph, re-adding a
+different grouping or permutation reuses the same e-class.
+
+This profile supports insertion, union, congruence repair and extraction.
+The syntax-directed saturation runner rejects a nonempty rule inventory
+on this profile. Its proof runner owns a fresh ordered graph. Native
+multiset matching and proof steps authorizing AC rearrangement are tracked
+in [#662](https://github.com/carstenartur/Regelsuche/issues/662).
+
 ## Persisted format
 
 `ExtractionCertificateCodec` reads and writes certificate data in binary format
