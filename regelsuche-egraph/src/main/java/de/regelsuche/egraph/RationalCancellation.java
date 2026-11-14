@@ -19,6 +19,7 @@ import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -30,11 +31,12 @@ final class RationalCancellation {
     private static final PatternExpr REST = PatternExpr.var("rest");
     private static final List<PatternExpr> SOURCES = List.of(
         source(FACTOR, REST), source(REST, FACTOR));
-    private static final AssumptionEvaluatorPortfolio LOCAL = AssumptionEvaluatorPortfolio.localOnly();
+    private static final AssumptionEvaluatorPortfolio LOCAL = new AssumptionEvaluatorPortfolio(
+        List.of(new CanonicalNonzeroEvaluator()));
     private static final AssumptionEvaluatorPortfolio UNSUPPORTED = new AssumptionEvaluatorPortfolio(
         List.of(new UnsupportedFactorEvaluator()));
     private static final AssumptionEvaluatorPortfolio LITERAL = new AssumptionEvaluatorPortfolio(
-        List.of(KnownAssumptionEvaluator.INSTANCE, new LiteralNonZeroEvaluator()));
+        List.of(new CanonicalNonzeroEvaluator(), new LiteralNonZeroEvaluator()));
 
     final List<Assumption> assumptions;
     final List<GuardDecision> decisions = new ArrayList<>();
@@ -43,6 +45,12 @@ final class RationalCancellation {
 
     RationalCancellation(List<Assumption> assumptions) {
         this.assumptions = List.copyOf(assumptions);
+    }
+
+    private static boolean isCanonicalGuardFact(Assumption fact) {
+        if (fact.symbols().size() != 1) return false;
+        String subject = fact.symbols().getFirst();
+        return fact.equals(Assumption.nonZero(subject)) || fact.equals(Assumption.positive(subject));
     }
 
     private static PatternExpr source(PatternExpr left, PatternExpr right) {
@@ -85,13 +93,31 @@ final class RationalCancellation {
         Expr product = factorOnLeft ? new BinaryExpr(factor, BinaryOperator.MUL, after)
             : new BinaryExpr(after, BinaryOperator.MUL, factor);
         Expr before = new BinaryExpr(product, BinaryOperator.DIV, factor);
-        var evaluation = evaluate(factor);
-        if (evaluation.isSatisfied()) {
+        List<AssumptionEvaluation> facts = guardFacts(graph, match.bindings().get("factor"), factor);
+        boolean trueFact = facts.stream().anyMatch(e -> e.isSatisfied() || e.conflicting());
+        boolean falseFact = facts.stream().anyMatch(e -> e.isRejected() || e.conflicting());
+        boolean applied = trueFact && !falseFact;
+        if (applied) {
             graph.union(match.root(), rest);
             run.applied(rule.id(), new SaturationProvenance.Witness(rule.id(), before, after));
         }
-        undecided |= evaluation.isInconclusive();
-        decisions.add(new GuardDecision(rule.id(), before, after, evaluation, evaluation.isSatisfied()));
+        undecided |= trueFact == falseFact;
+        decisions.add(new GuardDecision(rule.id(), before, after, facts, applied));
+    }
+
+    /** Inspect every scalar literal and variable in the matched class, independent of extraction order. */
+    private List<AssumptionEvaluation> guardFacts(EGraph graph, EClassId id, Expr selected) {
+        var subjects = new LinkedHashSet<Expr>();
+        subjects.add(selected);
+        for (ENode node : graph.classOrThrow(id).nodes()) {
+            if (!node.isLeaf()) continue;
+            if (node.symbol().startsWith("num:")) {
+                subjects.add(new NumberExpr(ExactRational.fromCanonicalText(node.symbol().substring(4))));
+            } else if (node.symbol().startsWith("var:")) {
+                subjects.add(new VariableExpr(node.symbol().substring(4)));
+            }
+        }
+        return subjects.stream().map(this::evaluate).toList();
     }
 
     private AssumptionEvaluation evaluate(Expr factor) {
@@ -105,6 +131,17 @@ final class RationalCancellation {
         // identities are currently authorized; the concrete factor is retained in before.
         var requirement = Assumption.nonZero(ExpressionFormatter.format(factor));
         return UNSUPPORTED.evaluate(requirement, assumptions);
+    }
+
+    private static final class CanonicalNonzeroEvaluator implements AssumptionEvaluator {
+        public String id() { return "egraph.canonical-scalar-nonzero"; }
+        public String revision() { return "1/" + KnownAssumptionEvaluator.INSTANCE.revision(); }
+
+        public AssumptionEvaluationEvidence evaluate(Assumption required, List<Assumption> known) {
+            var compatible = known.stream().filter(RationalCancellation::isCanonicalGuardFact).toList();
+            var result = KnownAssumptionEvaluator.INSTANCE.evaluate(required, compatible);
+            return AssumptionEvaluationEvidence.evaluated(id(), revision(), result.result(), result.explanation(), "");
+        }
     }
 
     private static final class UnsupportedFactorEvaluator implements AssumptionEvaluator {

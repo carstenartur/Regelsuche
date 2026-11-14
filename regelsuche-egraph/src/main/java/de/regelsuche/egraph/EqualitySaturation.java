@@ -63,8 +63,12 @@ public final class EqualitySaturation {
     }
 
     /** A local guard decision in the invocation's fixed scalar context. */
-    public record GuardDecision(String ruleId, Expr before, Expr after, AssumptionEvaluation evaluation,
-            boolean applied) {}
+    public record GuardDecision(String ruleId, Expr before, Expr after, List<AssumptionEvaluation> evaluations,
+            boolean applied) {
+        public GuardDecision {
+            evaluations = List.copyOf(evaluations);
+        }
+    }
 
     /** The expression in result() belongs to this specific immutable assumption context. */
     public record ConditionalResult(Result result, List<Assumption> assumptions, List<GuardDecision> decisions) {

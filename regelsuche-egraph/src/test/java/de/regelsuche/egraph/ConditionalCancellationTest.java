@@ -1,7 +1,6 @@
 package de.regelsuche.egraph;
 
 import de.regelsuche.assumption.Assumption;
-import de.regelsuche.assumption.AssumptionEvaluatorPortfolio;
 import de.regelsuche.assumption.AssumptionTruthValue;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.input.InputRequest;
@@ -9,6 +8,8 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,9 +31,10 @@ class ConditionalCancellationTest {
         assertEquals(context, outcome.assumptions());
         assertTrue(outcome.decisions().stream().anyMatch(decision -> decision.applied()
             && decision.before().equals(parse("(y*x)/x")) && decision.after().equals(parse("y"))
-            && decision.evaluation().requiredAssumption().equals(Assumption.nonZero("x"))
-            && decision.evaluation().evaluatorProfileHash().equals(AssumptionEvaluatorPortfolio.localOnly().contentHash())
-            && decision.evaluation().result() == AssumptionTruthValue.TRUE));
+            && decision.evaluations().getFirst().requiredAssumption().equals(Assumption.nonZero("x"))
+            && decision.evaluations().getFirst().evaluatorProfileHash().matches("sha256:[0-9a-f]{64}")
+            && decision.evaluations().getFirst().contextSignature().equals(de.regelsuche.assumption.AssumptionSignature.ofAssumptions(context))
+            && decision.evaluations().getFirst().result() == AssumptionTruthValue.TRUE));
     }
 
     @Test
@@ -44,12 +46,12 @@ class ConditionalCancellationTest {
         var missing = runner.saturateUnderAssumptions(input, List.of(Assumption.positive("z")), n -> 1);
         assertEquals(input, missing.result().expression());
         assertEquals(SaturationStats.Reason.UNDECIDED_GUARDS, missing.result().stats().stopReason());
-        assertEquals(AssumptionTruthValue.UNKNOWN, missing.decisions().getFirst().evaluation().result());
+        assertEquals(AssumptionTruthValue.UNKNOWN, missing.decisions().getFirst().evaluations().getFirst().result());
 
         var zeroInput = parse("(y*0)/0");
         var zero = runner.saturateUnderAssumptions(zeroInput, List.of(), n -> 1);
         assertEquals(zeroInput, zero.result().expression());
-        assertEquals(AssumptionTruthValue.FALSE, zero.decisions().getFirst().evaluation().result());
+        assertEquals(AssumptionTruthValue.FALSE, zero.decisions().getFirst().evaluations().getFirst().result());
         assertFalse(zero.decisions().getFirst().applied());
         assertEquals(SaturationStats.Reason.FIX_POINT, zero.result().stats().stopReason());
     }
@@ -59,7 +61,7 @@ class ConditionalCancellationTest {
         var runner = new EqualitySaturation(List.of(CANCEL));
         var input = parse("(0*y)/0");
         var result = runner.saturateUnderAssumptions(input, List.of(Assumption.nonZero("0")), n -> 1);
-        var evaluation = result.decisions().getFirst().evaluation();
+        var evaluation = result.decisions().getFirst().evaluations().getFirst();
         assertTrue(evaluation.conflicting());
         assertEquals(AssumptionTruthValue.UNKNOWN, evaluation.result());
         assertFalse(result.decisions().getFirst().applied());
@@ -77,9 +79,9 @@ class ConditionalCancellationTest {
         var result = new EqualitySaturation(List.of(CANCEL)).saturateUnderAssumptions(input,
             List.of(Assumption.nonZero(label)), n -> 1);
         assertEquals(input, result.result().expression());
-        assertTrue(result.decisions().getFirst().evaluation().isInconclusive());
+        assertTrue(result.decisions().getFirst().evaluations().getFirst().isInconclusive());
         assertEquals(de.regelsuche.assumption.AssumptionEvaluationDisposition.UNSUPPORTED,
-            result.decisions().getFirst().evaluation().evidence().getFirst().disposition());
+            result.decisions().getFirst().evaluations().getFirst().evidence().getFirst().disposition());
     }
 
     @Test
@@ -117,6 +119,38 @@ class ConditionalCancellationTest {
         assertEquals(input, outcome.result().expression());
         var small = new EqualitySaturation(List.of(CANCEL), new EqualitySaturation.Config(4, 2));
         assertThrows(IllegalArgumentException.class, () -> small.saturateUnderAssumptions(input, List.of(), n -> 1));
+    }
+
+    @Test
+    void zeroAndDeclaredNonzeroInTheSameEClassBlockCancellationInEitherRuleOrder() {
+        var x = PatternExpr.var("X");
+        var f = PatternExpr.fn("F", x);
+        var asArgument = new PatternRewriteRule("F-is-its-argument", f, x);
+        var asZero = new PatternRewriteRule("F-is-zero", f, PatternExpr.num(0));
+        var input = parse("(F(z)*y)/F(z)");
+        for (boolean reverse : List.of(false, true)) {
+            List<RewriteRule> rules = reverse ? List.of(asZero, asArgument, CANCEL)
+                : List.of(asArgument, asZero, CANCEL);
+            var outcome = new EqualitySaturation(rules)
+                .saturateUnderAssumptions(input, List.of(Assumption.nonZero("z")), n -> 1);
+            assertFalse(outcome.decisions().stream().anyMatch(EqualitySaturation.GuardDecision::applied));
+            assertTrue(outcome.decisions().stream().anyMatch(decision ->
+                decision.evaluations().stream().anyMatch(e -> e.isSatisfied())
+                    && decision.evaluations().stream().anyMatch(e -> e.isRejected())));
+            assertEquals(SaturationStats.Reason.UNDECIDED_GUARDS, outcome.result().stats().stopReason());
+        }
+    }
+
+    @Test
+    void customPredicateOrMalformedTypedAssumptionCannotAuthorizeANumericGuard() {
+        var input = parse("(x*y)/x");
+        for (var fact : List.of(Assumption.customPredicate("x != 0", List.of("x")),
+                new Assumption(Assumption.Kind.NON_ZERO, "x == 0", List.of("x")))) {
+            var outcome = new EqualitySaturation(List.of(CANCEL)).saturateUnderAssumptions(input, List.of(fact), n -> 1);
+            assertEquals(input, outcome.result().expression());
+            assertTrue(outcome.decisions().getFirst().evaluations().getFirst().isInconclusive());
+            assertFalse(outcome.decisions().getFirst().applied());
+        }
     }
 
     private static Expr parse(String text) {
