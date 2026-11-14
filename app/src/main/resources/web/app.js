@@ -195,6 +195,7 @@
         const form = $('searchForm');
         form.expression.value = expression;
         form.type.value = type || 'TERM';
+        form.expression.dispatchEvent(new Event('input', {bubbles: true}));
     }
     $('loadExample-trig').addEventListener('click', () => loadExample('sin(x)^2 + cos(x)^2', 'TERM'));
     $('loadExample-log').addEventListener('click', () => loadExample('log(a*b)', 'TERM'));

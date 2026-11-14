@@ -164,6 +164,16 @@
                 <input type="text" name="expression" value="(x + 1)*(x + 1)" required
                        placeholder="z.B. (x+1)^2, sin(x)^2 + cos(x)^2, log(a*b)">
             </label>
+            <details id="formulaTools">
+                <summary>Formel bearbeiten und Vorschau öffnen</summary>
+                <div class="actions" aria-label="Auswahl im Ausdruck bearbeiten">
+                    <button type="button" data-formula="square">Auswahl quadrieren</button>
+                    <button type="button" data-formula="fraction">Bruch einfügen</button>
+                    <button type="button" data-formula="group">Auswahl klammern</button>
+                    <button type="button" id="previewFormula">Parser-Vorschau</button>
+                </div>
+                <div id="formulaPreview" role="status" aria-live="polite"></div>
+            </details>
             <div class="grid">
                 <label class="field">
                     <span>Typ</span>
@@ -673,6 +683,7 @@
     <small>Regelsuche · lokales Web-Frontend · für Trial &amp; Discovery, nicht für Produktion.</small>
 </footer>
 
+<script src="formula-input.js"></script>
 <script src="workbench-entry.js"></script>
 <script src="app.js"></script>
 <script src="run-workspace-state.js"></script>
