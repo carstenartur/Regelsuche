@@ -39,21 +39,27 @@ def verifyRegelsucheAiKnowledgeArtifacts = tasks.register(
     outputs.upToDateWhen { false }
 }
 
-def verifyComplexityHotspots = tasks.register(
-    'verifyComplexityHotspots',
-    Exec
-) {
+def hotspotRuntime = configurations.dependencyScope('hotspotRuntime')
+dependencies.add(hotspotRuntime.name, project(':regelsuche-quality'))
+def hotspotClasspath = configurations.resolvable('hotspotClasspath') {
+    extendsFrom hotspotRuntime.get()
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.JAR))
+    }
+}
+def verifyComplexityHotspots = tasks.register('verifyComplexityHotspots', JavaExec) {
     group = 'verification'
     description = 'Rejects new or materially worsened method-complexity hotspots without a finite exception.'
     dependsOn verifyRegelsucheAiKnowledgeArtifacts
-    workingDir rootProject.projectDir
-    commandLine aiKnowledgePython,
-        rootProject.file('scripts/verify-complexity-hotspots.py').absolutePath,
-        '--complexity', rootProject.file('build/ai-knowledge/complexity.json').absolutePath,
-        '--policy', rootProject.file('config/quality/complexity-hotspots.json').absolutePath,
-        '--json-output', rootProject.file('build/reports/quality/complexity-hotspot-report.json').absolutePath,
-        '--markdown-output', rootProject.file('build/reports/quality/complexity-hotspot-report.md').absolutePath
-    inputs.file(rootProject.file('scripts/verify-complexity-hotspots.py'))
+    classpath = files(hotspotClasspath)
+    mainClass = 'de.regelsuche.quality.complexity.ComplexityHotspotReportMain'
+    def measurement = rootProject.layout.buildDirectory.file('ai-knowledge/complexity.json')
+    args measurement.get().asFile.absolutePath,
+        rootProject.file('config/quality/complexity-hotspots.json').absolutePath,
+        rootProject.layout.buildDirectory.dir('reports/quality').get().asFile.absolutePath
+    inputs.file(measurement)
     inputs.file(rootProject.file('config/quality/complexity-hotspots.json'))
     inputs.file(rootProject.file('ai-knowledge/complexity-baseline.json'))
     outputs.file(rootProject.file('build/reports/quality/complexity-hotspot-report.json'))

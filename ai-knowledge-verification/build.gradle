@@ -1,5 +1,10 @@
 plugins {
+    id 'java-base'
     id 'org.aiknowledge.extractor'
+}
+
+repositories {
+    mavenCentral()
 }
 
 aiKnowledge {
