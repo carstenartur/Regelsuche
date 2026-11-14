@@ -148,7 +148,7 @@ public final class ExtractionProofChecker {
 <span class="fc" id="L148">            s.chars(identity.id());</span>
 <span class="fc" id="L149">            require(seen.add(identity.id()), &quot;duplicate rule ID&quot;);</span>
 <span class="fc" id="L150">            Integer rule = s.ruleIds.get(identity.id());</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            require(rule != null, &quot;untrusted rule ID&quot;);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            require(rule != null, &quot;untrusted rule ID&quot;);</span>
 <span class="fc" id="L152">            var r = s.rules.get(rule);</span>
 <span class="fc" id="L153">            require(</span>
 <span class="pc bpc" id="L154" title="1 of 2 branches missed.">                    s.pattern(identity.source()) == r.source()</span>

@@ -63,7 +63,7 @@
 </td>
 <td>
 <div class="infoBox duration">
-<div class="counter">4m10.94s</div>
+<div class="counter">3m43.89s</div>
 <p>duration</p>
 </div>
 </td>
@@ -85,67 +85,71 @@
 <div class="tab">
 <h2>error output</h2>
 <span class="code">
-<pre id="root-0-test-stderr-publicArtifactImageReproducesExpectedEvidenceWithoutNetwork(Path)">To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+<div class="clipboard-copy-btn-container">
+<button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="root-0-test-stderr-publicArtifactImageReproducesExpectedEvidenceWithoutNetwork(Path)">Copy</button>
+</div>
+<pre id="root-0-test-stderr-publicArtifactImageReproducesExpectedEvidenceWithoutNetwork(Path)">To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.9.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build 
 Calculating task graph as no cached configuration is available for tasks: :regelsuche-release:runAutonomousDiscoveryWalkthrough
 &gt; Task :regelsuche-autopilot:processResources NO-SOURCE
 &gt; Task :regelsuche-egraph:processResources NO-SOURCE
-&gt; Task :regelsuche-experiments:processResources
 &gt; Task :regelsuche-discovery:processResources
 &gt; Task :regelsuche-core:processResources
 &gt; Task :regelsuche-math-algorithms:processResources NO-SOURCE
-&gt; Task :regelsuche-release:processResources NO-SOURCE
-&gt; Task :regelsuche-optimization-sdk:processResources
 &gt; Task :regelsuche-learning:processResources
+&gt; Task :regelsuche-release:processResources NO-SOURCE
+&gt; Task :regelsuche-search:processResources
 &gt; Task :regelsuche-solver-ir:processResources NO-SOURCE
 &gt; Task :regelsuche-validation:processResources NO-SOURCE
-&gt; Task :regelsuche-search:processResources
+&gt; Task :regelsuche-optimization-sdk:processResources
+&gt; Task :regelsuche-experiments:processResources
 
-&gt; Task :regelsuche-core:compileJava
 Note: /workspace/regelsuche-core/src/main/java/de/regelsuche/retention/RetainedJson.java uses or overrides a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: /workspace/regelsuche-core/src/main/java/de/regelsuche/retention/RetainedJson.java uses unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
+&gt; Task :regelsuche-core:compileJava
 
 &gt; Task :regelsuche-core:classes
-&gt; Task :regelsuche-core:jar
 
 &gt; Task :regelsuche-validation:compileJava
-
-&gt; Task :regelsuche-validation:classes
-&gt; Task :regelsuche-validation:jar
 warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
 2 warnings
-warning: unknown enum constant Mode.PROPERTIES
+
+&gt; Task :regelsuche-validation:classes
+&gt; Task :regelsuche-validation:jar
+&gt; Task :regelsuche-core:jar
 
 &gt; Task :regelsuche-egraph:compileJava
 
 &gt; Task :regelsuche-egraph:classes
-&gt; Task :regelsuche-egraph:jar
+warning: unknown enum constant Mode.PROPERTIES
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
 2 warnings
+&gt; Task :regelsuche-egraph:jar
+
 /workspace/regelsuche-search/src/main/java/de/regelsuche/search/moves/NativeMoveProof.java:25: warning: non-varargs call of varargs method with inexact argument type for last parameter;
             try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {
                                                                           ^
   cast to Object for a varargs call
   cast to Object[] for a non-varargs call and to suppress this warning
-
 &gt; Task :regelsuche-search:compileJava
 1 warning
 
 &gt; Task :regelsuche-search:classes
 &gt; Task :regelsuche-search:jar
 
-&gt; Task :regelsuche-math-algorithms:compileJava
 warning: unknown enum constant Mode.PROPERTIES
+&gt; Task :regelsuche-math-algorithms:compileJava
   reason: class file for com.fasterxml.jackson.annotation.JsonCreator$Mode not found
 warning: unknown enum constant Mode.DELEGATING
 
 &gt; Task :regelsuche-discovery:compileJava
 &gt; Task :regelsuche-discovery:classes
+&gt; Task :regelsuche-discovery:jar
 
 &gt; Task :regelsuche-math-algorithms:compileJava
 Note: /workspace/regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/completion/KnuthBendixCompletionService.java uses or overrides a deprecated API.
@@ -153,12 +157,11 @@ Note: Recompile with -Xlint:deprecation for details.
 2 warnings
 
 &gt; Task :regelsuche-math-algorithms:classes
-&gt; Task :regelsuche-discovery:jar
 &gt; Task :regelsuche-math-algorithms:jar
-Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
 
 &gt; Task :regelsuche-solver-ir:compileJava
+Note: /workspace/regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverIrJsonCodec.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
 
 &gt; Task :regelsuche-solver-ir:classes
 &gt; Task :regelsuche-solver-ir:jar
@@ -179,22 +182,21 @@ Note: Recompile with -Xlint:deprecation for details.
 &gt; Task :regelsuche-autopilot:classes
 &gt; Task :regelsuche-autopilot:jar
 
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
 &gt; Task :regelsuche-release:compileJava
+Note: Some input files use or override a deprecated API.
 
 &gt; Task :regelsuche-release:classes
+Note: Recompile with -Xlint:deprecation for details.
 
 &gt; Task :regelsuche-release:runAutonomousDiscoveryWalkthrough
-sha256:1299099a1351f7da8964d7f934ba35ca9f939f20e30c0e66efb0b893db3c0f98
+sha256:7bdecba9b1a88aab98c14e68915f093e233a52202ce34b6a4a02e981e1a79587
 
 [Incubating] Problems report is available at: file:///workspace/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 55s
+BUILD SUCCESSFUL in 58s
 30 actionable tasks: 30 executed
 Configuration cache entry stored.
 </pre>
-<button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="root-0-test-stderr-publicArtifactImageReproducesExpectedEvidenceWithoutNetwork(Path)">Copy</button>
 </span>
 </div>
 </div>
@@ -207,7 +209,7 @@ Configuration cache entry stored.
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 9.7.1</a> at Nov 12, 2026, 4:09:29 AM</p>
+<a href="https://www.gradle.org">Gradle 9.9.1</a> at Nov 14, 2026, 12:08:24 AM</p>
 </div>
 </div>
 </body>

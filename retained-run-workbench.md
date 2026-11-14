@@ -26,8 +26,10 @@ produced alongside `run-workspace.json` by
 writer is accepted. The dossier endpoint accepts at most 1 MiB and checks
 canonical UTF-8, the scenario/search hashes, the immutable RunBundle bindings,
 information boundary, source assumptions and bridge-to-state lineage. Every
-subsequent read repeats those checks. Opening the dossier does not run search,
-replay or mathematical validation.
+subsequent read repeats those checks. If the manifest binds a supported dossier
+and the local copy is missing, the Workbench shows the expected artifact hash
+and offers the import control. Opening the dossier does not run search, replay
+or mathematical validation.
 
 The retained budget commitment and configured work must match the scenario's
 recorded search budget. Required nested identities, provenance text, evidence

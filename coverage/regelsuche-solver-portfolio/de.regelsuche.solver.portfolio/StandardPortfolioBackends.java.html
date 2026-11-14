@@ -68,19 +68,19 @@ public final class StandardPortfolioBackends {
         Z3SmtSolverBackend backend,
         BackendAvailability availability
     ) {
-<span class="nc" id="L71">        return new DeclaredPortfolioBackend(</span>
+<span class="fc" id="L71">        return new DeclaredPortfolioBackend(</span>
             backend,
-<span class="nc" id="L73">            BackendCapabilityProfile.create(</span>
-<span class="nc" id="L74">                backend.descriptor().backendId(), backend.descriptor().backendVersion(),</span>
-<span class="nc" id="L75">                List.of(SolverIr.OBLIGATION_SCHEMA),</span>
-<span class="nc" id="L76">                backend.descriptor().supportedTheories(),</span>
-<span class="nc" id="L77">                backend.descriptor().supportedRelations(),</span>
-<span class="nc" id="L78">                Arrays.asList(Relation.values()),</span>
-<span class="nc" id="L79">                List.of(Sort.REAL),</span>
-<span class="nc" id="L80">                Arrays.asList(BinaryOperator.values()),</span>
+<span class="fc" id="L73">            BackendCapabilityProfile.create(</span>
+<span class="fc" id="L74">                backend.descriptor().backendId(), backend.descriptor().backendVersion(),</span>
+<span class="fc" id="L75">                List.of(SolverIr.OBLIGATION_SCHEMA),</span>
+<span class="fc" id="L76">                backend.descriptor().supportedTheories(),</span>
+<span class="fc" id="L77">                backend.descriptor().supportedRelations(),</span>
+<span class="fc" id="L78">                Arrays.asList(Relation.values()),</span>
+<span class="fc" id="L79">                List.of(Sort.REAL),</span>
+<span class="fc" id="L80">                Arrays.asList(BinaryOperator.values()),</span>
                 false,
-<span class="nc" id="L82">                backend.descriptor().supportedEvidence(),</span>
-<span class="nc" id="L83">                List.of(BackendRole.ORACLE_VALIDATION,</span>
+<span class="fc" id="L82">                backend.descriptor().supportedEvidence(),</span>
+<span class="fc" id="L83">                List.of(BackendRole.ORACLE_VALIDATION,</span>
                     BackendRole.COUNTEREXAMPLE,
                     BackendRole.FORMAL_PROOF),
                 CostClass.HIGH,
@@ -88,7 +88,7 @@ public final class StandardPortfolioBackends {
                 true,
                 true,
                 availability,
-<span class="nc" id="L91">                backend.configurationHash()));</span>
+<span class="fc" id="L91">                backend.configurationHash()));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

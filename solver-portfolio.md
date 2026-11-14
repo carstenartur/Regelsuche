@@ -86,6 +86,16 @@ Every attempt with an `executionHash` must have exactly one retained directory c
 - process errors and `(error ...)` output can never become a certificate;
 - `unsat` becomes `CONFIRMED` only after a second successful invocation retrieves a non-empty Z3 proof object, whose canonical payload is hashed as the certificate.
 
+## Assumption consistency
+
+`AssumptionConsistencyAnalyzer.analyze(obligation)` explicitly checks whether the premises of an existing obligation can hold together. It copies the exact declarations, theories, and structured premises into a derived portfolio request with the fixed goal `0 = 1`. Negating that goal adds a tautology to the Z3 query. The original obligation and the derived request are available alongside the portfolio run. A result for the derived query is bound to that query's obligation hash.
+
+- `SAT` records Z3's satisfiability decision. A model is available only if the backend successfully retrieves and recognizes one.
+- `UNSAT` requires Z3's unsatisfiability decision and the existing proof-object retrieval check. The execution carries the proof object's hash. Independent replay remains a separate step.
+- `INCONCLUSIVE` covers unsupported translations, missing executables, timeouts, unknown results, and process errors. The portfolio report and any completed execution provide the diagnostics.
+
+The analysis is opt-in and uses the existing Z3 profile and translation limits. Proving a conditional implication does not run a consistency check on its premises.
+
 ## Reproduction
 
 Install Z3 and run the complete repository-owned verification command:

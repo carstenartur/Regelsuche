@@ -29,7 +29,7 @@ and verifies all **4,034** internal checksum entries and complete archive
 coverage before extracting. Duplicate entries, traversal paths, symlinks,
 unlisted files and excessive archive sizes fail closed.
 
-Both current example directories are copied into a private temporary directory
+The three current example directories are copied into a private temporary directory
 **outside the source checkout**. Their inputs are hashed; stale `target`, `build`
 and Gradle cache outputs are excluded. Each consumer gets a separate initially
 empty Maven cache and empty explicit user/global settings. There is no reactor
@@ -45,6 +45,7 @@ actual Surefire XML, resolves the runtime dependency graph and runs its Java CLI
 | --- | --- | --- |
 | `hello-rule-java25` | positive identity/replay and negative-operand test | Core, Egraph, Search, Plugin API — four modules |
 | `extension-runtime-java25` | typed greeting and stable catalogue reload test | Core, Extension API, Extension Runtime — three modules |
+| `geometric-sequence-domain-java25` | provider discovery, typed input, confirmed and refuted cases, budget exhaustion, invalid input and canonical evidence | Core, Egraph, Search, Validation, Discovery, Discovery SDK — six modules |
 
 Missing expected test cases, zero tests, failures, errors or skips reject the
 qualification. Runtime closures must use product version 0.5.2 and exclude app,
@@ -53,8 +54,11 @@ copied runtime JAR set. The hello-rule CLI output must match its exact concrete
 rule/replay/negative-case result. The extension CLI must print the exact extension,
 origin and greeting plus one canonical lowercase `sha256:<64hex>` catalogue ID.
 It is run twice from the same actual Maven build; complete outputs and catalogue
-IDs must match, alongside the required JUnit reload-identity test. Missing,
-malformed or unstable IDs reject qualification.
+IDs must match, alongside the required JUnit reload-identity test. The geometric
+sequence CLI must find the provider through ServiceLoader, confirm multiplier
+2, retain the counterexample for multiplier 1 and print an evidence hash.
+Two executions of that same build must agree on the full output and evidence hash.
+Missing, malformed or unstable IDs reject qualification.
 
 The classpath catalogue includes the provider's absolute CodeSource URL in its
 origin, so a different private build directory legitimately changes its hash.
@@ -73,7 +77,7 @@ checkout revision, exact tool versions, archive hash/checksum count, all copied
 source hashes, original command/exit records, JUnit counts and case names,
 runtime coordinates/JAR hashes, CLI output and final status. Raw combined Maven
 output, raw Surefire reports and CLI output remain alongside it, including on
-failure. `PASSED` is written only after **both** consumers satisfy every gate;
+failure. `PASSED` is written only after all three consumers satisfy every gate;
 a failed run exits nonzero and retains `FAILED` evidence.
 
 The existing Maven product job invokes the adapter, keeping assertions and

@@ -92,8 +92,8 @@ final class ProofSupport {
 <span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (!text.matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;))</span>
 <span class="nc" id="L93">            throw new IllegalArgumentException(&quot;noncanonical rational grammar&quot;);</span>
 <span class="fc" id="L94">        int slash = text.indexOf('/');</span>
-<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        int numeratorDigits = (slash &lt; 0 ? text.length() : slash) - (text.startsWith(&quot;-&quot;) ? 1 : 0);</span>
-<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        int denominatorDigits = slash &lt; 0 ? 1 : text.length() - slash - 1;</span>
+<span class="fc bfc" id="L95" title="All 4 branches covered.">        int numeratorDigits = (slash &lt; 0 ? text.length() : slash) - (text.startsWith(&quot;-&quot;) ? 1 : 0);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        int denominatorDigits = slash &lt; 0 ? 1 : text.length() - slash - 1;</span>
         // 30103/100000 strictly exceeds log10(2). Bound digit allocation before parsing.
 <span class="fc" id="L98">        long maxDigits = ((long) limits.maxRationalBits() * 30103) / 100000 + 1;</span>
 <span class="fc" id="L99">        size(numeratorDigits, maxDigits, &quot;rational bits&quot;);</span>
@@ -148,14 +148,14 @@ final class ProofSupport {
     }
 
     Parts parts(Object o) {
-<span class="pc bpc" id="L151" title="1 of 9 branches missed.">        return switch (o) {</span>
+<span class="fc bfc" id="L151" title="All 9 branches covered.">        return switch (o) {</span>
 <span class="fc" id="L152">            case NumberExpr n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
 <span class="fc" id="L153">            case VariableExpr v -&gt; new Parts(&quot;VARIABLE&quot;, v.name(), List.of());</span>
 <span class="fc" id="L154">            case BinaryExpr b -&gt;</span>
 <span class="fc" id="L155">                    new Parts(&quot;BINARY&quot;, b.operator().name(), List.of(b.left(), b.right()));</span>
 <span class="fc" id="L156">            case FunctionExpr f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>
 <span class="fc" id="L157">            case PatternExpr.Placeholder p -&gt; new Parts(&quot;P&quot;, p.name(), List.of());</span>
-<span class="nc" id="L158">            case PatternExpr.LiteralNumber n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
+<span class="fc" id="L158">            case PatternExpr.LiteralNumber n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
 <span class="fc" id="L159">            case PatternExpr.Operation b -&gt;</span>
 <span class="fc" id="L160">                    new Parts(&quot;BINARY&quot;, b.operator().name(), List.of(b.left(), b.right()));</span>
 <span class="fc" id="L161">            case PatternExpr.Function f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>

@@ -137,7 +137,7 @@ public record BackendCapabilityProfile(
 <span class="pc" id="L137">            .forEach(declaration -&gt; issues.add(</span>
 <span class="nc" id="L138">                &quot;UNSUPPORTED_SORT:&quot; + declaration.name() + ':' + declaration.sort().name()));</span>
 <span class="fc" id="L139">        obligation.assumptions().stream()</span>
-<span class="pc bnc" id="L140" title="All 2 branches missed.">            .filter(assumption -&gt; !supportedAssumptionRelations.contains(assumption.relation()))</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            .filter(assumption -&gt; !supportedAssumptionRelations.contains(assumption.relation()))</span>
 <span class="pc" id="L141">            .forEach(assumption -&gt; issues.add(</span>
 <span class="nc" id="L142">                &quot;UNSUPPORTED_ASSUMPTION_RELATION:&quot; + assumption.relation().name()));</span>
 
@@ -146,16 +146,16 @@ public record BackendCapabilityProfile(
 <span class="fc" id="L146">        inspect(obligation.goal().left(), operators, calls);</span>
 <span class="fc" id="L147">        inspect(obligation.goal().right(), operators, calls);</span>
 <span class="fc" id="L148">        obligation.assumptions().forEach(assumption -&gt; {</span>
-<span class="nc" id="L149">            inspect(assumption.left(), operators, calls);</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (assumption.right() != null) {</span>
-<span class="nc" id="L151">                inspect(assumption.right(), operators, calls);</span>
+<span class="fc" id="L149">            inspect(assumption.left(), operators, calls);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            if (assumption.right() != null) {</span>
+<span class="fc" id="L151">                inspect(assumption.right(), operators, calls);</span>
             }
-<span class="nc" id="L153">        });</span>
+<span class="fc" id="L153">        });</span>
 <span class="fc" id="L154">        operators.stream()</span>
 <span class="fc bfc" id="L155" title="All 2 branches covered.">            .filter(operator -&gt; !supportedOperators.contains(operator))</span>
 <span class="fc" id="L156">            .forEach(operator -&gt; issues.add(&quot;UNSUPPORTED_OPERATOR:&quot; + operator.name()));</span>
-<span class="pc bpc" id="L157" title="3 of 4 branches missed.">        if (calls[0] &amp;&amp; !supportsCalls) {</span>
-<span class="nc" id="L158">            issues.add(&quot;UNSUPPORTED_CALL_EXPRESSION&quot;);</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        if (calls[0] &amp;&amp; !supportsCalls) {</span>
+<span class="fc" id="L158">            issues.add(&quot;UNSUPPORTED_CALL_EXPRESSION&quot;);</span>
         }
 <span class="fc" id="L160">        return issues.stream().distinct().sorted().toList();</span>
     }
@@ -205,9 +205,9 @@ public record BackendCapabilityProfile(
 <span class="fc" id="L205">            operators.add(binary.operator());</span>
 <span class="fc" id="L206">            inspect(binary.left(), operators, calls);</span>
 <span class="fc" id="L207">            inspect(binary.right(), operators, calls);</span>
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        } else if (expression instanceof Call call) {</span>
-<span class="nc" id="L209">            calls[0] = true;</span>
-<span class="nc" id="L210">            call.arguments().forEach(argument -&gt; inspect(argument, operators, calls));</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        } else if (expression instanceof Call call) {</span>
+<span class="fc" id="L209">            calls[0] = true;</span>
+<span class="fc" id="L210">            call.arguments().forEach(argument -&gt; inspect(argument, operators, calls));</span>
         }
 <span class="fc" id="L212">    }</span>
 

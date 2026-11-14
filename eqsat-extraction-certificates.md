@@ -33,9 +33,11 @@ var result = runner.saturateWithProof(input,
     options);
 if (result.proof().complete()) {
     var certificate = result.proof().checked().orElseThrow().certificate();
+    byte[] persisted = ExtractionCertificateCodec.encode(certificate, options.replayLimits());
     // A receiver supplies its own expected endpoints and trusted rule definitions.
     Expr expectedOutput = new VariableExpr("x");
-    var received = ExtractionProofChecker.check(input, expectedOutput, certificate,
+    var decoded = ExtractionCertificateCodec.decode(persisted, options.replayLimits());
+    var received = ExtractionProofChecker.check(input, expectedOutput, decoded,
         trustedRules, options.replayLimits());
     if (received.status() != ExtractionProofChecker.Status.ACCEPTED) {
         throw new IllegalStateException(received.detail());
@@ -51,6 +53,38 @@ checker result creates a `CheckedCertificate` token. Complete result wrappers
 require the identical output object retained by the token; the fresh runner also
 binds the identical invocation input. To attach evidence to a separately rebuilt
 expression, run the checker again with that expression as expected output.
+
+## Persisted format
+
+`ExtractionCertificateCodec` reads and writes certificate data in binary format
+`EQSC` version 1. Decoding returns an `ExtractionCertificate`. The receiver
+passes it to `ExtractionProofChecker` with both independently expected endpoints
+and its own trusted rules. Rule definitions in storage provide exact matching
+data for replay. The format carries no checked token or trust decision.
+
+All counts and indices are four-byte big-endian integers. Node and step tags
+are one byte. Strings have a code-unit count followed by big-endian Java UTF-16
+code units, which preserves exact labels and scoped identifiers. The format is
+the four-byte `EQSC` marker and version integer, followed by these sections:
+
+| Section | Version 1 layout |
+| --- | --- |
+| Terms | Count and nodes in certificate order. Tags 0–3 mean number, variable, binary operator, function. Each node has a label and a counted list of prior term indices. |
+| Rule patterns | Count and nodes in postorder of first occurrence, visiting each rule's source then target in rule order. Equal nodes share an index. Tags 0–3 mean placeholder, number, binary operator, function. Each node has a label and a counted list of prior pattern indices. |
+| Rules | Count, then each ID and its source and target pattern indices. |
+| Proof steps | Count and steps in certificate order. Tags 0–4 mean reflexivity (term), symmetry (premise), transitivity (first premise, second premise), congruence (left term, right term, counted child proofs), pattern instance (rule, before term, after term, counted bindings of name then term). Binding names are in Java string order. |
+| Endpoints | Input term, output term, conclusion proof step. |
+
+The reader rejects unsupported versions, malformed fields, forward references,
+noncanonical pattern or binding order, truncated input, and trailing bytes.
+The codec applies a 16 MiB byte ceiling, plus the supplied `ProofLimits` to
+storage work, syntax, and allocations. Successful encoding reserves the
+additional read-side validation work so the same limits permit decoding.
+A limit failure raises
+`ExtractionProofBuilder.LimitExceeded`. Malformed data raises
+`IllegalArgumentException`. Use a separately sufficient `ProofLimits` budget
+for the detached replay itself. The byte API checks lengths before decoding.
+Callers reading files or streams should also bound the initial read.
 
 ## Admission and outcomes
 
@@ -134,6 +168,5 @@ proof limits.
 Legacy local witnesses remain diagnostic and unproved as an extraction chain.
 They do not include every congruence bridge from original input to extracted
 output. Their replay trusts rule callbacks. Only explicit complete evidence
-changes `hasExtractionProof()` to true. No persisted certificate codec, native
-AC extension, conditional context, new runtime or automatic default adoption is
-included.
+changes `hasExtractionProof()` to true. The storage format covers the same
+exact native base-pattern fragment as the detached checker.

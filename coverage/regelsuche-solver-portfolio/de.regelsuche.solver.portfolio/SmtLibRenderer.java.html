@@ -150,12 +150,12 @@ import java.util.Set;
     ) {
 <span class="fc" id="L151">        String leftTerm = expression(left, issues);</span>
 <span class="pc bpc" id="L152" title="1 of 2 branches missed.">        String rightTerm = right == null ? &quot;&quot; : expression(right, issues);</span>
-<span class="pc bpc" id="L153" title="5 of 7 branches missed.">        return switch (relation) {</span>
+<span class="pc bpc" id="L153" title="3 of 7 branches missed.">        return switch (relation) {</span>
 <span class="fc" id="L154">            case EQUALS -&gt; &quot;(= &quot; + leftTerm + ' ' + rightTerm + ')';</span>
 <span class="fc" id="L155">            case NOT_EQUALS -&gt; &quot;(not (= &quot; + leftTerm + ' ' + rightTerm + &quot;))&quot;;</span>
 <span class="nc" id="L156">            case LESS_THAN -&gt; &quot;(&lt; &quot; + leftTerm + ' ' + rightTerm + ')';</span>
-<span class="nc" id="L157">            case LESS_OR_EQUAL -&gt; &quot;(&lt;= &quot; + leftTerm + ' ' + rightTerm + ')';</span>
-<span class="nc" id="L158">            case GREATER_THAN -&gt; &quot;(&gt; &quot; + leftTerm + ' ' + rightTerm + ')';</span>
+<span class="fc" id="L157">            case LESS_OR_EQUAL -&gt; &quot;(&lt;= &quot; + leftTerm + ' ' + rightTerm + ')';</span>
+<span class="fc" id="L158">            case GREATER_THAN -&gt; &quot;(&gt; &quot; + leftTerm + ' ' + rightTerm + ')';</span>
 <span class="nc" id="L159">            case GREATER_OR_EQUAL -&gt; &quot;(&gt;= &quot; + leftTerm + ' ' + rightTerm + ')';</span>
 <span class="nc" id="L160">            case IS_INTEGER -&gt; &quot;(is_int &quot; + leftTerm + ')';</span>
         };

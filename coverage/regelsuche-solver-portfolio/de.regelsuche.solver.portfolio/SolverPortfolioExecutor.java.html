@@ -98,12 +98,12 @@ public final class SolverPortfolioExecutor {
 <span class="fc" id="L98">                cancelled = true;</span>
 <span class="fc" id="L99">                break;</span>
             }
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (profile.availability() != BackendAvailability.AVAILABLE) {</span>
-<span class="nc" id="L102">                attempts.add(PortfolioAttempt.create(</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (profile.availability() != BackendAvailability.AVAILABLE) {</span>
+<span class="fc" id="L102">                attempts.add(PortfolioAttempt.create(</span>
                     sequence++, profile, AttemptDisposition.SKIPPED_UNAVAILABLE,
-<span class="nc" id="L104">                    &quot;NOT_RUN&quot;, &quot;&quot;, List.of(&quot;BACKEND_&quot; + profile.availability().name()),</span>
+<span class="fc" id="L104">                    &quot;NOT_RUN&quot;, &quot;&quot;, List.of(&quot;BACKEND_&quot; + profile.availability().name()),</span>
                     0L, configurationHash));
-<span class="nc" id="L106">                continue;</span>
+<span class="fc" id="L106">                continue;</span>
             }
 <span class="fc" id="L108">            long cost = profile.estimatedCostUnits();</span>
 <span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (executedInvocations &gt;= request.budget().maxInvocations()</span>
@@ -334,7 +334,7 @@ public final class SolverPortfolioExecutor {
 <span class="nc" id="L334">            return new Aggregate(</span>
 <span class="nc" id="L335">                PortfolioOutcome.TIMEOUT, null, List.of(), false);</span>
         }
-<span class="pc bpc" id="L337" title="2 of 4 branches missed.">        if (!observed.isEmpty() &amp;&amp; observed.stream().allMatch(item -&gt;</span>
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">        if (!observed.isEmpty() &amp;&amp; observed.stream().allMatch(item -&gt;</span>
 <span class="pc bpc" id="L338" title="1 of 2 branches missed.">                item.execution().result().status() == ResultStatus.UNSUPPORTED)) {</span>
 <span class="nc" id="L339">            return new Aggregate(</span>
 <span class="nc" id="L340">                PortfolioOutcome.UNSUPPORTED, null, List.of(), false);</span>
