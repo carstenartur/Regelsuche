@@ -86,7 +86,7 @@ describes historical receipts. To verify independently, hash all bytes of emitte
 drop the terminal `contentHash` property, restore the closing brace and hash those
 canonical UTF-8 bytes; compare prefixed lowercase SHA-256 values. The protected
 study, actual scientific review and authority-bearing receipt remain with the
-[custodian](TODO-extern.md#flagship-studie).
+[custodian](https://github.com/carstenartur/Regelsuche/blob/b74134a2ff47f933478fd7953488b99ab5a1b88b/docs/TODO-extern.md#flagship-studie).
 
 ## Stage 2 — assemble the public freeze
 
