@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SharedFragmentRewriteBenchmark.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">SharedFragmentRewriteBenchmark.java</span></div><h1>SharedFragmentRewriteBenchmark.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.canonical.PolynomialNormalizer;
+import de.regelsuche.egraph.EqualitySaturation;
+import de.regelsuche.egraph.SaturationStats;
+import de.regelsuche.egraph.proof.ExtractionCertificateCodec;
+import de.regelsuche.egraph.proof.ExtractionProofChecker;
+import de.regelsuche.egraph.proof.ProofLimits;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.scoring.cost.StructuralCostModel;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.EqualitySaturationStrategy;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecordedExecution;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.math.BigInteger;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+
+/** Source-only comparison on a fixed inventory of unconditional ordered rewrites. */
+final class SharedFragmentRewriteBenchmark {
+    private static final String PATH = &quot;best-first&quot;;
+    private static final String EQSAT = &quot;equality-saturation&quot;;
+    private static final String EXACT = &quot;EXACT_AST&quot;;
+    private static final int NO_REFERENCE_COST = -1;
+    private static final int MAX_EXPONENT = 4;
+<span class="fc" id="L53">    private static final SearchHeuristic PATH_BUDGET = new SearchHeuristic(5, 128, 1, 0, 32, 8);</span>
+    private static final int ENGINE_MAX_AST_GROWTH = 0;
+    private static final int ENGINE_MAX_CANDIDATES = 128;
+<span class="fc" id="L56">    private static final EqualitySaturation.Config GRAPH_BUDGET = new EqualitySaturation.Config(8, 256);</span>
+<span class="fc" id="L57">    private static final List&lt;String&gt; RULE_IDS = List.of(</span>
+        &quot;ast_add_zero_right&quot;, &quot;ast_add_zero_left&quot;, &quot;ast_multiply_one_right&quot;,
+        &quot;ast_multiply_one_left&quot;, &quot;ast_multiply_zero_right&quot;, &quot;ast_multiply_zero_left&quot;,
+        &quot;ast_subtract_zero&quot;, &quot;ast_product_to_power_two&quot;);
+
+<span class="fc" id="L62">    private static final List&lt;BenchmarkCase&gt; CASES = List.of(</span>
+        new BenchmarkCase(&quot;neutral-composition&quot;, &quot;(x + 0) * (1 * (y + 0))&quot;, 1),
+        new BenchmarkCase(&quot;annihilation&quot;, &quot;(x + 0) * 0 + y&quot;, 0),
+        new BenchmarkCase(&quot;ordered-subtraction&quot;, &quot;(x - 0) - (y - 0)&quot;, 1),
+        new BenchmarkCase(&quot;square-folding&quot;, &quot;(x + 0) * (x + 0)&quot;, 1),
+        new BenchmarkCase(&quot;right-nested&quot;, &quot;x + (y + z)&quot;, 2),
+        new BenchmarkCase(&quot;missing-cancellation&quot;, &quot;(x - x) + y&quot;, 0),
+<span class="fc" id="L69">        new BenchmarkCase(&quot;guarded-division&quot;, &quot;x / x&quot;, List.of(&quot;x != 0&quot;), NO_REFERENCE_COST),</span>
+        new BenchmarkCase(&quot;symbolic-power&quot;, &quot;x ^ n&quot;, NO_REFERENCE_COST),
+        new BenchmarkCase(&quot;unregistered-function&quot;, &quot;f(x + 0)&quot;, NO_REFERENCE_COST));
+
+<span class="fc" id="L73">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L74">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L75">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L76">    private final PolynomialNormalizer normalizer = new PolynomialNormalizer();</span>
+<span class="fc" id="L77">    private final List&lt;RewriteRule&gt; rules = sharedRules();</span>
+    private final ProofLimits proofLimits;
+
+<span class="fc" id="L80">    SharedFragmentRewriteBenchmark(ProofLimits proofLimits) {</span>
+<span class="fc" id="L81">        this.proofLimits = proofLimits;</span>
+<span class="fc" id="L82">    }</span>
+
+    static void write(Path output) {
+<span class="fc" id="L85">        String report = new SharedFragmentRewriteBenchmark(ProofLimits.defaults()).report();</span>
+        try {
+<span class="fc" id="L87">            AtomicJsonFile.writeUtf8(output, report);</span>
+<span class="nc" id="L88">        } catch (IOException failure) {</span>
+<span class="nc" id="L89">            throw new UncheckedIOException(&quot;Could not write shared rewrite benchmark&quot;, failure);</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">    }</span>
+
+    String report() {
+<span class="fc" id="L94">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L95">            .property(&quot;schema&quot;, &quot;regelsuche.shared-fragment-rewrite-benchmark/v1&quot;)</span>
+<span class="fc" id="L96">            .property(&quot;track&quot;, &quot;EQUALITY_SATURATION_AND_TERM_REWRITING&quot;)</span>
+<span class="fc" id="L97">            .property(&quot;scorePolicy&quot;, ComparativeBenchmark.SCORE_POLICY)</span>
+<span class="fc" id="L98">            .property(&quot;targetVisible&quot;, false)</span>
+<span class="fc" id="L99">            .property(&quot;familyLabelsVisible&quot;, false)</span>
+<span class="fc" id="L100">            .property(&quot;sideConditionPolicy&quot;, &quot;UNCONDITIONAL_RULES_ONLY&quot;)</span>
+<span class="fc" id="L101">            .property(&quot;fragment&quot;, &quot;ordered-polynomial-unconditional/v1&quot;)</span>
+<span class="fc" id="L102">            .property(&quot;maximumLiteralExponent&quot;, MAX_EXPONENT)</span>
+<span class="fc" id="L103">            .property(&quot;objective&quot;, StructuralCostModel.OPERATOR_COUNT.id())</span>
+<span class="fc" id="L104">            .property(&quot;pathSelection&quot;, &quot;MINIMUM_OPERATOR_COUNT_THEN_EXPRESSION_THEN_DEPTH&quot;)</span>
+<span class="fc" id="L105">            .property(&quot;graphSelection&quot;, &quot;MINIMUM_OPERATOR_COUNT_NATIVE_EXTRACTION&quot;)</span>
+<span class="fc" id="L106">            .property(&quot;inventoryHash&quot;, RuleInventoryFingerprint.contentHash(rules))</span>
+<span class="fc" id="L107">            .stringArray(&quot;ruleIds&quot;, RULE_IDS)</span>
+<span class="fc" id="L108">            .object(&quot;pathBudget&quot;, SharedFragmentRewriteBenchmark::writePathBudget)</span>
+<span class="fc" id="L109">            .object(&quot;graphBudget&quot;, SharedFragmentRewriteBenchmark::writeGraphBudget)</span>
+<span class="fc" id="L110">            .object(&quot;proofLimits&quot;, this::writeProofLimits)</span>
+<span class="fc" id="L111">            .array(&quot;cases&quot;, array -&gt; CASES.forEach(row -&gt; array.objectValue(json -&gt; writeCase(json, row))))</span>
+<span class="fc" id="L112">            .endObject().toString();</span>
+    }
+
+    private void writeCase(JsonWriter json, BenchmarkCase row) {
+<span class="fc" id="L116">        Expr input = parser.parseTerm(row.source());</span>
+<span class="fc" id="L117">        String translation = translation(input);</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (EXACT.equals(translation) &amp;&amp; !row.assumptions().isEmpty()) {</span>
+<span class="nc" id="L119">            translation = &quot;ASSUMPTIONS_OUTSIDE_FRAGMENT&quot;;</span>
+        }
+<span class="fc" id="L121">        json.property(&quot;id&quot;, row.id()).property(&quot;source&quot;, row.source())</span>
+<span class="fc" id="L122">            .stringArray(&quot;sourceAssumptions&quot;, row.assumptions());</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (row.referenceCost() == NO_REFERENCE_COST) json.nullProperty(&quot;referenceOperatorCount&quot;);</span>
+<span class="fc" id="L124">        else json.property(&quot;referenceOperatorCount&quot;, row.referenceCost());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (EXACT.equals(translation)) {</span>
+<span class="fc" id="L126">            SearchProblem problem = new SearchProblem(row.source(), engine(rules),</span>
+<span class="fc" id="L127">                scorer, canonicalizer, PATH_BUDGET).withCostModel(StructuralCostModel.OPERATOR_COUNT);</span>
+<span class="fc" id="L128">            json.array(&quot;outcomes&quot;, array -&gt; {</span>
+<span class="fc" id="L129">                array.objectValue(result -&gt; writeBestFirst(result, input, problem, row.referenceCost()));</span>
+<span class="fc" id="L130">                array.objectValue(result -&gt; writeSaturation(result, input, problem, row.referenceCost()));</span>
+<span class="fc" id="L131">            });</span>
+<span class="fc" id="L132">        } else {</span>
+<span class="fc" id="L133">            String reason = translation;</span>
+<span class="fc" id="L134">            json.array(&quot;outcomes&quot;, array -&gt; {</span>
+<span class="fc" id="L135">                array.objectValue(result -&gt; writeUnsupported(result, PATH, reason));</span>
+<span class="fc" id="L136">                array.objectValue(result -&gt; writeUnsupported(result, EQSAT, reason));</span>
+<span class="fc" id="L137">            });</span>
+        }
+<span class="fc" id="L139">    }</span>
+
+    private void writeBestFirst(JsonWriter json, Expr input, SearchProblem problem, int referenceCost) {
+<span class="fc" id="L142">        var run = new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+<span class="fc" id="L143">        SearchState selected = run.states().stream()</span>
+<span class="fc" id="L144">            .min(Comparator.comparingInt((SearchState state) -&gt; operatorCount(parser.parseTerm(state.expression())))</span>
+<span class="fc" id="L145">                .thenComparing(SearchState::expression).thenComparingInt(SearchState::depth)).orElseThrow();</span>
+<span class="fc" id="L146">        PathReplay replay = replay(problem.rootExpression(), selected);</span>
+<span class="fc" id="L147">        writeOutput(json, PATH, input, selected, referenceCost, true);</span>
+<span class="fc" id="L148">        var work = run.metrics();</span>
+<span class="fc" id="L149">        json.property(&quot;proofStatus&quot;, &quot;PRIMITIVE_REPLAYED&quot;).property(&quot;proofObjectAvailable&quot;, false)</span>
+<span class="fc" id="L150">            .property(&quot;execution&quot;, replay.execution().toCanonicalJson())</span>
+<span class="fc" id="L151">            .array(&quot;occurrencePaths&quot;, paths -&gt; replay.occurrencePaths().forEach(path -&gt;</span>
+<span class="fc" id="L152">                paths.arrayValue(indexes -&gt; path.forEach(index -&gt; indexes.value(index)))))</span>
+<span class="fc" id="L153">            .object(&quot;work&quot;, metrics -&gt; metrics.property(&quot;exploredStates&quot;, work.exploredStates())</span>
+<span class="fc" id="L154">                .property(&quot;expandedStates&quot;, work.expandedStates())</span>
+<span class="fc" id="L155">                .property(&quot;generatedTransformations&quot;, work.generatedTransformations())</span>
+<span class="fc" id="L156">                .property(&quot;depthPrunes&quot;, work.depthPrunes())</span>
+<span class="fc" id="L157">                .property(&quot;candidateBudgetPrunes&quot;, work.candidateBudgetPrunes())</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                .property(&quot;stateBudgetReached&quot;, work.exploredStates() == PATH_BUDGET.maxVisitedExpressions())</span>
+<span class="fc" id="L159">                .property(&quot;selectedPrimitiveSteps&quot;, replay.execution().edgeCount())</span>
+<span class="fc" id="L160">                .property(&quot;detachedReplayEngineInvocations&quot;, replay.execution().edgeCount()));</span>
+<span class="fc" id="L161">    }</span>
+
+    private PathReplay replay(String input, SearchState selected) {
+<span class="fc" id="L164">        var recorded = selected.recordedExecution().orElseThrow();</span>
+<span class="fc" id="L165">        List&lt;RewriteRule&gt; replayRules = sharedRules();</span>
+<span class="fc" id="L166">        var engine = engine(replayRules);</span>
+<span class="fc" id="L167">        var replayed = new ArrayList&lt;Transformation&gt;();</span>
+<span class="fc" id="L168">        var positions = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc" id="L169">        String source = input;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (var expected : selected.transformations()) {</span>
+<span class="fc" id="L171">            var occurrences = new ArrayList&lt;AstRewriteTransformationEngine.GeneratedTransformation&gt;();</span>
+<span class="fc" id="L172">            engine.transformWithOccurrences(source, occurrences::add);</span>
+<span class="fc" id="L173">            var actual = occurrences.stream().filter(move -&gt; move.transformation().equals(expected))</span>
+<span class="fc" id="L174">                .findFirst().orElseThrow();</span>
+<span class="fc" id="L175">            requireExactStep(parser.parseTerm(source), actual, replayRules);</span>
+<span class="fc" id="L176">            replayed.add(actual.transformation());</span>
+<span class="fc" id="L177">            positions.add(actual.position().path());</span>
+<span class="fc" id="L178">            source = actual.transformation().transformedExpression();</span>
+<span class="fc" id="L179">        }</span>
+<span class="fc" id="L180">        recorded.requireEndpoints(input, selected.expression());</span>
+<span class="fc" id="L181">        recorded.requireReplay(input, replayed);</span>
+<span class="fc" id="L182">        return new PathReplay(recorded, List.copyOf(positions));</span>
+    }
+
+    private void requireExactStep(Expr source, AstRewriteTransformationEngine.GeneratedTransformation move,
+            List&lt;RewriteRule&gt; replayRules) {
+<span class="fc" id="L187">        var step = move.transformation();</span>
+<span class="fc" id="L188">        RewriteRule rule = replayRules.stream().filter(candidate -&gt; candidate.id().equals(step.rule()))</span>
+<span class="fc" id="L189">            .findFirst().orElseThrow();</span>
+<span class="fc" id="L190">        Expr subtree = move.position().subtreeAt(source).orElseThrow();</span>
+<span class="pc bpc" id="L191" title="2 of 4 branches missed.">        if (!rule.matches(subtree) || !rule.assumptions(subtree).isEmpty()) {</span>
+<span class="nc" id="L192">            throw new IllegalStateException(&quot;retained rule did not match its ordered AST occurrence: &quot; + step.rule());</span>
+        }
+<span class="fc" id="L194">        Expr rewritten = move.position().replaceAt(source, rule.apply(subtree)).rewrittenRoot().orElseThrow();</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (!rewritten.equals(parser.parseTerm(step.transformedExpression()))) {</span>
+<span class="nc" id="L196">            throw new IllegalStateException(&quot;retained step changed the ordered AST outside its rule: &quot; + step.rule());</span>
+        }
+<span class="fc" id="L198">    }</span>
+
+    private void writeSaturation(JsonWriter json, Expr input, SearchProblem problem, int referenceCost) {
+<span class="fc" id="L201">        var strategy = new EqualitySaturationStrategy(GRAPH_BUDGET,</span>
+            new EqualitySaturation.ProofOptions(proofLimits, proofLimits));
+<span class="fc" id="L203">        SearchState selected = strategy.search(problem).getLast();</span>
+<span class="fc" id="L204">        var proof = strategy.lastProofOutcome();</span>
+<span class="fc" id="L205">        writeOutput(json, EQSAT, input, selected, referenceCost, proof.complete());</span>
+<span class="fc" id="L206">        json.property(&quot;producerProofStatus&quot;, proof.status().name());</span>
+<span class="fc" id="L207">        json.object(&quot;work&quot;, work -&gt; {</span>
+<span class="fc" id="L208">            writeGraphWork(work, strategy.lastStats());</span>
+<span class="fc" id="L209">            work.property(&quot;proofCaptureWork&quot;, proof.captureWork()).property(&quot;proofBuildWork&quot;, proof.buildWork())</span>
+<span class="fc" id="L210">                .property(&quot;producerReplayWork&quot;, proof.replayWork());</span>
+<span class="fc" id="L211">        });</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (proof.complete()) {</span>
+<span class="fc" id="L213">            var certificate = proof.checked().orElseThrow().certificate();</span>
+<span class="fc" id="L214">            byte[] encoded = ExtractionCertificateCodec.encode(certificate, proofLimits);</span>
+<span class="fc" id="L215">            var reloaded = ExtractionCertificateCodec.decode(encoded, proofLimits);</span>
+<span class="fc" id="L216">            var checked = ExtractionProofChecker.check(parser.parseTerm(problem.rootExpression()),</span>
+<span class="fc" id="L217">                parser.parseTerm(selected.expression()), reloaded, sharedRules(), proofLimits);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (checked.status() != ExtractionProofChecker.Status.ACCEPTED) {</span>
+<span class="nc" id="L219">                throw new IllegalStateException(&quot;stored shared-fragment certificate did not replay: &quot; + checked.detail());</span>
+            }
+<span class="fc" id="L221">            json.property(&quot;proofStatus&quot;, &quot;DETACHED_CERTIFICATE_CHECKED&quot;).property(&quot;proofObjectAvailable&quot;, true)</span>
+<span class="fc" id="L222">                .property(&quot;certificateHash&quot;, digest(encoded))</span>
+<span class="fc" id="L223">                .property(&quot;certificateBase64&quot;, Base64.getEncoder().encodeToString(encoded))</span>
+<span class="fc" id="L224">                .property(&quot;detachedReplayWork&quot;, checked.workUsed());</span>
+<span class="fc" id="L225">        } else {</span>
+<span class="fc" id="L226">            json.property(&quot;proofStatus&quot;, &quot;UNAVAILABLE&quot;).property(&quot;proofObjectAvailable&quot;, false)</span>
+<span class="fc" id="L227">                .property(&quot;proofDetail&quot;, proof.detail());</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    private void writeOutput(JsonWriter json, String system, Expr input, SearchState selected,
+            int referenceCost, boolean evidenceAvailable) {
+<span class="fc" id="L233">        Expr output = parser.parseTerm(selected.expression());</span>
+<span class="fc" id="L234">        int cost = operatorCount(output);</span>
+<span class="fc" id="L235">        var normalizedOutput = normalizer.normalize(output);</span>
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">        boolean equal = normalizedOutput.isPresent() &amp;&amp; normalizedOutput.equals(normalizer.normalize(input));</span>
+<span class="fc" id="L237">        String verdict = &quot;OUTPUT_VALIDATION_FAILED&quot;;</span>
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">        if (equal &amp;&amp; selected.assumptions().isEmpty()) {</span>
+<span class="fc" id="L239">            verdict = costVerdict(cost, referenceCost, evidenceAvailable);</span>
+        }
+<span class="fc" id="L241">        json.property(&quot;system&quot;, system).property(&quot;translation&quot;, EXACT)</span>
+<span class="fc" id="L242">            .property(&quot;output&quot;, selected.expression()).property(&quot;operatorCount&quot;, cost)</span>
+<span class="fc" id="L243">            .stringArray(&quot;emittedAssumptions&quot;, selected.assumptions())</span>
+<span class="fc" id="L244">            .property(&quot;exactPolynomialEquality&quot;, equal).property(&quot;verdict&quot;, verdict);</span>
+<span class="fc" id="L245">    }</span>
+
+    private static String costVerdict(int cost, int referenceCost, boolean evidenceAvailable) {
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (!evidenceAvailable) return &quot;PROOF_UNAVAILABLE&quot;;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        return cost &lt;= referenceCost ? &quot;REFERENCE_COST_REACHED&quot; : &quot;REFERENCE_COST_MISSED&quot;;</span>
+    }
+
+    private static void writeUnsupported(JsonWriter json, String system, String reason) {
+<span class="fc" id="L253">        json.property(&quot;system&quot;, system).property(&quot;translation&quot;, reason)</span>
+<span class="fc" id="L254">            .property(&quot;verdict&quot;, &quot;UNSUPPORTED&quot;).property(&quot;proofStatus&quot;, &quot;NOT_REQUESTED&quot;)</span>
+<span class="fc" id="L255">            .property(&quot;proofObjectAvailable&quot;, false);</span>
+<span class="fc" id="L256">    }</span>
+
+    private static String translation(Expr input) {
+<span class="fc bfc" id="L259" title="All 4 branches covered.">        return switch (input) {</span>
+<span class="fc" id="L260">            case VariableExpr ignored -&gt; EXACT;</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            case NumberExpr number -&gt; number.value().isInteger() ? EXACT : &quot;NUMBER_OUTSIDE_FRAGMENT&quot;;</span>
+<span class="fc" id="L262">            case FunctionExpr ignored -&gt; &quot;FUNCTION_OUTSIDE_FRAGMENT&quot;;</span>
+<span class="fc bfc" id="L263" title="All 3 branches covered.">            case BinaryExpr binary -&gt; switch (binary.operator()) {</span>
+<span class="fc" id="L264">                case DIV -&gt; &quot;DIVISION_OUTSIDE_FRAGMENT&quot;;</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                case POW -&gt; supportedPower(binary.right()) ? translation(binary.left()) : &quot;POWER_OUTSIDE_FRAGMENT&quot;;</span>
+<span class="fc" id="L266">                default -&gt; childTranslation(binary);</span>
+            };
+        };
+    }
+
+    private static boolean supportedPower(Expr exponent) {
+<span class="pc bnc" id="L272" title="All 2 branches missed.">        return exponent instanceof NumberExpr number &amp;&amp; number.value().isInteger()</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            &amp;&amp; number.value().signum() &gt; 0</span>
+<span class="pc bpc" id="L274" title="3 of 4 branches missed.">            &amp;&amp; number.value().numerator().compareTo(BigInteger.valueOf(MAX_EXPONENT)) &lt;= 0;</span>
+    }
+
+    private static String childTranslation(BinaryExpr binary) {
+<span class="fc" id="L278">        String left = translation(binary.left());</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        return EXACT.equals(left) ? translation(binary.right()) : left;</span>
+    }
+
+    private static int operatorCount(Expr expression) {
+<span class="fc" id="L283">        return StructuralCostModel.OPERATOR_COUNT.cost(&quot;&quot;, expression, null);</span>
+    }
+
+    private static List&lt;RewriteRule&gt; sharedRules() {
+<span class="fc" id="L287">        List&lt;RewriteRule&gt; rules = AstRewriteTransformationEngine.allBuiltInRules().stream()</span>
+<span class="fc" id="L288">            .filter(rule -&gt; RULE_IDS.contains(rule.id())).toList();</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (!rules.stream().map(RewriteRule::id).toList().equals(RULE_IDS)</span>
+<span class="pc bpc" id="L290" title="2 of 4 branches missed.">            || rules.stream().anyMatch(rule -&gt; !admitted(rule))) {</span>
+<span class="nc" id="L291">            throw new IllegalStateException(&quot;shared exact rule inventory drifted&quot;);</span>
+        }
+<span class="fc" id="L293">        return rules;</span>
+    }
+
+    private static boolean admitted(RewriteRule rule) {
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        return rule.getClass() == PatternRewriteRule.class</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">            &amp;&amp; ((PatternRewriteRule) rule).recognitionProfile().equals(RecognitionProfile.exact())</span>
+<span class="pc bpc" id="L299" title="2 of 4 branches missed.">            &amp;&amp; !rule.mayEmitAssumptions() &amp;&amp; rule.isEquivalencePreservingByConstruction();</span>
+    }
+
+    private static AstRewriteTransformationEngine engine(List&lt;RewriteRule&gt; rules) {
+<span class="fc" id="L303">        return new AstRewriteTransformationEngine(rules, ENGINE_MAX_AST_GROWTH, ENGINE_MAX_CANDIDATES) {</span>
+            @Override
+            protected String formatState(Expr expression) {
+<span class="fc" id="L306">                return formatOrdered(expression);</span>
+            }
+        };
+    }
+
+    private static String formatOrdered(Expr expression) {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L313">            return &quot;(&quot; + formatOrdered(binary.left()) + &quot; &quot; + binary.operator().symbol()</span>
+<span class="fc" id="L314">                + &quot; &quot; + formatOrdered(binary.right()) + &quot;)&quot;;</span>
+        }
+<span class="fc" id="L316">        return ExpressionFormatter.format(expression);</span>
+    }
+
+    private static void writePathBudget(JsonWriter json) {
+<span class="fc" id="L320">        json.property(&quot;maxDepth&quot;, PATH_BUDGET.maxDepth())</span>
+<span class="fc" id="L321">            .property(&quot;maxVisitedExpressions&quot;, PATH_BUDGET.maxVisitedExpressions())</span>
+<span class="fc" id="L322">            .property(&quot;maxCandidatesPerState&quot;, PATH_BUDGET.maxCandidatesPerState())</span>
+<span class="fc" id="L323">            .property(&quot;maxExpandingSteps&quot;, PATH_BUDGET.maxExpandingSteps())</span>
+<span class="fc" id="L324">            .property(&quot;engineMaxAstGrowth&quot;, ENGINE_MAX_AST_GROWTH)</span>
+<span class="fc" id="L325">            .property(&quot;engineMaxCandidates&quot;, ENGINE_MAX_CANDIDATES);</span>
+<span class="fc" id="L326">    }</span>
+
+    private static void writeGraphBudget(JsonWriter json) {
+<span class="fc" id="L329">        json.property(&quot;maxIterations&quot;, GRAPH_BUDGET.maxIterations())</span>
+<span class="fc" id="L330">            .property(&quot;maxNodes&quot;, GRAPH_BUDGET.maxNodes())</span>
+<span class="fc" id="L331">            .property(&quot;dirtyWorklist&quot;, GRAPH_BUDGET.useDirtyWorklist());</span>
+<span class="fc" id="L332">    }</span>
+
+    private void writeProofLimits(JsonWriter json) {
+<span class="fc" id="L335">        json.property(&quot;maxTerms&quot;, proofLimits.maxTerms()).property(&quot;maxProofSteps&quot;, proofLimits.maxProofSteps())</span>
+<span class="fc" id="L336">            .property(&quot;maxReferences&quot;, proofLimits.maxReferences()).property(&quot;maxCharacters&quot;, proofLimits.maxCharacters())</span>
+<span class="fc" id="L337">            .property(&quot;maxRationalBits&quot;, proofLimits.maxRationalBits()).property(&quot;maxDepth&quot;, proofLimits.maxDepth())</span>
+<span class="fc" id="L338">            .property(&quot;maxExpandedNodes&quot;, proofLimits.maxExpandedNodes()).property(&quot;maxWork&quot;, proofLimits.maxWork());</span>
+<span class="fc" id="L339">    }</span>
+
+    private static void writeGraphWork(JsonWriter json, SaturationStats stats) {
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        if (stats == null) return;</span>
+<span class="fc" id="L343">        json.property(&quot;iterations&quot;, stats.iterations()).property(&quot;eClasses&quot;, stats.eclasses())</span>
+<span class="fc" id="L344">            .property(&quot;eNodes&quot;, stats.enodes()).property(&quot;rulesFired&quot;, stats.rulesFired())</span>
+<span class="fc" id="L345">            .property(&quot;nodesScanned&quot;, stats.nodesScanned()).property(&quot;matchesFound&quot;, stats.matchesFound())</span>
+<span class="fc" id="L346">            .property(&quot;stopReason&quot;, stats.stopReason().name())</span>
+<span class="fc" id="L347">            .object(&quot;appliedRules&quot;, counts -&gt; stats.appliedRules().entrySet().stream()</span>
+<span class="fc" id="L348">                .sorted(Map.Entry.comparingByKey()).forEach(entry -&gt; counts.property(entry.getKey(), entry.getValue())));</span>
+<span class="fc" id="L349">    }</span>
+
+    private static String digest(byte[] data) {
+        try {
+<span class="fc" id="L353">            return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(data));</span>
+<span class="nc" id="L354">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L355">            throw new IllegalStateException(impossible);</span>
+        }
+    }
+
+<span class="fc" id="L359">    private record BenchmarkCase(String id, String source, List&lt;String&gt; assumptions, int referenceCost) {</span>
+        BenchmarkCase(String id, String source, int referenceCost) {
+<span class="fc" id="L361">            this(id, source, List.of(), referenceCost);</span>
+<span class="fc" id="L362">        }</span>
+    }
+
+<span class="fc" id="L365">    private record PathReplay(RecordedExecution execution, List&lt;List&lt;Integer&gt;&gt; occurrencePaths) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
