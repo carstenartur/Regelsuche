@@ -48,6 +48,9 @@
             RATE_LIMITED: 'Abruf begrenzt',
             FAILED: 'Abruf fehlgeschlagen'
         };
+        const access = {
+            SEARCHED: 'Durchsucht', PARTIAL: 'Teilweise zugänglich', INACCESSIBLE: 'Kein Zugang'
+        };
         const relations = {
             EXACT: 'gleiche Aussage',
             EQUIVALENT: 'äquivalent',
@@ -90,11 +93,25 @@
                 const detail = text('details', undefined, view);
                 text('summary', labels[assessment.status] + ' · ' + assessment.reviewedOn, detail);
                 text('p', 'Geprüft durch ' + assessment.reviewedBy, detail);
-                assessment.scope.forEach(scope => text('p', scope.source + ' · ' + scope.versionOrDate, detail));
+                if (assessment.schema === 'regelsuche.literature-assessment/v1') {
+                    text('p', 'Historische Bewertung ohne Angaben zur Zugangsabdeckung.', detail);
+                }
+                assessment.scope.forEach(scope => {
+                    text('p', scope.source + ' · ' + scope.versionOrDate, detail);
+                    if (scope.coverage) {
+                        text('p', access[scope.coverage.status] + ' · ' + scope.coverage.limitations, detail);
+                        scope.coverage.unresolvedHits.forEach(hit =>
+                            text('p', 'Ungeprüfter Treffer · ' + hit.identifier + ' · ' + hit.reason, detail));
+                    }
+                });
+                assessment.queries.forEach(query => text('p', 'Suchanfrage · ' + query, detail));
                 assessment.matches.forEach(match => {
                     const row = text('p', undefined, detail);
                     sourceLink(row, match.source.title + ' · ' + match.source.locator, match.source.url);
                     text('span', ' · ' + relations[match.relation] + ' · ' + match.rationale, row);
+                    if (Number.isInteger(match.scopeIndex)) {
+                        text('p', 'Gefunden in · ' + assessment.scope[match.scopeIndex].source, detail);
+                    }
                     if (match.assumptions.length) text('p', 'Voraussetzungen · ' + match.assumptions.join(', '), detail);
                     if (match.entailmentRationale) text('p', match.entailmentRationale, detail);
                 });
@@ -103,8 +120,10 @@
             template.type = 'button';
             template.addEventListener('click', () => {
                 const templateData = {
-                    schema: 'regelsuche.literature-assessment/v1', subject: data.subject, reviewedOn: '',
-                    reviewedBy: '', scope: [{source: '', versionOrDate: ''}], queries: [''], status: 'UNRESOLVED', matches: []
+                    schema: 'regelsuche.literature-assessment/v2', subject: data.subject, reviewedOn: '',
+                    reviewedBy: '', scope: [{source: '', versionOrDate: '',
+                        coverage: {status: '', limitations: '', unresolvedHits: []}}],
+                    queries: [], status: 'UNRESOLVED', matches: []
                 };
                 const blob = new Blob([JSON.stringify(templateData, null, 2) + '\n'], {type: 'application/json'});
                 const link = document.createElement('a');

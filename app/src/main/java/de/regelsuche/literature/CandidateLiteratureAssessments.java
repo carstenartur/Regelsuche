@@ -2,6 +2,7 @@ package de.regelsuche.literature;
 
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -41,6 +42,7 @@ import java.util.regex.Pattern;
 /** Explicit human assessments of a candidate's literature context, stored privately. */
 public final class CandidateLiteratureAssessments {
     public static final String SCHEMA = "regelsuche.literature-assessment/v1";
+    public static final String COVERAGE_SCHEMA = "regelsuche.literature-assessment/v2";
     public static final int MAX_BYTES = 128 * 1024;
 
     private static final int MAX_ENTRIES = 1024;
@@ -70,7 +72,33 @@ public final class CandidateLiteratureAssessments {
 
     public enum Status { PRIOR_ART_FOUND, NO_PRIOR_ART_FOUND_WITHIN_SCOPE, UNRESOLVED }
 
-    public record Scope(String source, String versionOrDate) {
+    public enum Access { SEARCHED, PARTIAL, INACCESSIBLE }
+
+    public record UnresolvedHit(String identifier, String reason) {
+        public UnresolvedHit {
+            requireText(identifier, 1000);
+            requireText(reason, 2000);
+        }
+    }
+
+    public record Coverage(Access status, String limitations, List<UnresolvedHit> unresolvedHits) {
+        public Coverage {
+            Objects.requireNonNull(status, "source access status");
+            requireText(limitations, 2000);
+            unresolvedHits = boundedList(unresolvedHits, 0, 32);
+        }
+
+        private boolean complete() {
+            return status == Access.SEARCHED && unresolvedHits.isEmpty();
+        }
+    }
+
+    public record Scope(String source, String versionOrDate,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) Coverage coverage) {
+        public Scope(String source, String versionOrDate) {
+            this(source, versionOrDate, null);
+        }
+
         public Scope {
             requireText(source, 500);
             requireText(versionOrDate, 300);
@@ -78,7 +106,13 @@ public final class CandidateLiteratureAssessments {
     }
 
     public record Match(Source source, Relation relation, List<String> assumptions, String rationale,
-                        String entailmentRationale) {
+                        String entailmentRationale,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) Integer scopeIndex) {
+        public Match(Source source, Relation relation, List<String> assumptions, String rationale,
+                     String entailmentRationale) {
+            this(source, relation, assumptions, rationale, entailmentRationale, null);
+        }
+
         public Match {
             Objects.requireNonNull(source, "match source");
             Objects.requireNonNull(relation, "match relation");
@@ -98,15 +132,38 @@ public final class CandidateLiteratureAssessments {
     public record Assessment(String schema, Subject subject, String reviewedOn, String reviewedBy, List<Scope> scope,
                              List<String> queries, Status status, List<Match> matches) {
         public Assessment {
-            if (!SCHEMA.equals(schema)) throw new IllegalArgumentException("invalid literature assessment schema");
+            boolean coverageRequired = COVERAGE_SCHEMA.equals(schema);
+            if (!coverageRequired && !SCHEMA.equals(schema)) {
+                throw new IllegalArgumentException("invalid literature assessment schema");
+            }
             Objects.requireNonNull(subject, "assessment subject");
             Objects.requireNonNull(status, "assessment status");
             requireText(reviewedBy, 300);
             requireDate(reviewedOn);
             scope = boundedList(scope, 1, 24);
-            queries = boundedList(queries, 1, 32);
+            if (scope.stream().anyMatch(source -> (source.coverage() != null) != coverageRequired)) {
+                throw new IllegalArgumentException("source coverage differs from assessment schema");
+            }
+            boolean allInaccessible = coverageRequired && scope.stream()
+                .allMatch(source -> source.coverage().status() == Access.INACCESSIBLE);
+            queries = boundedList(queries, allInaccessible ? 0 : 1, 32);
             queries.forEach(query -> requireText(query, 1000));
             matches = boundedList(matches, 0, 32);
+            if (coverageRequired && status == Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE
+                && (scope.stream().anyMatch(source -> !source.coverage().complete())
+                    || matches.stream().anyMatch(match -> match.relation() == Relation.SOURCE_GENERALIZATION))) {
+                throw new IllegalArgumentException("incomplete coverage or unresolved generalization in scoped absence");
+            }
+            for (Match match : matches) {
+                Integer index = match.scopeIndex();
+                if (coverageRequired && (index == null || index < 0 || index >= scope.size()
+                    || scope.get(index).coverage().status() == Access.INACCESSIBLE)) {
+                    throw new IllegalArgumentException("reviewed match requires one accessible declared source");
+                }
+                if (!coverageRequired && index != null) {
+                    throw new IllegalArgumentException("source index requires the coverage schema");
+                }
+            }
             boolean priorArt = matches.stream().anyMatch(Match::establishesPriorArt);
             if ((status == Status.PRIOR_ART_FOUND && !priorArt)
                 || (status == Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE && priorArt)) {
