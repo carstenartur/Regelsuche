@@ -71,10 +71,27 @@ the chosen per-node cost plus each child occurrence and materializes a
 left-associated binary AST in class-ID order. Within one graph, re-adding a
 different grouping or permutation reuses the same e-class.
 
-This profile supports insertion, union, congruence repair and extraction.
+The native matcher also supports whole multiset queries. Compile a flat
+sum or product of placeholders with `FlatAcMatchPlan.compile(pattern)` and
+call `new EGraphPatternMatcher(graph).matchFlatAc(plan, workLimit)`. A pattern
+such as `X + (Y + X)` groups repeated placeholders before matching. It binds
+`X` to one class with two occurrences and `Y` to one remaining occurrence.
+Both can bind to the same class when it occurs three times. Descendant
+e-classes are treated as single operands. Named variables in a pattern use
+`PatternExpr.var` (placeholder), not literal-variable syntax.
+
+The `exact-scalar-flat-ac/v1` fragment permits at most 64 operands per pattern.
+Each root, node, child occurrence and attempted slot assignment consumes one
+unit of the explicit scan budget (at most 100,000). A run reports the units used,
+the distinct root-and-binding pairs and whether it exhausted the candidate
+space. With a smaller budget an incomplete result can contain zero bindings.
+The graph's signature and canonical class indexes supply candidate roots.
+The exhaustive finite control compares every three-operand multiset over
+three atoms against all variable assignments for both addition and multiplication.
+
 The syntax-directed saturation runner rejects a nonempty rule inventory
-on this profile. Its proof runner owns a fresh ordered graph. Native
-multiset matching and proof steps authorizing AC rearrangement are tracked
+on this profile. Its proof runner owns a fresh ordered graph. AC rest bindings,
+nested matcher plans and detached proof steps for AC rearrangement remain open
 in [#662](https://github.com/carstenartur/Regelsuche/issues/662).
 
 ## Persisted format

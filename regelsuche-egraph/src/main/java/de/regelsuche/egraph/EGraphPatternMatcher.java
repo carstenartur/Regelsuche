@@ -68,6 +68,11 @@ public final class EGraphPatternMatcher {
         this.eGraph = eGraph;
     }
 
+    /** Run the versioned flat multiset fragment with explicit bounded-work completion. */
+    public FlatAcMatchPlan.Result matchFlatAc(FlatAcMatchPlan plan, int workLimit) {
+        return plan.match(eGraph, workLimit);
+    }
+
     /** Every {@link Match} of {@code pattern} anywhere in the graph. */
     public List<Match> matchAll(PatternExpr pattern) {
         return matchAll(pattern.toString(), pattern, null);
