@@ -440,6 +440,69 @@ class Z3SmtSolverBackendTest {
             });
     }
 
+    @Test
+    void independentlyReplaysRealZ3EqualityEvidenceAndRejectsChangedInputs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root) throws Exception {
+        var detection = Z3SmtSolverBackend.detectSystemZ3();
+        assumeTrue(detection.availability() == BackendAvailability.AVAILABLE, detection.detail());
+        var x = new Symbol("x");
+        var y = new Symbol("y");
+        var z = new Symbol("z");
+        var xy = new Predicate("xy", Relation.EQUALS, x, y);
+        var yz = new Predicate("yz", Relation.EQUALS, y, z);
+        var xz = new Goal(Relation.EQUALS, x, z);
+        var obligation = equalityObligation(List.of(xy, yz), xz);
+        var attempt = detection.backend().executeWithEvidence(obligation, root);
+        assertEquals(ResultStatus.CONFIRMED, attempt.execution().result().status());
+        String proof = java.nio.file.Files.readString(attempt.directory().resolve("invocation-2/proof.txt"));
+        assertTrue(attempt.replaysEqualityProof(obligation));
+        assertTrue(Z3EqualityProofReplay.verifies(obligation, proof));
+        assertFalse(Z3EqualityProofReplay.verifies(equalityObligation(List.of(xy), xz), proof));
+        assertFalse(Z3EqualityProofReplay.verifies(equalityObligation(List.of(xy, yz),
+            new Goal(Relation.EQUALS, z, x)), proof));
+        assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.replace("trans*", "unverified-rule")));
+        assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.replace("(asserted (= y z))", "(asserted (= x z))")));
+        assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.substring(0, proof.length() - 1)));
+        var symmetry = equalityObligation(List.of(xy), new Goal(Relation.EQUALS, y, x));
+        var other = detection.backend().executeWithEvidence(symmetry, root);
+        assertTrue(other.replaysEqualityProof(symmetry));
+        assertFalse(other.replaysEqualityProof(obligation));
+        java.nio.file.Files.copy(other.directory().resolve("invocation-2/proof.txt"),
+            attempt.directory().resolve("invocation-2/proof.txt"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        assertFalse(attempt.replaysEqualityProof(obligation));
+    }
+
+    @Test
+    void rejectsUnusedPremisesUnboundLetsInventedStepsAndMalformedProofs() {
+        var x = new Symbol("x");
+        var y = new Symbol("y");
+        var z = new Symbol("z");
+        var xy = new Predicate("xy", Relation.EQUALS, x, y);
+        var goal = new Goal(Relation.EQUALS, x, y);
+        var obligation = equalityObligation(List.of(xy), goal);
+        String body = "(unit-resolution (asserted (= x y)) (asserted (not (= x y))) false)";
+        String raw = "((set-logic ALL) (proof " + body + "))";
+        assertTrue(Z3EqualityProofReplay.verifies(obligation, raw));
+        assertFalse(Z3EqualityProofReplay.verifies(equalityObligation(List.of(xy,
+            new Predicate("yz", Relation.EQUALS, y, z)), goal), raw));
+        for (String malformed : List.of(raw + "()", raw.replace("false", "true"),
+                raw.replace("(asserted (= x y))", "(symm (asserted (= x y)) (= x y))"),
+                raw.replace("(asserted (= x y))", "(trans* (asserted (= x y)) (asserted (= x y)) (= x y))"),
+                raw.replace("(asserted (= x y))", "@x9"), raw.replace("(asserted (= x y))", "(asserted (= y x))"),
+                raw.replace("(asserted (= x y))", "(let ((@x8 (asserted (= x y)))) (let ((@x8 @x8)) @x8))"),
+                raw.replace(body, "(asserted false)"), raw.replace(body, "(symm (asserted (= x y)) false)"),
+                raw.replace("(asserted (= x y))", "(let ((@x8 (asserted (= x y)))) $x8)"),
+                raw.replace(body, "(".repeat(180) + body + ")".repeat(180)))) {
+            assertFalse(Z3EqualityProofReplay.verifies(obligation, malformed));
+        }
+    }
+
+    private static Obligation equalityObligation(List<Predicate> assumptions, Goal goal) {
+        return Obligation.create("equality-replay", List.of(new SymbolDeclaration("x", Sort.REAL),
+            new SymbolDeclaration("y", Sort.REAL), new SymbolDeclaration("z", Sort.REAL)),
+            List.of(Theory.REAL_ARITHMETIC), assumptions, goal, RequestedEvidence.FORMAL_PROOF,
+            provenance("equality-replay"));
+    }
+
     private static Obligation referenceObligation() {
         return new SolverObligationFactory().equality(
             "z3-x-plus-zero", "x + 0", "x", List.of(),

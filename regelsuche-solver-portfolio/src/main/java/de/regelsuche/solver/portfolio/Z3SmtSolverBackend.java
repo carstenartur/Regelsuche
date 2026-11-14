@@ -148,7 +148,22 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     }
 
     /** Full raw evidence for one invocation of this existing backend. */
-    public record RetainedAttempt(SolverExecution execution, java.nio.file.Path directory) { }
+    public record RetainedAttempt(SolverExecution execution, java.nio.file.Path directory) {
+        /** Optional independent replay of the retained native real-symbol equality fragment. */
+        public boolean replaysEqualityProof(Obligation expected) throws IOException {
+            if (expected == null || !execution.obligationHash().equals(expected.contentHash())
+                    || execution.result().status() != ResultStatus.CONFIRMED) return false;
+            try (var input = java.nio.file.Files.newInputStream(directory.resolve("invocation-2/proof.txt"))) {
+                byte[] bytes = input.readNBytes(Z3EqualityProofReplay.MAX_BYTES + 1);
+                if (bytes.length > Z3EqualityProofReplay.MAX_BYTES) return false;
+                String proof = new String(bytes, StandardCharsets.UTF_8);
+                return SolverIr.sha256(proof).equals(execution.result().certificateHash())
+                    && Z3EqualityProofReplay.verifies(expected, proof);
+            } catch (java.nio.file.NoSuchFileException missing) {
+                return false;
+            }
+        }
+    }
 
     public RetainedAttempt executeWithEvidence(Obligation obligation, java.nio.file.Path root)
             throws IOException {
