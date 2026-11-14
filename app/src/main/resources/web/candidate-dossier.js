@@ -323,7 +323,7 @@
             ['Syntax-ID / semantische ID', missing + '; stateHash ist eine Suchzustandsidentität.']]);
 
         const compression = section(detail, 'Rohe Beschreibung und Sharing');
-        text('p', 'Die Dimensionen bleiben getrennt. Ein längerer Ausdruck kann eine belegte Fähigkeit erschließen.', compression);
+
         const dimensions = ['tokenCount', 'astNodeCount', 'operatorCount', 'numericBitLength', 'semanticValueOccurrences',
             'distinctSemanticValues', 'repeatedSemanticValueSavings'];
         table(compression, dimensions.map(key => [key, selected.source.metrics[key], candidate.metrics[key],
@@ -350,6 +350,16 @@
         capability.className = 'dossier-capability';
         if (bridge) {
             const follow = data.followOnExecution;
+            const change = selected.capabilityChange;
+            const summary = text('p', undefined, capability);
+            summary.dataset.capabilityEvidence = change.executed ? 'EXECUTED' : 'UNCONFIRMED';
+            if (change.executed) {
+                const length = change.tokenDelta > 0 ? '+' + change.tokenDelta : String(change.tokenDelta);
+                text('strong', 'Ausgeführte Folgefähigkeit · ' + change.consequence, summary);
+                text('span', ' · Tokenänderung gegenüber der Quelle: ' + length, summary);
+            } else {
+                summary.textContent = 'Für diese Auswahl fehlt ein ausgeführter Nachfolger mit passendem Kontrollvergleich.';
+            }
             table(capability, [['Konsequenz-ID', bridge.consequenceId],
                 ['Regel in Formation / deaktiviert / aktiviert', [follow.formationTargetRulePresent, follow.disabledTargetRulePresent, follow.enabledTargetRulePresent].map(fact).join(' / ')],
                 ['Nachfolger aus Formation', follow.formationTargetSuccessors], ['Nachfolger bei deaktiviertem Pack', follow.disabledTargetSuccessors],

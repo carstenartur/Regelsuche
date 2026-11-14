@@ -75,10 +75,13 @@
         integer(plan.deterministicSeed);
         if (!STATES.includes(outcome.state)) fail('Nicht unterstützter Run-Zustand');
         text(outcome.terminalReason, 'terminalReason');
-        remainingWork(outcome.configuredWork, outcome.consumedWork);
+        const remaining = remainingWork(outcome.configuredWork, outcome.consumedWork);
         if (outcome.state === 'CREATED' && (integer(outcome.configuredWork) !== 0n
                 || integer(outcome.consumedWork) !== 0n || outcome.terminalReason !== 'NOT_STARTED')) {
             fail('Ungültiger CREATED-Zustand');
+        }
+        if (outcome.state === 'BUDGET_EXHAUSTED' && (integer(outcome.configuredWork) === 0n || remaining !== '0')) {
+            fail('Erschöpftes Budget muss vollständig verbraucht sein');
         }
         ['canonicalWorkLedgerHash', 'runtimeDiagnosticsHash'].forEach((key) => hash(outcome[key], key));
         const artifacts = workspace.artifacts;

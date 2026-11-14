@@ -50,6 +50,17 @@ window.runWorkspaceStateControls = async function (sample) {
     check(exact.text === '9223372036854775807 " quoted', 'quoted text changed');
     check(api.remainingWork('9223372036854775807', '9223372036854775806') === '1', 'work subtraction lost precision');
 
+    const budgetState = async (configuredWork, consumedWork) => {
+        const outcome = {...sample.outcome, state: 'BUDGET_EXHAUSTED', terminalReason: 'CAP', configuredWork, consumedWork};
+        const reply = {raw: JSON.stringify({...sample, outcome}), etag: '"' + first + '"'};
+        const budgetStore = api.createStore(async () => reply, () => {});
+        await budgetStore.open(first);
+        return budgetStore.state().status;
+    };
+    check(await budgetState('9223372036854775807', '9223372036854775807') === 'READY', 'exactly exhausted long rejected');
+    check(await budgetState(10, 9) === 'ERROR', 'positive remainder accepted as exhausted');
+    check(await budgetState(0, 0) === 'ERROR', 'zero allowance accepted as exhausted');
+
     const duplicate = {...sample, artifacts: [...sample.artifacts.slice(1), sample.artifacts[1]]};
     const roles = api.createStore(async () => ({raw: JSON.stringify(duplicate), etag: '"' + first + '"'}), () => {});
     await roles.open(first);
@@ -64,5 +75,5 @@ window.runWorkspaceStateControls = async function (sample) {
     good.selectRole('PROOF_OBLIGATIONS');
     check(good.state().raw === retained && good.state().workspace.runId === sample.runId, 'role selection mutated retained evidence');
     check(good.state().role === 'PROOF_OBLIGATIONS', 'role selection was not published');
-    return '11 state, identity, role, race and integer controls passed';
+    return 'Retained run state, budget, identity and selection controls passed';
 };

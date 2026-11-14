@@ -67,6 +67,17 @@
         });
         return freeze(artifact);
     }
+    function capabilityChange(data, source, candidate, bridge) {
+        if (!bridge) return null;
+        const follow = data.followOnExecution;
+        const executed = data.classification.verifiedUnlocks.includes(bridge.consequenceId)
+            && follow.formationTargetRulePresent === false && follow.disabledTargetRulePresent === false
+            && follow.enabledTargetRulePresent === true && follow.formationTargetSuccessors.length === 0
+            && follow.disabledTargetSuccessors.length === 0 && follow.enabledTargetSuccessors.length > 0;
+        return {executed, consequence: bridge.consequenceId,
+            tokenDelta: candidate.metrics.tokenCount - source.metrics.tokenCount};
+    }
+
     function selection(artifact, candidateId, edge = '', generation = '') {
         if (artifact.content.schema === NATIVE) {
             const data = artifact.content, candidate = data.states.find(s => s.stateId === candidateId);
@@ -107,8 +118,10 @@
         const edges = search.transitions.filter(t => t.toStateHash === candidateId);
         const selectedEdge = edge ? edges.find(t => String(t.sequence) === edge) : null;
         if (edge && !selectedEdge) fail('Graphkante gehört nicht zum ausgewählten Kandidaten.');
-        return freeze({candidate, source: search.states[0], edges, selectedEdge,
-            bridge: data.discoveredBridge.stateHash === candidateId ? data.discoveredBridge : null});
+        const source = search.states[0];
+        const bridge = data.discoveredBridge.stateHash === candidateId ? data.discoveredBridge : null;
+        return freeze({candidate, source, edges, selectedEdge, bridge,
+            capabilityChange: capabilityChange(data, source, candidate, bridge)});
     }
     function createStore(load, changed = () => {}) {
         let generation = 0, current = freeze({status: 'EMPTY', runId: '', artifact: null, error: ''});

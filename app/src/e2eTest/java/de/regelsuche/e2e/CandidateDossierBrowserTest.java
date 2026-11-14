@@ -91,6 +91,8 @@ class CandidateDossierBrowserTest {
         assertTrue(detail.textContent().contains("SYMBOLICALLY_VERIFIED"));
         assertTrue(detail.textContent().contains("rule:sympy.trig.pythagorean"));
         assertTrue(detail.textContent().contains("semanticValueOccurrences"));
+        assertEquals("EXECUTED", detail.locator("[data-capability-evidence]").getAttribute("data-capability-evidence"));
+        assertTrue(detail.locator("[data-capability-evidence]").textContent().contains("rule:sympy.trig.pythagorean"));
         assertTrue(detail.textContent().contains("UNKNOWN"));
         assertTrue(detail.textContent().contains("FALSE"));
         assertTrue(detail.textContent().contains("Konflikt"));
@@ -109,6 +111,7 @@ class CandidateDossierBrowserTest {
         otherButton.focus(); page.keyboard().press("Enter");
         assertEquals(other.stateHash(), page.locator("#candidateDossierDetail").getAttribute("data-candidate-id"));
         assertFalse(page.locator("#candidateDossierDetail").textContent().contains("SYMBOLICALLY_VERIFIED"));
+        assertEquals(0, page.locator("#candidateDossierDetail [data-capability-evidence]").count());
         assertTrue((Boolean) page.evaluate("document.activeElement.dataset.candidateId === '" + other.stateHash() + "'"));
         page.locator("[data-candidate-id='" + bridgeId + "']").first().click();
         if (entry.equals("/")) {
