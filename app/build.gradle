@@ -242,6 +242,15 @@ tasks.register('generateDiscoveryGallery', JavaExec) {
     args rootProject.projectDir.absolutePath
 }
 
+tasks.register('discoveryComponentPanel', JavaExec) {
+    description = 'Replay the preregistered public discovery component controls.'
+    group = 'verification'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.docs.DiscoveryComponentPanel'
+    args rootProject.layout.buildDirectory.file('reports/discovery-component-panel.json').get().asFile.absolutePath
+}
+
 tasks.register('runDiscoveryCampaign1', JavaExec) {
     description = 'Runs Discovery Campaign 1 and writes reports under app/build/reports/discovery-campaign-1.'
     group = 'documentation'

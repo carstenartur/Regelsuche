@@ -237,7 +237,7 @@ public final class ReferenceCampaignRunner {
     // Phase 1+2: Training + Search
     // -----------------------------------------------------------------------
 
-    private List<TrainingResult> runTraining() {
+    List<TrainingResult> runTraining() {
         return trainingCases().stream()
             .map(this::evaluateTraining)
             .sorted(Comparator.comparing(TrainingResult::id))
@@ -305,7 +305,7 @@ public final class ReferenceCampaignRunner {
     // Phase 3+4: Hypothesis formation + counterexample-guided refinement
     // -----------------------------------------------------------------------
 
-    private HypothesisEvolution runRefinement(List<TrainingResult> training) {
+    static HypothesisCandidate initialLogChallenge(List<TrainingResult> training) {
         // Build the deliberate overgeneralisation: log(F0*F1) = log(F0)+log(F1), no assumptions
         List<HypothesisCandidate.ExpressionPair> supportPairs = training.stream()
             .filter(TrainingResult::success)
@@ -317,7 +317,7 @@ public final class ReferenceCampaignRunner {
             .map(TrainingResult::id)
             .toList();
 
-        HypothesisCandidate overgeneralized = new HypothesisCandidate(
+        return new HypothesisCandidate(
             "rc-log-product-hypothesis-v0",
             INITIAL_LEFT_PATTERN,
             INITIAL_RIGHT_PATTERN,
@@ -331,7 +331,10 @@ public final class ReferenceCampaignRunner {
             Map.of("F0", training.stream().map(TrainingResult::inputExpression).limit(3).toList()),
             Instant.ofEpochSecond(1_700_000_000L)
         );
+    }
 
+    private HypothesisEvolution runRefinement(List<TrainingResult> training) {
+        HypothesisCandidate overgeneralized = initialLogChallenge(training);
         CounterexampleSearchService cexService = new DeterministicCounterexampleSearchService();
         HypothesisRefinementLoop refinementLoop = new HypothesisRefinementLoop(cexService);
         HypothesisRefinementLoop.RefinementOutcome outcome = refinementLoop.refine(overgeneralized);
