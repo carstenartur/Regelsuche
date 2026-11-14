@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,6 +33,8 @@ class VisualRegressionContractTest {
 
         assertEquals("regelsuche.visual-regression-policy/v1", policy.path("schema").asText());
         assertEquals("chromium", environment.path("browser").asText());
+        assertTrue(expectedChromiumVersion().matches("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+"),
+            "visual policy must pin the complete Chromium version");
         assertEquals(MathRenderingVisualTest.VIEWPORT_WIDTH,
             environment.path("viewportWidth").asInt());
         assertEquals(MathRenderingVisualTest.VIEWPORT_HEIGHT,
@@ -104,7 +107,11 @@ class VisualRegressionContractTest {
         }
     }
 
-    private static JsonNode readPolicy() throws Exception {
+    static String expectedChromiumVersion() throws IOException {
+        return readPolicy().path("environment").path("browserVersion").asText();
+    }
+
+    private static JsonNode readPolicy() throws IOException {
         Path policy = requiredPath(List.of(
             Path.of("app", "src", "e2eTest", "resources", "screenshots",
                 "visual-regression-policy.json"),
