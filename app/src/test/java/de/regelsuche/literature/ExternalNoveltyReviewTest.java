@@ -21,7 +21,7 @@ class ExternalNoveltyReviewTest {
     Packet packet(Status status, Access access, boolean hit, boolean unresolved) {
         var observed=hits(hit,unresolved);
         var rows=access==Access.INACCESSIBLE ? List.<Query>of() : forms.entrySet().stream().map(e->
-            new Query(0,e.getKey(),e.getValue(),"fixture: " + e.getValue(),"2026-11-01T13:00:00Z",observed.size(),observed)).toList();
+            new Query(0,e.getKey(),e.getValue(),e.getValue(),"2026-11-01T13:00:00Z",observed.size(),observed)).toList();
         var log=new QueryLog(review.freeze(plan),review.catalogueRoot(catalog),rows);
         var scope=new Scope("fixture","v1",new Coverage(access,"scope bound",
             unresolved?List.of(new UnresolvedHit("ref2","full text missing")):List.of()));
@@ -70,7 +70,7 @@ class ExternalNoveltyReviewTest {
         var accepted=decide(p,elig,yes,sign(p,b,Vote.SUPPORT_SCOPED_NOVELTY));
         assertEquals(Decision.EXTERNALLY_NOVEL_CONFIRMED,accepted.outcome().decision());
         var third=signer("8");
-        assertEquals(Decision.NOVELTY_UNRESOLVED,decide(p,List.of(a.eligible(),b.eligible(),third.eligible()),yes,
+        assertEquals(Decision.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,decide(p,List.of(a.eligible(),b.eligible(),third.eligible()),yes,
             sign(p,b,Vote.SUPPORT_SCOPED_NOVELTY)).outcome().decision());
         var receiver=new ExternalNoveltyReview();var encoded=review.encode(accepted);
         assertEquals(accepted,receiver.replay(review.freeze(plan),review.catalogueRoot(catalog),elig,encoded));
@@ -137,6 +137,60 @@ class ExternalNoveltyReviewTest {
             "The cited variables are renamed consistently.",hash("d"));
         var recoded = new Dossier(dossier.logRoot(),dossier.assessment(),List.of(alpha));
         assertNotEquals(review.packetRoot(p),review.packetRoot(new Packet(plan,catalog,p.log(),recoded)));
+    }
+
+    @Test void missingApprovalsDoNotTurnScopedAbsenceIntoUnresolvedAtTwoOfThree() throws Exception {
+        var p = packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE, Access.SEARCHED, false, false);
+        var first = signer("6");
+        var second = signer("7");
+        var eligible = List.of(first.eligible(), second.eligible(), signer("8").eligible());
+        var recommendation = Decision.NO_PRIOR_ART_FOUND_WITHIN_SCOPE;
+        assertEquals(recommendation, decide(p, eligible).outcome().decision());
+        assertEquals(recommendation, decide(p, eligible, sign(p,first,Vote.SUPPORT_SCOPED_NOVELTY)).outcome().decision());
+        assertEquals(recommendation, decide(p, eligible, sign(p,first,Vote.SUPPORT_SCOPED_NOVELTY),
+            sign(p,second,Vote.SUPPORT_SCOPED_NOVELTY)).outcome().decision());
+    }
+
+    @Test void approvedSourceTranslationIsBoundAtFreezeAndUnknownTranslationsStayPartial() throws Exception {
+        var base = packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
+        var first = base.log().entries().getFirst();
+        var source = catalog.sources().getFirst();
+        String translated = "#find \u2200 (x y : \u211d), x + y = y + x";
+        var approval = new Translation(source.name(),source.version(),first.family(),first.expression(),translated,
+            "Both sides of the equality use commutative addition of real variables.",hash("9"));
+        var trustedPlan = new Plan(subject,plan.equation(),plan.assumptions(),plan.formationEvidenceRoot(),
+            plan.exposureLedgerRoot(),plan.formationAccess(),plan.frozenAt(),List.of(approval));
+        var rows = new ArrayList<>(base.log().entries());
+        rows.set(0,new Query(0,first.family(),first.expression(),translated,first.executedAt(),0,List.of()));
+        var translatedLog = new QueryLog(review.freeze(trustedPlan),review.catalogueRoot(catalog),rows);
+        var p = new Packet(trustedPlan,catalog,translatedLog,
+            new Dossier(review.logRoot(translatedLog),base.dossier().assessment(),List.of()));
+        var a=signer("6"); var b=signer("7"); var roster=List.of(a.eligible(),b.eligible());
+        var intake=new Intake(review.packetRoot(p),List.of(sign(p,a,Vote.SUPPORT_SCOPED_NOVELTY),sign(p,b,Vote.SUPPORT_SCOPED_NOVELTY)));
+        var run=review.evaluate(review.freeze(trustedPlan),review.catalogueRoot(catalog),p,intake,roster);
+        assertEquals(Decision.EXTERNALLY_NOVEL_CONFIRMED,run.outcome().decision());
+        assertEquals(run,review.replay(review.freeze(trustedPlan),review.catalogueRoot(catalog),roster,review.encode(run)));
+        assertThrows(IllegalArgumentException.class,()->review.replay(review.freeze(plan),review.catalogueRoot(catalog),roster,review.encode(run)));
+        var partial = packet(Status.UNRESOLVED,Access.PARTIAL,false,false);
+        var unapprovedLog=new QueryLog(review.freeze(plan),review.catalogueRoot(catalog),rows);
+        var unapproved=new Packet(plan,catalog,unapprovedLog,new Dossier(review.logRoot(unapprovedLog),partial.dossier().assessment(),List.of()));
+        assertEquals(Decision.NOVELTY_UNRESOLVED,decide(unapproved,roster,sign(unapproved,a,Vote.SUPPORT_SCOPED_NOVELTY),
+            sign(unapproved,b,Vote.SUPPORT_SCOPED_NOVELTY)).outcome().decision());
+        var wrong = new Translation(source.name(),"v2",first.family(),first.expression(),translated,"reviewed",hash("9"));
+        var wrongPlan = new Plan(subject,plan.equation(),plan.assumptions(),plan.formationEvidenceRoot(),plan.exposureLedgerRoot(),
+            plan.formationAccess(),plan.frozenAt(),List.of(wrong));
+        var wrongLog = new QueryLog(review.freeze(wrongPlan),review.catalogueRoot(catalog),rows);
+        assertThrows(IllegalArgumentException.class,()->review.packetRoot(new Packet(wrongPlan,catalog,wrongLog,
+            new Dossier(review.logRoot(wrongLog),base.dossier().assessment(),List.of()))));
+    }
+
+    @Test void unrelatedActualQueriesCannotQualifyEvenIfAllGeneratedFormsAreListed() {
+        var p = packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE, Access.SEARCHED, false, false);
+        var rows = p.log().entries().stream().map(q -> new Query(q.sourceIndex(),q.family(),q.expression(),
+            "same unrelated query",q.executedAt(),q.resultCount(),q.hitIds())).toList();
+        var log = new QueryLog(p.log().planRoot(),p.log().catalogueRoot(),rows);
+        var changed = new Packet(plan,catalog,log,new Dossier(review.logRoot(log),p.dossier().assessment(),List.of()));
+        assertThrows(IllegalArgumentException.class, () -> review.packetRoot(changed));
     }
 
     @Test void droppedOrSubstitutedHitsAndPreFreezeLookupsFail() {

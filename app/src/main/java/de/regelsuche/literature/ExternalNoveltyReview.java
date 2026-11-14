@@ -32,11 +32,35 @@ public final class ExternalNoveltyReview {
     public enum Decision { PRIOR_ART_FOUND, NOVELTY_UNRESOLVED, NO_PRIOR_ART_FOUND_WITHIN_SCOPE, EXTERNALLY_NOVEL_CONFIRMED }
     public enum Vote { SUPPORT_SCOPED_NOVELTY, PRIOR_ART, ABSTAIN }
 
+    /** A source-specific rendering inspected and authorized by the custodian before lookup. */
+    public record Translation(String source,String version,String family,String generatedQuery,
+                              String approvedQuery,String semanticRationale,String approvalEvidenceRoot) {
+        public Translation {
+            text(source); text(version); text(family); text(generatedQuery);
+            text(approvedQuery); text(semanticRationale); root(approvalEvidenceRoot);
+        }
+    }
+
     public record Plan(Subject subject, String equation, List<String> assumptions, String formationEvidenceRoot,
-                       String exposureLedgerRoot, Disclosure formationAccess, String frozenAt) {
+                       String exposureLedgerRoot, Disclosure formationAccess, String frozenAt,
+                       List<Translation> approvedTranslations) {
+        public Plan(Subject subject,String equation,List<String> assumptions,String formationEvidenceRoot,
+                    String exposureLedgerRoot,Disclosure formationAccess,String frozenAt) {
+            this(subject,equation,assumptions,formationEvidenceRoot,exposureLedgerRoot,formationAccess,frozenAt,List.of());
+        }
+
         public Plan {
             Objects.requireNonNull(subject); Objects.requireNonNull(formationAccess); Instant.parse(frozenAt);
-            assumptions = texts(assumptions,0,32); NoveltyQueryForms.forEquation(equation, assumptions);
+            assumptions = texts(assumptions,0,32);
+            var forms = NoveltyQueryForms.forEquation(equation, assumptions);
+            approvedTranslations = bounded(approvedTranslations,0,192);
+            var unique = new HashSet<List<String>>();
+            for (var approval : approvedTranslations) {
+                if (!approval.generatedQuery().equals(forms.get(approval.family()))
+                        || !unique.add(List.of(approval.source(),approval.version(),approval.family()))) {
+                    throw bad("translation must bind one generated candidate query per source version and family");
+                }
+            }
             root(formationEvidenceRoot); root(exposureLedgerRoot);
         }
     }
@@ -153,7 +177,6 @@ public final class ExternalNoveltyReview {
         if(status==CandidateLiteratureAssessments.Status.PRIOR_ART_FOUND) return Decision.PRIOR_ART_FOUND;
         if(status!=CandidateLiteratureAssessments.Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE
                 || votes.stream().anyMatch(v->v!=Vote.SUPPORT_SCOPED_NOVELTY)) return Decision.NOVELTY_UNRESOLVED;
-        if (!votes.isEmpty() && votes.size() < assigned && votes.size() >= 2) return Decision.NOVELTY_UNRESOLVED;
         return votes.size()>=2 && votes.size()==assigned ? Decision.EXTERNALLY_NOVEL_CONFIRMED : Decision.NO_PRIOR_ART_FOUND_WITHIN_SCOPE;
     }
     public byte[] encode(Run run) throws IOException {
