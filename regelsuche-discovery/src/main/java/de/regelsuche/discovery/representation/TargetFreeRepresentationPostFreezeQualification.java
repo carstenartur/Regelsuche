@@ -241,6 +241,7 @@ final class TargetFreeRepresentationPostFreezeQualification {
                 "post-freeze disclosure differs from its commitment");
         }
 
+        var replay = new FrozenPrimitiveLineage(boundary.candidateFormationRules());
         RepresentationCandidateAssessor assessor =
             new RepresentationCandidateAssessor(
                 disclosure.classificationCatalog());
@@ -254,7 +255,7 @@ final class TargetFreeRepresentationPostFreezeQualification {
                 candidate,
                 assessor,
                 engine,
-                oracle
+                replay, oracle
             ))
             .sorted(Comparator.comparing(
                 QualifiedCandidate::candidateHash))
@@ -286,13 +287,13 @@ final class TargetFreeRepresentationPostFreezeQualification {
         TargetFreeRepresentationCandidateFreeze.CandidateEvidence candidate,
         RepresentationCandidateAssessor assessor,
         AstRewriteTransformationEngine engine,
-        SymPyOracleValidator oracle
+        FrozenPrimitiveLineage replay, SymPyOracleValidator oracle
     ) {
         boolean reference = rule.referenceExpressions().stream()
             .map(TargetFreeRepresentationPostFreezeQualification::normalize)
             .anyMatch(normalize(candidate.expression())::equals);
         Proof proof = proof(
-            benchmarkCase.sourceExpression(), candidate, reference, oracle);
+            benchmarkCase.sourceExpression(), benchmarkCase.assumptions(), candidate, reference, replay, oracle);
         RepresentationCandidateAssessment assessment = assessor.assess(
             RepresentationCandidateProposal.whole(
                 benchmarkCase.sourceExpression(),
@@ -388,10 +389,10 @@ final class TargetFreeRepresentationPostFreezeQualification {
     }
 
     private static Proof proof(
-        String source,
+        String source, List<String> initialAssumptions,
         TargetFreeRepresentationCandidateFreeze.CandidateEvidence candidate,
         boolean reference,
-        SymPyOracleValidator oracle
+        FrozenPrimitiveLineage replay, SymPyOracleValidator oracle
     ) {
         if (!reference) {
             return new Proof(
@@ -406,6 +407,12 @@ final class TargetFreeRepresentationPostFreezeQualification {
         try {
             var validation = oracle.validateEquivalence(
                 source, candidate.expression());
+            if (validation.status() != OracleValidator.OracleValidationStatus.AGREE
+                    && validation.status() != OracleValidator.OracleValidationStatus.DISAGREE
+                    && replay.verifies(source, candidate.expression(), candidate.depth(), candidate.pathRuleIds(),
+                        candidate.primitiveRuleIds(), initialAssumptions, candidate.assumptions(), List.of())) {
+                return new Proof(CandidateProofStatus.SYMBOLICALLY_VERIFIED, "VERIFIED_PRIMITIVE_REPLAY");
+            }
             return new Proof(
                 validation.status()
                     == OracleValidator.OracleValidationStatus.AGREE

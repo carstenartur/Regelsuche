@@ -53,12 +53,14 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         collectVariables(right, variables);
         List<String> orderedVariables = new ArrayList<>(variables);
         List<AssumptionGuard> assumptionGuards = assumptionGuards(hypothesis.assumptions());
+        ExactScalarWitnessSearch scalar = ExactScalarWitnessSearch.accepts(left) && ExactScalarWitnessSearch.accepts(right)
+            ? new ExactScalarWitnessSearch(hypothesis.leftExpression(), hypothesis.rightExpression(), hypothesis.assumptions()) : null;
 
         if (budget.includeBoundaryValues()) {
             String source = "numeric-boundary-values";
             attemptedSources.add(source);
             Optional<Counterexample> edgeCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, assumptionGuards, source
+                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, assumptionGuards, source, scalar
             );
             if (edgeCounterexample.isPresent()) {
                 return CounterexampleSearchResult.counterexampleFound(
@@ -74,7 +76,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             String source = "rational-samples";
             attemptedSources.add(source);
             Optional<Counterexample> rationalCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, RATIONAL_VALUES, inferredAssumptions, assumptionGuards, source
+                left, right, orderedVariables, RATIONAL_VALUES, inferredAssumptions, assumptionGuards, source, scalar
             );
             if (rationalCounterexample.isPresent()) {
                 return CounterexampleSearchResult.counterexampleFound(
@@ -95,7 +97,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 randomValues.add(-5.0 + (10.0 * random.nextDouble()));
             }
             Optional<Counterexample> randomCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, randomValues, inferredAssumptions, assumptionGuards, source
+                left, right, orderedVariables, randomValues, inferredAssumptions, assumptionGuards, source, scalar
             );
             if (randomCounterexample.isPresent()) {
                 return CounterexampleSearchResult.counterexampleFound(
@@ -145,6 +147,12 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 typedAssumptions(inferredAssumptions)
             );
         }
+        if (scalar != null && !scalar.evaluated() && attemptedSources.stream().anyMatch(
+                name -> name.startsWith("numeric-") || name.equals("rational-samples"))) {
+            return new CounterexampleSearchResult(CounterexampleSearchService.Status.INCONCLUSIVE,
+                Optional.empty(), inferredAssumptionExpressions(inferredAssumptions), attemptedSources,
+                "no defined scalar pair within the exact arithmetic bounds", typedAssumptions(inferredAssumptions));
+        }
         return CounterexampleSearchResult.noCounterexampleFound(
             inferredAssumptionExpressions(inferredAssumptions),
             attemptedSources,
@@ -159,52 +167,59 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         List<Double> values,
         Map<String, CounterexampleSearchService.TypedAssumption> inferredAssumptions,
         List<AssumptionGuard> assumptionGuards,
-        String source
+        String source,
+        ExactScalarWitnessSearch scalar
     ) {
-        if (values.isEmpty()) {
-            return Optional.empty();
-        }
+        if (values.isEmpty()) return Optional.empty();
         if (orderedVariables.isEmpty()) {
-            Evaluation leftEvaluation = evaluate(left, Map.of());
-            Evaluation rightEvaluation = evaluate(right, Map.of());
-            if (leftEvaluation.defined() && rightEvaluation.defined()) {
-                if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
-                    return Optional.of(new Counterexample(List.of(), leftEvaluation.value().asText(), rightEvaluation.value().asText()));
-                }
-            }
-            return Optional.empty();
+            if (scalar != null) return scalar.compare(Map.of(), List.of()).witness();
+            return numericWitness(left, right, Map.of(), List.of(), inferredAssumptions, source);
         }
 
         int assignmentCount = Math.max(values.size(), orderedVariables.size());
         for (int i = 0; i < assignmentCount; i++) {
             Map<String, RuntimeValue> assignment = new HashMap<>();
+            Map<String, String> exactAssignment = new LinkedHashMap<>();
             List<String> assignmentText = new ArrayList<>();
             int j = 0;
             for (String variable : orderedVariables) {
                 double value = values.get((i + j) % values.size());
                 assignment.put(variable, RuntimeValue.scalar(value));
-                assignmentText.add(variable + "=" + trimDouble(value));
+                String text = scalar == null ? trimDouble(value)
+                    : ExactScalarWitnessSearch.sampleText(value, source.equals("rational-samples"));
+                exactAssignment.put(variable, text);
+                assignmentText.add(variable + "=" + text);
                 j++;
             }
-            if (violatesAssumptions(assignment, assumptionGuards)) {
-                continue;
+            if (violatesAssumptions(assignment, assumptionGuards)) continue;
+            Optional<Counterexample> witness;
+            if (scalar == null) {
+                witness = numericWitness(left, right, assignment, assignmentText, inferredAssumptions, source);
+            } else {
+                var result = scalar.compare(exactAssignment, assignmentText);
+                witness = result.witness();
+                if (!result.defined()) {
+                    // Preserve domain-obligation inference, without promoting a projected value to a witness.
+                    inferAssumptions(evaluate(left, assignment), inferredAssumptions, source);
+                    inferAssumptions(evaluate(right, assignment), inferredAssumptions, source);
+                }
             }
-            Evaluation leftEvaluation = evaluate(left, assignment);
-            Evaluation rightEvaluation = evaluate(right, assignment);
-            if (!leftEvaluation.defined() || !rightEvaluation.defined()) {
-                inferAssumptions(leftEvaluation, inferredAssumptions, source);
-                inferAssumptions(rightEvaluation, inferredAssumptions, source);
-                continue;
-            }
-            if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
-                return Optional.of(new Counterexample(
-                    assignmentText,
-                    leftEvaluation.value().asText(),
-                    rightEvaluation.value().asText()
-                ));
-            }
+            if (witness.isPresent()) return witness;
         }
         return Optional.empty();
+    }
+
+    private Optional<Counterexample> numericWitness(Expr left, Expr right, Map<String, RuntimeValue> assignment,
+            List<String> labels, Map<String, CounterexampleSearchService.TypedAssumption> inferredAssumptions, String source) {
+        Evaluation a = evaluate(left, assignment);
+        Evaluation b = evaluate(right, assignment);
+        if (!a.defined() || !b.defined()) {
+            inferAssumptions(a, inferredAssumptions, source);
+            inferAssumptions(b, inferredAssumptions, source);
+            return Optional.empty();
+        }
+        return a.value().approximatelyEquals(b.value()) ? Optional.empty()
+            : Optional.of(new Counterexample(labels, a.value().asText(), b.value().asText()));
     }
 
     private Optional<Counterexample> tryComplexCounterexample(
@@ -305,7 +320,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
     private Evaluation evaluate(Expr expression, Map<String, RuntimeValue> variables) {
         if (expression instanceof NumberExpr numberExpr) {
-            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue()));
+            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().approximate(java.math.MathContext.DECIMAL128).value().doubleValue()));
         }
         if (expression instanceof VariableExpr variableExpr) {
             RuntimeValue value = variables.get(variableExpr.name());
@@ -639,7 +654,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     }
 
     private static String trimDouble(double value) {
-        if (value == Math.floor(value) && !Double.isInfinite(value)) {
+        if (value >= -0x1p63 && value < 0x1p63 && value == Math.rint(value)) {
             return Long.toString((long) value);
         }
         return Double.toString(value);
@@ -655,7 +670,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         }
 
         static Evaluation defined(RuntimeValue value) {
-            return new Evaluation(value, true, Set.of());
+            return value.finite() ? new Evaluation(value, true, Set.of()) : undefined(Set.of());
         }
 
         static Evaluation undefined(Set<InferenceCandidate> inferredAssumptions) {
@@ -697,6 +712,22 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
         static RuntimeValue complex(Complex value) {
             return new RuntimeValue(Kind.COMPLEX, 0.0, null, value);
+        }
+
+        boolean finite() {
+            return switch (kind) {
+                case SCALAR -> Double.isFinite(scalar);
+                case COMPLEX -> Double.isFinite(complex.real()) && Double.isFinite(complex.imaginary());
+                case MATRIX -> {
+                    boolean finite = true;
+                    for (int row = 0; row < matrix.rows() && finite; row++) {
+                        for (int column = 0; column < matrix.columns() && finite; column++) {
+                            finite = Double.isFinite(matrix.get(row, column));
+                        }
+                    }
+                    yield finite;
+                }
+            };
         }
 
         boolean isNumeric() {

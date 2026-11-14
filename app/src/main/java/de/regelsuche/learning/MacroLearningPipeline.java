@@ -17,6 +17,7 @@ import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.mining.SuccessfulTransformationPath;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.OracleValidator;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
 import java.time.Instant;
@@ -95,7 +96,9 @@ public class MacroLearningPipeline {
                     List<MacroValidationExample> examples = validateGeneratedSchema(pattern, stages);
                     validationExamples.addAll(examples);
                     boolean generatedValid = !examples.isEmpty() && examples.stream().allMatch(MacroValidationExample::equivalent);
-                    boolean symbolic = equivalenceService.areEquivalent(pattern.leftPattern(), pattern.rightPattern());
+                    boolean symbolic = equivalenceService instanceof OracleValidator oracle
+                        && oracle.validateEquivalence(pattern.leftPattern(), pattern.rightPattern()).status()
+                            == OracleValidator.OracleValidationStatus.AGREE;
                     CounterexampleSearchService.CounterexampleSearchResult counterexamples = counterexampleSearchService.search(
                         new CounterexampleSearchService.HypothesisInput(
                             path.id(),

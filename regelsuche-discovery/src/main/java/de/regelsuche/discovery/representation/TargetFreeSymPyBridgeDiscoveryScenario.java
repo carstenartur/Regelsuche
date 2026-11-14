@@ -18,6 +18,7 @@ import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.OracleValidator;
 import de.regelsuche.validation.OracleValidator.OracleValidation;
 import de.regelsuche.validation.SymPyOracleValidator;
 import java.io.IOException;
@@ -98,6 +99,9 @@ public final class TargetFreeSymPyBridgeDiscoveryScenario {
             "formation reached the withheld SymPy consequence"
         );
 
+        var replay = new FrozenPrimitiveLineage(enabledBoundary.candidateFormationRules());
+        var byHash = enabledSearch.content().states().stream().collect(java.util.stream.Collectors.toMap(
+            TargetFreeRepresentationSearch.State::stateHash, java.util.function.Function.identity()));
         Map<String, RewriteRule> formationRules = ruleIndex(
             enabledBoundary.candidateFormationRules());
         SymPyOracleValidator oracle = new SymPyOracleValidator();
@@ -105,7 +109,7 @@ public final class TargetFreeSymPyBridgeDiscoveryScenario {
             .candidateStates().stream()
             .map(state -> candidate(
                 state,
-                proofStatus(state, formationRules, oracle)
+                proofStatus(state, formationRules, replay, FrozenPrimitiveLineage.statePath(state, byHash), oracle)
             ))
             .toList();
         requireTrue(!candidates.isEmpty(),
@@ -285,11 +289,12 @@ public final class TargetFreeSymPyBridgeDiscoveryScenario {
 
     private static CandidateProofStatus proofStatus(
         TargetFreeRepresentationSearch.State state,
-        Map<String, RewriteRule> rules,
+        Map<String, RewriteRule> rules, FrozenPrimitiveLineage replay, List<String> path,
         SymPyOracleValidator oracle
     ) {
         OracleValidation validation = oracle.validateEquivalence(
             SOURCE_EXPRESSION, state.expression());
+        if (path.isEmpty()) return CandidateProofStatus.OBSERVED;
         boolean validatedPath = state.pathRuleIds().stream()
             .map(rules::get)
             .allMatch(rule -> rule != null
@@ -297,7 +302,9 @@ public final class TargetFreeSymPyBridgeDiscoveryScenario {
         if (state.equivalencePreserving()
                 && state.assumptions().isEmpty()
                 && validatedPath
-                && validation.status() == AGREE) {
+                && (validation.status() == AGREE || (validation.status() != OracleValidator.OracleValidationStatus.DISAGREE
+                    && replay.verifies(path.getFirst(), state.expression(), state.depth(),
+                        state.pathRuleIds(), state.primitiveRuleIds(), List.of(), state.assumptions(), path)))) {
             return CandidateProofStatus.SYMBOLICALLY_VERIFIED;
         }
         return validation.status() == AGREE
