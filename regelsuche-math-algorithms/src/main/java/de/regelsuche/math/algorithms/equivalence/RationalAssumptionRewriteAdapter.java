@@ -50,8 +50,12 @@ public final class RationalAssumptionRewriteAdapter {
     private final TransformationEngine evaluationEngine;
 
     public RationalAssumptionRewriteAdapter() {
+        this(RationalNormalizationHypothesisOperator.Forms.COMBINED);
+    }
+
+    public RationalAssumptionRewriteAdapter(RationalNormalizationHypothesisOperator.Forms forms) {
         this(
-            new RationalNormalizationHypothesisOperator(),
+            new RationalNormalizationHypothesisOperator(forms),
             new RationalFunctionNormalFormEquivalenceService(),
             new ExpressionCanonicalizer());
     }
@@ -117,7 +121,7 @@ public final class RationalAssumptionRewriteAdapter {
             evidence.add(selected.orElseThrow());
         }
         CandidateForm candidate = new CandidateForm(
-            CANDIDATE_FORM_ID,
+            candidateFormId(),
             OPERATOR_ID,
             formationOperator.getClass().getName(),
             evidence.stream().map(FormationEvidence::seedId).toList(),
@@ -128,6 +132,12 @@ public final class RationalAssumptionRewriteAdapter {
             List.copyOf(evidence),
             ledger.snapshot(),
             "every formation seed supports the same generic operator");
+    }
+
+    private String candidateFormId() {
+        var forms = formationOperator.forms();
+        return forms == RationalNormalizationHypothesisOperator.Forms.COMBINED
+            ? CANDIDATE_FORM_ID : CANDIDATE_FORM_ID + "/" + forms.name();
     }
 
     private Optional<FormationEvidence> selectFormationCandidate(
@@ -201,6 +211,9 @@ public final class RationalAssumptionRewriteAdapter {
                     0,
                     budget.maxCandidateEvaluations()),
                 "held-out evaluation cannot run without a formed candidate");
+        }
+        if (!candidateFormId().equals(formation.candidate().orElseThrow().candidateFormId())) {
+            throw new IllegalArgumentException("evaluation requires the frozen operator forms");
         }
         BudgetLedger ledger = new BudgetLedger(budget);
         ArrayDeque<SearchNode> queue = new ArrayDeque<>();
