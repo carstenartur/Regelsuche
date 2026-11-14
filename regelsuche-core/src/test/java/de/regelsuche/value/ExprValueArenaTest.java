@@ -5,8 +5,10 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.symbol.SymbolId;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -77,6 +79,79 @@ class ExprValueArenaTest {
             assertEquals(4001, arena.size());
             assertEquals(root, arena.intern(expression));
             assertTrue(arena.digest(root).matches("regelsuche.expr-value-digest/v1:[0-9a-f]{64}"));
+        }
+    }
+
+    @Test void projectedPositionsKeepExactSourceGroupingAndSelectIndependentRewrites() {
+        var parsed = parser.parseExactTerm("pair((x + 1.00), (1 + x))");
+        var source = (FunctionExpr) parsed.expression();
+        try (var arena = new ExprValueArena(4)) {
+            var projection = arena.project(source, 7);
+            var left = projection.at(new TreePosition(List.of(0), "x + 1")).orElseThrow();
+            var right = projection.at(new TreePosition(List.of(1), "1 + x")).orElseThrow();
+            assertSame(source, left.source());
+            assertSame(source, right.source());
+            assertSame(source.arguments().getFirst(), left.syntax());
+            assertEquals("(x + 1.00)", parsed.sourceTextFor(left.syntax()).orElseThrow());
+            assertEquals("(1 + x)", parsed.sourceTextFor(right.syntax()).orElseThrow());
+            assertSame(left.value(), right.value());
+            assertNotEquals(left.position(), right.position());
+            assertTrue(projection.at(new TreePosition(List.of(2), "missing")).isEmpty());
+            assertTrue(projection.at(new TreePosition(List.of(-1), "invalid")).isEmpty());
+            var replacement = new VariableExpr("z");
+            var changed = (FunctionExpr) right.position().replaceAt(right.source(), replacement)
+                .rewrittenRoot().orElseThrow();
+            assertSame(left.syntax(), changed.arguments().getFirst());
+            assertSame(replacement, changed.arguments().getLast());
+            assertSame(right.syntax(), source.arguments().getLast());
+            assertThrows(IllegalArgumentException.class, () -> projection.valueOf(parser.parseTerm("x")));
+            arena.close();
+            assertThrows(IllegalStateException.class, () -> projection.at(left.position()));
+        }
+    }
+
+    @Test void projectionIndexesPhysicalNodesAndNavigatesOnlyTheRequestedPathInASharedDag() {
+        Expr leaf = new VariableExpr("x");
+        Expr dag = leaf;
+        for (int level = 0; level < 4000; level++)
+            dag = new BinaryExpr(dag, BinaryOperator.POW, dag);
+        try (var arena = new ExprValueArena(4001)) {
+            var projection = arena.project(dag, 4001);
+            var first = projection.at(new TreePosition(Collections.nCopies(4000, 0), "x")).orElseThrow();
+            var last = projection.at(new TreePosition(Collections.nCopies(4000, 1), "x")).orElseThrow();
+            var firstAgain = projection.at(new TreePosition(first.position().path(), "same path")).orElseThrow();
+            assertEquals(first, firstAgain);
+            assertEquals(first.hashCode(), firstAgain.hashCode());
+            assertNotEquals(first, last);
+            assertSame(leaf, first.syntax());
+            assertSame(first.syntax(), last.syntax());
+            assertSame(first.value(), last.value());
+            assertNotEquals(first.position(), last.position());
+            assertSame(arena.intern(dag), projection.at(new TreePosition(List.of(), "root")).orElseThrow().value());
+            var replacement = new VariableExpr("z");
+            var rewritten = first.position().replaceAt(first.source(), replacement);
+            assertEquals(4000, rewritten.copiedAncestors());
+            var changedRoot = rewritten.rewrittenRoot().orElseThrow();
+            assertSame(replacement, first.position().subtreeAt(changedRoot).orElseThrow());
+            assertSame(leaf, last.position().subtreeAt(changedRoot).orElseThrow());
+        }
+    }
+
+    @Test void physicallyDistinctEqualSubtreesRespectTheProjectionBoundAndRollback() {
+        Expr root = parser.parseTerm("f(x,x,x)");
+        try (var arena = new ExprValueArena(3); var other = new ExprValueArena(3)) {
+            var existing = arena.intern(new VariableExpr("z"));
+            assertThrows(IllegalArgumentException.class, () -> arena.project(root, 0));
+            assertThrows(IllegalStateException.class, () -> arena.project(root, 3));
+            assertEquals(1, arena.size());
+            assertSame(existing, arena.intern(new VariableExpr("z")));
+            var projection = arena.project(root, 4);
+            var one = projection.at(new TreePosition(List.of(0), "x")).orElseThrow();
+            var two = projection.at(new TreePosition(List.of(1), "x")).orElseThrow();
+            assertNotSame(one.syntax(), two.syntax());
+            assertSame(one.value(), two.value());
+            assertThrows(IllegalArgumentException.class, () -> other.digest(one.value()));
+            assertEquals(arena.digest(one.value()), other.digest(other.intern(one.syntax())));
         }
     }
 

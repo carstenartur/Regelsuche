@@ -6,18 +6,23 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.scalar.ExactRational;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.WeakHashMap;
 
 /** Bounded owner-local semantic interning for the exact expression language. */
 public final class ExprValueArena implements AutoCloseable {
@@ -50,7 +55,81 @@ public final class ExprValueArena implements AutoCloseable {
         boolean unordered() { return kind == Kind.ADD || kind == Kind.MUL; }
     }
 
-    private record Visit(Expr syntax, boolean expanded) {}
+    /** Exact immutable source occurrence. TreePosition performs selection and local replacement. */
+    public static final class Occurrence {
+        private final Expr source;
+        private final TreePosition position;
+        private final Expr syntax;
+        private final ValueId value;
+
+        private Occurrence(Expr source, TreePosition position, Expr syntax, ValueId value) {
+            this.source = source;
+            this.position = position;
+            this.syntax = syntax;
+            this.value = value;
+        }
+
+        public Expr source() { return source; }
+        public TreePosition position() { return position; }
+        public Expr syntax() { return syntax; }
+        public ValueId value() { return value; }
+
+        @Override public boolean equals(Object other) {
+            return other instanceof Occurrence occurrence && source == occurrence.source
+                && value == occurrence.value && position.path().equals(occurrence.position.path());
+        }
+
+        @Override public int hashCode() {
+            return 31 * (31 * System.identityHashCode(source) + value.hashCode()) + position.path().hashCode();
+        }
+    }
+
+    /** One identity-map entry per physical syntax node. Positions are resolved only on request. */
+    public final class Projection {
+        private Expr source;
+        private final IdentityHashMap<Expr, ValueId> values;
+
+        private Projection(Expr source, IdentityHashMap<Expr, ValueId> values) {
+            this.source = source;
+            this.values = values;
+        }
+
+        /** O(1) lookup for a node already obtained by walking this source. */
+        public ValueId valueOf(Expr syntax) {
+            synchronized (ExprValueArena.this) {
+                requireOpen();
+                var value = values.get(Objects.requireNonNull(syntax, "syntax"));
+                if (value == null) throw new IllegalArgumentException("syntax is outside this projection");
+                return value;
+            }
+        }
+
+        /** Navigate the original AST by child index. The text remains the caller's display/staleness metadata. */
+        public Optional<Occurrence> at(TreePosition position) {
+            synchronized (ExprValueArena.this) {
+                requireOpen();
+                return position.subtreeAt(source).map(syntax ->
+                    new Occurrence(source, position, syntax, values.get(syntax)));
+            }
+        }
+    }
+
+    /** Suspend one parent while resolving a child, even for a wide shared argument list. */
+    private static final class Visit {
+        final Expr syntax;
+        final List<Expr> children;
+        int nextChild;
+
+        Visit(Expr syntax) {
+            this.syntax = syntax;
+            children = switch (syntax) {
+                case BinaryExpr binary -> List.of(binary.left(), binary.right());
+                case FunctionExpr function -> function.arguments();
+                default -> List.of();
+            };
+        }
+    }
+
     private record DigestCount(byte[] digest, int count) {}
     private static final int[] NO_EDGES = {};
     private final Object owner = new Object();
@@ -58,6 +137,8 @@ public final class ExprValueArena implements AutoCloseable {
     private final List<Key> entries = new ArrayList<>();
     private final HashMap<Key, ValueId> index = new HashMap<>();
     private final List<byte[]> digests = new ArrayList<>();
+    // The arena can invalidate live projections on close without retaining abandoned source trees.
+    private final Set<Projection> projections = Collections.newSetFromMap(new WeakHashMap<>());
     private boolean closed;
 
     public ExprValueArena(int maximumEntries) {
@@ -67,32 +148,44 @@ public final class ExprValueArena implements AutoCloseable {
 
     /** Each syntax object is visited once per projection, including shared input DAGs. */
     public synchronized ValueId intern(Expr expression) {
+        return resolve(expression, Integer.MAX_VALUE).get(expression);
+    }
+
+    /**
+     * Keep the source identity map built during interning. The caller bounds distinct physical
+     * syntax nodes separately from the arena's bound on distinct semantic values. Both limits
+     * apply before publishing the projection; a failure rolls back all new arena entries.
+     */
+    public synchronized Projection project(Expr expression, long maximumSyntaxNodes) {
+        if (maximumSyntaxNodes < 1) throw new IllegalArgumentException("maximumSyntaxNodes must be positive");
+        var projection = new Projection(expression, resolve(expression, maximumSyntaxNodes));
+        projections.add(projection);
+        return projection;
+    }
+
+    private IdentityHashMap<Expr, ValueId> resolve(Expr expression, long maximumSyntaxNodes) {
         requireOpen();
         Objects.requireNonNull(expression, "expression");
         int startingSize = entries.size();
         try {
             var resolved = new IdentityHashMap<Expr, ValueId>();
             var visits = new ArrayDeque<Visit>();
-            visits.push(new Visit(expression, false));
+            visits.push(new Visit(expression));
             while (!visits.isEmpty()) {
-                var visit = visits.pop();
-                Expr syntax = visit.syntax();
-                if (resolved.containsKey(syntax)) continue;
-                List<Expr> children = switch (syntax) {
-                    case BinaryExpr binary -> List.of(binary.left(), binary.right());
-                    case FunctionExpr function -> function.arguments();
-                    default -> List.of();
-                };
-                if (visit.expanded() || children.isEmpty()) {
-                    resolved.put(syntax, internNode(syntax, resolved));
-                } else {
-                    visits.push(new Visit(syntax, true));
-                    for (var child : children.reversed()) {
-                        if (!resolved.containsKey(child)) visits.push(new Visit(child, false));
+                var visit = visits.peek();
+                if (visit.nextChild < visit.children.size()) {
+                    Expr child = visit.children.get(visit.nextChild++);
+                    if (!resolved.containsKey(child)) {
+                        if ((long) resolved.size() + visits.size() >= maximumSyntaxNodes)
+                            throw new IllegalStateException("syntax projection capacity exceeded");
+                        visits.push(new Visit(child));
                     }
+                } else {
+                    resolved.put(visit.syntax, internNode(visit.syntax, resolved));
+                    visits.pop();
                 }
             }
-            return resolved.get(expression);
+            return resolved;
         } catch (RuntimeException failure) {
             while (entries.size() > startingSize) index.remove(entries.removeLast());
             throw failure;
@@ -225,6 +318,11 @@ public final class ExprValueArena implements AutoCloseable {
     }
 
     @Override public synchronized void close() {
+        for (var projection : projections) {
+            projection.source = null;
+            projection.values.clear();
+        }
+        projections.clear();
         entries.clear();
         index.clear();
         digests.clear();

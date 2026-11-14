@@ -3,16 +3,18 @@ package de.regelsuche.discovery.representation;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.value.ExprValueArena;
+import de.regelsuche.value.ExprValueArena.Projection;
+import de.regelsuche.value.ExprValueArena.ValueId;
 import de.regelsuche.value.ExprValueFactory;
-import de.regelsuche.value.ExprValueFactory.ExprValue;
-import de.regelsuche.value.ExprValueFactory.ValueKey;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 
 /** Finds repeated non-leaf semantic values with exact AST occurrences. */
 public final class RepeatedStructureExtractor {
@@ -51,37 +53,26 @@ public final class RepeatedStructureExtractor {
             RepresentationCandidateAssessment.requireText(
                 sourceExpression, "sourceExpression"));
         String normalizedSource = ExpressionFormatter.format(root);
-        Map<ValueKey, Integer> occurrenceCounts = new TreeMap<>();
-        Map<ValueKey, List<RepeatedStructureExtractionCandidate.Occurrence>>
-            occurrencesByValue = new TreeMap<>();
+        Map<ValueId, Integer> occurrenceCounts = new HashMap<>();
+        Map<ValueId, List<RepeatedStructureExtractionCandidate.Occurrence>> occurrencesByValue = new HashMap<>();
 
-        try (ExprValueFactory factory = new ExprValueFactory()) {
-            ExprValueFactory.Projection projection = factory.project(root);
-            countOccurrences(
-                root,
-                projection.valuesBySyntaxIdentity(),
-                occurrenceCounts
-            );
-            collectRepeatedOccurrences(
-                root,
-                ExpressionOccurrencePath.root(),
-                projection.valuesBySyntaxIdentity(),
-                occurrenceCounts,
-                occurrencesByValue
-            );
+        try (var arena = new ExprValueArena(ExprValueFactory.DEFAULT_MAXIMUM_ENTRIES);
+             var evidenceKeys = new ExprValueFactory()) {
+            // Each source token creates at most one AST node, plus an implicit zero for unary minus.
+            var projection = arena.project(root, 2L * sourceExpression.length());
+            countOccurrences(root, projection, occurrenceCounts);
+            collectRepeatedOccurrences(root, ExpressionOccurrencePath.root(), projection, occurrenceCounts,
+                occurrencesByValue);
+
+            return occurrencesByValue.values().stream().map(occurrences -> {
+                // Only published groups need the historical, recursively encoded evidence key.
+                var first = occurrences.getFirst();
+                var position = new TreePosition(first.path().childIndexes(), first.expression());
+                var syntax = projection.at(position).orElseThrow().syntax();
+                return RepeatedStructureExtractionCandidate.create(normalizedSource,
+                    evidenceKeys.fromExpr(syntax).key().toString(), occurrences, policy);
+            }).sorted().toList();
         }
-
-        return occurrencesByValue.entrySet().stream()
-            .filter(entry ->
-                entry.getValue().size() >= policy.minimumOccurrences())
-            .map(entry -> RepeatedStructureExtractionCandidate.create(
-                normalizedSource,
-                entry.getKey().toString(),
-                entry.getValue(),
-                policy
-            ))
-            .sorted()
-            .toList();
     }
 
     public List<RepeatedStructureExtractionCandidate> extractMaterial(
@@ -94,8 +85,8 @@ public final class RepeatedStructureExtractor {
 
     private int countOccurrences(
         Expr expression,
-        Map<Expr, ExprValue> valuesBySyntaxIdentity,
-        Map<ValueKey, Integer> occurrenceCounts
+        Projection projection,
+        Map<ValueId, Integer> occurrenceCounts
     ) {
         int astNodeCount = 1;
         List<Expr> children = children(expression);
@@ -104,16 +95,14 @@ public final class RepeatedStructureExtractor {
                 astNodeCount,
                 countOccurrences(
                     children.get(index),
-                    valuesBySyntaxIdentity,
+                    projection,
                     occurrenceCounts
                 )
             );
         }
         if (astNodeCount >= policy.minimumSubtreeNodes()) {
-            ExprValue value = Objects.requireNonNull(
-                valuesBySyntaxIdentity.get(expression),
-                "semantic value for syntax occurrence");
-            occurrenceCounts.merge(value.key(), 1, Integer::sum);
+            ValueId value = projection.valueOf(expression);
+            occurrenceCounts.merge(value, 1, Integer::sum);
         }
         return astNodeCount;
     }
@@ -121,9 +110,9 @@ public final class RepeatedStructureExtractor {
     private int collectRepeatedOccurrences(
         Expr expression,
         ExpressionOccurrencePath path,
-        Map<Expr, ExprValue> valuesBySyntaxIdentity,
-        Map<ValueKey, Integer> occurrenceCounts,
-        Map<ValueKey, List<RepeatedStructureExtractionCandidate.Occurrence>>
+        Projection projection,
+        Map<ValueId, Integer> occurrenceCounts,
+        Map<ValueId, List<RepeatedStructureExtractionCandidate.Occurrence>>
             occurrencesByValue
     ) {
         int astNodeCount = 1;
@@ -134,20 +123,18 @@ public final class RepeatedStructureExtractor {
                 collectRepeatedOccurrences(
                     children.get(index),
                     path.append(index),
-                    valuesBySyntaxIdentity,
+                    projection,
                     occurrenceCounts,
                     occurrencesByValue
                 )
             );
         }
         if (astNodeCount >= policy.minimumSubtreeNodes()) {
-            ExprValue value = Objects.requireNonNull(
-                valuesBySyntaxIdentity.get(expression),
-                "semantic value for syntax occurrence");
-            if (occurrenceCounts.getOrDefault(value.key(), 0)
+            ValueId value = projection.valueOf(expression);
+            if (occurrenceCounts.getOrDefault(value, 0)
                 >= policy.minimumOccurrences()) {
                 occurrencesByValue.computeIfAbsent(
-                    value.key(), ignored -> new ArrayList<>()).add(
+                    value, ignored -> new ArrayList<>()).add(
                         new RepeatedStructureExtractionCandidate.Occurrence(
                             path,
                             ExpressionFormatter.format(expression),

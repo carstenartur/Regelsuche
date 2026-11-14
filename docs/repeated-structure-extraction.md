@@ -4,10 +4,12 @@ Die Representation Discovery behandelt wiederholte semantische Strukturen als
 eigenen Kandidatentyp. Sie verschwinden damit nicht mehr unbemerkt in einem
 einzigen aggregierten Einfachheitswert.
 
-`RepeatedStructureExtractor` parst einen Ausdruck, projiziert jedes
-AST-Vorkommen in die vorhandene owner-scoped `ExprValueFactory` und gruppiert
-nicht-blattförmige Vorkommen nach ihrem stabilen semantischen `ValueKey`. Der
-erzeugte `RepeatedStructureExtractionCandidate` bewahrt:
+`RepeatedStructureExtractor` parst einen Ausdruck und ordnet jedem physischen
+AST-Knoten einmal eine `ValueId` in einer lokalen `ExprValueArena` zu. Er zählt
+die einzelnen Vorkommen mit dieser ID. Für jede Gruppe, welche die Schwellen
+der Policy erreicht, löst er einen ihrer Pfade am ursprünglichen AST auf und
+bildet daraus den persistierten `ValueKey`. Zum erzeugten
+`RepeatedStructureExtractionCandidate` gehören
 
 - den normalisierten Ausgangsausdruck;
 - die gemeinsame semantische Wertidentität;
@@ -44,7 +46,7 @@ dagegen qualifizieren.
 
 ## Semantische Gleichheit und Vorkommensidentität
 
-Die Gruppierung verwendet `ValueKey`. Daher können AC-äquivalente Vorkommen wie
+Die Gruppierung verwendet die lokale `ValueId`. Daher können AC-äquivalente Vorkommen wie
 `x + y` und `y + x` zum selben Kandidaten gehören. Ihre unabhängig gerenderten
 AST-Formen und ihre jeweiligen Pfade bleiben erhalten. Ursprüngliche Leerzeichen
 und redundante Klammern werden ausdrücklich nicht als bewahrter Quelltext

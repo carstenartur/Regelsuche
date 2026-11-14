@@ -71,6 +71,9 @@ class RepeatedStructureExtractorTest {
                 .findFirst()
                 .orElseThrow();
 
+        // Candidate identity as emitted by the original ValueKey projection.
+        assertEquals("sha256:fb0221b3784730d344d243c5805913cb82f136a7de9ae94a9cf0b42b31195241",
+            candidate.identity());
         assertEquals("x + y", candidate.representativeExpression());
         assertEquals(
             List.of("x + y", "y + x"),
