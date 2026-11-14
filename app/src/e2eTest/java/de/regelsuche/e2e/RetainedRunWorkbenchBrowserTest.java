@@ -133,13 +133,33 @@ class RetainedRunWorkbenchBrowserTest {
         assertEquals(0, page.locator(".run-artifact").count());
     }
 
+    @Test void distinguishesUnusedBudgetFromUnknownTotalWorkUntilTheRunEnds() throws Exception {
+        for (var state : List.of(RepresentationDiscoveryRunOutcome.TerminalState.RUNNING,
+                RepresentationDiscoveryRunOutcome.TerminalState.COMPLETED)) {
+            var outcome = RepresentationDiscoveryRunOutcome.create(state, state.name(), Long.MAX_VALUE, 13,
+                sha("work"), sha("runtime"));
+            var run = RepresentationDiscoveryRunWorkspace.create(first.input(), first.plan(), outcome,
+                RepresentationDiscoveryRunWorkspace.notProducedArtifacts(), revisions());
+            retain(run);
+            page.navigate(url("/static/index.html#run=" + digest(run)));
+            ready(run);
+            assertEquals("9223372036854775794", page.locator("#retainedRunDetail tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("Unverbrauchtes Budget"))
+                .locator("td").textContent());
+            assertEquals(state == RepresentationDiscoveryRunOutcome.TerminalState.RUNNING ? "Unbekannt" : "13",
+                page.locator("#retainedRunDetail tr")
+                    .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText("Gesamtarbeit bis zum Abschluss"))
+                    .locator("td").textContent());
+        }
+    }
+
     @Test void rejectsLateResponsesAndChecksImmutableDtoAndIntegerContracts() throws Exception {
         page.navigate(url("/static/index.html"));
         try (var script = getClass().getResourceAsStream("/run-workspace-state-controls.js")) {
             assertNotNull(script);
             page.addScriptTag(new Page.AddScriptTagOptions().setContent(new String(script.readAllBytes(), StandardCharsets.UTF_8)));
         }
-        assertEquals("11 state, identity, role, race and integer controls passed",
+        assertEquals("Retained run state, budget, identity and selection controls passed",
             page.evaluate("raw => window.runWorkspaceStateControls(JSON.parse(raw))", first.toCanonicalJson()));
     }
 

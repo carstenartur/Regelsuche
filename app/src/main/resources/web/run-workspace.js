@@ -98,8 +98,10 @@
             ['Informationsgrenze', plan.informationTrack], ['Strategie / Profil', plan.searchStrategyId + ' / ' + plan.searchProfileId],
             ['Ziel', plan.objectiveId], ['Seed', plan.deterministicSeed], ['Backend-Identitäten', plan.backendIdentities],
             ['Gespeicherter Zustand', outcome.state], ['Grund', outcome.terminalReason],
-            ['Deklarierte Arbeit', outcome.state === 'CREATED' ? 'Noch nicht deklariert' : outcome.configuredWork],
-            ['Verbrauchte Arbeit', outcome.consumedWork], ['Verbleibende Arbeit', outcome.state === 'CREATED' ? 'Unbekannt' : api.remainingWork(outcome.configuredWork, outcome.consumedWork)],
+            ['Deklariertes Arbeitsbudget', outcome.state === 'CREATED' ? 'Noch nicht deklariert' : outcome.configuredWork],
+            ['Verbrauchte Arbeit', outcome.consumedWork],
+            ['Unverbrauchtes Budget', outcome.state === 'CREATED' ? 'Unbekannt' : api.remainingWork(outcome.configuredWork, outcome.consumedWork)],
+            ['Gesamtarbeit bis zum Abschluss', ['CREATED', 'RUNNING'].includes(outcome.state) ? 'Unbekannt' : outcome.consumedWork],
             ['Beziehung', run.relation], ['Eltern-Run', run.parentRunId || 'Keiner'],
             ['Geänderter Parameter', run.changedPlanParameter || 'Keiner']]);
         renderDuplication(detail, run);
