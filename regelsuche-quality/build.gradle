@@ -168,6 +168,6 @@ tasks.register('verifyAllocationReport', JavaExec) {
     def summary = rootProject.layout.projectDirectory.file('public/dev/bench/allocation.json')
     inputs.file(result)
     outputs.file(summary)
-    args result.get().asFile.absolutePath, summary.asFile.absolutePath
+    args result.asFile.absolutePath, summary.asFile.absolutePath
     outputs.upToDateWhen { false }
 }
