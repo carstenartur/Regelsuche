@@ -132,6 +132,11 @@ public final class BoundedReachabilityOracle {
         }
     }
 
+    /** An engine-side execution ceiling omitted work from the declared finite closure. */
+    static final class EngineWorkExhausted extends RuntimeException {
+        EngineWorkExhausted(String detailCode) { super(detailCode); }
+    }
+
     public enum Status {
         REACHABLE,
         REACHABLE_ONLY_WITH_ADDITIONAL_ASSUMPTIONS,
@@ -481,6 +486,8 @@ public final class BoundedReachabilityOracle {
                 List<Candidate> candidates;
                 try {
                     candidates = candidates(current);
+                } catch (EngineWorkExhausted limit) {
+                    return budgetInconclusive(limit.getMessage());
                 } catch (RuntimeException exception) {
                     return technicalFailure(exception);
                 }
