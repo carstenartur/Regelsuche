@@ -34,6 +34,8 @@ def verifyPaperFoundation = tasks.register(
     workingDir paperRepositoryRoot
     inputs.file(paperReproductionVerifier)
     inputs.file(paperFoundationVerifier)
+    inputs.file(paperRepositoryRoot.file('scripts/paper_controller_figure.py'))
+    inputs.file(paperRepositoryRoot.file('docs/evidence/autopilot-controller-comparison-v1.json.gz'))
     inputs.file(paperManifest)
     inputs.file(paperManifestSchema)
     inputs.files(paperSources)
