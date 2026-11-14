@@ -1,0 +1,43 @@
+{
+  "activeMacroPatterns": [
+    [
+      "a^2 + 2*a*b + b^2",
+      "(a + b)^2"
+    ],
+    [
+      "x^2 + 2*a*x + a^2",
+      "(x + a)^2"
+    ],
+    [
+      "a^2 - 2*a*b + b^2",
+      "(a - b)^2"
+    ],
+    [
+      "x^2 - 2*a*x + a^2",
+      "(x - a)^2"
+    ],
+    [
+      "(a + b)*(a - b)",
+      "a^2 - b^2"
+    ],
+    [
+      "x^2 + 2*a*x",
+      "(x + a)^2 - a^2"
+    ],
+    [
+      "x^2 - 2*a*x",
+      "(x - a)^2 - a^2"
+    ]
+  ],
+  "historicalRationalOperations": [
+    "COMMON_FACTOR_CANCELLATION",
+    "SAME_DENOMINATOR_ADDITION_SUBTRACTION"
+  ],
+  "revision": "34eb0900f26f9791545e0201d2f5db2d4a2ee96f",
+  "sources": {
+    "regelsuche-core/src/main/java/de/regelsuche/transform/RationalNormalizationHypothesisOperator.java": "110ac69b0d09b1e4fb19d1a31d45f9781d5eb7b061c6aadd1cd5837ca2c63b5b",
+    "regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/FiniteDifferenceSequenceDomain.java": "b1c1085aed92d1924a4fd4e84941da59fdaf732b0a61ef86db122966dae549c7",
+    "regelsuche-learning/src/main/java/de/regelsuche/mining/KnownRuleRepository.java": "871a3a29738f238d162b2c1bf442afc4d922426a4fa00c53232c5a5992a4bb72",
+    "regelsuche-learning/src/main/java/de/regelsuche/mining/RulePatternCanonicalizer.java": "8d0381f5e90357b1ea3cbd51b1cb6072b606c2a7e6378a4cb2ca0e0c4a487665"
+  }
+}

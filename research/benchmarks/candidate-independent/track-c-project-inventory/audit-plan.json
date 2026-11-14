@@ -1,0 +1,20 @@
+{
+  "schema": "regelsuche.track-c-public-inventory-audit-plan/v1",
+  "scope": "Post-formation audit of four already public prospective comparisons. Formation, selection, raw results and holdouts are frozen. Neither new candidate discovery nor external novelty is tested.",
+  "inventoryRevision": "34eb0900f26f9791545e0201d2f5db2d4a2ee96f",
+  "inventoryReason": "This pre-comparison repository revision contains the completed historical #383 adapters for all four forms and the project known-rule catalogue. Use their complete historical run output over the original frozen corpus. This is a finite named project catalogue, not a search across every project rule, commit or literature reference. Historical reference fits may include held-out cases; they are available only in this retrospective audit.",
+  "comparisonPaths": {
+    "recurrence": "track-c-recurrence/comparison-result.json",
+    "finiteDifferences": "track-c-finite-differences/comparison-result.json",
+    "macros": "track-c-open-macros/comparison-result.json.gz",
+    "rational": "track-c-rational-grammar/comparison-result.json.gz"
+  },
+  "matching": {
+    "recurrence": "Match the normalized ordered vector of exact rational homogeneous recurrence coefficients, keeping different orders separate even if a finite prefix admits both equations. Keep native model identities and source rows of matches. No extrapolation to mathematical novelty.",
+    "finiteDifferences": "Match the complete ordered initial forward-difference vector in the common Newton basis at n=0. Keep the degree and intercept. Missing recoverable native coefficients produce explicit incomparability.",
+    "macros": "Use the historical full macro adapter output and the native RulePatternCanonicalizer alpha-normalized directed pattern identity. Compare ordered abstract operation sequence and assumptions separately. Retain the existing native KnownRuleRepository.statusFor and symbolic validation from the frozen output as different fields.",
+    "rational": "Compare selected program operation membership with the native pre-comparison RationalNormalizationHypothesisOperator and historical frozen program. A selected subset gets subset status, not exact historical program identity. Preserve guarded identity witnesses and primitive scope.",
+    "residual": "Absence from any named finite inventory means no exact match in that specific inventory only. Preserve unsupported and incomparable representations. Never infer NEW from missing coverage."
+  },
+  "accounting": "Retain all twelve campaign-arm slots per form, including zero outputs. Report realized accepted candidates, genuinely distinct semantic keys, project-match witnesses, formation support, observed refutations/rejections, proof scope and held-out outcomes in their native units. Distinguish paired macro utility from checks of candidate reuse or reachability. No aggregate capability score."
+}
