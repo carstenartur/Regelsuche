@@ -171,7 +171,7 @@ public final class AutonomousProductionMiningRunner {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
-    private static MiningBatch mineBatch(
+    static MiningBatch mineBatch(
         AutonomousResearchBriefV2 brief,
         CampaignPlan plan,
         AggregateDecision decision,
