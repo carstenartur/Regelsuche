@@ -1,0 +1,9 @@
+# Target-directed search on the additive factor/distribution fragment
+
+## Frozen comparison
+
+Use every `SYNTAX_EXACT` row of the unchanged #620 `historical-rediscovery-corpus.json`, its published source, target and oracle depth. Compare one-sided breadth-first search, bidirectional breadth-first search and the complete bounded closure under the same four native primitives, empty initial assumptions and a fixed controller. The `VALUE_EQUIVALENT` row has a different target relation. Add a public three-step control from `a*x + a*y + (b*x + b*y)` to `(a+b)*(x+y)` for an interior meeting, with the original formatted expression transport and exactly the same fragment. Also test depth limits, exhausted shared work, changed assumptions and forged steps.
+
+Use the two declared inverse pairs `ast_factor_common_left` / `ast_distribute_left_add` and `ast_factor_common_right` / `ast_distribute_right_add`. The four rules express left and right distributivity over scalar addition. Admit a formatted transition only when the actual opposite primitive reproduces its starting syntax with no new assumptions. This restriction matters because expression formatting can erase intermediate grouping. Set the fragment language bound to 63 AST nodes per formatted state and allow 10,000 primitive-engine calls per policy or oracle run. Count calls plus their entire returned primitive proposal lists for forward traversal, reverse traversal and independent directed witness replay, including inverse probes. This is a visible-target diagnostic with no discovery consumer.
+
+Use `pair(a*x+a*y, b*x+b*y)` to `pair(a*(x+y), b*(x+y))` as a second two-step control. The ordered function arguments keep the two independent sites separated during formatted transport. Retain both supplementary rows, including any unreached target.
