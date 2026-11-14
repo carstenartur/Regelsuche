@@ -12,6 +12,8 @@ import de.regelsuche.egraph.proof.ExtractionProofBuilder;
 import de.regelsuche.egraph.proof.ExtractionProofChecker;
 import de.regelsuche.egraph.proof.ProofLimits;
 import de.regelsuche.egraph.proof.ProofOutcome;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteRule;
@@ -41,6 +43,38 @@ class EqualitySaturationExtractionProofTest {
         assertDetached(input, expected, rules, result);
         assertTrue(result.proof().checked().orElseThrow().certificate().steps().stream()
             .anyMatch(step -> step instanceof de.regelsuche.egraph.proof.ExtractionCertificate.Congruence));
+    }
+
+    @Test
+    void revisitsOuterRuleAfterAnInnerRewriteRevealsItsLiteral() {
+        var parser = new ExpressionParser();
+        var input = parser.parseTerm("(x + 0) * 0 + y");
+        var expected = parser.parseTerm("y");
+        var ids = List.of("ast_add_zero_right", "ast_add_zero_left", "ast_multiply_one_right",
+            "ast_multiply_one_left", "ast_multiply_zero_right", "ast_multiply_zero_left",
+            "ast_subtract_zero", "ast_product_to_power_two");
+        var rules = AstRewriteTransformationEngine.allBuiltInRules().stream()
+            .filter(rule -> ids.contains(rule.id())).toList();
+        for (boolean dirtyWorklist : List.of(true, false)) {
+            var result = new EqualitySaturation(rules, new EqualitySaturation.Config(8, 256, dirtyWorklist))
+                .saturateWithProof(input, node -> node.isLeaf() ? 0 : 1, EqualitySaturation.ProofOptions.defaults());
+            assertEquals(expected, result.expression(), "dirty worklist: " + dirtyWorklist);
+            assertDetached(input, expected, rules, result);
+        }
+    }
+
+    @Test
+    void dirtyWorklistRevisitsGrandparentsOfAChangedClass() {
+        Expr input = fn("top", fn("mid", X, fn("erase", new VariableExpr("y"))));
+        List<RewriteRule> rules = List.of(
+            rule("top-zero", pattern("top", pattern("mid", A, PatternExpr.num(0))), A),
+            rule("erase", pattern("erase", A), PatternExpr.num(0)));
+        for (boolean dirtyWorklist : List.of(true, false)) {
+            var result = new EqualitySaturation(rules, new EqualitySaturation.Config(8, 256, dirtyWorklist))
+                .saturateWithProof(input, node -> node.isLeaf() ? 0 : 1, EqualitySaturation.ProofOptions.defaults());
+            assertEquals(X, result.expression(), "dirty worklist: " + dirtyWorklist);
+            assertDetached(input, X, rules, result);
+        }
     }
 
     @Test

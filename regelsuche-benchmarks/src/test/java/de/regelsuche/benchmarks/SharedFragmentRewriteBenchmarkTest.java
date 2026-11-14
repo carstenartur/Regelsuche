@@ -115,8 +115,15 @@ class SharedFragmentRewriteBenchmarkTest {
 
     @Test
     void retainsAValidEqSatOutputThatMissesTheReferenceCost(@TempDir Path directory) throws Exception {
-        var outcomes = list(namedCase(run(directory), "annihilation").get("outcomes"));
-        assertEquals("REFERENCE_COST_REACHED", outcomes.getFirst().get("verdict"));
+        var report = run(directory);
+        var annihilation = list(namedCase(report, "annihilation").get("outcomes"));
+        for (var outcome : annihilation) {
+            assertEquals("REFERENCE_COST_REACHED", outcome.get("verdict"));
+            assertEquals(0, outcome.get("operatorCount"));
+            assertEquals("y", outcome.get("output"));
+        }
+        var outcomes = list(namedCase(report, "missing-cancellation").get("outcomes"));
+        assertEquals("REFERENCE_COST_MISSED", outcomes.getFirst().get("verdict"));
         var eqsat = outcomes.getLast();
         assertEquals("REFERENCE_COST_MISSED", eqsat.get("verdict"));
         assertEquals("DETACHED_CERTIFICATE_CHECKED", eqsat.get("proofStatus"));

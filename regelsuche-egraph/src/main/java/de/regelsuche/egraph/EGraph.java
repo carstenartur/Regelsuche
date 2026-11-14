@@ -114,10 +114,6 @@ public final class EGraph {
         classes.put(id, eclass);
         canonicalClassCount++;
         putHashCons(canonical, id);
-        // record this node as a parent of each child class.
-        for (EClassId child : canonical.children()) {
-            classOf(child).addParent(canonical);
-        }
         markDirty(id);
         bumpVersion();
         return id;
@@ -279,9 +275,9 @@ public final class EGraph {
         return dedupeCanonical(hits);
     }
 
-    /** Consume and clear the set of classes changed since the last call. */
+    /** Consume changes and include ancestors whose patterns may now match. */
     public Collection<EClassId> consumeDirtyClasses() {
-        Collection<EClassId> snapshot = dedupeCanonical(dirtyClasses);
+        Collection<EClassId> snapshot = classesWithAncestors(dirtyClasses);
         dirtyClasses.clear();
         return snapshot;
     }
@@ -299,21 +295,20 @@ public final class EGraph {
                 changed.add(unionFind.find(entry.getKey()));
             }
         }
+        return classesWithAncestors(changed);
+    }
+
+    private Collection<EClassId> classesWithAncestors(Collection<EClassId> changed) {
         LinkedHashSet<EClassId> affected = new LinkedHashSet<>(dedupeCanonical(changed));
         ArrayDeque<EClassId> queue = new ArrayDeque<>(affected);
         while (!queue.isEmpty()) {
             EClassId id = queue.removeFirst();
-            EClass eclass = classes.get(unionFind.find(id));
-            if (eclass == null) {
-                continue;
-            }
+            EClass eclass = classOf(id);
             for (ENode parent : eclass.parents()) {
-                EClassId owner = hashCons.get(parent.canonicalize(unionFind));
-                if (owner != null) {
-                    EClassId canonicalOwner = unionFind.find(owner);
-                    if (affected.add(canonicalOwner)) {
-                        queue.addLast(canonicalOwner);
-                    }
+                // Backlinks use the current hash-cons key even before rebuild.
+                EClassId owner = unionFind.find(hashCons.get(parent));
+                if (affected.add(owner)) {
+                    queue.addLast(owner);
                 }
             }
         }
@@ -473,35 +468,12 @@ public final class EGraph {
     private void repair(EClassId id) {
         EClass eclass = classOf(id);
         // 1. re-canonicalize the parents, looking for new congruences.
-        Map<ENode, EClassId> newParents = new HashMap<>();
         for (ENode parent : new ArrayList<>(eclass.parents())) {
-            ENode parentCanonical = parent.canonicalize(unionFind);
-            EClassId hit = removeHashCons(parent);
-            if (hit != null) {
-                putHashCons(parentCanonical, unionFind.find(hit));
-                markDirty(hit);
-            }
-            EClassId alreadyOwned = newParents.get(parentCanonical);
-            if (alreadyOwned != null) {
-                // Same parent shape, different ids before canonicalization —
-                // congruence! merge.
-                EClassId here = unionFind.find(hit == null ? alreadyOwned : hit);
-                EClassId there = unionFind.find(alreadyOwned);
-                if (!here.equals(there)) {
-                    EClassId survivor = mergeClasses(here, there);
-                    worklist.add(survivor);
-                }
-                newParents.put(parentCanonical, unionFind.find(here));
-            } else {
-                newParents.put(parentCanonical, hit == null ? null : unionFind.find(hit));
-            }
-        }
-        eclass.clearParents();
-        for (ENode parent : newParents.keySet()) {
-            eclass.addParent(parent);
+            repairParent(parent);
         }
         // 2. re-canonicalize this class' own nodes so each canonical node
         // appears exactly once across the whole graph.
+        eclass = classOf(id);
         LinkedHashSet<ENode> dedup = new LinkedHashSet<>();
         for (ENode node : eclass.nodes()) {
             ENode canonical = node.canonicalize(unionFind);
@@ -510,13 +482,34 @@ public final class EGraph {
             if (owner == null) {
                 putHashCons(canonical, eclass.id());
             } else if (!unionFind.find(owner).equals(eclass.id())) {
-                // Two classes claim the same canonical node → congruence.
-                EClassId survivor = mergeClasses(eclass.id(), owner);
-                worklist.add(survivor);
+                // Merging can change this node set. Repair the survivor
+                // before replacing its nodes so absorbed nodes are retained.
+                worklist.add(mergeClasses(eclass.id(), owner));
+                return;
             }
         }
         eclass.replaceNodes(dedup);
         markDirty(eclass.id());
+    }
+
+    private void repairParent(ENode parent) {
+        ENode canonical = parent.canonicalize(unionFind);
+        EClassId owner = hashCons.get(parent);
+        if (parent.equals(canonical)) {
+            markDirty(owner);
+            return;
+        }
+        EClassId existing = hashCons.get(canonical);
+        if (existing != null && !unionFind.inSameSet(owner, existing)) {
+            worklist.add(mergeClasses(owner, existing));
+        }
+        removeHashCons(parent, owner);
+        if (existing == null) {
+            putHashCons(canonical, unionFind.find(owner));
+        } else {
+            addSignatureMembership(canonical, existing);
+        }
+        markDirty(owner);
     }
 
     private Expr buildExpression(EClassId canonical, Map<EClassId, ENode> bestNode) {
@@ -601,20 +594,20 @@ public final class EGraph {
         return survivor;
     }
 
-    private EClassId removeHashCons(ENode node) {
-        EClassId owner = hashCons.remove(node);
-        if (owner != null) {
-            removeSignatureMembership(node, owner);
+    private void removeHashCons(ENode node, EClassId owner) {
+        hashCons.remove(node);
+        removeSignatureMembership(node, owner);
+        for (EClassId child : node.children()) {
+            classOf(child).removeParent(node);
         }
-        return owner;
     }
 
     private void putHashCons(ENode node, EClassId owner) {
-        EClassId previous = hashCons.put(node, owner);
-        if (previous != null) {
-            removeSignatureMembership(node, previous);
-        }
+        hashCons.put(node, owner);
         addSignatureMembership(node, owner);
+        for (EClassId child : node.children()) {
+            classOf(child).addParent(node);
+        }
     }
 
     private void addSignatureMembership(ENode node, EClassId owner) {
