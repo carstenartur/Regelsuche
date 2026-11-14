@@ -98,6 +98,29 @@ belegt ihre Adapteroperationen, aber keine vollständige interne symbolische
 Arbeit. Weder eine native Substitution noch erfundene externe Nullarbeitszeilen
 füllen diese Lücke. Der vollständige Start scheitert vor dem ersten Run.
 
+Der Preflight vergleicht außerdem die GraalPy-Version und alle aufgelösten
+Paketversionen im Checkout-Lock mit der Laufzeitkennung des eingefrorenen
+Studienplans. Für diesen Plan sind GraalPy 25.1.3, SymPy 1.14.0 und mpmath
+1.3.0 festgelegt. Der aktuelle Lock nennt GraalPy 25.5.5.0.3. Der Preflight
+meldet dafür zusätzlich `EXTERNAL_RUNTIME_LOCK_MISMATCH`. Diese Prüfung liest
+nur den Lock und startet keine Engine.
+
+Die Adapterledger beobachtet unter anderem Quellterme, Aufrufzahl und
+dekodierte Faktor-/Termzahlen. Das Backend ruft `sympy.factor_list` auf und
+liefert Faktoren, Multiplizitäten und Nanosekunden. Für interne Operationen
+wie modulare Faktorisierung, Hensel-Liftung und Rekombination fehlen
+ausführungsgebundene Zähler und ein vor der jeweiligen Operation wirksamer
+Budgetabbruch mit erhaltenem Arbeitspräfix. Auch ein exakt rekonstruiertes
+Produkt oder der passende historische Lock allein liefert diese Belege nicht.
+
+Eine lokale Diagnose mit dem unveränderten Bridge-Skript, SymPy 1.14.0
+unter CPython und `QQ` zeigt den Unterschied an zwei Entwicklungsbeispielen.
+Für `x^4+x-1` und `x^4+x+1` werden je drei Eingabeterme und ein Faktor
+mit drei Ausgabetermen beobachtet. Beim ersten Aufruf wurde die interne
+Funktion `dup_zz_hensel_step` nullmal aufgerufen, beim zweiten zweimal.
+Diese Funktionsaufrufe sind eine Diagnose für die unsichtbare Arbeit und
+keine kanonischen Studieneinheiten. Der eingefrorene GraalPy-Run steht aus.
+
 Die Kontrollen umfassen je 20 öffentliche CP06-Formationsfälle für Cache und
 Spezialprofil, echte Cache-Insert-/Replay-/FIFO-Folgen unter ausdrücklich
 größeren Komponentenautoritäten, Ablehnung eines außerhalb des Runs

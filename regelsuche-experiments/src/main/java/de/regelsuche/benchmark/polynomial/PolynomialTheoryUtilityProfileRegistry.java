@@ -1,5 +1,10 @@
 package de.regelsuche.benchmark.polynomial;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,13 +32,50 @@ public final class PolynomialTheoryUtilityProfileRegistry {
 
     /** Fails before any session opens while a frozen profile lacks complete work evidence. */
     public static List<PolynomialTheoryUtilityProfileAdapter> requireRunnableAdapters() {
+        return requireRunnableAdapters(Path.of(System.getProperty("regelsuche.repositoryRoot", ".")));
+    }
+
+    public static List<PolynomialTheoryUtilityProfileAdapter> requireRunnableAdapters(Path checkout) {
         var entries = entries();
-        var blocked = entries.stream().filter(value -> value.adapter().isEmpty()).toList();
-        if (!blocked.isEmpty()) {
-            throw new IllegalStateException("polynomial utility profiles are not ready: " + blocked.stream()
-                .map(value -> value.profile().profileId() + ":" + value.blocker()).toList());
+        var blockers = new ArrayList<String>();
+        runtimeLockMismatch(checkout).ifPresent(blockers::add);
+        entries.stream().filter(entry -> entry.adapter().isEmpty())
+            .map(entry -> entry.profile().profileId() + ":" + entry.blocker())
+            .forEach(blockers::add);
+        if (!blockers.isEmpty()) {
+            throw new IllegalStateException("polynomial utility profiles are not ready: " + blockers);
         }
-        return entries.stream().flatMap(value -> value.adapter().stream()).toList();
+        return entries.stream().map(value -> value.adapter().orElseThrow()).toList();
+    }
+
+    private static Optional<String> runtimeLockMismatch(Path checkout) {
+        Path lock = checkout.resolve(PolynomialTheoryUtilityExecutionPlan.EXTERNAL_LOCK_PATH);
+        String expected = PolynomialTheoryUtilityExecutionPlan.EXTERNAL_RUNTIME_ID;
+        String prefix = "# graalpy-version:";
+        var runtime = new ArrayList<String>();
+        var packages = new ArrayList<String>();
+        try {
+            for (String raw : Files.readAllLines(lock)) {
+                String line = raw.strip();
+                if (line.startsWith(prefix)) {
+                    runtime.add("graalpy-" + line.substring(prefix.length()).strip());
+                } else if (!line.isEmpty() && !line.startsWith("#")) {
+                    packages.add(line);
+                }
+            }
+        } catch (IOException e) {
+            return Optional.of("EXTERNAL_RUNTIME_LOCK_MISMATCH: cannot read " + lock);
+        }
+        // Check the complete resolved environment, including duplicate or extra entries.
+        // Input-package comments are generator metadata and do not replace resolved pins.
+        var parts = expected.split("_");
+        var expectedPackages = Arrays.stream(parts).skip(1)
+            .map(pin -> pin.replaceFirst("-", "==")).sorted().toList();
+        if (runtime.equals(List.of(parts[0])) && packages.stream().sorted().toList().equals(expectedPackages)) {
+            return Optional.empty();
+        }
+        return Optional.of("EXTERNAL_RUNTIME_LOCK_MISMATCH: expected " + expected
+            + ", observed runtime " + runtime + " and packages " + packages);
     }
 
     public record Registration(PolynomialTheoryUtilityExecutionProfile profile,
