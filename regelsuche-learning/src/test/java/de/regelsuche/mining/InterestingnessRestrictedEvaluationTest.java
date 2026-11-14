@@ -17,6 +17,14 @@ import org.junit.jupiter.api.io.TempDir;
 
 class InterestingnessRestrictedEvaluationTest {
     @Test void authenticatesPredictionInputsAndEvaluatesFrozenFixtureLabelsOnce(@TempDir Path temp) throws Exception {
+        exercisePanel(temp, false);
+    }
+
+    @Test void blockedAnalysisIsRetainedAndConsumesOnlyOneTestExposure(@TempDir Path temp) throws Exception {
+        exercisePanel(temp, true);
+    }
+
+    private void exercisePanel(Path temp, boolean withholdOneAssignment) throws Exception {
         var json = new ObjectMapper();
         var data = new InterestingnessProfileCalibrationTest().dataset();
         var candidates = new ArrayList<CandidateCase>();
@@ -48,6 +56,7 @@ class InterestingnessRestrictedEvaluationTest {
         assertThrows(IllegalStateException.class, () -> InterestingnessRestrictedCollection.evaluate(vault));
         var assignments = json.readTree(export.resolve("private/assignment-manifest.json").toFile()).required("assignments");
         for (var slot : assignments) {
+            if (withholdOneAssignment && slot == assignments.get(0)) continue;
             String candidate = slot.required("candidateId").asText();
             var form = json.createObjectNode();
             form.put("registrationHash", registration);
@@ -66,18 +75,25 @@ class InterestingnessRestrictedEvaluationTest {
         var audit = json.readTree(InterestingnessRestrictedCollection.audit(vault));
         var evaluation = audit.required("evaluation");
         assertEquals("DEVELOPMENT_ONLY", evaluation.required("evidenceClass").asText());
-        assertEquals("FIXTURE_DIAGNOSTICS", evaluation.required("analysisStatus").asText());
+        assertEquals(withholdOneAssignment ? "INSUFFICIENT_CONSENSUS" : "FIXTURE_DIAGNOSTICS",
+            evaluation.required("analysisStatus").asText());
         assertEquals("NOT_EVALUATED", evaluation.required("empiricalConsensusStatus").asText());
         assertEquals("NOT_EVALUATED", evaluation.required("publicEvidenceStatus").asText());
         assertEquals(1, audit.required("historicalExposures").size());
         assertEquals(3, evaluation.required("testExposureLedger").size());
-        assertEquals(3, evaluation.required("calibration").required("testRanking").size());
-        assertEquals(2, evaluation.required("calibration").required("profileMetrics").size());
-        assertFalse(evaluation.required("calibration").required("paretoCandidateIds").isEmpty());
-        assertTrue(evaluation.required("calibration").required("sensitivity").has("leaveOneOutSelectionStabilityPermille"));
-        for (var row : evaluation.required("corpus").required("cases")) assertEquals(0, row.required("countedExpertReviews").asInt());
-        for (var row : evaluation.required("consensus").required("candidates")) assertEquals("DEVELOPMENT_ONLY", row.required("status").asText());
-        assertEquals(evaluation.required("calibration").required("contentHash"), evaluation.required("acceptance").required("calibrationReportHash"));
+        if (withholdOneAssignment) {
+            assertEquals("MISSING", audit.required("slots").get(0).required("disposition").asText());
+            assertTrue(evaluation.required("blockers").toString().contains("insufficient-reviews:"));
+            assertFalse(evaluation.has("calibration"));
+        } else {
+            assertEquals(3, evaluation.required("calibration").required("testRanking").size());
+            assertEquals(2, evaluation.required("calibration").required("profileMetrics").size());
+            assertFalse(evaluation.required("calibration").required("paretoCandidateIds").isEmpty());
+            assertTrue(evaluation.required("calibration").required("sensitivity").has("leaveOneOutSelectionStabilityPermille"));
+            for (var row : evaluation.required("corpus").required("cases")) assertEquals(0, row.required("countedExpertReviews").asInt());
+            for (var row : evaluation.required("consensus").required("candidates")) assertEquals("DEVELOPMENT_ONLY", row.required("status").asText());
+            assertEquals(evaluation.required("calibration").required("contentHash"), evaluation.required("acceptance").required("calibrationReportHash"));
+        }
         InterestingnessRestrictedCollection.revise(vault, frozen, "TRANSCRIPTION");
         InterestingnessRestrictedCollection.freeze(vault);
         assertThrows(IllegalStateException.class, () -> InterestingnessRestrictedCollection.evaluate(vault));
