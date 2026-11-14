@@ -198,7 +198,8 @@ class MavenParallelVerificationWorkflowContractTest {
         "classpath = _coverage_classpath(root)"));
     assertTrue(compact(coverageConvergence).contains(
         "subprocess.run( [ \"java\", \"-cp\", classpath, COVERAGE_MAIN,"
-            + " \"--root\", str(root), ], cwd=root, check=True, )"),
+            + " \"--root\", str(root), \"--isolated-report\", str(isolated),"
+            + " ], cwd=root, check=True, )"),
         "convergence must run the retained Java runtime and propagate a failing decision");
     assertTrue(convergence.contains("name: coverage-verification"));
     assertTrue(convergence.contains(
