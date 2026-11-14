@@ -1,4 +1,5 @@
 package de.regelsuche.discovery.domain;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -146,6 +147,21 @@ class DomainExportWorkspaceTest {
         rows.remove(index);
         rows.remove(original);
         assertThrows(IllegalArgumentException.class, () -> withResources(source,rows));
+    }
+
+    @Test void attemptLedgerRejectsCertificatesAndEvaluationClaimsOutsideTheirStage() {
+        var digest = "sha256:" + "a".repeat(64);
+        var confirmed = DomainDiscoveryEvidence.EvaluationDisposition.CONFIRMED;
+        var refuted = DomainDiscoveryEvidence.EvaluationDisposition.REFUTED;
+        var counterexample = DomainDiscoveryEvidence.AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE;
+        var evaluated = DomainDiscoveryEvidence.AttemptDisposition.REFUTED_BY_EVALUATOR;
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.CandidateAttempt(
+            1,digest,evaluated,CounterexampleStatus.NONE_FOUND,1,"",refuted,"evaluated",digest,java.util.Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.CandidateAttempt(
+            1,digest,counterexample,CounterexampleStatus.FOUND,1,"witness",confirmed,"evaluated",digest,java.util.Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.CandidateAttempt(
+            1,digest,counterexample,CounterexampleStatus.FOUND,1,"",DomainDiscoveryEvidence.EvaluationDisposition.NOT_RUN,
+            "skipped","",java.util.Map.of()));
     }
 
     @Test void resourceRowsEnforceBalanceAtConstruction() {

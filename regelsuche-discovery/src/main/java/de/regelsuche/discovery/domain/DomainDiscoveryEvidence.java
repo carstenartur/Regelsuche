@@ -473,12 +473,36 @@ public final class DomainDiscoveryEvidence {
                 DomainCanonical.requireSha256(certificateHash, "certificateHash");
             }
             metrics = DomainCanonical.sortedMap(metrics);
-            if (disposition == AttemptDisposition.CONFIRMED
-                    && (evaluationStatus != EvaluationDisposition.CONFIRMED
-                        || certificateHash.isEmpty())) {
-                throw new IllegalArgumentException(
-                    "confirmed candidate attempt requires confirmed evaluation and certificate");
+            if (counterexampleStatus == CounterexampleStatus.FOUND && counterexampleWitness.isBlank()) {
+                throw new IllegalArgumentException("found counterexample requires its witness");
             }
+            boolean hasCertificate = !certificateHash.isEmpty();
+            boolean confirmed = evaluationStatus == EvaluationDisposition.CONFIRMED;
+            if (disposition != expectedDisposition(counterexampleStatus, evaluationStatus) || hasCertificate != confirmed) {
+                throw new IllegalArgumentException("candidate disposition or certificate contradicts the executed stages");
+            }
+        }
+
+        private static AttemptDisposition expectedDisposition(CounterexampleStatus counterexample,
+                                                              EvaluationDisposition evaluation) {
+            if (counterexample == CounterexampleStatus.NONE_FOUND) {
+                return switch (evaluation) {
+                    case CONFIRMED -> AttemptDisposition.CONFIRMED;
+                    case REFUTED -> AttemptDisposition.REFUTED_BY_EVALUATOR;
+                    case INCONCLUSIVE -> AttemptDisposition.INCONCLUSIVE;
+                    case UNSUPPORTED -> AttemptDisposition.UNSUPPORTED;
+                    case NOT_RUN -> throw new IllegalArgumentException("missing candidate evaluation");
+                };
+            }
+            if (evaluation != EvaluationDisposition.NOT_RUN) {
+                throw new IllegalArgumentException("counterexample stage prevented evaluation");
+            }
+            return switch (counterexample) {
+                case FOUND -> AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE;
+                case INCONCLUSIVE -> AttemptDisposition.INCONCLUSIVE;
+                case UNSUPPORTED -> AttemptDisposition.UNSUPPORTED;
+                case NONE_FOUND -> throw new IllegalStateException("expected an evaluation");
+            };
         }
     }
 
