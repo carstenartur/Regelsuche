@@ -124,6 +124,15 @@ def verifyEvolutionStudyContracts = tasks.register('verifyEvolutionStudyContract
     }
 }
 
+tasks.register('restrictedReviewCollection', JavaExec) {
+    group = 'application'
+    description = 'Runs the custodian-operated blinded review collection CLI.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.mining.InterestingnessRestrictedCollection'
+    standardInput = System.in
+}
+
 def independentReviewOutput = layout.buildDirectory.dir(
     'reports/independent-review-protocol')
 def independentReviewVerifier = rootProject.file(
