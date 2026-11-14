@@ -84,7 +84,7 @@ class DomainGenericQualificationRunnerTest {
         VerifiedDomainExport expression = verifier.requireVerified(
             output.resolve("runs/run-1/expression"));
         QualificationReport blocked = new DomainGenericDiscoveryQualification()
-            .evaluate(List.of(expression, expression), 3, true);
+            .evaluate(java.util.Collections.nCopies(3, List.of(expression, expression)));
 
         assertEquals(QualificationStatus.BLOCKED, blocked.status());
         assertEquals(1, blocked.domains().size());
@@ -108,7 +108,7 @@ class DomainGenericQualificationRunnerTest {
         VerifiedDomainExport refuted = verifier.requireVerified(sequenceDirectory);
 
         QualificationReport blocked = new DomainGenericDiscoveryQualification()
-            .evaluate(List.of(expression, refuted), 3, true);
+            .evaluate(java.util.Collections.nCopies(3, List.of(expression, refuted)));
 
         assertEquals(QualificationStatus.BLOCKED, blocked.status());
         assertTrue(blocked.blockers().contains(
@@ -124,11 +124,52 @@ class DomainGenericQualificationRunnerTest {
             output.resolve("runs/run-1/sequence"));
 
         QualificationReport blocked = new DomainGenericDiscoveryQualification()
-            .evaluate(List.of(expression, sequence), 2, true);
+            .evaluate(java.util.Collections.nCopies(2, List.of(expression, sequence)));
 
         assertEquals(QualificationStatus.BLOCKED, blocked.status());
         assertEquals(List.of("THREE_CLEAN_MULTI_DOMAIN_RUNS"),
             blocked.blockers());
+    }
+
+    @Test
+    void exactVerifiedSourcesDriveTheComposition(@TempDir Path copy) throws Exception {
+        try (var paths = Files.walk(output)) {
+            for (var file : paths.toList()) {
+                Path target = copy.resolve(output.relativize(file));
+                if (Files.isDirectory(file)) Files.createDirectories(target);
+                else Files.copy(file, target);
+            }
+        }
+        assertEquals(run.toCanonicalJson(), runner.verifyRetained(copy).toCanonicalJson());
+        Path manifest = copy.resolve("runs/run-2/sequence/export-manifest.json");
+        Files.writeString(manifest, Files.readString(manifest) + "\n");
+        var changed = verifier.requireVerified(manifest.getParent());
+        var original = verifier.requireVerified(copy.resolve("runs/run-1/sequence"));
+        assertEquals(original.manifest().contentHash(), changed.manifest().contentHash());
+        assertFalse(original.verification().manifestByteHash().equals(changed.verification().manifestByteHash()));
+        assertThrows(IllegalArgumentException.class, () -> runner.verifyRetained(copy));
+        Files.writeString(copy.resolve("runs/run-2/verification-receipts/sequence.json"),
+            changed.verification().toCanonicalJson());
+        assertThrows(IllegalArgumentException.class, () -> runner.verifyRetained(copy));
+    }
+
+    @Test
+    void retainedRunRejectsForgedReproductionFacts() {
+        var fingerprints = run.cleanRunFingerprints();
+        var shortened = fingerprints.subList(0, 2);
+        String hash = de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.hash(
+            run.schema() + "\nprofileCatalogHash=" + run.profileCatalogHash()
+            + "\nqualificationReportHash=" + run.qualificationReportHash() + "\ncleanRunFingerprints=" + shortened
+            + "\ncleanRunsIdentical=false\ndomainGenericQualificationStatus=" + run.domainGenericQualificationStatus()
+            + "\ndomainGenericClaimAuthorized=" + run.domainGenericClaimAuthorized()
+            + "\nautonomousCampaignClaimAuthorized=" + run.autonomousCampaignClaimAuthorized()
+            + "\nproofStatus=" + run.proofStatus() + "\nexternalNoveltyStatus=" + run.externalNoveltyStatus()
+            + "\npromotionStatus=" + run.promotionStatus() + "\npublicEvidenceStatus=" + run.publicEvidenceStatus());
+        assertThrows(IllegalArgumentException.class, () -> new DomainGenericQualificationRunner.QualificationRun(
+            run.schema(), run.profileCatalogHash(), run.qualificationReportHash(), shortened, false,
+            run.domainGenericQualificationStatus(), run.domainGenericClaimAuthorized(), run.autonomousCampaignClaimAuthorized(),
+            run.proofStatus(), run.externalNoveltyStatus(), run.promotionStatus(), run.publicEvidenceStatus(),
+            hash, run.profileCatalogJson(), run.report()));
     }
 
     @Test

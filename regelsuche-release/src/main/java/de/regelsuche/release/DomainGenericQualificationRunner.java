@@ -17,7 +17,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -38,30 +37,15 @@ public final class DomainGenericQualificationRunner {
         Path root = outputDirectory.toAbsolutePath().normalize();
         try {
             Files.createDirectories(root);
-            List<String> runFingerprints = new ArrayList<>();
-            List<VerifiedDomainExport> retained = List.of();
+            // A completion receipt from an earlier execution cannot cover a partial refresh.
+            Files.deleteIfExists(root.resolve("qualification-run.json"));
             for (int run = 1; run <= CLEAN_RUN_COUNT; run++) {
-                Path runDirectory = root.resolve("runs/run-" + run);
-                List<VerifiedDomainExport> exports = executeRun(runDirectory);
-                String fingerprint = runFingerprint(exports);
-                runFingerprints.add(fingerprint);
-                if (run == 1) {
-                    retained = exports;
-                }
+                executeRun(root.resolve("runs/run-" + run));
             }
-            boolean identical = runFingerprints.stream().distinct().count() == 1L;
-            DomainGenericDiscoveryQualification.QualificationReport report =
-                qualification.evaluate(retained, runFingerprints.size(), identical);
-            String profileCatalog = DomainGenericEvidenceProfile.catalogJson();
-            String profileCatalogHash = AutonomousResearchBriefV2.hash(profileCatalog);
-            QualificationRun result = QualificationRun.create(
-                report,
-                profileCatalog,
-                profileCatalogHash,
-                runFingerprints);
-            write(root.resolve("profile-catalog.json"), profileCatalog);
+            QualificationRun result = compose(root);
+            write(root.resolve("profile-catalog.json"), result.profileCatalogJson());
             write(root.resolve("qualification-report.json"),
-                report.toCanonicalJson());
+                result.report().toCanonicalJson());
             write(root.resolve("qualification-run.json"),
                 result.toCanonicalJson());
             return result;
@@ -71,39 +55,65 @@ public final class DomainGenericQualificationRunner {
         }
     }
 
-    private List<VerifiedDomainExport> executeRun(Path directory)
+    private void executeRun(Path directory)
             throws IOException {
         DomainDiscoveryEvidence expression = expressionEvidence();
         DomainDiscoveryEvidence sequence = sequenceEvidence();
         List<DomainInput> inputs = List.of(
             new DomainInput("expression", expression),
             new DomainInput("sequence", sequence));
-        List<VerifiedDomainExport> verified = new ArrayList<>();
         Path receipts = directory.resolve("verification-receipts");
         Files.createDirectories(receipts);
         for (DomainInput input : inputs) {
             Path exportDirectory = directory.resolve(input.name());
             exporter.write(exportDirectory, input.evidence());
             VerifiedDomainExport snapshot = verifier.requireVerified(exportDirectory);
-            verified.add(snapshot);
             write(
                 receipts.resolve(input.name() + ".json"),
                 snapshot.verification().toCanonicalJson());
         }
-        return verified.stream()
-            .sorted(Comparator.comparing(item -> item.manifest().domainId()))
-            .toList();
     }
 
-    private static String runFingerprint(List<VerifiedDomainExport> exports) {
-        List<String> material = exports.stream()
-            .sorted(Comparator.comparing(item -> item.manifest().domainId()))
-            .map(item -> item.manifest().domainId() + '|'
-                + item.manifest().contentHash() + '|'
-                + item.verification().contentHash())
-            .toList();
-        return AutonomousResearchBriefV2.hash(
-            "regelsuche.domain-generic-clean-run/v1\nexports=" + material);
+    /** Reopens all source exports and compares every emitted public artifact with its producer. */
+    public QualificationRun verifyRetained(Path root) {
+        try {
+            QualificationRun result = compose(root);
+            requireOriginal(root.resolve("profile-catalog.json"), result.profileCatalogJson());
+            requireOriginal(root.resolve("qualification-report.json"), result.report().toCanonicalJson());
+            requireOriginal(root.resolve("qualification-run.json"), result.toCanonicalJson());
+            return result;
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Could not verify retained domain qualification", exception);
+        }
+    }
+
+    private QualificationRun compose(Path root) throws IOException {
+        List<List<VerifiedDomainExport>> runs = new ArrayList<>();
+        for (int index = 1; index <= CLEAN_RUN_COUNT; index++) {
+            Path directory = root.resolve("runs/run-" + index);
+            List<VerifiedDomainExport> exports = new ArrayList<>();
+            for (String name : List.of("expression", "sequence")) {
+                VerifiedDomainExport verified = verifier.requireVerified(directory.resolve(name));
+                String expectedDomain = name.equals("expression") ? "expression-rewrite" : "integer-sequence-finite-difference";
+                if (!expectedDomain.equals(verified.manifest().domainId())) {
+                    throw new IllegalArgumentException("Unexpected reference domain at " + directory.resolve(name));
+                }
+                requireOriginal(directory.resolve("verification-receipts").resolve(name + ".json"),
+                    verified.verification().toCanonicalJson());
+                exports.add(verified);
+            }
+            runs.add(List.copyOf(exports));
+        }
+        String catalog = DomainGenericEvidenceProfile.catalogJson();
+        return QualificationRun.create(qualification.evaluate(runs), catalog, AutonomousResearchBriefV2.hash(catalog),
+            runs.stream().map(DomainGenericDiscoveryQualification::runFingerprint).toList());
+    }
+
+    private static void requireOriginal(Path file, String expected) throws IOException {
+        if (Files.isSymbolicLink(file) || Files.size(file) != expected.getBytes(StandardCharsets.UTF_8).length
+                || !Files.readString(file, StandardCharsets.UTF_8).equals(expected)) {
+            throw new IllegalArgumentException("Retained domain qualification evidence differs: " + file);
+        }
     }
 
     private static DomainDiscoveryEvidence expressionEvidence() {
@@ -196,6 +206,8 @@ public final class DomainGenericQualificationRunner {
             if (!AutonomousResearchBriefV2.hash(profileCatalogJson)
                     .equals(profileCatalogHash)
                     || !report.contentHash().equals(qualificationReportHash)
+                    || report.cleanRunCount() != cleanRunFingerprints.size()
+                    || report.cleanRunsIdentical() != cleanRunsIdentical
                     || cleanRunsIdentical
                         != (cleanRunFingerprints.size() >= CLEAN_RUN_COUNT
                             && cleanRunFingerprints.stream().distinct().count() == 1L)

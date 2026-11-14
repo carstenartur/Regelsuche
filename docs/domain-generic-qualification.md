@@ -208,6 +208,20 @@ Die Liste wird nach `domainId` sortiert und unter
 identisch sein. `qualification-run.json` bindet zusätzlich Katalog-, Report- und
 Fingerprint-Identitäten sowie sämtliche Claim- und Statusgrenzen.
 
+Der normale Release-Pfad liest alle sechs Exporte erneut ein und rekonstruiert
+den Bericht aus den verifizierten Snapshots. `manifestByteHash` bindet auch
+Leerzeichen im ursprünglichen Exportmanifest. `artifactSetHash` bindet Rolle,
+Byteanzahl und SHA-256 jedes exportierten Artefakts. Bereits ein abweichender
+Zeilenumbruch in nur einem gültigen Manifest ändert den Run-Fingerprint.
+
+`DomainGenericQualificationMain --verify-retained <Verzeichnis>` prüft die
+gespeicherten Dateien ohne Neuschreiben. Es vergleicht alle Verifikationsbelege,
+den Profilkatalog, den Bericht und den Run mit der Rekonstruktion.
+`generate-capability-status.py` prüft beim Einlesen dieselben Quellidentitäten
+und die daraus abgeleiteten Domänenzeilen. Das v1-Format und die kanonischen
+Referenzbytes bleiben kompatibel. Der Java-Einstieg für eine neue Auswertung
+erwartet die tatsächlich verifizierten Exporte aller Läufe.
+
 ## Consumer-Prüfverfahren
 
 Ein Consumer SOLLTE die Artefakte in dieser Reihenfolge prüfen:
