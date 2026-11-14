@@ -1,6 +1,7 @@
 package de.regelsuche.value;
 
 import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
@@ -152,14 +153,14 @@ public final class ExprValueFactory implements AutoCloseable {
             ExprValue right = fromExprRecursive(binary.right(), valuesBySyntax);
             value = switch (binary.operator()) {
                 case ADD -> sum(List.of(left, right));
-                case SUB -> left instanceof NumberValue a && right instanceof NumberValue b
-                    ? number(a.value().subtract(b.value()))
-                    : ordered(ValueOperator.SUB, List.of(left, right));
+                case SUB, DIV -> {
+                    ExactRational folded = left instanceof NumberValue a && right instanceof NumberValue b
+                        ? foldOrderedNumbers(binary.operator(), a.value(), b.value()) : null;
+                    yield folded != null ? number(folded)
+                        : ordered(binary.operator() == BinaryOperator.SUB ? ValueOperator.SUB : ValueOperator.DIV,
+                            List.of(left, right));
+                }
                 case MUL -> product(List.of(left, right));
-                case DIV -> left instanceof NumberValue a && right instanceof NumberValue b
-                        && !b.value().isZero()
-                    ? number(a.value().divide(b.value()))
-                    : ordered(ValueOperator.DIV, List.of(left, right));
                 case POW -> ordered(ValueOperator.POW, List.of(left, right));
             };
         } else {
@@ -170,6 +171,14 @@ public final class ExprValueFactory implements AutoCloseable {
             valuesBySyntax.put(expression, value);
         }
         return value;
+    }
+
+    static ExactRational foldOrderedNumbers(BinaryOperator operator, ExactRational left, ExactRational right) {
+        return switch (operator) {
+            case SUB -> left.subtract(right);
+            case DIV -> right.isZero() ? null : left.divide(right);
+            default -> null;
+        };
     }
 
     private synchronized ExprValue associativeCommutative(
