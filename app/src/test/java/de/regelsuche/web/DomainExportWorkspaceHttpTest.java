@@ -239,16 +239,20 @@ class DomainExportWorkspaceHttpTest {
         assertEquals(200, request("GET", receiptPath, null).statusCode());
 
         for (String field : List.of("check", "artifacts", "status", "promotionStatus", "checkBudget",
-                "rows", "work", "counterexampleStatus")) {
+                "rows", "work", "counterexampleStatus", "checkerContract", "firstCounterexampleIndex")) {
             var malformed = (ObjectNode) json.readTree(receipt.body());
             if (field.equals("status")) malformed.put(field, "FUTURE_STATUS");
             else if (field.equals("promotionStatus")) malformed.put(field, "APPROVED");
             else if (field.equals("checkBudget")) malformed.putObject(field);
-            else if (Set.of("rows", "work", "counterexampleStatus").contains(field)) {
+            else if (Set.of("rows", "work", "counterexampleStatus", "checkerContract", "firstCounterexampleIndex").contains(field)) {
                 var check = (ObjectNode) malformed.path("check");
                 if (field.equals("counterexampleStatus")) {
                     check.put(field, "FOUND").put("firstCounterexampleIndex", 0);
                     malformed.put(field, "FOUND");
+                } else if (field.equals("checkerContract")) {
+                    check.put(field, DomainFiniteDataCheck.RESIDUAL_CONTRACT);
+                } else if (field.equals("firstCounterexampleIndex")) {
+                    check.put(field, 1);
                 } else check.remove(field);
                 String checkHash = rehash(check);
                 for (var role : malformed.path("artifacts")) {

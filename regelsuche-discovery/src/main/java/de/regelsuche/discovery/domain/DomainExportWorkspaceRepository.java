@@ -172,7 +172,7 @@ public final class DomainExportWorkspaceRepository {
     private static void requireValidationBytes(DomainExportWorkspace workspace, String hash, byte[] bytes) {
         if (bytes.length > MAX_VALIDATION_BYTES) throw new IllegalArgumentException("domain validation receipt exceeds 1 MiB");
         var value = (ObjectNode) DomainExportWorkspace.read(bytes);
-        DomainDownstreamValidation.requireRetainedShape(value);
+        DomainDownstreamValidation.requireRetainedShape(workspace.evidence(), value);
         if (!DomainDownstreamValidation.SCHEMA.equals(value.path("schema").asText())
                 || !DomainDownstreamValidation.CONTRACT.equals(value.path("consumerContract").asText())
                 || !hash.equals(value.path("contentHash").asText())
