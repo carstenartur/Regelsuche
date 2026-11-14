@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from paper_controller_figure import MATRIX, write_controller_outputs
+
 
 def canonical_bytes(value: Any) -> bytes:
     return json.dumps(
@@ -170,6 +172,7 @@ def main() -> None:
         raise SystemExit("foundation manuscript must not imply final results")
 
     output = prepare_output(args.output)
+    write_controller_outputs(require_regular_input(root / MATRIX, "public controller evidence"), output)
     summary = {
         "schema": "regelsuche.paper-foundation-verification/v1",
         "manifestHash": manifest["contentHash"],

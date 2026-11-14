@@ -27,8 +27,7 @@ environment and does not require GitHub Actions.
    directories;
 3. compares both complete output trees byte-for-byte;
 4. compares the reproduced tree with committed `paper/generated`;
-5. requires exactly `foundation-verification.json` and
-   `foundation-summary.md`;
+5. requires the two foundation summaries, the public controller tables and the candidate-slot allocation figure;
 6. verifies that the receipt binds the manifest content hash and all required
    evidence issue IDs;
 7. requires `status=FOUNDATION`, pending central claims and
@@ -44,6 +43,7 @@ The underlying verifier additionally:
 - rejects symbolic manifest, schema, source and output paths;
 - restricts every listed source to the `paper/` tree;
 - checks every retained source SHA-256;
+- binds the decompressed public controller matrix to its integrated revision and digest, then derives per-policy tables and a shared-scale SVG;
 - recomputes the canonical manifest `contentHash`;
 - requires the limitations and foundation-only manuscript language.
 

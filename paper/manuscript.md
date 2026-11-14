@@ -117,6 +117,14 @@ The independent artifact in #387 must execute without undocumented maintainer kn
 
 Primary tables and figures are intentionally absent from this foundation revision. They will be generated from retained evidence after #383, #235, and #384 freeze their evaluated outputs.
 
+### Retrospective controller comparison
+
+The public one-round campaign compared the production feedback controller with two fixed policies. The comparison tests whether reallocating candidate slots between two mining batches changes which conjecture survives. The paired-observation batch supplies a negative control for diversity of support. The allocation figure shows how each policy divided the available slots. The table reports each batch's outputs and rejected clusters, the executed positive and negative holdouts, the next decisions and the stopping reason. The resource table retains the original units for every stage. [Generated tables and source revision](generated/public-controller-results.md) · [Allocation figure](generated/public-controller-allocation.svg)
+
+The feedback controller found no eligible continuation after qualification. Both fixed policies stopped at the horizon specified in their configurations. The observed agreement therefore leaves the value of feedback on campaigns with competing continuations open. Equal slots in one mining stage also leave open how resources should be allocated between stages. The historical observations were public before this comparison was planned. [Experiment protocol](../docs/autopilot-controller-comparison.md)
+
+### Outstanding primary evaluation
+
 Required result families include:
 
 - campaign and candidate terminal accounting;
@@ -159,6 +167,12 @@ Dwork et al. examine how choosing each analysis in response to earlier results c
 
 ACM's artifact policy distinguishes permanent availability, an audit of the software and data, and independent validation of reported results. For this study, two clean runs can test whether the supplied procedure emits identical canonical bytes. The separate reproduction record must identify the independent team, the artifacts it used and which claims it reproduced. An archive identifier establishes where to retrieve a version. [ACM, Artifact Review and Badging v1.1](https://www.acm.org/publications/policies/artifact-review-and-badging-current)
 
-## 12. Conclusion
+## 12. Ethics, tool use and provenance
+
+The controller comparison analyses machine-generated search observations. Its inputs, configuration and rejection receipts are part of the source artifact. Automated generation of the manuscript tables preserves the configured policies, including unsuccessful mining branches. Proof and novelty decisions in other studies require their own evidence. No expert labels, participant quotations or unpublished candidate statements enter this comparison.
+
+The repository distributes the implementation and associated documentation under the MIT license. Its third-party notices identify separate component licenses. The public controller matrix is bound to an exact revision and an uncompressed SHA-256 digest in the generated report. The manuscript and its declared source files are independently checked against the paper manifest. Automated assistance was used to prepare parts of the software, tests and manuscript. The authors' individual contributions, conflicts of interest, funding statements and approval for deposit remain pending. [Repository license](../LICENSE) · [Third-party notices](../THIRD_PARTY_NOTICES.md) · [Paper manifest](paper-artifact-manifest.json)
+
+## 13. Conclusion
 
 This foundation defines a falsifiable, claim-bounded evaluation of autonomous symbolic rule discovery. The final conclusion will be written only after the candidate-independent experiments, comparisons, amortization study, and independent artifact reproduction are frozen.
