@@ -211,6 +211,18 @@ output. Their replay trusts rule callbacks. Only explicit complete evidence
 changes `hasExtractionProof()` to true. The storage format covers the same
 exact native base-pattern fragment as the detached checker.
 
+## Concrete reference rules and closure
+
+The ordinary saturation API records each rule evaluated through concrete
+representatives in `result.diagnostics().referenceBridgeRules()`, in first-use
+order. For each root e-node it selects one finite expression for each child
+class. Other child alternatives can enable a match that this procedure misses.
+After such a rule participates, a no-progress pass reports
+`INCOMPLETE_REFERENCE_BRIDGE` with `saturated == false`. A more specific
+failure, budget or unresolved native guard keeps its own stop reason, and the
+reference rule IDs remain available. Exact native pattern matches still inspect
+alternative child e-nodes and can reach `FIX_POINT`.
+
 ## Conditional factor cancellation
 
 `saturateUnderAssumptions(input, assumptions, costOfNode)` takes an immutable

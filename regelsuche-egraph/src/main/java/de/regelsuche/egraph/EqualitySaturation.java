@@ -405,6 +405,7 @@ public final class EqualitySaturation {
     }
 
     private void applyConcrete(EGraph graph, RewriteRule rule, List<EClassId> snapshot, Run run) {
+        run.diagnostics.recordReferenceBridge(rule.id());
         var seen = new LinkedHashSet<EClassId>();
         for (EClassId raw : snapshot) {
             checkBudget(graph);
@@ -504,7 +505,8 @@ public final class EqualitySaturation {
             if (guards != null && (guards.undecided || diagnostics.hasUnresolvedConditions())) {
                 return SaturationStats.Reason.UNDECIDED_GUARDS;
             }
-            return SaturationStats.Reason.FIX_POINT;
+            return diagnostics.hasReferenceBridge()
+                ? SaturationStats.Reason.INCOMPLETE_REFERENCE_BRIDGE : SaturationStats.Reason.FIX_POINT;
         }
         void applied(String rule, SaturationProvenance.Witness witness) {
             appliedRules.merge(rule, 1, Integer::sum);
