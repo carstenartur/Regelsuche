@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,12 @@ class HistoricalComparisonWorkerTest {
         return worker.handle(JSON.writeValueAsString(request));
     }
     private Map<String, Object> task(String kind, String source) { return Map.of("kind", kind, "source", source); }
+
+    @Test void regeneratesThePublicSourceOnlyCandidateFreeze() throws Exception {
+        var panel = Path.of("..", "docs", "research", "cassini-development-v1");
+        String sources = Files.readString(panel.resolve("sources.json"));
+        assertEquals(Files.readString(panel.resolve("candidates.json")), HistoricalComparisonWorker.freezeInvariants(sources));
+    }
 
     @Test void freezeIncludesEveryLawAndBindsExactSourceBytes() throws Exception {
         var identity = Map.of("linear", List.of(List.of("1", "0"), List.of("0", "1")),
