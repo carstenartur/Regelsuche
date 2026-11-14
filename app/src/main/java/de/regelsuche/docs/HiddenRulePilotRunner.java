@@ -50,6 +50,16 @@ public final class HiddenRulePilotRunner {
     private final SymPyEquivalenceService equivalence = new SymPyEquivalenceService();
     private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();
 
+    private final BestFirstSearchStrategy searchStrategy;
+
+    public HiddenRulePilotRunner() {
+        this(new BestFirstSearchStrategy());
+    }
+
+    HiddenRulePilotRunner(BestFirstSearchStrategy searchStrategy) {
+        this.searchStrategy = Objects.requireNonNull(searchStrategy);
+    }
+
     public RuntimeResult run(RuntimeTask task) {
         Objects.requireNonNull(task, "task");
         GoalSearchResult discovery = search(
@@ -205,7 +215,7 @@ public final class HiddenRulePilotRunner {
     ) {
         SearchProblem problem = new SearchProblem(
             input, engine, scorer, canonicalizer, heuristic).withTarget(target);
-        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+        return searchStrategy.searchWithDiagnostics(problem);
     }
 
     private SearchTarget syntaxTarget(String expression) {
