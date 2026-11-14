@@ -162,6 +162,20 @@ class RetainedCandidateDossierHttpTest {
             var reviewed = json.readTree(literature("GET", suffix, null, false).body());
             assertEquals("NO_PRIOR_ART_FOUND_WITHIN_SCOPE", reviewed.get("assessments").get(0).get("status").asText());
             assertTrue(reviewed.get("receipts").isEmpty());
+            var covered = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(assessment);
+            covered.put("schema", "regelsuche.literature-assessment/v2");
+            covered.put("reviewedOn", "2026-11-09");
+            var source = (com.fasterxml.jackson.databind.node.ObjectNode) covered.get("scope").get(0);
+            var coverage = source.putObject("coverage");
+            coverage.put("status", "PARTIAL").put("limitations", "Abstract only.")
+                .putArray("unresolvedHits").addObject().put("identifier", "Example 12").put("reason", "Full text unavailable.");
+            assertEquals(400, literature("PUT", suffix, covered.toString(), false).statusCode());
+            covered.put("status", "UNRESOLVED");
+            assertEquals(201, literature("PUT", suffix, covered.toString(), false).statusCode());
+            var history = json.readTree(literature("GET", suffix, null, false).body()).get("assessments");
+            assertEquals(2, history.size());
+            assertEquals(coverage, history.get(0).get("scope").get(0).get("coverage"));
+            assertEquals("regelsuche.literature-assessment/v1", history.get(1).get("schema").asText());
             assertEquals(BUNDLE.scenario().toCanonicalJson(), request("GET", path("dossier"), null).body());
         } finally {
             if (previous == null) System.clearProperty("regelsuche.literature.theoremsearch.enabled");

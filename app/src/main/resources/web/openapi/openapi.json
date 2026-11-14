@@ -1062,7 +1062,7 @@
         "tags": ["Discovery Runs"],
         "operationId": "retainCandidateLiteratureAssessment",
         "summary": "Manuelle Literaturbewertung lokal ablegen",
-        "description": "Importiert eine Bewertung im Schema regelsuche.literature-assessment/v1. Die Identitäten von Run, Kandidat und gebundenem Artefakt müssen übereinstimmen.",
+        "description": "Importiert regelsuche.literature-assessment/v2 mit Zugangsstatus, Suchgrenzen und offenen Treffern je Quelle. Historische v1-Bewertungen bleiben lesbar und importierbar. Die Identitäten von Run, Kandidat und gebundenem Artefakt müssen übereinstimmen.",
         "x-regelsuche-context": "/api/discovery-runs",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
         "responses": {

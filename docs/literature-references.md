@@ -82,6 +82,21 @@ der Quelle folgt.
 | `NO_PRIOR_ART_FOUND_WITHIN_SCOPE` | Im festgehaltenen Suchumfang wurde keine Vorarbeit gefunden. |
 | `UNRESOLVED` | Die Prüfung bleibt offen. |
 
+Die aktuelle Vorlage (`regelsuche.literature-assessment/v2`) erfasst für jeden
+Bestand den Zugangsstatus `SEARCHED`, `PARTIAL` oder `INACCESSIBLE`, die
+konkreten Suchgrenzen (`limitations`) und eine Liste offener Treffer
+(`unresolvedHits`). Ein offener Treffer enthält seine Fundkennung (`identifier`)
+und den Grund (`reason`), etwa den fehlenden Zugang zum vollständigen Satz.
+Jede geprüfte Fundstelle in `matches` verweist mit `scopeIndex` auf den
+zugehörigen zugänglichen Bestand. Die Zählung beginnt bei 0.
+Eine ergebnislose Suche kann nur als `NO_PRIOR_ART_FOUND_WITHIN_SCOPE` gelten,
+wenn alle angegebenen Bestände durchsucht wurden, alle Treffer geklärt sind
+und keine einschlägige Vorarbeit belegt ist. Bei vollständig fehlendem Zugang
+kann eine offene Bewertung auch ohne ausgeführte Suchanfrage gespeichert werden.
+Eine bestätigte Vorarbeit in einem zugänglichen Bestand lässt sich auch bei
+Lücken in weiteren Beständen dokumentieren. Historische v1-Bewertungen behalten
+ihre eigene Fassung und Inhaltsidentität.
+
 Ein vollständiges externes Neuheitsurteil hat eigene Anforderungen. [Issue #391](https://github.com/carstenartur/Regelsuche/issues/391)
 
 ## Freiwilliger Abruf über TheoremSearch
