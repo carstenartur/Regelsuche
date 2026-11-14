@@ -144,27 +144,10 @@ runJmhAllocationBenchmark.configure {
     mustRunAfter ':app:jmh'
 }
 
-def allocationQualityProject = project(':regelsuche-quality')
-def allocationReportClasspath = allocationQualityProject.providers.provider {
-    allocationQualityProject.extensions.getByType(org.gradle.api.tasks.SourceSetContainer)
-        .named('main').get().runtimeClasspath
-}
-def verifyJmhAllocationBenchmark = tasks.register(
-    'verifyJmhAllocationBenchmark', JavaExec) {
+def verifyJmhAllocationBenchmark = tasks.register('verifyJmhAllocationBenchmark') {
     group = 'verification'
     description = 'Verifies normalized B/op evidence for scoped AST and search benchmarks.'
-    dependsOn ':regelsuche-quality:classes', runJmhAllocationBenchmark
-    workingDir repositoryRoot
-    classpath = allocationQualityProject.files(allocationReportClasspath)
-    mainClass = 'de.regelsuche.quality.jmh.JmhAllocationReportMain'
-    javaLauncher = allocationQualityProject.extensions.getByType(JavaToolchainService).launcherFor {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-    def summary = repositoryRoot.file('public/dev/bench/allocation.json')
-    args jmhAllocationResult.get().asFile.absolutePath, summary.asFile.absolutePath
-    inputs.file jmhAllocationResult
-    outputs.file summary
-    outputs.upToDateWhen { false }
+    dependsOn runJmhAllocationBenchmark, ':regelsuche-quality:verifyAllocationReport'
 }
 
 def z3VersionOutput = new ByteArrayOutputStream()
