@@ -169,8 +169,10 @@ Unmeasured work is not omitted. The report currently retains machine-readable ga
 - hidden-rule rediscovery with an independent induction engine beyond the two search schedulers below;
 - open-target discovery with an information-equivalent external generator;
 - fully held-out cross-family transfer;
-- autonomous campaign-controller comparison over the #355 Research Brief and ledger;
-- discovery-component and controller ablations.
+- adaptive scheduling when multiple campaign branches remain eligible and uniform allocation across unlike stage resources;
+- discovery-component ablations.
+
+The public #355 controller comparison independently executes production feedback, fixed-uniform candidate slots and a fixed schedule without feedback. The retained matrix records both formation branches and all ten resource dimensions for every controller. [Protocol and measured results](autopilot-controller-comparison-results.md).
 
 The randomized-valid simplification control and the six named native SymPy operation baselines are no longer coverage gaps: each is a configured seven-case matrix whose operation or scheduling policy is content-bound. A remaining gap disappears only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
 

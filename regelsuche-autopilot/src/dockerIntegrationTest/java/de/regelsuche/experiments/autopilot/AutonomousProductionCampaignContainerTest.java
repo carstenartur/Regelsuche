@@ -72,6 +72,20 @@ class AutonomousProductionCampaignContainerTest {
             }
 
             assertTreesEqual(localOutput, containerOutput);
+
+            Path hostComparison = temporaryDirectory.resolve("host-comparison.json");
+            Path imageComparison = temporaryDirectory.resolve("image-comparison.json");
+            CampaignControllerComparison.write(hostComparison);
+            try (var comparison = new GenericContainer<>(image)
+                    .withCommand("--compare-controllers", "/tmp/matrix.json")
+                    .withStartupCheckStrategy(new OneShotStartupCheckStrategy()
+                        .withTimeout(Duration.ofMinutes(30)))
+                    .withLogConsumer(frame -> System.err.print(frame.getUtf8String()))) {
+                comparison.start();
+                comparison.copyFileFromContainer("/tmp/matrix.json", imageComparison.toString());
+            }
+            assertArrayEquals(Files.readAllBytes(hostComparison), Files.readAllBytes(imageComparison),
+                "controller comparison differs between host and production image");
         } finally {
             restoreContainerTreeAccessBestEffort(image, containerOutput);
         }
