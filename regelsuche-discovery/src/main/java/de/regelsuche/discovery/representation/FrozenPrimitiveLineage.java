@@ -1,6 +1,8 @@
 package de.regelsuche.discovery.representation;
 
 import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.knowledge.RuleStatus;
 import de.regelsuche.parse.ExpressionParser;
@@ -63,17 +65,61 @@ final class FrozenPrimitiveLineage {
     private Set<Node> expand(Set<Node> frontier, String rule, Expr required, Set<String> permitted, Work remaining) {
         var next = new LinkedHashSet<Node>();
         for (var node : frontier) {
-            var moves = engines.get(rule).transform(node.expression());
-            if (!remaining.admit(moves.size() + 1)) return Set.of();
-            for (var move : moves) {
+            var engine = engines.get(rule);
+            var records = new ArrayList<AstRewriteTransformationEngine.GeneratedTransformation>();
+            engine.transformWithOccurrences(node.expression(), records::add);
+            if (!remaining.admit(records.size() + 1)) return Set.of();
+            for (var generated : records) {
+                var move = generated.transformation();
                 if (!move.primitiveRuleIds().equals(List.of(rule)) || !move.equivalencePreservingByConstruction()) continue;
-                if (required != null && !parser.parseTerm(move.transformedExpression()).equals(required)) continue;
+                Expr after = parser.parseTerm(move.transformedExpression());
+                if (required != null && !after.equals(required)) continue;
+                if (!rebuilds(generated, engine.rules().getFirst(), after)) continue;
                 var obligations = new LinkedHashSet<>(node.premises());
                 obligations.addAll(premises(move.assumptions()));
                 if (permitted.containsAll(obligations)) next.add(new Node(move.transformedExpression(), Set.copyOf(obligations)));
             }
         }
         return next;
+    }
+
+    private boolean rebuilds(AstRewriteTransformationEngine.GeneratedTransformation generated, RewriteRule rule, Expr after) {
+        Expr before = parser.parseTerm(generated.sourceExpression());
+        var position = generated.position();
+        var selected = position.selectAt(before).selectedSubtree();
+        if (selected.isEmpty() || !rule.matches(selected.orElseThrow())) return false;
+        var replaced = position.replaceAt(before, rule.apply(selected.orElseThrow())).rewrittenRoot();
+        return replaced.isPresent() && sameGrouping(replaced.orElseThrow(), after);
+    }
+
+    // The search formatter flattens nested sums and products. This comparison permits only their
+    // associative grouping and preserves operand order, multiplicity and all other operators.
+    boolean sameGrouping(Expr left, Expr right) {
+        if (left.equals(right)) return true;
+        if (!(left instanceof BinaryExpr a) || !(right instanceof BinaryExpr b) || a.operator() != b.operator()) return false;
+        if (a.operator() != BinaryOperator.ADD && a.operator() != BinaryOperator.MUL) {
+            return sameGrouping(a.left(), b.left()) && sameGrouping(a.right(), b.right());
+        }
+        var lhs = new ArrayList<Expr>();
+        var rhs = new ArrayList<Expr>();
+        flatten(left, a.operator(), lhs);
+        flatten(right, a.operator(), rhs);
+        if (lhs.size() != rhs.size()) return false;
+        for (int i = 0; i < lhs.size(); i++) if (!sameGrouping(lhs.get(i), rhs.get(i))) return false;
+        return true;
+    }
+
+    private static void flatten(Expr term, BinaryOperator operator, List<Expr> terms) {
+        if (term instanceof BinaryExpr binary && binary.operator() == operator) {
+            flatten(binary.left(), operator, terms);
+            flatten(binary.right(), operator, terms);
+        } else {
+            terms.add(term);
+        }
+    }
+
+    boolean bindsSource(String source, List<String> path) {
+        return !path.isEmpty() && sameGrouping(parser.parseTerm(source), parser.parseTerm(path.getFirst()));
     }
 
     private static final class Work {

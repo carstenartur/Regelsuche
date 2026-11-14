@@ -25,7 +25,10 @@ class FrozenPrimitiveLineageTest {
         var search = new TargetFreeRepresentationSearch().search("sin(t)+0",
             AstRewriteTransformationEngine.defaultRules(), TargetFreeRepresentationSearch.Budget.small());
         var state = search.content().candidateStates().getFirst();
-        assertTrue(FrozenPrimitiveLineage.statePath(state, java.util.Map.of()).isEmpty());
+        assertFalse(replay.bindsSource("sin(t)+0", FrozenPrimitiveLineage.statePath(state, java.util.Map.of())));
+        assertTrue(replay.bindsSource("a+(b+c)", List.of("(a+b)+c")));
+        assertFalse(replay.bindsSource("a/(b/c)", List.of("(a/b)/c")));
+        assertFalse(replay.bindsSource("a+b", List.of("b+a")));
     }
 
     @Test void requiresExactlyTheActualPremisesProducedByTheRule() {

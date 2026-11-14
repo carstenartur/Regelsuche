@@ -294,7 +294,7 @@ public final class TargetFreeSymPyBridgeDiscoveryScenario {
     ) {
         OracleValidation validation = oracle.validateEquivalence(
             SOURCE_EXPRESSION, state.expression());
-        if (path.isEmpty()) return CandidateProofStatus.OBSERVED;
+        if (!replay.bindsSource(SOURCE_EXPRESSION, path)) return CandidateProofStatus.OBSERVED;
         boolean validatedPath = state.pathRuleIds().stream()
             .map(rules::get)
             .allMatch(rule -> rule != null
