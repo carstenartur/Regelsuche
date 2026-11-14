@@ -35,6 +35,7 @@ final class ModPowSearchTrace {
     private final List<Improvement> improvements = new ArrayList<>();
     private Matching primitiveMatch = NONE, learnedMatch = NONE;
     private int generated, replayed, approved, scored;
+    private long dispatchWork;
     private long best;
 
     ModPowSearchTrace(Row row) {
@@ -45,6 +46,11 @@ final class ModPowSearchTrace {
 
     void runLearned(TypedOutputPattern pattern) {
         var result = pattern.findWithMatchWork(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);
+        runLearned(result, 0);
+    }
+
+    void runLearned(TypedOutputPattern.MeasuredResult result, long dispatchWork) {
+        this.dispatchWork = dispatchWork;
         require(result.result().complete(), "incomplete AC matching on " + row.id());
         learnedMatch = new Matching(result.result().assignmentAttempts(), result.result().matcherSteps(), result.patternBranches());
         for (var proposal : result.result().applications()) {
@@ -100,10 +106,11 @@ final class ModPowSearchTrace {
         long dag = ModPowFrozenTransfer.cost(row, target).dag();
         if (dag < best) {
             best = dag;
-            improvements.add(new Improvement(work().total(), best));
+            improvements.add(new Improvement(completedWork(), best));
         }
     }
 
+    long completedWork() { return work().total() + dispatchWork; }
     Work work() { return new Work(primitiveMatch, learnedMatch, generated, replayed, approved, scored); }
     List<Improvement> improvements() { return List.copyOf(improvements); }
     Set<Expr> primitiveTargets() { return Set.copyOf(primitiveTargets); }

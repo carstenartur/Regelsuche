@@ -19,6 +19,40 @@ import org.junit.jupiter.api.Test;
 
 /** Development syntax fixtures, NOT equivalent mathematical f/g identities. */
 class TypedOutputPatternTest {
+    @Test void sharedKeyIndexPreservesScopedTermsDuplicateSlotsAndNativeOrder() {
+        var pattern = learned();
+        var index = pattern.compileIndex();
+        Expr a = VariableExpr.scoped(new SymbolId(new UUID(0, 8), 1));
+        Expr b = VariableExpr.scoped(new SymbolId(new UUID(0, 8), 2));
+        Expr nested = f("tag", a);
+        var input = f("bundle", f("keep", nested), f("keep", b), f("irrelevant", a),
+            f("f", nested), f("keep", nested));
+        var reference = pattern.findWithMatchWork(input, 64);
+        var indexed = index.find(input, 64);
+        assertTrue(indexed.matching().result().complete());
+        assertEquals(reference.result().applications(), indexed.matching().result().applications());
+        assertEquals(List.of(List.of(3, 0), List.of(3, 4)),
+            indexed.matching().result().applications().stream().map(TypedOutputPattern.Application::positions).toList());
+        assertEquals(3, index.compilationWork());
+        assertEquals(new TypedOutputPattern.DispatchWork(10, 3, 1, 2), indexed.dispatch());
+        assertEquals(2, indexed.matching().result().assignmentAttempts());
+        assertFalse(index.find(input, 1).matching().result().complete());
+        assertTrue(index.find(input, 2).matching().result().complete());
+        assertThrows(IllegalArgumentException.class, () -> index.find(input, 0));
+    }
+
+    @Test void unsupportedIndexFallsBackToTheSameBoundedMatcher() {
+        var source = PatternExpr.fn("pair", PatternExpr.var("U"), PatternExpr.var("V"));
+        var target = PatternExpr.fn("pair", PatternExpr.var("V"), PatternExpr.var("U"));
+        var pattern = new TypedOutputPattern(new TypedPatternGeneralizer.Candidate(source, target, List.of(), List.of()));
+        var index = pattern.compileIndex();
+        var input = f("pair", v("x"), v("y"));
+        for (int limit : List.of(1, 2)) {
+            assertEquals(pattern.findWithMatchWork(input, limit), index.find(input, limit).matching());
+            assertEquals(0, index.find(input, limit).dispatch().total());
+        }
+    }
+
     @Test void appliesAnActuallyGeneralizedHypothesisToRenamedOutputs() {
         var learned = learned();
         Expr z = v("renamed");

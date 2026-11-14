@@ -1,0 +1,315 @@
+{
+  "schema": "regelsuche.modpow-transfer-corpus/v1",
+  "split": "TEST",
+  "cases": [
+    {
+      "id": "J2-forward",
+      "source": "program(modpow(aJ20,qJ20*eJ20,nJ20),modpow(aJ20,eJ20,nJ20),modpow(qJ20,qJ20*qJ20,nJ20))",
+      "roles": {
+        "a": "aJ20",
+        "q": "qJ20",
+        "e": "eJ20",
+        "n": "nJ20",
+        "r": "rJ20"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": true,
+      "assumptions": [
+        "aJ20 integer",
+        "qJ20 integer",
+        "qJ20 >= 0",
+        "eJ20 integer",
+        "eJ20 >= 0",
+        "rJ20 integer",
+        "rJ20 >= 0",
+        "nJ20 integer",
+        "nJ20 > 0"
+      ]
+    },
+    {
+      "id": "J2-reverse",
+      "source": "program(modpow(qJ21,qJ21*qJ21,nJ21),modpow(aJ21,eJ21,nJ21),modpow(aJ21,eJ21*qJ21,nJ21))",
+      "roles": {
+        "a": "aJ21",
+        "q": "qJ21",
+        "e": "eJ21",
+        "n": "nJ21",
+        "r": "rJ21"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": true,
+      "assumptions": [
+        "aJ21 integer",
+        "qJ21 integer",
+        "qJ21 >= 0",
+        "eJ21 integer",
+        "eJ21 >= 0",
+        "rJ21 integer",
+        "rJ21 >= 0",
+        "nJ21 integer",
+        "nJ21 > 0"
+      ]
+    },
+    {
+      "id": "J2-no-reuse",
+      "source": "program(modpow(qJ22,qJ22*qJ22,nJ22),modpow(aJ22,rJ22,nJ22),modpow(aJ22,qJ22*eJ22,nJ22))",
+      "roles": {
+        "a": "aJ22",
+        "q": "qJ22",
+        "e": "eJ22",
+        "n": "nJ22",
+        "r": "rJ22"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": false,
+      "assumptions": [
+        "aJ22 integer",
+        "qJ22 integer",
+        "qJ22 >= 0",
+        "eJ22 integer",
+        "eJ22 >= 0",
+        "rJ22 integer",
+        "rJ22 >= 0",
+        "nJ22 integer",
+        "nJ22 > 0"
+      ]
+    },
+    {
+      "id": "J2-missing-premise",
+      "source": "program(modpow(qJ23,qJ23*qJ23,nJ23),modpow(aJ23,eJ23,nJ23),modpow(aJ23,qJ23*eJ23,nJ23))",
+      "roles": {
+        "a": "aJ23",
+        "q": "qJ23",
+        "e": "eJ23",
+        "n": "nJ23",
+        "r": "rJ23"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": false,
+      "assumptions": [
+        "aJ23 integer",
+        "qJ23 integer",
+        "qJ23 >= 0",
+        "eJ23 integer",
+        "eJ23 >= 0",
+        "rJ23 integer",
+        "rJ23 >= 0",
+        "nJ23 integer"
+      ]
+    },
+    {
+      "id": "J4-forward",
+      "source": "program(modpow(aJ40,qJ40*eJ40,nJ40),modpow(aJ40,eJ40,nJ40),modpow(qJ40,qJ40*qJ40,nJ40),modpow(eJ40,qJ40*qJ40,nJ40),modpow(rJ40,qJ40*qJ40,nJ40))",
+      "roles": {
+        "a": "aJ40",
+        "q": "qJ40",
+        "e": "eJ40",
+        "n": "nJ40",
+        "r": "rJ40"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": true,
+      "assumptions": [
+        "aJ40 integer",
+        "qJ40 integer",
+        "qJ40 >= 0",
+        "eJ40 integer",
+        "eJ40 >= 0",
+        "rJ40 integer",
+        "rJ40 >= 0",
+        "nJ40 integer",
+        "nJ40 > 0"
+      ]
+    },
+    {
+      "id": "J4-reverse",
+      "source": "program(modpow(qJ41,qJ41*qJ41,nJ41),modpow(eJ41,qJ41*qJ41,nJ41),modpow(rJ41,qJ41*qJ41,nJ41),modpow(aJ41,eJ41,nJ41),modpow(aJ41,eJ41*qJ41,nJ41))",
+      "roles": {
+        "a": "aJ41",
+        "q": "qJ41",
+        "e": "eJ41",
+        "n": "nJ41",
+        "r": "rJ41"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": true,
+      "assumptions": [
+        "aJ41 integer",
+        "qJ41 integer",
+        "qJ41 >= 0",
+        "eJ41 integer",
+        "eJ41 >= 0",
+        "rJ41 integer",
+        "rJ41 >= 0",
+        "nJ41 integer",
+        "nJ41 > 0"
+      ]
+    },
+    {
+      "id": "J4-no-reuse",
+      "source": "program(modpow(qJ42,qJ42*qJ42,nJ42),modpow(eJ42,qJ42*qJ42,nJ42),modpow(rJ42,qJ42*qJ42,nJ42),modpow(aJ42,rJ42,nJ42),modpow(aJ42,qJ42*eJ42,nJ42))",
+      "roles": {
+        "a": "aJ42",
+        "q": "qJ42",
+        "e": "eJ42",
+        "n": "nJ42",
+        "r": "rJ42"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": false,
+      "assumptions": [
+        "aJ42 integer",
+        "qJ42 integer",
+        "qJ42 >= 0",
+        "eJ42 integer",
+        "eJ42 >= 0",
+        "rJ42 integer",
+        "rJ42 >= 0",
+        "nJ42 integer",
+        "nJ42 > 0"
+      ]
+    },
+    {
+      "id": "J4-missing-premise",
+      "source": "program(modpow(qJ43,qJ43*qJ43,nJ43),modpow(eJ43,qJ43*qJ43,nJ43),modpow(rJ43,qJ43*qJ43,nJ43),modpow(aJ43,eJ43,nJ43),modpow(aJ43,qJ43*eJ43,nJ43))",
+      "roles": {
+        "a": "aJ43",
+        "q": "qJ43",
+        "e": "eJ43",
+        "n": "nJ43",
+        "r": "rJ43"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": false,
+      "assumptions": [
+        "aJ43 integer",
+        "qJ43 integer",
+        "qJ43 >= 0",
+        "eJ43 integer",
+        "eJ43 >= 0",
+        "rJ43 integer",
+        "rJ43 >= 0",
+        "nJ43 integer"
+      ]
+    },
+    {
+      "id": "J7-forward",
+      "source": "program(modpow(aJ70,qJ70*eJ70,nJ70),modpow(aJ70,eJ70,nJ70),modpow(qJ70,qJ70*qJ70,nJ70),modpow(eJ70,qJ70*qJ70,nJ70),modpow(rJ70,qJ70*qJ70,nJ70),modpow(nJ70,qJ70*qJ70,nJ70),modpow(qJ70*eJ70,qJ70*qJ70,nJ70),modpow(qJ70*rJ70,qJ70*qJ70,nJ70))",
+      "roles": {
+        "a": "aJ70",
+        "q": "qJ70",
+        "e": "eJ70",
+        "n": "nJ70",
+        "r": "rJ70"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": true,
+      "assumptions": [
+        "aJ70 integer",
+        "qJ70 integer",
+        "qJ70 >= 0",
+        "eJ70 integer",
+        "eJ70 >= 0",
+        "rJ70 integer",
+        "rJ70 >= 0",
+        "nJ70 integer",
+        "nJ70 > 0"
+      ]
+    },
+    {
+      "id": "J7-reverse",
+      "source": "program(modpow(qJ71,qJ71*qJ71,nJ71),modpow(eJ71,qJ71*qJ71,nJ71),modpow(rJ71,qJ71*qJ71,nJ71),modpow(nJ71,qJ71*qJ71,nJ71),modpow(qJ71*eJ71,qJ71*qJ71,nJ71),modpow(qJ71*rJ71,qJ71*qJ71,nJ71),modpow(aJ71,eJ71,nJ71),modpow(aJ71,eJ71*qJ71,nJ71))",
+      "roles": {
+        "a": "aJ71",
+        "q": "qJ71",
+        "e": "eJ71",
+        "n": "nJ71",
+        "r": "rJ71"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": true,
+      "assumptions": [
+        "aJ71 integer",
+        "qJ71 integer",
+        "qJ71 >= 0",
+        "eJ71 integer",
+        "eJ71 >= 0",
+        "rJ71 integer",
+        "rJ71 >= 0",
+        "nJ71 integer",
+        "nJ71 > 0"
+      ]
+    },
+    {
+      "id": "J7-no-reuse",
+      "source": "program(modpow(qJ72,qJ72*qJ72,nJ72),modpow(eJ72,qJ72*qJ72,nJ72),modpow(rJ72,qJ72*qJ72,nJ72),modpow(nJ72,qJ72*qJ72,nJ72),modpow(qJ72*eJ72,qJ72*qJ72,nJ72),modpow(qJ72*rJ72,qJ72*qJ72,nJ72),modpow(aJ72,rJ72,nJ72),modpow(aJ72,qJ72*eJ72,nJ72))",
+      "roles": {
+        "a": "aJ72",
+        "q": "qJ72",
+        "e": "eJ72",
+        "n": "nJ72",
+        "r": "rJ72"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": false,
+      "assumptions": [
+        "aJ72 integer",
+        "qJ72 integer",
+        "qJ72 >= 0",
+        "eJ72 integer",
+        "eJ72 >= 0",
+        "rJ72 integer",
+        "rJ72 >= 0",
+        "nJ72 integer",
+        "nJ72 > 0"
+      ]
+    },
+    {
+      "id": "J7-missing-premise",
+      "source": "program(modpow(qJ73,qJ73*qJ73,nJ73),modpow(eJ73,qJ73*qJ73,nJ73),modpow(rJ73,qJ73*qJ73,nJ73),modpow(nJ73,qJ73*qJ73,nJ73),modpow(qJ73*eJ73,qJ73*qJ73,nJ73),modpow(qJ73*rJ73,qJ73*qJ73,nJ73),modpow(aJ73,eJ73,nJ73),modpow(aJ73,qJ73*eJ73,nJ73))",
+      "roles": {
+        "a": "aJ73",
+        "q": "qJ73",
+        "e": "eJ73",
+        "n": "nJ73",
+        "r": "rJ73"
+      },
+      "qBits": 23,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": false,
+      "assumptions": [
+        "aJ73 integer",
+        "qJ73 integer",
+        "qJ73 >= 0",
+        "eJ73 integer",
+        "eJ73 >= 0",
+        "rJ73 integer",
+        "rJ73 >= 0",
+        "nJ73 integer"
+      ]
+    }
+  ]
+}

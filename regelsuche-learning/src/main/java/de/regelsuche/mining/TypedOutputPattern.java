@@ -9,6 +9,7 @@ import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.RecognitionProfile;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -124,7 +125,95 @@ public final class TypedOutputPattern {
         return new MeasuredResult(run.result(), run.patternBranches);
     }
 
-    private Run execute(FunctionExpr program, int maximumAssignments) {
+    /**
+     * Compile an optional shared direct argument as a necessary structural equality.
+     * The existing matcher still checks each admitted tuple and constructs its applications.
+     */
+    public Indexed compileIndex() {
+        int work = 1;
+        if (sourcePattern.arguments().size() == 2
+                && sourcePattern.arguments().get(0) instanceof PatternExpr.Function left
+                && sourcePattern.arguments().get(1) instanceof PatternExpr.Function right) {
+            for (int i = 0; i < left.arguments().size(); i++) {
+                work++;
+                if (!(left.arguments().get(i) instanceof PatternExpr.Placeholder hole)) continue;
+                for (int j = 0; j < right.arguments().size(); j++) {
+                    work++;
+                    if (hole.equals(right.arguments().get(j))) {
+                        return new Indexed(new Key(left, i), new Key(right, j), work);
+                    }
+                }
+            }
+        }
+        return new Indexed(null, null, work);
+    }
+
+    private record Key(PatternExpr.Function slot, int index) {
+        Expr extract(Expr output) {
+            if (output instanceof FunctionExpr f && f.name().equals(slot.name())
+                    && f.arguments().size() == slot.arguments().size()) {
+                return f.arguments().get(index);
+            }
+            return null;
+        }
+    }
+
+    public record DispatchWork(int extractions, int writes, int lookups, int examined) {
+        public long total() { return (long) extractions + writes + lookups + examined; }
+    }
+
+    public record IndexedResult(MeasuredResult matching, DispatchWork dispatch) {}
+
+    public final class Indexed {
+        private final Key left;
+        private final Key right;
+        private final int compilationWork;
+
+        private Indexed(Key left, Key right, int compilationWork) {
+            this.left = left;
+            this.right = right;
+            this.compilationWork = compilationWork;
+        }
+
+        public int compilationWork() { return compilationWork; }
+
+        /** The assignment limit applies to tuples actually delegated to the native matcher. */
+        public IndexedResult find(FunctionExpr program, int maximumAssignments) {
+            if (left == null) {
+                return new IndexedResult(findWithMatchWork(program, maximumAssignments),
+                    new DispatchWork(0, 0, 0, 0));
+            }
+            var run = new Run();
+            int extractions = 0, writes = 0, lookups = 0, examined = 0;
+            if (eligible(program, maximumAssignments)) {
+                var outputs = program.arguments();
+                var buckets = new HashMap<Expr, List<Integer>>();
+                for (int i = 0; i < outputs.size(); i++) {
+                    extractions++;
+                    Expr value = right.extract(outputs.get(i));
+                    if (value == null) continue;
+                    buckets.computeIfAbsent(value, ignored -> new ArrayList<>()).add(i);
+                    writes++;
+                }
+                for (int i = 0; i < outputs.size() && !run.stopped; i++) {
+                    extractions++;
+                    Expr value = left.extract(outputs.get(i));
+                    if (value == null) continue;
+                    lookups++;
+                    for (int j : buckets.getOrDefault(value, List.of())) {
+                        examined++;
+                        if (i == j) continue;
+                        attempt(program, maximumAssignments, List.of(i, j), run);
+                        if (run.stopped) break;
+                    }
+                }
+            }
+            return new IndexedResult(new MeasuredResult(run.result(), run.patternBranches),
+                new DispatchWork(extractions, writes, lookups, examined));
+        }
+    }
+
+    private boolean eligible(FunctionExpr program, int maximumAssignments) {
         Objects.requireNonNull(program, "program");
         if (maximumAssignments < 1 || maximumAssignments > MAXIMUM_ASSIGNMENTS) {
             throw new IllegalArgumentException("assignment budget outside supported bounds");
@@ -133,9 +222,13 @@ public final class TypedOutputPattern {
             throw new IllegalArgumentException("too many program outputs");
         }
         requireBounded(program, null);
+        return program.name().equals(sourcePattern.name())
+            && program.arguments().size() >= sourcePattern.arguments().size();
+    }
+
+    private Run execute(FunctionExpr program, int maximumAssignments) {
         var run = new Run();
-        if (program.name().equals(sourcePattern.name())
-                && program.arguments().size() >= sourcePattern.arguments().size()) {
+        if (eligible(program, maximumAssignments)) {
             enumerate(program, maximumAssignments, new ArrayList<>(),
                 new boolean[program.arguments().size()], run);
         }
@@ -159,45 +252,7 @@ public final class TypedOutputPattern {
             List<Integer> positions, boolean[] used, Run run) {
         if (run.stopped) return;
         if (positions.size() == sourcePattern.arguments().size()) {
-            // Only an untried assignment makes an exactly consumed budget incomplete.
-            if (run.attempts == maximumAssignments) {
-                run.complete = false;
-                run.stopped = true;
-                return;
-            }
-            run.attempts++;
-            var selected = new FunctionExpr(program.name(), positions.stream()
-                .map(index -> program.arguments().get(index)).toList());
-            var outcome = matcher.match(selected);
-            run.matcherSteps = Math.addExact(run.matcherSteps, outcome.evaluatedSteps());
-            run.patternBranches = Math.addExact(run.patternBranches, outcome.patternBranches());
-            run.complete &= outcome.complete();
-            for (var match : outcome.matches()) {
-                var bindings = match.bindings();
-                try {
-                    // Bound substitution before allocating a reconstruction or target.
-                    requireBounded(sourcePattern, bindings);
-                    requireBounded(targetPattern, bindings);
-                    if (recognitionProfile.equals(RecognitionProfile.exact())
-                            && !sourcePattern.instantiate(bindings).equals(selected)) {
-                        throw new IllegalStateException("exact output match does not reconstruct its source");
-                    }
-                    var replacement = (FunctionExpr) targetPattern.instantiate(bindings);
-                    var outputs = new ArrayList<>(program.arguments());
-                    for (int i = 0; i < positions.size(); i++) {
-                        // Recognition must not reorder or rebuild an unchanged output.
-                        if (!sourcePattern.arguments().get(i).equals(targetPattern.arguments().get(i))) {
-                            outputs.set(positions.get(i), replacement.arguments().get(i));
-                        }
-                    }
-                    var target = new FunctionExpr(program.name(), outputs);
-                    requireBounded(target, null);
-                    run.applications.add(new Application(program, target, positions, bindings,
-                        recognitionProfile, match.trace()));
-                } catch (StructuralLimit exception) {
-                    run.complete = false;
-                }
-            }
+            attempt(program, maximumAssignments, positions, run);
             return;
         }
         for (int index = 0; index < used.length && !run.stopped; index++) {
@@ -207,6 +262,48 @@ public final class TypedOutputPattern {
             enumerate(program, maximumAssignments, positions, used, run);
             positions.removeLast();
             used[index] = false;
+        }
+    }
+
+    private void attempt(FunctionExpr program, int maximumAssignments, List<Integer> positions, Run run) {
+        // Only an untried assignment makes an exactly consumed budget incomplete.
+        if (run.attempts == maximumAssignments) {
+            run.complete = false;
+            run.stopped = true;
+            return;
+        }
+        run.attempts++;
+        var selected = new FunctionExpr(program.name(), positions.stream()
+            .map(index -> program.arguments().get(index)).toList());
+        var outcome = matcher.match(selected);
+        run.matcherSteps = Math.addExact(run.matcherSteps, outcome.evaluatedSteps());
+        run.patternBranches = Math.addExact(run.patternBranches, outcome.patternBranches());
+        run.complete &= outcome.complete();
+        for (var match : outcome.matches()) {
+            var bindings = match.bindings();
+            try {
+                // Bound substitution before allocating a reconstruction or target.
+                requireBounded(sourcePattern, bindings);
+                requireBounded(targetPattern, bindings);
+                if (recognitionProfile.equals(RecognitionProfile.exact())
+                        && !sourcePattern.instantiate(bindings).equals(selected)) {
+                    throw new IllegalStateException("exact output match does not reconstruct its source");
+                }
+                var replacement = (FunctionExpr) targetPattern.instantiate(bindings);
+                var outputs = new ArrayList<>(program.arguments());
+                for (int i = 0; i < positions.size(); i++) {
+                    // Recognition must not reorder or rebuild an unchanged output.
+                    if (!sourcePattern.arguments().get(i).equals(targetPattern.arguments().get(i))) {
+                        outputs.set(positions.get(i), replacement.arguments().get(i));
+                    }
+                }
+                var target = new FunctionExpr(program.name(), outputs);
+                requireBounded(target, null);
+                run.applications.add(new Application(program, target, positions, bindings,
+                    recognitionProfile, match.trace()));
+            } catch (StructuralLimit exception) {
+                run.complete = false;
+            }
         }
     }
 
