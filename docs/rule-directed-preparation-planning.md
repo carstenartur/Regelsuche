@@ -227,18 +227,23 @@ Fallklassifikation und die vom Pilot erwartete Regel gelangen erst nach dem
 Festschreiben der Kandidaten in den Vergleich. Es gelten dieselben Grenzen
 und dieselben Ausgangsannahmen in allen vier Profilen.
 
-| Zugelassene Stufen | Qualifizierte Anwendungen auf 8 Positivfällen | Zusätzliche Anwendungen der letzten Stufe |
+| Zugelassene Stufen | Anwendungen unter den Eingabeannahmen (8 Positivfälle) | Weitere Kandidaten mit zusätzlichen Bedingungen |
 | --- | ---: | ---: |
-| Exaktes strukturelles Matching | 3 | 3 |
-| Zusätzlich die für die Regel deklarierte Theorie | 4 | 1 |
+| Exaktes strukturelles Matching | 3 | 0 |
+| Zusätzlich die für die Regel deklarierte Theorie | 4 | 0 |
 | Zusätzlich registrierte exakte Spezialisten | 4 | 0 |
-| Zusätzlich die begrenzte lokale Brückensuche | 8 | 4 |
+| Zusätzlich die begrenzte lokale Brückensuche | 4 | 4 |
 
 Die Theorie erkennt die vertauschten Summanden der pythagoreischen Identität.
 Für die drei importierten Hauptregel-IDs ist kein exakter Spezialist registriert.
-Die letzte Stufe erzeugte insgesamt 51 Übergänge über alle Quellen und
-Hauptregeln. Sie erreichte vier zusätzliche belegte Anwendungen durch ein
-oder zwei Kürzungsschritte. Die drei Negativfälle lieferten in jedem Profil
+Die letzte Stufe erzeugte über alle Quellen und Hauptregeln 51 Übergänge.
+Die vier zusätzlich erreichten Ausdrücke setzen nach ein oder zwei Kürzungen
+jeweils `a != 0` voraus, drei davon zusätzlich `b != 0`. Beide Bedingungen
+fehlen in den jeweiligen Eingaben. Zwei Fälle im separat registrierten
+Guard-Panel liefern die für die Kürzung erforderliche Annahme und erlauben so
+eine zusätzliche Anwendung. [Auswertung nach Regel und Stufe](research/sympy-preparation-attribution.md).
+
+Die drei Negativfälle lieferten in jedem Profil
 keinen Kandidaten. Bei vollständig aktivierter Brückensuche endeten alle 25
 erfolglosen Regelversuche nach Ausschöpfen der endlichen Closure. Mit
 abgeschaltetem Fallback erfasst der Bericht die erschöpften aktivierten Stufen.

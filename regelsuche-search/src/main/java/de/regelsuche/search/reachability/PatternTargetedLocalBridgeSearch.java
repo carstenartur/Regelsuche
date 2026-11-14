@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 
 /**
  * Bounded local breadth-first search whose only terminal objective is concrete
@@ -125,10 +126,16 @@ public final class PatternTargetedLocalBridgeSearch {
         String sourceExpression,
         AssumptionSignature initialAssumptions
     ) {
+        return analyze(sourceExpression, initialAssumptions, OperationLedger.DISABLED);
+    }
+
+    /** Observes one formation and any concrete certificate checks it actually performs. */
+    public Attempt analyze(String sourceExpression, AssumptionSignature initialAssumptions, OperationLedger ledger) {
+        Objects.requireNonNull(ledger, "ledger").requireUnusedFormation();
         String source = normalize(sourceExpression, "sourceExpression");
         AssumptionSignature assumptions = normalized(initialAssumptions);
         try {
-            return new SearchRun(source, assumptions).execute();
+            return new SearchRun(source, assumptions, ledger).execute();
         } catch (RuntimeException exception) {
             return new Attempt(
                 Status.TECHNICAL_FAILURE,
@@ -144,6 +151,13 @@ public final class PatternTargetedLocalBridgeSearch {
 
     /** Independently replays a retained preparation/principal certificate. */
     public Verification verify(Bridge bridge) {
+        return verify(bridge, OperationLedger.DISABLED);
+    }
+
+    /** Observes this certificate check, including any work before a rejection. */
+    public Verification verify(Bridge bridge, OperationLedger ledger) {
+        Objects.requireNonNull(ledger, "ledger").beginVerification();
+        var operations = ledger.verification;
         if (bridge == null) {
             return new Verification(false, "BRIDGE_MISSING");
         }
@@ -177,8 +191,8 @@ public final class PatternTargetedLocalBridgeSearch {
                     return new Verification(
                         false, "PREPARATION_PATH_DISCONNECTED");
                 }
-                Optional<Transformation> replay = replayEngine
-                    .transform(current).stream()
+                Optional<Transformation> replay = operations
+                    .prepare(replayEngine, current).stream()
                     .filter(value -> retained.ruleId().equals(
                         value.rule()))
                     .filter(value -> retained.applicationKey().equals(
@@ -213,13 +227,13 @@ public final class PatternTargetedLocalBridgeSearch {
                 return new Verification(false, "TERMINAL_STATE_MISMATCH");
             }
             PatternMatchAnalyzer.Analysis terminal = analyzePattern(
-                parser.parseTerm(current));
+                parser.parseTerm(current), operations);
             if (!terminal.matched()
                     || !AnalysisSnapshot.from(terminal).equals(
                         bridge.terminalAnalysis())) {
                 return new Verification(false, "TERMINAL_MATCH_MISMATCH");
             }
-            PrincipalStep principal = replayPrincipal(current);
+            PrincipalStep principal = replayPrincipal(current, operations);
             if (principal == null
                     || !principal.equals(bridge.principalStep())) {
                 return new Verification(false, "PRINCIPAL_REPLAY_FAILED");
@@ -236,6 +250,7 @@ public final class PatternTargetedLocalBridgeSearch {
                 return new Verification(false, "RESULT_STATE_MISMATCH");
             }
             Bridge unsigned = bridge.withCertificateHash("");
+            ledger.checkHash();
             return certificateHash(unsigned).equals(
                     bridge.certificateHash())
                 ? new Verification(true, "VERIFIED")
@@ -248,8 +263,8 @@ public final class PatternTargetedLocalBridgeSearch {
         }
     }
 
-    private PatternMatchAnalyzer.Analysis analyzePattern(Expr expression) {
-        return analyzer.analyze(
+    private PatternMatchAnalyzer.Analysis analyzePattern(Expr expression, Counters operations) {
+        return operations.analyze(() -> analyzer.analyze(
             principalRule.source(),
             expression,
             principalRule.recognitionProfile(),
@@ -257,15 +272,16 @@ public final class PatternTargetedLocalBridgeSearch {
                 EquivalentExpressionProvider.identity(),
                 budget.maxMatchResults(),
                 budget.maxMatchSteps(),
-                budget.maxPatternBranches()));
+                budget.maxPatternBranches())));
     }
 
-    private PrincipalStep replayPrincipal(String expression) {
+    private PrincipalStep replayPrincipal(String expression, Counters operations) {
         AstRewriteTransformationEngine engine =
             new AstRewriteTransformationEngine(
                 List.of(principalRule),
                 Integer.MAX_VALUE,
                 1);
+        operations.principalReplay();
         return engine.transform(expression).stream()
             .filter(value -> principalRule.id().equals(value.rule()))
             .filter(value -> expression.equals(
@@ -326,6 +342,7 @@ public final class PatternTargetedLocalBridgeSearch {
     }
 
     private final class SearchRun {
+        private final OperationLedger ledger;
         private final String sourceExpression;
         private final AssumptionSignature initialAssumptions;
         private final ArrayDeque<Node> frontier = new ArrayDeque<>();
@@ -340,16 +357,19 @@ public final class PatternTargetedLocalBridgeSearch {
 
         private SearchRun(
             String sourceExpression,
-            AssumptionSignature initialAssumptions
+            AssumptionSignature initialAssumptions,
+            OperationLedger ledger
         ) {
+            this.ledger = ledger;
             this.sourceExpression = sourceExpression;
             this.initialAssumptions = initialAssumptions;
         }
 
         private Attempt execute() {
             Expr sourceAst = parser.parseTerm(sourceExpression);
+            ledger.beginSource(sourceAst);
             PatternMatchAnalyzer.Analysis initial =
-                analyzePattern(sourceAst);
+                analyzePattern(sourceAst, ledger.formation);
             Node source = node(
                 sourceExpression,
                 sourceAst,
@@ -384,13 +404,13 @@ public final class PatternTargetedLocalBridgeSearch {
                     }
                     if (retained.analysis().matched()) {
                         PrincipalStep principal = replayPrincipal(
-                            retained.expression());
+                            retained.expression(), ledger.formation);
                         if (principal != null && !ExplicitZeroConditions.conflict(
                                 merge(retained.assumptions(), principal.emittedAssumptions()))) {
                             Bridge result = bridge(
                                 source, retained, states,
                                 principal, work());
-                            Verification verification = verify(result);
+                            Verification verification = verify(result, ledger);
                             return verification.valid()
                                 ? attempt(
                                     Status.PREPARED,
@@ -439,9 +459,7 @@ public final class PatternTargetedLocalBridgeSearch {
         }
 
         private void expand(Node current, List<Candidate> candidates) {
-            List<Transformation> generated = Objects.requireNonNull(
-                preparationEngine.transform(current.expression()),
-                "preparation engine result");
+            List<Transformation> generated = ledger.formation.prepare(preparationEngine, current.expression());
             if (current.depth() >= budget.maxDepth()) {
                 if (!generated.isEmpty()) {
                     limits.add("DEPTH");
@@ -497,6 +515,7 @@ public final class PatternTargetedLocalBridgeSearch {
                 "transformedExpression");
             Expr ast = parser.parseTerm(expression);
             int nodes = expressionNodes(ast);
+            ledger.sizeCandidate(nodes);
             if (nodes > budget.maxExpressionNodes()) {
                 limits.add("EXPRESSION_NODES");
                 return null;
@@ -504,7 +523,7 @@ public final class PatternTargetedLocalBridgeSearch {
             AssumptionSignature assumptions = merge(
                 parent.assumptions(), transformation.assumptions());
             if (ExplicitZeroConditions.conflict(assumptions)) return null;
-            PatternMatchAnalyzer.Analysis analysis = analyzePattern(ast);
+            PatternMatchAnalyzer.Analysis analysis = analyzePattern(ast, ledger.formation);
             analyzedCandidates++;
             recordInconclusiveMatch(analysis);
             return new Candidate(
@@ -558,7 +577,7 @@ public final class PatternTargetedLocalBridgeSearch {
             Node source,
             PatternMatchAnalyzer.Analysis initial
         ) {
-            PrincipalStep replay = replayPrincipal(source.expression());
+            PrincipalStep replay = replayPrincipal(source.expression(), ledger.formation);
             if (replay != null && ExplicitZeroConditions.conflict(
                     merge(source.assumptions(), replay.emittedAssumptions()))) {
                 return attempt(Status.UNSUPPORTED, Optional.empty(), initial, "CONTRADICTED_NONZERO_PRECONDITION", "");
@@ -1004,6 +1023,107 @@ public final class PatternTargetedLocalBridgeSearch {
             return expressionBefore + ":" + expressionAfter + ":"
                 + ruleId + ":" + emittedAssumptions + ":"
                 + applicationKey + ":" + primitiveRuleIds;
+        }
+    }
+
+    /**
+     * Observations for one source/principal attempt, independent of the v1 certificate bytes.
+     * A caller may also supply the same ledger to subsequent certificate checks on that attempt.
+     * Use a fresh ledger for each formation; the counters are not thread-safe.
+     */
+    public static final class OperationLedger {
+        static final OperationLedger DISABLED = new OperationLedger(false);
+        private final boolean enabled;
+        private final Counters formation;
+        private final Counters verification;
+        final Counters coordinator;
+        private long certificateChecks;
+        private long certificateHashesChecked;
+        private int sourceAstNodes;
+        private long sizedCandidateAsts;
+        private int peakObservedAstNodes;
+
+        public OperationLedger() { this(true); }
+
+        private OperationLedger(boolean enabled) {
+            this.enabled = enabled;
+            this.formation = new Counters(enabled);
+            this.verification = new Counters(enabled);
+            this.coordinator = new Counters(enabled);
+        }
+
+        public Operations formation() { return formation.snapshot(); }
+        public Operations certificateVerification() { return verification.snapshot(); }
+        public Operations coordinatorValidation() { return coordinator.snapshot(); }
+        public long certificateChecks() { return certificateChecks; }
+        public long certificateHashesChecked() { return certificateHashesChecked; }
+        public int sourceAstNodes() { return sourceAstNodes; }
+        public long sizedCandidateAsts() { return sizedCandidateAsts; }
+
+        /** Includes the source and every generated candidate reaching the AST size gate, before admission. */
+        public int peakObservedAstNodes() { return peakObservedAstNodes; }
+
+        private void requireUnusedFormation() {
+            if (sourceAstNodes != 0) throw new IllegalStateException("one formation per operation ledger");
+        }
+
+        private void beginVerification() { if (enabled) certificateChecks++; }
+
+        private void checkHash() { if (enabled) certificateHashesChecked++; }
+
+        private void beginSource(Expr ast) {
+            if (!enabled) return;
+            sourceAstNodes = expressionNodes(ast);
+            peakObservedAstNodes = sourceAstNodes;
+        }
+
+        private void sizeCandidate(int nodes) {
+            if (!enabled) return;
+            sizedCandidateAsts++;
+            peakObservedAstNodes = Math.max(peakObservedAstNodes, nodes);
+        }
+    }
+
+    /** Counts at the matcher and concrete engine boundaries. Engine internals are not matcher steps. */
+    public record Operations(long patternAnalyses, long evaluatedMatchSteps, long patternBranches,
+            long structuralComparisons, long preparationEngineCalls, long returnedPreparationTransitions,
+            long principalReplayCalls) { }
+
+    static final class Counters {
+        private final boolean enabled;
+        private long patternAnalyses;
+        private long evaluatedMatchSteps;
+        private long patternBranches;
+        private long structuralComparisons;
+        private long preparationEngineCalls;
+        private long returnedPreparationTransitions;
+        private long principalReplayCalls;
+
+        private Counters(boolean enabled) { this.enabled = enabled; }
+
+        void principalReplay() { if (enabled) principalReplayCalls++; }
+
+        PatternMatchAnalyzer.Analysis analyze(Supplier<PatternMatchAnalyzer.Analysis> matcher) {
+            if (!enabled) return matcher.get();
+            patternAnalyses++;
+            var result = matcher.get();
+            evaluatedMatchSteps += result.evaluatedSteps();
+            patternBranches += result.patternBranches();
+            structuralComparisons += result.structuralComparisons();
+            return result;
+        }
+
+        private List<Transformation> prepare(AstRewriteTransformationEngine engine, String expression) {
+            if (!enabled) return engine.transform(expression);
+            preparationEngineCalls++;
+            var transitions = engine.transform(expression);
+            returnedPreparationTransitions += transitions.size();
+            return transitions;
+        }
+
+        private Operations snapshot() {
+            return new Operations(patternAnalyses, evaluatedMatchSteps, patternBranches, structuralComparisons,
+                preparationEngineCalls, returnedPreparationTransitions, principalReplayCalls);
         }
     }
 

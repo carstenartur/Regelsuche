@@ -140,8 +140,13 @@ public final class RulePreparationCoordinator {
 
     /** Runs the bounded local fallback after the caller has already attempted direct replay. */
     Outcome analyzeBridge(String ruleId, String source, AssumptionSignature assumptions) {
+        return analyzeBridge(ruleId, source, assumptions, PatternTargetedLocalBridgeSearch.OperationLedger.DISABLED);
+    }
+
+    Outcome analyzeBridge(String ruleId, String source, AssumptionSignature assumptions,
+            PatternTargetedLocalBridgeSearch.OperationLedger ledger) {
         PrincipalRuntime runtime = runtimes.get(ruleId);
-        return outcome(runtime, source, assumptions, runtime.search().analyze(source, assumptions));
+        return outcome(runtime, source, assumptions, runtime.search().analyze(source, assumptions, ledger), ledger);
     }
 
     /** Recomputes the complete deterministic evaluation and all bridge replay. */
@@ -203,7 +208,8 @@ public final class RulePreparationCoordinator {
         PrincipalRuntime runtime,
         String source,
         AssumptionSignature sourceAssumptions,
-        PatternTargetedLocalBridgeSearch.Attempt attempt
+        PatternTargetedLocalBridgeSearch.Attempt attempt,
+        PatternTargetedLocalBridgeSearch.OperationLedger ledger
     ) {
         PatternTargetedLocalBridgeSearch.Status status = attempt.status();
         Optional<Transformation> candidate = Optional.empty();
@@ -213,6 +219,7 @@ public final class RulePreparationCoordinator {
         if (status
                 == PatternTargetedLocalBridgeSearch.Status
                     .DIRECT_MATCH_AVAILABLE) {
+            ledger.coordinator.principalReplay();
             Optional<Transformation> replay = directCandidate(
                 runtime.adapter(), source, sourceAssumptions);
             if (replay.isEmpty()) {
@@ -220,8 +227,8 @@ public final class RulePreparationCoordinator {
                     .TECHNICAL_FAILURE;
                 detailCode = "COORDINATOR_DIRECT_REPLAY_FAILED";
             } else {
-                PatternMatchAnalyzer.Analysis analysis = analyzePattern(
-                    runtime.schema(), source);
+                PatternMatchAnalyzer.Analysis analysis = ledger.coordinator.analyze(
+                    () -> analyzePattern(runtime.schema(), source));
                 GuardCheck guards = checkRequiredAssumptions(
                     runtime.schema(), analysis, sourceAssumptions);
                 if (!guards.authorized()) {
@@ -237,14 +244,14 @@ public final class RulePreparationCoordinator {
             PatternTargetedLocalBridgeSearch.Bridge bridge =
                 attempt.bridge().orElseThrow();
             PatternTargetedLocalBridgeSearch.Verification verification =
-                runtime.search().verify(bridge);
+                runtime.search().verify(bridge, ledger);
             if (!verification.valid()) {
                 status = PatternTargetedLocalBridgeSearch.Status
                     .INVALID_CERTIFICATE;
                 detailCode = verification.detailCode();
             } else {
-                PatternMatchAnalyzer.Analysis terminal = analyzePattern(
-                    runtime.schema(), bridge.terminalExpression());
+                PatternMatchAnalyzer.Analysis terminal = ledger.coordinator.analyze(
+                    () -> analyzePattern(runtime.schema(), bridge.terminalExpression()));
                 GuardCheck guards = checkRequiredAssumptions(
                     runtime.schema(), terminal,
                     bridge.terminalAssumptions());

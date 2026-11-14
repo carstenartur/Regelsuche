@@ -56,6 +56,23 @@ class PreparationProfileTest {
         assertFalse(nativeResult.certificateHash().isEmpty());
     }
 
+    @Test void profileMeasuresBothActualBridgeVerificationsAndTheFinalScopeCheck() {
+        var coordinator = coordinator(imported("sympy.trig.pythagorean"));
+        var profile = PreparationProfile.SAFE_PREPARATION_PLUS_LOCAL_BRIDGE;
+        String source = "((sin(x)*a)/a)^2 + cos(x)^2";
+        var counters = new java.util.HashMap<String, PatternTargetedLocalBridgeSearch.OperationLedger>();
+        var measured = coordinator.analyzeProfile(profile, source, NONE,
+            id -> counters.computeIfAbsent(id, key -> new PatternTargetedLocalBridgeSearch.OperationLedger()));
+        assertEquals(coordinator.analyzeProfile(profile, source, NONE), measured);
+        var ledger = counters.get("sympy.trig.pythagorean");
+        assertEquals(2, ledger.certificateChecks());
+        assertEquals(2, ledger.certificateVerification().principalReplayCalls());
+        assertEquals(1, ledger.coordinatorValidation().patternAnalyses());
+        assertTrue(ledger.sizedCandidateAsts() > 0);
+        assertTrue(ledger.peakObservedAstNodes() >= ledger.sourceAstNodes());
+        assertEquals(0, ledger.peakObservedAstNodes() - ledger.sourceAstNodes());
+    }
+
     @Test void aSchemaMatchCannotBorrowAConcreteReplayAtAnotherOccurrence() {
         var pattern = PatternExpr.var("ANY");
         var executor = new PatternRewriteRule("match-only-x", pattern, PatternExpr.num(1)) {

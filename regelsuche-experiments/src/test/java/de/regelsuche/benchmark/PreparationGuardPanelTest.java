@@ -90,7 +90,7 @@ class PreparationGuardPanelTest {
         Files.write(out, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(report));
     }
 
-    private static void assertExpectedAuthorization(String id, PreparationProfile profile, JsonNode verdicts) {
+    static void assertExpectedAuthorization(String id, PreparationProfile profile, JsonNode verdicts) {
         Map<Character, String> principals = Map.of(
             'T', SymPyRuleAmplificationExperiment.PYTHAGOREAN_RULE_ID,
             'P', SymPyRuleAmplificationExperiment.DIFFERENCE_OF_SQUARES_RULE_ID,
@@ -108,7 +108,7 @@ class PreparationGuardPanelTest {
         }
     }
 
-    private static ObjectNode qualify(JsonNode raw, List<String> inputs) {
+    static ObjectNode qualify(JsonNode raw, List<String> inputs) {
         var verdict = JSON.createObjectNode().put("ruleId", raw.required("ruleId").asText());
         if (!raw.has("candidate")) return verdict.put("status", "NO_CANDIDATE");
         var introduced = new TreeSet<String>();

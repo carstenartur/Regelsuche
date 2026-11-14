@@ -11,7 +11,8 @@ ARG REGELSUCHE_PREPARATION_REVISION
 RUN REGELSUCHE_PREPARATION_REVISION="$REGELSUCHE_PREPARATION_REVISION" \
     ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:test \
         --tests de.regelsuche.benchmark.PreparationAblationTest \
-        --tests de.regelsuche.benchmark.PreparationGuardPanelTest
+        --tests de.regelsuche.benchmark.PreparationGuardPanelTest \
+        --tests de.regelsuche.benchmark.PreparationStageAttributionTest
 
 FROM eclipse-temurin:25.0.5_8-jre-noble AS runtime
 
