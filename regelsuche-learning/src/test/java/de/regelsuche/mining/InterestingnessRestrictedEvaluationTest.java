@@ -3,6 +3,7 @@ package de.regelsuche.mining;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import de.regelsuche.mining.InterestingnessIndependentReviewIntake.ReviewOrigin;
 import de.regelsuche.mining.InterestingnessIndependentReviewStudy.CandidateCase;
 import de.regelsuche.mining.InterestingnessIndependentReviewStudy.ExposureKind;
@@ -99,5 +100,13 @@ class InterestingnessRestrictedEvaluationTest {
         assertThrows(IllegalStateException.class, () -> InterestingnessRestrictedCollection.evaluate(vault));
         assertEquals(result, json.readTree(InterestingnessRestrictedCollection.audit(vault, 1))
             .required("evaluation").required("evaluationHash").asText());
+        var corrected = json.readTree(InterestingnessRestrictedCollection.audit(vault));
+        assertEquals(result, corrected.required("priorEvaluationHash").asText());
+        assertEquals(evaluation.required("testExposureLedger"), corrected.required("priorTestExposureLedger"));
+        var stateFile = vault.resolve("collection.json");
+        var state = json.readTree(stateFile.toFile());
+        ((ArrayNode) state.required("evaluation").required("testExposureLedger")).removeAll();
+        Files.writeString(stateFile, state.toString());
+        assertThrows(IllegalArgumentException.class, () -> InterestingnessRestrictedCollection.audit(vault));
     }
 }

@@ -353,10 +353,10 @@ public final class InterestingnessRestrictedCollection {
             frozen.set("freezeHash", claimed);
             if (state.has("evaluation")) {
                 var result = (ObjectNode) state.required("evaluation");
+                var material = result.deepCopy();
+                var hash = material.remove("evaluationHash");
+                require(hash != null && digest(material).equals(hash.asText()), "evaluation hash mismatch");
                 if (result.required("freezeHash").equals(claimed)) {
-                    var material = result.deepCopy();
-                    var hash = material.remove("evaluationHash");
-                    require(digest(material).equals(hash.asText()), "evaluation hash mismatch");
                     frozen.set("evaluation", result);
                 } else {
                     frozen.set("priorTestExposureLedger", result.required("testExposureLedger"));
