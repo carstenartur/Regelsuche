@@ -1,6 +1,6 @@
 # Paper foundation verification
 
 - Status: `FOUNDATION`
-- Manifest: `sha256:31937952f38f07a84d83c0af0bfe66d807f2199c6e849af8ca29e417751c1603`
+- Manifest: `sha256:52c2e774ded286a5787e19a02e4d6592dace77c39b2f53a5c1d8899b886bc441`
 - Central empirical claims: pending preregistered evidence
 - External mathematical novelty: not authorized

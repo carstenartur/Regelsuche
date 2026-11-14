@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from paper_track_comparisons import write_track_reports
 from paper_recurrence_results import RESULT, write_recurrence_report
 from paper_corpus_splits import CORPUS, RECEIPT, write_split_report
 from paper_controller_figure import MATRIX, write_controller_outputs
@@ -178,6 +179,7 @@ def main() -> None:
                        require_regular_input(root / RECEIPT, "public freeze receipt"), output)
     write_controller_outputs(require_regular_input(root / MATRIX, "public controller evidence"), output)
     write_recurrence_report(require_regular_input(root / RESULT, "public recurrence evidence"), output)
+    write_track_reports(root, output, require_regular_input)
     summary = {
         "schema": "regelsuche.paper-foundation-verification/v1",
         "manifestHash": manifest["contentHash"],
