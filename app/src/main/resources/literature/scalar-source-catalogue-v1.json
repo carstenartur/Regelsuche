@@ -1,0 +1,28 @@
+{
+  "revision": "scalar-equation-sources/2026-11-14.v1",
+  "sources": [
+    {
+      "name": "NIST DLMF",
+      "version": "1.2.8 (2026-09-15)",
+      "cataloguedOn": "2026-11-14",
+      "capabilities": [
+        "text phrases",
+        "formula fragments",
+        "wildcards and proximity"
+      ],
+      "accessConditions": "Public site. Inspect the candidate-free search guide at https://dlmf.nist.gov/help/search. Sending a candidate query requires separate authorization.",
+      "limitations": "Covers its handbook on mathematical functions. Automatic relaxation may return partial or approximate matches. Inspect the equation and its stated hypotheses in context."
+    },
+    {
+      "name": "mathlib4",
+      "version": "428aa8288d061ec3ae75c1b85ac178e2cb9def23",
+      "cataloguedOn": "2026-11-14",
+      "capabilities": [
+        "typed declaration patterns with #find",
+        "named lemma lookup"
+      ],
+      "accessConditions": "Search a locally imported environment at the specified revision. See https://github.com/leanprover-community/mathlib4/blob/428aa8288d061ec3ae75c1b85ac178e2cb9def23/Mathlib/Tactic/Find.lean.",
+      "limitations": "Only imported formal declarations are visible. Record types, coercions, namespaces and translation into Lean. A missing formal match leaves other mathematical literature unexamined."
+    }
+  ]
+}
