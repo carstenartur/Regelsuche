@@ -1,7 +1,6 @@
 package de.regelsuche.quality.jmh;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.StreamWriteFeature;
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.core.util.Separators;
@@ -9,8 +8,11 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.util.RawValue;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -33,7 +35,6 @@ public final class JmhAllocationReportMain {
     private static final List<String> COUNTERS = List.of(
         "enqueuedStates", "expandedStates", "exploredStates", "generatedTransformations", "reachedTargets", "searches");
     private static final ObjectMapper JSON = new ObjectMapper()
-        .enable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN.mappedFeature())
         .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     private static final DefaultIndenter INDENT = new DefaultIndenter("  ", "\n");
@@ -104,13 +105,13 @@ public final class JmhAllocationReportMain {
         var allocation = requireObject(secondary.path(GC_METRIC), name + ": " + GC_METRIC);
         requireUnit(primary, "ms/op", name + ": expected primary unit");
         requireUnit(allocation, "B/op", name + ": expected " + GC_METRIC + " unit");
-        row.put("bytesPerOperation", measurement(allocation, name + " " + GC_METRIC));
-        row.put("millisecondsPerOperation", measurement(primary, name + " primary score"));
+        row.putRawValue("bytesPerOperation", measurement(allocation, name + " " + GC_METRIC));
+        row.putRawValue("millisecondsPerOperation", measurement(primary, name + " primary score"));
         var counters = row.putObject("workCounters");
         for (String counter : COUNTERS) {
             var value = secondary.path(counter);
             if (value.isObject() && value.has("score")) {
-                counters.put(counter, measurement(value, name + " " + counter));
+                counters.putRawValue(counter, measurement(value, name + " " + counter));
             }
         }
     }
@@ -127,14 +128,29 @@ public final class JmhAllocationReportMain {
         }
     }
 
-    private static BigDecimal measurement(JsonNode metric, String label) {
+    private static RawValue measurement(JsonNode metric, String label) {
         var score = metric.path("score");
         if (!score.isNumber()) throw new IllegalArgumentException(label + " must be numeric");
         double value = score.doubleValue();
         if (!Double.isFinite(value) || value < 0.0) {
             throw new IllegalArgumentException(label + " must be finite and non-negative");
         }
-        BigDecimal decimal = BigDecimal.valueOf(value);
-        return decimal.scale() < 1 ? decimal.setScale(1) : decimal;
+        // The retained v1 Python JSON writer switches to scientific notation
+        // outside [1e-4, 1e16) and emits a signed, at least two-digit exponent.
+        if (value == 0.0) return new RawValue(Double.toString(value));
+        var decimal = BigDecimal.valueOf(value).stripTrailingZeros();
+        // Java may print two significant digits for a subnormal that also
+        // round-trips with one digit. The v1 format uses the shortest form.
+        if (value < Double.MIN_NORMAL && decimal.precision() == 2) {
+            var oneDigit = new BigDecimal(value, new MathContext(1, RoundingMode.HALF_EVEN));
+            if (oneDigit.doubleValue() == value) decimal = oneDigit;
+        }
+        int exponent = decimal.precision() - decimal.scale() - 1;
+        if (exponent >= -4 && exponent < 16) {
+            return new RawValue((decimal.scale() < 1 ? decimal.setScale(1) : decimal).toPlainString());
+        }
+        String digits = Integer.toString(Math.abs(exponent));
+        String power = (exponent < 0 ? "-" : "+") + (digits.length() == 1 ? "0" + digits : digits);
+        return new RawValue(decimal.movePointLeft(exponent).toPlainString() + "e" + power);
     }
 }

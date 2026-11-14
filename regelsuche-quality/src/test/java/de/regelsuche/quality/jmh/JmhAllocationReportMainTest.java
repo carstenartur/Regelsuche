@@ -58,6 +58,24 @@ class JmhAllocationReportMainTest {
     }
 
     @Test
+    void keepsScientificNotationAndSignedZeroInCanonicalEvidence() throws Exception {
+        var rows = sample();
+        var cases = List.of(-0.0, 0.0001, 0.00001, 1_000_000_000_000_000.0, 1e16, 1.25e98);
+        var expected = List.of("-0.0", "0.0001", "1e-05", "1000000000000000.0", "1e+16", "1.25e+98");
+        for (int index = 0; index < cases.size(); index++) {
+            ((ObjectNode) rows.get(index).get("primaryMetric")).put("score", cases.get(index));
+        }
+        ((ObjectNode) rows.get(0).at("/secondaryMetrics/" + GC_METRIC)).put("score", Double.MIN_VALUE);
+        Path output = directory.resolve("report.json");
+        JmhAllocationReportMain.main(new String[] {write(rows).toString(), output.toString()});
+        String report = Files.readString(output);
+        assertTrue(report.contains("\"bytesPerOperation\": 5e-324,"), report);
+        for (String literal : expected) {
+            assertTrue(report.contains("\"millisecondsPerOperation\": " + literal + ","), report);
+        }
+    }
+
+    @Test
     void rejectsMissingDuplicateAndInvalidMetricsBeforeReplacingTheReport() throws Exception {
         var missing = sample();
         missing.remove(0);
