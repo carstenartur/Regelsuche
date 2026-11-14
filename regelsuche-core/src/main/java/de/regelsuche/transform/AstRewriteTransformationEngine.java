@@ -798,7 +798,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
      * literal needs no assumption because the condition is decided; an
      * explicit zero divisor is refused at match time.</p>
      */
-    private static final class CancelDivisionFactorRule extends MetadataRule {
+    public static final class CancelDivisionFactorRule extends MetadataRule {
         private CancelDivisionFactorRule() {
             super(RewriteKind.SIMPLIFY, false, -3);
         }
