@@ -217,3 +217,50 @@ allgemeiner Workbench-/CLI-Standard ausgewählt. Vor der Auswahl von
 - [Architektur](architecture.md)
 - [Discovery- und Forschungsstand](discovery-status.md)
 - [Unterstützte Grenzen](limits.md)
+
+## Vier einzeln ausführbare Vorbereitungsprofile
+
+Die elf öffentlichen Quellen des Drei-Familien-Piloten durchlaufen je vier
+Profile. Für jede Kombination prüft der Koordinator alle drei Regeln für den
+gesamten Ausgangsausdruck. Das ergibt 132 Einzelentscheidungen. Zielausdruck,
+Fallklassifikation und die vom Pilot erwartete Regel gelangen erst nach dem
+Festschreiben der Kandidaten in den Vergleich. Es gelten dieselben Grenzen
+und dieselben Ausgangsannahmen in allen vier Profilen.
+
+| Zugelassene Stufen | Qualifizierte Anwendungen auf 8 Positivfällen | Zusätzliche Anwendungen der letzten Stufe |
+| --- | ---: | ---: |
+| Exaktes strukturelles Matching | 3 | 3 |
+| Zusätzlich die für die Regel deklarierte Theorie | 4 | 1 |
+| Zusätzlich registrierte exakte Spezialisten | 4 | 0 |
+| Zusätzlich die begrenzte lokale Brückensuche | 8 | 4 |
+
+Die Theorie erkennt die vertauschten Summanden der pythagoreischen Identität.
+Für die drei importierten Hauptregel-IDs ist kein exakter Spezialist registriert.
+Die letzte Stufe erzeugte insgesamt 51 Übergänge über alle Quellen und
+Hauptregeln. Sie erreichte vier zusätzliche belegte Anwendungen durch ein
+oder zwei Kürzungsschritte. Die drei Negativfälle lieferten in jedem Profil
+keinen Kandidaten. Bei vollständig aktivierter Brückensuche endeten alle 25
+erfolglosen Regelversuche nach Ausschöpfen der endlichen Closure. Mit
+abgeschaltetem Fallback erfasst der Bericht die erschöpften aktivierten Stufen.
+
+Der JSON-Bericht trennt Matcher-Schritte, Strukturvergleiche, Verzweigungen,
+Executor-Aufrufe, Spezialistenaufrufe und die Arbeitszähler der Brückensuche.
+Jeder Kandidat enthält seine Annahmen, primitive Lineage und Änderung der
+kanonischen AST-Knotenzahl. Die Prüfung vergleicht Ergebnis und Annahmen mit
+den erwarteten Werten und verlangt bei einer Brücke die Zertifikatidentität.
+Ein zweiter Koordinator führt die Suche mit derselben Quelle erneut aus. Seine
+Arbeit wird über die separat ausgewiesene, bytegleiche Ergebnis- und
+Arbeitsaufzeichnung gebunden. Die Zähler messen keine Laufzeit oder
+vollständige interne Kosten aller nachgelagerten Prüfoperationen.
+
+Mit Java 25 im Repository-Stamm:
+
+```sh
+mvn -pl regelsuche-experiments -am -Dtest=PreparationAblationTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Maven schreibt `regelsuche-experiments/target/reports/preparation-ablation/comparison.json`.
+Der Gradle-Task `verifyComparativeBenchmarks` übergibt die Git-Revision des
+Checkouts als Build-Argument an das gepinnte Vergleichsimage. Gradle liest
+beide im Image erzeugten Berichte aus dem netzwerkisolierten Container aus
+und vergleicht ihre Bytes mit den Hostläufen.

@@ -36,7 +36,7 @@ public final class SymPyRuleAmplificationExperiment {
     public static final String TELESCOPING_RULE_ID =
         "sympy.rational.partial_fraction.telescoping";
 
-    private static final PatternTargetedLocalBridgeSearch.Budget BUDGET =
+    static final PatternTargetedLocalBridgeSearch.Budget BUDGET =
         new PatternTargetedLocalBridgeSearch.Budget(
             3, 128, 1_024, 8, 160, 128,
             32, 5_000, 2_500);
@@ -134,7 +134,7 @@ public final class SymPyRuleAmplificationExperiment {
             evaluation.aggregateWork().discoveredStates());
     }
 
-    private List<PatternRewriteRule> principals() {
+    List<PatternRewriteRule> principals() {
         return List.of(
             principal("sympy-trigonometry", PYTHAGOREAN_RULE_ID),
             principal("sympy-polynomial", DIFFERENCE_OF_SQUARES_RULE_ID),
@@ -154,7 +154,7 @@ public final class SymPyRuleAmplificationExperiment {
                 "missing imported SymPy rule: " + ruleId));
     }
 
-    private List<RewriteRule> cancellationRules() {
+    List<RewriteRule> cancellationRules() {
         List<RewriteRule> rules = AstRewriteTransformationEngine
             .allBuiltInRules().stream()
             .filter(rule -> "ast_cancel_division_factor"

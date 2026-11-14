@@ -1,0 +1,66 @@
+{
+  "schema": "regelsuche.sympy-preparation-guard-sources/v1",
+  "cases": [
+    {
+      "id": "T1",
+      "source": "((sin(x)*a)/a)^2 + cos(x)^2",
+      "assumptions": [
+        "a != 0"
+      ]
+    },
+    {
+      "id": "T2",
+      "source": "((sin(x)*a)/a)^2 + cos(x)^2",
+      "assumptions": []
+    },
+    {
+      "id": "T3",
+      "source": "((sin(x)*a)/a)^2 + cos(x)^2",
+      "assumptions": [
+        "a = 0"
+      ]
+    },
+    {
+      "id": "P1",
+      "source": "((x^2*a)/a)-y^2",
+      "assumptions": [
+        "a != 0"
+      ]
+    },
+    {
+      "id": "P2",
+      "source": "((x^2*a)/a)-y^2",
+      "assumptions": []
+    },
+    {
+      "id": "P3",
+      "source": "((x^2*a)/a)-y^2",
+      "assumptions": [
+        "a = 0"
+      ]
+    },
+    {
+      "id": "R1",
+      "source": "1/(n*(n+1))",
+      "assumptions": [
+        "n + 1 != 0",
+        "n != 0"
+      ]
+    },
+    {
+      "id": "R2",
+      "source": "1/(n*(n+1))",
+      "assumptions": [
+        "n + 1 != 0"
+      ]
+    },
+    {
+      "id": "R3",
+      "source": "1/(n*(n+1))",
+      "assumptions": [
+        "n + 1 != 0",
+        "n = 0"
+      ]
+    }
+  ]
+}
