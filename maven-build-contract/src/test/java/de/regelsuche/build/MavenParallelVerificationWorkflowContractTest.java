@@ -183,16 +183,12 @@ class MavenParallelVerificationWorkflowContractTest {
         "staleness assertions must remain checkout-owned");
     assertFalse(convergence.contains("install -D"),
         "evidence joining must remain checkout-owned");
-    assertTrue(coverageConvergence.contains(
-        "if isolated_report.is_symlink() or not isolated_report.is_file():"));
-    assertTrue(coverageConvergence.contains(
-        "if canonical_report.exists() or canonical_report.is_symlink():"),
-        "a stale or duplicate SymPy report must be rejected");
-    assertTrue(coverageConvergence.contains(
-        "shutil.copyfile(isolated_report, canonical_report)"));
-    assertTrue(coverageConvergence.contains(
-        "if canonical_hash != source_hash:"),
-        "convergence must verify that it copied the exact isolated measurement");
+    assertFalse(coverageConvergence.contains("shutil.copyfile("),
+        "the Python launcher must not install the canonical report");
+    assertTrue(coverageConvergence.contains("\"--isolated-report\""),
+        "the isolated evidence must be handed to the Java verifier");
+    assertTrue(coverageConvergence.contains("str(isolated)"),
+        "the Java verifier must receive the caller-supplied isolated report");
     assertTrue(coverageGate.contains("mainClass = '" + COVERAGE_MAIN + "'"));
     assertTrue(coverageConvergence.contains("COVERAGE_MAIN = \"" + COVERAGE_MAIN + "\""),
         "local and converged coverage must use the same Java decision");
