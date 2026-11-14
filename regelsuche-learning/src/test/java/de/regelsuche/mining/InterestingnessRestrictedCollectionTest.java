@@ -175,6 +175,34 @@ class InterestingnessRestrictedCollectionTest {
         }
     }
 
+    @Test void correctionBindsPredecessorAndCarriesTheOtherReceiptsForward() throws Exception {
+        start();
+        submit(0, form(0));
+        submit(1, form(1));
+        String first = InterestingnessRestrictedCollection.freeze(vault);
+        var before = JSON.readTree(InterestingnessRestrictedCollection.audit(vault));
+        assertThrows(IllegalArgumentException.class, () ->
+            InterestingnessRestrictedCollection.revise(vault, IndependentReviewProtocolFixtures.hash('x'), "TRANSCRIPTION"));
+        InterestingnessRestrictedCollection.revise(vault, first, "WITHDRAWAL");
+        assertThrows(IllegalStateException.class, () -> InterestingnessRestrictedCollection.audit(vault));
+        var withdrawal = form(0).put("revision", 2).put("disposition", "EXCLUDED").put("reason", "WITHDRAWN");
+        withdrawal.remove(List.of("rationaleCodes", "confidencePermille", "relevancePermille", "optionalProse"));
+        submit(0, withdrawal);
+        assertThrows(IllegalArgumentException.class, () -> submit(0, withdrawal));
+        String second = InterestingnessRestrictedCollection.freeze(vault);
+        var after = JSON.readTree(InterestingnessRestrictedCollection.audit(vault));
+        assertNotEquals(first, second);
+        assertEquals(first, after.required("priorFreezeHash").asText());
+        assertEquals(before.required("intake").required("labeledEvaluationHash"),
+            after.required("intake").required("priorLabeledEvaluationHash"));
+        assertEquals(before.required("intake").required("predictiveCorpusHash"),
+            after.required("intake").required("predictiveCorpusHash"));
+        assertEquals(before.required("slots").get(1), after.required("slots").get(1));
+        assertEquals("EXCLUDED", after.required("slots").get(0).required("disposition").asText());
+        assertEquals("WITHDRAWAL", after.required("correctionReason").asText());
+        assertEquals(before, JSON.readTree(InterestingnessRestrictedCollection.audit(vault, 1)));
+    }
+
     @Test void rejectsModifiedPacketsAndDifferentRegistrationInputs() throws Exception {
         prepare();
         var packet = exchange.resolve("public/packets/" + assignments.get(0).required("packetId").asText() + ".json");
