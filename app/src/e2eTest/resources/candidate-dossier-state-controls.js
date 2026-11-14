@@ -9,7 +9,20 @@ window.candidateDossierStateControls = async function (run, artifact) {
     const reply = {raw: JSON.stringify(artifact), runId: run.runId, etag: '"' + artifact.contentHash.slice(7) + '"'};
     const decoded = api.decode(run, reply);
     const bridgeId = decoded.content.discoveredBridge.stateHash;
+    const initial = api.selection(decoded, bridgeId);
+    check(initial.capabilityChange.executed, 'verified bridge lost its executed follow-on');
+    check(initial.capabilityChange.consequence === decoded.content.discoveredBridge.consequenceId,
+        'consequence must belong to the selected bridge');
+    const altered = JSON.parse(reply.raw);
+    const candidate = altered.content.search.states.find(state => state.stateHash === bridgeId);
+    candidate.metrics.tokenCount = altered.content.search.states[0].metrics.tokenCount + 2;
+    check(api.selection(altered, bridgeId).capabilityChange.tokenDelta === 2,
+        'a longer candidate must retain both its measured cost and its earned capability');
+    altered.content.followOnExecution.disabledTargetSuccessors = ['already available'];
+    check(!api.selection(altered, bridgeId).capabilityChange.executed,
+        'enabled result was already available to the disabled control');
     const other = decoded.content.search.states.find(state => state.depth > 0 && state.stateHash !== bridgeId);
+    check(api.selection(decoded, other.stateHash).capabilityChange === null, 'another candidate inherited an unlock');
     check(api.selection(decoded, other.stateHash).bridge === null, 'another candidate inherited bridge evidence');
     check(api.selection(decoded, bridgeId).bridge.candidateProofStatus === 'SYMBOLICALLY_VERIFIED', 'retained validation status changed');
     check(Object.isFrozen(decoded.content.search.states), 'candidate artifact remained mutable');
