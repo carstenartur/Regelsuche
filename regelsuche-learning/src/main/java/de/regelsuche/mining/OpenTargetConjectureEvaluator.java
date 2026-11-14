@@ -13,6 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Compiles and challenges an already-formed open-target conjecture.
@@ -32,6 +33,12 @@ public final class OpenTargetConjectureEvaluator {
             new DynamicOperatorCompiler(),
             new SymPyEquivalenceService(),
             new DeterministicCounterexampleSearchService());
+    }
+
+    /** Runs the native evaluator with per-source observation of actual counterexample work. */
+    public static OpenTargetConjectureEvaluator observingCounterexampleAssignments(Consumer<String> observer) {
+        return new OpenTargetConjectureEvaluator(new DynamicOperatorCompiler(), new SymPyEquivalenceService(),
+            new DeterministicCounterexampleSearchService(observer));
     }
 
     OpenTargetConjectureEvaluator(
