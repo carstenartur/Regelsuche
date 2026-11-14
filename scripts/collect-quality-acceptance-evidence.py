@@ -54,8 +54,7 @@ SECTIONS = {
     "complexity": {
         "policyFiles": ["config/quality/complexity-hotspots.json",
                         "ai-knowledge/complexity-baseline.json"],
-        "supportFiles": ["regelsuche-quality/src/main/java/de/regelsuche/quality/complexity/ComplexityHotspots.java",
-                         "regelsuche-quality/src/main/java/de/regelsuche/quality/complexity/ComplexityHotspotReportMain.java"]},
+        "supportFiles": ["regelsuche-quality/src/main/java/de/regelsuche/quality/complexity/ComplexityHotspotReportMain.java"]},
     "visual": {
         "policyFiles": [VISUAL_POLICY],
         "supportFiles": ["Dockerfile.visual-regression",

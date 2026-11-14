@@ -2,7 +2,6 @@ package de.regelsuche.quality.complexity;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
@@ -34,22 +33,12 @@ class ComplexityHotspotsTest {
     @Test
     void matchesRetainedDecisionForEveryMethod() throws Exception {
         Path root = Path.of(System.getProperty("regelsuche.repositoryRoot", ".."));
-        JsonNode expected = JSON.readTree(root.resolve("ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/complexity-hotspot-report.json").toFile());
-        ObjectNode raw = JSON.createObjectNode();
-        var complexity = raw.putObject("codeComplexity");
-        var cognitive = complexity.putArray("topCognitiveMethods");
-        var cyclomatic = complexity.putArray("topCyclomaticMethods");
-        ObjectNode policy = policy();
-        var baseline = policy.withArray("baselineHotspots");
-        baseline.removeAll();
-        for (var change : expected.get("changes")) {
-            cognitive.add(change.get("current"));
-            cyclomatic.add(change.get("current"));
-            if (!change.get("baseline").isNull()) baseline.add(change.get("baseline"));
-        }
-        expected.get("retiredOrNoLongerTopHotspots").forEach(baseline::add);
-        var report = ComplexityHotspots.evaluate(raw, policy, DATE);
-        assertEquals(expected, JSON.valueToTree(report));
+        var expected = JSON.readTree(root.resolve("ai-knowledge/baseline-history/2026-10-11-maind7ec8b51/complexity-hotspot-report.json").toFile());
+        var policy = JSON.readTree(root.resolve("config/quality/complexity-hotspots.json").toFile());
+        var measured = JSON.readTree(root.resolve(
+            "ai-knowledge/baseline-history/2026-11-10-main-c267b7f/main-native-complexity.json").toFile());
+        var report = ComplexityHotspotReportMain.evaluate(measured, policy, DATE);
+        assertEquals(expected, report);
     }
 
     @Test
@@ -58,7 +47,7 @@ class ComplexityHotspotsTest {
         var measurement = measurement();
         var method = (ObjectNode) measurement.at("/codeComplexity/topCognitiveMethods/0");
         method.put("cognitiveComplexity", 12).put("cyclomaticComplexity", 11);
-        assertEquals("PASSED", ComplexityHotspots.evaluate(measurement, policy, DATE).status());
+        assertEquals("PASSED", ComplexityHotspotReportMain.evaluate(measurement, policy, DATE).get("status").asText());
         method.put("cyclomaticComplexity", 12);
         Path raw = directory.resolve("raw.json");
         Path limits = directory.resolve("policy.json");
@@ -76,24 +65,37 @@ class ComplexityHotspotsTest {
     }
 
     @Test
+    void preservesEscapedUnicodeInTheVersionedJson() throws Exception {
+        var raw = measurement();
+        ((ObjectNode) raw.at("/codeComplexity/topCognitiveMethods/0")).put("type", "AΩ𝕩");
+        Path input = directory.resolve("input.json");
+        Path limits = directory.resolve("policy.json");
+        JSON.writeValue(input.toFile(), raw);
+        JSON.writeValue(limits.toFile(), policy());
+        ComplexityHotspotReportMain.main(new String[] {input.toString(), limits.toString(), directory.toString()});
+        String json = Files.readString(directory.resolve("complexity-hotspot-report.json"));
+        assertTrue(json.contains("A\\u03a9\\ud835\\udd69"), json);
+    }
+
+    @Test
     void newHotspotNeedsAnUnexpiredExactExceptionAndBothCeilings() {
         var raw = measurement();
         var current = (ObjectNode) raw.at("/codeComplexity/topCognitiveMethods/0");
         current.put("signature", "newMethod()");
         var policy = policy();
-        var failures = ComplexityHotspots.evaluate(raw, policy, DATE);
-        assertEquals("NEW_HOTSPOT", failures.changes().getFirst().status());
-        assertEquals(1, failures.retiredOrNoLongerTopHotspots().size());
+        var failures = ComplexityHotspotReportMain.evaluate(raw, policy, DATE);
+        assertEquals("NEW_HOTSPOT", failures.at("/changes/0").get("status").asText());
+        assertEquals(1, failures.get("retiredOrNoLongerTopHotspots").size());
         var exception = policy.putArray("exceptions").addObject();
         exception.put("id", "debt-1").put("sourceFile", "A.java").put("signature", "newMethod()")
             .put("maximumCognitiveComplexity", 10).put("maximumCyclomaticComplexity", 10)
             .put("rationale", "control").put("expiresOn", DATE.toString());
-        assertEquals("PASSED", ComplexityHotspots.evaluate(raw, policy, DATE).status());
+        assertEquals("PASSED", ComplexityHotspotReportMain.evaluate(raw, policy, DATE).get("status").asText());
         exception.put("maximumCognitiveComplexity", 9);
-        assertEquals("FAILED", ComplexityHotspots.evaluate(raw, policy, DATE).status());
-        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspots.evaluate(raw, policy, DATE.plusDays(1)));
+        assertEquals("FAILED", ComplexityHotspotReportMain.evaluate(raw, policy, DATE).get("status").asText());
+        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspotReportMain.evaluate(raw, policy, DATE.plusDays(1)));
         policy.withArray("exceptions").add(exception.deepCopy());
-        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspots.evaluate(raw, policy, DATE));
+        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspotReportMain.evaluate(raw, policy, DATE));
     }
 
     @Test
@@ -101,12 +103,12 @@ class ComplexityHotspotsTest {
         var raw = measurement();
         var policy = policy();
         raw.withObject("/codeComplexity").withArray("topCyclomaticMethods").removeAll();
-        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspots.evaluate(raw, policy, DATE));
+        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspotReportMain.evaluate(raw, policy, DATE));
         raw.withObject("/codeComplexity").withArray("topCyclomaticMethods").add(method().put("cognitiveComplexity", 9));
-        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspots.evaluate(raw, policy, DATE));
+        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspotReportMain.evaluate(raw, policy, DATE));
         var duplicate = method();
         policy.withArray("baselineHotspots").add(duplicate);
-        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspots.evaluate(measurement(), policy, DATE));
+        assertThrows(IllegalArgumentException.class, () -> ComplexityHotspotReportMain.evaluate(measurement(), policy, DATE));
     }
 
     private static ObjectNode policy() {
