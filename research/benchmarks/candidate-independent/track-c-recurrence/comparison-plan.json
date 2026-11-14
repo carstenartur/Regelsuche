@@ -1,0 +1,42 @@
+{
+  "schema": "regelsuche.track-c-recurrence-comparison-plan/v1",
+  "scope": "Frozen #383 finite-difference-recurrences lane; homogeneous linear recurrence candidate formation and fixed-rule reuse only.",
+  "sourceRevision": "be1b27ba0bdbc383190d0543ffb3cfdf9f73e08b",
+  "caseCorpusContentHash": "sha256:8cb19a8e33964c3d2296515cbf9aef3a62432410840cbf0c4062338bad5b1802",
+  "freezeReceiptContentHash": "sha256:e8098edb6339d6debff04a4d97ad6e4f416202a94be7c6921fa239b066726f58",
+  "formationProfileContentHash": "sha256:235f9196671e23e96b12ce213b8224ed5d0e9f1ca3fe932aadea179cbde7d331",
+  "challengeId": "finite-difference-recurrences",
+  "campaignCount": 4,
+  "arms": [
+    "PRODUCTION_EXACT_FIT",
+    "ENUMERATE_VALID_GRAMMAR",
+    "SEEDED_RANDOM_VALID_GRAMMAR"
+  ],
+  "formation": "Only TRAIN formationInput.observedPrefix and maximumOrder. No case ID, stage label, targets, evaluationInput, continuation, cluster label or held-out prefix enters any former. Freeze all campaign candidate sets before evaluation.",
+  "grammar": "Integer coefficients -3 through 3 inclusive, last coefficient nonzero. Orders 1 through min(frozen maximumOrder, floor(prefix length / 2)). The same admissibility filter applies to the exact rational production output. Preserve excluded outputs.",
+  "minimumCoefficient": -3,
+  "maximumCoefficient": 3,
+  "proposalsPerTrainPrefix": 30,
+  "production": "Use the unmodified LinearRecurrenceSequenceDomain.inferUniqueRecurrence exactly once per TRAIN prefix. Preserve zero proposals. Do not fill unused budget.",
+  "enumeration": "Increasing order then lexicographic coefficient tuples, capped at 30 valid proposals per prefix.",
+  "random": "Uniform with replacement over the identical full admissible grammar using java.util.Random.nextInt(size). One stream per campaign across TRAIN prefixes in frozen corpus order. Seed is the first 64 bits, big endian, of the #383 campaign seed digest.",
+  "selection": "For each proposed model scan all observable recurrence equations on the generating prefix with exact rational arithmetic. Retain accepted unique models in emission order, record duplicate and rejected attempts and each equation visit. Freeze per-arm models before any evaluation.",
+  "evaluation": "Apply each frozen candidate without refitting to all six cases, including its formation cases. Check all observed-prefix equations, then every actual continuation term by next-step prediction from the observed prefix plus revealed preceding terms. Track prefix mismatch separately from continuation refutation. No-output campaigns retain all six explicit null rows. One or more confirmed models is a case success.",
+  "work": "Common maximum 60 proposal slots per campaign. Charge one candidate validation per proposal including duplicates; charge one prefix equation or continuation prediction per arithmetic check. Record actual per-arm usage; backend equation solving and grammar construction/sampling are distinct formation operations, so total compute-time parity is not a claim. No proof calls.",
+  "metrics": [
+    "proposalCount",
+    "duplicateCount",
+    "rejectedCount",
+    "outsideGrammarCount",
+    "zeroOutputCampaigns",
+    "uniqueCandidateCount",
+    "trainSupportByPrefix",
+    "prefixChecks",
+    "evaluationChecks",
+    "confirmed",
+    "refuted",
+    "noOutput",
+    "prefixMismatch"
+  ],
+  "claimBoundary": "This comparison measures the registered finite integer grammar and the six publicly known frozen cases. Historical production outcomes were public before this comparison. No inference of external novelty, general theorem discovery, economic cost equivalence, or universal superiority."
+}
