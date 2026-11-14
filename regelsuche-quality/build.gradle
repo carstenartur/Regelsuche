@@ -155,3 +155,19 @@ rootProject.tasks.named('generateCiPages').configure {
         dependsOn coverageModules.collect { ":${it}:jacocoTestReport" }
     }
 }
+
+
+tasks.register('verifyAllocationReport', JavaExec) {
+    group = 'verification'
+    description = 'Verifies the six measured JMH allocation workloads and writes their v1 summary.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.quality.jmh.JmhAllocationReportMain'
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mustRunAfter ':runJmhAllocationBenchmark'
+    def result = rootProject.layout.projectDirectory.file('app/build/reports/jmh-allocation/result.json')
+    def summary = rootProject.layout.projectDirectory.file('public/dev/bench/allocation.json')
+    inputs.file(result)
+    outputs.file(summary)
+    args result.asFile.absolutePath, summary.asFile.absolutePath
+    outputs.upToDateWhen { false }
+}
