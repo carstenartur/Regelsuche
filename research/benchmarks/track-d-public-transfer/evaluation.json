@@ -1,0 +1,34 @@
+[
+  {
+    "family": "coefficient-gap-two",
+    "role": "FORMATION",
+    "positiveSource": "u * 14 + u * 16",
+    "positiveTarget": "u * (14 + 16)",
+    "negativeSource": "u * 14 + v * 16",
+    "negativeTarget": "u * (14 + 16)"
+  },
+  {
+    "family": "coefficient-twin-prime",
+    "role": "FORMATION",
+    "positiveSource": "s * 59 + s * 61",
+    "positiveTarget": "s * (59 + 61)",
+    "negativeSource": "s * 59 + t * 61",
+    "negativeTarget": "s * (59 + 61)"
+  },
+  {
+    "family": "trigonometric",
+    "role": "HELD_OUT",
+    "positiveSource": "sin(z) * 6 + sin(z) * 11",
+    "positiveTarget": "sin(z) * (6 + 11)",
+    "negativeSource": "sin(z) * 6 + cos(z) * 11",
+    "negativeTarget": "sin(z) * (6 + 11)"
+  },
+  {
+    "family": "univariate-polynomial",
+    "role": "HELD_OUT",
+    "positiveSource": "(z ^ 2 + 1) * 9 + (z ^ 2 + 1) * 14",
+    "positiveTarget": "(z ^ 2 + 1) * (9 + 14)",
+    "negativeSource": "(z ^ 2 + 1) * 9 + (z ^ 3 + 1) * 14",
+    "negativeTarget": "(z ^ 2 + 1) * (9 + 14)"
+  }
+]
