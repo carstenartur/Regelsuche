@@ -3,7 +3,7 @@ WORKDIR /workspace
 
 COPY . .
 RUN chmod +x ./gradlew \
-    && ./gradlew --no-daemon :regelsuche-benchmarks:installDist :app:test \
+    && ./gradlew --no-daemon --no-configuration-cache :regelsuche-benchmarks:installDist :app:test \
         --tests de.regelsuche.docs.HiddenRuleComparisonTest \
         --tests de.regelsuche.docs.HiddenRulePilotCampaignTest.productionRuntimeContainsNoHiddenManifestIdentifiersOrTemplates
 
