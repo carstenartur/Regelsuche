@@ -153,11 +153,21 @@ class InterestingnessRestrictedCollectionTest {
             .put("blind", false).put("independent", false);
         conflict.remove(List.of("relevancePermille", "confidencePermille", "rationaleCodes"));
         submit(0, conflict);
+        var competingInterest = form(1).put("disposition", "EXCLUDED").put("reason", "CONFLICT")
+            .put("blind", true).put("independent", false);
+        competingInterest.remove(List.of("relevancePermille", "confidencePermille", "rationaleCodes"));
+        submit(1, competingInterest);
+        var ineligible = form(2).put("disposition", "EXCLUDED").put("reason", "INELIGIBLE");
+        ineligible.remove(List.of("relevancePermille", "confidencePermille", "rationaleCodes"));
+        submit(2, ineligible);
         InterestingnessRestrictedCollection.freeze(vault);
         var audit = JSON.readTree(InterestingnessRestrictedCollection.audit(vault));
         assertEquals(0, audit.required("intake").required("decisions").size());
         assertEquals("EXPOSURE", audit.required("slots").get(0).required("reason").asText());
         assertFalse(audit.required("slots").get(0).required("blind").asBoolean());
+        assertEquals("CONFLICT", audit.required("slots").get(1).required("reason").asText());
+        assertFalse(audit.required("slots").get(1).required("independent").asBoolean());
+        assertEquals("INELIGIBLE", audit.required("slots").get(2).required("reason").asText());
     }
 
     @Test void aDisagreementSurvivesAlongsideTheOriginalFixtureReceipts() throws Exception {
