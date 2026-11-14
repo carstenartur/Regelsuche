@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
 import org.junit.jupiter.api.AfterAll;
@@ -57,7 +58,7 @@ class AdmissibleWorkbenchBrowserTest {
         page = context.newPage();
         observe(page);
         page.onRequest(recordWrites);
-        page.navigate(app.baseUrl() + "/static/admissible-workbench.html");
+        openWorkbench(page);
     }
     @AfterEach void close() {
         try {
@@ -76,6 +77,26 @@ class AdmissibleWorkbenchBrowserTest {
         observed.onLoad(loaded -> record(lifecycle, "page loaded: " + loaded.url()));
         observed.onCrash(crashed -> record(lifecycle, "page crashed: " + crashed.url()));
         observed.onClose(closed -> record(lifecycle, "page closed: " + closed.url()));
+    }
+
+    private void openWorkbench(Page target) {
+        String origin = app.baseUrl() + "/static/";
+        var scriptInterrupted = new AtomicBoolean();
+        Consumer<Request> detectNetworkChange = request -> {
+            if ("script".equals(request.resourceType())
+                    && request.url().startsWith(origin + "admissible-")
+                    && "net::ERR_NETWORK_CHANGED".equals(request.failure())) {
+                scriptInterrupted.set(true);
+            }
+        };
+        target.onRequestFailed(detectNetworkChange);
+        try {
+            target.navigate(origin + "admissible-workbench.html");
+            if (scriptInterrupted.getAndSet(false)) target.reload();
+            assertFalse(scriptInterrupted.get(), () -> "Workbench script load interrupted twice. " + diagnostics(target));
+        } finally {
+            target.offRequestFailed(detectNetworkChange);
+        }
     }
     private static void record(List<String> events, String event) {
         if (events.size() == 100) events.removeFirst();

@@ -151,9 +151,9 @@ public final class ModPowFrozenTransfer {
         return bytes;
     }
 
-    private record Baseline(int generated, List<Expr> approved) {}
+    record Baseline(int generated, List<Expr> approved) {}
 
-    private static Baseline baseline(Row row) {
+    static Baseline baseline(Row row) {
         // This preflight also bounds role-renaming/cost recursion independently of matching.
         requireBounded(row.source());
         require(productSites(row.source()) == 1, "v1 requires exactly one product-exponent site");
@@ -174,13 +174,13 @@ public final class ModPowFrozenTransfer {
         return new Baseline(steps.size(), List.copyOf(approved));
     }
 
-    private static Expr best(Row row, List<Expr> alternatives) {
+    static Expr best(Row row, List<Expr> alternatives) {
         var candidates = new ArrayList<Expr>(); candidates.add(row.source()); candidates.addAll(alternatives);
         return candidates.stream().min(Comparator.comparingLong((Expr e) -> cost(row, e).dag())
             .thenComparingLong(e -> cost(row, e).tree()).thenComparing(CODEC::encodeExpression)).orElseThrow();
     }
 
-    private static ModPowDagRediscoveryStudy.ProgramCost cost(Row row, Expr program) {
+    static ModPowDagRediscoveryStudy.ProgramCost cost(Row row, Expr program) {
         var names = new HashMap<String, String>(); row.roles().forEach((role, name) -> names.put(name, role));
         return ModPowDagRediscoveryStudy.cost(rename(program, names),
             new ModPowDagRediscoveryStudy.BitProfile(row.id(), row.qBits(), row.eBits(), row.rBits()));

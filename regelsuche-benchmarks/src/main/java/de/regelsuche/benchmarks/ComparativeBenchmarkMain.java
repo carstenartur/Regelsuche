@@ -25,6 +25,13 @@ public final class ComparativeBenchmarkMain {
     }
 
     public static void main(String[] args) {
+        if (args.length > 0 && "--shared-rewrite-fragment".equals(args[0])) {
+            if (args.length != 2) {
+                throw new IllegalArgumentException("expected --shared-rewrite-fragment <output-file>");
+            }
+            SharedFragmentRewriteBenchmark.write(Path.of(args[1]));
+            return;
+        }
         Path output = args.length == 0
             ? Path.of("build", "reports", "comparative-benchmarks")
             : Path.of(args[0]);

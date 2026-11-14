@@ -2,6 +2,7 @@ package de.regelsuche.egraph;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
@@ -76,10 +77,22 @@ public final class EGraph {
     private int insertionLimit = Integer.MAX_VALUE;
     private final EGraphProofCapture proofCapture;
 
+    private final boolean arithmeticAc;
+
+    /** Exact scalar addition and multiplication, with n-ary AC identity (profile v1). */
+    public static EGraph exactScalarAcV1() { return new EGraph(null, true); }
+
     public EGraph() { this(null); }
 
     /** Only a fresh owned runner can request capture; existing graphs cannot acquire proofs. */
-    EGraph(EGraphProofCapture proofCapture) { this.proofCapture = proofCapture; }
+    EGraph(EGraphProofCapture proofCapture) { this(proofCapture, false); }
+
+    private EGraph(EGraphProofCapture proofCapture, boolean arithmeticAc) {
+        this.proofCapture = proofCapture;
+        this.arithmeticAc = arithmeticAc;
+    }
+
+    boolean usesArithmeticAc() { return arithmeticAc; }
 
     /** Saturation-local insertion cap; restoring the previous limit is the caller's responsibility. */
     int setInsertionLimit(int limit) {
@@ -100,6 +113,9 @@ public final class EGraph {
      */
     public EClassId add(ENode node) {
         Objects.requireNonNull(node, "node");
+        if (arithmeticAc ? isBinaryAcSymbol(node.symbol()) : ENode.isArithmeticAcSymbol(node.symbol())) {
+            throw new IllegalArgumentException("Node operator is incompatible with this graph profile: " + node.symbol());
+        }
         ENode canonical = node.canonicalize(unionFind);
         EClassId existing = hashCons.get(canonical);
         if (existing != null) {
@@ -114,10 +130,6 @@ public final class EGraph {
         classes.put(id, eclass);
         canonicalClassCount++;
         putHashCons(canonical, id);
-        // record this node as a parent of each child class.
-        for (EClassId child : canonical.children()) {
-            classOf(child).addParent(canonical);
-        }
         markDirty(id);
         bumpVersion();
         return id;
@@ -140,7 +152,10 @@ public final class EGraph {
      * distinct assumption-gated identities.</p>
      */
     public EClassId addExpression(Expr expression, List<String> assumptions) {
-        EClassId id = addExpressionInternal(expression);
+        return bindAssumptions(addExpressionInternal(expression), assumptions);
+    }
+
+    EClassId bindAssumptions(EClassId id, List<String> assumptions) {
         EClassId canonical = unionFind.find(id);
         AssumptionSignature newSig = AssumptionSignature.ofExpressions(assumptions);
         AssumptionSignature existing = assumptionsByClass.get(canonical);
@@ -154,6 +169,10 @@ public final class EGraph {
         return id;
     }
 
+    private static boolean isBinaryAcSymbol(String symbol) {
+        return symbol.equals("op:ADD") || symbol.equals("op:MUL");
+    }
+
     private EClassId addExpressionInternal(Expr expression) {
         if (expression instanceof NumberExpr number) {
             return add(ENode.leaf("num:" + format(number.value())));
@@ -162,6 +181,9 @@ public final class EGraph {
             return add(ENode.leaf("var:" + variable.name()));
         }
         if (expression instanceof BinaryExpr binary) {
+            if (arithmeticAc && (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.MUL)) {
+                return addAcExpression(binary);
+            }
             EClassId left = addExpressionInternal(binary.left());
             EClassId right = addExpressionInternal(binary.right());
             return add(new ENode("op:" + binary.operator().name(), List.of(left, right)));
@@ -174,6 +196,23 @@ public final class EGraph {
             return add(new ENode("fn:" + function.name(), arguments));
         }
         throw new IllegalArgumentException("Unsupported expression: " + expression.getClass());
+    }
+
+    /** Flatten the actual syntax only. Following alternative representatives could traverse a cycle. */
+    private EClassId addAcExpression(BinaryExpr expression) {
+        Deque<Expr> pending = new ArrayDeque<>();
+        List<EClassId> operands = new ArrayList<>();
+        pending.push(expression);
+        while (!pending.isEmpty()) {
+            Expr next = pending.pop();
+            if (next instanceof BinaryExpr binary && binary.operator() == expression.operator()) {
+                pending.push(binary.right());
+                pending.push(binary.left());
+            } else {
+                operands.add(addExpressionInternal(next));
+            }
+        }
+        return add(new ENode("ac:" + expression.operator().name(), operands));
     }
 
     /** Canonical id for {@code id} (i.e. the surviving root after merges). */
@@ -279,9 +318,9 @@ public final class EGraph {
         return dedupeCanonical(hits);
     }
 
-    /** Consume and clear the set of classes changed since the last call. */
+    /** Consume changes and include ancestors whose patterns may now match. */
     public Collection<EClassId> consumeDirtyClasses() {
-        Collection<EClassId> snapshot = dedupeCanonical(dirtyClasses);
+        Collection<EClassId> snapshot = classesWithAncestors(dirtyClasses);
         dirtyClasses.clear();
         return snapshot;
     }
@@ -299,21 +338,20 @@ public final class EGraph {
                 changed.add(unionFind.find(entry.getKey()));
             }
         }
+        return classesWithAncestors(changed);
+    }
+
+    private Collection<EClassId> classesWithAncestors(Collection<EClassId> changed) {
         LinkedHashSet<EClassId> affected = new LinkedHashSet<>(dedupeCanonical(changed));
         ArrayDeque<EClassId> queue = new ArrayDeque<>(affected);
         while (!queue.isEmpty()) {
             EClassId id = queue.removeFirst();
-            EClass eclass = classes.get(unionFind.find(id));
-            if (eclass == null) {
-                continue;
-            }
+            EClass eclass = classOf(id);
             for (ENode parent : eclass.parents()) {
-                EClassId owner = hashCons.get(parent.canonicalize(unionFind));
-                if (owner != null) {
-                    EClassId canonicalOwner = unionFind.find(owner);
-                    if (affected.add(canonicalOwner)) {
-                        queue.addLast(canonicalOwner);
-                    }
+                // Backlinks use the current hash-cons key even before rebuild.
+                EClassId owner = unionFind.find(hashCons.get(parent));
+                if (affected.add(owner)) {
+                    queue.addLast(owner);
                 }
             }
         }
@@ -473,35 +511,12 @@ public final class EGraph {
     private void repair(EClassId id) {
         EClass eclass = classOf(id);
         // 1. re-canonicalize the parents, looking for new congruences.
-        Map<ENode, EClassId> newParents = new HashMap<>();
         for (ENode parent : new ArrayList<>(eclass.parents())) {
-            ENode parentCanonical = parent.canonicalize(unionFind);
-            EClassId hit = removeHashCons(parent);
-            if (hit != null) {
-                putHashCons(parentCanonical, unionFind.find(hit));
-                markDirty(hit);
-            }
-            EClassId alreadyOwned = newParents.get(parentCanonical);
-            if (alreadyOwned != null) {
-                // Same parent shape, different ids before canonicalization —
-                // congruence! merge.
-                EClassId here = unionFind.find(hit == null ? alreadyOwned : hit);
-                EClassId there = unionFind.find(alreadyOwned);
-                if (!here.equals(there)) {
-                    EClassId survivor = mergeClasses(here, there);
-                    worklist.add(survivor);
-                }
-                newParents.put(parentCanonical, unionFind.find(here));
-            } else {
-                newParents.put(parentCanonical, hit == null ? null : unionFind.find(hit));
-            }
-        }
-        eclass.clearParents();
-        for (ENode parent : newParents.keySet()) {
-            eclass.addParent(parent);
+            repairParent(parent);
         }
         // 2. re-canonicalize this class' own nodes so each canonical node
         // appears exactly once across the whole graph.
+        eclass = classOf(id);
         LinkedHashSet<ENode> dedup = new LinkedHashSet<>();
         for (ENode node : eclass.nodes()) {
             ENode canonical = node.canonicalize(unionFind);
@@ -510,13 +525,34 @@ public final class EGraph {
             if (owner == null) {
                 putHashCons(canonical, eclass.id());
             } else if (!unionFind.find(owner).equals(eclass.id())) {
-                // Two classes claim the same canonical node → congruence.
-                EClassId survivor = mergeClasses(eclass.id(), owner);
-                worklist.add(survivor);
+                // Merging can change this node set. Repair the survivor
+                // before replacing its nodes so absorbed nodes are retained.
+                worklist.add(mergeClasses(eclass.id(), owner));
+                return;
             }
         }
         eclass.replaceNodes(dedup);
         markDirty(eclass.id());
+    }
+
+    private void repairParent(ENode parent) {
+        ENode canonical = parent.canonicalize(unionFind);
+        EClassId owner = hashCons.get(parent);
+        if (parent.equals(canonical)) {
+            markDirty(owner);
+            return;
+        }
+        EClassId existing = hashCons.get(canonical);
+        if (existing != null && !unionFind.inSameSet(owner, existing)) {
+            worklist.add(mergeClasses(owner, existing));
+        }
+        removeHashCons(parent, owner);
+        if (existing == null) {
+            putHashCons(canonical, unionFind.find(owner));
+        } else {
+            addSignatureMembership(canonical, existing);
+        }
+        markDirty(owner);
     }
 
     private Expr buildExpression(EClassId canonical, Map<EClassId, ENode> bestNode) {
@@ -531,6 +567,14 @@ public final class EGraph {
         }
         if (symbol.startsWith("var:")) {
             return new VariableExpr(symbol.substring(4));
+        }
+        if (ENode.isArithmeticAcSymbol(symbol)) {
+            BinaryOperator operator = BinaryOperator.valueOf(symbol.substring(3));
+            Expr result = buildExpression(find(node.children().getFirst()), bestNode);
+            for (int i = 1; i < node.children().size(); i++) {
+                result = new BinaryExpr(result, operator, buildExpression(find(node.children().get(i)), bestNode));
+            }
+            return result;
         }
         if (symbol.startsWith("op:")) {
             de.regelsuche.ast.BinaryOperator operator = de.regelsuche.ast.BinaryOperator.valueOf(symbol.substring(3));
@@ -601,20 +645,20 @@ public final class EGraph {
         return survivor;
     }
 
-    private EClassId removeHashCons(ENode node) {
-        EClassId owner = hashCons.remove(node);
-        if (owner != null) {
-            removeSignatureMembership(node, owner);
+    private void removeHashCons(ENode node, EClassId owner) {
+        hashCons.remove(node);
+        removeSignatureMembership(node, owner);
+        for (EClassId child : node.children()) {
+            classOf(child).removeParent(node);
         }
-        return owner;
     }
 
     private void putHashCons(ENode node, EClassId owner) {
-        EClassId previous = hashCons.put(node, owner);
-        if (previous != null) {
-            removeSignatureMembership(node, previous);
-        }
+        hashCons.put(node, owner);
         addSignatureMembership(node, owner);
+        for (EClassId child : node.children()) {
+            classOf(child).addParent(node);
+        }
     }
 
     private void addSignatureMembership(ENode node, EClassId owner) {

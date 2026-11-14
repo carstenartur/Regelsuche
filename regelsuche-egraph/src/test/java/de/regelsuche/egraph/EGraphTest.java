@@ -20,6 +20,7 @@ import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.value.ExprValueFactory;
 import de.regelsuche.value.ExprValueFactory.ExprValue;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class EGraphTest {
@@ -81,6 +82,50 @@ class EGraphTest {
         // After rebuild: the parent classes are equivalent too.
         assertTrue(eGraph.areEquivalent(aPlusOne, bPlusOne),
             "rebuild() must propagate a≡b up to (a+1)≡(b+1)");
+    }
+
+    @Test
+    void rebuildKeepsARekeyedParentIndexedWhenItsCanonicalNodeAlreadyExists() {
+        EGraph graph = new EGraph();
+        EClassId a = graph.addExpression(parse("a"));
+        EClassId b = graph.addExpression(parse("b"));
+        EClassId right = graph.addExpression(parse("f(b, b)"));
+        EClassId left = graph.addExpression(parse("f(a, a)"));
+        graph.union(left, right);
+        graph.union(a, b);
+        graph.rebuild();
+
+        EClassId survivor = graph.find(left);
+        var parent = new ENode("fn:f", List.of(graph.find(a), graph.find(a)));
+        assertEquals(Set.of(parent), graph.classOrThrow(survivor).nodes());
+        assertEquals(Set.of(parent), graph.classOrThrow(a).parents());
+        assertEquals(List.of(survivor), graph.classesWith(new ENodeSignature("fn:f", 2)));
+        assertEquals(survivor, graph.addExpression(parse("f(a, a)")));
+    }
+
+    @Test
+    void rebuildFinishesACyclicCongruenceWithoutDroppingAbsorbedNodes() {
+        EGraph graph = new EGraph();
+        EClassId a = graph.addExpression(parse("a"));
+        EClassId fOfC = graph.addExpression(parse("f(c)"));
+        EClassId gOfA = graph.addExpression(parse("g(a)"));
+        EClassId fLeaf = graph.addExpression(parse("f()"));
+        EClassId gOfF = graph.addExpression(parse("g(f(c))"));
+        graph.union(gOfF, fLeaf);
+        graph.union(a, fOfC);
+        EClassId cyclic = graph.add(new ENode("fn:f", List.of(fOfC, fLeaf)));
+        graph.union(cyclic, gOfF);
+
+        graph.rebuild();
+        graph.rebuild();
+
+        assertTrue(graph.areEquivalent(gOfA, cyclic));
+        EClassId survivor = graph.find(cyclic);
+        assertEquals(Set.of(ENode.leaf("fn:f"),
+                new ENode("fn:g", List.of(graph.find(a))),
+                new ENode("fn:f", List.of(graph.find(a), survivor))),
+            graph.classOrThrow(survivor).nodes());
+        assertEquals(survivor, graph.add(new ENode("fn:f", List.of(a, survivor))));
     }
 
     @Test

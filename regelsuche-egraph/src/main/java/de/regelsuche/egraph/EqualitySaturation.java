@@ -1,6 +1,9 @@
 package de.regelsuche.egraph;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionEvaluation;
+import de.regelsuche.transform.AstRewriteTransformationEngine.CancelDivisionFactorRule;
 import de.regelsuche.egraph.proof.ExtractionProofBuilder;
 import de.regelsuche.egraph.proof.ExtractionProofChecker;
 import de.regelsuche.egraph.proof.ProofLimits;
@@ -52,11 +55,50 @@ public final class EqualitySaturation {
     /** Exact extraction for additive, non-negative per-node costs. */
     public Result saturate(EGraph graph, EClassId root, ToIntFunction<ENode> costOfNode) {
         Objects.requireNonNull(graph, "graph");
+        if (graph.usesArithmeticAc() && !rules.isEmpty()) {
+            throw new IllegalArgumentException("Saturation of native AC graphs requires a native multiset matcher");
+        }
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(costOfNode, "costOfNode");
         Execution execution = saturateGraph(graph, root, costOfNode, new Run(null));
         Expr best = graph.extract(root, costOfNode);
         return execution.result(best, de.regelsuche.parse.ExpressionFormatter.format(best), ProofOutcome.notRequested());
+    }
+
+    /** A local guard decision in the invocation's fixed scalar context. */
+    public record GuardDecision(String ruleId, Expr before, Expr after, List<AssumptionEvaluation> evaluations,
+            boolean applied) {
+        public GuardDecision {
+            evaluations = List.copyOf(evaluations);
+        }
+    }
+
+    /** The expression in result() belongs to this specific immutable assumption context. */
+    public record ConditionalResult(Result result, List<Assumption> assumptions, List<GuardDecision> decisions) {
+        public ConditionalResult {
+            Objects.requireNonNull(result);
+            assumptions = List.copyOf(assumptions);
+            decisions = List.copyOf(decisions);
+        }
+    }
+
+    /** Fresh, isolated graph for the built-in scalar factor-cancellation rule and unconditional rules. */
+    public ConditionalResult saturateUnderAssumptions(Expr input, List<Assumption> assumptions,
+            ToIntFunction<ENode> costOfNode) {
+        var guards = new RationalCancellation(assumptions);
+        var graph = new EGraph();
+        graph.setInsertionLimit(config.maxNodes());
+        EClassId root;
+        try {
+            root = graph.addExpression(Objects.requireNonNull(input));
+        } catch (EGraph.NodeBudgetExceeded exhausted) {
+            throw new IllegalArgumentException("Input exceeds the configured e-node budget", exhausted);
+        }
+        var run = new Run(null, guards);
+        Execution execution = saturateGraph(graph, root, costOfNode, run);
+        Expr best = graph.extract(root, costOfNode);
+        var result = execution.result(best, de.regelsuche.parse.ExpressionFormatter.format(best), ProofOutcome.notRequested());
+        return new ConditionalResult(result, guards.assumptions, guards.decisions);
     }
 
     private Execution saturateGraph(EGraph graph, EClassId root,
@@ -295,7 +337,9 @@ public final class EqualitySaturation {
                 run.diagnostics.record(rule.id(), null, RULE_FAILURE, ELIGIBILITY, failure);
                 continue;
             }
-            if (rule.getClass() == PatternRewriteRule.class
+            if (run.guards != null && rule instanceof CancelDivisionFactorRule) {
+                run.guards.apply(graph, matcher, rule, snapshot, run);
+            } else if (rule.getClass() == PatternRewriteRule.class
                     && ((PatternRewriteRule) rule).recognitionProfile().equals(RecognitionProfile.exact())) {
                 applyPattern(graph, matcher, applier, (PatternRewriteRule) rule, snapshot, run);
             } else {
@@ -433,9 +477,14 @@ public final class EqualitySaturation {
     private static List<EClassId> canonicalSorted(EGraph graph, Collection<EClassId> ids) {
         return ids.stream().map(graph::find).distinct().sorted().toList();
     }
-    private static final class Run {
+    static final class Run {
+        final RationalCancellation guards;
         final EGraphProofCapture capture;
-        Run(EGraphProofCapture capture) { this.capture = capture; }
+        Run(EGraphProofCapture capture) { this(capture, null); }
+        Run(EGraphProofCapture capture, RationalCancellation guards) {
+            this.capture = capture;
+            this.guards = guards;
+        }
         final Map<String, Integer> appliedRules = new LinkedHashMap<>();
         final SaturationDiagnostics.Collector diagnostics = new SaturationDiagnostics.Collector();
         final List<SaturationProvenance.Witness> witnesses = new ArrayList<>();
@@ -445,6 +494,10 @@ public final class EqualitySaturation {
         SaturationStats.Reason noProgressReason() {
             if (diagnostics.hasFailures()) return SaturationStats.Reason.RULE_FAILURES;
             if (diagnostics.hasInconclusiveMatches()) return SaturationStats.Reason.MATCHER_LIMIT;
+            if (guards != null && guards.decisionLimit) return SaturationStats.Reason.GUARD_BUDGET;
+            if (guards != null && (guards.undecided || diagnostics.hasUnresolvedConditions())) {
+                return SaturationStats.Reason.UNDECIDED_GUARDS;
+            }
             return SaturationStats.Reason.FIX_POINT;
         }
         void applied(String rule, SaturationProvenance.Witness witness) {

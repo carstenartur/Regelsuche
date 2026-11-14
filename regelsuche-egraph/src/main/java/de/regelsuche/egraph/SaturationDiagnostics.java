@@ -43,6 +43,7 @@ public record SaturationDiagnostics(Map<Outcome, Long> counts, List<Event> event
                 failure == null ? "" : failure.getClass().getName(), message));
         }
         SaturationDiagnostics snapshot() { return new SaturationDiagnostics(counts, events, dropped); }
+        boolean hasUnresolvedConditions() { return counts.containsKey(Outcome.UNRESOLVED_CONDITIONS); }
         boolean hasFailures() { return counts.containsKey(Outcome.RULE_FAILURE); }
         boolean hasInconclusiveMatches() { return counts.containsKey(Outcome.MATCH_INCONCLUSIVE); }
     }

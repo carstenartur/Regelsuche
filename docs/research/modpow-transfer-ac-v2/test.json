@@ -1,0 +1,214 @@
+{
+  "schema": "regelsuche.modpow-transfer-corpus/v1",
+  "split": "TEST",
+  "cases": [
+    {
+      "id": "T01",
+      "source": "program(modpow(b0,u0*v0,m0),modpow(b0,v0,m0))",
+      "roles": {
+        "a": "b0",
+        "q": "u0",
+        "e": "v0",
+        "n": "m0",
+        "r": "w0"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": true,
+      "assumptions": [
+        "b0 integer",
+        "u0 integer",
+        "u0 >= 0",
+        "v0 integer",
+        "v0 >= 0",
+        "w0 integer",
+        "w0 >= 0",
+        "m0 integer",
+        "m0 > 0"
+      ]
+    },
+    {
+      "id": "T02",
+      "source": "program(modpow(b1,v1,m1),modpow(b1,v1*u1,m1))",
+      "roles": {
+        "a": "b1",
+        "q": "u1",
+        "e": "v1",
+        "n": "m1",
+        "r": "w1"
+      },
+      "qBits": 20,
+      "eBits": 16,
+      "rBits": 16,
+      "positive": true,
+      "assumptions": [
+        "b1 integer",
+        "u1 integer",
+        "u1 >= 0",
+        "v1 integer",
+        "v1 >= 0",
+        "w1 integer",
+        "w1 >= 0",
+        "m1 integer",
+        "m1 > 0"
+      ]
+    },
+    {
+      "id": "T03",
+      "source": "program(11,modpow(b2,v2*u2,m2),17,modpow(b2,v2,m2))",
+      "roles": {
+        "a": "b2",
+        "q": "u2",
+        "e": "v2",
+        "n": "m2",
+        "r": "w2"
+      },
+      "qBits": 21,
+      "eBits": 17,
+      "rBits": 17,
+      "positive": true,
+      "assumptions": [
+        "b2 integer",
+        "u2 integer",
+        "u2 >= 0",
+        "v2 integer",
+        "v2 >= 0",
+        "w2 integer",
+        "w2 >= 0",
+        "m2 integer",
+        "m2 > 0"
+      ]
+    },
+    {
+      "id": "T04",
+      "source": "program(modpow(b3,v3,m3),11,17,modpow(b3,u3*v3,m3))",
+      "roles": {
+        "a": "b3",
+        "q": "u3",
+        "e": "v3",
+        "n": "m3",
+        "r": "w3"
+      },
+      "qBits": 22,
+      "eBits": 18,
+      "rBits": 18,
+      "positive": true,
+      "assumptions": [
+        "b3 integer",
+        "u3 integer",
+        "u3 >= 0",
+        "v3 integer",
+        "v3 >= 0",
+        "w3 integer",
+        "w3 >= 0",
+        "m3 integer",
+        "m3 > 0"
+      ]
+    },
+    {
+      "id": "T05",
+      "source": "program(5,modpow(b4,v4,m4),7,11,13,modpow(b4,v4*u4,m4))",
+      "roles": {
+        "a": "b4",
+        "q": "u4",
+        "e": "v4",
+        "n": "m4",
+        "r": "w4"
+      },
+      "qBits": 23,
+      "eBits": 19,
+      "rBits": 19,
+      "positive": true,
+      "assumptions": [
+        "b4 integer",
+        "u4 integer",
+        "u4 >= 0",
+        "v4 integer",
+        "v4 >= 0",
+        "w4 integer",
+        "w4 >= 0",
+        "m4 integer",
+        "m4 > 0"
+      ]
+    },
+    {
+      "id": "T06",
+      "source": "program(3,5,7,11,modpow(b5,u5*v5,m5),13,17,modpow(b5,v5,m5))",
+      "roles": {
+        "a": "b5",
+        "q": "u5",
+        "e": "v5",
+        "n": "m5",
+        "r": "w5"
+      },
+      "qBits": 24,
+      "eBits": 20,
+      "rBits": 20,
+      "positive": true,
+      "assumptions": [
+        "b5 integer",
+        "u5 integer",
+        "u5 >= 0",
+        "v5 integer",
+        "v5 >= 0",
+        "w5 integer",
+        "w5 >= 0",
+        "m5 integer",
+        "m5 > 0"
+      ]
+    },
+    {
+      "id": "T07",
+      "source": "program(modpow(b6,u6*v6,m6),modpow(b6,w6,m6))",
+      "roles": {
+        "a": "b6",
+        "q": "u6",
+        "e": "v6",
+        "n": "m6",
+        "r": "w6"
+      },
+      "qBits": 25,
+      "eBits": 21,
+      "rBits": 21,
+      "positive": false,
+      "assumptions": [
+        "b6 integer",
+        "u6 integer",
+        "u6 >= 0",
+        "v6 integer",
+        "v6 >= 0",
+        "w6 integer",
+        "w6 >= 0",
+        "m6 integer",
+        "m6 > 0"
+      ]
+    },
+    {
+      "id": "T08",
+      "source": "program(3,modpow(b7,w7,m7),11,modpow(b7,v7*u7,m7),17)",
+      "roles": {
+        "a": "b7",
+        "q": "u7",
+        "e": "v7",
+        "n": "m7",
+        "r": "w7"
+      },
+      "qBits": 26,
+      "eBits": 22,
+      "rBits": 22,
+      "positive": false,
+      "assumptions": [
+        "b7 integer",
+        "u7 integer",
+        "u7 >= 0",
+        "v7 integer",
+        "v7 >= 0",
+        "w7 integer",
+        "w7 >= 0",
+        "m7 integer",
+        "m7 > 0"
+      ]
+    }
+  ]
+}

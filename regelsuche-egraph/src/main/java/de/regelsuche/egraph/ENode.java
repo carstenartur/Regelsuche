@@ -1,11 +1,6 @@
 package de.regelsuche.egraph;
 
-import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
-import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
 import de.regelsuche.value.ExprValueFactory.ExprValue;
 import de.regelsuche.value.ExprValueFactory.NumberValue;
@@ -46,6 +41,15 @@ public record ENode(String symbol, List<EClassId> children) {
             throw new IllegalArgumentException("symbol must not be empty");
         }
         children = children == null ? List.of() : List.copyOf(children);
+        if (isArithmeticAcSymbol(symbol)) {
+            if (children.size() < 2) throw new IllegalArgumentException("AC nodes require at least two operands");
+            // Hash-cons a multiset of canonical class IDs. Equal IDs retain every occurrence.
+            children = children.stream().sorted().toList();
+        }
+    }
+
+    static boolean isArithmeticAcSymbol(String symbol) {
+        return symbol.equals("ac:ADD") || symbol.equals("ac:MUL");
     }
 
     /** Convenience constructor for leaves (variables, numbers). */
@@ -105,13 +109,7 @@ public record ENode(String symbol, List<EClassId> children) {
             Objects.requireNonNull(value, "value");
             List<String> safeAssumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
             EClassId direct = addValueNodes(value);
-            EClassId checked = graph.addExpression(toExpression(value), safeAssumptions);
-            EClassId directRoot = graph.find(direct);
-            if (!directRoot.equals(graph.find(checked))) {
-                throw new IllegalStateException("ExprValue and AST insertion produced different e-classes");
-            }
-            classesByValue.put(value.key(), directRoot);
-            return directRoot;
+            return graph.bindAssumptions(graph.find(direct), safeAssumptions);
         }
 
         public Optional<EClassId> classFor(ValueKey key) {
@@ -134,18 +132,11 @@ public record ENode(String symbol, List<EClassId> children) {
             } else if (value instanceof NumberValue number) {
                 added = graph.add(leaf("num:" + format(number.value())));
             } else if (value instanceof OrderedValue ordered) {
+                validateOrderedOperator(ordered);
                 List<EClassId> childIds = ordered.operands().stream().map(this::addValueNodes).toList();
                 added = graph.add(new ENode(symbol(ordered.operator()), childIds));
             } else if (value instanceof AssociativeCommutativeValue acValue) {
-                List<ExprValue> operands = expandedOperands(acValue);
-                EClassId result = addValueNodes(operands.getFirst());
-                String nodeSymbol = symbol(acValue.operator());
-                for (int i = 1; i < operands.size(); i++) {
-                    result = graph.add(new ENode(
-                        nodeSymbol,
-                        List.of(result, addValueNodes(operands.get(i)))));
-                }
-                added = result;
+                added = addAcValue(acValue);
             } else {
                 throw new IllegalArgumentException(
                     "unsupported ExprValue type: " + value.getClass().getName());
@@ -155,50 +146,46 @@ public record ENode(String symbol, List<EClassId> children) {
             return canonical;
         }
 
-        private Expr toExpression(ExprValue value) {
-            if (value instanceof VariableValue variable) {
-                return new VariableExpr(variable.name());
+        private EClassId addAcValue(AssociativeCommutativeValue value) {
+            if (graph.usesArithmeticAc()) requireStandardOperator(value.operator(), value.operandCount());
+            List<Map.Entry<ExprValue, Integer>> entries = new ArrayList<>(value.multiplicities().entrySet());
+            entries.sort(Map.Entry.comparingByKey(Comparator.comparing(ExprValue::key)));
+            List<EClassId> children = new ArrayList<>(value.operandCount());
+            for (var entry : entries) {
+                children.addAll(Collections.nCopies(entry.getValue(), addValueNodes(entry.getKey())));
             }
-            if (value instanceof NumberValue number) {
-                return new NumberExpr(number.value());
+            if (graph.usesArithmeticAc()) {
+                return graph.add(new ENode("ac:" + binaryOperator(value.operator()).name(), children));
             }
-            if (value instanceof OrderedValue ordered) {
-                List<Expr> operands = ordered.operands().stream().map(this::toExpression).toList();
-                if (ordered.operator().id().startsWith("fn:")) {
-                    return new FunctionExpr(ordered.operator().id().substring(3), operands);
-                }
-                if (operands.size() != 2) {
-                    throw new IllegalArgumentException(
-                        "ordered non-function value must have exactly two operands: "
-                            + ordered.operator().id());
-                }
-                return new BinaryExpr(
-                    operands.get(0), binaryOperator(ordered.operator()), operands.get(1));
+            String nodeSymbol = symbol(value.operator());
+            EClassId result = children.getFirst();
+            for (int i = 1; i < children.size(); i++) {
+                result = graph.add(new ENode(nodeSymbol, List.of(result, children.get(i))));
             }
-            if (value instanceof AssociativeCommutativeValue acValue) {
-                List<ExprValue> operands = expandedOperands(acValue);
-                Expr result = toExpression(operands.getFirst());
-                BinaryOperator operator = binaryOperator(acValue.operator());
-                for (int i = 1; i < operands.size(); i++) {
-                    result = new BinaryExpr(result, operator, toExpression(operands.get(i)));
-                }
-                return result;
-            }
-            throw new IllegalArgumentException(
-                "unsupported ExprValue type: " + value.getClass().getName());
+            return result;
         }
 
-        private static List<ExprValue> expandedOperands(AssociativeCommutativeValue value) {
-            List<Map.Entry<ExprValue, Integer>> entries =
-                new ArrayList<>(value.multiplicities().entrySet());
-            entries.sort(Comparator.comparing(entry -> entry.getKey().key()));
-            List<ExprValue> expanded = new ArrayList<>(value.operandCount());
-            for (Map.Entry<ExprValue, Integer> entry : entries) {
-                for (int i = 0; i < entry.getValue(); i++) {
-                    expanded.add(entry.getKey());
-                }
+        private void validateOrderedOperator(OrderedValue value) {
+            if (graph.usesArithmeticAc()) {
+                requireStandardOperator(value.operator(), value.operands().size());
+            } else if (!value.operator().id().startsWith("fn:") && value.operands().size() != 2) {
+                throw new IllegalArgumentException("Ordered binary operator requires two operands: " + value.operator().id());
             }
-            return List.copyOf(expanded);
+        }
+
+        private static void requireStandardOperator(ValueOperator operator, int arity) {
+            ValueOperator standard = switch (operator.id()) {
+                case "add" -> ValueOperator.ADD;
+                case "mul" -> ValueOperator.MUL;
+                case "sub" -> ValueOperator.SUB;
+                case "div" -> ValueOperator.DIV;
+                case "pow" -> ValueOperator.POW;
+                default -> operator.id().startsWith("fn:")
+                    ? ValueOperator.function(operator.id().substring(3), arity) : null;
+            };
+            if (!operator.equals(standard)) {
+                throw new IllegalArgumentException("Unsupported operator laws for the exact scalar profile: " + operator);
+            }
         }
 
         private static String symbol(ValueOperator operator) {

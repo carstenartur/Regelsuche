@@ -77,6 +77,18 @@ tasks.register('writeComparativeBenchmarkRunB', JavaExec) { task ->
             'reports/comparative-ci/run-b').get().asFile.absolutePath)
 }
 
+tasks.register('writeSharedRewriteFragment', JavaExec) {
+    group = 'verification'
+    description = 'Writes the source-only shared rewrite and equality saturation comparison.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    def output = rootProject.layout.buildDirectory.file(
+        'reports/comparative-ci/shared-fragment/checkout.json')
+    args '--shared-rewrite-fragment', output.get().asFile.absolutePath
+    outputs.file output
+    outputs.upToDateWhen { false }
+}
+
 tasks.named('test') { testTask ->
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
