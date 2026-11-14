@@ -2,6 +2,7 @@ package de.regelsuche.egraph;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
@@ -76,10 +77,22 @@ public final class EGraph {
     private int insertionLimit = Integer.MAX_VALUE;
     private final EGraphProofCapture proofCapture;
 
+    private final boolean arithmeticAc;
+
+    /** Exact scalar addition and multiplication, with n-ary AC identity (profile v1). */
+    public static EGraph exactScalarAcV1() { return new EGraph(null, true); }
+
     public EGraph() { this(null); }
 
     /** Only a fresh owned runner can request capture; existing graphs cannot acquire proofs. */
-    EGraph(EGraphProofCapture proofCapture) { this.proofCapture = proofCapture; }
+    EGraph(EGraphProofCapture proofCapture) { this(proofCapture, false); }
+
+    private EGraph(EGraphProofCapture proofCapture, boolean arithmeticAc) {
+        this.proofCapture = proofCapture;
+        this.arithmeticAc = arithmeticAc;
+    }
+
+    boolean usesArithmeticAc() { return arithmeticAc; }
 
     /** Saturation-local insertion cap; restoring the previous limit is the caller's responsibility. */
     int setInsertionLimit(int limit) {
@@ -100,6 +113,9 @@ public final class EGraph {
      */
     public EClassId add(ENode node) {
         Objects.requireNonNull(node, "node");
+        if (arithmeticAc ? isBinaryAcSymbol(node.symbol()) : ENode.isArithmeticAcSymbol(node.symbol())) {
+            throw new IllegalArgumentException("Node operator is incompatible with this graph profile: " + node.symbol());
+        }
         ENode canonical = node.canonicalize(unionFind);
         EClassId existing = hashCons.get(canonical);
         if (existing != null) {
@@ -140,7 +156,10 @@ public final class EGraph {
      * distinct assumption-gated identities.</p>
      */
     public EClassId addExpression(Expr expression, List<String> assumptions) {
-        EClassId id = addExpressionInternal(expression);
+        return bindAssumptions(addExpressionInternal(expression), assumptions);
+    }
+
+    EClassId bindAssumptions(EClassId id, List<String> assumptions) {
         EClassId canonical = unionFind.find(id);
         AssumptionSignature newSig = AssumptionSignature.ofExpressions(assumptions);
         AssumptionSignature existing = assumptionsByClass.get(canonical);
@@ -154,6 +173,10 @@ public final class EGraph {
         return id;
     }
 
+    private static boolean isBinaryAcSymbol(String symbol) {
+        return symbol.equals("op:ADD") || symbol.equals("op:MUL");
+    }
+
     private EClassId addExpressionInternal(Expr expression) {
         if (expression instanceof NumberExpr number) {
             return add(ENode.leaf("num:" + format(number.value())));
@@ -162,6 +185,9 @@ public final class EGraph {
             return add(ENode.leaf("var:" + variable.name()));
         }
         if (expression instanceof BinaryExpr binary) {
+            if (arithmeticAc && (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.MUL)) {
+                return addAcExpression(binary);
+            }
             EClassId left = addExpressionInternal(binary.left());
             EClassId right = addExpressionInternal(binary.right());
             return add(new ENode("op:" + binary.operator().name(), List.of(left, right)));
@@ -174,6 +200,23 @@ public final class EGraph {
             return add(new ENode("fn:" + function.name(), arguments));
         }
         throw new IllegalArgumentException("Unsupported expression: " + expression.getClass());
+    }
+
+    /** Flatten the actual syntax only. Following alternative representatives could traverse a cycle. */
+    private EClassId addAcExpression(BinaryExpr expression) {
+        Deque<Expr> pending = new ArrayDeque<>();
+        List<EClassId> operands = new ArrayList<>();
+        pending.push(expression);
+        while (!pending.isEmpty()) {
+            Expr next = pending.pop();
+            if (next instanceof BinaryExpr binary && binary.operator() == expression.operator()) {
+                pending.push(binary.right());
+                pending.push(binary.left());
+            } else {
+                operands.add(addExpressionInternal(next));
+            }
+        }
+        return add(new ENode("ac:" + expression.operator().name(), operands));
     }
 
     /** Canonical id for {@code id} (i.e. the surviving root after merges). */
@@ -531,6 +574,14 @@ public final class EGraph {
         }
         if (symbol.startsWith("var:")) {
             return new VariableExpr(symbol.substring(4));
+        }
+        if (ENode.isArithmeticAcSymbol(symbol)) {
+            BinaryOperator operator = BinaryOperator.valueOf(symbol.substring(3));
+            Expr result = buildExpression(find(node.children().getFirst()), bestNode);
+            for (int i = 1; i < node.children().size(); i++) {
+                result = new BinaryExpr(result, operator, buildExpression(find(node.children().get(i)), bestNode));
+            }
+            return result;
         }
         if (symbol.startsWith("op:")) {
             de.regelsuche.ast.BinaryOperator operator = de.regelsuche.ast.BinaryOperator.valueOf(symbol.substring(3));

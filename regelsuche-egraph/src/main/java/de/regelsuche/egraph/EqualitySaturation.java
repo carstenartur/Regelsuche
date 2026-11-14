@@ -52,6 +52,9 @@ public final class EqualitySaturation {
     /** Exact extraction for additive, non-negative per-node costs. */
     public Result saturate(EGraph graph, EClassId root, ToIntFunction<ENode> costOfNode) {
         Objects.requireNonNull(graph, "graph");
+        if (graph.usesArithmeticAc() && !rules.isEmpty()) {
+            throw new IllegalArgumentException("Saturation of native AC graphs requires a native multiset matcher");
+        }
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(costOfNode, "costOfNode");
         Execution execution = saturateGraph(graph, root, costOfNode, new Run(null));
