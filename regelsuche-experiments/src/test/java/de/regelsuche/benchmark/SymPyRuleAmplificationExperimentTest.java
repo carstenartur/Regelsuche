@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +18,24 @@ import org.junit.jupiter.api.io.TempDir;
 class SymPyRuleAmplificationExperimentTest {
     private static final String REVISION =
         "0123456789abcdef0123456789abcdef01234567";
+
+    @Test
+    void externalReferenceUsesTheSameSourcesAndAssumptionsInTheSameOrder() throws Exception {
+        var mapper = new ObjectMapper();
+        var file = Path.of("..", "scripts", "sympy_rule_reference", "sources.json");
+        JsonNode sources = mapper.readTree(file.toFile());
+        var cases = SymPyRuleAmplificationExperiment.cases();
+        assertTrue(sources.isArray());
+        assertEquals(cases.size(), sources.size());
+        for (int index = 0; index < cases.size(); index++) {
+            var entry = cases.get(index);
+            var expected = mapper.createObjectNode();
+            expected.put("id", entry.id());
+            expected.put("source", entry.sourceExpression());
+            expected.set("declaredAssumptions", mapper.valueToTree(entry.sourceAssumptions()));
+            assertEquals(expected, sources.get(index));
+        }
+    }
 
     @Test
     void retainsFourAdditionalApplicationsAcrossThreeFamilies() {
