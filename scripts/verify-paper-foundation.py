@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from paper_corpus_splits import CORPUS, RECEIPT, write_split_report
 from paper_controller_figure import MATRIX, write_controller_outputs
 
 
@@ -172,6 +173,8 @@ def main() -> None:
         raise SystemExit("foundation manuscript must not imply final results")
 
     output = prepare_output(args.output)
+    write_split_report(require_regular_input(root / CORPUS, "public case corpus"),
+                       require_regular_input(root / RECEIPT, "public freeze receipt"), output)
     write_controller_outputs(require_regular_input(root / MATRIX, "public controller evidence"), output)
     summary = {
         "schema": "regelsuche.paper-foundation-verification/v1",

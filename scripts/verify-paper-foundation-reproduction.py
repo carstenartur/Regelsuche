@@ -26,6 +26,7 @@ EXPECTED_JSONSCHEMA_VERSION = "4.25.1"
 EXPECTED_OUTPUT_FILES = (
     "public-controller-allocation.svg",
     "public-controller-results.md",
+    "public-corpus-splits.md",
     "foundation-summary.md",
     "foundation-verification.json",
 )

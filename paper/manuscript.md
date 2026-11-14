@@ -74,6 +74,8 @@ Every transition retains source identities, configured and executed resources, t
 
 The final evaluation will use the corpus and split protocol from #383, informed by the evaluator-backed challenge portfolio in #390. Corpus construction, structural clusters, split assignments, budgets, metrics, and thresholds must be frozen before evaluated campaigns run.
 
+The registered public corpus separates cases used for formation from cases reserved for evaluation. The generated split table counts each challenge directly from the case manifest, checks each case identity against its contents and binds the corpus to its freeze receipt. The table tests the stated information policy. Determining what a particular learner actually consumed requires that learner's execution receipts. [Corpus splits and declared access](generated/public-corpus-splits.md)
+
 The design requires:
 
 - multiple independent structural clusters;
