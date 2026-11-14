@@ -172,9 +172,15 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main before merging the public discovery and workbench comparisons (2026-11-14)
+
+The reference is the clean main checkout `be1b27ba0bdbc383190d0543ffb3cfdf9f73e08b`. Its [post-merge CI](https://github.com/carstenartur/Regelsuche/actions/runs/43594627405) passed the seven verification jobs and the aggregate checkout gate. The extractor measured 774320 context units, 9070 more than the previous reference. The allowance is 15000. The [acceptance record](../ai-knowledge/baseline-history/2026-11-14-main-be1b27ba/provenance.json) binds all 286 indexed files to their byte lengths and hashes.
+
+After the later merges, main `03b58d1d` measured 782420 units. The previous reference yielded an increase of 17170 and one [rejected trend](../ai-knowledge/baseline-history/2026-11-14-main-be1b27ba/rejected-trend.json). Applying the pinned extractor to the accepted predecessor gives an increase of 8100 on the same source. The measurement from the rejected run is retained for comparison.
+
 ### Accepted main before the November 14 integrations
 
-The active baseline is the native v0.1.10 projection of main
+The earlier baseline was the native v0.1.10 projection of main
 `273d850569325fde5f15db9faa45a32c98632ebe`. Its [post-merge CI run](https://github.com/carstenartur/Regelsuche/actions/runs/43551043301)
 passed seven verification jobs and the aggregate `ciCheck` against the previous
 baseline. The extractor measured 765250 context units, up 14380 from 750870
@@ -182,7 +188,7 @@ within the 15000-unit allowance. Its normalized context debt was 14.46.
 
 The [qualification and artifact hashes](../ai-knowledge/baseline-history/2026-11-14-main-273d850/provenance.json)
 bind the clean checkout, CI jobs and all 285 verified archive entries.
-The pinned extractor's `TrendAnalyzer.snapshot` projects the active baseline
+The pinned extractor's `TrendAnalyzer.snapshot` projected that baseline
 from the [accepted complexity report](../ai-knowledge/baseline-history/2026-11-14-main-273d850/accepted-complexity.json).
 The [passing check](../ai-knowledge/baseline-history/2026-11-14-main-273d850/accepted-check.json)
 records the native gate outcome. The [later run on main](https://github.com/carstenartur/Regelsuche/actions/runs/43557641631)
