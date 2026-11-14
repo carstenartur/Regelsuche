@@ -40,4 +40,34 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>verify-jmh-allocation-result</id>
+      <activation><property><name>regelsuche.jmh.allocationResult</name></property></activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>verify-retained-jmh-allocation</id>
+                <phase>verify</phase>
+                <goals><goal>test</goal></goals>
+                <configuration>
+                  <test>de.regelsuche.quality.jmh.JmhAllocationMavenEvidenceIT</test>
+                  <skipTests>false</skipTests>
+                  <failIfNoTests>true</failIfNoTests>
+                  <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+                  <systemPropertyVariables combine.children="append">
+                    <regelsuche.jmh.allocationSummary>${project.build.directory}/reports/quality/jmh-allocation/allocation.json</regelsuche.jmh.allocationSummary>
+                  </systemPropertyVariables>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

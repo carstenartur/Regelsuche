@@ -47,7 +47,8 @@ SECTIONS = {
                         "config/quality/jmh-regression-decision-policy-more-warmup-v1.json",
                         "config/quality/jmh-baseline-more-warmup-v1.json"],
         "supportFiles": ["scripts/verify-jmh-regression-v3.py",
-                         "scripts/verify-jmh-benchmark.py"]},
+                         "scripts/verify-jmh-benchmark.py",
+                         "regelsuche-quality/src/main/java/de/regelsuche/quality/jmh/JmhAllocationReportMain.java"]},
     "history": {
         "policyFiles": [HISTORY_POLICY],
         "supportFiles": ["docs/performance-history.md"]},
