@@ -12,6 +12,16 @@ class DeterministicCounterexampleSearchServiceTest {
     private final DeterministicCounterexampleSearchService service = new DeterministicCounterexampleSearchService();
 
     @Test
+    void reportsOnlyAssignmentsActuallyEvaluatedUpToTheFirstRefutation() {
+        var assignments = new java.util.ArrayList<String>();
+        var measured = new DeterministicCounterexampleSearchService(assignments::add);
+        var result = measured.search(new CounterexampleSearchService.HypothesisInput("early", "x", "x + 1", List.of()),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget());
+        assertTrue(result.counterexample().isPresent());
+        assertEquals(List.of("numeric-boundary-values"), assignments);
+    }
+
+    @Test
     void existingNonZeroAssumptionIsRespectedDuringSampling() {
         CounterexampleSearchService.CounterexampleSearchResult result = service.search(
             new CounterexampleSearchService.HypothesisInput(
