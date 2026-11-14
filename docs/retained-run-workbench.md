@@ -141,7 +141,11 @@ In the ordinary Workbench search form, **Formel bearbeiten und Vorschau öffnen*
 can wrap a selected expression, square it or insert a fraction. The same text
 field remains editable and supplies the search request. **Parser-Vorschau**
 renders the term or equation as MathML and exposes its exact AST, including
-the zero introduced by unary minus. The read-only preview accepts up to 256
+the zero introduced by unary minus. On syntax errors the parser returns the
+offending half-open UTF-16 interval in the original input. Use **Fehlerstelle
+im Ausdruck auswählen** to select it or move the caret to a missing character.
+For example, `2x` selects the unexpected `x`; enter `2*x` to multiply.
+The read-only preview accepts up to 256
 characters, uses the Java search parser and does not start a search. The
 separate runtime and system profiles use their own input contracts.
 

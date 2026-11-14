@@ -1907,6 +1907,11 @@ public class WebWorkbenchServer {
             var input = requestBodies.readSearch(exchange);
             try {
                 sendJson(exchange, 200, FormulaPreview.parse(input.expression(), input.type()));
+            } catch (de.regelsuche.parse.ExpressionParser.Diagnostic diagnostic) {
+                sendJson(exchange, 422, new JsonWriter().beginObject()
+                    .property("message", diagnostic.getMessage())
+                    .property("startInclusive", diagnostic.startInclusive())
+                    .property("endExclusive", diagnostic.endExclusive()).endObject().toString());
             } catch (IllegalArgumentException invalid) {
                 sendStatus(exchange, 400, invalid.getMessage());
             }

@@ -82,6 +82,20 @@
         try {
             const response = await fetch('/api/inspect/formula', {method: 'POST',
                 headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expression, type})});
+            if (response.status === 422) {
+                const diagnostic = await response.json();
+                if (!current()) return;
+                const select = document.createElement('button');
+                select.type = 'button';
+                select.textContent = 'Fehlerstelle im Ausdruck auswählen';
+                select.addEventListener('click', () => {
+                    input.focus();
+                    input.setSelectionRange(diagnostic.startInclusive, diagnostic.endExclusive);
+                });
+                const range = '[' + diagnostic.startInclusive + ', ' + diagnostic.endExclusive + ')';
+                preview.replaceChildren(diagnostic.message + ' · UTF-16 ' + range + ' ', select);
+                return;
+            }
             if (!response.ok) throw new Error(await response.text());
             const tree = await response.json();
             if (!current()) return;

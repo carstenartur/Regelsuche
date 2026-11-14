@@ -6,7 +6,6 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
-import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.parse.ExpressionParser;
@@ -21,12 +20,12 @@ final class FormulaPreview {
             throw new IllegalArgumentException("Die Formelvorschau unterstützt bis zu " + MAX_SOURCE_LENGTH + " Zeichen.");
         InputType inputType = InputType.valueOf(type);
         if (inputType == InputType.SYSTEM) throw new IllegalArgumentException("TERM oder EQUATION erforderlich.");
-        var parsed = new ExpressionParser().parse(new InputRequest(inputType, source));
+        var parser = new ExpressionParser();
         var result = new JsonWriter().beginObject();
         if (inputType == InputType.EQUATION) {
-            Equation equation = parsed.equations().getFirst();
+            Equation equation = parser.parseEquation(source);
             node(result, "EQUATION", "=", List.of(equation.left(), equation.right()));
-        } else write(result, parsed.terms().getFirst());
+        } else write(result, parser.parseTerm(source));
         return result.endObject().toString();
     }
 

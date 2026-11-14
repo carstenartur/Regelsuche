@@ -1639,6 +1639,10 @@
         }}}},
         "responses": {
           "200": {"description": "Vom Parser erzeugter AST", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FormulaAstNode"}}}},
+          "422": {"description": "Parserfehler mit halboffenem UTF-16-Bereich im Originaltext. Fehlende Zeichen haben einen leeren Bereich.", "content": {"application/json": {"schema": {
+            "type": "object", "required": ["message", "startInclusive", "endExclusive"],
+            "properties": {"message": {"type": "string"}, "startInclusive": {"type": "integer", "minimum": 0}, "endExclusive": {"type": "integer", "minimum": 0}}
+          }}}},
           "400": {"$ref": "#/components/responses/BadRequestText"},
           "413": {"$ref": "#/components/responses/PayloadTooLarge"}
         }

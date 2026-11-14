@@ -171,6 +171,28 @@ class LandingPageBrowserFlowTest {
         page.locator("#previewFormula").click();
         page.waitForFunction("() => document.querySelector('#formulaPreview').textContent.includes('position')");
         assertEquals(0, preview.locator("math").count());
+        var range = preview.locator("button");
+        range.click();
+        assertEquals(3, input.evaluate("node => node.selectionStart"));
+        assertEquals(3, input.evaluate("node => node.selectionEnd"));
+
+        page.locator("#searchForm select[name='type']").selectOption("EQUATION");
+        input.fill("  α = 2💡 + β");
+        page.locator("#previewFormula").click();
+        range.click();
+        assertEquals("💡", input.evaluate("node => node.value.slice(node.selectionStart, node.selectionEnd)"));
+        assertEquals(7, input.evaluate("node => node.selectionStart"));
+        assertEquals(9, input.evaluate("node => node.selectionEnd"));
+
+        page.locator("#searchForm select[name='type']").selectOption("TERM");
+        input.fill("2x");
+        page.locator("#previewFormula").click();
+        range.click();
+        assertEquals("x", input.evaluate("node => node.value.slice(node.selectionStart, node.selectionEnd)"));
+        input.fill("2*x");
+        page.locator("#previewFormula").click();
+        page.waitForFunction("() => document.querySelector('#formulaPreview math') !== null");
+        assertEquals("MUL(2, x)", preview.locator("code").textContent());
 
         // The caller may change input while the production parser response is in flight.
         page.evaluate("""
