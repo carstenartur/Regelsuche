@@ -74,8 +74,22 @@ A reported `unsat` alone is insufficient: a second invocation must retrieve a
 nonempty proof object. `executeWithEvidence` retains the complete SMT inputs,
 stdout/stderr, invocation status and proof object as well as the canonical
 native evidence chain. The stored proof text has exactly the certificate hash
-reported by the backend. This is a solver proof object, **not** an independent
-Lean-kernel replay of Z3's proof.
+reported by the backend. The optional `RetainedAttempt.replaysEqualityProof(expected)` reads the
+retained object, checks its hash and the expected native obligation, and calls
+a solver-independent Java checker. The supported fragment is equality between
+declared real symbols. The checker validates each native asserted leaf, equality
+symmetry, transitivity and final unit resolution. Acceptance requires a
+derivation of false from the exact negated goal and every distinct premise.
+Duplicate or unused premises and unsupported native rules yield no replay.
+The raw checker `Z3EqualityProofReplay.verifies(expected, object)` performs
+the same proof check using only the typed statement and object text. Neither
+entry point invokes Z3 or infers consistency of the premises. Existing
+arithmetic proof retention and portfolio result statuses remain separate.
+
+The checked-proof suite generates fresh objects with the installed Z3 binary
+for an equality chain and its symmetry control. It also exercises changed
+goals, changed asserted leaves, missing premises, truncated objects and a
+proof file exchanged between two genuine executions.
 
 ## Process success is not mathematical evidence
 
