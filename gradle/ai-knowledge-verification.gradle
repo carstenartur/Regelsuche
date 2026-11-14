@@ -39,20 +39,22 @@ def verifyRegelsucheAiKnowledgeArtifacts = tasks.register(
     outputs.upToDateWhen { false }
 }
 
-def hotspotQualityProject = project(':regelsuche-quality')
-def hotspotClasspath = hotspotQualityProject.providers.provider {
-    hotspotQualityProject.extensions.getByType(org.gradle.api.tasks.SourceSetContainer)
-        .named('main').get().runtimeClasspath
+def hotspotRuntime = configurations.dependencyScope('hotspotRuntime')
+dependencies.add(hotspotRuntime.name, project(':regelsuche-quality'))
+def hotspotClasspath = configurations.resolvable('hotspotClasspath') {
+    extendsFrom hotspotRuntime.get()
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.JAR))
+    }
 }
 def verifyComplexityHotspots = tasks.register('verifyComplexityHotspots', JavaExec) {
     group = 'verification'
     description = 'Rejects new or materially worsened method-complexity hotspots without a finite exception.'
-    dependsOn verifyRegelsucheAiKnowledgeArtifacts, ':regelsuche-quality:classes'
-    classpath = hotspotQualityProject.files(hotspotClasspath)
+    dependsOn verifyRegelsucheAiKnowledgeArtifacts
+    classpath = files(hotspotClasspath)
     mainClass = 'de.regelsuche.quality.complexity.ComplexityHotspotReportMain'
-    javaLauncher = hotspotQualityProject.extensions.getByType(JavaToolchainService).launcherFor {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
     def measurement = rootProject.layout.buildDirectory.file('ai-knowledge/complexity.json')
     args measurement.get().asFile.absolutePath,
         rootProject.file('config/quality/complexity-hotspots.json').absolutePath,
