@@ -99,6 +99,25 @@ Reference identity is only a scoped fast path. Stable structural identity remain
 authoritative across serialization and factory boundaries. An unbounded global
 intern pool is rejected.
 
+### Compact values for representation metrics
+
+`ExprValueArena` interns parsed expressions up to an owner-supplied entry limit.
+Each local handle belongs to one arena. Keys compare the operator or exact leaf
+and immediate child IDs. Addition and multiplication flatten to child/count
+pairs. Ordered operators retain operand order. A rejected projection rolls back
+all entries it added. The existing sharing metric uses a fresh arena for the
+expression and counts its distinct values.
+
+For evidence across processes, `digest(id)` returns
+`regelsuche.expr-value-digest/v1:` followed by a SHA-256 hex digest. The input
+frames each Java string with its 32-bit big-endian length in UTF-16 code units,
+then writes those units in big-endian order. Each node hashes the version, kind,
+canonical leaf payload or function name, the 32-bit number of edge slots, and
+the child digests. Each AC child uses two slots and carries a 32-bit multiplicity.
+AC pairs sort by unsigned digest bytes then count. The arena computes digests
+on demand and local equality compares complete keys even on hash collisions.
+The legacy `ValueKey` encodings continue to identify existing persisted values.
+
 ### Occurrences
 
 A concrete occurrence has independent identity and references one value,
