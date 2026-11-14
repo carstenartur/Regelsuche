@@ -7,14 +7,11 @@ RUN chmod +x ./gradlew \
         --tests de.regelsuche.docs.HiddenRuleComparisonTest \
         --tests de.regelsuche.docs.HiddenRulePilotCampaignTest.productionRuntimeContainsNoHiddenManifestIdentifiersOrTemplates
 
-FROM build AS preparation-ablation
 ARG REGELSUCHE_PREPARATION_REVISION
 RUN REGELSUCHE_PREPARATION_REVISION="$REGELSUCHE_PREPARATION_REVISION" \
     ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:test \
-        --tests de.regelsuche.benchmark.PreparationAblationTest
-
-FROM scratch AS preparation-evidence
-COPY --from=preparation-ablation /workspace/regelsuche-experiments/build/reports/preparation-ablation/comparison.json /comparison.json
+        --tests de.regelsuche.benchmark.PreparationAblationTest \
+        --tests de.regelsuche.benchmark.PreparationGuardPanelTest
 
 FROM eclipse-temurin:25.0.5_8-jre-noble AS runtime
 
@@ -37,6 +34,7 @@ WORKDIR /opt/regelsuche-benchmarks
 COPY --from=build \
     /workspace/regelsuche-benchmarks/build/install/regelsuche-benchmarks/ ./
 COPY --from=build /workspace/app/build/reports/hidden-rule-pilot/comparison.json ./hidden-rule-comparison.json
+COPY --from=build /workspace/regelsuche-experiments/build/reports/preparation-ablation/ /opt/regelsuche-benchmarks/preparation-ablation/
 RUN chown -R regelsuche:regelsuche /opt/regelsuche-benchmarks
 
 ENV HOME=/tmp

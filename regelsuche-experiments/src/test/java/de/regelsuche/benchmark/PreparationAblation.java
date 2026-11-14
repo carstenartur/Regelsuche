@@ -67,7 +67,7 @@ final class PreparationAblation {
         return report;
     }
 
-    private static ObjectNode describe(PreparationProfile.Result result, String source) {
+    static ObjectNode describe(PreparationProfile.Result result, String source) {
         var node = JSON.createObjectNode();
         node.put("ruleId", result.ruleId());
         node.put("ruleFingerprint", result.ruleFingerprint());
@@ -94,7 +94,7 @@ final class PreparationAblation {
         return node;
     }
 
-    private static String digest(byte[] bytes) throws NoSuchAlgorithmException {
+    static String digest(byte[] bytes) throws NoSuchAlgorithmException {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 }

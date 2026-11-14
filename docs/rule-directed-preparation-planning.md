@@ -260,7 +260,7 @@ mvn -pl regelsuche-experiments -am -Dtest=PreparationAblationTest -Dsurefire.fai
 ```
 
 Maven schreibt `regelsuche-experiments/target/reports/preparation-ablation/comparison.json`.
-Der Gradle-Task `verifyComparativeBenchmarks` vergleicht die Ausgabe des
-Checkouts mit einem separaten Durchlauf im Benchmark-Image. Der gesonderte
-Docker-Build-Target `preparation-evidence` erhält die Git-Revision des
-Checkouts als Build-Argument `REGELSUCHE_PREPARATION_REVISION`.
+Der Gradle-Task `verifyComparativeBenchmarks` übergibt die Git-Revision des
+Checkouts als Build-Argument an das gepinnte Vergleichsimage. Gradle liest
+beide im Image erzeugten Berichte aus dem netzwerkisolierten Container aus
+und vergleicht ihre Bytes mit den Hostläufen.

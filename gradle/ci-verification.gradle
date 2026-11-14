@@ -186,6 +186,11 @@ def verifyComparativeZ3Toolchain = tasks.register(
 }
 
 def comparativeImage = 'regelsuche-comparative-benchmarks:verification'
+def checkoutForPreparation = providers.environmentVariable('REGELSUCHE_PREPARATION_REVISION').orElse(providers.exec {
+    workingDir repositoryRoot
+    commandLine 'git', 'rev-parse', 'HEAD'
+}.standardOutput.asText.map { it.trim() })
+
 def buildComparativeBenchmarkImage = tasks.register(
     'buildComparativeBenchmarkImage', Exec) {
     group = 'verification'
@@ -196,9 +201,12 @@ def buildComparativeBenchmarkImage = tasks.register(
         'gradlew', 'gradlew.bat', 'settings.gradle', 'build.gradle',
         'gradle.properties')
     outputs.upToDateWhen { false }
-    commandLine 'docker', 'build',
-        '-f', 'Dockerfile.comparative-benchmarks',
-        '-t', comparativeImage, '.'
+    inputs.property 'preparationRevision', checkoutForPreparation
+    doFirst {
+        commandLine 'docker', 'build', '-f', 'Dockerfile.comparative-benchmarks',
+            '--build-arg', "REGELSUCHE_PREPARATION_REVISION=${checkoutForPreparation.get()}",
+            '-t', comparativeImage, '.'
+    }
 }
 
 def comparativeDockerOutput = layout.buildDirectory.dir(
@@ -272,31 +280,35 @@ def preparationCheckout = project(':regelsuche-experiments').layout.buildDirecto
     'reports/preparation-ablation/comparison.json')
 def preparationImageOutput = layout.buildDirectory.dir('reports/comparative-ci/preparation-ablation')
 def preparationContainer = preparationImageOutput.map { it.file('comparison.json') }
-def checkoutForPreparation = providers.environmentVariable('REGELSUCHE_PREPARATION_REVISION').orElse(providers.exec {
-    workingDir repositoryRoot
-    commandLine 'git', 'rev-parse', 'HEAD'
-}.standardOutput.asText.map { it.trim() })
+def guardCheckout = project(':regelsuche-experiments').layout.buildDirectory.file(
+    'reports/preparation-ablation/guards-v1.json')
+def guardContainer = preparationImageOutput.map { it.file('guards-v1.json') }
 
 project(':regelsuche-experiments').tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
     inputs.property 'preparationRevision', checkoutForPreparation
-    outputs.file preparationCheckout
+    outputs.files preparationCheckout, guardCheckout
     doFirst { environment 'REGELSUCHE_PREPARATION_REVISION', checkoutForPreparation.get() }
 }
 
-def runPreparationAblationImage = tasks.register('runPreparationAblationImage', Exec) {
-    group = 'verification'
-    description = 'Runs the eleven input preparation ablation in the pinned build image.'
-    dependsOn buildComparativeBenchmarkImage
-    workingDir repositoryRoot
-    outputs.file preparationContainer
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine 'docker', 'build', '-f', 'Dockerfile.comparative-benchmarks',
-            '--target', 'preparation-evidence',
-            '--build-arg', "REGELSUCHE_PREPARATION_REVISION=${checkoutForPreparation.get()}",
-            '--output', "type=local,dest=${preparationImageOutput.get().asFile.absolutePath}", '.'
+def extractPreparationReport = { String taskName, String filename, output ->
+    tasks.register(taskName, Exec) {
+        group = 'verification'
+        description = "Extracts ${filename} generated during the pinned comparative image build."
+        dependsOn buildComparativeBenchmarkImage
+        outputs.file output
+        outputs.upToDateWhen { false }
+        doFirst {
+            def destination = output.get().asFile
+            destination.parentFile.mkdirs()
+            commandLine 'docker', 'run', '--rm', '--network', 'none', '--entrypoint', 'cat',
+                comparativeImage, "/opt/regelsuche-benchmarks/preparation-ablation/${filename}"
+            standardOutput = new FileOutputStream(destination)
+        }
+        doLast { standardOutput.close() }
     }
 }
+def extractPreparation = extractPreparationReport('extractPreparationAblation', 'comparison.json', preparationContainer)
+def extractGuards = extractPreparationReport('extractPreparationGuards', 'guards-v1.json', guardContainer)
 
 def verifyComparativeBenchmarks = tasks.register(
     'verifyComparativeBenchmarks', Exec) {
@@ -311,7 +323,7 @@ def verifyComparativeBenchmarks = tasks.register(
         runComparativeBenchmarkImage,
         runSharedRewriteFragmentImage,
         ':app:test', extractHiddenRuleContainerReport,
-        ':regelsuche-experiments:test', runPreparationAblationImage
+        ':regelsuche-experiments:test', extractPreparation, extractGuards
     workingDir repositoryRoot
     inputs.file repositoryRoot.file(
         'scripts/verify-comparative-benchmark-reproducibility.py')
@@ -323,6 +335,7 @@ def verifyComparativeBenchmarks = tasks.register(
     inputs.file hiddenRuleContainer
     inputs.file preparationCheckout
     inputs.file preparationContainer
+    inputs.files guardCheckout, guardContainer
     inputs.file sharedRewriteCheckout
     inputs.file sharedRewriteContainer
     outputs.upToDateWhen { false }
@@ -342,6 +355,10 @@ def verifyComparativeBenchmarks = tasks.register(
         if (java.nio.file.Files.mismatch(preparationCheckout.get().asFile.toPath(),
                 preparationContainer.get().asFile.toPath()) != -1L) {
             throw new GradleException('Preparation ablation differs between the checkout and pinned image.')
+        }
+        if (java.nio.file.Files.mismatch(guardCheckout.get().asFile.toPath(),
+                guardContainer.get().asFile.toPath()) != -1L) {
+            throw new GradleException('Guard-panel decisions differ between the checkout and pinned image.')
         }
         def checkout = sharedRewriteCheckout.get().asFile.toPath()
         def container = sharedRewriteContainer.get().asFile.toPath()

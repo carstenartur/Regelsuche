@@ -256,6 +256,7 @@ public final class UnifiedRulePreparationCoordinator {
         }
 
         PreparationProfile.Result run(PreparationProfile profile, boolean oversized) {
+            if (ExplicitZeroConditions.conflict(assumptions)) return negative("UNSUPPORTED", "CONTRADICTED_NONZERO_PRECONDITION");
             if (oversized) return negative("BUDGET_INCONCLUSIVE", "SOURCE_EXCEEDS_MAX_EXPRESSION_NODES");
             var result = match("DIRECT_ONLY", RecognitionProfile.exact());
             if (result.isEmpty() && profile != PreparationProfile.DIRECT_ONLY

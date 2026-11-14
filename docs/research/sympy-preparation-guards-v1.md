@@ -21,3 +21,24 @@ solver. Repeat the coordinator on the same unlabelled input and require all
 raw decisions to reproduce. Do not count conditional or incompatible edges
 as authorized, and report any such candidate even if that defeats a safety
 hypothesis. Report by principal and preparer, including zero gains.
+
+## Results
+
+The last stage admits one qualified result in each family's explicit-nonzero
+case. Trig and polynomial unknowns retain `a != 0` as an extra condition.
+Neither is authorized under its input alone. All explicit-zero cases return
+no candidate. The rational matcher reports an unsupported required premise
+for both the undeclared and zero cases. The three earlier profiles return
+only the telescoping result with both denominator assumptions supplied.
+
+The original implementation produced two incompatible local bridges: both
+T3 and P3 carried `a = 0` from the input and introduced `a != 0` on the
+cancellation edge. The regression rejects both edges and checks certificate
+replay against the same explicit-zero boundary. The full report stores all
+nine inputs, four profiles, three attempted principals, qualified results,
+negative statuses and verifier reruns.
+
+Maven writes `regelsuche-experiments/target/reports/preparation-ablation/guards-v1.json`.
+Gradle writes the same relative path under `build/`. The canonical comparison
+build also runs this suite in the pinned JDK image and compares the emitted
+host and container report bytes at the same checkout revision.

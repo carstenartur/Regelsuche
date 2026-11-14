@@ -226,6 +226,9 @@ public final class PatternTargetedLocalBridgeSearch {
             }
             AssumptionSignature resultAssumptions = merge(
                 assumptions, principal.emittedAssumptions());
+            if (ExplicitZeroConditions.conflict(resultAssumptions)) {
+                return new Verification(false, "CONTRADICTED_NONZERO_PRECONDITION");
+            }
             if (!principal.expressionAfter().equals(
                     bridge.resultExpression())
                     || !resultAssumptions.equals(
@@ -382,7 +385,8 @@ public final class PatternTargetedLocalBridgeSearch {
                     if (retained.analysis().matched()) {
                         PrincipalStep principal = replayPrincipal(
                             retained.expression());
-                        if (principal != null) {
+                        if (principal != null && !ExplicitZeroConditions.conflict(
+                                merge(retained.assumptions(), principal.emittedAssumptions()))) {
                             Bridge result = bridge(
                                 source, retained, states,
                                 principal, work());
@@ -497,11 +501,12 @@ public final class PatternTargetedLocalBridgeSearch {
                 limits.add("EXPRESSION_NODES");
                 return null;
             }
+            AssumptionSignature assumptions = merge(
+                parent.assumptions(), transformation.assumptions());
+            if (ExplicitZeroConditions.conflict(assumptions)) return null;
             PatternMatchAnalyzer.Analysis analysis = analyzePattern(ast);
             analyzedCandidates++;
             recordInconclusiveMatch(analysis);
-            AssumptionSignature assumptions = merge(
-                parent.assumptions(), transformation.assumptions());
             return new Candidate(
                 parent,
                 transformation,
@@ -554,6 +559,10 @@ public final class PatternTargetedLocalBridgeSearch {
             PatternMatchAnalyzer.Analysis initial
         ) {
             PrincipalStep replay = replayPrincipal(source.expression());
+            if (replay != null && ExplicitZeroConditions.conflict(
+                    merge(source.assumptions(), replay.emittedAssumptions()))) {
+                return attempt(Status.UNSUPPORTED, Optional.empty(), initial, "CONTRADICTED_NONZERO_PRECONDITION", "");
+            }
             return replay == null
                 ? attempt(
                     Status.TECHNICAL_FAILURE,
