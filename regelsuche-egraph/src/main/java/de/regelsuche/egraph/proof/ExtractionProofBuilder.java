@@ -13,7 +13,11 @@ public final class ExtractionProofBuilder {
     private final List<GroundInstance> instances = new ArrayList<>();
 
     public ExtractionProofBuilder(Collection<? extends RewriteRule> rules, ProofLimits limits) {
-        syntax = new ProofSupport(limits);
+        this(rules, limits, false);
+    }
+
+    ExtractionProofBuilder(Collection<? extends RewriteRule> rules, ProofLimits limits, boolean literalVariables) {
+        syntax = new ProofSupport(limits, literalVariables);
         try {
             syntax.registry(ProofSupport.nonNull(rules));
         } catch (LimitExceeded exhausted) {
