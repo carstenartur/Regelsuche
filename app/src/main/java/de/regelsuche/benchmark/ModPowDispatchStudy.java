@@ -6,6 +6,7 @@ import static de.regelsuche.benchmark.ModPowTransferFiles.read;
 import static de.regelsuche.benchmark.ModPowTransferFiles.require;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.regelsuche.benchmark.ModPowTransferFiles.Row;
 import de.regelsuche.mining.TypedOutputPattern;
@@ -75,68 +76,85 @@ public final class ModPowDispatchStudy {
         long[] prefix = setup.clone();
         int[][] reach = new int[ARMS.size()][budgets.size()];
         for (var row : rows) {
-            var targets = ModPowSearchTrace.referenceTargets(row);
-            long optimum = ModPowSearchTrace.referenceDag(row, targets);
-            long original = ModPowFrozenTransfer.cost(row, row.source()).dag();
-            var result = cases.addObject().put("id", row.id()).put("positive", row.positive())
-                .put("sourceDag", original).put("optimumDag", optimum).put("uniquePrimitiveTargets", targets.size());
-            var exhaustive = matcher.findWithMatchWork(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);
-            var indexed = index.find(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);
-            require(exhaustive.result().complete() && indexed.matching().result().complete()
-                && exhaustive.result().applications().equals(indexed.matching().result().applications()),
-                "ordered applications differ on " + row.id());
-            result.put("learnedApplications", exhaustive.result().applications().size());
-            for (var proposal : exhaustive.result().applications()) {
-                require(targets.contains(proposal.target()), "learned target outside reference grammar");
-            }
-            for (int arm = 0; arm < ARMS.size(); arm++) {
-                var trace = new ModPowSearchTrace(row);
-                if (arm == 1) trace.runLearned(exhaustive, 0);
-                if (arm == 2) trace.runLearned(indexed.matching(), indexed.dispatch().total());
-                trace.runPrimitive();
-                require(targets.equals(trace.primitiveTargets()) && trace.best() == optimum, "reference mismatch: " + row.id());
-                var node = result.putObject(ARMS.get(arm));
-                node.set("ledger", JSON.valueToTree(trace.work()));
-                if (arm == 2) node.set("dispatch", JSON.valueToTree(indexed.dispatch()));
-                node.put("duplicates", trace.work().generated() - trace.work().replayed());
-                node.set("improvements", JSON.valueToTree(trace.improvements()));
-                long hit = trace.firstOptimum(original, optimum);
-                node.put("firstOptimum", hit).put("streamFirstOptimum", prefix[arm] + hit)
-                    .put("completedWork", trace.completedWork());
-                var checkpoints = node.putArray("checkpoints");
-                for (int i = 0; i < budgets.size(); i++) {
-                    long budget = budgets.get(i).longValue();
-                    boolean reached = budget >= prefix[arm] + hit;
-                    if (row.positive() && reached) reach[arm][i]++;
-                    checkpoints.addObject().put("budget", budget).put("warmDag", at(trace, original, budget))
-                        .put("coldDag", at(trace, original, budget - setup[arm])).put("streamOptimum", reached);
-                }
-                prefix[arm] += trace.completedWork();
-            }
+            runRow(row, cases.addObject(), budgets, matcher, index, setup, prefix, reach);
         }
         var summary = out.putObject("summary");
         summary.set("budgets", budgets);
         for (int arm = 0; arm < ARMS.size(); arm++) {
-            var node = summary.putObject(ARMS.get(arm)).put("setup", setup[arm]).put("streamWork", prefix[arm]);
+            String name = ARMS.get(arm);
+            var node = summary.putObject(name).put("setup", setup[arm]).put("streamWork", prefix[arm]);
             node.set("positiveStreamReach", JSON.valueToTree(reach[arm]));
             if (arm > 0) {
-                for (var view : List.of("warmDag", "coldDag")) {
-                    int wins = 0, ties = 0, losses = 0;
-                    for (var row : cases) {
-                        if (!row.required("positive").booleanValue()) continue;
-                        for (int i = 0; i < budgets.size(); i++) {
-                            long baseline = row.required("primitive").required("checkpoints").get(i).required(view).longValue();
-                            long learned = row.required(ARMS.get(arm)).required("checkpoints").get(i).required(view).longValue();
-                            if (learned < baseline) wins++;
-                            else if (learned > baseline) losses++;
-                            else ties++;
-                        }
-                    }
-                    node.putObject(view).put("wins", wins).put("ties", ties).put("losses", losses);
-                }
+                node.set("warmDag", pairedOutcomes(cases, name, "warmDag"));
+                node.set("coldDag", pairedOutcomes(cases, name, "coldDag"));
             }
         }
         return out;
+    }
+
+    private static void runRow(Row row, ObjectNode result, JsonNode budgets,
+            TypedOutputPattern matcher, TypedOutputPattern.Indexed index, long[] setup, long[] prefix, int[][] reach) {
+        var targets = ModPowSearchTrace.referenceTargets(row);
+        long optimum = ModPowSearchTrace.referenceDag(row, targets);
+        long original = ModPowFrozenTransfer.cost(row, row.source()).dag();
+        result.put("id", row.id()).put("positive", row.positive()).put("sourceDag", original)
+            .put("optimumDag", optimum).put("uniquePrimitiveTargets", targets.size());
+        var exhaustive = matcher.findWithMatchWork(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);
+        var indexed = index.find(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);
+        require(exhaustive.result().complete() && indexed.matching().result().complete()
+            && exhaustive.result().applications().equals(indexed.matching().result().applications()),
+            "ordered applications differ on " + row.id());
+        result.put("learnedApplications", exhaustive.result().applications().size());
+        for (var proposal : exhaustive.result().applications()) {
+            require(targets.contains(proposal.target()), "learned target outside reference grammar");
+        }
+        for (int arm = 0; arm < ARMS.size(); arm++) {
+            var trace = new ModPowSearchTrace(row);
+            if (arm == 1) trace.runLearned(exhaustive, 0);
+            if (arm == 2) trace.runLearned(indexed.matching(), indexed.dispatch().total());
+            trace.runPrimitive();
+            require(targets.equals(trace.primitiveTargets()) && trace.best() == optimum, "reference mismatch: " + row.id());
+            var node = result.putObject(ARMS.get(arm));
+            node.set("ledger", JSON.valueToTree(trace.work()));
+            if (arm == 2) node.set("dispatch", JSON.valueToTree(indexed.dispatch()));
+            recordCheckpoints(node, trace, budgets, original, optimum, setup[arm], prefix[arm],
+                row.positive(), reach[arm]);
+            prefix[arm] += trace.completedWork();
+        }
+    }
+
+    private static void recordCheckpoints(ObjectNode node, ModPowSearchTrace trace, JsonNode budgets,
+            long original, long optimum, long setup, long prefix, boolean positive, int[] reach) {
+        node.put("duplicates", trace.work().generated() - trace.work().replayed());
+        node.set("improvements", JSON.valueToTree(trace.improvements()));
+        long hit = trace.firstOptimum(original, optimum);
+        node.put("firstOptimum", hit).put("streamFirstOptimum", prefix + hit)
+            .put("completedWork", trace.completedWork());
+        var checkpoints = node.putArray("checkpoints");
+        for (int i = 0; i < budgets.size(); i++) {
+            long budget = budgets.get(i).longValue();
+            boolean reached = budget >= prefix + hit;
+            if (positive && reached) reach[i]++;
+            checkpoints.addObject().put("budget", budget).put("warmDag", at(trace, original, budget))
+                .put("coldDag", at(trace, original, budget - setup)).put("streamOptimum", reached);
+        }
+    }
+
+    private static ObjectNode pairedOutcomes(ArrayNode cases, String arm, String view) {
+        int wins = 0, ties = 0, losses = 0;
+        for (var row : cases) {
+            if (!row.required("positive").booleanValue()) continue;
+            var primitive = row.required("primitive").required("checkpoints");
+            var learned = row.required(arm).required("checkpoints");
+            for (int i = 0; i < primitive.size(); i++) {
+                long baseline = primitive.get(i).required(view).longValue();
+                long candidate = learned.get(i).required(view).longValue();
+                if (candidate < baseline) wins++;
+                else if (candidate > baseline) losses++;
+                else ties++;
+            }
+        }
+        return JSON.createObjectNode().put("wins", wins).put("ties", ties).put("losses", losses);
     }
 
     private static long at(ModPowSearchTrace trace, long original, long budget) {
