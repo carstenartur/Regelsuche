@@ -28,3 +28,16 @@ The [full table](reversible-factor-search.tsv) includes paths, per-direction and
 cmp docs/research/reversible-factor-search.tsv \
   regelsuche-experiments/build/reports/reversible-factor-search/comparison.tsv
 ```
+
+### Iterative deepening on the same public panel
+
+The [registered control](reversible-factor-id-protocol.md) used one-sided iterative-deepening depth-first search on the same cases, primitives, assumptions and call allowance. Each new depth pass charged its own work. A successful path was replayed independently. Repeated states were excluded only while present on the active path.
+
+| Policy on the 13 syntax-exact cases | Primitive engine calls | Generated primitive proposals |
+| --- | ---: | ---: |
+| Exhaustive oracle | 35 | 40 |
+| One-sided BFS with replay | 30 | 32 |
+| Bidirectional BFS with replay | 28 | 28 |
+| Iterative deepening with replay | 34 | 36 |
+
+All three policies agreed with the minimum primitive lengths from the complete oracle on all 13 rows. Three were reachable and ten were absent. Of the iterative arm's 34 calls and 36 proposals, directed replay used 7 calls and generated 12 proposals. On the additional two-site control, iterative deepening recovered the length-two witness using 15 calls and 30 proposals. On the separate grouped control it found no path within depth three and used 6 calls and 6 proposals. The [full per-case table](reversible-factor-id.tsv) includes both controls and the actual directed witnesses. There is no target-blind or runtime comparison here.
