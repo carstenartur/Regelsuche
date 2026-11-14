@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
-"""Join isolated SymPy JaCoCo evidence and run the checkout coverage gate."""
+"""Validate the retained Java classpath and invoke the checkout coverage gate."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-CANONICAL_SYMPY_REPORT = Path(
-    "regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml"
-)
 COVERAGE_RUNTIME = Path("build/reports/quality/coverage-report-runtime")
 COVERAGE_MAIN = "de.regelsuche.quality.coverage.CoverageRegressionMain"
 
@@ -42,14 +37,6 @@ def _inside(root: Path, candidate: Path, label: str) -> Path:
     return lexical
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _coverage_classpath(root: Path) -> str:
     runtime = _inside(root, COVERAGE_RUNTIME, "coverage verifier runtime")
     if runtime.is_symlink() or not runtime.is_dir():
@@ -67,31 +54,7 @@ def converge(root: Path, isolated: Path) -> None:
     if not root.is_dir():
         raise CoverageConvergenceError(f"repository root is not a directory: {root}")
 
-    isolated_report = _inside(root, isolated, "isolated report")
-    canonical_report = _inside(root, CANONICAL_SYMPY_REPORT, "canonical report")
-
-    if isolated_report.is_symlink() or not isolated_report.is_file():
-        raise CoverageConvergenceError(
-            f"isolated SymPy JaCoCo report is missing or not a regular file: "
-            f"{isolated_report}"
-        )
-    if canonical_report.exists() or canonical_report.is_symlink():
-        raise CoverageConvergenceError(
-            f"canonical SymPy JaCoCo report already exists; refusing stale or "
-            f"ambiguous evidence: {canonical_report}"
-        )
     classpath = _coverage_classpath(root)
-
-    canonical_report.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(isolated_report, canonical_report)
-    source_hash = _sha256(isolated_report)
-    canonical_hash = _sha256(canonical_report)
-    if canonical_hash != source_hash:
-        raise CoverageConvergenceError(
-            "copied SymPy JaCoCo report is not byte-identical to isolated evidence"
-        )
-
-    print(f"crossAuthorityCoverageSymPyReport=sha256:{canonical_hash}")
     subprocess.run(
         [
             "java",
@@ -100,6 +63,8 @@ def converge(root: Path, isolated: Path) -> None:
             COVERAGE_MAIN,
             "--root",
             str(root),
+            "--isolated-report",
+            str(isolated),
         ],
         cwd=root,
         check=True,
