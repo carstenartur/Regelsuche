@@ -105,6 +105,39 @@ class ExistentialIntroductionTest {
             new Proof(vacuous, new Literal("1".repeat(65)), leaf)));
     }
 
+    @Test void searchesForAWitnessMissingFromTheGoalAndChecksItInTheRecipientScope() {
+        var target = statement("w", "w + x", "y");
+        var run = ExistentialWitnessSearch.search(target, 256);
+        assertEquals(ExistentialWitnessSearch.Status.FOUND, run.status());
+        var proof = run.proof().orElseThrow();
+        assertEquals(term("y - x"), proof.witness());
+        assertTrue(ExistentialIntroduction.replay(statement("z", "z + x", "y"), proof));
+        assertFalse(ExistentialIntroduction.replay(statement("z", "z + y", "x"), proof));
+        assertTrue(run.examined() > 1);
+        assertEquals(ExistentialWitnessSearch.Status.BUDGET_EXHAUSTED,
+            ExistentialWitnessSearch.search(target, run.examined() - 1).status());
+        assertEquals(run, ExistentialWitnessSearch.search(target, run.examined()));
+    }
+
+    @Test void finiteExhaustionAndPremiseUseDoNotAssertNonexistence() {
+        var premise = equality("h", "x + x", "y");
+        var target = statement("w", "w + w", "y", premise);
+        var run = ExistentialWitnessSearch.search(target, 256);
+        var proof = run.proof().orElseThrow();
+        assertEquals(term("x"), proof.witness());
+        assertInstanceOf(Hypothesis.class, proof.premise());
+        var noPremise = statement("w", "w + w", "y");
+        assertFalse(ExistentialIntroduction.replay(noPremise, proof));
+        var exhausted = ExistentialWitnessSearch.search(noPremise, 256);
+        assertEquals(ExistentialWitnessSearch.Status.GRAMMAR_EXHAUSTED, exhausted.status());
+        assertTrue(exhausted.proof().isEmpty());
+        assertEquals(exhausted, ExistentialWitnessSearch.search(noPremise, exhausted.examined()));
+        var empty = ExistentialWitnessSearch.search(target, 0);
+        assertEquals(0, empty.examined());
+        assertEquals(ExistentialWitnessSearch.Status.BUDGET_EXHAUSTED, empty.status());
+        assertThrows(IllegalArgumentException.class, () -> ExistentialWitnessSearch.search(target, -1));
+    }
+
     private static Statement statement(String binder, String left, String right, Predicate... assumptions) {
         var body = Obligation.create("witness-goal", List.of(real("x"), real("y"), real(binder)),
             List.of(Theory.REAL_ARITHMETIC), List.of(assumptions), new Goal(Relation.EQUALS, term(left), term(right)),
