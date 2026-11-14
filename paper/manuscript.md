@@ -137,9 +137,27 @@ The mandatory limitations are maintained in `limitations.md`. The final paper mu
 
 ## 11. Related work
 
-The final related-work review will cover symbolic term rewriting, equality saturation, inductive and grammar-guided program synthesis, automated conjecture generation, theorem proving, algorithm and mathematical discovery systems, benchmark leakage, and reproducible artifact evaluation.
+### Rewriting and equality saturation
 
-Candidate generation must be distinguished from candidate validation and proof. A system that validates an equality is not treated as a failed open-target generator, and a generator receives no proof credit it did not produce.
+Tate et al. accumulate equalities between program fragments and then choose an implementation using a cost model. The `egg` library makes this approach extensible through e-class analyses that attach domain-specific facts to equivalence classes. These methods explain how a system can find a cheaper expression using rules it already knows. Regelsuche's shared-fragment comparison therefore fixes the visible rules and measures extraction cost and certificate verification. Learning a reusable rule from the search requires a separate experiment with that rule withheld. [Tate et al., POPL 2009](https://www.cs.cornell.edu/~ross/publications/eqsat/) · [Willsey et al., POPL 2021](https://doi.org/10.1145/3434304)
+
+### Synthesis and conjecture formation
+
+In syntax-guided synthesis, a grammar defines candidate implementations and a logical specification defines correctness. Alur et al. describe solvers that use counterexamples to refine candidate programs. The information supplied to the solver determines which Regelsuche comparison it can enter. A solver given a desired input-output relation can address a target-directed task. An open-target enumerative baseline must receive only the grammar, observations and budget available to the discovery system while candidates are formed. [Alur et al., FMCAD 2013](https://doi.org/10.1109/FMCAD.2013.6679385)
+
+QuickSpec takes a collection of pure functions and proposes algebraic laws by testing expressions built from them. This is a closer comparison for the origin of a conjecture. An equation that survives those tests is a candidate for further investigation. In the proposed evaluation, the record of how a candidate was generated is retained even when a later counterexample invalidates it. Coverage, refutation and formal proof can therefore have different denominators. [Claessen, Smallbone and Hughes, 2010](https://doi.org/10.1007/978-3-642-13977-2_3)
+
+### Mathematical discovery and proof
+
+Davies et al. used learned predictions and feature attribution to guide mathematicians studying relationships between knot invariants. Fawzi et al. supplied AlphaTensor with a specific matrix-multiplication tensor and searched for efficient decompositions over a finite set of factors. The former study identifies the human contribution to formulating a conjecture. The latter specifies the mathematical task before the search begins and evaluates the resulting algorithms against an explicit operation or hardware cost. For a proposed Regelsuche discovery, this distinction calls for recording who supplied the question, which target was visible and how reuse was measured. [Davies et al., Nature 2021](https://doi.org/10.1038/s41586-021-04086-x) · [Fawzi et al., Nature 2022](https://doi.org/10.1038/s41586-022-05172-4)
+
+Lean checks an elaborated proof term against a theorem type in a particular environment. A meaningful comparison with a proof assistant starts once the candidate, premises and translation have been fixed. Regelsuche's checked Lean bridge binds the resulting theorem to the requested statement and audits its transitive axiom dependencies. A process that only generated tactic text has reached an earlier stage. [de Moura and Ullrich, CADE 2021](https://doi.org/10.1007/978-3-030-79876-5_37) · [Lean language reference](https://lean-lang.org/doc/reference/latest/Elaboration-and-Compilation/) · [Regelsuche proof bridge](../docs/proof-bridge.md)
+
+### Holdout reuse and artifact evaluation
+
+Dwork et al. examine how choosing each analysis in response to earlier results can compromise inference on reused data. They give a privacy-based mechanism for adaptive access to a holdout. The protocol in Section 5 addresses the same source of leakage with a different design. Validation selects the configuration, then a single final evaluation records every configured case. A crash after the final data have been revealed is a reportable outcome, since rerunning with a different configuration would let that disclosure influence selection. [Dwork et al., Science 2015](https://doi.org/10.1126/science.aaa9375)
+
+ACM's artifact policy distinguishes permanent availability, an audit of the software and data, and independent validation of reported results. For this study, two clean runs can test whether the supplied procedure emits identical canonical bytes. The separate reproduction record must identify the independent team, the artifacts it used and which claims it reproduced. An archive identifier establishes where to retrieve a version. [ACM, Artifact Review and Badging v1.1](https://www.acm.org/publications/policies/artifact-review-and-badging-current)
 
 ## 12. Conclusion
 
