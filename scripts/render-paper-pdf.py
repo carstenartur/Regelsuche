@@ -20,9 +20,12 @@ INK = colors.HexColor("#25303c")
 ACCENT = colors.HexColor("#17566b")
 WIDTH = A4[0] - 96
 SECTIONS = ("paper/manuscript.md", "paper/generated/public-corpus-splits.md",
-            "paper/generated/public-controller-results.md", "paper/limitations.md",
+            "paper/generated/public-controller-results.md", "paper/generated/public-recurrence-results.md",
+            "paper/limitations.md",
             "paper/claims-and-evidence.md", "paper/artifact-appendix.md")
 WIDTHS = {
+    "Proposals": (.22, .15, .16, .16, .16, .15),
+    "Slots": (.19, .14, .09, .14, .15, .16, .13),
     "Challenge": (.38, .13, .17, .13, .19),
     "ID": (.065, .32, .39, .225),
     "Full-batch outputs": (.16, .11, .08, .12, .08, .09, .11, .25),

@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. This working manuscript defines the methods and evaluation protocol. Final quantitative conclusions are intentionally deferred until the preregistered candidate-independent benchmark, information-parity baselines, ablations, end-to-end cost analysis, and independent reproduction are complete.
+Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. We evaluate two claims that can be tested on retained public evidence. Changing how a controller allocated candidate slots left the surviving output unchanged in a one-round campaign. In a separate recurrence experiment, production and both grammar controls found models for a TRAIN sequence, but none transferred to the VALIDATION or TEST cases. These observations bound what the system demonstrated on the two protocols. Broader performance and end-to-end cost claims remain pending. [Controller outcomes](generated/public-controller-results.md) · [Recurrence outcomes](generated/public-recurrence-results.md)
 
 ## 1. Research question
 
@@ -74,7 +74,7 @@ Every transition retains source identities, configured and executed resources, t
 
 The final evaluation will use the corpus and split protocol from #383, informed by the evaluator-backed challenge portfolio in #390. Corpus construction, structural clusters, split assignments, budgets, metrics, and thresholds must be frozen before evaluated campaigns run.
 
-The registered public corpus separates cases used for formation from cases reserved for evaluation. The generated split table counts each challenge directly from the case manifest, checks each case identity against its contents and binds the corpus to its freeze receipt. The table tests the stated information policy. Determining what a particular learner actually consumed requires that learner's execution receipts. [Corpus splits and declared access](generated/public-corpus-splits.md)
+The registered public corpus separates cases used for formation from cases reserved for evaluation. The split labels describe roles within a public development corpus. A human who already knows a published case could select a grammar or search bound favorable to it. Restricting formation inputs and registering the comparison plan limit what the program can use during execution. They cannot remove prior knowledge from the experimental design. Independent sealed cases would be needed to assess performance on previously unseen material. The generated split table counts each challenge directly from the case manifest, checks each case identity against its contents and binds the corpus to its freeze receipt. The table tests the stated information policy. Determining what a particular learner actually consumed requires that learner's execution receipts. [Corpus splits and declared access](generated/public-corpus-splits.md)
 
 The design requires:
 
@@ -113,17 +113,23 @@ The archival artifact will distinguish:
 - semantic reproduction through canonical roots;
 - non-reproduction with retained mismatches.
 
+The clean package build regenerates the tables and figure, verifies the source tree and executable modes, and renders the PDF. Offline replay also checks each file against the archive inventory. These checks test the manuscript and its public evidence at a named code revision. An independent scientific reproduction requires a separately identified execution and its receipt. [Archive verification](../docs/paper-foundation-verification.md)
+
 The independent artifact in #387 must execute without undocumented maintainer knowledge, undeclared network access, or mutable external inputs. Corrective changes receive new immutable artifact identities.
 
 ## 9. Results
 
-Primary tables and figures are intentionally absent from this foundation revision. They will be generated from retained evidence after #383, #235, and #384 freeze their evaluated outputs.
+The complete primary evaluation remains pending. The following results derive from two public comparisons with different units of observation.
 
 ### Retrospective controller comparison
 
 The public one-round campaign compared the production feedback controller with two fixed policies. The comparison tests whether reallocating candidate slots between two mining batches changes which conjecture survives. The paired-observation batch supplies a negative control for diversity of support. The allocation figure shows how each policy divided the available slots. The table reports each batch's outputs and rejected clusters, the executed positive and negative holdouts, the next decisions and the stopping reason. The resource table retains the original units for every stage. [Generated tables and source revision](generated/public-controller-results.md) · [Allocation figure](generated/public-controller-allocation.svg)
 
 The feedback controller found no eligible continuation after qualification. Both fixed policies stopped at the horizon specified in their configurations. The observed agreement therefore leaves the value of feedback on campaigns with competing continuations open. Equal slots in one mining stage also leave open how resources should be allocated between stages. The historical observations were public before this comparison was planned. [Experiment protocol](../docs/autopilot-controller-comparison.md)
+
+### Open-target recurrence formation and reuse
+
+The production fitter solved for recurrence coefficients from two TRAIN prefixes. The deterministic and randomized controls proposed coefficients from the same bounded grammar. Each arm froze its model set before scoring the six public cases. Agreement with an observed prefix and agreement with its subsequent terms were both required. All three arms repeatedly fit the same geometric TRAIN sequence. None of their frozen sets confirmed any VALIDATION or TEST case. The randomized arm also produced an empty campaign. Its duplicate draws and every case in that campaign remain in the denominators. A fixed cap on submitted candidates leaves the solvers free to incur different internal work. The experiment measures reuse within a bounded recurrence grammar. [Generated formation and per-split outcomes](generated/public-recurrence-results.md) · [Independent replay and experimental design](../docs/track-c-recurrence-comparison.md)
 
 ### Outstanding primary evaluation
 
@@ -143,7 +149,9 @@ No primary result may be copied manually into the manuscript.
 
 ## 10. Limitations
 
-The mandatory limitations are maintained in `limitations.md`. The final paper must discuss candidate simplicity, benchmark scope, evaluator coverage, external novelty status, reviewer status, compute bounds, and the distinction between symbolic validation and formal proof.
+The public controller replay offers no choice among eligible follow-up branches. Agreement among the three policies leaves their behavior in a longer campaign unresolved. In the recurrence comparison, a finite geometric prefix admits several coefficient tuples. Agreement with its finite continuation tests those predictions, while an infinite-sequence identity would require a proof. Repeated campaigns on the same cases also share their mathematical content. The reported slots cannot serve as independent samples of mathematical families. [Controller outcomes](generated/public-controller-results.md) · [Recurrence outcomes](generated/public-recurrence-results.md)
+
+Both studies measure performance under fixed information, grammars and budgets. Neither collects independent human judgments, tests the protected flagship corpus or establishes external novelty. End-to-end savings require a task stream frozen before evaluation, per-task paired search receipts and a complete discovery-cost ledger. We draw no break-even conclusion from these public comparisons. [Limitations and claim boundaries](limitations.md)
 
 ## 11. Related work
 
@@ -177,4 +185,4 @@ The repository distributes the implementation and associated documentation under
 
 ## 13. Conclusion
 
-This foundation defines a falsifiable, claim-bounded evaluation of autonomous symbolic rule discovery. The final conclusion will be written only after the candidate-independent experiments, comparisons, amortization study, and independent artifact reproduction are frozen.
+The public comparisons distinguish forming a candidate from choosing a continuation and transferring a frozen candidate to another case. The controller retained the same output under every allocation. The recurrence formers recovered a TRAIN pattern but had no confirmed transfer on the registered VALIDATION or TEST cases. Retaining the rejected attempts, empty campaign and unchanged controller outcomes makes both conclusions reproducible from their source records. The full open-target and cross-family baseline and ablation comparisons remain open. [Controller results](generated/public-controller-results.md) · [Recurrence results](generated/public-recurrence-results.md)

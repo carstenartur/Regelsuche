@@ -27,6 +27,7 @@ EXPECTED_OUTPUT_FILES = (
     "public-controller-allocation.svg",
     "public-controller-results.md",
     "public-corpus-splits.md",
+    "public-recurrence-results.md",
     "foundation-summary.md",
     "foundation-verification.json",
 )
@@ -197,7 +198,7 @@ def verify_claim_boundaries(root: Path) -> None:
         "manuscript contains a premature external-novelty claim",
     )
     require(
-        "Primary tables and figures are intentionally absent" in manuscript,
+        "The complete primary evaluation remains pending" in manuscript,
         "foundation manuscript implies completed primary results",
     )
 
