@@ -209,3 +209,11 @@ Erfolgseintrag im Cache, Inventar oder Job-Artefaktbundle.
 
 Diese Messwerte betreffen den Proof-Worker des jeweiligen Jobs. Die
 unveränderlichen Discovery-Runs im Tab „Runs“ lesen ihre eigenen Quellen.
+
+Der Browser-Test für den Abbruch verwendet den regulären Proof-Jobs-Tab und
+einen kontrolliert angehaltenen Worker. Er prüft den sichtbaren Zwischenzustand,
+den erneuten Aufruf der Jobliste nach Worker-Ende, dieselbe Job-ID und
+Anforderungszeit nach dem Neuladen sowie das leere Job-Artefaktbundle.
+`ciCheck` führt diesen Test über `fullCheck` und `verifyVisualRegression` im
+versionierten Playwright-Image aus. Der Funktionstest benötigt keinen neuen
+Screenshot.

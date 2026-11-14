@@ -10,4 +10,4 @@ RUN chmod +x ./gradlew
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     REGELSUCHE_VISUAL_REPORT_DIR=/output
 
-ENTRYPOINT ["./gradlew", "--no-daemon", "--no-configuration-cache", "-Pregelsuche.runVisualTests=true", "-Pregelsuche.skipPlaywrightInstall=true", ":app:e2eTest", "--tests", "de.regelsuche.e2e.MathRenderingVisualTest", "--tests", "de.regelsuche.e2e.VisualRegressionContractTest", "--console=plain"]
+ENTRYPOINT ["./gradlew", "--no-daemon", "--no-configuration-cache", "-Pregelsuche.runVisualTests=true", "-Pregelsuche.skipPlaywrightInstall=true", ":app:e2eTest", "--tests", "de.regelsuche.e2e.MathRenderingVisualTest", "--tests", "de.regelsuche.e2e.VisualRegressionContractTest", "--tests", "de.regelsuche.e2e.ProofJobPanelBrowserFlowTest.cancelsRunningProofJobAndRetainsTerminalRecord", "--console=plain"]
