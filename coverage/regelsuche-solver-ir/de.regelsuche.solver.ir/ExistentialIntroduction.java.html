@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExistentialIntroduction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">ExistentialIntroduction.java</span></div><h1>ExistentialIntroduction.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.solver.ir.SolverIr.Binary;
+import de.regelsuche.solver.ir.SolverIr.Expression;
+import de.regelsuche.solver.ir.SolverIr.Goal;
+import de.regelsuche.solver.ir.SolverIr.Literal;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Predicate;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.Sort;
+import de.regelsuche.solver.ir.SolverIr.Symbol;
+import de.regelsuche.solver.ir.SolverIr.SymbolDeclaration;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import java.util.List;
+import java.util.Objects;
+
+/** Two-node proof of a single existential equality over total real ring terms. */
+public final class ExistentialIntroduction {
+    private ExistentialIntroduction() {}
+
+    /** The indicated real declaration is bound in the goal only. All others are parameters. */
+    public record Statement(Obligation body, String binder) {
+<span class="fc" id="L25">        public Statement {</span>
+<span class="fc" id="L26">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (!body.declarations().contains(new SymbolDeclaration(binder, Sort.REAL))</span>
+<span class="fc bfc" id="L28" title="All 4 branches covered.">                    || body.declarations().stream().anyMatch(declaration -&gt; declaration.sort() != Sort.REAL)</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">                    || !body.theories().equals(List.of(Theory.REAL_ARITHMETIC))</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">                    || body.requestedEvidence() != RequestedEvidence.SYMBOLIC_CERTIFICATE</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">                    || body.goal().relation() != Relation.EQUALS) {</span>
+<span class="fc" id="L32">                throw new IllegalArgumentException(&quot;expected a declared real binder and a real equality&quot;);</span>
+            }
+<span class="fc" id="L34">            RingTerm.check(body.goal().left());</span>
+<span class="fc" id="L35">            RingTerm.check(body.goal().right());</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            for (Predicate premise : body.assumptions()) {</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">                if (premise.relation() != Relation.EQUALS || premise.referencedSymbols().contains(binder)) {</span>
+<span class="fc" id="L38">                    throw new IllegalArgumentException(&quot;premises must be equalities in the outer scope&quot;);</span>
+                }
+<span class="fc" id="L40">                RingTerm.check(premise.left());</span>
+<span class="fc" id="L41">                RingTerm.check(premise.right());</span>
+<span class="fc" id="L42">            }</span>
+<span class="fc" id="L43">        }</span>
+
+        private List&lt;SymbolDeclaration&gt; parameters() {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            return body.declarations().stream().filter(declaration -&gt; !declaration.name().equals(binder)).toList();</span>
+        }
+
+        private boolean sameStatement(Statement other) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (equals(other)) return true;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (!parameters().equals(other.parameters())) return false;</span>
+            // Equal outer contexts make the receiver's binder fresh in both scopes.
+<span class="fc" id="L53">            var declarations = body.declarations();</span>
+<span class="fc" id="L54">            var renamed = other.substitutedGoal(new Symbol(binder));</span>
+<span class="fc" id="L55">            var candidate = Obligation.create(other.body.obligationId(), declarations, other.body.theories(),</span>
+<span class="fc" id="L56">                other.body.assumptions(), renamed, other.body.requestedEvidence(), other.body.provenance());</span>
+<span class="fc" id="L57">            return body.equals(candidate);</span>
+        }
+
+        private Goal substitutedGoal(Expression replacement) {
+<span class="fc" id="L61">            return new Goal(Relation.EQUALS, substitute(body.goal().left(), binder, replacement),</span>
+<span class="fc" id="L62">                substitute(body.goal().right(), binder, replacement));</span>
+        }
+
+        /** Instantiate only the body, once, with a total term from the outer context. */
+        public Obligation instantiate(Expression witness) {
+<span class="fc" id="L67">            RingTerm.check(witness);</span>
+<span class="fc" id="L68">            var outer = parameters();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (!outer.stream().map(SymbolDeclaration::name).toList().containsAll(witness.referencedSymbols())) {</span>
+<span class="fc" id="L70">                throw new IllegalArgumentException(&quot;witness refers outside the outer context&quot;);</span>
+            }
+<span class="fc" id="L72">            Goal goal = substitutedGoal(witness);</span>
+<span class="fc" id="L73">            RingTerm.check(goal.left());</span>
+<span class="fc" id="L74">            RingTerm.check(goal.right());</span>
+<span class="fc" id="L75">            return Obligation.create(body.obligationId(), outer, body.theories(), body.assumptions(), goal,</span>
+<span class="fc" id="L76">                body.requestedEvidence(), body.provenance());</span>
+        }
+    }
+
+    public sealed interface Leaf permits NormalForm, Hypothesis {
+        Obligation instance();
+    }
+
+    public record NormalForm(Obligation instance) implements Leaf {
+<span class="fc" id="L85">        public NormalForm { Objects.requireNonNull(instance, &quot;instance&quot;); }</span>
+    }
+
+    public record Hypothesis(Obligation instance, String premiseId) implements Leaf {
+<span class="fc" id="L89">        public Hypothesis {</span>
+<span class="fc" id="L90">            Objects.requireNonNull(instance, &quot;instance&quot;);</span>
+<span class="fc" id="L91">            Objects.requireNonNull(premiseId, &quot;premiseId&quot;);</span>
+<span class="fc" id="L92">        }</span>
+    }
+
+    /** The introduction root points to its one independently replayable premise node. */
+    public record Proof(Statement conclusion, Expression witness, Leaf premise) {
+<span class="fc" id="L97">        public Proof {</span>
+<span class="fc" id="L98">            Objects.requireNonNull(conclusion, &quot;conclusion&quot;);</span>
+<span class="fc" id="L99">            Objects.requireNonNull(witness, &quot;witness&quot;);</span>
+<span class="fc" id="L100">            Objects.requireNonNull(premise, &quot;premise&quot;);</span>
+<span class="fc" id="L101">        }</span>
+    }
+
+    /** Check the proof against the receiver's statement and reconstruct the premise from that statement. */
+    public static boolean replay(Statement expected, Proof proof) {
+<span class="pc bpc" id="L106" title="2 of 6 branches missed.">        if (expected == null || proof == null || !expected.sameStatement(proof.conclusion())) return false;</span>
+        Obligation instance;
+        try {
+<span class="fc" id="L109">            instance = expected.instantiate(proof.witness());</span>
+<span class="fc" id="L110">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L111">            return false;</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (!instance.equals(proof.premise().instance())) return false;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        return switch (proof.premise()) {</span>
+<span class="fc" id="L115">            case Hypothesis h -&gt; instance.assumptions().stream().anyMatch(p -&gt; matches(h, p, instance.goal()));</span>
+<span class="fc" id="L116">            case NormalForm ignored -&gt; new PolynomialNormalFormSolverBackend().execute(instance)</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                .result().status() == ResultStatus.CONFIRMED;</span>
+        };
+    }
+
+    private static boolean matches(Hypothesis leaf, Predicate premise, Goal goal) {
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        return premise.id().equals(leaf.premiseId()) &amp;&amp; premise.relation() == goal.relation()</span>
+<span class="fc bfc" id="L123" title="All 4 branches covered.">            &amp;&amp; premise.left().equals(goal.left()) &amp;&amp; premise.right().equals(goal.right());</span>
+    }
+
+    private static Expression substitute(Expression term, String binder, Expression witness) {
+<span class="fc bfc" id="L127" title="All 3 branches covered.">        return switch (term) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            case Symbol symbol -&gt; symbol.name().equals(binder) ? witness : symbol;</span>
+<span class="fc" id="L129">            case Binary binary -&gt; new Binary(binary.operator(), substitute(binary.left(), binder, witness),</span>
+<span class="fc" id="L130">                substitute(binary.right(), binder, witness));</span>
+<span class="fc" id="L131">            default -&gt; term; // Already checked as a literal, symbol or ring operation.</span>
+        };
+    }
+
+    /** Preflight before substitution and before expansion by the polynomial leaf. */
+    private static final class RingTerm {
+        private static final int MAX_NODES = 63;
+        private static final int MAX_MONOMIALS = 256;
+        private int nodes;
+
+        private static void check(Expression term) {
+<span class="fc" id="L142">            new RingTerm().monomialBound(term);</span>
+<span class="fc" id="L143">        }</span>
+
+        private int monomialBound(Expression term) {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (++nodes &gt; MAX_NODES) throw new IllegalArgumentException(&quot;ring term exceeds node bound&quot;);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (term instanceof Symbol) return 1;</span>
+<span class="fc bfc" id="L148" title="All 4 branches covered.">            if (term instanceof Literal literal &amp;&amp; literal.value().length() &lt;= 64) return 1;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (!(term instanceof Binary binary)) throw new IllegalArgumentException(&quot;unsupported ring term&quot;);</span>
+<span class="fc" id="L150">            int left = monomialBound(binary.left());</span>
+<span class="fc" id="L151">            int right = monomialBound(binary.right());</span>
+<span class="fc bfc" id="L152" title="All 3 branches covered.">            int bound = switch (binary.operator()) {</span>
+<span class="fc" id="L153">                case ADD, SUBTRACT -&gt; left + right;</span>
+<span class="fc" id="L154">                case MULTIPLY -&gt; left * right;</span>
+<span class="fc" id="L155">                default -&gt; throw new IllegalArgumentException(&quot;unsupported ring operator&quot;);</span>
+            };
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (bound &gt; MAX_MONOMIALS) throw new IllegalArgumentException(&quot;ring term exceeds expansion bound&quot;);</span>
+<span class="fc" id="L158">            return bound;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

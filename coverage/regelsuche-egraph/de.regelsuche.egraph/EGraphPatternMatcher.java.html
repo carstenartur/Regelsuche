@@ -68,15 +68,20 @@ public final class EGraphPatternMatcher {
 <span class="fc" id="L68">        this.eGraph = eGraph;</span>
 <span class="fc" id="L69">    }</span>
 
+    /** Run the versioned flat multiset fragment with explicit bounded-work completion. */
+    public FlatAcMatchPlan.Result matchFlatAc(FlatAcMatchPlan plan, int workLimit) {
+<span class="fc" id="L73">        return plan.match(eGraph, workLimit);</span>
+    }
+
     /** Every {@link Match} of {@code pattern} anywhere in the graph. */
     public List&lt;Match&gt; matchAll(PatternExpr pattern) {
-<span class="nc" id="L73">        return matchAll(pattern.toString(), pattern, null);</span>
+<span class="nc" id="L78">        return matchAll(pattern.toString(), pattern, null);</span>
     }
 
     /** Every {@link Match} of {@code pattern} on the given candidate roots. */
     public List&lt;Match&gt; matchAll(String patternId, PatternExpr pattern, Collection&lt;EClassId&gt; candidates) {
-<span class="fc" id="L78">        clearCacheIfVersionChanged();</span>
-<span class="fc" id="L79">        return collectMatches(patternId, pattern, selectCandidateRoots(pattern, candidates));</span>
+<span class="fc" id="L83">        clearCacheIfVersionChanged();</span>
+<span class="fc" id="L84">        return collectMatches(patternId, pattern, selectCandidateRoots(pattern, candidates));</span>
     }
 
     /**
@@ -84,26 +89,26 @@ public final class EGraphPatternMatcher {
      * matcher without root-signature candidate selection.
      */
     public List&lt;Match&gt; matchAllFullScan(String patternId, PatternExpr pattern) {
-<span class="nc" id="L87">        clearCacheIfVersionChanged();</span>
-<span class="nc" id="L88">        return collectMatches(patternId, pattern, allRoots());</span>
+<span class="nc" id="L92">        clearCacheIfVersionChanged();</span>
+<span class="nc" id="L93">        return collectMatches(patternId, pattern, allRoots());</span>
     }
 
     private List&lt;Match&gt; collectMatches(String patternId, PatternExpr pattern, Collection&lt;EClassId&gt; roots) {
-<span class="fc" id="L92">        List&lt;Match&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L97">        List&lt;Match&gt; results = new ArrayList&lt;&gt;();</span>
         // De-duplicate matches sharing the same root + bindings — multiple
         // e-nodes inside the same class can produce the same logical match.
-<span class="fc" id="L95">        Set&lt;String&gt; seen = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L96">        classesScanned += roots.size();</span>
-<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (EClassId rootId : roots) {</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">            for (Map&lt;String, EClassId&gt; bindings : matchInClassMemoized(patternId, pattern, rootId)) {</span>
-<span class="fc" id="L99">                String key = rootId + &quot;|&quot; + canonicalBindingsKey(bindings);</span>
-<span class="fc bfc" id="L100" title="All 2 branches covered.">                if (seen.add(key)) {</span>
-<span class="fc" id="L101">                    results.add(new Match(rootId, bindings));</span>
-<span class="fc" id="L102">                    matchesFound++;</span>
+<span class="fc" id="L100">        Set&lt;String&gt; seen = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L101">        classesScanned += roots.size();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (EClassId rootId : roots) {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            for (Map&lt;String, EClassId&gt; bindings : matchInClassMemoized(patternId, pattern, rootId)) {</span>
+<span class="fc" id="L104">                String key = rootId + &quot;|&quot; + canonicalBindingsKey(bindings);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                if (seen.add(key)) {</span>
+<span class="fc" id="L106">                    results.add(new Match(rootId, bindings));</span>
+<span class="fc" id="L107">                    matchesFound++;</span>
                 }
-<span class="fc" id="L104">            }</span>
-<span class="fc" id="L105">        }</span>
-<span class="fc" id="L106">        return results;</span>
+<span class="fc" id="L109">            }</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        return results;</span>
     }
 
     /**
@@ -112,8 +117,8 @@ public final class EGraphPatternMatcher {
      * not match.
      */
     public List&lt;Map&lt;String, EClassId&gt;&gt; matchInClass(PatternExpr pattern, EClassId targetClass) {
-<span class="fc" id="L115">        EClassId canonical = eGraph.find(targetClass);</span>
-<span class="fc" id="L116">        return immutableBindings(matchAgainst(pattern, canonical, Collections.emptyMap()));</span>
+<span class="fc" id="L120">        EClassId canonical = eGraph.find(targetClass);</span>
+<span class="fc" id="L121">        return immutableBindings(matchAgainst(pattern, canonical, Collections.emptyMap()));</span>
     }
 
     private List&lt;Map&lt;String, EClassId&gt;&gt; matchAgainst(
@@ -121,39 +126,39 @@ public final class EGraphPatternMatcher {
         EClassId targetClass,
         Map&lt;String, EClassId&gt; bindings
     ) {
-<span class="fc" id="L124">        EClassId canonical = eGraph.find(targetClass);</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
-<span class="fc" id="L126">            EClassId existing = bindings.get(placeholder.name());</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (existing != null) {</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                if (!eGraph.find(existing).equals(canonical)) {</span>
-<span class="fc" id="L129">                    return List.of();</span>
+<span class="fc" id="L129">        EClassId canonical = eGraph.find(targetClass);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L131">            EClassId existing = bindings.get(placeholder.name());</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (existing != null) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                if (!eGraph.find(existing).equals(canonical)) {</span>
+<span class="fc" id="L134">                    return List.of();</span>
                 }
-<span class="fc" id="L131">                return List.of(bindings);</span>
+<span class="fc" id="L136">                return List.of(bindings);</span>
             }
-<span class="fc" id="L133">            Map&lt;String, EClassId&gt; next = new LinkedHashMap&lt;&gt;(bindings);</span>
-<span class="fc" id="L134">            next.put(placeholder.name(), canonical);</span>
-<span class="fc" id="L135">            return List.of(next);</span>
+<span class="fc" id="L138">            Map&lt;String, EClassId&gt; next = new LinkedHashMap&lt;&gt;(bindings);</span>
+<span class="fc" id="L139">            next.put(placeholder.name(), canonical);</span>
+<span class="fc" id="L140">            return List.of(next);</span>
         }
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.LiteralNumber literal) {</span>
-<span class="fc" id="L138">            String symbol = &quot;num:&quot; + formatNumber(literal.value());</span>
-<span class="fc" id="L139">            EClass eclass = eGraph.classOrThrow(canonical);</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">            for (ENode node : eclass.nodes()) {</span>
-<span class="fc" id="L141">                nodesScanned++;</span>
-<span class="fc bfc" id="L142" title="All 4 branches covered.">                if (node.isLeaf() &amp;&amp; node.symbol().equals(symbol)) {</span>
-<span class="fc" id="L143">                    return List.of(bindings);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.LiteralNumber literal) {</span>
+<span class="fc" id="L143">            String symbol = &quot;num:&quot; + formatNumber(literal.value());</span>
+<span class="fc" id="L144">            EClass eclass = eGraph.classOrThrow(canonical);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            for (ENode node : eclass.nodes()) {</span>
+<span class="fc" id="L146">                nodesScanned++;</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">                if (node.isLeaf() &amp;&amp; node.symbol().equals(symbol)) {</span>
+<span class="fc" id="L148">                    return List.of(bindings);</span>
                 }
-<span class="fc" id="L145">            }</span>
-<span class="fc" id="L146">            return List.of();</span>
+<span class="fc" id="L150">            }</span>
+<span class="fc" id="L151">            return List.of();</span>
         }
-<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L149">            String symbol = &quot;op:&quot; + operation.operator().name();</span>
-<span class="fc" id="L150">            return matchChildren(canonical, symbol, List.of(operation.left(), operation.right()), bindings);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L154">            String symbol = &quot;op:&quot; + operation.operator().name();</span>
+<span class="fc" id="L155">            return matchChildren(canonical, symbol, List.of(operation.left(), operation.right()), bindings);</span>
         }
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
-<span class="fc" id="L153">            String symbol = &quot;fn:&quot; + function.name();</span>
-<span class="fc" id="L154">            return matchChildren(canonical, symbol, function.arguments(), bindings);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L158">            String symbol = &quot;fn:&quot; + function.name();</span>
+<span class="fc" id="L159">            return matchChildren(canonical, symbol, function.arguments(), bindings);</span>
         }
-<span class="nc" id="L156">        throw new IllegalArgumentException(&quot;Unsupported pattern: &quot; + pattern.getClass());</span>
+<span class="nc" id="L161">        throw new IllegalArgumentException(&quot;Unsupported pattern: &quot; + pattern.getClass());</span>
     }
 
     private List&lt;Map&lt;String, EClassId&gt;&gt; matchChildren(
@@ -162,124 +167,124 @@ public final class EGraphPatternMatcher {
         List&lt;PatternExpr&gt; argumentPatterns,
         Map&lt;String, EClassId&gt; bindings
     ) {
-<span class="fc" id="L165">        EClass eclass = eGraph.classOrThrow(targetClass);</span>
-<span class="fc" id="L166">        List&lt;Map&lt;String, EClassId&gt;&gt; results = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (ENode node : eclass.nodes()) {</span>
-<span class="fc" id="L168">            nodesScanned++;</span>
-<span class="pc bpc" id="L169" title="1 of 4 branches missed.">            if (!node.symbol().equals(expectedSymbol) || node.children().size() != argumentPatterns.size()) {</span>
-<span class="nc" id="L170">                continue;</span>
+<span class="fc" id="L170">        EClass eclass = eGraph.classOrThrow(targetClass);</span>
+<span class="fc" id="L171">        List&lt;Map&lt;String, EClassId&gt;&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        for (ENode node : eclass.nodes()) {</span>
+<span class="fc" id="L173">            nodesScanned++;</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">            if (!node.symbol().equals(expectedSymbol) || node.children().size() != argumentPatterns.size()) {</span>
+<span class="nc" id="L175">                continue;</span>
             }
-<span class="fc" id="L172">            List&lt;Map&lt;String, EClassId&gt;&gt; currents = List.of(bindings);</span>
-<span class="fc bfc" id="L173" title="All 2 branches covered.">            for (int i = 0; i &lt; argumentPatterns.size(); i++) {</span>
-<span class="fc" id="L174">                List&lt;Map&lt;String, EClassId&gt;&gt; next = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L175">                EClassId childClass = eGraph.find(node.children().get(i));</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">                for (Map&lt;String, EClassId&gt; current : currents) {</span>
-<span class="fc" id="L177">                    next.addAll(matchAgainst(argumentPatterns.get(i), childClass, current));</span>
-<span class="fc" id="L178">                }</span>
-<span class="fc" id="L179">                currents = next;</span>
-<span class="fc bfc" id="L180" title="All 2 branches covered.">                if (currents.isEmpty()) {</span>
-<span class="fc" id="L181">                    break;</span>
+<span class="fc" id="L177">            List&lt;Map&lt;String, EClassId&gt;&gt; currents = List.of(bindings);</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (int i = 0; i &lt; argumentPatterns.size(); i++) {</span>
+<span class="fc" id="L179">                List&lt;Map&lt;String, EClassId&gt;&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L180">                EClassId childClass = eGraph.find(node.children().get(i));</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                for (Map&lt;String, EClassId&gt; current : currents) {</span>
+<span class="fc" id="L182">                    next.addAll(matchAgainst(argumentPatterns.get(i), childClass, current));</span>
+<span class="fc" id="L183">                }</span>
+<span class="fc" id="L184">                currents = next;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                if (currents.isEmpty()) {</span>
+<span class="fc" id="L186">                    break;</span>
                 }
             }
-<span class="fc" id="L184">            results.addAll(currents);</span>
-<span class="fc" id="L185">        }</span>
-<span class="fc" id="L186">        return results;</span>
+<span class="fc" id="L189">            results.addAll(currents);</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        return results;</span>
     }
 
     private List&lt;Map&lt;String, EClassId&gt;&gt; matchInClassMemoized(String patternId, PatternExpr pattern, EClassId rootId) {
-<span class="fc" id="L190">        MatchCacheKey key = new MatchCacheKey(patternId, pattern.toString(), eGraph.find(rootId));</span>
-<span class="fc" id="L191">        List&lt;Map&lt;String, EClassId&gt;&gt; hit = matchCache.get(key);</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (hit != null) {</span>
-<span class="fc" id="L193">            matcherCacheHits++;</span>
-<span class="fc" id="L194">            return hit;</span>
+<span class="fc" id="L195">        MatchCacheKey key = new MatchCacheKey(patternId, pattern.toString(), eGraph.find(rootId));</span>
+<span class="fc" id="L196">        List&lt;Map&lt;String, EClassId&gt;&gt; hit = matchCache.get(key);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (hit != null) {</span>
+<span class="fc" id="L198">            matcherCacheHits++;</span>
+<span class="fc" id="L199">            return hit;</span>
         }
-<span class="fc" id="L196">        matcherCacheMisses++;</span>
-<span class="fc" id="L197">        List&lt;Map&lt;String, EClassId&gt;&gt; computed = matchInClass(pattern, rootId);</span>
-<span class="fc" id="L198">        matchCache.put(key, computed);</span>
-<span class="fc" id="L199">        return computed;</span>
+<span class="fc" id="L201">        matcherCacheMisses++;</span>
+<span class="fc" id="L202">        List&lt;Map&lt;String, EClassId&gt;&gt; computed = matchInClass(pattern, rootId);</span>
+<span class="fc" id="L203">        matchCache.put(key, computed);</span>
+<span class="fc" id="L204">        return computed;</span>
     }
 
     private List&lt;Map&lt;String, EClassId&gt;&gt; immutableBindings(List&lt;Map&lt;String, EClassId&gt;&gt; bindings) {
-<span class="fc" id="L203">        List&lt;Map&lt;String, EClassId&gt;&gt; immutable = new ArrayList&lt;&gt;(bindings.size());</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (Map&lt;String, EClassId&gt; binding : bindings) {</span>
-<span class="fc" id="L205">            immutable.add(Map.copyOf(binding));</span>
-<span class="fc" id="L206">        }</span>
-<span class="fc" id="L207">        return List.copyOf(immutable);</span>
+<span class="fc" id="L208">        List&lt;Map&lt;String, EClassId&gt;&gt; immutable = new ArrayList&lt;&gt;(bindings.size());</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (Map&lt;String, EClassId&gt; binding : bindings) {</span>
+<span class="fc" id="L210">            immutable.add(Map.copyOf(binding));</span>
+<span class="fc" id="L211">        }</span>
+<span class="fc" id="L212">        return List.copyOf(immutable);</span>
     }
 
     private Collection&lt;EClassId&gt; selectCandidateRoots(PatternExpr pattern, Collection&lt;EClassId&gt; candidates) {
-<span class="fc" id="L211">        Collection&lt;EClassId&gt; signatureCandidates = candidatesForPatternRoot(pattern);</span>
-<span class="pc bpc" id="L212" title="2 of 6 branches missed.">        if ((candidates == null || candidates.isEmpty()) &amp;&amp; signatureCandidates != null) {</span>
-<span class="fc" id="L213">            List&lt;EClassId&gt; roots = canonicalize(signatureCandidates);</span>
-<span class="fc" id="L214">            candidateClassesSkipped += Math.max(0, eGraph.classCount() - roots.size());</span>
-<span class="fc" id="L215">            return roots;</span>
+<span class="fc" id="L216">        Collection&lt;EClassId&gt; signatureCandidates = candidatesForPatternRoot(pattern);</span>
+<span class="pc bpc" id="L217" title="2 of 6 branches missed.">        if ((candidates == null || candidates.isEmpty()) &amp;&amp; signatureCandidates != null) {</span>
+<span class="fc" id="L218">            List&lt;EClassId&gt; roots = canonicalize(signatureCandidates);</span>
+<span class="fc" id="L219">            candidateClassesSkipped += Math.max(0, eGraph.classCount() - roots.size());</span>
+<span class="fc" id="L220">            return roots;</span>
         }
         Collection&lt;EClassId&gt; base;
-<span class="pc bpc" id="L218" title="2 of 4 branches missed.">        if (candidates == null || candidates.isEmpty()) {</span>
-<span class="nc" id="L219">            List&lt;EClassId&gt; all = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L220" title="All 2 branches missed.">            for (EClass eClass : eGraph.classes()) {</span>
-<span class="nc" id="L221">                all.add(eClass.id());</span>
-<span class="nc" id="L222">            }</span>
-<span class="nc" id="L223">            base = all;</span>
-<span class="nc" id="L224">        } else {</span>
-<span class="fc" id="L225">            base = candidates;</span>
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        if (candidates == null || candidates.isEmpty()) {</span>
+<span class="nc" id="L224">            List&lt;EClassId&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            for (EClass eClass : eGraph.classes()) {</span>
+<span class="nc" id="L226">                all.add(eClass.id());</span>
+<span class="nc" id="L227">            }</span>
+<span class="nc" id="L228">            base = all;</span>
+<span class="nc" id="L229">        } else {</span>
+<span class="fc" id="L230">            base = candidates;</span>
         }
-<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (signatureCandidates == null) {</span>
-<span class="fc" id="L228">            return canonicalize(base);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (signatureCandidates == null) {</span>
+<span class="fc" id="L233">            return canonicalize(base);</span>
         }
-<span class="fc" id="L230">        Set&lt;EClassId&gt; bySignature = new LinkedHashSet&lt;&gt;(canonicalize(signatureCandidates));</span>
-<span class="fc" id="L231">        List&lt;EClassId&gt; filtered = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (EClassId root : canonicalize(base)) {</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (bySignature.contains(root)) {</span>
-<span class="fc" id="L234">                filtered.add(root);</span>
+<span class="fc" id="L235">        Set&lt;EClassId&gt; bySignature = new LinkedHashSet&lt;&gt;(canonicalize(signatureCandidates));</span>
+<span class="fc" id="L236">        List&lt;EClassId&gt; filtered = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (EClassId root : canonicalize(base)) {</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            if (bySignature.contains(root)) {</span>
+<span class="fc" id="L239">                filtered.add(root);</span>
             } else {
-<span class="fc" id="L236">                candidateClassesSkipped++;</span>
+<span class="fc" id="L241">                candidateClassesSkipped++;</span>
             }
-<span class="fc" id="L238">        }</span>
-<span class="fc" id="L239">        return filtered;</span>
+<span class="fc" id="L243">        }</span>
+<span class="fc" id="L244">        return filtered;</span>
     }
 
     private List&lt;EClassId&gt; allRoots() {
-<span class="nc" id="L243">        List&lt;EClassId&gt; all = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L244" title="All 2 branches missed.">        for (EClass eClass : eGraph.classes()) {</span>
-<span class="nc" id="L245">            all.add(eClass.id());</span>
-<span class="nc" id="L246">        }</span>
-<span class="nc" id="L247">        return canonicalize(all);</span>
+<span class="nc" id="L248">        List&lt;EClassId&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        for (EClass eClass : eGraph.classes()) {</span>
+<span class="nc" id="L250">            all.add(eClass.id());</span>
+<span class="nc" id="L251">        }</span>
+<span class="nc" id="L252">        return canonicalize(all);</span>
     }
 
     private Collection&lt;EClassId&gt; candidatesForPatternRoot(PatternExpr pattern) {
-<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder) {</span>
-<span class="fc" id="L252">            return null;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder) {</span>
+<span class="fc" id="L257">            return null;</span>
         }
-<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L255">            return eGraph.classesWith(new ENodeSignature(&quot;op:&quot; + operation.operator().name(), 2));</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L260">            return eGraph.classesWith(new ENodeSignature(&quot;op:&quot; + operation.operator().name(), 2));</span>
         }
-<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
-<span class="fc" id="L258">            return eGraph.classesWith(new ENodeSignature(&quot;fn:&quot; + function.name(), function.arguments().size()));</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L263">            return eGraph.classesWith(new ENodeSignature(&quot;fn:&quot; + function.name(), function.arguments().size()));</span>
         }
-<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber literal) {</span>
-<span class="nc" id="L261">            String symbol = &quot;num:&quot; + formatNumber(literal.value());</span>
-<span class="nc" id="L262">            Collection&lt;EClassId&gt; exact = eGraph.classesWith(new ENodeSignature(symbol, 0));</span>
-<span class="nc bnc" id="L263" title="All 2 branches missed.">            if (!exact.isEmpty()) {</span>
-<span class="nc" id="L264">                return exact;</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber literal) {</span>
+<span class="nc" id="L266">            String symbol = &quot;num:&quot; + formatNumber(literal.value());</span>
+<span class="nc" id="L267">            Collection&lt;EClassId&gt; exact = eGraph.classesWith(new ENodeSignature(symbol, 0));</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">            if (!exact.isEmpty()) {</span>
+<span class="nc" id="L269">                return exact;</span>
             }
-<span class="nc" id="L266">            return eGraph.classesWithSymbolPrefix(&quot;num:&quot;, 0);</span>
+<span class="nc" id="L271">            return eGraph.classesWithSymbolPrefix(&quot;num:&quot;, 0);</span>
         }
-<span class="nc" id="L268">        return null;</span>
+<span class="nc" id="L273">        return null;</span>
     }
 
     private List&lt;EClassId&gt; canonicalize(Collection&lt;EClassId&gt; classes) {
-<span class="fc" id="L272">        LinkedHashSet&lt;EClassId&gt; canonical = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L273" title="All 2 branches covered.">        for (EClassId id : classes) {</span>
-<span class="fc" id="L274">            canonical.add(eGraph.find(id));</span>
-<span class="fc" id="L275">        }</span>
-<span class="fc" id="L276">        List&lt;EClassId&gt; sorted = new ArrayList&lt;&gt;(canonical);</span>
-<span class="fc" id="L277">        Collections.sort(sorted);</span>
-<span class="fc" id="L278">        return sorted;</span>
+<span class="fc" id="L277">        LinkedHashSet&lt;EClassId&gt; canonical = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (EClassId id : classes) {</span>
+<span class="fc" id="L279">            canonical.add(eGraph.find(id));</span>
+<span class="fc" id="L280">        }</span>
+<span class="fc" id="L281">        List&lt;EClassId&gt; sorted = new ArrayList&lt;&gt;(canonical);</span>
+<span class="fc" id="L282">        Collections.sort(sorted);</span>
+<span class="fc" id="L283">        return sorted;</span>
     }
 
     public MatcherStats stats() {
-<span class="fc" id="L282">        return new MatcherStats(</span>
+<span class="fc" id="L287">        return new MatcherStats(</span>
             classesScanned,
             nodesScanned,
             candidateClassesSkipped,
@@ -290,42 +295,42 @@ public final class EGraphPatternMatcher {
     }
 
     public void resetStats() {
-<span class="nc" id="L293">        classesScanned = 0L;</span>
-<span class="nc" id="L294">        nodesScanned = 0L;</span>
-<span class="nc" id="L295">        candidateClassesSkipped = 0L;</span>
-<span class="nc" id="L296">        matchesFound = 0L;</span>
-<span class="nc" id="L297">        matcherCacheHits = 0L;</span>
-<span class="nc" id="L298">        matcherCacheMisses = 0L;</span>
-<span class="nc" id="L299">    }</span>
+<span class="nc" id="L298">        classesScanned = 0L;</span>
+<span class="nc" id="L299">        nodesScanned = 0L;</span>
+<span class="nc" id="L300">        candidateClassesSkipped = 0L;</span>
+<span class="nc" id="L301">        matchesFound = 0L;</span>
+<span class="nc" id="L302">        matcherCacheHits = 0L;</span>
+<span class="nc" id="L303">        matcherCacheMisses = 0L;</span>
+<span class="nc" id="L304">    }</span>
 
     private void clearCacheIfVersionChanged() {
-<span class="fc" id="L302">        long currentVersion = eGraph.version();</span>
-<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (cacheVersion != currentVersion) {</span>
-<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (cacheVersion &lt; 0) {</span>
-<span class="fc" id="L305">                matchCache.clear();</span>
+<span class="fc" id="L307">        long currentVersion = eGraph.version();</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (cacheVersion != currentVersion) {</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (cacheVersion &lt; 0) {</span>
+<span class="fc" id="L310">                matchCache.clear();</span>
             } else {
-<span class="fc" id="L307">                Set&lt;EClassId&gt; affectedRoots = new LinkedHashSet&lt;&gt;(eGraph.affectedClassesChangedAfter(cacheVersion));</span>
-<span class="fc" id="L308">                matchCache.keySet().removeIf(key -&gt; affectedRoots.contains(eGraph.find(key.root())));</span>
+<span class="fc" id="L312">                Set&lt;EClassId&gt; affectedRoots = new LinkedHashSet&lt;&gt;(eGraph.affectedClassesChangedAfter(cacheVersion));</span>
+<span class="fc" id="L313">                matchCache.keySet().removeIf(key -&gt; affectedRoots.contains(eGraph.find(key.root())));</span>
             }
-<span class="fc" id="L310">            cacheVersion = currentVersion;</span>
+<span class="fc" id="L315">            cacheVersion = currentVersion;</span>
         }
-<span class="fc" id="L312">    }</span>
+<span class="fc" id="L317">    }</span>
 
     private String canonicalBindingsKey(Map&lt;String, EClassId&gt; bindings) {
-<span class="fc" id="L315">        Map&lt;String, EClassId&gt; canonical = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (Map.Entry&lt;String, EClassId&gt; entry : bindings.entrySet()) {</span>
-<span class="fc" id="L317">            canonical.put(entry.getKey(), eGraph.find(entry.getValue()));</span>
-<span class="fc" id="L318">        }</span>
+<span class="fc" id="L320">        Map&lt;String, EClassId&gt; canonical = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        for (Map.Entry&lt;String, EClassId&gt; entry : bindings.entrySet()) {</span>
+<span class="fc" id="L322">            canonical.put(entry.getKey(), eGraph.find(entry.getValue()));</span>
+<span class="fc" id="L323">        }</span>
         // Stable ordering for the key.
-<span class="fc" id="L320">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L321">        canonical.entrySet().stream()</span>
-<span class="fc" id="L322">            .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L323">            .forEach(entry -&gt; builder.append(entry.getKey()).append('=').append(entry.getValue()).append(';'));</span>
-<span class="fc" id="L324">        return builder.toString();</span>
+<span class="fc" id="L325">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L326">        canonical.entrySet().stream()</span>
+<span class="fc" id="L327">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L328">            .forEach(entry -&gt; builder.append(entry.getKey()).append('=').append(entry.getValue()).append(';'));</span>
+<span class="fc" id="L329">        return builder.toString();</span>
     }
 
     private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
-<span class="fc" id="L328">        return value.canonicalText();</span>
+<span class="fc" id="L333">        return value.canonicalText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

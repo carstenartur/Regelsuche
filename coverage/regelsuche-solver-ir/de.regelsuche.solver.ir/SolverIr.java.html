@@ -596,9 +596,9 @@ public final class SolverIr {
 <span class="fc" id="L596">        Set&lt;String&gt; names = new LinkedHashSet&lt;&gt;();</span>
 <span class="fc bfc" id="L597" title="All 2 branches covered.">        for (SymbolDeclaration declaration : result) {</span>
 <span class="fc" id="L598">            Objects.requireNonNull(declaration, &quot;declaration&quot;);</span>
-<span class="pc bpc" id="L599" title="1 of 2 branches missed.">            if (!names.add(declaration.name())) {</span>
-<span class="nc" id="L600">                throw new IllegalArgumentException(</span>
-<span class="nc" id="L601">                    &quot;duplicate symbol declaration: &quot; + declaration.name());</span>
+<span class="fc bfc" id="L599" title="All 2 branches covered.">            if (!names.add(declaration.name())) {</span>
+<span class="fc" id="L600">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L601">                    &quot;duplicate symbol declaration: &quot; + declaration.name());</span>
             }
 <span class="fc" id="L603">        }</span>
 <span class="fc" id="L604">        return List.copyOf(result);</span>

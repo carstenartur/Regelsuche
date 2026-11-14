@@ -29,61 +29,98 @@ public record ProofJob(
     Instant createdAt,
     Instant updatedAt,
     CandidateProofStatus resultStatus,
-    String errorMessage
+    String errorMessage,
+    Integer attemptsStarted,
+    Long attemptTimeoutMillis,
+    Instant cancellationRequestedAt,
+    String stopReason
 ) {
-<span class="fc" id="L34">    public ProofJob {</span>
-<span class="fc" id="L35">        Objects.requireNonNull(id, &quot;id&quot;);</span>
-<span class="fc" id="L36">        Objects.requireNonNull(leftPattern, &quot;leftPattern&quot;);</span>
-<span class="fc" id="L37">        Objects.requireNonNull(rightPattern, &quot;rightPattern&quot;);</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        status = status == null ? ProofJobStatus.QUEUED : status;</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (priority &lt; 0) {</span>
-<span class="nc" id="L41">            throw new IllegalArgumentException(&quot;priority must be &gt;= 0&quot;);</span>
+<span class="fc" id="L38">    public ProofJob {</span>
+<span class="fc" id="L39">        Objects.requireNonNull(id, &quot;id&quot;);</span>
+<span class="fc" id="L40">        Objects.requireNonNull(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L41">        Objects.requireNonNull(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        status = status == null ? ProofJobStatus.QUEUED : status;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (priority &lt; 0) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;priority must be &gt;= 0&quot;);</span>
         }
-<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (maxRetries &lt; 0) {</span>
-<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;maxRetries must be &gt;= 0&quot;);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (maxRetries &lt; 0) {</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(&quot;maxRetries must be &gt;= 0&quot;);</span>
         }
-<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        workerType = workerType == null ? &quot;lean4&quot; : workerType;</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">        updatedAt = updatedAt == null ? createdAt : updatedAt;</span>
-<span class="fc bfc" id="L49" title="All 2 branches covered.">        errorMessage = errorMessage == null ? &quot;&quot; : errorMessage;</span>
-<span class="fc" id="L50">    }</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        workerType = workerType == null ? &quot;lean4&quot; : workerType;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        createdAt = createdAt == null ? Instant.now() : createdAt;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        updatedAt = updatedAt == null ? createdAt : updatedAt;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        errorMessage = errorMessage == null ? &quot;&quot; : errorMessage;</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        stopReason = stopReason == null ? &quot;&quot; : stopReason;</span>
+<span class="pc bpc" id="L55" title="1 of 6 branches missed.">        if ((attemptsStarted != null &amp;&amp; attemptsStarted &lt; 0)</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                || (attemptTimeoutMillis != null &amp;&amp; attemptTimeoutMillis &lt;= 0)) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;invalid proof attempt accounting&quot;);</span>
+        }
+<span class="fc" id="L59">    }</span>
+
+    /** Snapshots predating attempt accounting retain unknown values. */
+    public ProofJob(String id, String leftPattern, String rightPattern, List&lt;Assumption&gt; assumptions,
+                    ProofJobStatus status, int priority, int retryCount, int maxRetries, String workerType,
+                    Instant createdAt, Instant updatedAt, CandidateProofStatus resultStatus, String errorMessage) {
+<span class="fc" id="L65">        this(id, leftPattern, rightPattern, assumptions, status, priority, retryCount, maxRetries, workerType,</span>
+            createdAt, updatedAt, resultStatus, errorMessage, null, null, null, &quot;&quot;);
+<span class="fc" id="L67">    }</span>
 
     /** Convenience constructor with defaults for optional fields. */
     public ProofJob(String id, String leftPattern, String rightPattern,
                     List&lt;Assumption&gt; assumptions, int priority, String workerType) {
-<span class="fc" id="L55">        this(id, leftPattern, rightPattern, assumptions,</span>
+<span class="fc" id="L72">        this(id, leftPattern, rightPattern, assumptions,</span>
             ProofJobStatus.QUEUED, priority, 0, 3, workerType,
             null, null, null, null);
-<span class="fc" id="L58">    }</span>
+<span class="fc" id="L75">    }</span>
 
-    public ProofJob withStatus(ProofJobStatus newStatus) {
-<span class="fc" id="L61">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
-            newStatus, priority, retryCount, maxRetries, workerType,
-<span class="fc" id="L63">            createdAt, Instant.now(), resultStatus, errorMessage);</span>
+    ProofJob withBudget(long timeoutMillis) {
+<span class="fc" id="L78">        return new ProofJob(id, leftPattern, rightPattern, assumptions, status, priority, retryCount,</span>
+            maxRetries, workerType, createdAt, updatedAt, resultStatus, errorMessage,
+<span class="fc" id="L80">            0, timeoutMillis, null, &quot;&quot;);</span>
+    }
+
+    ProofJob startAttempt(long timeoutMillis) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        Integer count = attemptsStarted == null ? null : Integer.valueOf(Math.incrementExact(attemptsStarted));</span>
+<span class="fc" id="L85">        return new ProofJob(id, leftPattern, rightPattern, assumptions, ProofJobStatus.RUNNING, priority,</span>
+<span class="fc" id="L86">            retryCount, maxRetries, workerType, createdAt, Instant.now(), resultStatus, errorMessage,</span>
+<span class="fc" id="L87">            count, timeoutMillis, cancellationRequestedAt, stopReason);</span>
+    }
+
+    public ProofJob withStatus(ProofJobStatus status) {
+<span class="fc" id="L91">        return transition(status, retryCount, resultStatus, errorMessage, cancellationRequestedAt, stopReason);</span>
+    }
+
+    ProofJob stopping(String reason) {
+<span class="fc" id="L95">        return transition(ProofJobStatus.CANCELLING, retryCount, null, errorMessage, Instant.now(), reason);</span>
+    }
+
+    ProofJob stopped(String reason) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        Instant requested = cancellationRequestedAt == null ? Instant.now() : cancellationRequestedAt;</span>
+<span class="fc" id="L100">        return transition(ProofJobStatus.CANCELLED, retryCount, null, errorMessage, requested, reason);</span>
     }
 
     public ProofJob withRetry() {
-<span class="fc" id="L67">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
-            ProofJobStatus.RETRYING, priority, retryCount + 1, maxRetries, workerType,
-<span class="fc" id="L69">            createdAt, Instant.now(), resultStatus, errorMessage);</span>
+<span class="fc" id="L104">        return transition(ProofJobStatus.RETRYING, retryCount + 1, resultStatus, errorMessage, null, &quot;&quot;);</span>
     }
 
     public ProofJob withDone(CandidateProofStatus result) {
-<span class="fc" id="L73">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
-            ProofJobStatus.DONE, priority, retryCount, maxRetries, workerType,
-<span class="fc" id="L75">            createdAt, Instant.now(), result, &quot;&quot;);</span>
+<span class="fc" id="L108">        return transition(ProofJobStatus.DONE, retryCount, result, &quot;&quot;, null, &quot;&quot;);</span>
     }
 
     public ProofJob withFailed(String reason) {
-<span class="fc" id="L79">        return new ProofJob(id, leftPattern, rightPattern, assumptions,</span>
-            ProofJobStatus.FAILED, priority, retryCount, maxRetries, workerType,
-<span class="fc" id="L81">            createdAt, Instant.now(), resultStatus, reason);</span>
+<span class="fc" id="L112">        return transition(ProofJobStatus.FAILED, retryCount, resultStatus, reason, null, &quot;&quot;);</span>
     }
 
-    /** @return {@code true} if this job may still be retried. */
+    private ProofJob transition(ProofJobStatus next, int retries, CandidateProofStatus result,
+                                String error, Instant requestTime, String reason) {
+<span class="fc" id="L117">        return new ProofJob(id, leftPattern, rightPattern, assumptions, next, priority, retries, maxRetries,</span>
+<span class="fc" id="L118">            workerType, createdAt, Instant.now(), result, error, attemptsStarted, attemptTimeoutMillis,</span>
+            requestTime, reason);
+    }
+
     public boolean canRetry() {
-<span class="fc bfc" id="L86" title="All 2 branches covered.">        return retryCount &lt; maxRetries;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        return retryCount &lt; maxRetries;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

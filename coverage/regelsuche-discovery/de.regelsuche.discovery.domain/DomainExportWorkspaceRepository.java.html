@@ -100,92 +100,92 @@ public final class DomainExportWorkspaceRepository {
 
     /** Retains the bytes of a live validation without changing any original export file. */
     public void retainValidation(DomainExportWorkspace workspace, DomainDownstreamValidation.Receipt receipt) {
-<span class="nc" id="L103">        byte[] bytes = receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8);</span>
-<span class="nc" id="L104">        String hash = receipt.contentHash();</span>
-<span class="nc" id="L105">        requireValidationBytes(workspace, hash, bytes);</span>
-<span class="nc" id="L106">        synchronized (DomainExportWorkspaceRepository.class) {</span>
+<span class="fc" id="L103">        byte[] bytes = receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L104">        String hash = receipt.contentHash();</span>
+<span class="fc" id="L105">        requireValidationBytes(workspace, hash, bytes);</span>
+<span class="fc" id="L106">        synchronized (DomainExportWorkspaceRepository.class) {</span>
             try {
-<span class="nc" id="L108">                requireSame(find(workspace.runId()).orElseThrow(() -&gt;</span>
+<span class="fc" id="L108">                requireSame(find(workspace.runId()).orElseThrow(() -&gt;</span>
 <span class="nc" id="L109">                    new IllegalStateException(&quot;domain export is not retained&quot;)), workspace);</span>
-<span class="nc" id="L110">                Path target = validationTarget(workspace, hash);</span>
-<span class="nc" id="L111">                Path parent = target.getParent();</span>
-<span class="nc" id="L112">                Files.createDirectories(parent);</span>
-<span class="nc" id="L113">                rejectLinks(parent);</span>
-<span class="nc" id="L114">                var existing = readValidation(workspace, hash);</span>
-<span class="nc bnc" id="L115" title="All 2 branches missed.">                if (existing.isPresent()) {</span>
+<span class="fc" id="L110">                Path target = validationTarget(workspace, hash);</span>
+<span class="fc" id="L111">                Path parent = target.getParent();</span>
+<span class="fc" id="L112">                Files.createDirectories(parent);</span>
+<span class="fc" id="L113">                rejectLinks(parent);</span>
+<span class="fc" id="L114">                var existing = readValidation(workspace, hash);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if (existing.isPresent()) {</span>
 <span class="nc" id="L116">                    requireSameValidation(existing.orElseThrow(), bytes);</span>
 <span class="nc" id="L117">                    return;</span>
                 }
-<span class="nc" id="L119">                try (var entries = Files.list(parent)) {</span>
-<span class="nc" id="L120">                    if (entries.filter(path -&gt; path.getFileName().toString().endsWith(&quot;.json&quot;))</span>
-<span class="nc bnc" id="L121" title="All 2 branches missed.">                            .limit(MAX_VALIDATIONS_PER_EXPORT).count() &gt;= MAX_VALIDATIONS_PER_EXPORT) {</span>
+<span class="fc" id="L119">                try (var entries = Files.list(parent)) {</span>
+<span class="pc" id="L120">                    if (entries.filter(path -&gt; path.getFileName().toString().endsWith(&quot;.json&quot;))</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                            .limit(MAX_VALIDATIONS_PER_EXPORT).count() &gt;= MAX_VALIDATIONS_PER_EXPORT) {</span>
 <span class="nc" id="L122">                        throw new IllegalStateException(&quot;domain validation receipt limit exceeded&quot;);</span>
                     }
                 }
-<span class="nc" id="L125">                Path staged = Files.createTempFile(parent, &quot;.pending-&quot;, &quot;.tmp&quot;);</span>
+<span class="fc" id="L125">                Path staged = Files.createTempFile(parent, &quot;.pending-&quot;, &quot;.tmp&quot;);</span>
                 try {
-<span class="nc" id="L127">                    Files.write(staged, bytes);</span>
+<span class="fc" id="L127">                    Files.write(staged, bytes);</span>
                     try {
-<span class="nc" id="L129">                        Files.createLink(target, staged);</span>
+<span class="fc" id="L129">                        Files.createLink(target, staged);</span>
 <span class="nc" id="L130">                    } catch (FileAlreadyExistsException exception) {</span>
 <span class="nc" id="L131">                        requireSameValidation(readValidation(workspace, hash).orElseThrow(), bytes);</span>
-<span class="nc" id="L132">                    }</span>
+<span class="fc" id="L132">                    }</span>
                 } finally {
-<span class="nc" id="L134">                    Files.deleteIfExists(staged);</span>
+<span class="fc" id="L134">                    Files.deleteIfExists(staged);</span>
                 }
 <span class="nc" id="L136">            } catch (IOException | IllegalArgumentException exception) {</span>
 <span class="nc" id="L137">                throw new IllegalStateException(&quot;cannot retain domain validation receipt&quot;, exception);</span>
-<span class="nc" id="L138">            }</span>
-<span class="nc" id="L139">        }</span>
-<span class="nc" id="L140">    }</span>
+<span class="fc" id="L138">            }</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">    }</span>
 
     /** Re-verifies the retained source and reads historical bytes without issuing a live receipt. */
     public Optional&lt;byte[]&gt; findValidation(String runId, String hash) throws IOException {
-<span class="nc" id="L144">        DomainCanonical.requireSha256(hash, &quot;validation receipt hash&quot;);</span>
-<span class="nc" id="L145">        var workspace = find(runId);</span>
-<span class="nc bnc" id="L146" title="All 2 branches missed.">        return workspace.isEmpty() ? Optional.empty() : readValidation(workspace.orElseThrow(), hash);</span>
+<span class="fc" id="L144">        DomainCanonical.requireSha256(hash, &quot;validation receipt hash&quot;);</span>
+<span class="fc" id="L145">        var workspace = find(runId);</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        return workspace.isEmpty() ? Optional.empty() : readValidation(workspace.orElseThrow(), hash);</span>
     }
 
     private Optional&lt;byte[]&gt; readValidation(DomainExportWorkspace workspace, String hash) {
         try {
-<span class="nc" id="L151">            Path target = validationTarget(workspace, hash);</span>
-<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();</span>
-<span class="nc bnc" id="L153" title="All 4 branches missed.">            if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.size(target) &gt; MAX_VALIDATION_BYTES) {</span>
+<span class="fc" id="L151">            Path target = validationTarget(workspace, hash);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();</span>
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">            if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.size(target) &gt; MAX_VALIDATION_BYTES) {</span>
 <span class="nc" id="L154">                throw new IllegalArgumentException(&quot;invalid retained domain validation file&quot;);</span>
             }
-<span class="nc" id="L156">            try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {</span>
-<span class="nc" id="L157">                byte[] bytes = input.readNBytes(MAX_VALIDATION_BYTES + 1);</span>
-<span class="nc" id="L158">                requireValidationBytes(workspace, hash, bytes);</span>
-<span class="nc" id="L159">                return Optional.of(bytes);</span>
+<span class="fc" id="L156">            try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L157">                byte[] bytes = input.readNBytes(MAX_VALIDATION_BYTES + 1);</span>
+<span class="fc" id="L158">                requireValidationBytes(workspace, hash, bytes);</span>
+<span class="fc" id="L159">                return Optional.of(bytes);</span>
             }
-<span class="nc" id="L161">        } catch (IOException | IllegalArgumentException exception) {</span>
-<span class="nc" id="L162">            throw new IllegalStateException(&quot;invalid retained domain validation receipt&quot;, exception);</span>
+<span class="fc" id="L161">        } catch (IOException | IllegalArgumentException exception) {</span>
+<span class="fc" id="L162">            throw new IllegalStateException(&quot;invalid retained domain validation receipt&quot;, exception);</span>
         }
     }
 
     private Path validationTarget(DomainExportWorkspace workspace, String hash) {
-<span class="nc" id="L167">        Path parent = directory.resolveSibling(directory.getFileName() + &quot;-validations&quot;).resolve(workspace.runId().substring(7));</span>
-<span class="nc" id="L168">        rejectLinks(parent);</span>
-<span class="nc" id="L169">        return parent.resolve(hash.substring(7) + &quot;.json&quot;);</span>
+<span class="fc" id="L167">        Path parent = directory.resolveSibling(directory.getFileName() + &quot;-validations&quot;).resolve(workspace.runId().substring(7));</span>
+<span class="fc" id="L168">        rejectLinks(parent);</span>
+<span class="fc" id="L169">        return parent.resolve(hash.substring(7) + &quot;.json&quot;);</span>
     }
 
     private static void requireValidationBytes(DomainExportWorkspace workspace, String hash, byte[] bytes) {
-<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (bytes.length &gt; MAX_VALIDATION_BYTES) throw new IllegalArgumentException(&quot;domain validation receipt exceeds 1 MiB&quot;);</span>
-<span class="nc" id="L174">        var value = (ObjectNode) DomainExportWorkspace.read(bytes);</span>
-<span class="nc" id="L175">        DomainDownstreamValidation.requireRetainedShape(value);</span>
-<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (!DomainDownstreamValidation.SCHEMA.equals(value.path(&quot;schema&quot;).asText())</span>
-<span class="nc bnc" id="L177" title="All 2 branches missed.">                || !DomainDownstreamValidation.CONTRACT.equals(value.path(&quot;consumerContract&quot;).asText())</span>
-<span class="nc bnc" id="L178" title="All 2 branches missed.">                || !hash.equals(value.path(&quot;contentHash&quot;).asText())</span>
-<span class="nc bnc" id="L179" title="All 2 branches missed.">                || !workspace.evidence().outcome().name().equals(value.path(&quot;sourceOutcome&quot;).asText())</span>
-<span class="nc bnc" id="L180" title="All 2 branches missed.">                || !DomainDownstreamValidation.sourceBinding(workspace).equals(value.path(&quot;source&quot;))</span>
-<span class="nc bnc" id="L181" title="All 2 branches missed.">                || !Arrays.equals(bytes, DomainExportWorkspace.write(value).getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_VALIDATION_BYTES) throw new IllegalArgumentException(&quot;domain validation receipt exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L174">        var value = (ObjectNode) DomainExportWorkspace.read(bytes);</span>
+<span class="fc" id="L175">        DomainDownstreamValidation.requireRetainedShape(workspace.evidence(), value);</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (!DomainDownstreamValidation.SCHEMA.equals(value.path(&quot;schema&quot;).asText())</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                || !DomainDownstreamValidation.CONTRACT.equals(value.path(&quot;consumerContract&quot;).asText())</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                || !hash.equals(value.path(&quot;contentHash&quot;).asText())</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                || !workspace.evidence().outcome().name().equals(value.path(&quot;sourceOutcome&quot;).asText())</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                || !DomainDownstreamValidation.sourceBinding(workspace).equals(value.path(&quot;source&quot;))</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                || !Arrays.equals(bytes, DomainExportWorkspace.write(value).getBytes(StandardCharsets.UTF_8))) {</span>
 <span class="nc" id="L182">            throw new IllegalArgumentException(&quot;retained validation receipt differs from its canonical source binding&quot;);</span>
         }
-<span class="nc" id="L184">        value.remove(&quot;contentHash&quot;);</span>
-<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (!hash.equals(DomainCanonical.sha256(DomainExportWorkspace.write(value)))) {</span>
+<span class="fc" id="L184">        value.remove(&quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (!hash.equals(DomainCanonical.sha256(DomainExportWorkspace.write(value)))) {</span>
 <span class="nc" id="L186">            throw new IllegalArgumentException(&quot;retained validation receipt hash differs from its content&quot;);</span>
         }
-<span class="nc" id="L188">    }</span>
+<span class="fc" id="L188">    }</span>
 
     private static void requireSameValidation(byte[] retained, byte[] supplied) {
 <span class="nc bnc" id="L191" title="All 2 branches missed.">        if (!Arrays.equals(retained, supplied)) throw new IllegalStateException(&quot;immutable domain validation receipt conflict&quot;);</span>
@@ -229,10 +229,10 @@ public final class DomainExportWorkspaceRepository {
     }
 
     private static DomainExportWorkspace requireSame(DomainExportWorkspace retained, DomainExportWorkspace supplied) {
-<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (!retained.toCanonicalJson().equals(supplied.toCanonicalJson())) {</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (!retained.toCanonicalJson().equals(supplied.toCanonicalJson())) {</span>
 <span class="nc" id="L233">            throw new SourceIdentityConflictException(&quot;the export identity already binds different original bytes&quot;);</span>
         }
-<span class="nc" id="L235">        return retained;</span>
+<span class="fc" id="L235">        return retained;</span>
     }
 
     public static final class SourceIdentityConflictException extends IllegalStateException {

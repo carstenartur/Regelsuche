@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExprValueArena.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.value</a> &gt; <span class="el_source">ExprValueArena.java</span></div><h1>ExprValueArena.java</h1><pre class="source lang-java linenums">package de.regelsuche.value;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scalar.ExactRational;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Bounded owner-local semantic interning for the exact expression language. */
+public final class ExprValueArena implements AutoCloseable {
+    public static final String DIGEST_VERSION = &quot;regelsuche.expr-value-digest/v1&quot;;
+
+    /** Opaque local identity. The handle does not retain the arena or its other entries. */
+    public static final class ValueId {
+        private final Object owner;
+        private final int index;
+
+<span class="fc" id="L31">        private ValueId(Object owner, int index) {</span>
+<span class="fc" id="L32">            this.owner = owner;</span>
+<span class="fc" id="L33">            this.index = index;</span>
+<span class="fc" id="L34">        }</span>
+    }
+
+<span class="fc" id="L37">    private enum Kind { VARIABLE, SCOPED, NUMBER, FUNCTION, ADD, MUL, SUB, DIV, POW }</span>
+
+    // Arrays are privately created and never mutated. A hash match is only a bucket lookup.
+<span class="fc" id="L40">    private record Key(Kind kind, Object atom, int[] edges) {</span>
+        @Override public int hashCode() {
+<span class="fc" id="L42">            return 31 * (31 * kind.hashCode() + atom.hashCode()) + Arrays.hashCode(edges);</span>
+        }
+
+        @Override public boolean equals(Object other) {
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">            return other instanceof Key key &amp;&amp; kind == key.kind &amp;&amp; atom.equals(key.atom)</span>
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">                &amp;&amp; Arrays.equals(edges, key.edges);</span>
+        }
+
+<span class="fc bfc" id="L50" title="All 4 branches covered.">        boolean unordered() { return kind == Kind.ADD || kind == Kind.MUL; }</span>
+    }
+
+<span class="fc" id="L53">    private record Visit(Expr syntax, boolean expanded) {}</span>
+<span class="fc" id="L54">    private record DigestCount(byte[] digest, int count) {}</span>
+<span class="fc" id="L55">    private static final int[] NO_EDGES = {};</span>
+<span class="fc" id="L56">    private final Object owner = new Object();</span>
+    private final int maximumEntries;
+<span class="fc" id="L58">    private final List&lt;Key&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L59">    private final HashMap&lt;Key, ValueId&gt; index = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L60">    private final List&lt;byte[]&gt; digests = new ArrayList&lt;&gt;();</span>
+    private boolean closed;
+
+<span class="fc" id="L63">    public ExprValueArena(int maximumEntries) {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (maximumEntries &lt; 1) throw new IllegalArgumentException(&quot;maximumEntries must be positive&quot;);</span>
+<span class="fc" id="L65">        this.maximumEntries = maximumEntries;</span>
+<span class="fc" id="L66">    }</span>
+
+    /** Each syntax object is visited once per projection, including shared input DAGs. */
+    public synchronized ValueId intern(Expr expression) {
+<span class="fc" id="L70">        requireOpen();</span>
+<span class="fc" id="L71">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L72">        int startingSize = entries.size();</span>
+        try {
+<span class="fc" id="L74">            var resolved = new IdentityHashMap&lt;Expr, ValueId&gt;();</span>
+<span class="fc" id="L75">            var visits = new ArrayDeque&lt;Visit&gt;();</span>
+<span class="fc" id="L76">            visits.push(new Visit(expression, false));</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            while (!visits.isEmpty()) {</span>
+<span class="fc" id="L78">                var visit = visits.pop();</span>
+<span class="fc" id="L79">                Expr syntax = visit.syntax();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (resolved.containsKey(syntax)) continue;</span>
+<span class="fc bfc" id="L81" title="All 3 branches covered.">                List&lt;Expr&gt; children = switch (syntax) {</span>
+<span class="fc" id="L82">                    case BinaryExpr binary -&gt; List.of(binary.left(), binary.right());</span>
+<span class="fc" id="L83">                    case FunctionExpr function -&gt; function.arguments();</span>
+<span class="fc" id="L84">                    default -&gt; List.of();</span>
+<span class="fc" id="L85">                };</span>
+<span class="fc bfc" id="L86" title="All 4 branches covered.">                if (visit.expanded() || children.isEmpty()) {</span>
+<span class="fc" id="L87">                    resolved.put(syntax, internNode(syntax, resolved));</span>
+                } else {
+<span class="fc" id="L89">                    visits.push(new Visit(syntax, true));</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                    for (var child : children.reversed()) {</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                        if (!resolved.containsKey(child)) visits.push(new Visit(child, false));</span>
+<span class="fc" id="L92">                    }</span>
+                }
+<span class="fc" id="L94">            }</span>
+<span class="fc" id="L95">            return resolved.get(expression);</span>
+<span class="fc" id="L96">        } catch (RuntimeException failure) {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            while (entries.size() &gt; startingSize) index.remove(entries.removeLast());</span>
+<span class="fc" id="L98">            throw failure;</span>
+        }
+    }
+
+    private ValueId internNode(Expr syntax, IdentityHashMap&lt;Expr, ValueId&gt; resolved) {
+<span class="fc bfc" id="L103" title="All 4 branches covered.">        Key key = switch (syntax) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            case VariableExpr variable -&gt; new Key(variable.symbol().isPresent() ? Kind.SCOPED : Kind.VARIABLE,</span>
+<span class="fc" id="L105">                variable.name(), NO_EDGES);</span>
+<span class="fc" id="L106">            case NumberExpr number -&gt; new Key(Kind.NUMBER, number.value(), NO_EDGES);</span>
+<span class="fc" id="L107">            case FunctionExpr function -&gt; new Key(Kind.FUNCTION, function.name().trim(),</span>
+<span class="fc" id="L108">                function.arguments().stream().mapToInt(arg -&gt; resolved.get(arg).index).toArray());</span>
+<span class="fc" id="L109">            case BinaryExpr binary -&gt; binaryKey(binary.operator(), resolved.get(binary.left()).index,</span>
+<span class="fc" id="L110">                resolved.get(binary.right()).index);</span>
+<span class="fc" id="L111">        };</span>
+<span class="fc" id="L112">        ValueId existing = index.get(key);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (existing != null) return existing;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (entries.size() == maximumEntries) throw new IllegalStateException(&quot;semantic value arena capacity exceeded&quot;);</span>
+<span class="fc" id="L115">        var id = new ValueId(owner, entries.size());</span>
+<span class="fc" id="L116">        entries.add(key);</span>
+<span class="fc" id="L117">        index.put(key, id);</span>
+<span class="fc" id="L118">        return id;</span>
+    }
+
+    private Key binaryKey(BinaryOperator operator, int left, int right) {
+<span class="fc" id="L122">        var a = entries.get(left);</span>
+<span class="fc" id="L123">        var b = entries.get(right);</span>
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        if (a.atom() instanceof ExactRational x &amp;&amp; b.atom() instanceof ExactRational y) {</span>
+<span class="fc" id="L125">            var folded = ExprValueFactory.foldOrderedNumbers(operator, x, y);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (folded != null) return new Key(Kind.NUMBER, folded, NO_EDGES);</span>
+        }
+<span class="fc bfc" id="L128" title="All 5 branches covered.">        var kind = switch (operator) {</span>
+<span class="fc" id="L129">            case ADD -&gt; Kind.ADD;</span>
+<span class="fc" id="L130">            case MUL -&gt; Kind.MUL;</span>
+<span class="fc" id="L131">            case SUB -&gt; Kind.SUB;</span>
+<span class="fc" id="L132">            case DIV -&gt; Kind.DIV;</span>
+<span class="fc" id="L133">            case POW -&gt; Kind.POW;</span>
+        };
+<span class="fc bfc" id="L135" title="All 4 branches covered.">        if (kind != Kind.ADD &amp;&amp; kind != Kind.MUL) return new Key(kind, &quot;&quot;, new int[]{left, right});</span>
+<span class="fc" id="L136">        var counts = new TreeMap&lt;Integer, Integer&gt;();</span>
+<span class="fc" id="L137">        addOperands(counts, kind, left);</span>
+<span class="fc" id="L138">        addOperands(counts, kind, right);</span>
+<span class="fc" id="L139">        var edges = new int[Math.multiplyExact(counts.size(), 2)];</span>
+<span class="fc" id="L140">        int position = 0;</span>
+<span class="fc" id="L141">        int total = 0;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (var term : counts.entrySet()) {</span>
+<span class="fc" id="L143">            edges[position++] = term.getKey();</span>
+<span class="fc" id="L144">            edges[position++] = term.getValue();</span>
+<span class="fc" id="L145">            total = Math.addExact(total, term.getValue()); // Match the existing AC operand-count bound.</span>
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        return new Key(kind, &quot;&quot;, edges);</span>
+    }
+
+    private void addOperands(TreeMap&lt;Integer, Integer&gt; counts, Kind kind, int child) {
+<span class="fc" id="L151">        Key key = entries.get(child);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (key.kind() != kind) {</span>
+<span class="fc" id="L153">            counts.merge(child, 1, Math::addExact);</span>
+        } else {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (int i = 0; i &lt; key.edges().length; i += 2)</span>
+<span class="fc" id="L156">                counts.merge(key.edges()[i], key.edges()[i + 1], Math::addExact);</span>
+        }
+<span class="fc" id="L158">    }</span>
+
+    public synchronized int size() {
+<span class="fc" id="L161">        requireOpen();</span>
+<span class="fc" id="L162">        return entries.size();</span>
+    }
+
+    /**
+     * Stable SHA-256 Merkle identity. Every field is versioned, length-framed and
+     * ordered by semantic role. AC child digests sort independently of local IDs.
+     * The digest is evidence for cross-process comparison, never an interning key.
+     */
+    public synchronized String digest(ValueId id) {
+<span class="fc" id="L171">        requireOpen();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (Objects.requireNonNull(id, &quot;id&quot;).owner != owner) throw new IllegalArgumentException(&quot;foreign value ID&quot;);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (digests.size() &lt;= id.index) {</span>
+            MessageDigest hash;
+            try {
+<span class="fc" id="L176">                hash = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L177">            } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L178">                throw new IllegalStateException(impossible);</span>
+<span class="fc" id="L179">            }</span>
+            // Children are older than their parents. Each entry is hashed at most once.
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            while (digests.size() &lt;= id.index) digests.add(hashNode(hash, entries.get(digests.size())));</span>
+        }
+<span class="fc" id="L183">        return DIGEST_VERSION + &quot;:&quot; + HexFormat.of().formatHex(digests.get(id.index));</span>
+    }
+
+    private byte[] hashNode(MessageDigest hash, Key key) {
+<span class="fc" id="L187">        text(hash, DIGEST_VERSION);</span>
+<span class="fc" id="L188">        text(hash, key.kind().name());</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        text(hash, key.atom() instanceof ExactRational number ? number.canonicalText() : (String) key.atom());</span>
+<span class="fc" id="L190">        integer(hash, key.edges().length);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (key.unordered()) {</span>
+<span class="fc" id="L192">            var terms = new ArrayList&lt;DigestCount&gt;();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            for (int i = 0; i &lt; key.edges().length; i += 2)</span>
+<span class="fc" id="L194">                terms.add(new DigestCount(digests.get(key.edges()[i]), key.edges()[i + 1]));</span>
+<span class="fc" id="L195">            terms.sort((a, b) -&gt; {</span>
+<span class="fc" id="L196">                int order = Arrays.compareUnsigned(a.digest(), b.digest());</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                return order != 0 ? order : Integer.compare(a.count(), b.count());</span>
+            });
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            for (var term : terms) {</span>
+<span class="fc" id="L200">                hash.update(term.digest());</span>
+<span class="fc" id="L201">                integer(hash, term.count());</span>
+<span class="fc" id="L202">            }</span>
+<span class="fc" id="L203">        } else {</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (int child : key.edges()) hash.update(digests.get(child));</span>
+        }
+<span class="fc" id="L206">        return hash.digest();</span>
+    }
+
+    // Preserve exact Java string identity, including unpaired UTF-16 code units.
+    private static void text(MessageDigest hash, String value) {
+<span class="fc" id="L211">        integer(hash, value.length());</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L213">            char c = value.charAt(i);</span>
+<span class="fc" id="L214">            hash.update((byte) (c &gt;&gt;&gt; 8));</span>
+<span class="fc" id="L215">            hash.update((byte) c);</span>
+        }
+<span class="fc" id="L217">    }</span>
+
+    private static void integer(MessageDigest hash, int value) {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (int shift = 24; shift &gt;= 0; shift -= 8) hash.update((byte) (value &gt;&gt;&gt; shift));</span>
+<span class="fc" id="L221">    }</span>
+
+    private void requireOpen() {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (closed) throw new IllegalStateException(&quot;semantic value arena is closed&quot;);</span>
+<span class="fc" id="L225">    }</span>
+
+    @Override public synchronized void close() {
+<span class="fc" id="L228">        entries.clear();</span>
+<span class="fc" id="L229">        index.clear();</span>
+<span class="fc" id="L230">        digests.clear();</span>
+<span class="fc" id="L231">        closed = true;</span>
+<span class="fc" id="L232">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

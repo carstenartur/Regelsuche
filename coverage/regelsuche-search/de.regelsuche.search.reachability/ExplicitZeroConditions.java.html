@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExplicitZeroConditions.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">ExplicitZeroConditions.java</span></div><h1>ExplicitZeroConditions.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.HashSet;
+
+/** Recognizes exact, explicitly stated scalar zero/nonzero conflicts in a conditional path. */
+final class ExplicitZeroConditions {
+    private ExplicitZeroConditions() {}
+
+    static boolean conflict(AssumptionSignature signature) {
+<span class="fc" id="L14">        var terms = signature.normalizedAssumptions();</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if (terms.stream().noneMatch(term -&gt; term.endsWith(&quot; != 0&quot;))) return false;</span>
+<span class="fc" id="L16">        var zeros = new HashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L17">        var nonzeros = new HashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L18">        var parser = new ExpressionParser();</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (var term : terms) {</span>
+            try {
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                if (term.endsWith(&quot; != 0&quot;)) {</span>
+<span class="fc" id="L22">                    nonzeros.add(parser.parseTerm(term.substring(0, term.length() - &quot; != 0&quot;.length())));</span>
+<span class="pc bpc" id="L23" title="3 of 8 branches missed.">                } else if (term.contains(&quot;=&quot;) &amp;&amp; !term.contains(&quot;!&quot;) &amp;&amp; !term.contains(&quot;&lt;&quot;) &amp;&amp; !term.contains(&quot;&gt;&quot;)) {</span>
+<span class="fc" id="L24">                    var equation = parser.parseEquation(term);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">                    if (zero(equation.left())) zeros.add(equation.right());</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">                    if (zero(equation.right())) zeros.add(equation.left());</span>
+                }
+<span class="fc" id="L28">            } catch (IllegalArgumentException opaquePredicate) {</span>
+                // Other assumption languages remain outside this exact structural decision.
+<span class="fc" id="L30">            }</span>
+<span class="fc" id="L31">        }</span>
+<span class="fc bfc" id="L32" title="All 4 branches covered.">        return nonzeros.stream().anyMatch(term -&gt; zero(term) || zeros.contains(term));</span>
+    }
+
+    private static boolean zero(Expr term) {
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">        return term instanceof NumberExpr number &amp;&amp; number.value().isZero();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

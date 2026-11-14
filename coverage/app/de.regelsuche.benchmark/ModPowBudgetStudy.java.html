@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModPowBudgetStudy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ModPowBudgetStudy.java</span></div><h1>ModPowBudgetStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import static de.regelsuche.benchmark.ModPowTransferFiles.JSON;
+import static de.regelsuche.benchmark.ModPowTransferFiles.hash;
+import static de.regelsuche.benchmark.ModPowTransferFiles.read;
+import static de.regelsuche.benchmark.ModPowTransferFiles.require;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.benchmark.ModPowTransferFiles.Row;
+import de.regelsuche.mining.TypedOutputPattern;
+import de.regelsuche.transform.RecognitionProfile;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.HashSet;
+import java.util.List;
+
+/** Finite, prefix-accounted study of an already published modular-program learner. */
+public final class ModPowBudgetStudy {
+    static final String PROTOCOL = &quot;80610c07660656ffa96e80070c5c7faec0745ce9735067c1e0e32c096b1f95af&quot;;
+    private static final String ACQUISITION = &quot;1f09b47df5044ec226e5f3a4aa496cc87fea785764548f03140a6b694912e7db&quot;;
+    private ModPowBudgetStudy() {}
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        require(args.length == 5, &quot;acquire protocol TRAIN new-model new-receipt | evaluate protocol model receipt new-result (TEST beside protocol)&quot;);</span>
+<span class="fc" id="L28">        Path protocolFile = Path.of(args[1]);</span>
+<span class="fc" id="L29">        var protocol = JSON.readTree(bound(protocolFile, PROTOCOL));</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (&quot;acquire&quot;.equals(args[0])) {</span>
+<span class="fc" id="L31">            acquire(protocol, Path.of(args[2]), Path.of(args[3]), Path.of(args[4]));</span>
+        } else {
+<span class="fc" id="L33">            require(&quot;evaluate&quot;.equals(args[0]), &quot;unknown mode&quot;);</span>
+<span class="fc" id="L34">            var model = JSON.readTree(bound(Path.of(args[2]), protocol.required(&quot;modelSha256&quot;).asText()));</span>
+<span class="fc" id="L35">            byte[] receipt = bound(Path.of(args[3]), ACQUISITION);</span>
+<span class="fc" id="L36">            var acquisition = JSON.readTree(receipt);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            require(acquisition.required(&quot;modelSha256&quot;).equals(protocol.required(&quot;modelSha256&quot;))</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                &amp;&amp; acquisition.required(&quot;protocolSha256&quot;).asText().equals(PROTOCOL)</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                &amp;&amp; acquisition.required(&quot;trainSha256&quot;).equals(protocol.required(&quot;trainSha256&quot;)), &quot;foreign acquisition&quot;);</span>
+<span class="fc" id="L40">            var rows = ModPowTransferFiles.rows(bound(protocolFile.resolveSibling(&quot;test.json&quot;),</span>
+<span class="fc" id="L41">                protocol.required(&quot;testSha256&quot;).asText()), &quot;TEST&quot;);</span>
+<span class="fc" id="L42">            var result = evaluate(protocol, model, acquisition, rows);</span>
+<span class="fc" id="L43">            result.put(&quot;acquisitionSha256&quot;, hash(receipt));</span>
+<span class="fc" id="L44">            write(Path.of(args[4]), result);</span>
+        }
+<span class="fc" id="L46">    }</span>
+
+    private static void acquire(JsonNode protocol, Path train, Path model, Path receipt) throws Exception {
+<span class="fc" id="L49">        byte[] corpus = bound(train, protocol.required(&quot;trainSha256&quot;).asText());</span>
+<span class="fc" id="L50">        var rows = ModPowTransferFiles.rows(corpus, &quot;TRAIN&quot;);</span>
+<span class="fc" id="L51">        var artifact = ModPowFrozenTransfer.train(train);</span>
+<span class="fc" id="L52">        byte[] bytes = JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(artifact);</span>
+<span class="fc" id="L53">        require(hash(bytes).equals(protocol.required(&quot;modelSha256&quot;).asText()), &quot;TRAIN model drift&quot;);</span>
+<span class="fc" id="L54">        var counts = JSON.createObjectNode();</span>
+<span class="fc" id="L55">        var matching = ModPowSearchTrace.NONE;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            for (var sample : List.of(row, ModPowFrozenTransfer.shuffled(row))) {</span>
+<span class="fc" id="L58">                var baseline = ModPowFrozenTransfer.baseline(sample);</span>
+<span class="fc" id="L59">                var trace = new ModPowSearchTrace(sample);</span>
+<span class="fc" id="L60">                trace.runPrimitive();</span>
+<span class="fc" id="L61">                require(trace.primitiveTargets().equals(new HashSet&lt;&gt;(baseline.approved())), &quot;TRAIN primitive mismatch&quot;);</span>
+<span class="fc" id="L62">                matching = matching.plus(trace.work().primitiveMatch());</span>
+<span class="fc" id="L63">                add(counts, &quot;primitiveGeneratorCalls&quot;, 1);</span>
+<span class="fc" id="L64">                add(counts, &quot;generatedCandidates&quot;, baseline.generated());</span>
+<span class="fc" id="L65">                add(counts, &quot;replayRequests&quot;, baseline.generated());</span>
+<span class="fc" id="L66">                Expr best = ModPowFrozenTransfer.best(sample, baseline.approved(), expression -&gt; {</span>
+<span class="fc" id="L67">                    add(counts, &quot;scoreCalls&quot;, 1);</span>
+<span class="fc" id="L68">                    return ModPowFrozenTransfer.cost(sample, expression);</span>
+                });
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                int explicitScores = sample == row ? 4 : 2;</span>
+                // v1 scores both sides of the savings test and writes both scores for retained witnesses.
+<span class="fc" id="L72">                add(counts, &quot;scoreCalls&quot;, explicitScores);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                if (sample == row) {</span>
+<span class="fc" id="L74">                    require(ModPowCompositionReplay.verify(row.source(), best, row.assumptions()).isPresent(), &quot;TRAIN witness&quot;);</span>
+<span class="fc" id="L75">                    add(counts, &quot;replayRequests&quot;, 1);</span>
+<span class="fc" id="L76">                    add(counts, &quot;trainingExamples&quot;, 1);</span>
+                }
+<span class="fc" id="L78">            }</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        add(counts, &quot;primitiveMatchAttempts&quot;, matching.attempts());</span>
+<span class="fc" id="L81">        add(counts, &quot;primitiveMatcherSteps&quot;, matching.steps());</span>
+<span class="fc" id="L82">        add(counts, &quot;primitiveMatcherBranches&quot;, matching.branches());</span>
+<span class="fc" id="L83">        add(counts, &quot;generalizations&quot;, 1);</span>
+<span class="fc" id="L84">        add(counts, &quot;serializations&quot;, 1);</span>
+<span class="fc" id="L85">        add(counts, &quot;modelDecodes&quot;, 1);</span>
+<span class="fc" id="L86">        var result = JSON.createObjectNode().put(&quot;protocolSha256&quot;, PROTOCOL)</span>
+<span class="fc" id="L87">            .put(&quot;trainSha256&quot;, hash(corpus)).put(&quot;modelSha256&quot;, hash(bytes));</span>
+<span class="fc" id="L88">        result.set(&quot;counts&quot;, counts);</span>
+<span class="fc" id="L89">        result.put(&quot;work&quot;, countWork(counts));</span>
+<span class="fc" id="L90">        Files.write(model, bytes, StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L91">        write(receipt, result);</span>
+<span class="fc" id="L92">    }</span>
+
+    private static ObjectNode evaluate(JsonNode protocol, JsonNode model, JsonNode acquisition, List&lt;Row&gt; rows) {
+<span class="fc" id="L95">        var matcher = new TypedOutputPattern(ModPowTransferFiles.candidate(model), RecognitionProfile.arithmeticAc());</span>
+<span class="fc" id="L96">        long setup = countWork(acquisition.required(&quot;counts&quot;));</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        require(setup == acquisition.required(&quot;work&quot;).longValue() &amp;&amp; setup &gt; 0, &quot;invalid acquisition cost&quot;);</span>
+<span class="fc" id="L98">        var report = JSON.createObjectNode().put(&quot;schema&quot;, &quot;regelsuche.modpow-budget-result/v3&quot;)</span>
+<span class="fc" id="L99">            .put(&quot;protocolSha256&quot;, PROTOCOL);</span>
+<span class="fc" id="L100">        report.set(&quot;modelSha256&quot;, protocol.required(&quot;modelSha256&quot;));</span>
+<span class="fc" id="L101">        report.set(&quot;testSha256&quot;, protocol.required(&quot;testSha256&quot;));</span>
+<span class="fc" id="L102">        report.set(&quot;acquisition&quot;, acquisition);</span>
+<span class="fc" id="L103">        var cases = report.putArray(&quot;cases&quot;);</span>
+<span class="fc" id="L104">        long primitivePrefix = 0, learnedPrefix = setup;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (Row row : rows) {</span>
+<span class="fc" id="L106">            var targets = ModPowSearchTrace.referenceTargets(row);</span>
+<span class="fc" id="L107">            long optimum = ModPowSearchTrace.referenceDag(row, targets);</span>
+<span class="fc" id="L108">            long original = ModPowFrozenTransfer.cost(row, row.source()).dag();</span>
+<span class="fc" id="L109">            var primitive = new ModPowSearchTrace(row);</span>
+<span class="fc" id="L110">            primitive.runPrimitive();</span>
+<span class="fc" id="L111">            var learned = new ModPowSearchTrace(row);</span>
+<span class="fc" id="L112">            learned.runLearned(matcher);</span>
+<span class="fc" id="L113">            learned.runPrimitive();</span>
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">            require(primitive.primitiveTargets().equals(targets) &amp;&amp; learned.primitiveTargets().equals(targets),</span>
+<span class="fc" id="L115">                &quot;full transport differs from scheduler: &quot; + row.id());</span>
+<span class="pc bpc" id="L116" title="2 of 4 branches missed.">            require(primitive.best() == optimum &amp;&amp; learned.best() == optimum, &quot;unbounded endpoint differs from reference&quot;);</span>
+<span class="fc" id="L117">            var result = cases.addObject().put(&quot;id&quot;, row.id()).put(&quot;positive&quot;, row.positive()).put(&quot;sourceDag&quot;, original)</span>
+<span class="fc" id="L118">                .put(&quot;optimumDag&quot;, optimum).put(&quot;uniquePrimitiveTargets&quot;, targets.size());</span>
+<span class="fc" id="L119">            putArm(result.putObject(&quot;primitive&quot;), primitive, original, optimum, primitivePrefix);</span>
+<span class="fc" id="L120">            putArm(result.putObject(&quot;learned&quot;), learned, original, optimum, learnedPrefix);</span>
+<span class="fc" id="L121">            long pHit = primitive.firstOptimum(original, optimum), lHit = learned.firstOptimum(original, optimum);</span>
+<span class="fc" id="L122">            var budgets = result.putArray(&quot;budgets&quot;);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (var budget : protocol.required(&quot;budgetPoints&quot;)) {</span>
+<span class="fc" id="L124">                long limit = budget.longValue();</span>
+<span class="fc" id="L125">                budgets.addObject().put(&quot;budget&quot;, limit)</span>
+<span class="fc" id="L126">                    .put(&quot;primitiveDag&quot;, at(primitive, original, limit)).put(&quot;warmLearnedDag&quot;, at(learned, original, limit))</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                    .put(&quot;coldLearnedDag&quot;, at(learned, original, limit - setup))</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                    .put(&quot;streamPrimitiveOptimum&quot;, limit &gt;= primitivePrefix + pHit)</span>
+<span class="fc" id="L129">                    .put(&quot;streamLearnedOptimum&quot;, limit &gt;= learnedPrefix + lHit);</span>
+<span class="fc" id="L130">            }</span>
+<span class="fc" id="L131">            primitivePrefix += primitive.work().total();</span>
+<span class="fc" id="L132">            learnedPrefix += learned.work().total();</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return report.put(&quot;primitiveStreamWork&quot;, primitivePrefix).put(&quot;learnedStreamWorkIncludingAcquisition&quot;, learnedPrefix);</span>
+    }
+
+    private static long at(ModPowSearchTrace trace, long original, long budget) {
+<span class="fc" id="L138">        long incumbent = original;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (var improvement : trace.improvements()) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (improvement.work() &gt; budget) break;</span>
+<span class="fc" id="L141">            incumbent = improvement.dag();</span>
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">        return incumbent;</span>
+    }
+
+    private static void putArm(ObjectNode node, ModPowSearchTrace trace, long source, long optimum, long prefix) {
+<span class="fc" id="L147">        node.set(&quot;ledger&quot;, JSON.valueToTree(trace.work()));</span>
+<span class="fc" id="L148">        node.set(&quot;improvements&quot;, JSON.valueToTree(trace.improvements()));</span>
+<span class="fc" id="L149">        long first = trace.firstOptimum(source, optimum);</span>
+<span class="fc" id="L150">        node.put(&quot;firstOptimumWork&quot;, first).put(&quot;completedWork&quot;, trace.work().total())</span>
+<span class="fc" id="L151">            .put(&quot;streamFirstOptimumWork&quot;, prefix + first);</span>
+<span class="fc" id="L152">    }</span>
+
+<span class="fc" id="L154">    private static void add(ObjectNode node, String key, long value) { node.put(key, node.path(key).longValue() + value); }</span>
+    private static long countWork(JsonNode counts) {
+<span class="fc" id="L156">        long total = 0;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (var value : counts) {</span>
+<span class="pc bpc" id="L158" title="3 of 6 branches missed.">            require(value.isIntegralNumber() &amp;&amp; value.canConvertToLong() &amp;&amp; value.longValue() &gt;= 0, &quot;invalid count&quot;);</span>
+<span class="fc" id="L159">            total = Math.addExact(total, value.longValue());</span>
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">        return total;</span>
+    }
+    private static byte[] bound(Path path, String digest) throws Exception {
+<span class="fc" id="L164">        byte[] bytes = read(path);</span>
+<span class="fc" id="L165">        require(hash(bytes).equals(digest), &quot;digest mismatch for &quot; + path);</span>
+<span class="fc" id="L166">        return bytes;</span>
+    }
+    private static void write(Path path, ObjectNode value) throws Exception {
+<span class="fc" id="L169">        Files.write(path, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(value), StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L170">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -124,15 +124,9 @@ public final class RulePreparationCoordinator {
 <span class="fc" id="L124">                    direct.orElseThrow()));</span>
 <span class="fc" id="L125">                continue;</span>
             }
-<span class="fc" id="L127">            PatternTargetedLocalBridgeSearch.Attempt attempt =</span>
-<span class="fc" id="L128">                runtime.search().analyze(source, assumptions);</span>
-<span class="fc" id="L129">            outcomes.add(outcome(</span>
-                runtime,
-                source,
-                assumptions,
-                attempt));
-<span class="fc" id="L134">        }</span>
-<span class="fc" id="L135">        return new Evaluation(</span>
+<span class="fc" id="L127">            outcomes.add(analyzeBridge(schema.ruleId(), source, assumptions));</span>
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">        return new Evaluation(</span>
             COORDINATOR_ID,
             repositoryRevision,
             principalInventoryFingerprint,
@@ -141,7 +135,13 @@ public final class RulePreparationCoordinator {
             source,
             assumptions,
             outcomes,
-<span class="fc" id="L144">            AggregateWork.from(outcomes));</span>
+<span class="fc" id="L138">            AggregateWork.from(outcomes));</span>
+    }
+
+    /** Runs the bounded local fallback after the caller has already attempted direct replay. */
+    Outcome analyzeBridge(String ruleId, String source, AssumptionSignature assumptions) {
+<span class="fc" id="L143">        PrincipalRuntime runtime = runtimes.get(ruleId);</span>
+<span class="fc" id="L144">        return outcome(runtime, source, assumptions, runtime.search().analyze(source, assumptions));</span>
     }
 
     /** Recomputes the complete deterministic evaluation and all bridge replay. */

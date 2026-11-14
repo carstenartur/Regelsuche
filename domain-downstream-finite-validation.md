@@ -116,7 +116,12 @@ retain their exact bytes.
 Retrieval re-verifies the source export, the receipt's exact source binding
 and its canonical content hash. It checks the receipt's required top-level
 fields, finite-check budget and content hash, selected object identities,
-outcome bindings, artifact roles and claim boundaries. The release module
+outcome bindings, artifact roles and claim boundaries. Each retained row must
+use the checker for its source domain and match its index, observed/holdout
+partition, retained term and generated certificate term. Recurrence rows must
+carry the source order’s window. Retrieval checks the agreement flags, the
+first differing row and the completeness of the reported prefix. A partial
+check may retain a counterexample it already observed. The release module
 tests live receipts against the full offline schemas. A missing receipt
 returns `404`, and invalid retained receipts return `500`. Retrieval returns
 historical evidence. Only live validation replays the source and checks the

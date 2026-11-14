@@ -9,7 +9,7 @@
  *                   ↘ FAILED
  *                   ↘ RETRYING → RUNNING
  *   QUEUED → CANCELLED
- *   RUNNING → CANCELLED
+ *   RUNNING → CANCELLING → CANCELLED
  * &lt;/pre&gt;
  * &lt;/p&gt;
  */
@@ -18,18 +18,20 @@
 <span class="fc" id="L18">    QUEUED,</span>
     /** Currently being executed by a worker. */
 <span class="fc" id="L20">    RUNNING,</span>
+    /** Stop requested; the worker has not yet acknowledged exit. */
+<span class="fc" id="L22">    CANCELLING,</span>
     /** A previous attempt failed; the job has been requeued. */
-<span class="fc" id="L22">    RETRYING,</span>
+<span class="fc" id="L24">    RETRYING,</span>
     /** Worker returned a successful proof result. */
-<span class="fc" id="L24">    DONE,</span>
+<span class="fc" id="L26">    DONE,</span>
     /** All retry attempts exhausted without success. */
-<span class="fc" id="L26">    FAILED,</span>
+<span class="fc" id="L28">    FAILED,</span>
     /** Explicitly cancelled by the caller. */
-<span class="fc" id="L28">    CANCELLED;</span>
+<span class="fc" id="L30">    CANCELLED;</span>
 
     /** @return {@code true} for terminal states that never transition again. */
     public boolean isTerminal() {
-<span class="pc bpc" id="L32" title="1 of 6 branches missed.">        return this == DONE || this == FAILED || this == CANCELLED;</span>
+<span class="fc bfc" id="L34" title="All 6 branches covered.">        return this == DONE || this == FAILED || this == CANCELLED;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

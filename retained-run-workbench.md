@@ -131,8 +131,14 @@ claim isolation and delayed-response controls. Screenshots are generated under
 `build/reports/candidate-dossier-ui` at desktop and 390-pixel widths. These
 native controllers add no Node/npm host requirement.
 
+The existing [Proof-Jobs panel](proof-workbench.md#laufenden-proof-job-anhalten)
+can stop a live proof worker and retain its request time, terminal reason and
+actual attempt count under that job ID. Its admission and stop records belong
+to the proof job. A retained discovery run needs a source reference to
+associate that job with its candidate.
+
 This is a bounded product slice of #669. Broader dossier artifact schemas,
-occurrence-local evidence, exact replay/radar/proof correlations, live operation
-controls, navigation consolidation and an optional mathematical editor remain
+occurrence-local evidence, exact replay/radar/proof correlations, live discovery
+search controls, navigation consolidation and an optional mathematical editor remain
 open. No new discovery evaluation, mathematical-proof, novelty or search-quality
 claim follows from this view.

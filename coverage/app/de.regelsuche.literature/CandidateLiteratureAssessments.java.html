@@ -2,6 +2,7 @@
 
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -41,299 +42,355 @@ import java.util.regex.Pattern;
 /** Explicit human assessments of a candidate's literature context, stored privately. */
 public final class CandidateLiteratureAssessments {
     public static final String SCHEMA = &quot;regelsuche.literature-assessment/v1&quot;;
+    public static final String COVERAGE_SCHEMA = &quot;regelsuche.literature-assessment/v2&quot;;
     public static final int MAX_BYTES = 128 * 1024;
 
     private static final int MAX_ENTRIES = 1024;
     private static final String LOCK_FILE = &quot;.lock&quot;;
-<span class="fc" id="L48">    private static final Object LOCAL_WRITES = new Object();</span>
-<span class="fc" id="L49">    private static final Pattern CONTENT_FILE = Pattern.compile(&quot;[0-9a-f]{64}-[0-9a-f]{64}\\.json&quot;);</span>
-<span class="fc" id="L50">    private static final JsonMapper JSON = JsonMapper.builder()</span>
-<span class="fc" id="L51">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
-<span class="fc" id="L52">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
-<span class="fc" id="L53">        .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)</span>
-<span class="fc" id="L54">        .withCoercionConfig(LogicalType.Textual, config -&gt; config</span>
-<span class="fc" id="L55">            .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)</span>
-<span class="fc" id="L56">            .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)</span>
-<span class="fc" id="L57">            .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))</span>
-<span class="fc" id="L58">        .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)</span>
-<span class="fc" id="L59">        .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)</span>
-<span class="fc" id="L60">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
-<span class="fc" id="L61">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
-<span class="fc" id="L62">        .build();</span>
+<span class="fc" id="L50">    private static final Object LOCAL_WRITES = new Object();</span>
+<span class="fc" id="L51">    private static final Pattern CONTENT_FILE = Pattern.compile(&quot;[0-9a-f]{64}-[0-9a-f]{64}\\.json&quot;);</span>
+<span class="fc" id="L52">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L53">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L54">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L55">        .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)</span>
+<span class="fc" id="L56">        .withCoercionConfig(LogicalType.Textual, config -&gt; config</span>
+<span class="fc" id="L57">            .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail)</span>
+<span class="fc" id="L58">            .setCoercion(CoercionInputShape.Float, CoercionAction.Fail)</span>
+<span class="fc" id="L59">            .setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail))</span>
+<span class="fc" id="L60">        .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)</span>
+<span class="fc" id="L61">        .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)</span>
+<span class="fc" id="L62">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L63">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L64">        .build();</span>
 
     private final Path directory;
 
-<span class="fc" id="L66">    public CandidateLiteratureAssessments(Path directory) {</span>
-<span class="fc" id="L67">        this.directory = Objects.requireNonNull(directory).toAbsolutePath().normalize();</span>
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (this.directory.getParent() == null) throw new IllegalArgumentException(&quot;assessment directory needs a parent&quot;);</span>
-<span class="fc" id="L69">    }</span>
+<span class="fc" id="L68">    public CandidateLiteratureAssessments(Path directory) {</span>
+<span class="fc" id="L69">        this.directory = Objects.requireNonNull(directory).toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (this.directory.getParent() == null) throw new IllegalArgumentException(&quot;assessment directory needs a parent&quot;);</span>
+<span class="fc" id="L71">    }</span>
 
-<span class="fc" id="L71">    public enum Status { PRIOR_ART_FOUND, NO_PRIOR_ART_FOUND_WITHIN_SCOPE, UNRESOLVED }</span>
+<span class="fc" id="L73">    public enum Status { PRIOR_ART_FOUND, NO_PRIOR_ART_FOUND_WITHIN_SCOPE, UNRESOLVED }</span>
 
-    public record Scope(String source, String versionOrDate) {
-<span class="fc" id="L74">        public Scope {</span>
-<span class="fc" id="L75">            requireText(source, 500);</span>
-<span class="fc" id="L76">            requireText(versionOrDate, 300);</span>
-<span class="fc" id="L77">        }</span>
+<span class="fc" id="L75">    public enum Access { SEARCHED, PARTIAL, INACCESSIBLE }</span>
+
+    public record UnresolvedHit(String identifier, String reason) {
+<span class="fc" id="L78">        public UnresolvedHit {</span>
+<span class="fc" id="L79">            requireText(identifier, 1000);</span>
+<span class="fc" id="L80">            requireText(reason, 2000);</span>
+<span class="fc" id="L81">        }</span>
+    }
+
+    public record Coverage(Access status, String limitations, List&lt;UnresolvedHit&gt; unresolvedHits) {
+<span class="fc" id="L85">        public Coverage {</span>
+<span class="fc" id="L86">            Objects.requireNonNull(status, &quot;source access status&quot;);</span>
+<span class="fc" id="L87">            requireText(limitations, 2000);</span>
+<span class="fc" id="L88">            unresolvedHits = boundedList(unresolvedHits, 0, 32);</span>
+<span class="fc" id="L89">        }</span>
+
+        private boolean complete() {
+<span class="fc bfc" id="L92" title="All 4 branches covered.">            return status == Access.SEARCHED &amp;&amp; unresolvedHits.isEmpty();</span>
+        }
+    }
+
+    public record Scope(String source, String versionOrDate,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) Coverage coverage) {
+        public Scope(String source, String versionOrDate) {
+<span class="nc" id="L99">            this(source, versionOrDate, null);</span>
+<span class="nc" id="L100">        }</span>
+
+<span class="fc" id="L102">        public Scope {</span>
+<span class="fc" id="L103">            requireText(source, 500);</span>
+<span class="fc" id="L104">            requireText(versionOrDate, 300);</span>
+<span class="fc" id="L105">        }</span>
     }
 
     public record Match(Source source, Relation relation, List&lt;String&gt; assumptions, String rationale,
-                        String entailmentRationale) {
-<span class="fc" id="L82">        public Match {</span>
-<span class="fc" id="L83">            Objects.requireNonNull(source, &quot;match source&quot;);</span>
-<span class="fc" id="L84">            Objects.requireNonNull(relation, &quot;match relation&quot;);</span>
-<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (source.authors().size() &gt; 32) throw new IllegalArgumentException(&quot;too many source authors&quot;);</span>
-<span class="fc" id="L86">            assumptions = boundedList(assumptions, 0, 24);</span>
-<span class="fc" id="L87">            assumptions.forEach(assumption -&gt; requireText(assumption, 1000));</span>
-<span class="fc" id="L88">            requireText(rationale, 3000);</span>
-<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (entailmentRationale != null) requireText(entailmentRationale, 3000);</span>
-<span class="fc" id="L90">        }</span>
+                        String entailmentRationale,
+                        @JsonInclude(JsonInclude.Include.NON_NULL) Integer scopeIndex) {
+        public Match(Source source, Relation relation, List&lt;String&gt; assumptions, String rationale,
+                     String entailmentRationale) {
+<span class="nc" id="L113">            this(source, relation, assumptions, rationale, entailmentRationale, null);</span>
+<span class="nc" id="L114">        }</span>
+
+<span class="fc" id="L116">        public Match {</span>
+<span class="fc" id="L117">            Objects.requireNonNull(source, &quot;match source&quot;);</span>
+<span class="fc" id="L118">            Objects.requireNonNull(relation, &quot;match relation&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (source.authors().size() &gt; 32) throw new IllegalArgumentException(&quot;too many source authors&quot;);</span>
+<span class="fc" id="L120">            assumptions = boundedList(assumptions, 0, 24);</span>
+<span class="fc" id="L121">            assumptions.forEach(assumption -&gt; requireText(assumption, 1000));</span>
+<span class="fc" id="L122">            requireText(rationale, 3000);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (entailmentRationale != null) requireText(entailmentRationale, 3000);</span>
+<span class="fc" id="L124">        }</span>
 
         private boolean establishesPriorArt() {
-<span class="fc bfc" id="L93" title="All 8 branches covered.">            return relation == Relation.EXACT || relation == Relation.EQUIVALENT</span>
+<span class="fc bfc" id="L127" title="All 8 branches covered.">            return relation == Relation.EXACT || relation == Relation.EQUIVALENT</span>
                 || relation == Relation.SOURCE_GENERALIZATION &amp;&amp; entailmentRationale != null;
         }
     }
 
     public record Assessment(String schema, Subject subject, String reviewedOn, String reviewedBy, List&lt;Scope&gt; scope,
                              List&lt;String&gt; queries, Status status, List&lt;Match&gt; matches) {
-<span class="fc" id="L100">        public Assessment {</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) throw new IllegalArgumentException(&quot;invalid literature assessment schema&quot;);</span>
-<span class="fc" id="L102">            Objects.requireNonNull(subject, &quot;assessment subject&quot;);</span>
-<span class="fc" id="L103">            Objects.requireNonNull(status, &quot;assessment status&quot;);</span>
-<span class="fc" id="L104">            requireText(reviewedBy, 300);</span>
-<span class="fc" id="L105">            requireDate(reviewedOn);</span>
-<span class="fc" id="L106">            scope = boundedList(scope, 1, 24);</span>
-<span class="fc" id="L107">            queries = boundedList(queries, 1, 32);</span>
-<span class="fc" id="L108">            queries.forEach(query -&gt; requireText(query, 1000));</span>
-<span class="fc" id="L109">            matches = boundedList(matches, 0, 32);</span>
-<span class="fc" id="L110">            boolean priorArt = matches.stream().anyMatch(Match::establishesPriorArt);</span>
-<span class="fc bfc" id="L111" title="All 8 branches covered.">            if ((status == Status.PRIOR_ART_FOUND &amp;&amp; !priorArt)</span>
-                || (status == Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE &amp;&amp; priorArt)) {
-<span class="fc" id="L113">                throw new IllegalArgumentException(&quot;literature assessment status conflicts with its matches&quot;);</span>
+<span class="fc" id="L134">        public Assessment {</span>
+<span class="fc" id="L135">            boolean coverageRequired = COVERAGE_SCHEMA.equals(schema);</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">            if (!coverageRequired &amp;&amp; !SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L137">                throw new IllegalArgumentException(&quot;invalid literature assessment schema&quot;);</span>
             }
-<span class="fc" id="L115">        }</span>
+<span class="fc" id="L139">            Objects.requireNonNull(subject, &quot;assessment subject&quot;);</span>
+<span class="fc" id="L140">            Objects.requireNonNull(status, &quot;assessment status&quot;);</span>
+<span class="fc" id="L141">            requireText(reviewedBy, 300);</span>
+<span class="fc" id="L142">            requireDate(reviewedOn);</span>
+<span class="fc" id="L143">            scope = boundedList(scope, 1, 24);</span>
+<span class="fc bfc" id="L144" title="All 6 branches covered.">            if (scope.stream().anyMatch(source -&gt; (source.coverage() != null) != coverageRequired)) {</span>
+<span class="fc" id="L145">                throw new IllegalArgumentException(&quot;source coverage differs from assessment schema&quot;);</span>
+            }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            boolean allInaccessible = coverageRequired &amp;&amp; scope.stream()</span>
+<span class="fc bfc" id="L148" title="All 4 branches covered.">                .allMatch(source -&gt; source.coverage().status() == Access.INACCESSIBLE);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            queries = boundedList(queries, allInaccessible ? 0 : 1, 32);</span>
+<span class="fc" id="L150">            queries.forEach(query -&gt; requireText(query, 1000));</span>
+<span class="fc" id="L151">            matches = boundedList(matches, 0, 32);</span>
+<span class="fc bfc" id="L152" title="All 4 branches covered.">            if (coverageRequired &amp;&amp; status == Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE</span>
+<span class="fc bfc" id="L153" title="All 4 branches covered.">                &amp;&amp; (scope.stream().anyMatch(source -&gt; !source.coverage().complete())</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">                    || matches.stream().anyMatch(match -&gt; match.relation() == Relation.SOURCE_GENERALIZATION))) {</span>
+<span class="fc" id="L155">                throw new IllegalArgumentException(&quot;incomplete coverage or unresolved generalization in scoped absence&quot;);</span>
+            }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            for (Match match : matches) {</span>
+<span class="fc" id="L158">                Integer index = match.scopeIndex();</span>
+<span class="pc bpc" id="L159" title="1 of 8 branches missed.">                if (coverageRequired &amp;&amp; (index == null || index &lt; 0 || index &gt;= scope.size()</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                    || scope.get(index).coverage().status() == Access.INACCESSIBLE)) {</span>
+<span class="fc" id="L161">                    throw new IllegalArgumentException(&quot;reviewed match requires one accessible declared source&quot;);</span>
+                }
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">                if (!coverageRequired &amp;&amp; index != null) {</span>
+<span class="nc" id="L164">                    throw new IllegalArgumentException(&quot;source index requires the coverage schema&quot;);</span>
+                }
+<span class="fc" id="L166">            }</span>
+<span class="fc" id="L167">            boolean priorArt = matches.stream().anyMatch(Match::establishesPriorArt);</span>
+<span class="fc bfc" id="L168" title="All 8 branches covered.">            if ((status == Status.PRIOR_ART_FOUND &amp;&amp; !priorArt)</span>
+                || (status == Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE &amp;&amp; priorArt)) {
+<span class="fc" id="L170">                throw new IllegalArgumentException(&quot;literature assessment status conflicts with its matches&quot;);</span>
+            }
+<span class="fc" id="L172">        }</span>
     }
 
     public static final class InvalidAssessmentException extends IOException {
         private static final long serialVersionUID = 1L;
 
         private InvalidAssessmentException(String message) {
-<span class="fc" id="L122">            super(message);</span>
-<span class="fc" id="L123">        }</span>
+<span class="fc" id="L179">            super(message);</span>
+<span class="fc" id="L180">        }</span>
 
         private InvalidAssessmentException(String message, Throwable cause) {
-<span class="fc" id="L126">            super(message, cause);</span>
-<span class="fc" id="L127">        }</span>
+<span class="fc" id="L183">            super(message, cause);</span>
+<span class="fc" id="L184">        }</span>
     }
 
     public Assessment retain(Subject expected, byte[] json) throws IOException {
-<span class="fc" id="L131">        Objects.requireNonNull(expected);</span>
-<span class="fc" id="L132">        Assessment assessment = decode(json, expected);</span>
-<span class="fc" id="L133">        byte[] canonical = JSON.writeValueAsBytes(assessment);</span>
-<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (canonical.length &gt; MAX_BYTES) throw new InvalidAssessmentException(&quot;literature assessment is too large&quot;);</span>
-<span class="fc" id="L135">        Path target = directory.resolve(fileName(expected, canonical));</span>
+<span class="fc" id="L188">        Objects.requireNonNull(expected);</span>
+<span class="fc" id="L189">        Assessment assessment = decode(json, expected);</span>
+<span class="fc" id="L190">        byte[] canonical = JSON.writeValueAsBytes(assessment);</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (canonical.length &gt; MAX_BYTES) throw new InvalidAssessmentException(&quot;literature assessment is too large&quot;);</span>
+<span class="fc" id="L192">        Path target = directory.resolve(fileName(expected, canonical));</span>
         // File locks are JVM-wide. Also serialize calls within this process.
-<span class="fc" id="L137">        synchronized (LOCAL_WRITES) {</span>
-<span class="fc" id="L138">            checkDirectory(true);</span>
-<span class="fc" id="L139">            Path lockFile = directory.resolve(LOCK_FILE);</span>
+<span class="fc" id="L194">        synchronized (LOCAL_WRITES) {</span>
+<span class="fc" id="L195">            checkDirectory(true);</span>
+<span class="fc" id="L196">            Path lockFile = directory.resolve(LOCK_FILE);</span>
             try {
-<span class="fc" id="L141">                Files.createFile(lockFile, permissions(directory, &quot;rw-------&quot;));</span>
-<span class="fc" id="L142">            } catch (FileAlreadyExistsException existing) {</span>
+<span class="fc" id="L198">                Files.createFile(lockFile, permissions(directory, &quot;rw-------&quot;));</span>
+<span class="fc" id="L199">            } catch (FileAlreadyExistsException existing) {</span>
                 // Other repository instances use the same lock.
-<span class="fc" id="L144">            }</span>
-<span class="fc" id="L145">            requirePrivateFile(lockFile);</span>
-<span class="fc" id="L146">            try (var channel = FileChannel.open(lockFile, StandardOpenOption.WRITE, NOFOLLOW_LINKS);</span>
-<span class="fc" id="L147">                 var lock = channel.lock()) {</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (!lock.isValid()) throw new IOException(&quot;literature assessment lock unavailable&quot;);</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">                if (attributes(target) != null) {</span>
-<span class="fc" id="L150">                    Assessment retained = read(target, expected);</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                    if (!retained.equals(assessment)) throw new IOException(&quot;literature assessment identity conflict&quot;);</span>
-<span class="fc" id="L152">                    return retained;</span>
+<span class="fc" id="L201">            }</span>
+<span class="fc" id="L202">            requirePrivateFile(lockFile);</span>
+<span class="fc" id="L203">            try (var channel = FileChannel.open(lockFile, StandardOpenOption.WRITE, NOFOLLOW_LINKS);</span>
+<span class="fc" id="L204">                 var lock = channel.lock()) {</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                if (!lock.isValid()) throw new IOException(&quot;literature assessment lock unavailable&quot;);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                if (attributes(target) != null) {</span>
+<span class="fc" id="L207">                    Assessment retained = read(target, expected);</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                    if (!retained.equals(assessment)) throw new IOException(&quot;literature assessment identity conflict&quot;);</span>
+<span class="fc" id="L209">                    return retained;</span>
                 }
-<span class="fc" id="L154">                try (var entries = Files.newDirectoryStream(directory)) {</span>
-<span class="fc" id="L155">                    int count = 0;</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">                    for (Path entry : entries) {</span>
-<span class="pc bpc" id="L157" title="1 of 4 branches missed.">                        if (!entry.getFileName().toString().equals(LOCK_FILE) &amp;&amp; ++count &gt;= MAX_ENTRIES) {</span>
-<span class="nc" id="L158">                            throw new IOException(&quot;literature assessment storage limit reached&quot;);</span>
+<span class="fc" id="L211">                try (var entries = Files.newDirectoryStream(directory)) {</span>
+<span class="fc" id="L212">                    int count = 0;</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                    for (Path entry : entries) {</span>
+<span class="pc bpc" id="L214" title="1 of 4 branches missed.">                        if (!entry.getFileName().toString().equals(LOCK_FILE) &amp;&amp; ++count &gt;= MAX_ENTRIES) {</span>
+<span class="nc" id="L215">                            throw new IOException(&quot;literature assessment storage limit reached&quot;);</span>
                         }
-<span class="fc" id="L160">                    }</span>
-<span class="nc" id="L161">                } catch (DirectoryIteratorException e) {</span>
-<span class="nc" id="L162">                    throw e.getCause();</span>
-<span class="fc" id="L163">                }</span>
-<span class="fc" id="L164">                write(target, canonical);</span>
-<span class="pc bpc" id="L165" title="2 of 4 branches missed.">            }</span>
-<span class="fc" id="L166">        }</span>
-<span class="fc" id="L167">        return assessment;</span>
+<span class="fc" id="L217">                    }</span>
+<span class="nc" id="L218">                } catch (DirectoryIteratorException e) {</span>
+<span class="nc" id="L219">                    throw e.getCause();</span>
+<span class="fc" id="L220">                }</span>
+<span class="fc" id="L221">                write(target, canonical);</span>
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">            }</span>
+<span class="fc" id="L223">        }</span>
+<span class="fc" id="L224">        return assessment;</span>
     }
 
     public List&lt;Assessment&gt; list(Subject subject) throws IOException {
-<span class="fc" id="L171">        Objects.requireNonNull(subject);</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (!checkDirectory(false)) return List.of();</span>
-<span class="fc" id="L173">        var assessments = new ArrayList&lt;Assessment&gt;();</span>
+<span class="fc" id="L228">        Objects.requireNonNull(subject);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (!checkDirectory(false)) return List.of();</span>
+<span class="fc" id="L230">        var assessments = new ArrayList&lt;Assessment&gt;();</span>
         // Scan names in deterministic content order so the date sort has a stable tie order.
-<span class="fc" id="L175">        var paths = new ArrayList&lt;Path&gt;();</span>
-<span class="fc" id="L176">        try (var entries = Files.newDirectoryStream(directory, subjectKey(subject) + &quot;-*.json&quot;)) {</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">            for (Path path : entries) {</span>
-<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                if (paths.size() == MAX_ENTRIES) throw new IOException(&quot;literature assessment storage limit reached&quot;);</span>
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                if (!CONTENT_FILE.matcher(path.getFileName().toString()).matches()) {</span>
-<span class="nc" id="L180">                    throw new IOException(&quot;invalid literature assessment filename&quot;);</span>
+<span class="fc" id="L232">        var paths = new ArrayList&lt;Path&gt;();</span>
+<span class="fc" id="L233">        try (var entries = Files.newDirectoryStream(directory, subjectKey(subject) + &quot;-*.json&quot;)) {</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            for (Path path : entries) {</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                if (paths.size() == MAX_ENTRIES) throw new IOException(&quot;literature assessment storage limit reached&quot;);</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                if (!CONTENT_FILE.matcher(path.getFileName().toString()).matches()) {</span>
+<span class="nc" id="L237">                    throw new IOException(&quot;invalid literature assessment filename&quot;);</span>
                 }
-<span class="fc" id="L182">                paths.add(path);</span>
-<span class="fc" id="L183">            }</span>
-<span class="nc" id="L184">        } catch (DirectoryIteratorException e) {</span>
-<span class="nc" id="L185">            throw e.getCause();</span>
-<span class="fc" id="L186">        }</span>
-<span class="fc" id="L187">        paths.sort(Comparator.naturalOrder());</span>
-<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (Path path : paths) assessments.add(read(path, subject));</span>
-<span class="fc" id="L189">        assessments.sort(Comparator.comparing(Assessment::reviewedOn).reversed());</span>
-<span class="fc" id="L190">        return List.copyOf(assessments);</span>
+<span class="fc" id="L239">                paths.add(path);</span>
+<span class="fc" id="L240">            }</span>
+<span class="nc" id="L241">        } catch (DirectoryIteratorException e) {</span>
+<span class="nc" id="L242">            throw e.getCause();</span>
+<span class="fc" id="L243">        }</span>
+<span class="fc" id="L244">        paths.sort(Comparator.naturalOrder());</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (Path path : paths) assessments.add(read(path, subject));</span>
+<span class="fc" id="L246">        assessments.sort(Comparator.comparing(Assessment::reviewedOn).reversed());</span>
+<span class="fc" id="L247">        return List.copyOf(assessments);</span>
     }
 
     private static Assessment decode(byte[] bytes, Subject expected) throws InvalidAssessmentException {
-<span class="pc bpc" id="L194" title="2 of 6 branches missed.">        if (bytes == null || bytes.length == 0 || bytes.length &gt; MAX_BYTES) {</span>
-<span class="fc" id="L195">            throw new InvalidAssessmentException(&quot;invalid literature assessment size&quot;);</span>
+<span class="pc bpc" id="L251" title="2 of 6 branches missed.">        if (bytes == null || bytes.length == 0 || bytes.length &gt; MAX_BYTES) {</span>
+<span class="fc" id="L252">            throw new InvalidAssessmentException(&quot;invalid literature assessment size&quot;);</span>
         }
         Assessment result;
         try {
-<span class="fc" id="L199">            String json = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();</span>
-<span class="fc" id="L200">            result = JSON.readValue(json, Assessment.class);</span>
-<span class="fc" id="L201">        } catch (IOException | IllegalArgumentException invalid) {</span>
-<span class="fc" id="L202">            throw new InvalidAssessmentException(&quot;invalid literature assessment JSON&quot;, invalid);</span>
-<span class="fc" id="L203">        }</span>
-<span class="pc bpc" id="L204" title="1 of 4 branches missed.">        if (result == null || !expected.equals(result.subject())) {</span>
-<span class="fc" id="L205">            throw new InvalidAssessmentException(&quot;literature assessment does not match the retained evidence&quot;);</span>
+<span class="fc" id="L256">            String json = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();</span>
+<span class="fc" id="L257">            result = JSON.readValue(json, Assessment.class);</span>
+<span class="fc" id="L258">        } catch (IOException | IllegalArgumentException invalid) {</span>
+<span class="fc" id="L259">            throw new InvalidAssessmentException(&quot;invalid literature assessment JSON&quot;, invalid);</span>
+<span class="fc" id="L260">        }</span>
+<span class="pc bpc" id="L261" title="1 of 4 branches missed.">        if (result == null || !expected.equals(result.subject())) {</span>
+<span class="fc" id="L262">            throw new InvalidAssessmentException(&quot;literature assessment does not match the retained evidence&quot;);</span>
         }
-<span class="fc" id="L207">        return result;</span>
+<span class="fc" id="L264">        return result;</span>
     }
 
     private static Assessment read(Path path, Subject subject) throws IOException {
-<span class="fc" id="L211">        requirePrivateFile(path);</span>
-<span class="fc" id="L212">        try (var input = Files.newInputStream(path, NOFOLLOW_LINKS)) {</span>
-<span class="fc" id="L213">            Assessment result = decode(input.readNBytes(MAX_BYTES + 1), subject);</span>
-<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (!path.getFileName().toString().equals(fileName(subject, JSON.writeValueAsBytes(result)))) {</span>
-<span class="fc" id="L215">                throw new IOException(&quot;literature assessment content differs from its storage identity&quot;);</span>
+<span class="fc" id="L268">        requirePrivateFile(path);</span>
+<span class="fc" id="L269">        try (var input = Files.newInputStream(path, NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L270">            Assessment result = decode(input.readNBytes(MAX_BYTES + 1), subject);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (!path.getFileName().toString().equals(fileName(subject, JSON.writeValueAsBytes(result)))) {</span>
+<span class="fc" id="L272">                throw new IOException(&quot;literature assessment content differs from its storage identity&quot;);</span>
             }
-<span class="fc" id="L217">            return result;</span>
-<span class="nc" id="L218">        } catch (InvalidAssessmentException invalid) {</span>
-<span class="nc" id="L219">            throw new IOException(&quot;invalid retained literature assessment&quot;, invalid);</span>
+<span class="fc" id="L274">            return result;</span>
+<span class="nc" id="L275">        } catch (InvalidAssessmentException invalid) {</span>
+<span class="nc" id="L276">            throw new IOException(&quot;invalid retained literature assessment&quot;, invalid);</span>
         }
     }
 
     private void write(Path target, byte[] bytes) throws IOException {
-<span class="fc" id="L224">        Path temporary = Files.createTempFile(directory, &quot;.assessment-&quot;, &quot;.tmp&quot;, permissions(directory, &quot;rw-------&quot;));</span>
+<span class="fc" id="L281">        Path temporary = Files.createTempFile(directory, &quot;.assessment-&quot;, &quot;.tmp&quot;, permissions(directory, &quot;rw-------&quot;));</span>
         try {
-<span class="fc" id="L226">            try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE, NOFOLLOW_LINKS)) {</span>
-<span class="fc" id="L227">                var buffer = ByteBuffer.wrap(bytes);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">                while (buffer.hasRemaining()) channel.write(buffer);</span>
-<span class="fc" id="L229">                channel.force(true);</span>
+<span class="fc" id="L283">            try (var channel = FileChannel.open(temporary, StandardOpenOption.WRITE, NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L284">                var buffer = ByteBuffer.wrap(bytes);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                while (buffer.hasRemaining()) channel.write(buffer);</span>
+<span class="fc" id="L286">                channel.force(true);</span>
             }
-<span class="fc" id="L231">            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);</span>
-<span class="fc" id="L232">            forceDirectory(directory);</span>
+<span class="fc" id="L288">            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);</span>
+<span class="fc" id="L289">            forceDirectory(directory);</span>
         } finally {
-<span class="fc" id="L234">            Files.deleteIfExists(temporary);</span>
+<span class="fc" id="L291">            Files.deleteIfExists(temporary);</span>
         }
-<span class="fc" id="L236">    }</span>
+<span class="fc" id="L293">    }</span>
 
     private boolean checkDirectory(boolean create) throws IOException {
-<span class="fc" id="L239">        Path current = directory.getRoot();</span>
-<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (Path part : directory) {</span>
-<span class="fc" id="L241">            current = current.resolve(part);</span>
-<span class="fc" id="L242">            BasicFileAttributes attrs = attributes(current);</span>
-<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (attrs == null) {</span>
-<span class="fc bfc" id="L244" title="All 2 branches covered.">                if (!create) return false;</span>
+<span class="fc" id="L296">        Path current = directory.getRoot();</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (Path part : directory) {</span>
+<span class="fc" id="L298">            current = current.resolve(part);</span>
+<span class="fc" id="L299">            BasicFileAttributes attrs = attributes(current);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (attrs == null) {</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                if (!create) return false;</span>
                 try {
-<span class="fc" id="L246">                    Files.createDirectory(current, permissions(current.getParent(), &quot;rwx------&quot;));</span>
-<span class="fc" id="L247">                    forceDirectory(current.getParent());</span>
-<span class="nc" id="L248">                } catch (FileAlreadyExistsException existing) {</span>
-<span class="nc" id="L249">                    attrs = attributes(current);</span>
-<span class="nc bnc" id="L250" title="All 4 branches missed.">                    if (attrs == null || !attrs.isDirectory()) throw existing;</span>
-<span class="pc" id="L251">                }</span>
-<span class="fc bfc" id="L252" title="All 2 branches covered.">            } else if (!attrs.isDirectory()) {</span>
-<span class="fc" id="L253">                throw new IOException(&quot;invalid literature assessment directory component&quot;);</span>
+<span class="fc" id="L303">                    Files.createDirectory(current, permissions(current.getParent(), &quot;rwx------&quot;));</span>
+<span class="fc" id="L304">                    forceDirectory(current.getParent());</span>
+<span class="nc" id="L305">                } catch (FileAlreadyExistsException existing) {</span>
+<span class="nc" id="L306">                    attrs = attributes(current);</span>
+<span class="nc bnc" id="L307" title="All 4 branches missed.">                    if (attrs == null || !attrs.isDirectory()) throw existing;</span>
+<span class="pc" id="L308">                }</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            } else if (!attrs.isDirectory()) {</span>
+<span class="fc" id="L310">                throw new IOException(&quot;invalid literature assessment directory component&quot;);</span>
             }
-<span class="fc" id="L255">        }</span>
-<span class="fc" id="L256">        requirePrivate(directory);</span>
-<span class="fc" id="L257">        return true;</span>
+<span class="fc" id="L312">        }</span>
+<span class="fc" id="L313">        requirePrivate(directory);</span>
+<span class="fc" id="L314">        return true;</span>
     }
 
     private static BasicFileAttributes attributes(Path path) throws IOException {
         try {
-<span class="fc" id="L262">            return Files.readAttributes(path, BasicFileAttributes.class, NOFOLLOW_LINKS);</span>
-<span class="fc" id="L263">        } catch (NoSuchFileException missing) {</span>
-<span class="fc" id="L264">            return null;</span>
+<span class="fc" id="L319">            return Files.readAttributes(path, BasicFileAttributes.class, NOFOLLOW_LINKS);</span>
+<span class="fc" id="L320">        } catch (NoSuchFileException missing) {</span>
+<span class="fc" id="L321">            return null;</span>
         }
     }
 
     private static void requirePrivateFile(Path path) throws IOException {
-<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, NOFOLLOW_LINKS)) throw new IOException(&quot;invalid literature assessment file&quot;);</span>
-<span class="fc" id="L270">        requirePrivate(path);</span>
-<span class="fc" id="L271">    }</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, NOFOLLOW_LINKS)) throw new IOException(&quot;invalid literature assessment file&quot;);</span>
+<span class="fc" id="L327">        requirePrivate(path);</span>
+<span class="fc" id="L328">    }</span>
 
     private static void requirePrivate(Path path) throws IOException {
-<span class="fc" id="L274">        var view = Files.getFileAttributeView(path, PosixFileAttributeView.class, NOFOLLOW_LINKS);</span>
-<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        if (view != null &amp;&amp; view.readAttributes().permissions().stream()</span>
-<span class="pc bpc" id="L276" title="2 of 4 branches missed.">            .anyMatch(permission -&gt; !permission.name().startsWith(&quot;OWNER_&quot;))) {</span>
-<span class="nc" id="L277">            throw new IOException(&quot;literature assessment storage is not owner-only&quot;);</span>
+<span class="fc" id="L331">        var view = Files.getFileAttributeView(path, PosixFileAttributeView.class, NOFOLLOW_LINKS);</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (view != null &amp;&amp; view.readAttributes().permissions().stream()</span>
+<span class="pc bpc" id="L333" title="2 of 4 branches missed.">            .anyMatch(permission -&gt; !permission.name().startsWith(&quot;OWNER_&quot;))) {</span>
+<span class="nc" id="L334">            throw new IOException(&quot;literature assessment storage is not owner-only&quot;);</span>
         }
-<span class="fc" id="L279">    }</span>
+<span class="fc" id="L336">    }</span>
 
     private static FileAttribute&lt;?&gt;[] permissions(Path parent, String mode) throws IOException {
-<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        return Files.getFileStore(parent).supportsFileAttributeView(&quot;posix&quot;)</span>
-<span class="fc" id="L283">            ? new FileAttribute&lt;?&gt;[] {PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(mode))}</span>
-<span class="nc" id="L284">            : new FileAttribute&lt;?&gt;[0];</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        return Files.getFileStore(parent).supportsFileAttributeView(&quot;posix&quot;)</span>
+<span class="fc" id="L340">            ? new FileAttribute&lt;?&gt;[] {PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(mode))}</span>
+<span class="nc" id="L341">            : new FileAttribute&lt;?&gt;[0];</span>
     }
 
     private static void forceDirectory(Path path) throws IOException {
-<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (Files.getFileStore(path).supportsFileAttributeView(&quot;posix&quot;)) {</span>
-<span class="fc" id="L289">            try (var channel = FileChannel.open(path, StandardOpenOption.READ, NOFOLLOW_LINKS)) {</span>
-<span class="fc" id="L290">                channel.force(true);</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (Files.getFileStore(path).supportsFileAttributeView(&quot;posix&quot;)) {</span>
+<span class="fc" id="L346">            try (var channel = FileChannel.open(path, StandardOpenOption.READ, NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L347">                channel.force(true);</span>
             }
         }
-<span class="fc" id="L293">    }</span>
+<span class="fc" id="L350">    }</span>
 
     private static String fileName(Subject subject, byte[] canonical) {
-<span class="fc" id="L296">        return subjectKey(subject) + &quot;-&quot; + sha256(canonical) + &quot;.json&quot;;</span>
+<span class="fc" id="L353">        return subjectKey(subject) + &quot;-&quot; + sha256(canonical) + &quot;.json&quot;;</span>
     }
 
     private static String subjectKey(Subject subject) {
-<span class="fc" id="L300">        String key = subject.runId() + &quot;\n&quot; + subject.candidateId() + &quot;\n&quot; + subject.artifactHash();</span>
-<span class="fc" id="L301">        return sha256(key.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L357">        String key = subject.runId() + &quot;\n&quot; + subject.candidateId() + &quot;\n&quot; + subject.artifactHash();</span>
+<span class="fc" id="L358">        return sha256(key.getBytes(StandardCharsets.UTF_8));</span>
     }
 
     private static String sha256(byte[] value) {
         try {
-<span class="fc" id="L306">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value));</span>
-<span class="nc" id="L307">        } catch (NoSuchAlgorithmException impossible) {</span>
-<span class="nc" id="L308">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, impossible);</span>
+<span class="fc" id="L363">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value));</span>
+<span class="nc" id="L364">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L365">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, impossible);</span>
         }
     }
 
     private static &lt;T&gt; List&lt;T&gt; boundedList(List&lt;T&gt; values, int min, int max) {
-<span class="pc bpc" id="L313" title="2 of 6 branches missed.">        if (values == null || values.size() &lt; min || values.size() &gt; max) {</span>
-<span class="fc" id="L314">            throw new IllegalArgumentException(&quot;invalid literature assessment list size&quot;);</span>
+<span class="pc bpc" id="L370" title="2 of 6 branches missed.">        if (values == null || values.size() &lt; min || values.size() &gt; max) {</span>
+<span class="fc" id="L371">            throw new IllegalArgumentException(&quot;invalid literature assessment list size&quot;);</span>
         }
-<span class="fc" id="L316">        return List.copyOf(values);</span>
+<span class="fc" id="L373">        return List.copyOf(values);</span>
     }
 
     private static void requireText(String value, int limit) {
-<span class="pc bpc" id="L320" title="3 of 6 branches missed.">        if (value == null || value.length() &gt; limit || !StandardCharsets.UTF_8.newEncoder().canEncode(value)</span>
-<span class="pc bpc" id="L321" title="4 of 8 branches missed.">            || value.codePoints().noneMatch(c -&gt; !Character.isWhitespace(c) &amp;&amp; !Character.isSpaceChar(c) &amp;&amp; c != 0x85)</span>
-<span class="pc bpc" id="L322" title="8 of 10 branches missed.">            || value.codePoints().anyMatch(c -&gt; Character.isISOControl(c) &amp;&amp; c != '\n' &amp;&amp; c != '\r' &amp;&amp; c != '\t')) {</span>
-<span class="nc" id="L323">            throw new IllegalArgumentException(&quot;invalid literature assessment text&quot;);</span>
+<span class="pc bpc" id="L377" title="3 of 6 branches missed.">        if (value == null || value.length() &gt; limit || !StandardCharsets.UTF_8.newEncoder().canEncode(value)</span>
+<span class="pc bpc" id="L378" title="3 of 8 branches missed.">            || value.codePoints().noneMatch(c -&gt; !Character.isWhitespace(c) &amp;&amp; !Character.isSpaceChar(c) &amp;&amp; c != 0x85)</span>
+<span class="pc bpc" id="L379" title="8 of 10 branches missed.">            || value.codePoints().anyMatch(c -&gt; Character.isISOControl(c) &amp;&amp; c != '\n' &amp;&amp; c != '\r' &amp;&amp; c != '\t')) {</span>
+<span class="fc" id="L380">            throw new IllegalArgumentException(&quot;invalid literature assessment text&quot;);</span>
         }
-<span class="fc" id="L325">    }</span>
+<span class="fc" id="L382">    }</span>
 
     private static void requireDate(String value) {
-<span class="pc bpc" id="L328" title="2 of 4 branches missed.">        if (value == null || value.length() != 10) throw new IllegalArgumentException(&quot;invalid literature assessment date&quot;);</span>
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">        if (value == null || value.length() != 10) throw new IllegalArgumentException(&quot;invalid literature assessment date&quot;);</span>
         try {
-<span class="fc" id="L330">            var date = LocalDate.parse(value);</span>
-<span class="pc bpc" id="L331" title="2 of 4 branches missed.">            if (date.getYear() &lt; 1 || !date.toString().equals(value)) {</span>
-<span class="nc" id="L332">                throw new IllegalArgumentException(&quot;invalid literature assessment date&quot;);</span>
+<span class="fc" id="L387">            var date = LocalDate.parse(value);</span>
+<span class="pc bpc" id="L388" title="2 of 4 branches missed.">            if (date.getYear() &lt; 1 || !date.toString().equals(value)) {</span>
+<span class="nc" id="L389">                throw new IllegalArgumentException(&quot;invalid literature assessment date&quot;);</span>
             }
-<span class="nc" id="L334">        } catch (DateTimeParseException e) {</span>
-<span class="nc" id="L335">            throw new IllegalArgumentException(&quot;invalid literature assessment date&quot;, e);</span>
-<span class="fc" id="L336">        }</span>
-<span class="fc" id="L337">    }</span>
+<span class="nc" id="L391">        } catch (DateTimeParseException e) {</span>
+<span class="nc" id="L392">            throw new IllegalArgumentException(&quot;invalid literature assessment date&quot;, e);</span>
+<span class="fc" id="L393">        }</span>
+<span class="fc" id="L394">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

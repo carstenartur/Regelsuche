@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PreparationProfile.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">PreparationProfile.java</span></div><h1>PreparationProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.transform.Transformation;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+/** Cumulative, opt-in profiles for whole-source principal preparation. */
+<span class="fc" id="L9">public enum PreparationProfile {</span>
+<span class="fc" id="L10">    DIRECT_ONLY,</span>
+<span class="fc" id="L11">    THEORY_MATCHING,</span>
+<span class="fc" id="L12">    SAFE_EXACT_PREPARATION,</span>
+<span class="fc" id="L13">    SAFE_PREPARATION_PLUS_LOCAL_BRIDGE;</span>
+
+    public record Result(String ruleId, String ruleFingerprint, String status, String selectedStage, String detail,
+            Optional&lt;Transformation&gt; candidate, String certificateHash, List&lt;Stage&gt; stages) {
+<span class="fc" id="L17">        public Result {</span>
+<span class="fc" id="L18">            stages = List.copyOf(stages);</span>
+<span class="fc" id="L19">        }</span>
+    }
+
+    /** Counts returned matcher work and real dispatches. Bridge work exists only when the bridge returned. */
+    public record Stage(String name, String detail, int matcherSteps, int matcherBranches, int structuralComparisons,
+            int executorReplays, int specialistDispatches, int specialistResults,
+            PatternTargetedLocalBridgeSearch.Work bridgeWork, Set&lt;String&gt; reachedLimits) {
+<span class="fc" id="L26">        public Stage {</span>
+<span class="fc" id="L27">            reachedLimits = Set.copyOf(reachedLimits);</span>
+<span class="fc" id="L28">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

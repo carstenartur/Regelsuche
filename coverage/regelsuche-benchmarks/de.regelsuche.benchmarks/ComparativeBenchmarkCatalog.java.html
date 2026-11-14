@@ -301,55 +301,53 @@ final class ComparativeBenchmarkCatalog {
                     &quot;PAIRED_UTILITY&quot;)),
 <span class="fc" id="L302">            CoverageGap.create(</span>
                 Track.AUTONOMOUS_CAMPAIGN,
-                &quot;Controller baselines have not yet consumed the pinned #355 research brief and budget ledger.&quot;,
+                &quot;The separate #355 controller comparison retains all three schedules and the physical resource ledger. Its terminal round leaves no eligible continuation for a second allocation.&quot;,
 <span class="fc" id="L305">                List.of(</span>
-                    &quot;COMMON_RESEARCH_BRIEF&quot;,
-                    &quot;COMMON_RESOURCE_LEDGER&quot;,
-                    &quot;COMPLETE_RECEIPT_DAG&quot;)),
-<span class="fc" id="L309">            CoverageGap.create(</span>
+                    &quot;MULTIPLE_ELIGIBLE_CONTINUATIONS&quot;,
+                    &quot;RECEIPT_DRIVEN_NEXT_ROUND_ALLOCATION&quot;)),
+<span class="fc" id="L308">            CoverageGap.create(</span>
                 Track.DISCOVERY_COMPONENT_ABLATION,
                 &quot;At least three production discovery-component ablations remain to be measured.&quot;,
-<span class="fc" id="L312">                List.of(</span>
+<span class="fc" id="L311">                List.of(</span>
                     &quot;THREE_COMPONENT_ABLATIONS&quot;,
                     &quot;IDENTICAL_INPUT_EVIDENCE&quot;,
                     &quot;SEPARATE_CORRECTNESS_AND_UTILITY&quot;)),
-<span class="fc" id="L316">            CoverageGap.create(</span>
+<span class="fc" id="L315">            CoverageGap.create(</span>
                 Track.CONTROLLER_ABLATION,
-                &quot;At least two autonomous-controller ablations remain to be measured.&quot;,
-<span class="fc" id="L319">                List.of(</span>
-                    &quot;TWO_CONTROLLER_ABLATIONS&quot;,
-                    &quot;BALANCED_RESOURCE_ACCOUNTING&quot;,
-                    &quot;DETERMINISTIC_NEXT_PLAN&quot;)));
+                &quot;The public #355 panel measures uniform candidate slots and disabled feedback. A uniform allocation across different stage resources needs a common, preregistered cost model.&quot;,
+<span class="fc" id="L318">                List.of(</span>
+                    &quot;CROSS_STAGE_COST_MODEL&quot;,
+                    &quot;UNIFORM_CROSS_STAGE_ALLOCATION&quot;)));
     }
 
     private static String corpusHash(List&lt;Case&gt; cases) {
-<span class="fc" id="L326">        return SolverIr.sha256(</span>
-<span class="fc" id="L327">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
+<span class="fc" id="L324">        return SolverIr.sha256(</span>
+<span class="fc" id="L325">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
     }
 
     private static String searchInventoryHash() {
-<span class="fc" id="L331">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
-<span class="fc" id="L332">            .stream()</span>
-<span class="fc" id="L333">            .map(rule -&gt; rule.id())</span>
-<span class="fc" id="L334">            .sorted()</span>
-<span class="fc" id="L335">            .toList();</span>
-<span class="fc" id="L336">        return SolverIr.sha256(ruleIds.toString());</span>
+<span class="fc" id="L329">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
+<span class="fc" id="L330">            .stream()</span>
+<span class="fc" id="L331">            .map(rule -&gt; rule.id())</span>
+<span class="fc" id="L332">            .sorted()</span>
+<span class="fc" id="L333">            .toList();</span>
+<span class="fc" id="L334">        return SolverIr.sha256(ruleIds.toString());</span>
     }
 
     private static String searchBudgetHash() {
-<span class="fc" id="L340">        return SolverIr.sha256(</span>
-<span class="fc" id="L341">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
+<span class="fc" id="L338">        return SolverIr.sha256(</span>
+<span class="fc" id="L339">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
                 + &quot;\nmaxVisitedExpressions=&quot;
-<span class="fc" id="L343">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
+<span class="fc" id="L341">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
                 + &quot;\nmaxExpandingSteps=&quot;
-<span class="fc" id="L345">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
+<span class="fc" id="L343">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
                 + &quot;\nmaxCandidatesPerState=&quot;
-<span class="fc" id="L347">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
-<span class="fc" id="L348">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
+<span class="fc" id="L345">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
+<span class="fc" id="L346">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
     }
 
     private static String notApplicable(String name) {
-<span class="fc" id="L352">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
+<span class="fc" id="L350">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

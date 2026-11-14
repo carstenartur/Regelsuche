@@ -75,6 +75,14 @@ Beispiel:
 
 Deklarationen, Theorien und Annahmen werden kanonisch sortiert. Nicht deklarierte Symbole, doppelte IDs, ungültige Hashes oder inkonsistente `IS_INTEGER`-Prädikate werden bereits beim Aufbau beziehungsweise JSON-Round-Trip abgelehnt.
 
+## Existenz-Einführung über reellen Ringtermen
+
+`ExistentialIntroduction.Statement` bindet genau eine reelle Deklaration im Ziel einer `SolverIr.Obligation`. Die übrigen Deklarationen und alle expliziten Gleichheitsannahmen gehören zum äußeren Kontext. Ein Zeuge darf nur dessen Symbole verwenden. Zugelassen sind Dezimalliterale und Ausdrücke aus Addition, Subtraktion und Multiplikation. Die Instanziierung ersetzt alle gebundenen Vorkommen im Ziel. Auch bei einem Ziel ohne gebundenes Vorkommen prüft sie den Zeugen auf Definitionsbereich und Skopus.
+
+Der Beweis besteht aus dem Einführungsknoten mit Aussage und Zeuge sowie seinem Instanzknoten. `ExistentialIntroduction.replay(expected, proof)` vergleicht die Aussage mit der separat vorgegebenen Empfängeraussage bis auf konsistente Umbenennung des Binders. Der Prüfer rekonstruiert die vollständige Instanzobligation einschließlich Annahmen und Provenienz. Ein `NormalForm`-Blatt führt das exakte Polynomial-Backend für diese Obligation erneut aus. Das Backend unterstützt annahmenfreie Normalformgleichheiten. Ein `Hypothesis`-Blatt weist das instanziierte Ziel über die ID und beide geordneten Seiten einer ausdrücklich deklarierten Gleichheitsannahme nach.
+
+Die Entwicklungskontrolle für `∃w. w + w = 2 * (x + 1)` verwendet den vorgeschlagenen Zeugen `1 + x`. Kontrollen decken geänderte Zeugen, fremde Annahmen und verschiedene Wurzeln mit identischen Instanzzielen ab. Jeder einzelne Ausdruck und jede instanziierte Zielseite ist auf 63 Termknoten, 64 Zeichen je kanonischem Literal und eine konservative Expansionsschranke von 256 Monomen begrenzt. Die API prüft einen bereits vorgeschlagenen Zeugen. Allgemeine Quantoren-DAGs, Induktion und die verblindete Zeugenstudie bleiben eigenständige Arbeitspunkte in [#874](https://github.com/carstenartur/Regelsuche/issues/874).
+
 ## Strukturierte Annahmen
 
 Der erste bounded-algebra Slice übersetzt Vergleiche wie:

@@ -1,0 +1,1802 @@
+{
+  "schema" : "regelsuche.modpow-budget-result/v3",
+  "protocolSha256" : "80610c07660656ffa96e80070c5c7faec0745ce9735067c1e0e32c096b1f95af",
+  "modelSha256" : "e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068",
+  "testSha256" : "c5d040bd4ba2c088f9e229d8360997fb808c01ef2278c78a30bd1210bcbfc2b6",
+  "acquisition" : {
+    "protocolSha256" : "80610c07660656ffa96e80070c5c7faec0745ce9735067c1e0e32c096b1f95af",
+    "trainSha256" : "c2932bb1a8a4412a819da52fb0b75ec62dae768b9e2261f19b1e7c6b6725c978",
+    "modelSha256" : "e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068",
+    "counts" : {
+      "primitiveGeneratorCalls" : 4,
+      "generatedCandidates" : 8,
+      "replayRequests" : 10,
+      "scoreCalls" : 24,
+      "trainingExamples" : 2,
+      "primitiveMatchAttempts" : 8,
+      "primitiveMatcherSteps" : 8,
+      "primitiveMatcherBranches" : 0,
+      "generalizations" : 1,
+      "serializations" : 1,
+      "modelDecodes" : 1
+    },
+    "work" : 67
+  },
+  "cases" : [ {
+    "id" : "S1-forward",
+    "positive" : true,
+    "sourceDag" : 49,
+    "optimumDag" : 34,
+    "uniquePrimitiveTargets" : 2,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 2,
+        "replayed" : 2,
+        "approved" : 2,
+        "scored" : 3
+      },
+      "improvements" : [ {
+        "work" : 9,
+        "dag" : 34
+      } ],
+      "firstOptimumWork" : 9,
+      "completedWork" : 11,
+      "streamFirstOptimumWork" : 9
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "generated" : 3,
+        "replayed" : 2,
+        "approved" : 2,
+        "scored" : 3
+      },
+      "improvements" : [ {
+        "work" : 8,
+        "dag" : 34
+      } ],
+      "firstOptimumWork" : 8,
+      "completedWork" : 16,
+      "streamFirstOptimumWork" : 75
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S1-reverse",
+    "positive" : true,
+    "sourceDag" : 49,
+    "optimumDag" : 34,
+    "uniquePrimitiveTargets" : 2,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 2,
+        "replayed" : 2,
+        "approved" : 2,
+        "scored" : 3
+      },
+      "improvements" : [ {
+        "work" : 8,
+        "dag" : 34
+      } ],
+      "firstOptimumWork" : 8,
+      "completedWork" : 11,
+      "streamFirstOptimumWork" : 19
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 4
+        },
+        "generated" : 3,
+        "replayed" : 2,
+        "approved" : 2,
+        "scored" : 3
+      },
+      "improvements" : [ {
+        "work" : 12,
+        "dag" : 34
+      } ],
+      "firstOptimumWork" : 12,
+      "completedWork" : 20,
+      "streamFirstOptimumWork" : 95
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 34,
+      "warmLearnedDag" : 34,
+      "coldLearnedDag" : 34,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S1-no-reuse",
+    "positive" : false,
+    "sourceDag" : 49,
+    "optimumDag" : 49,
+    "uniquePrimitiveTargets" : 2,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 2,
+        "replayed" : 2,
+        "approved" : 2,
+        "scored" : 3
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 11,
+      "streamFirstOptimumWork" : 22
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 4
+        },
+        "generated" : 2,
+        "replayed" : 2,
+        "approved" : 2,
+        "scored" : 3
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 19,
+      "streamFirstOptimumWork" : 103
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S1-missing-premise",
+    "positive" : false,
+    "sourceDag" : 49,
+    "optimumDag" : 49,
+    "uniquePrimitiveTargets" : 2,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 2,
+        "replayed" : 2,
+        "approved" : 0,
+        "scored" : 1
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 9,
+      "streamFirstOptimumWork" : 33
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 2,
+          "steps" : 2,
+          "branches" : 0
+        },
+        "generated" : 3,
+        "replayed" : 2,
+        "approved" : 0,
+        "scored" : 1
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 14,
+      "streamFirstOptimumWork" : 122
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 49,
+      "warmLearnedDag" : 49,
+      "coldLearnedDag" : 49,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S2-forward",
+    "positive" : true,
+    "sourceDag" : 87,
+    "optimumDag" : 72,
+    "uniquePrimitiveTargets" : 3,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 4,
+        "replayed" : 3,
+        "approved" : 3,
+        "scored" : 4
+      },
+      "improvements" : [ {
+        "work" : 9,
+        "dag" : 72
+      } ],
+      "firstOptimumWork" : 9,
+      "completedWork" : 17,
+      "streamFirstOptimumWork" : 51
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 6,
+          "steps" : 6,
+          "branches" : 12
+        },
+        "generated" : 5,
+        "replayed" : 3,
+        "approved" : 3,
+        "scored" : 4
+      },
+      "improvements" : [ {
+        "work" : 28,
+        "dag" : 72
+      } ],
+      "firstOptimumWork" : 28,
+      "completedWork" : 42,
+      "streamFirstOptimumWork" : 164
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S2-reverse",
+    "positive" : true,
+    "sourceDag" : 87,
+    "optimumDag" : 72,
+    "uniquePrimitiveTargets" : 3,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 4,
+        "replayed" : 3,
+        "approved" : 3,
+        "scored" : 4
+      },
+      "improvements" : [ {
+        "work" : 14,
+        "dag" : 72
+      } ],
+      "firstOptimumWork" : 14,
+      "completedWork" : 17,
+      "streamFirstOptimumWork" : 73
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 6,
+          "steps" : 6,
+          "branches" : 16
+        },
+        "generated" : 5,
+        "replayed" : 3,
+        "approved" : 3,
+        "scored" : 4
+      },
+      "improvements" : [ {
+        "work" : 32,
+        "dag" : 72
+      } ],
+      "firstOptimumWork" : 32,
+      "completedWork" : 46,
+      "streamFirstOptimumWork" : 210
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 72,
+      "warmLearnedDag" : 72,
+      "coldLearnedDag" : 72,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S2-no-reuse",
+    "positive" : false,
+    "sourceDag" : 87,
+    "optimumDag" : 87,
+    "uniquePrimitiveTargets" : 3,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 4,
+        "replayed" : 3,
+        "approved" : 3,
+        "scored" : 4
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 17,
+      "streamFirstOptimumWork" : 76
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 6,
+          "steps" : 6,
+          "branches" : 16
+        },
+        "generated" : 4,
+        "replayed" : 3,
+        "approved" : 3,
+        "scored" : 4
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 45,
+      "streamFirstOptimumWork" : 224
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S2-missing-premise",
+    "positive" : false,
+    "sourceDag" : 87,
+    "optimumDag" : 87,
+    "uniquePrimitiveTargets" : 3,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 4,
+        "replayed" : 3,
+        "approved" : 0,
+        "scored" : 1
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 14,
+      "streamFirstOptimumWork" : 93
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 3,
+          "steps" : 3,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 6,
+          "steps" : 6,
+          "branches" : 12
+        },
+        "generated" : 5,
+        "replayed" : 3,
+        "approved" : 0,
+        "scored" : 1
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 39,
+      "streamFirstOptimumWork" : 269
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 87,
+      "warmLearnedDag" : 87,
+      "coldLearnedDag" : 87,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S4-forward",
+    "positive" : true,
+    "sourceDag" : 220,
+    "optimumDag" : 163,
+    "uniquePrimitiveTargets" : 7,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 8,
+        "replayed" : 7,
+        "approved" : 7,
+        "scored" : 8
+      },
+      "improvements" : [ {
+        "work" : 9,
+        "dag" : 205
+      }, {
+        "work" : 22,
+        "dag" : 182
+      }, {
+        "work" : 30,
+        "dag" : 163
+      } ],
+      "firstOptimumWork" : 30,
+      "completedWork" : 33,
+      "streamFirstOptimumWork" : 137
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 20,
+          "steps" : 20,
+          "branches" : 28
+        },
+        "generated" : 9,
+        "replayed" : 7,
+        "approved" : 7,
+        "scored" : 8
+      },
+      "improvements" : [ {
+        "work" : 72,
+        "dag" : 205
+      }, {
+        "work" : 91,
+        "dag" : 182
+      }, {
+        "work" : 99,
+        "dag" : 163
+      } ],
+      "firstOptimumWork" : 99,
+      "completedWork" : 102,
+      "streamFirstOptimumWork" : 407
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 205,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S4-reverse",
+    "positive" : true,
+    "sourceDag" : 220,
+    "optimumDag" : 163,
+    "uniquePrimitiveTargets" : 7,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 8,
+        "replayed" : 7,
+        "approved" : 7,
+        "scored" : 8
+      },
+      "improvements" : [ {
+        "work" : 12,
+        "dag" : 182
+      }, {
+        "work" : 20,
+        "dag" : 163
+      } ],
+      "firstOptimumWork" : 20,
+      "completedWork" : 33,
+      "streamFirstOptimumWork" : 160
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 20,
+          "steps" : 20,
+          "branches" : 32
+        },
+        "generated" : 9,
+        "replayed" : 7,
+        "approved" : 7,
+        "scored" : 8
+      },
+      "improvements" : [ {
+        "work" : 76,
+        "dag" : 205
+      }, {
+        "work" : 87,
+        "dag" : 182
+      }, {
+        "work" : 95,
+        "dag" : 163
+      } ],
+      "firstOptimumWork" : 95,
+      "completedWork" : 106,
+      "streamFirstOptimumWork" : 505
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 182,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S4-no-reuse",
+    "positive" : false,
+    "sourceDag" : 220,
+    "optimumDag" : 163,
+    "uniquePrimitiveTargets" : 7,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 8,
+        "replayed" : 7,
+        "approved" : 7,
+        "scored" : 8
+      },
+      "improvements" : [ {
+        "work" : 12,
+        "dag" : 182
+      }, {
+        "work" : 20,
+        "dag" : 163
+      } ],
+      "firstOptimumWork" : 20,
+      "completedWork" : 33,
+      "streamFirstOptimumWork" : 193
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 20,
+          "steps" : 20,
+          "branches" : 32
+        },
+        "generated" : 8,
+        "replayed" : 7,
+        "approved" : 7,
+        "scored" : 8
+      },
+      "improvements" : [ {
+        "work" : 84,
+        "dag" : 182
+      }, {
+        "work" : 92,
+        "dag" : 163
+      } ],
+      "firstOptimumWork" : 92,
+      "completedWork" : 105,
+      "streamFirstOptimumWork" : 608
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 182,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 163,
+      "warmLearnedDag" : 163,
+      "coldLearnedDag" : 163,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  }, {
+    "id" : "S4-missing-premise",
+    "positive" : false,
+    "sourceDag" : 220,
+    "optimumDag" : 220,
+    "uniquePrimitiveTargets" : 7,
+    "primitive" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 0,
+          "steps" : 0,
+          "branches" : 0
+        },
+        "generated" : 8,
+        "replayed" : 7,
+        "approved" : 0,
+        "scored" : 1
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 26,
+      "streamFirstOptimumWork" : 206
+    },
+    "learned" : {
+      "ledger" : {
+        "primitiveMatch" : {
+          "attempts" : 5,
+          "steps" : 5,
+          "branches" : 0
+        },
+        "learnedMatch" : {
+          "attempts" : 20,
+          "steps" : 20,
+          "branches" : 28
+        },
+        "generated" : 9,
+        "replayed" : 7,
+        "approved" : 0,
+        "scored" : 1
+      },
+      "improvements" : [ ],
+      "firstOptimumWork" : 0,
+      "completedWork" : 95,
+      "streamFirstOptimumWork" : 621
+    },
+    "budgets" : [ {
+      "budget" : 0,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 2,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 4,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 8,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 16,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 32,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 64,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 128,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : false,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 256,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 512,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : false
+    }, {
+      "budget" : 1024,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    }, {
+      "budget" : 2048,
+      "primitiveDag" : 220,
+      "warmLearnedDag" : 220,
+      "coldLearnedDag" : 220,
+      "streamPrimitiveOptimum" : true,
+      "streamLearnedOptimum" : true
+    } ]
+  } ],
+  "primitiveStreamWork" : 232,
+  "learnedStreamWorkIncludingAcquisition" : 716,
+  "acquisitionSha256" : "1f09b47df5044ec226e5f3a4aa496cc87fea785764548f03140a6b694912e7db"
+}

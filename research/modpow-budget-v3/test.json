@@ -1,0 +1,315 @@
+{
+  "schema": "regelsuche.modpow-transfer-corpus/v1",
+  "split": "TEST",
+  "cases": [
+    {
+      "id": "S1-forward",
+      "source": "program(modpow(a10,q10*e10,n10),modpow(a10,e10,n10))",
+      "roles": {
+        "a": "a10",
+        "q": "q10",
+        "e": "e10",
+        "n": "n10",
+        "r": "r10"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": true,
+      "assumptions": [
+        "a10 integer",
+        "q10 integer",
+        "q10 >= 0",
+        "e10 integer",
+        "e10 >= 0",
+        "r10 integer",
+        "r10 >= 0",
+        "n10 integer",
+        "n10 > 0"
+      ]
+    },
+    {
+      "id": "S1-reverse",
+      "source": "program(modpow(a11,e11,n11),modpow(a11,e11*q11,n11))",
+      "roles": {
+        "a": "a11",
+        "q": "q11",
+        "e": "e11",
+        "n": "n11",
+        "r": "r11"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": true,
+      "assumptions": [
+        "a11 integer",
+        "q11 integer",
+        "q11 >= 0",
+        "e11 integer",
+        "e11 >= 0",
+        "r11 integer",
+        "r11 >= 0",
+        "n11 integer",
+        "n11 > 0"
+      ]
+    },
+    {
+      "id": "S1-no-reuse",
+      "source": "program(modpow(a12,r12,n12),modpow(a12,q12*e12,n12))",
+      "roles": {
+        "a": "a12",
+        "q": "q12",
+        "e": "e12",
+        "n": "n12",
+        "r": "r12"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": false,
+      "assumptions": [
+        "a12 integer",
+        "q12 integer",
+        "q12 >= 0",
+        "e12 integer",
+        "e12 >= 0",
+        "r12 integer",
+        "r12 >= 0",
+        "n12 integer",
+        "n12 > 0"
+      ]
+    },
+    {
+      "id": "S1-missing-premise",
+      "source": "program(modpow(a13,e13,n13),modpow(a13,q13*e13,n13))",
+      "roles": {
+        "a": "a13",
+        "q": "q13",
+        "e": "e13",
+        "n": "n13",
+        "r": "r13"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": false,
+      "assumptions": [
+        "a13 integer",
+        "q13 integer",
+        "q13 >= 0",
+        "e13 integer",
+        "e13 >= 0",
+        "r13 integer",
+        "r13 >= 0",
+        "n13 integer"
+      ]
+    },
+    {
+      "id": "S2-forward",
+      "source": "program(modpow(a20,q20*e20,n20),modpow(a20,e20,n20),modpow(a20,q20*q20,n20))",
+      "roles": {
+        "a": "a20",
+        "q": "q20",
+        "e": "e20",
+        "n": "n20",
+        "r": "r20"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": true,
+      "assumptions": [
+        "a20 integer",
+        "q20 integer",
+        "q20 >= 0",
+        "e20 integer",
+        "e20 >= 0",
+        "r20 integer",
+        "r20 >= 0",
+        "n20 integer",
+        "n20 > 0"
+      ]
+    },
+    {
+      "id": "S2-reverse",
+      "source": "program(modpow(a21,q21*q21,n21),modpow(a21,e21,n21),modpow(a21,e21*q21,n21))",
+      "roles": {
+        "a": "a21",
+        "q": "q21",
+        "e": "e21",
+        "n": "n21",
+        "r": "r21"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": true,
+      "assumptions": [
+        "a21 integer",
+        "q21 integer",
+        "q21 >= 0",
+        "e21 integer",
+        "e21 >= 0",
+        "r21 integer",
+        "r21 >= 0",
+        "n21 integer",
+        "n21 > 0"
+      ]
+    },
+    {
+      "id": "S2-no-reuse",
+      "source": "program(modpow(a22,q22*q22,n22),modpow(a22,r22,n22),modpow(a22,q22*e22,n22))",
+      "roles": {
+        "a": "a22",
+        "q": "q22",
+        "e": "e22",
+        "n": "n22",
+        "r": "r22"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": false,
+      "assumptions": [
+        "a22 integer",
+        "q22 integer",
+        "q22 >= 0",
+        "e22 integer",
+        "e22 >= 0",
+        "r22 integer",
+        "r22 >= 0",
+        "n22 integer",
+        "n22 > 0"
+      ]
+    },
+    {
+      "id": "S2-missing-premise",
+      "source": "program(modpow(a23,q23*q23,n23),modpow(a23,e23,n23),modpow(a23,q23*e23,n23))",
+      "roles": {
+        "a": "a23",
+        "q": "q23",
+        "e": "e23",
+        "n": "n23",
+        "r": "r23"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": false,
+      "assumptions": [
+        "a23 integer",
+        "q23 integer",
+        "q23 >= 0",
+        "e23 integer",
+        "e23 >= 0",
+        "r23 integer",
+        "r23 >= 0",
+        "n23 integer"
+      ]
+    },
+    {
+      "id": "S4-forward",
+      "source": "program(modpow(a40,q40*e40,n40),modpow(a40,e40,n40),modpow(a40,q40*q40,n40),modpow(a40,q40*q40*q40,n40),modpow(a40,q40*q40*q40*q40,n40))",
+      "roles": {
+        "a": "a40",
+        "q": "q40",
+        "e": "e40",
+        "n": "n40",
+        "r": "r40"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": true,
+      "assumptions": [
+        "a40 integer",
+        "q40 integer",
+        "q40 >= 0",
+        "e40 integer",
+        "e40 >= 0",
+        "r40 integer",
+        "r40 >= 0",
+        "n40 integer",
+        "n40 > 0"
+      ]
+    },
+    {
+      "id": "S4-reverse",
+      "source": "program(modpow(a41,q41*q41,n41),modpow(a41,q41*q41*q41,n41),modpow(a41,q41*q41*q41*q41,n41),modpow(a41,e41,n41),modpow(a41,e41*q41,n41))",
+      "roles": {
+        "a": "a41",
+        "q": "q41",
+        "e": "e41",
+        "n": "n41",
+        "r": "r41"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": true,
+      "assumptions": [
+        "a41 integer",
+        "q41 integer",
+        "q41 >= 0",
+        "e41 integer",
+        "e41 >= 0",
+        "r41 integer",
+        "r41 >= 0",
+        "n41 integer",
+        "n41 > 0"
+      ]
+    },
+    {
+      "id": "S4-no-reuse",
+      "source": "program(modpow(a42,q42*q42,n42),modpow(a42,q42*q42*q42,n42),modpow(a42,q42*q42*q42*q42,n42),modpow(a42,r42,n42),modpow(a42,q42*e42,n42))",
+      "roles": {
+        "a": "a42",
+        "q": "q42",
+        "e": "e42",
+        "n": "n42",
+        "r": "r42"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": false,
+      "assumptions": [
+        "a42 integer",
+        "q42 integer",
+        "q42 >= 0",
+        "e42 integer",
+        "e42 >= 0",
+        "r42 integer",
+        "r42 >= 0",
+        "n42 integer",
+        "n42 > 0"
+      ]
+    },
+    {
+      "id": "S4-missing-premise",
+      "source": "program(modpow(a43,q43*q43,n43),modpow(a43,q43*q43*q43,n43),modpow(a43,q43*q43*q43*q43,n43),modpow(a43,e43,n43),modpow(a43,q43*e43,n43))",
+      "roles": {
+        "a": "a43",
+        "q": "q43",
+        "e": "e43",
+        "n": "n43",
+        "r": "r43"
+      },
+      "qBits": 19,
+      "eBits": 15,
+      "rBits": 15,
+      "positive": false,
+      "assumptions": [
+        "a43 integer",
+        "q43 integer",
+        "q43 >= 0",
+        "e43 integer",
+        "e43 >= 0",
+        "r43 integer",
+        "r43 >= 0",
+        "n43 integer"
+      ]
+    }
+  ]
+}

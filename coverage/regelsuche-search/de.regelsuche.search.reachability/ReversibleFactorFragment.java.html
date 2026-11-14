@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ReversibleFactorFragment.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">ReversibleFactorFragment.java</span></div><h1>ReversibleFactorFragment.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/** A versioned subset of native production rules, restricted to concrete reciprocal edges. */
+final class ReversibleFactorFragment {
+    static final String ID = &quot;regelsuche.reversible-factor-add/v1&quot;;
+<span class="fc" id="L18">    private static final Map&lt;String, String&gt; INVERSE = Map.of(</span>
+        &quot;ast_factor_common_left&quot;, &quot;ast_distribute_left_add&quot;, &quot;ast_distribute_left_add&quot;, &quot;ast_factor_common_left&quot;,
+        &quot;ast_factor_common_right&quot;, &quot;ast_distribute_right_add&quot;, &quot;ast_distribute_right_add&quot;, &quot;ast_factor_common_right&quot;);
+<span class="fc" id="L21">    private final ExpressionParser parser = new ExpressionParser();</span>
+    private final AstRewriteTransformationEngine engine;
+
+<span class="fc" id="L24">    ReversibleFactorFragment() {</span>
+<span class="fc" id="L25">        var rules = AstRewriteTransformationEngine.defaultRules().stream().filter(r -&gt; INVERSE.containsKey(r.id())).toList();</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (rules.size() != INVERSE.size()) throw new IllegalStateException(&quot;reversible primitive inventory changed&quot;);</span>
+<span class="fc" id="L27">        engine = new AstRewriteTransformationEngine(rules, Integer.MAX_VALUE, Integer.MAX_VALUE);</span>
+<span class="fc" id="L28">    }</span>
+
+    String endpoint(String input) {
+<span class="fc" id="L31">        var term = parser.parseTerm(input);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (nodes(term) &gt; 63) throw new IllegalArgumentException(&quot;endpoint outside bounded fragment&quot;);</span>
+<span class="fc" id="L33">        return ExpressionFormatter.format(term);</span>
+    }
+
+<span class="fc" id="L36">    record Arc(Transformation outgoing, Transformation returning) {}</span>
+
+    List&lt;Arc&gt; neighbors(String source, Counter counter) {
+<span class="fc" id="L39">        List&lt;Arc&gt; arcs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (Transformation candidate : raw(source, counter)) {</span>
+<span class="fc" id="L41">            String destination = candidate.transformedExpression();</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (nodes(parser.parseTerm(destination)) &gt; 63) continue;</span>
+<span class="fc" id="L43">            Optional&lt;Transformation&gt; inverse = raw(destination, counter).stream()</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">                .filter(t -&gt; t.rule().equals(INVERSE.get(candidate.rule())) &amp;&amp; t.transformedExpression().equals(source))</span>
+<span class="fc" id="L45">                .findFirst();</span>
+<span class="fc" id="L46">            inverse.ifPresent(t -&gt; arcs.add(new Arc(candidate, t)));</span>
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return arcs;</span>
+    }
+
+    private List&lt;Transformation&gt; raw(String source, Counter counter) {
+<span class="fc" id="L52">        counter.charge();</span>
+<span class="fc" id="L53">        List&lt;Transformation&gt; candidates = engine.transform(source);</span>
+<span class="fc" id="L54">        counter.generated = Math.addExact(counter.generated, candidates.size());</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (Transformation t : candidates) {</span>
+<span class="pc bpc" id="L56" title="3 of 6 branches missed.">            if (!INVERSE.containsKey(t.rule()) || !t.equivalencePreservingByConstruction() || !t.assumptions().isEmpty()</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">                    || !t.primitiveRuleIds().equals(List.of(t.rule())) || t.exactTheoryStepCount() != 0) {</span>
+<span class="nc" id="L58">                throw new IllegalStateException(&quot;unexpected native primitive or assumption: &quot; + t.rule());</span>
+            }
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        return candidates;</span>
+    }
+
+    private static int nodes(Expr term) {
+<span class="fc bfc" id="L65" title="All 3 branches covered.">        return switch (term) {</span>
+<span class="fc" id="L66">            case BinaryExpr b -&gt; 1 + nodes(b.left()) + nodes(b.right());</span>
+<span class="fc" id="L67">            case FunctionExpr f -&gt; 1 + f.arguments().stream().mapToInt(ReversibleFactorFragment::nodes).sum();</span>
+<span class="fc" id="L68">            default -&gt; 1;</span>
+        };
+    }
+
+    static final class Allowance {
+        private int remaining;
+<span class="fc" id="L74">        Allowance(int limit) {</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (limit &lt; 0) throw new IllegalArgumentException(&quot;negative work limit&quot;);</span>
+<span class="fc" id="L76">            remaining = limit;</span>
+<span class="fc" id="L77">        }</span>
+    }
+
+    static final class Counter {
+        private final Allowance allowance;
+        private int calls;
+        private long generated;
+<span class="fc" id="L84">        Counter(Allowance allowance) { this.allowance = allowance; }</span>
+        void charge() {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (allowance.remaining == 0) throw new BoundedReachabilityOracle.EngineWorkExhausted(&quot;PRIMITIVE_ENGINE_CALL_LIMIT_REACHED&quot;);</span>
+<span class="fc" id="L87">            allowance.remaining--;</span>
+<span class="fc" id="L88">            calls++;</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">        ReversibleFactorSearch.Count snapshot() { return new ReversibleFactorSearch.Count(calls, generated); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

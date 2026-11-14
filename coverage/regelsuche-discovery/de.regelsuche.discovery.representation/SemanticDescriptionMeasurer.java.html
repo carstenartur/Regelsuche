@@ -7,10 +7,10 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.value.ExprValueArena;
 import de.regelsuche.value.ExprValueFactory;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -37,9 +37,9 @@ public final class SemanticDescriptionMeasurer {
 <span class="fc" id="L37">        inspect(expression, syntax);</span>
 
         int distinctValues;
-<span class="fc" id="L40">        try (ExprValueFactory factory = new ExprValueFactory()) {</span>
-<span class="fc" id="L41">            distinctValues = new LinkedHashSet&lt;&gt;(</span>
-<span class="fc" id="L42">                factory.project(expression).valuesBySyntaxIdentity().values()).size();</span>
+<span class="fc" id="L40">        try (var arena = new ExprValueArena(ExprValueFactory.DEFAULT_MAXIMUM_ENTRIES)) {</span>
+<span class="fc" id="L41">            arena.intern(expression);</span>
+<span class="fc" id="L42">            distinctValues = arena.size();</span>
         }
 
 <span class="fc" id="L45">        String normalized = ExpressionFormatter.format(expression);</span>

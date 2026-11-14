@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RetainedFiniteCheck.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">RetainedFiniteCheck.java</span></div><h1>RetainedFiniteCheck.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
+
+/** Binds historical finite-check rows to source data without executing the checker. */
+final class RetainedFiniteCheck {
+    private RetainedFiniteCheck() { }
+
+    static void verify(DomainDiscoveryEvidence source, JsonNode check, int maxRows) {
+<span class="pc bpc" id="L11" title="1 of 3 branches missed.">        boolean recurrence = switch (source.descriptor().domainId()) {</span>
+<span class="fc" id="L12">            case FiniteDifferenceSequenceDomain.DOMAIN_ID -&gt; false;</span>
+<span class="fc" id="L13">            case LinearRecurrenceSequenceDomain.DOMAIN_ID -&gt; true;</span>
+<span class="nc" id="L14">            default -&gt; throw new IllegalArgumentException(&quot;unsupported retained finite checker domain&quot;);</span>
+        };
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        String contract = recurrence ? DomainFiniteDataCheck.RESIDUAL_CONTRACT : DomainFiniteDataCheck.NEWTON_CONTRACT;</span>
+<span class="fc" id="L17">        require(contract.equals(check.path(&quot;checkerContract&quot;).textValue()));</span>
+<span class="fc" id="L18">        var properties = source.domainEvidence().properties();</span>
+<span class="fc" id="L19">        var observed = terms(properties.get(&quot;observedTerms&quot;));</span>
+<span class="fc" id="L20">        var holdout = terms(properties.get(&quot;holdoutTerms&quot;));</span>
+<span class="fc" id="L21">        int total = observed.size() + holdout.size();</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        require(numberEquals(check.path(&quot;observedCount&quot;), observed.size())</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">            &amp;&amp; numberEquals(check.path(&quot;holdoutCount&quot;), holdout.size())</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            &amp;&amp; numberEquals(check.path(&quot;retainedTermCount&quot;), total));</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        require(source.certificate() != null);</span>
+<span class="fc" id="L26">        var generated = source.certificate().rendered().lines().filter(line -&gt; line.startsWith(&quot;generatedTerms=&quot;))</span>
+<span class="fc" id="L27">            .map(line -&gt; terms(line.substring(&quot;generatedTerms=&quot;.length()))).findFirst()</span>
+<span class="pc" id="L28">            .orElseThrow(() -&gt; new IllegalArgumentException(&quot;missing generated terms in source certificate&quot;));</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        require(generated.size() == total);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        int order = recurrence ? Integer.parseInt(properties.get(&quot;recurrenceOrder&quot;)) : 0;</span>
+<span class="fc" id="L31">        JsonNode rows = check.path(&quot;rows&quot;);</span>
+<span class="pc bpc" id="L32" title="3 of 6 branches missed.">        require(rows.isArray() &amp;&amp; rows.size() &lt;= maxRows &amp;&amp; rows.size() &lt;= total);</span>
+<span class="fc" id="L33">        int firstMismatch = -1;</span>
+<span class="fc" id="L34">        boolean witnessMismatch = false;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (int index = 0; index &lt; rows.size(); index++) {</span>
+<span class="fc" id="L36">            JsonNode row = rows.get(index);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            boolean inObserved = index &lt; observed.size();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            String retained = inObserved ? observed.get(index) : holdout.get(index - observed.size());</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            require(numberEquals(row.path(&quot;index&quot;), index)</span>
+<span class="fc bfc" id="L40" title="All 4 branches covered.">                &amp;&amp; (inObserved ? &quot;OBSERVED&quot; : &quot;HOLDOUT&quot;).equals(row.path(&quot;partition&quot;).textValue()));</span>
+<span class="fc" id="L41">            verifyWindow(row, index, recurrence, order);</span>
+<span class="fc" id="L42">            verifyTerms(row, retained, generated.get(index));</span>
+<span class="fc" id="L43">            boolean dataAgrees = row.path(&quot;dataAgrees&quot;).booleanValue();</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">            if (!dataAgrees &amp;&amp; firstMismatch &lt; 0) firstMismatch = index;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            witnessMismatch |= !row.path(&quot;witnessAgrees&quot;).booleanValue();</span>
+        }
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        verifySummary(check, total &gt; 0 &amp;&amp; rows.size() == total, firstMismatch, witnessMismatch);</span>
+<span class="fc" id="L48">    }</span>
+
+    private static void verifyTerms(JsonNode row, String retained, String witness) {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        require(retained.equals(row.path(&quot;retained&quot;).textValue())</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            &amp;&amp; witness.equals(row.path(&quot;witness&quot;).textValue())</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">            &amp;&amp; row.path(&quot;computed&quot;).isTextual() &amp;&amp; row.path(&quot;residual&quot;).isTextual());</span>
+<span class="fc" id="L54">        boolean dataAgrees = retained.equals(row.path(&quot;computed&quot;).textValue());</span>
+<span class="fc" id="L55">        boolean witnessAgrees = witness.equals(row.path(&quot;computed&quot;).textValue());</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        require(booleanEquals(row.path(&quot;dataAgrees&quot;), dataAgrees)</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            &amp;&amp; booleanEquals(row.path(&quot;witnessAgrees&quot;), witnessAgrees)</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            &amp;&amp; dataAgrees == &quot;0&quot;.equals(row.path(&quot;residual&quot;).textValue()));</span>
+<span class="fc" id="L59">    }</span>
+
+    private static void verifyWindow(JsonNode row, int index, boolean recurrence, int order) {
+<span class="fc bfc" id="L62" title="All 4 branches covered.">        boolean residual = recurrence &amp;&amp; index &gt;= order;</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        String kind = recurrence ? (residual ? &quot;RECURRENCE_RESIDUAL&quot; : &quot;SEED_IDENTITY&quot;) : &quot;NEWTON_TERM&quot;;</span>
+<span class="fc" id="L64">        require(kind.equals(row.path(&quot;kind&quot;).textValue()));</span>
+<span class="fc" id="L65">        JsonNode start = row.path(&quot;windowStartInclusive&quot;), end = row.path(&quot;windowEndExclusive&quot;);</span>
+<span class="pc bpc" id="L66" title="1 of 6 branches missed.">        require(residual ? numberEquals(start, index - order) &amp;&amp; numberEquals(end, index)</span>
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">            : start.isNull() &amp;&amp; end.isNull());</span>
+<span class="fc" id="L68">    }</span>
+
+    private static void verifySummary(JsonNode check, boolean complete, int firstMismatch, boolean witnessMismatch) {
+<span class="fc" id="L71">        require(booleanEquals(check.path(&quot;complete&quot;), complete));</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        boolean found = firstMismatch &gt;= 0;</span>
+<span class="fc" id="L73">        JsonNode reported = check.path(&quot;firstCounterexampleIndex&quot;);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        require(found ? numberEquals(reported, firstMismatch) : reported.isNull());</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        String counterexample = found ? &quot;FOUND&quot; : complete ? &quot;NONE_FOUND&quot; : &quot;INCONCLUSIVE&quot;;</span>
+<span class="fc" id="L76">        require(counterexample.equals(check.path(&quot;counterexampleStatus&quot;).textValue()));</span>
+<span class="fc" id="L77">        String status = check.path(&quot;status&quot;).textValue();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (complete) {</span>
+<span class="nc bnc" id="L79" title="All 4 branches missed.">            String expected = found ? &quot;REFUTED_FINITE_DATA&quot; : witnessMismatch ? &quot;INVALID_WITNESS&quot; : &quot;CONFIRMED_FINITE_DATA&quot;;</span>
+<span class="nc" id="L80">            require(expected.equals(status));</span>
+<span class="nc" id="L81">        } else {</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">            require(!&quot;REFUTED_FINITE_DATA&quot;.equals(status) &amp;&amp; !&quot;CONFIRMED_FINITE_DATA&quot;.equals(status));</span>
+        }
+<span class="fc" id="L84">    }</span>
+
+    private static List&lt;String&gt; terms(String text) {
+<span class="pc bpc" id="L87" title="3 of 6 branches missed.">        require(text != null &amp;&amp; text.startsWith(&quot;[&quot;) &amp;&amp; text.endsWith(&quot;]&quot;));</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        return text.length() == 2 ? List.of() : List.of(text.substring(1, text.length() - 1).split(&quot;,&quot;, -1));</span>
+    }
+
+    private static boolean numberEquals(JsonNode value, int expected) {
+<span class="pc bpc" id="L92" title="2 of 6 branches missed.">        return value.isIntegralNumber() &amp;&amp; value.canConvertToInt() &amp;&amp; value.intValue() == expected;</span>
+    }
+
+    private static boolean booleanEquals(JsonNode value, boolean expected) {
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        return value.isBoolean() &amp;&amp; value.booleanValue() == expected;</span>
+    }
+
+    private static void require(boolean condition) {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(&quot;retained finite check disagrees with source or row evidence&quot;);</span>
+<span class="fc" id="L101">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

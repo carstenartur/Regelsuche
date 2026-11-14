@@ -36,7 +36,7 @@ import java.util.Set;
     public static final String TELESCOPING_RULE_ID =
         &quot;sympy.rational.partial_fraction.telescoping&quot;;
 
-<span class="fc" id="L39">    private static final PatternTargetedLocalBridgeSearch.Budget BUDGET =</span>
+<span class="fc" id="L39">    static final PatternTargetedLocalBridgeSearch.Budget BUDGET =</span>
         new PatternTargetedLocalBridgeSearch.Budget(
             3, 128, 1_024, 8, 160, 128,
             32, 5_000, 2_500);
@@ -134,7 +134,7 @@ import java.util.Set;
 <span class="fc" id="L134">            evaluation.aggregateWork().discoveredStates());</span>
     }
 
-    private List&lt;PatternRewriteRule&gt; principals() {
+    List&lt;PatternRewriteRule&gt; principals() {
 <span class="fc" id="L138">        return List.of(</span>
 <span class="fc" id="L139">            principal(&quot;sympy-trigonometry&quot;, PYTHAGOREAN_RULE_ID),</span>
 <span class="fc" id="L140">            principal(&quot;sympy-polynomial&quot;, DIFFERENCE_OF_SQUARES_RULE_ID),</span>
@@ -154,7 +154,7 @@ import java.util.Set;
                 &quot;missing imported SymPy rule: &quot; + ruleId));
     }
 
-    private List&lt;RewriteRule&gt; cancellationRules() {
+    List&lt;RewriteRule&gt; cancellationRules() {
         List&lt;RewriteRule&gt; rules = AstRewriteTransformationEngine
 <span class="fc" id="L159">            .allBuiltInRules().stream()</span>
 <span class="fc" id="L160">            .filter(rule -&gt; &quot;ast_cancel_division_factor&quot;</span>

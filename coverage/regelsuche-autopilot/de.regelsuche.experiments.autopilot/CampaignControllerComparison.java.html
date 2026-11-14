@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CampaignControllerComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">CampaignControllerComparison.java</span></div><h1>CampaignControllerComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.experiments.autopilot.AutonomousProductionMiningRunner.MiningBatch;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+
+/** Executes each preregistered controller against a fresh instance of the public campaign. */
+final class CampaignControllerComparison {
+<span class="fc" id="L20">    private static final JsonMapper JSON = new JsonMapper();</span>
+    private static final String SCHEMA = &quot;regelsuche.production-controller-comparison/v1&quot;;
+    private static final String PROTOCOL_SHA256 =
+        &quot;7ddc243adfd1297f1c1c331453872cbea501fe2beddcfd7145a7c1e8be250f8e&quot;;
+
+<span class="fc" id="L25">    private enum Policy { PRODUCTION_FEEDBACK, FIXED_UNIFORM, NO_FEEDBACK }</span>
+
+    static void write(Path destination) {
+<span class="fc" id="L28">        var brief = PinnedAutonomousProductionCampaign.brief();</span>
+<span class="fc" id="L29">        ObjectNode report = JSON.createObjectNode();</span>
+<span class="fc" id="L30">        report.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L31">        report.put(&quot;protocolSha256&quot;, PROTOCOL_SHA256);</span>
+<span class="fc" id="L32">        report.set(&quot;brief&quot;, artifact(brief.toCanonicalJson()));</span>
+<span class="fc" id="L33">        report.putArray(&quot;initialEvidence&quot;);</span>
+<span class="fc" id="L34">        report.put(&quot;costModel&quot;, AutonomousCampaignResourceLedger.SCHEMA);</span>
+<span class="fc" id="L35">        report.putArray(&quot;coverageGaps&quot;)</span>
+<span class="fc" id="L36">            .add(&quot;NO_CHOICE_BETWEEN_ELIGIBLE_CONTINUATIONS&quot;)</span>
+<span class="fc" id="L37">            .add(&quot;NO_COMMON_CURRENCY_FOR_UNIFORM_CROSS_STAGE_ALLOCATION&quot;)</span>
+<span class="fc" id="L38">            .add(&quot;SINGLE_PUBLIC_CAMPAIGN&quot;);</span>
+<span class="fc" id="L39">        report.put(&quot;allocationScope&quot;, &quot;CANDIDATE_SLOTS_BETWEEN_TWO_PREDECLARED_FORMATION_BATCHES&quot;);</span>
+<span class="fc" id="L40">        ArrayNode lanes = report.putArray(&quot;lanes&quot;);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (Policy policy : Policy.values()) {</span>
+<span class="fc" id="L42">            execute(brief, policy, lanes.addObject());</span>
+        }
+<span class="fc" id="L44">        verifyInputParity(lanes);</span>
+<span class="fc" id="L45">        Path absolute = destination.toAbsolutePath();</span>
+        try {
+<span class="fc" id="L47">            Files.createDirectories(absolute.getParent());</span>
+<span class="fc" id="L48">            Path pending = Files.createTempFile(absolute.getParent(), &quot;campaign-controllers-&quot;, &quot;.tmp&quot;);</span>
+            try {
+<span class="fc" id="L50">                Files.write(pending, JSON.writeValueAsBytes(report));</span>
+<span class="fc" id="L51">                Files.move(pending, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);</span>
+            } finally {
+<span class="fc" id="L53">                Files.deleteIfExists(pending);</span>
+            }
+<span class="nc" id="L55">        } catch (IOException exception) {</span>
+<span class="nc" id="L56">            throw new UncheckedIOException(&quot;Could not write controller comparison&quot;, exception);</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (var lane : lanes) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (!&quot;COMPLETED&quot;.equals(lane.required(&quot;status&quot;).asText())) {</span>
+<span class="nc" id="L60">                throw new IllegalStateException(&quot;Incomplete controller comparison; see &quot; + destination);</span>
+            }
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">    }</span>
+
+    static void verifyInputParity(ArrayNode lanes) {
+<span class="fc" id="L66">        JsonNode generation = null;</span>
+<span class="fc" id="L67">        JsonNode fullBatch = null;</span>
+<span class="fc" id="L68">        JsonNode pair = null;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (JsonNode lane : lanes) {</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (!&quot;COMPLETED&quot;.equals(lane.required(&quot;status&quot;).asText())) {</span>
+<span class="fc" id="L71">                continue;</span>
+            }
+<span class="fc" id="L73">            JsonNode actual = lane.required(&quot;generation&quot;);</span>
+<span class="fc" id="L74">            JsonNode fullInputs = lane.at(&quot;/branches/0/decision/inputs&quot;);</span>
+<span class="fc" id="L75">            JsonNode pairInputs = lane.at(&quot;/branches/1/decision/inputs&quot;);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (generation == null) {</span>
+<span class="fc" id="L77">                generation = actual;</span>
+<span class="fc" id="L78">                fullBatch = fullInputs;</span>
+<span class="fc" id="L79">                pair = pairInputs;</span>
+<span class="pc bpc" id="L80" title="1 of 6 branches missed.">            } else if (!actual.equals(generation) || !fullInputs.equals(fullBatch) || !pairInputs.equals(pair)) {</span>
+<span class="fc" id="L81">                recordFailure((ObjectNode) lane, &quot;INPUT_PARITY&quot;,</span>
+                    new IllegalStateException(&quot;Generation or formation inputs differ across completed lanes&quot;));
+            }
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">    }</span>
+
+    private static void execute(AutonomousResearchBriefV2 brief, Policy policy, ObjectNode lane) {
+<span class="fc" id="L88">        lane.put(&quot;policy&quot;, policy.name());</span>
+<span class="fc" id="L89">        long slots = brief.budget(EvidenceStage.CANDIDATE_FORMATION).configured(ResourceKind.CANDIDATES);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        long pairSlots = policy == Policy.FIXED_UNIFORM ? slots / 2 : 1;</span>
+<span class="fc" id="L91">        lane.put(&quot;configurationHash&quot;, AutonomousResearchBriefV2.hash(String.join(&quot;\n&quot;,</span>
+<span class="fc" id="L92">            SCHEMA, PROTOCOL_SHA256, brief.contentHash(), policy.name(), Long.toString(pairSlots))));</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        lane.put(&quot;decisionSource&quot;, policy == Policy.PRODUCTION_FEEDBACK</span>
+<span class="fc" id="L94">            ? &quot;PRODUCTION_RECEIPTS&quot; : &quot;STATIC_HORIZON_BEFORE_EXECUTION&quot;);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (policy != Policy.PRODUCTION_FEEDBACK) {</span>
+<span class="fc" id="L96">            var terminal = AutonomousCampaignArtifactsV2.plan(brief, List.of());</span>
+<span class="fc" id="L97">            lane.set(&quot;nextPlan&quot;, artifact(terminal.toCanonicalJson()));</span>
+        }
+<span class="fc" id="L99">        String stage = &quot;GENERATION&quot;;</span>
+        try {
+<span class="fc" id="L101">            var generation = new AutonomousProductionGenerationRunner().run(</span>
+<span class="fc" id="L102">                brief, PinnedAutonomousProductionCampaign.seeds(), 1);</span>
+<span class="fc" id="L103">            lane.set(&quot;generation&quot;, artifact(generation.toCanonicalJson()));</span>
+<span class="fc" id="L104">            lane.set(&quot;seedCatalog&quot;, artifact(generation.seedCatalog().toCanonicalJson()));</span>
+<span class="fc" id="L105">            lane.set(&quot;generationReceipt&quot;, artifact(generation.receipt().toCanonicalJson()));</span>
+<span class="fc" id="L106">            stage = &quot;CANDIDATE_FORMATION&quot;;</span>
+<span class="fc" id="L107">            var miner = new AutonomousProductionMiningRunner();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            var mining = policy == Policy.PRODUCTION_FEEDBACK</span>
+<span class="fc" id="L109">                ? miner.run(generation) : miner.run(generation, pairSlots);</span>
+<span class="fc" id="L110">            lane.set(&quot;plan&quot;, artifact(mining.plan().toCanonicalJson()));</span>
+<span class="fc" id="L111">            lane.set(&quot;evidenceDag&quot;, artifact(mining.dag().toCanonicalJson()));</span>
+<span class="fc" id="L112">            lane.set(&quot;formationReceipt&quot;, artifact(mining.formationReceipt().toCanonicalJson()));</span>
+<span class="fc" id="L113">            var branches = lane.putArray(&quot;branches&quot;);</span>
+<span class="fc" id="L114">            var candidates = lane.putArray(&quot;candidateIds&quot;);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            for (MiningBatch batch : List.of(mining.fullBatch(), mining.rejectionBatch())) {</span>
+<span class="fc" id="L116">                var branch = branches.addObject();</span>
+<span class="fc" id="L117">                branch.set(&quot;decision&quot;, artifact(batch.decision().toCanonicalJson()));</span>
+<span class="fc" id="L118">                branch.set(&quot;receipt&quot;, artifact(batch.binding().receipt().toCanonicalJson()));</span>
+<span class="fc" id="L119">                branch.set(&quot;execution&quot;, artifact(batch.execution().toCanonicalJson()));</span>
+<span class="fc" id="L120">                batch.binding().receipt().outputs().forEach(item -&gt; candidates.add(item.conjectureId()));</span>
+<span class="fc" id="L121">            }</span>
+<span class="fc" id="L122">            stage = &quot;LIFECYCLE&quot;;</span>
+<span class="fc" id="L123">            var lifecycle = new AutonomousProductionLifecycleRunner().run(mining);</span>
+<span class="fc" id="L124">            lane.set(&quot;lifecycle&quot;, artifact(lifecycle.toCanonicalJson()));</span>
+<span class="fc" id="L125">            lane.set(&quot;downstreamLedger&quot;, artifact(lifecycle.stageLedger().toCanonicalJson()));</span>
+<span class="fc" id="L126">            lane.set(&quot;lifecycleDecision&quot;, artifact(lifecycle.lifecycleDecision().toCanonicalJson()));</span>
+<span class="fc" id="L127">            lane.set(&quot;validation&quot;, artifact(lifecycle.validationJson()));</span>
+<span class="fc" id="L128">            lane.set(&quot;counterexample&quot;, artifact(lifecycle.counterexampleJson()));</span>
+<span class="fc" id="L129">            lane.set(&quot;novelty&quot;, artifact(lifecycle.noveltyJson()));</span>
+<span class="fc" id="L130">            lane.set(&quot;proof&quot;, artifact(lifecycle.proof().toCanonicalJson()));</span>
+<span class="fc" id="L131">            lane.set(&quot;solverObligation&quot;, artifact(lifecycle.proof().obligation().toCanonicalJson()));</span>
+<span class="fc" id="L132">            lane.set(&quot;solverResult&quot;, artifact(lifecycle.proof().result().toCanonicalJson()));</span>
+<span class="fc" id="L133">            stage = &quot;COMPLETION&quot;;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (policy == Policy.PRODUCTION_FEEDBACK) {</span>
+<span class="fc" id="L135">                var campaign = new AutonomousProductionCampaignRunner().run(lifecycle);</span>
+<span class="fc" id="L136">                lane.set(&quot;nextPlan&quot;, artifact(campaign.nextPlan().toCanonicalJson()));</span>
+<span class="fc" id="L137">                lane.set(&quot;feedback&quot;, artifact(campaign.feedback().toCanonicalJson()));</span>
+<span class="fc" id="L138">                lane.set(&quot;ledger&quot;, artifact(campaign.resourceLedger().toCanonicalJson()));</span>
+<span class="fc" id="L139">                lane.put(&quot;productionCampaignHash&quot;, campaign.contentHash());</span>
+<span class="fc" id="L140">                lane.put(&quot;stopReason&quot;, campaign.feedback().disposition());</span>
+<span class="fc" id="L141">            } else {</span>
+<span class="fc" id="L142">                lane.set(&quot;ledger&quot;, artifact(AutonomousCampaignResourceLedger.create(lifecycle).toCanonicalJson()));</span>
+<span class="fc" id="L143">                lane.put(&quot;stopReason&quot;, &quot;FIXED_ONE_ROUND_HORIZON&quot;);</span>
+            }
+<span class="fc" id="L145">            lane.put(&quot;status&quot;, &quot;COMPLETED&quot;);</span>
+<span class="nc" id="L146">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L147">            recordFailure(lane, stage, failure);</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc" id="L149">    }</span>
+
+    private static void recordFailure(ObjectNode lane, String stage, RuntimeException failure) {
+<span class="fc" id="L152">        lane.put(&quot;status&quot;, &quot;FAILED&quot;);</span>
+<span class="fc" id="L153">        var diagnostic = lane.putObject(&quot;failure&quot;);</span>
+<span class="fc" id="L154">        diagnostic.put(&quot;stage&quot;, stage);</span>
+<span class="fc" id="L155">        diagnostic.put(&quot;type&quot;, failure.getClass().getName());</span>
+<span class="fc" id="L156">        diagnostic.put(&quot;message&quot;, failure.getMessage());</span>
+<span class="fc" id="L157">    }</span>
+
+    private static JsonNode artifact(String canonicalJson) {
+        try {
+<span class="fc" id="L161">            return JSON.readTree(canonicalJson);</span>
+<span class="nc" id="L162">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L163">            throw new IllegalArgumentException(&quot;Campaign returned an invalid JSON artifact&quot;, exception);</span>
+        }
+    }
+
+    private CampaignControllerComparison() { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -39,33 +39,36 @@ public final class CompositeProofWorker implements ProofWorker {
     public Result prove(RuleCandidate candidate, List&lt;Assumption&gt; assumptions) {
 <span class="fc" id="L40">        Result best = null;</span>
 <span class="fc bfc" id="L41" title="All 2 branches covered.">        for (ProofWorker worker : workers) {</span>
-<span class="fc" id="L42">            Result result = worker.prove(candidate, assumptions);</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (result.status() == CandidateProofStatus.FORMALLY_PROVED) {</span>
-<span class="fc" id="L44">                return result;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (Thread.currentThread().isInterrupted()) {</span>
+<span class="nc" id="L43">                throw new java.util.concurrent.CancellationException(&quot;Proof attempt interrupted&quot;);</span>
             }
-<span class="pc bpc" id="L46" title="1 of 4 branches missed.">            if (best == null || result.status().ordinal() &gt; best.status().ordinal()) {</span>
-<span class="fc" id="L47">                best = result;</span>
+<span class="fc" id="L45">            Result result = worker.prove(candidate, assumptions);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (result.status() == CandidateProofStatus.FORMALLY_PROVED) {</span>
+<span class="fc" id="L47">                return result;</span>
             }
-<span class="fc" id="L49">        }</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        return best != null ? best</span>
-<span class="nc" id="L51">            : new Result(candidate, candidate.proofStatus(), &quot;&quot;, &quot;none&quot;, 0L);</span>
+<span class="pc bpc" id="L49" title="1 of 4 branches missed.">            if (best == null || result.status().ordinal() &gt; best.status().ordinal()) {</span>
+<span class="fc" id="L50">                best = result;</span>
+            }
+<span class="fc" id="L52">        }</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        return best != null ? best</span>
+<span class="nc" id="L54">            : new Result(candidate, candidate.proofStatus(), &quot;&quot;, &quot;none&quot;, 0L);</span>
     }
 
     @Override
     public String workerId() {
-<span class="fc" id="L56">        return workerId;</span>
+<span class="fc" id="L59">        return workerId;</span>
     }
 
     @Override
     public String cacheIdentity() {
         // Do not freeze members' mutable toolchain identities at construction.
-<span class="fc" id="L62">        return &quot;proof-cache/v2/composite/&quot; + de.regelsuche.solver.ir.SolverIr.sha256(</span>
-<span class="fc" id="L63">            workers.stream().map(ProofWorker::cacheIdentity).collect(Collectors.joining(&quot;\n&quot;)));</span>
+<span class="fc" id="L65">        return &quot;proof-cache/v2/composite/&quot; + de.regelsuche.solver.ir.SolverIr.sha256(</span>
+<span class="fc" id="L66">            workers.stream().map(ProofWorker::cacheIdentity).collect(Collectors.joining(&quot;\n&quot;)));</span>
     }
 
     /** Expose the individual workers for diagnostic purposes. */
     public List&lt;ProofWorker&gt; workers() {
-<span class="nc" id="L68">        return workers;</span>
+<span class="nc" id="L71">        return workers;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
