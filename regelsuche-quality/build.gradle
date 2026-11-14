@@ -171,3 +171,20 @@ tasks.register('verifyAllocationReport', JavaExec) {
     args result.asFile.absolutePath, summary.asFile.absolutePath
     outputs.upToDateWhen { false }
 }
+
+tasks.register('publishJmhBenchmark', JavaExec) {
+    group = 'verification'
+    description = 'Checks the current latency measurements against the frozen baseline and writes the badge and page.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.quality.jmh.JmhPublicationMain'
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
+    mustRunAfter ':app:jmh'
+    def result = rootProject.file('app/build/reports/jmh/result.json')
+    def baseline = rootProject.file('config/quality/jmh-baseline-more-warmup-v1.json')
+    def badge = rootProject.file('public/dev/bench/badge.json')
+    def report = rootProject.file('public/dev/bench/index.html')
+    inputs.files(result, baseline)
+    outputs.files(badge, report)
+    args result, baseline, badge, report
+    outputs.upToDateWhen { false }
+}

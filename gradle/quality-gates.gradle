@@ -147,7 +147,7 @@ def testJmhMoreWarmupPolicy = tasks.register('testJmhMoreWarmupPolicy', Exec) {
     workingDir qualityRepositoryRoot
     inputs.files(fileTree(qualityRepositoryRoot.dir('config/quality')) { include 'jmh-*.json' })
     inputs.files(['scripts/test-jmh-more-warmup-policy.py', 'scripts/verify-jmh-regression-v3.py',
-        'scripts/verify-jmh-benchmark.py', '.gitattributes', 'app/build.gradle', 'gradle/ci-verification.gradle',
+        '.gitattributes', 'app/build.gradle', 'regelsuche-quality/build.gradle',
         'gradle/quality-gates.gradle'].collect { path -> qualityRepositoryRoot.file(path) })
     outputs.upToDateWhen { false }
     doFirst {

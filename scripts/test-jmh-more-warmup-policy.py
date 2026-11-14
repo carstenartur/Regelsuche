@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-import copy
 import hashlib
-import importlib.util
 import json
 from pathlib import Path
 import shlex
@@ -24,13 +22,6 @@ BASELINE = QUALITY / "jmh-baseline-more-warmup-v1.json"
 
 def read(path):
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def load(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 class MoreWarmupPolicyTest(unittest.TestCase):
@@ -140,18 +131,6 @@ class MoreWarmupPolicyTest(unittest.TestCase):
         self.assertNotEqual(0, code)
         self.assertEqual("FAILED", report["status"])
 
-    def test_publisher_checks_current_duration_and_iteration_contract(self):
-        verifier = load("jmh_publication_policy_test", ROOT / "scripts/verify-jmh-benchmark.py")
-        baseline = verifier.load_baseline(BASELINE)
-        rows = self.rows()
-        self.assertEqual(29, len(verifier.validate_results(rows, baseline)))
-        for field, value in (("warmupIterations", 2), ("warmupTime", "2 s"),
-                             ("measurementTime", "2 s")):
-            changed = copy.deepcopy(rows)
-            changed[0][field] = value
-            with self.subTest(field=field), self.assertRaises(SystemExit):
-                verifier.validate_results(changed, baseline)
-
     def test_autocrlf_checkout_preserves_content_bound_policy_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
             checkout = Path(directory)
@@ -225,10 +204,9 @@ class MoreWarmupPolicyTest(unittest.TestCase):
         self.assertIn(str(THRESHOLD.relative_to(ROOT)), block)
         self.assertIn(str(DECISION.relative_to(ROOT)), block)
         self.assertIn("testJmhMoreWarmupPolicy", block)
-        publication = (ROOT / "gradle/ci-verification.gradle").read_text()
-        start = publication.index("def verifyJmhBenchmark =")
-        block = publication[start:publication.index("def jmhAllocationResult", start)]
-        self.assertIn("'--baseline', 'config/quality/jmh-baseline-more-warmup-v1.json'", block)
+        publication = (ROOT / "regelsuche-quality/build.gradle").read_text()
+        start = publication.index("tasks.register('publishJmhBenchmark'")
+        self.assertIn("config/quality/jmh-baseline-more-warmup-v1.json", publication[start:])
 
 
 if __name__ == "__main__":
