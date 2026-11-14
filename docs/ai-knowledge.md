@@ -132,6 +132,21 @@ addressed directly when diagnosing a failure:
 ./gradlew :ai-knowledge-verification:verifyComplexityHotspots
 ```
 
+The extractor produces the two method rankings in `complexity.json`. Maven can
+apply the same Java policy decision to a retained extraction using the following
+command from the repository root.
+
+```bash
+mvn -pl regelsuche-quality -am test -Dtest=ComplexityHotspotsTest \
+  -Dregelsuche.complexityResult=/absolute/path/to/complexity.json
+```
+
+The JSON decision and Markdown table are written to
+`regelsuche-quality/target/reports/quality/complexity`. A policy violation
+writes both diagnostics and fails the build. The Gradle lifecycle invokes the
+same verifier immediately after extracting the current checkout.
+
+
 These commands require the same enablement flag as `aiKnowledgeCheck`.
 `checkAiKnowledgeIndex` evaluates rule-bearing claim seeds from
 `ai-knowledge/claims.seed.yaml`. Claims marked with `severity: error` fail the
