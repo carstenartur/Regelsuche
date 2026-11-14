@@ -18,7 +18,7 @@ RUN apt-get update \
     && /opt/regelsuche-sympy/bin/python -m pip install \
         --disable-pip-version-check \
         --no-cache-dir \
-        sympy==1.14.0 \
+        sympy==1.14.0 mpmath==1.3.0 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 regelsuche \
     && mkdir -p /output /opt/regelsuche-benchmarks \
@@ -33,6 +33,8 @@ RUN chown -R regelsuche:regelsuche /opt/regelsuche-benchmarks
 ENV HOME=/tmp
 ENV REGELSUCHE_SYMPY_PYTHON=/opt/regelsuche-sympy/bin/python
 USER regelsuche
+COPY scripts/sympy_rule_reference/ /opt/regelsuche-sympy-reference/
+RUN /opt/regelsuche-sympy/bin/python /opt/regelsuche-sympy-reference/reference.py --verify
 VOLUME ["/output"]
 
 ENTRYPOINT ["./bin/regelsuche-benchmarks"]

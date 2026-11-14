@@ -8,6 +8,7 @@ export PYTHONPATH="$repository_root/scripts"
 python3 -m venv build/external-polynomial-venv
 pilot_python=build/external-polynomial-venv/bin/python
 "$pilot_python" -m pip install sympy==1.14.0 mpmath==1.3.0
+"$pilot_python" -m unittest discover -s scripts/sympy_rule_reference -p 'test_*.py' -v
 "$pilot_python" -m unittest discover -s scripts/external_polynomial_comparison -p 'test_*.py' -v
 
 env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2 \

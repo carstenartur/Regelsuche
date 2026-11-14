@@ -1,0 +1,66 @@
+[
+  {
+    "id": "pythagorean-direct-canonical",
+    "source": "sin(x)^2 + cos(x)^2",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "pythagorean-direct-ac-reordered",
+    "source": "cos(x)^2 + sin(x)^2",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "pythagorean-one-hidden-cancellation",
+    "source": "((sin(x) * a) / a)^2 + cos(x)^2",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "pythagorean-two-hidden-cancellations",
+    "source": "((sin(x) * a) / a)^2 + ((cos(x) * b) / b)^2",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "pythagorean-different-argument-near-miss",
+    "source": "((sin(x) * a) / a)^2 + ((cos(y) * b) / b)^2",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "difference-squares-direct",
+    "source": "x^2 - y^2",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "difference-squares-two-hidden-cancellations",
+    "source": "((x^2 * a) / a) - ((y^2 * b) / b)",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "difference-squares-sum-near-miss",
+    "source": "x^2 + y^2",
+    "declaredAssumptions": []
+  },
+  {
+    "id": "telescoping-direct",
+    "source": "1 / (n * (n + 1))",
+    "declaredAssumptions": [
+      "n != 0",
+      "n + 1 != 0"
+    ]
+  },
+  {
+    "id": "telescoping-two-hidden-cancellations",
+    "source": "1 / (((n * a) / a) * (((n + 1) * b) / b))",
+    "declaredAssumptions": [
+      "n != 0",
+      "n + 1 != 0"
+    ]
+  },
+  {
+    "id": "telescoping-step-two-near-miss",
+    "source": "1 / (n * (n + 2))",
+    "declaredAssumptions": [
+      "n != 0",
+      "n + 2 != 0"
+    ]
+  }
+]

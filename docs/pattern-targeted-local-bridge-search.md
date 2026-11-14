@@ -162,3 +162,34 @@ optimality, external mathematical novelty or safe amplification of rules whose
 domain guards are incomplete. Logarithm, root, power, inequality and operator
 rules require typed guard hardening before they may enter a normal amplified
 profile.
+
+### External operation results for the three-family pilot
+
+The eleven public inputs also run through three individually identified SymPy
+1.14.0 operations with mpmath 1.3.0. Each operation receives every source,
+giving 33 outputs. The corpus contains the expression and the declared
+assumptions for each case. A Java test binds them to the original experiment.
+All symbols are real. SymPy receives single-symbol nonzero declarations as
+symbol assumptions. Composite conditions such as `n + 1 != 0` are retained
+beside the output. Simplifications apply on the input domain, including any
+denominators hidden by cancellation. SymPy supplies no separate certificate
+for these conditions.
+
+| Public cases | Operation | Returned expression |
+| --- | --- | --- |
+| Four Pythagorean positives | `fu` | `1` |
+| Different-argument control | `fu` | `1 + sin(x - y)*sin(x + y)` |
+| Direct and obscured difference of squares | `factor` | `(x - y)*(x + y)` |
+| Sum-of-squares control | `factor` | `x**2 + y**2` |
+| Direct and obscured step-one rational input | `apart(expr, n)` | `1/n - 1/(n + 1)` |
+| Step-two rational control | `apart(expr, n)` | `1/(2*n) - 1/(2*(n + 2))` |
+
+The step-two result is a valid partial-fraction expansion outside the step-one
+Regelsuche rule. The table uses the operation previously specified for each
+family. The [raw matrix](../scripts/sympy_rule_reference/expected.json)
+also contains every other operation's output on the same input.
+
+With the pinned packages available, run
+`python scripts/sympy_rule_reference/reference.py --verify` from the repository
+root. Omit `--verify` to print the complete JSON. The external-comparison job
+and comparative benchmark image each check the retained bytes.
