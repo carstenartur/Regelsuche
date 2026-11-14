@@ -3,7 +3,9 @@ package de.regelsuche.quality.jmh;
 import java.io.IOException;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
+@EnabledIfSystemProperty(named = "regelsuche.jmh.allocationSummary", matches = ".+")
 class JmhAllocationMavenEvidenceIT {
     @Test
     void verifyRetainedMeasurement() throws IOException {
