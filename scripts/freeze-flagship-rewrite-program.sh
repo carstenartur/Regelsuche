@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 4 ]]; then
+if [[ $# -ne 6 ]]; then
   cat >&2 <<'USAGE'
 usage: scripts/freeze-flagship-rewrite-program.sh \
   <repository-commit> \
   <validation-private.json> \
   <final-test-private.json> \
+  <preregistration.json> \
+  <architecture-decision.json> \
   <public-output-directory>
 USAGE
   exit 2
@@ -15,7 +17,9 @@ fi
 repository_commit=$1
 validation_private=$2
 final_test_private=$3
-output_directory=$4
+preregistration=$4
+architecture_decision=$5
+output_directory=$6
 
 if [[ ! ${repository_commit} =~ ^[0-9a-f]{40}$ ]]; then
   echo "repository commit must be a lowercase 40-character Git commit" >&2
@@ -78,4 +82,6 @@ exec ./gradlew \
   -PflagshipRepositoryCommit="${repository_commit}" \
   -PflagshipValidationPrivate="${validation_private}" \
   -PflagshipFinalTestPrivate="${final_test_private}" \
+  -PflagshipPreregistration="${preregistration}" \
+  -PflagshipArchitectureDecision="${architecture_decision}" \
   -PflagshipFreezeOutput="${output_directory}"

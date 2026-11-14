@@ -25,6 +25,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
     String mutationCatalogHash,
     String baselineAblationPlanHash,
     String performancePlanHash,
+    String architectureDecisionHash,
+    String preregistrationHash,
     String schemaBundleHash,
     FreezeStatus status,
     StageStatus trainResultStatus,
@@ -33,7 +35,7 @@ public record EvolutionRewriteProgramFreezeReceipt(
     String contentHash
 ) {
     public static final String SCHEMA =
-        "regelsuche.evolution-rewrite-program-freeze-receipt/v1";
+        "regelsuche.evolution-rewrite-program-freeze-receipt/v2";
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]{2,127}");
     private static final Pattern COMMIT = Pattern.compile("[0-9a-f]{40}");
 
@@ -63,6 +65,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             mutationCatalogHash,
             baselineAblationPlanHash,
             performancePlanHash,
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash);
         if (validationCommitmentHash.equals(finalTestCommitmentHash)) {
             throw new IllegalArgumentException(
@@ -85,6 +89,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             mutationCatalogHash,
             baselineAblationPlanHash,
             performancePlanHash,
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash,
             null));
         if (!expected.equals(contentHash)) {
@@ -102,11 +108,13 @@ public record EvolutionRewriteProgramFreezeReceipt(
         EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
         EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
         EvolutionRewriteProgramStudyPlan populationStudyPlan,
-        EvolutionRewriteProgramAcceptanceThresholds acceptanceThresholds,
+        FlagshipEndpointThresholds acceptanceThresholds,
         String primitiveInventoryHash,
         String programGrammarHash,
         String baselineAblationPlanHash,
         EvolutionRewriteProgramPerformancePlan performancePlan,
+        String architectureDecisionHash,
+        String preregistrationHash,
         String schemaBundleHash
     ) {
         requireId(freezeId, "freezeId");
@@ -123,6 +131,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             programGrammarHash,
             baselineAblationPlanHash,
             performancePlan,
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash);
         String hash = EvolutionGenome.hash(render(
             freezeId,
@@ -140,6 +150,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             populationStudyPlan.mutationCatalogHash(),
             baselineAblationPlanHash,
             performancePlan.contentHash(),
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash,
             null));
         return new EvolutionRewriteProgramFreezeReceipt(
@@ -159,6 +171,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             populationStudyPlan.mutationCatalogHash(),
             baselineAblationPlanHash,
             performancePlan.contentHash(),
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash,
             FreezeStatus.FROZEN_NOT_RUN,
             StageStatus.NOT_EVALUATED,
@@ -174,11 +188,13 @@ public record EvolutionRewriteProgramFreezeReceipt(
         EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
         EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
         EvolutionRewriteProgramStudyPlan populationStudyPlan,
-        EvolutionRewriteProgramAcceptanceThresholds acceptanceThresholds,
+        FlagshipEndpointThresholds acceptanceThresholds,
         String primitiveInventoryHash,
         String programGrammarHash,
         String baselineAblationPlanHash,
         EvolutionRewriteProgramPerformancePlan performancePlan,
+        String architectureDecisionHash,
+        String preregistrationHash,
         String schemaBundleHash
     ) {
         validateInputs(
@@ -193,6 +209,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             programGrammarHash,
             baselineAblationPlanHash,
             performancePlan,
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash);
         if (!splitManifest.contentHash().equals(splitManifestHash)
                 || !trainSuite.contentHash().equals(trainSuiteHash)
@@ -213,6 +231,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
                 || !baselineAblationPlanHash.equals(
                     this.baselineAblationPlanHash)
                 || !performancePlan.contentHash().equals(performancePlanHash)
+                || !architectureDecisionHash.equals(this.architectureDecisionHash)
+                || !preregistrationHash.equals(this.preregistrationHash)
                 || !schemaBundleHash.equals(this.schemaBundleHash)) {
             throw new IllegalArgumentException(
                 "freeze receipt input identity mismatch");
@@ -236,6 +256,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             mutationCatalogHash,
             baselineAblationPlanHash,
             performancePlanHash,
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash,
             contentHash);
     }
@@ -247,11 +269,13 @@ public record EvolutionRewriteProgramFreezeReceipt(
         EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
         EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
         EvolutionRewriteProgramStudyPlan populationStudyPlan,
-        EvolutionRewriteProgramAcceptanceThresholds acceptanceThresholds,
+        FlagshipEndpointThresholds acceptanceThresholds,
         String primitiveInventoryHash,
         String programGrammarHash,
         String baselineAblationPlanHash,
         EvolutionRewriteProgramPerformancePlan performancePlan,
+        String architectureDecisionHash,
+        String preregistrationHash,
         String schemaBundleHash
     ) {
         Objects.requireNonNull(splitManifest, "splitManifest");
@@ -287,6 +311,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             programGrammarHash,
             baselineAblationPlanHash,
             performancePlan.contentHash(),
+            architectureDecisionHash,
+            preregistrationHash,
             schemaBundleHash);
     }
 
@@ -342,6 +368,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
         String mutationCatalogHash,
         String baselineAblationPlanHash,
         String performancePlanHash,
+        String architectureDecisionHash,
+        String preregistrationHash,
         String schemaBundleHash,
         String contentHash
     ) {
@@ -363,6 +391,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
             .property("mutationCatalogHash", mutationCatalogHash)
             .property("baselineAblationPlanHash", baselineAblationPlanHash)
             .property("performancePlanHash", performancePlanHash)
+            .property("architectureDecisionHash", architectureDecisionHash)
+            .property("preregistrationHash", preregistrationHash)
             .property("schemaBundleHash", schemaBundleHash)
             .property("status", FreezeStatus.FROZEN_NOT_RUN.name())
             .property("trainResultStatus", StageStatus.NOT_EVALUATED.name())

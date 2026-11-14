@@ -54,6 +54,8 @@ class EvolutionRewriteProgramFreezeContractsTest {
             hash("program-grammar"),
             hash("baseline-ablation-plan"),
             fixture.performance(),
+            hash("architecture-decision"),
+            hash("preregistration"),
             hash("schema-bundle"));
     }
 
@@ -121,6 +123,8 @@ class EvolutionRewriteProgramFreezeContractsTest {
                 hash("program-grammar"),
                 hash("baseline-ablation-plan"),
                 changedPerformance,
+                hash("architecture-decision"),
+                hash("preregistration"),
                 hash("schema-bundle"));
         assertNotEquals(base.contentHash(), changed.contentHash());
         assertThrows(IllegalArgumentException.class, () -> base.requireInputs(
@@ -135,6 +139,8 @@ class EvolutionRewriteProgramFreezeContractsTest {
             hash("program-grammar"),
             hash("baseline-ablation-plan"),
             changedPerformance,
+            hash("architecture-decision"),
+            hash("preregistration"),
             hash("schema-bundle")));
     }
 
@@ -183,6 +189,8 @@ class EvolutionRewriteProgramFreezeContractsTest {
             hash("program-grammar"),
             hash("baseline-ablation-plan"),
             fixture.performance(),
+            hash("architecture-decision"),
+            hash("preregistration"),
             hash("schema-bundle"));
     }
 

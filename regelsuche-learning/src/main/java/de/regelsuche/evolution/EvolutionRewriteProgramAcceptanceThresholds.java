@@ -28,7 +28,7 @@ public record EvolutionRewriteProgramAcceptanceThresholds(
     SuccessRoute successRoute,
     NullResultPolicy nullResultPolicy,
     String contentHash
-) {
+) implements FlagshipEndpointThresholds {
     public static final String SCHEMA =
         "regelsuche.evolution-rewrite-program-acceptance-thresholds/v1";
 

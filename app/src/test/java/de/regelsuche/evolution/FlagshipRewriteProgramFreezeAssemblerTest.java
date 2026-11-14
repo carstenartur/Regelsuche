@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import de.regelsuche.evolution.EvolutionRewriteProgramFreezeReceipt.FreezeStatus;
 import de.regelsuche.evolution.EvolutionRewriteProgramFreezeReceipt.StageStatus;
 import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
@@ -26,19 +30,15 @@ class FlagshipRewriteProgramFreezeAssemblerTest {
     private static final String COMMIT =
         "0123456789abcdef0123456789abcdef01234567";
 
+    private static final JsonMapper JSON = new JsonMapper();
+
     @TempDir
     Path tempDir;
 
     @Test
-    void assemblesOneDeterministicCompletePreExecutionContract() {
-        var first = FlagshipRewriteProgramFreezeAssembler.assemble(
-            COMMIT,
-            validationBundle("validation_private_symbol"),
-            finalTestBundle("final_private_symbol"));
-        var second = FlagshipRewriteProgramFreezeAssembler.assemble(
-            COMMIT,
-            validationBundle("validation_private_symbol"),
-            finalTestBundle("final_private_symbol"));
+    void assemblesOneDeterministicCompletePreExecutionContract() throws Exception {
+        var first = assemble("validation_private_symbol", template("validation_private_symbol"));
+        var second = assemble("validation_private_symbol", template("validation_private_symbol"));
 
         assertEquals(first.receipt(), second.receipt());
         assertEquals(
@@ -84,13 +84,16 @@ class FlagshipRewriteProgramFreezeAssemblerTest {
             tempDir.resolve("freeze-a"),
             COMMIT,
             validationPrivate,
-            finalPrivate);
+            finalPrivate, reviewFile(template("validation_private_symbol")), resource("flagship-synthetic-architecture-decision.json"));
         var second = FlagshipRewriteProgramFreezeAssembler.write(
             tempDir.resolve("freeze-b"),
             COMMIT,
             validationPrivate,
-            finalPrivate);
+            finalPrivate, reviewFile(template("validation_private_symbol")), resource("flagship-synthetic-architecture-decision.json"));
 
+        assertThrows(IllegalArgumentException.class, () -> FlagshipRewriteProgramFreezeAssembler.write(
+            first.outputDirectory(), COMMIT, validationPrivate, finalPrivate,
+            reviewFile(template("validation_private_symbol")), resource("flagship-synthetic-architecture-decision.json")));
         assertEquals(readDirectory(first.outputDirectory()),
             readDirectory(second.outputDirectory()));
         assertEquals(
@@ -99,12 +102,20 @@ class FlagshipRewriteProgramFreezeAssemblerTest {
         assertFalse(first.prerequisiteArtifacts().contains(first.receiptPath()));
         assertTrue(Files.isRegularFile(first.receiptPath()));
         assertEquals(
-            FlagshipRewriteProgramFreezeAssembler.assemble(
-                COMMIT,
-                validationBundle("validation_private_symbol"),
-                finalTestBundle("final_private_symbol"))
+            assemble("validation_private_symbol", template("validation_private_symbol"))
                 .receipt().contentHash(),
             first.receiptHash());
+
+        var artifacts = readDirectory(first.outputDirectory());
+        var receipt = (ObjectNode) JSON.readTree(artifacts.get("freeze-receipt.json"));
+        String expectedHash = receipt.remove("contentHash").textValue();
+        assertEquals(expectedHash, digest(receipt.toString()));
+        assertEquals(receipt.path("preregistrationHash").textValue(), digest(artifacts.get("preregistration.json")));
+        assertEquals(receipt.path("acceptanceThresholdsHash").textValue(), digest(artifacts.get("acceptance-thresholds.json")));
+        var decision = (ObjectNode) JSON.readTree(artifacts.get("architecture-decision.json"));
+        String decisionHash = decision.remove("contentHash").textValue();
+        assertEquals(decisionHash, digest(decision.toString()));
+        assertEquals(decisionHash, receipt.path("architectureDecisionHash").textValue());
 
         String publicMaterial = readDirectory(first.outputDirectory()).values()
             .stream().collect(Collectors.joining("\n"));
@@ -117,15 +128,9 @@ class FlagshipRewriteProgramFreezeAssemblerTest {
     }
 
     @Test
-    void privateSubstitutionChangesTheCompleteFreezeIdentity() {
-        var base = FlagshipRewriteProgramFreezeAssembler.assemble(
-            COMMIT,
-            validationBundle("validation_private_symbol"),
-            finalTestBundle("final_private_symbol"));
-        var changed = FlagshipRewriteProgramFreezeAssembler.assemble(
-            COMMIT,
-            validationBundle("changed_validation_symbol"),
-            finalTestBundle("final_private_symbol"));
+    void privateSubstitutionChangesTheCompleteFreezeIdentity() throws Exception {
+        var base = assemble("validation_private_symbol", template("validation_private_symbol"));
+        var changed = assemble("changed_validation_symbol", template("changed_validation_symbol"));
 
         assertNotEquals(
             base.manifest().contentHash(),
@@ -155,8 +160,85 @@ class FlagshipRewriteProgramFreezeAssemblerTest {
                 output,
                 "not-a-git-commit",
                 validationPrivate,
-                finalPrivate));
+                finalPrivate, reviewFile(template("validation_private_symbol")), resource("flagship-synthetic-architecture-decision.json")));
         assertFalse(Files.exists(output.resolve("freeze-receipt.json")));
+    }
+
+    @Test
+    void architecturePoliciesBaselinesAndPrimaryEndpointChangeTheReceipt() throws Exception {
+        String symbol = "validation_private_symbol";
+        ObjectNode template = template(symbol);
+        var original = assemble(symbol, template).receipt();
+        for (String pointer : List.of("/components/MATCHER_CANDIDATE_ORDER/characterizationHash",
+                "/components/RUNTIME_ENVIRONMENT/implementationHash",
+                "/baselines/FIXED_PRIMITIVE_BEST_FIRST/translationLossHash",
+                "/tranches/EXACT_VALUE_ARENA_SEARCH_QUOTIENT/excludedClaimHash",
+                "/endpoint/policyRoots/ANTI_ALIAS_EXPANDED_COST",
+                "/endpoint/comparisonBaselines/RANDOMIZED_VALID_CANDIDATE/configurationHash")) {
+            ObjectNode changed = template.deepCopy();
+            int slash = pointer.lastIndexOf('/');
+            ((ObjectNode) changed.at(pointer.substring(0, slash))).put(pointer.substring(slash + 1), digest("different"));
+            assertNotEquals(original.contentHash(), assemble(symbol, changed).receipt().contentHash(), pointer);
+        }
+        ObjectNode search = template.deepCopy();
+        search.set("endpoint", JSON.readTree(resource("flagship-search-review-inputs.json").toFile()));
+        var searchInputs = assemble(symbol, search);
+        assertNotEquals(original.acceptanceThresholdsHash(), searchInputs.receipt().acceptanceThresholdsHash());
+        assertTrue(searchInputs.thresholds() instanceof EvolutionRewriteProgramAcceptanceThresholds);
+    }
+
+    @Test
+    void invalidOrSubstitutedPublicInputCannotProduceAReceipt() throws Exception {
+        String symbol = "validation_private_symbol";
+        ObjectNode original = template(symbol);
+        for (String mandatory : List.of("architectureDecisionHash", "components", "baselines", "endpoint")) {
+            ObjectNode missing = original.deepCopy();
+            missing.remove(mandatory);
+            assertThrows(IllegalArgumentException.class, () -> assemble(symbol, missing), mandatory);
+        }
+        ObjectNode missingAxis = original.deepCopy();
+        ((ObjectNode) missingAxis.at("/endpoint/policyRoots")).remove("RECOGNITION_SCOPE");
+        assertThrows(IllegalArgumentException.class, () -> assemble(symbol, missingAxis));
+        for (String changed : List.of("architectureDecisionHash", "finalTestCommitmentHash", "validationCommitmentHash")) {
+            ObjectNode substituted = original.deepCopy().put(changed, digest("substitution"));
+            assertThrows(IllegalArgumentException.class, () -> assemble(symbol, substituted), changed);
+        }
+        ObjectNode result = original.deepCopy();
+        ((ObjectNode) result.get("endpoint")).put("finalTestResultRoot", digest("forbidden"));
+        assertThrows(IllegalArgumentException.class, () -> assemble(symbol, result));
+        ObjectNode impossible = original.deepCopy();
+        ((ObjectNode) impossible.at("/endpoint/thresholds")).put("minimumEligibleFinalCases", 4);
+        assertThrows(IllegalArgumentException.class, () -> assemble(symbol, impossible));
+        Path decision = resource("flagship-synthetic-architecture-decision.json");
+        Path tampered = tempDir.resolve("tampered-decision.json");
+        Files.writeString(tampered, Files.readString(decision).replace("synthetic-public-test", "different-test"));
+        assertThrows(IllegalArgumentException.class, () -> FlagshipStudyPreregistration.readDecision(tampered));
+    }
+
+    private FlagshipRewriteProgramFreezeAssembler.FreezeInputs assemble(String symbol, ObjectNode review) throws Exception {
+        return FlagshipRewriteProgramFreezeAssembler.assemble(COMMIT, validationBundle(symbol),
+            finalTestBundle("final_private_symbol"), FlagshipStudyPreregistration.read(reviewFile(review)),
+            FlagshipStudyPreregistration.readDecision(resource("flagship-synthetic-architecture-decision.json")));
+    }
+
+    private static ObjectNode template(String symbol) throws Exception {
+        ObjectNode plan = (ObjectNode) JSON.readTree(resource("flagship-review-inputs.json").toFile());
+        plan.put("validationCommitmentHash", validationBundle(symbol).commitment().contentHash());
+        plan.put("finalTestCommitmentHash", finalTestBundle("final_private_symbol").commitment().contentHash());
+        return plan;
+    }
+
+    private Path reviewFile(ObjectNode review) throws Exception {
+        return Files.writeString(tempDir.resolve("review.json"), review.toString());
+    }
+
+    private static Path resource(String name) throws Exception {
+        return Path.of(FlagshipRewriteProgramFreezeAssemblerTest.class.getResource(name).toURI());
+    }
+
+    private static String digest(String value) throws Exception {
+        return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+            .digest(value.getBytes(StandardCharsets.UTF_8)));
     }
 
     private static Map<String, String> readDirectory(Path directory)

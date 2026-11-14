@@ -38,6 +38,56 @@ The command:
 The validation receipt contains no local path and no expression. It retains only
 study/split identity, case IDs, terminal classes and normal-form hashes.
 
+## Assemble review inputs before execution
+
+The custodian and scientific reviewers supply two public files. Obtain the canonical
+`rewrite-architecture-decision.json` from the #620 historical development-atlas
+workflow at its recorded commit. The producer hashes its canonical UTF-8 object
+before appending the terminal `contentHash` property. The assembler reconstructs
+the decision using the producer's own report representation and verifies that hash.
+
+Prepare `preregistration.json` using the [non-secret representation example](../app/src/test/resources/de/regelsuche/evolution/flagship-review-inputs.json).
+The [search-work example](../app/src/test/resources/de/regelsuche/evolution/flagship-search-review-inputs.json)
+is a replacement for the entire `endpoint` object. Both examples are test inputs.
+Replace the synthetic digests with reviewed artifact identities before the real
+study. Compute `validationCommitmentHash` and `finalTestCommitmentHash` from the
+two published split commitment objects (`contentHash`). Copy the exact #620
+decision root. Supply SHA-256 identities for the implementation revision and its
+retained characterization on each component, including the runtime image and
+benchmark suite. For each included decision track retain the exact implementation
+and evidence. For each deferred track state the limitation and reference its
+corpus-coverage and claim-exclusion documents. For each baseline retain
+implementation, configuration and translation-loss manifests, including
+unsupported operations, assumption provenance and the applicable information
+regime. The custodian archives the referenced documents and checks their
+digests, coverage and scientific suitability before approving the public file.
+
+Choose exactly one primary endpoint. For representation discovery, supply all
+policy roots, the exact R1–R4 information profile, and the comparable #235
+formation, transfer and ablation baselines. The expanded-cost metric charges
+aliases and hidden definitions. The capability-frontier policy defines a material
+unlock, and the bridge policy defines an independently checked held-out reuse.
+The catalogue, held-out consequences, proof policy, ranking and visibility
+are fixed before formation. Evaluate each predeclared comparator under the
+same information and work limits and retain all outcomes.
+
+| Review example | Positive criterion | Budget, exclusions and reproducibility | Transparent null |
+| --- | --- | --- | --- |
+| Search work | Improve at least two FINAL cases in two families. Reach one new case or reduce mechanical work by at least 100 permille under the frozen matched-work policy. | Eight-track plan and public TRAIN ledger (20,000 primitive units). At most 24 program nodes and 12 genome rules. Zero correctness, hidden-assumption and technical failures. Require two clean reproductions and a pinned environment. | Publish the complete registered case and baseline surface if the positive route is missed. |
+| Representation discovery | Two FINAL cases in two families must each meet all three gates: at least 100 permille expanded-cost reduction, one new capability and one certified held-out reuse. | At most 20,000 declared work units per case. Zero correctness and assumption regressions. Require two clean reproductions and a pinned environment. | Report all cases and baselines with unmet criteria, including unsupported and inconclusive cases. |
+
+The assembler checks threshold ranges and committed case/family counts. Scientific
+reviewers assess whether the numerical thresholds and policy roots are suitable
+for the actual corpus, including whether the declared capabilities can be reached.
+Changes to any bound field produce a different receipt. The v2 receipt binds
+`architectureDecisionHash` and `preregistrationHash`; the archived v1 schema still
+describes historical receipts. To verify independently, hash all bytes of emitted
+`preregistration.json` as UTF-8. For the architecture decision and freeze receipt,
+drop the terminal `contentHash` property, restore the closing brace and hash those
+canonical UTF-8 bytes; compare prefixed lowercase SHA-256 values. The protected
+study, actual scientific review and authority-bearing receipt remain with the
+[custodian](TODO-extern.md#flagship-studie).
+
 ## Stage 2 — assemble the public freeze
 
 After both private bundles have been reviewed and sealed, run from a clean
@@ -48,6 +98,8 @@ bash scripts/freeze-flagship-rewrite-program.sh \
   "$(git rev-parse HEAD)" \
   /private/validation-sealed.json \
   /private/final-test-sealed.json \
+  /review/preregistration.json \
+  /review/rewrite-architecture-decision.json \
   ./build/flagship-freeze
 ```
 
