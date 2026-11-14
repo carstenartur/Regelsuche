@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Product-facing coordinator for direct replay, exact specialized preparation
@@ -230,13 +231,22 @@ public final class UnifiedRulePreparationCoordinator {
     /** Runs the enabled stages on each principal with no reference result or case labels. */
     public List<PreparationProfile.Result> analyzeProfile(PreparationProfile profile, String sourceExpression,
             AssumptionSignature initialAssumptions) {
+        return analyzeProfile(profile, sourceExpression, initialAssumptions,
+            ignored -> PatternTargetedLocalBridgeSearch.OperationLedger.DISABLED);
+    }
+
+    /** Supplies one fresh operation ledger per principal for every local stage reached. */
+    public List<PreparationProfile.Result> analyzeProfile(PreparationProfile profile, String sourceExpression,
+            AssumptionSignature initialAssumptions,
+            Function<String, PatternTargetedLocalBridgeSearch.OperationLedger> bridgeLedgers) {
+        Objects.requireNonNull(bridgeLedgers, "bridgeLedgers");
         Objects.requireNonNull(profile, "profile");
         String source = normalize(sourceExpression);
         var expression = parser.parseTerm(source);
         var assumptions = normalized(initialAssumptions);
         boolean oversized = new ExpressionCanonicalizer().astNodeCount(source) > bridgeBudget.maxExpressionNodes();
         return principalSchemas.stream().map(schema -> new ProfileRun(runtimes.get(schema.ruleId()),
-            source, expression, assumptions).run(profile, oversized)).toList();
+            source, expression, assumptions).run(profile, oversized, bridgeLedgers)).toList();
     }
 
     private final class ProfileRun {
@@ -255,7 +265,8 @@ public final class UnifiedRulePreparationCoordinator {
             this.assumptions = assumptions;
         }
 
-        PreparationProfile.Result run(PreparationProfile profile, boolean oversized) {
+        PreparationProfile.Result run(PreparationProfile profile, boolean oversized,
+                Function<String, PatternTargetedLocalBridgeSearch.OperationLedger> bridgeLedgers) {
             if (ExplicitZeroConditions.conflict(assumptions)) return negative("UNSUPPORTED", "CONTRADICTED_NONZERO_PRECONDITION");
             if (oversized) return negative("BUDGET_INCONCLUSIVE", "SOURCE_EXCEEDS_MAX_EXPRESSION_NODES");
             var result = match("DIRECT_ONLY", RecognitionProfile.exact());
@@ -268,7 +279,7 @@ public final class UnifiedRulePreparationCoordinator {
                 result = specialist();
             }
             if (result.isPresent()) return result.orElseThrow();
-            if (profile == PreparationProfile.SAFE_PREPARATION_PLUS_LOCAL_BRIDGE) return local();
+            if (profile == PreparationProfile.SAFE_PREPARATION_PLUS_LOCAL_BRIDGE) return local(bridgeLedgers.apply(schema.ruleId()));
             return negative("NO_MATCH_IN_ENABLED_STAGES", "ENABLED_STAGES_EXHAUSTED");
         }
 
@@ -346,10 +357,10 @@ public final class UnifiedRulePreparationCoordinator {
             }
         }
 
-        private PreparationProfile.Result local() {
+        private PreparationProfile.Result local(PatternTargetedLocalBridgeSearch.OperationLedger ledger) {
             String stage = "LOCAL_BRIDGE";
             try {
-                var outcome = runtime.localCoordinator().analyzeBridge(schema.ruleId(), source, assumptions);
+                var outcome = runtime.localCoordinator().analyzeBridge(schema.ruleId(), source, assumptions, ledger);
                 stages.add(new PreparationProfile.Stage(stage, outcome.detailCode(), 0, 0, 0, 0, 0, 0,
                     outcome.work(), outcome.reachedLimits()));
                 if (outcome.direct()) return negative("TECHNICAL_FAILURE", "DIRECT_STAGE_DISAGREES_WITH_BRIDGE");

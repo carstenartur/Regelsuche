@@ -270,10 +270,13 @@ def preparationContainer = preparationImageOutput.map { it.file('comparison.json
 def guardCheckout = project(':regelsuche-experiments').layout.buildDirectory.file(
     'reports/preparation-ablation/guards-v1.json')
 def guardContainer = preparationImageOutput.map { it.file('guards-v1.json') }
+def attributionCheckout = project(':regelsuche-experiments').layout.buildDirectory.file(
+    'reports/preparation-ablation/stage-attribution.json')
+def attributionContainer = preparationImageOutput.map { it.file('stage-attribution.json') }
 
 project(':regelsuche-experiments').tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
     inputs.property 'preparationRevision', checkoutForPreparation
-    outputs.files preparationCheckout, guardCheckout
+    outputs.files preparationCheckout, guardCheckout, attributionCheckout
     doFirst { environment 'REGELSUCHE_PREPARATION_REVISION', checkoutForPreparation.get() }
 }
 
@@ -296,6 +299,7 @@ def extractPreparationReport = { String taskName, String filename, output ->
 }
 def extractPreparation = extractPreparationReport('extractPreparationAblation', 'comparison.json', preparationContainer)
 def extractGuards = extractPreparationReport('extractPreparationGuards', 'guards-v1.json', guardContainer)
+def extractAttribution = extractPreparationReport('extractPreparationAttribution', 'stage-attribution.json', attributionContainer)
 
 def verifyComparativeBenchmarks = tasks.register(
     'verifyComparativeBenchmarks', Exec) {
@@ -310,7 +314,7 @@ def verifyComparativeBenchmarks = tasks.register(
         runComparativeBenchmarkImage,
         runSharedRewriteFragmentImage,
         ':app:test', extractHiddenRuleContainerReport,
-        ':regelsuche-experiments:test', extractPreparation, extractGuards
+        ':regelsuche-experiments:test', extractPreparation, extractGuards, extractAttribution
     workingDir repositoryRoot
     inputs.file repositoryRoot.file(
         'scripts/verify-comparative-benchmark-reproducibility.py')
@@ -323,6 +327,7 @@ def verifyComparativeBenchmarks = tasks.register(
     inputs.file preparationCheckout
     inputs.file preparationContainer
     inputs.files guardCheckout, guardContainer
+    inputs.files attributionCheckout, attributionContainer
     inputs.file sharedRewriteCheckout
     inputs.file sharedRewriteContainer
     outputs.upToDateWhen { false }
@@ -346,6 +351,10 @@ def verifyComparativeBenchmarks = tasks.register(
         if (java.nio.file.Files.mismatch(guardCheckout.get().asFile.toPath(),
                 guardContainer.get().asFile.toPath()) != -1L) {
             throw new GradleException('Guard-panel decisions differ between the checkout and pinned image.')
+        }
+        if (java.nio.file.Files.mismatch(attributionCheckout.get().asFile.toPath(),
+                attributionContainer.get().asFile.toPath()) != -1L) {
+            throw new GradleException('Preparation stage attribution differs between the checkout and pinned image.')
         }
         def checkout = sharedRewriteCheckout.get().asFile.toPath()
         def container = sharedRewriteContainer.get().asFile.toPath()

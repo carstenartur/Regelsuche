@@ -76,6 +76,69 @@ class PatternTargetedLocalBridgeSearchTest {
     }
 
     @Test
+    void metersFormationAndConcreteCertificateReplaySeparately() {
+        var search = search(pythagoreanRule(), cancellationRules(), defaultBudget());
+        var ledger = new PatternTargetedLocalBridgeSearch.OperationLedger();
+        var assumptions = AssumptionSignature.ofExpressions(List.of());
+        var attempt = search.analyze(PYTHAGOREAN_SOURCE, assumptions, ledger);
+        var bridge = attempt.bridge().orElseThrow();
+        assertEquals(search.analyze(PYTHAGOREAN_SOURCE, assumptions), attempt);
+        var formation = ledger.formation();
+        assertEquals(attempt.work().analyzedCandidates() + 1L, formation.patternAnalyses());
+        assertTrue(formation.evaluatedMatchSteps() > 0);
+        assertTrue(formation.structuralComparisons() > 0);
+        assertEquals(1, formation.principalReplayCalls());
+        assertEquals(attempt.work().expandedStates(), formation.preparationEngineCalls());
+
+        var verification = ledger.certificateVerification();
+        assertEquals(1, ledger.certificateChecks());
+        assertEquals(1, ledger.certificateHashesChecked());
+        assertThrows(IllegalStateException.class, () -> search.analyze(PYTHAGOREAN_SOURCE, assumptions, ledger));
+        assertEquals(bridge.preparationSteps().size(), verification.preparationEngineCalls());
+        assertTrue(verification.returnedPreparationTransitions() > verification.preparationEngineCalls());
+        assertEquals(1, verification.patternAnalyses());
+        assertEquals(1, verification.principalReplayCalls());
+        var replay = new PatternTargetedLocalBridgeSearch.OperationLedger();
+        assertTrue(search.verify(bridge, replay).valid());
+        assertEquals(verification, replay.certificateVerification());
+        assertEquals(0, replay.formation().patternAnalyses());
+    }
+
+    @Test
+    void metersDepthLimitProbeAndMissingCertificateWithoutCreditingReplay() {
+        var budget = new PatternTargetedLocalBridgeSearch.Budget(0, 16, 16, 4, 128, 16, 8, 128, 64);
+        var search = search(pythagoreanRule(), cancellationRules(), budget);
+        var ledger = new PatternTargetedLocalBridgeSearch.OperationLedger();
+        var attempt = search.analyze(PYTHAGOREAN_SOURCE, AssumptionSignature.ofExpressions(List.of()), ledger);
+        assertEquals(PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE, attempt.status());
+        assertEquals(0, attempt.work().expandedStates());
+        assertEquals(1, ledger.formation().preparationEngineCalls());
+        assertTrue(ledger.formation().returnedPreparationTransitions() > 0);
+        assertEquals(0, ledger.certificateChecks());
+        assertFalse(search.verify(null, ledger).valid());
+        assertEquals(1, ledger.certificateChecks());
+        assertEquals(0, ledger.certificateHashesChecked());
+        assertEquals(0, ledger.certificateVerification().preparationEngineCalls());
+        assertEquals(0, ledger.certificateVerification().patternAnalyses());
+        assertEquals(0, ledger.certificateVerification().principalReplayCalls());
+    }
+
+    @Test
+    void peakIncludesAnOversizedGeneratedCandidateThatNeverEntersTheFrontier() {
+        var grow = new PatternRewriteRule("grow-a", PatternExpr.variable("a"),
+            PatternExpr.op(BinaryOperator.ADD, PatternExpr.variable("a"), PatternExpr.num(1)));
+        var budget = new PatternTargetedLocalBridgeSearch.Budget(2, 8, 8, 2, 1, 8, 8, 128, 64);
+        var search = search(pattern("principal-z", "z", "y"), List.of(grow), budget);
+        var ledger = new PatternTargetedLocalBridgeSearch.OperationLedger();
+        var attempt = search.analyze("a", AssumptionSignature.ofExpressions(List.of()), ledger);
+        assertTrue(attempt.reachedLimits().contains("EXPRESSION_NODES"));
+        assertEquals(0, attempt.work().retainedTransitions());
+        assertEquals(1, ledger.sourceAstNodes());
+        assertEquals(1, ledger.sizedCandidateAsts());
+        assertEquals(3, ledger.peakObservedAstNodes());
+    }
+
+    @Test
     void directMatchDoesNotManufacturePreparationEvidence() {
         PatternTargetedLocalBridgeSearch search = search(
             pythagoreanRule(),
