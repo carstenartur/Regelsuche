@@ -164,7 +164,7 @@ tasks.register('verifyAllocationReport', JavaExec) {
     mainClass = 'de.regelsuche.quality.jmh.JmhAllocationReportMain'
     javaLauncher = javaToolchains.launcherFor(java.toolchain)
     mustRunAfter ':runJmhAllocationBenchmark'
-    def result = project(':app').layout.buildDirectory.file('reports/jmh-allocation/result.json')
+    def result = rootProject.layout.projectDirectory.file('app/build/reports/jmh-allocation/result.json')
     def summary = rootProject.layout.projectDirectory.file('public/dev/bench/allocation.json')
     inputs.file(result)
     outputs.file(summary)
