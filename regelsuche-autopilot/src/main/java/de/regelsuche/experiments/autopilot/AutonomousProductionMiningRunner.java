@@ -53,13 +53,17 @@ public final class AutonomousProductionMiningRunner {
     }
 
     MiningRun run(GenerationRun generation) {
+        return run(generation, 1L);
+    }
+
+    MiningRun run(GenerationRun generation, long pairCandidateSlots) {
         Objects.requireNonNull(generation, "generation");
         var brief = generation.brief();
         long candidateCapacity = brief.budget(EvidenceStage.CANDIDATE_FORMATION)
             .configured(ResourceKind.CANDIDATES);
         long batchCapacity = brief.budget(EvidenceStage.CANDIDATE_FORMATION)
             .configured(ResourceKind.MINING_BATCHES);
-        if (candidateCapacity < 2L || batchCapacity < 2L) {
+        if (pairCandidateSlots < 1L || pairCandidateSlots >= candidateCapacity || batchCapacity < 2L) {
             throw new IllegalArgumentException(
                 "production mining requires two batches and candidate capacity for both");
         }
@@ -74,7 +78,7 @@ public final class AutonomousProductionMiningRunner {
             fullInputs.stream().map(GeneratedObservation::branch).toList(),
             Map.of(
                 ResourceKind.MINING_BATCHES, 1L,
-                ResourceKind.CANDIDATES, candidateCapacity - 1L),
+                ResourceKind.CANDIDATES, candidateCapacity - pairCandidateSlots),
             "mine all pinned cross-family production observations");
         AggregateDecision rejectionDecision = AutonomousEvidenceDagV2.planCandidateFormation(
             brief,
@@ -82,7 +86,7 @@ public final class AutonomousProductionMiningRunner {
             rejectionInputs.stream().map(GeneratedObservation::branch).toList(),
             Map.of(
                 ResourceKind.MINING_BATCHES, 1L,
-                ResourceKind.CANDIDATES, 1L),
+                ResourceKind.CANDIDATES, pairCandidateSlots),
             "execute the predeclared alpha-equivalent cross-family rejection batch");
         CampaignPlan plan = AutonomousCampaignArtifactsV2.plan(
             brief, List.of(fullDecision, rejectionDecision));

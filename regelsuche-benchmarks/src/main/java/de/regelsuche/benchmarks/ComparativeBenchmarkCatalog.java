@@ -301,11 +301,10 @@ final class ComparativeBenchmarkCatalog {
                     "PAIRED_UTILITY")),
             CoverageGap.create(
                 Track.AUTONOMOUS_CAMPAIGN,
-                "Controller baselines have not yet consumed the pinned #355 research brief and budget ledger.",
+                "The separate #355 controller comparison retains all three schedules and the physical resource ledger. Its terminal round leaves no eligible continuation for a second allocation.",
                 List.of(
-                    "COMMON_RESEARCH_BRIEF",
-                    "COMMON_RESOURCE_LEDGER",
-                    "COMPLETE_RECEIPT_DAG")),
+                    "MULTIPLE_ELIGIBLE_CONTINUATIONS",
+                    "RECEIPT_DRIVEN_NEXT_ROUND_ALLOCATION")),
             CoverageGap.create(
                 Track.DISCOVERY_COMPONENT_ABLATION,
                 "At least three production discovery-component ablations remain to be measured.",
@@ -315,11 +314,10 @@ final class ComparativeBenchmarkCatalog {
                     "SEPARATE_CORRECTNESS_AND_UTILITY")),
             CoverageGap.create(
                 Track.CONTROLLER_ABLATION,
-                "At least two autonomous-controller ablations remain to be measured.",
+                "The public #355 panel measures uniform candidate slots and disabled feedback. A uniform allocation across different stage resources needs a common, preregistered cost model.",
                 List.of(
-                    "TWO_CONTROLLER_ABLATIONS",
-                    "BALANCED_RESOURCE_ACCOUNTING",
-                    "DETERMINISTIC_NEXT_PLAN")));
+                    "CROSS_STAGE_COST_MODEL",
+                    "UNIFORM_CROSS_STAGE_ALLOCATION")));
     }
 
     private static String corpusHash(List<Case> cases) {
