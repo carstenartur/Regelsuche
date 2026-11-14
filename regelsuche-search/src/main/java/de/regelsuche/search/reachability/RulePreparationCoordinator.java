@@ -124,13 +124,7 @@ public final class RulePreparationCoordinator {
                     direct.orElseThrow()));
                 continue;
             }
-            PatternTargetedLocalBridgeSearch.Attempt attempt =
-                runtime.search().analyze(source, assumptions);
-            outcomes.add(outcome(
-                runtime,
-                source,
-                assumptions,
-                attempt));
+            outcomes.add(analyzeBridge(schema.ruleId(), source, assumptions));
         }
         return new Evaluation(
             COORDINATOR_ID,
@@ -142,6 +136,12 @@ public final class RulePreparationCoordinator {
             assumptions,
             outcomes,
             AggregateWork.from(outcomes));
+    }
+
+    /** Runs the bounded local fallback after the caller has already attempted direct replay. */
+    Outcome analyzeBridge(String ruleId, String source, AssumptionSignature assumptions) {
+        PrincipalRuntime runtime = runtimes.get(ruleId);
+        return outcome(runtime, source, assumptions, runtime.search().analyze(source, assumptions));
     }
 
     /** Recomputes the complete deterministic evaluation and all bridge replay. */

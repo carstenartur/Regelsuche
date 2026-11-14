@@ -7,6 +7,15 @@ RUN chmod +x ./gradlew \
         --tests de.regelsuche.docs.HiddenRuleComparisonTest \
         --tests de.regelsuche.docs.HiddenRulePilotCampaignTest.productionRuntimeContainsNoHiddenManifestIdentifiersOrTemplates
 
+FROM build AS preparation-ablation
+ARG REGELSUCHE_PREPARATION_REVISION
+RUN REGELSUCHE_PREPARATION_REVISION="$REGELSUCHE_PREPARATION_REVISION" \
+    ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:test \
+        --tests de.regelsuche.benchmark.PreparationAblationTest
+
+FROM scratch AS preparation-evidence
+COPY --from=preparation-ablation /workspace/regelsuche-experiments/build/reports/preparation-ablation/comparison.json /comparison.json
+
 FROM eclipse-temurin:25.0.5_8-jre-noble AS runtime
 
 RUN apt-get update \

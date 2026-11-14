@@ -268,6 +268,36 @@ def extractHiddenRuleContainerReport = tasks.register('extractHiddenRuleContaine
     }
 }
 
+def preparationCheckout = project(':regelsuche-experiments').layout.buildDirectory.file(
+    'reports/preparation-ablation/comparison.json')
+def preparationImageOutput = layout.buildDirectory.dir('reports/comparative-ci/preparation-ablation')
+def preparationContainer = preparationImageOutput.map { it.file('comparison.json') }
+def checkoutForPreparation = providers.environmentVariable('REGELSUCHE_PREPARATION_REVISION').orElse(providers.exec {
+    workingDir repositoryRoot
+    commandLine 'git', 'rev-parse', 'HEAD'
+}.standardOutput.asText.map { it.trim() })
+
+project(':regelsuche-experiments').tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+    inputs.property 'preparationRevision', checkoutForPreparation
+    outputs.file preparationCheckout
+    doFirst { environment 'REGELSUCHE_PREPARATION_REVISION', checkoutForPreparation.get() }
+}
+
+def runPreparationAblationImage = tasks.register('runPreparationAblationImage', Exec) {
+    group = 'verification'
+    description = 'Runs the eleven input preparation ablation in the pinned build image.'
+    dependsOn buildComparativeBenchmarkImage
+    workingDir repositoryRoot
+    outputs.file preparationContainer
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine 'docker', 'build', '-f', 'Dockerfile.comparative-benchmarks',
+            '--target', 'preparation-evidence',
+            '--build-arg', "REGELSUCHE_PREPARATION_REVISION=${checkoutForPreparation.get()}",
+            '--output', "type=local,dest=${preparationImageOutput.get().asFile.absolutePath}", '.'
+    }
+}
+
 def verifyComparativeBenchmarks = tasks.register(
     'verifyComparativeBenchmarks', Exec) {
     group = 'verification'
@@ -280,7 +310,8 @@ def verifyComparativeBenchmarks = tasks.register(
         ':regelsuche-benchmarks:writeSharedRewriteFragment',
         runComparativeBenchmarkImage,
         runSharedRewriteFragmentImage,
-        ':app:test', extractHiddenRuleContainerReport
+        ':app:test', extractHiddenRuleContainerReport,
+        ':regelsuche-experiments:test', runPreparationAblationImage
     workingDir repositoryRoot
     inputs.file repositoryRoot.file(
         'scripts/verify-comparative-benchmark-reproducibility.py')
@@ -290,6 +321,8 @@ def verifyComparativeBenchmarks = tasks.register(
     inputs.dir comparativeDockerOutput
     inputs.file hiddenRuleCheckout
     inputs.file hiddenRuleContainer
+    inputs.file preparationCheckout
+    inputs.file preparationContainer
     inputs.file sharedRewriteCheckout
     inputs.file sharedRewriteContainer
     outputs.upToDateWhen { false }
@@ -305,6 +338,10 @@ def verifyComparativeBenchmarks = tasks.register(
         if (java.nio.file.Files.mismatch(hiddenRuleCheckout.get().asFile.toPath(),
                 hiddenRuleContainer.get().asFile.toPath()) != -1L) {
             throw new GradleException('Hidden-rule comparison differs between the checkout and pinned image.')
+        }
+        if (java.nio.file.Files.mismatch(preparationCheckout.get().asFile.toPath(),
+                preparationContainer.get().asFile.toPath()) != -1L) {
+            throw new GradleException('Preparation ablation differs between the checkout and pinned image.')
         }
         def checkout = sharedRewriteCheckout.get().asFile.toPath()
         def container = sharedRewriteContainer.get().asFile.toPath()

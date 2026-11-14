@@ -2,6 +2,8 @@ package de.regelsuche.search.reachability;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
@@ -9,6 +11,7 @@ import de.regelsuche.transform.EquivalentExpressionProvider;
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternMatchAnalyzer;
+import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteRule;
@@ -214,6 +217,163 @@ public final class UnifiedRulePreparationCoordinator {
             RulePreparationCoordinator.AggregateWork.from(outcomes));
     }
 
+    /** The legacy analyze method and its evidence schema remain independent of this opt-in policy. */
+    public String profileHash(PreparationProfile profile) {
+        Objects.requireNonNull(profile, "profile");
+        var material = new StringBuilder();
+        for (String input : List.of("regelsuche.whole-source-preparation-profile/v1", COORDINATOR_ID,
+                profile.name(), repositoryRevision, principalInventoryFingerprint, preparationInventoryFingerprint,
+                exactRegistryFingerprint, bridgeBudget.identity())) append(material, input);
+        return sha256(material.toString());
+    }
+
+    /** Runs the enabled stages on each principal with no reference result or case labels. */
+    public List<PreparationProfile.Result> analyzeProfile(PreparationProfile profile, String sourceExpression,
+            AssumptionSignature initialAssumptions) {
+        Objects.requireNonNull(profile, "profile");
+        String source = normalize(sourceExpression);
+        var expression = parser.parseTerm(source);
+        var assumptions = normalized(initialAssumptions);
+        boolean oversized = new ExpressionCanonicalizer().astNodeCount(source) > bridgeBudget.maxExpressionNodes();
+        return principalSchemas.stream().map(schema -> new ProfileRun(runtimes.get(schema.ruleId()),
+            source, expression, assumptions).run(profile, oversized)).toList();
+    }
+
+    private final class ProfileRun {
+        private final PrincipalRuntime runtime;
+        private final RewriteApplicabilitySchema schema;
+        private final String source;
+        private final Expr expression;
+        private final AssumptionSignature assumptions;
+        private final List<PreparationProfile.Stage> stages = new ArrayList<>();
+
+        ProfileRun(PrincipalRuntime runtime, String source, Expr expression, AssumptionSignature assumptions) {
+            this.runtime = runtime;
+            this.schema = runtime.schema();
+            this.source = source;
+            this.expression = expression;
+            this.assumptions = assumptions;
+        }
+
+        PreparationProfile.Result run(PreparationProfile profile, boolean oversized) {
+            if (oversized) return negative("BUDGET_INCONCLUSIVE", "SOURCE_EXCEEDS_MAX_EXPRESSION_NODES");
+            var result = match("DIRECT_ONLY", RecognitionProfile.exact());
+            if (result.isEmpty() && profile != PreparationProfile.DIRECT_ONLY
+                    && !schema.recognitionProfile().equals(RecognitionProfile.exact())) {
+                result = match("THEORY_MATCHING", schema.recognitionProfile());
+            }
+            if (result.isEmpty() && (profile == PreparationProfile.SAFE_EXACT_PREPARATION
+                    || profile == PreparationProfile.SAFE_PREPARATION_PLUS_LOCAL_BRIDGE)) {
+                result = specialist();
+            }
+            if (result.isPresent()) return result.orElseThrow();
+            if (profile == PreparationProfile.SAFE_PREPARATION_PLUS_LOCAL_BRIDGE) return local();
+            return negative("NO_MATCH_IN_ENABLED_STAGES", "ENABLED_STAGES_EXHAUSTED");
+        }
+
+        private Optional<PreparationProfile.Result> match(String stage, RecognitionProfile recognition) {
+            PatternMatchAnalyzer.Analysis analysis;
+            try {
+                analysis = analyzer.analyze(schema.pattern(), expression, recognition, new ExprMatcher.MatchOptions(
+                    EquivalentExpressionProvider.identity(), bridgeBudget.maxMatchResults(),
+                    bridgeBudget.maxMatchSteps(), bridgeBudget.maxPatternBranches()));
+            } catch (RuntimeException exception) {
+                stages.add(new PreparationProfile.Stage(stage, "MATCHER_FAILURE", 0, 0, 0, 0, 0, 0, null, Set.of()));
+                return Optional.of(negative("TECHNICAL_FAILURE", "MATCHER_FAILURE"));
+            }
+            if (!analysis.matched()) {
+                var limits = analysis.diagnostics().stream().map(ExprMatcher.MatchDiagnostic::code)
+                    .collect(java.util.stream.Collectors.toSet());
+                matchWork(stage, analysis, analysis.detailCode(), 0, limits);
+                return analysis.status() == PatternMatchAnalyzer.Status.INCONCLUSIVE
+                    ? Optional.of(negative("BUDGET_INCONCLUSIVE", analysis.detailCode())) : Optional.empty();
+            }
+            GuardCheck guards = checkRequiredAssumptions(schema, analysis, assumptions);
+            if (!guards.authorized()) {
+                matchWork(stage, analysis, guards.detailCode(), 0, Set.of());
+                return Optional.of(negative(guards.failureStatus().name(), guards.detailCode()));
+            }
+            return Optional.of(replay(stage, analysis));
+        }
+
+        private PreparationProfile.Result replay(String stage, PatternMatchAnalyzer.Analysis analysis) {
+            List<Transformation> rootMatches = new ArrayList<>();
+            try {
+                new AstRewriteTransformationEngine(List.of(schema.executor()), Integer.MAX_VALUE, 1)
+                    .transformWithOccurrences(source, generated -> {
+                        if (generated.position().path().isEmpty()) rootMatches.add(generated.transformation());
+                    });
+            } catch (RuntimeException exception) {
+                matchWork(stage, analysis, "EXECUTOR_FAILURE", 1, Set.of());
+                return negative("TECHNICAL_FAILURE", "EXECUTOR_FAILURE");
+            }
+            if (rootMatches.isEmpty()) {
+                matchWork(stage, analysis, "EXECUTOR_REJECTED_SOURCE", 1, Set.of());
+                return negative("UNSUPPORTED", "EXECUTOR_REJECTED_SOURCE");
+            }
+            matchWork(stage, analysis, "ROOT_EXECUTOR_REPLAYED", 1, Set.of());
+            return positive("DIRECT_MATCH_AVAILABLE", stage, "ROOT_EXECUTOR_REPLAYED",
+                withCumulativeAssumptions(rootMatches.getFirst(), assumptions), "");
+        }
+
+        private void matchWork(String stage, PatternMatchAnalyzer.Analysis analysis, String detail, int replays,
+                Set<String> limits) {
+            stages.add(new PreparationProfile.Stage(stage, detail, analysis.evaluatedSteps(), analysis.patternBranches(),
+                analysis.structuralComparisons(), replays, 0, 0, null, limits));
+        }
+
+        private Optional<PreparationProfile.Result> specialist() {
+            String stage = "EXACT_SPECIALIST";
+            boolean supported = runtime.exactRegistry().supportsPrincipal(schema.ruleId());
+            if (!supported || !schema.requiredAssumptions().isEmpty()) {
+                String detail = supported
+                    ? "GUARDED_SPECIALIST_BINDINGS_UNAVAILABLE" : "NO_REGISTERED_SPECIALIST";
+                stages.add(new PreparationProfile.Stage(stage, detail, 0, 0, 0, 0, 0, 0, null, Set.of()));
+                return Optional.empty();
+            }
+            try {
+                var execution = runtime.exactRegistry().transform(source);
+                var exact = exactCandidate(runtime, source, assumptions, execution);
+                String detail = exact.isPresent() ? "EXACT_REGISTRY_PREPARATION_REPLAYED" : "NO_SPECIALIST_RESULT";
+                stages.add(new PreparationProfile.Stage(stage, detail, 0, 0, 0, 0, 1,
+                    execution.transformations().size(), null, Set.of()));
+                return exact.map(candidate -> positive("PREPARED", stage, detail, candidate.transformation(),
+                    candidate.certificateHash()));
+            } catch (RuntimeException exception) {
+                stages.add(new PreparationProfile.Stage(stage, "EXACT_REGISTRY_FAILURE", 0, 0, 0, 0, 1, 0, null, Set.of()));
+                return Optional.of(negative("TECHNICAL_FAILURE", "EXACT_REGISTRY_FAILURE"));
+            }
+        }
+
+        private PreparationProfile.Result local() {
+            String stage = "LOCAL_BRIDGE";
+            try {
+                var outcome = runtime.localCoordinator().analyzeBridge(schema.ruleId(), source, assumptions);
+                stages.add(new PreparationProfile.Stage(stage, outcome.detailCode(), 0, 0, 0, 0, 0, 0,
+                    outcome.work(), outcome.reachedLimits()));
+                if (outcome.direct()) return negative("TECHNICAL_FAILURE", "DIRECT_STAGE_DISAGREES_WITH_BRIDGE");
+                return outcome.prepared()
+                    ? positive(outcome.status().name(), stage, outcome.detailCode(), outcome.candidate().orElseThrow(),
+                        outcome.bridgeCertificateHash())
+                    : negative(outcome.status().name(), outcome.detailCode());
+            } catch (RuntimeException exception) {
+                stages.add(new PreparationProfile.Stage(stage, "LOCAL_BRIDGE_FAILURE", 0, 0, 0, 0, 0, 0, null, Set.of()));
+                return negative("TECHNICAL_FAILURE", "LOCAL_BRIDGE_FAILURE");
+            }
+        }
+
+        private PreparationProfile.Result positive(String status, String stage, String detail,
+                Transformation candidate, String certificateHash) {
+            return new PreparationProfile.Result(schema.ruleId(), schema.contentHash(), status, stage, detail,
+                Optional.of(candidate), certificateHash, stages);
+        }
+
+        private PreparationProfile.Result negative(String status, String detail) {
+            return new PreparationProfile.Result(schema.ruleId(), schema.contentHash(), status, "NONE", detail,
+                Optional.empty(), "", stages);
+        }
+    }
+
     public Verification verify(Evaluation evaluation) {
         if (evaluation == null) {
             return new Verification(false, "EVALUATION_MISSING");
@@ -317,8 +477,11 @@ public final class UnifiedRulePreparationCoordinator {
         String source,
         AssumptionSignature assumptions
     ) {
-        SafePreparationEngineRegistry.Execution execution =
-            runtime.exactRegistry().transform(source);
+        return exactCandidate(runtime, source, assumptions, runtime.exactRegistry().transform(source));
+    }
+
+    private Optional<ExactCandidate> exactCandidate(PrincipalRuntime runtime, String source, AssumptionSignature assumptions,
+            SafePreparationEngineRegistry.Execution execution) {
         List<Transformation> prepared = execution.preparedTransformations();
         Optional<Transformation> selected = prepared.stream()
             .filter(value -> runtime.schema().ruleId().equals(value.rule()))
