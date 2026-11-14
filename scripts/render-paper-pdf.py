@@ -24,6 +24,8 @@ SECTIONS = ("paper/manuscript.md", "paper/generated/public-corpus-splits.md",
             "paper/limitations.md",
             "paper/claims-and-evidence.md", "paper/artifact-appendix.md")
 WIDTHS = {
+    "Mined checks": (.24, .12, .16, .16, .16, .16),
+    "Negative executed": (.16, .22, .12, .18, .17, .15),
     "Emitted": (.15, .22, .12, .11, .13, .14, .13),
     "Distinct keys": (.16, .14, .14, .56),
     "Applications": (.28, .16, .14, .14, .12, .16),

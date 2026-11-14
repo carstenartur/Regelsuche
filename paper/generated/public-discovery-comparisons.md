@@ -67,9 +67,9 @@ Every lane had fourteen stage dispatch opportunities. The evaluator uses one val
 
 On the original public production campaign, the same miner formed a candidate only when it could pool observations. The control preserves all twelve seeds, capacity and native rejection records. [All batch receipts](https://github.com/carstenartur/Regelsuche/blob/5c34abe7b98d4ea508cceec282c9f304de6144c9/docs/evidence/open-target-fan-in-v1.json.gz).
 
-## Matched discovery-component ablations
+## Historical matched discovery-component ablations
 
-The separate diagnostic used historical input/output observations and a fixed challenge. Each row disables one production mechanism under the same slot and validation ceilings. Score changes compare the candidates present in both arms. Changed prefixes count budgets whose selected IDs differ from production.
+The original component run used the pre-#1245 validator on historical input/output observations and a fixed challenge. Each control disables one production mechanism under the same slot and validation ceilings. Score changes compare the candidates present in both arms. Changed prefixes count budgets whose selected IDs differ from production.
 
 | Policy | Candidates | Score changes | Changed prefixes | Refuted | Revisions |
 | --- | --- | --- | --- | --- | --- |
@@ -79,3 +79,27 @@ The separate diagnostic used historical input/output observations and a fixed ch
 | No novelty scheduling | 5 | 4 | 0 | 0 | 0 |
 
 The production miner pooled 23 observations and formed five candidates. Four known candidates gained two score points each when project novelty was disabled. Every budget from zero to 46 selected the same ordered prefix as production. The five terminal checks found no counterexample and issued no revised statement. The historical log-product control, counted separately in every arm, also produced no counterexample. It inferred three positivity guards. This panel provides no evidence about how often refinement repairs a refuted conjecture. [Matched inputs, schedules, challenges and control](https://github.com/carstenartur/Regelsuche/blob/a0abfcbf8b136047c52e51d87a13b0933433f9d7/docs/evidence/discovery-component-panel-v1.json.gz).
+
+## Validator-version comparison
+
+The same public component protocol ran with the exactness revision. No witness means the sampled search returned NO_COUNTEREXAMPLE_FOUND. Inconclusive means the validator could not decide within its exact arithmetic bounds. The separate log control is excluded from the mined-check denominator.
+
+| Policy | Mined checks | Earlier: no witness | Earlier inconclusive | Exact: no witness | Exact inconclusive |
+| --- | --- | --- | --- | --- | --- |
+| Production | 5 | 5 | 0 | 4 | 1 |
+| No fan-in | 0 | 0 | 0 | 0 | 0 |
+| No refinement | 5 | 5 | 0 | 4 | 1 |
+| No novelty scheduling | 5 | 5 | 0 | 4 | 1 |
+
+One distinct rational cancellation candidate changed to inconclusive in every arm that formed it. Its exact search found no defined scalar pair within the bounds. The four other mined candidates retained their bounded no-witness status. Twelve polynomial source pairs now carry exact univariate normal-form provenance. Both versions of the separate log control retained three positivity guards and found no refuting witness. [Historical component execution](https://github.com/carstenartur/Regelsuche/blob/a0abfcbf8b136047c52e51d87a13b0933433f9d7/docs/evidence/discovery-component-panel-v1.json.gz) · [Exact execution](https://github.com/carstenartur/Regelsuche/blob/5ddc10da51282fd6e23a01c3b6c7de1dd3bfa3cb/docs/evidence/discovery-component-panel-exact-v1.json.gz).
+
+The separate hidden-rule replay used the same twenty tasks in both versions. A missing admitted candidate can leave negative holdouts unexecuted. The false-positive count has the executed holdouts as its denominator.
+
+| Validator | Search | Recovered | Negative executed | Negative skipped | False positives |
+| --- | --- | --- | --- | --- | --- |
+| Historical | Best-first | 19/20 | 38 | 2 | 0 |
+| Historical | Project A* | 19/20 | 38 | 2 | 0 |
+| Exact | Best-first | 13/20 | 26 | 14 | 0 |
+| Exact | Project A* | 13/20 | 26 | 14 | 0 |
+
+[Historical hidden-rule execution](https://github.com/carstenartur/Regelsuche/blob/df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b/research/benchmarks/comparative-v2/hidden-rule-historical.json.gz) · [Exact execution](https://github.com/carstenartur/Regelsuche/blob/df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b/research/benchmarks/comparative-v2/hidden-rule-current.json.gz).

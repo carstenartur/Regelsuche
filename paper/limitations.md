@@ -16,7 +16,7 @@ A finite preregistered corpus supports only track- and corpus-scoped conclusions
 
 An evaluator establishes only its declared relation over its supported domain. Finite sequence continuation does not prove a unique infinite sequence. Symbolic normalization is not automatically a theorem-prover proof. Missing assumptions or translation losses must block stronger claims.
 
-The four open-target comparisons reused public cases. Their campaign seeds repeat the same sources. The sequence, rational and macro outcome denominators measure different operations. The held-out bridge and seven-stage panels each produced one distinct conjecture. The positive control for counterexample-guided refinement produced no refuting witness. [Public tables, figure and outcome definitions](generated/public-discovery-comparisons.md)
+The four open-target comparisons reused public cases. Their campaign seeds repeat the same sources. The sequence, rational and macro outcome denominators measure different operations. The held-out bridge and seven-stage panels each produced one distinct conjecture. The matched component panel and hidden-rule replay retain their historical and exact-arithmetic validator results separately. The component positive control for counterexample-guided refinement produced no refuting witness under either version. [Public tables, figure and outcome definitions](generated/public-discovery-comparisons.md)
 
 ## Novelty
 
