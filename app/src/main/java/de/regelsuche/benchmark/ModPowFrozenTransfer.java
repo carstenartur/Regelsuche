@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Process-separated TRAIN/freeze/TEST research; no executable learned rule is promoted.
@@ -157,14 +158,8 @@ public final class ModPowFrozenTransfer {
         // This preflight also bounds role-renaming/cost recursion independently of matching.
         requireBounded(row.source());
         require(productSites(row.source()) == 1, "v1 requires exactly one product-exponent site");
-        PatternExpr a = PatternExpr.var("A"), u = PatternExpr.var("U"), v = PatternExpr.var("V"), n = PatternExpr.var("N");
-        PatternExpr source = PatternExpr.fn("modpow", a, PatternExpr.op(BinaryOperator.MUL, u, v), n);
-        var rules = List.<de.regelsuche.transform.RewriteRule>of(
-            new PatternRewriteRule(ModPowDagRediscoveryStudy.RULE_LEFT, source,
-                PatternExpr.fn("modpow", PatternExpr.fn("modpow", a, u, n), v, n), RewriteKind.NORMALIZE, true, 0, false),
-            new PatternRewriteRule(ModPowDagRediscoveryStudy.RULE_RIGHT, source,
-                PatternExpr.fn("modpow", PatternExpr.fn("modpow", a, v, n), u, n), RewriteKind.NORMALIZE, true, 0, false));
-        var steps = new AstRewriteTransport(rules, 1024, 4096).generate(row.source());
+        var rules = compositionRules();
+        var steps = new AstRewriteTransport(List.copyOf(rules), 1024, 4096).generate(row.source());
         require(steps.size() == 2 && steps.stream().map(AstRewriteTransport.Step::rule).distinct().count() == 2,
             "primitive enumeration did not expose both factor orders; no completeness claim");
         var approved = new ArrayList<Expr>();
@@ -174,10 +169,24 @@ public final class ModPowFrozenTransfer {
         return new Baseline(steps.size(), List.copyOf(approved));
     }
 
+    static List<PatternRewriteRule> compositionRules() {
+        PatternExpr a = PatternExpr.var("A"), u = PatternExpr.var("U"), v = PatternExpr.var("V"), n = PatternExpr.var("N");
+        PatternExpr source = PatternExpr.fn("modpow", a, PatternExpr.op(BinaryOperator.MUL, u, v), n);
+        return List.of(
+            new PatternRewriteRule(ModPowDagRediscoveryStudy.RULE_LEFT, source,
+                PatternExpr.fn("modpow", PatternExpr.fn("modpow", a, u, n), v, n), RewriteKind.NORMALIZE, true, 0, false),
+            new PatternRewriteRule(ModPowDagRediscoveryStudy.RULE_RIGHT, source,
+                PatternExpr.fn("modpow", PatternExpr.fn("modpow", a, v, n), u, n), RewriteKind.NORMALIZE, true, 0, false));
+    }
+
     static Expr best(Row row, List<Expr> alternatives) {
+        return best(row, alternatives, expression -> cost(row, expression));
+    }
+
+    static Expr best(Row row, List<Expr> alternatives, Function<Expr, ModPowDagRediscoveryStudy.ProgramCost> score) {
         var candidates = new ArrayList<Expr>(); candidates.add(row.source()); candidates.addAll(alternatives);
         return candidates.stream().min(Comparator.comparingLong((Expr e) -> cost(row, e).dag())
-            .thenComparingLong(e -> cost(row, e).tree()).thenComparing(CODEC::encodeExpression)).orElseThrow();
+            .thenComparingLong(e -> score.apply(e).tree()).thenComparing(CODEC::encodeExpression)).orElseThrow();
     }
 
     static ModPowDagRediscoveryStudy.ProgramCost cost(Row row, Expr program) {
@@ -195,7 +204,7 @@ public final class ModPowFrozenTransfer {
         return expression;
     }
 
-    private static Row shuffled(Row row) {
+    static Row shuffled(Row row) {
         require(row.source().arguments().size() == 2, "TRAIN must have two outputs");
         var outputs = new ArrayList<>(row.source().arguments());
         require(outputs.get(1) instanceof FunctionExpr, "TRAIN retained residue required");
