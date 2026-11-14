@@ -19,6 +19,21 @@ class HistoricalComparisonWorkerTest {
     }
     private Map<String, Object> task(String kind, String source) { return Map.of("kind", kind, "source", source); }
 
+    @Test void freezeIncludesEveryLawAndBindsExactSourceBytes() throws Exception {
+        var identity = Map.of("linear", List.of(List.of("1", "0"), List.of("0", "1")),
+            "offset", List.of("0", "0"), "initial", List.of("0", "1"), "degree", 2, "workBudget", 100000);
+        String source = JSON.writeValueAsString(Map.of("version", 1, "cases", List.of(Map.of("id", "a", "request", identity))));
+        var frozen = JSON.readTree(HistoricalComparisonWorker.freezeInvariants(source));
+        assertEquals(5, frozen.required("cases").get(0).required("laws").size());
+        assertEquals("COMPLETE", frozen.required("cases").get(0).required("status").asText());
+        assertEquals(SchematicProofPlan.hash(source), frozen.required("sourceHash").asText());
+        assertNotEquals(frozen.required("sourceHash"),
+            JSON.readTree(HistoricalComparisonWorker.freezeInvariants(source + " ")).required("sourceHash"));
+        var contaminated = Map.of("id", "a", "request", identity, "reference", "x0");
+        String invalid = JSON.writeValueAsString(Map.of("version", 1, "cases", List.of(contaminated)));
+        assertThrows(IllegalArgumentException.class, () -> HistoricalComparisonWorker.freezeInvariants(invalid));
+    }
+
     @Test void callsTheExistingStructuralSolverForBothHistoricalGoals(@TempDir Path directory) throws Exception {
         var worker = new HistoricalComparisonWorker();
         var ready = call(worker, Map.of("op", "initialize", "profile", "NATIVE_BASE", "prelude", EMPTY, "directory", directory.toString()));
