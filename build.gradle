@@ -172,9 +172,10 @@ def verifyDomainLifecycleHandoffEvidence = tasks.register('verifyDomainLifecycle
 def verifyDomainGenericQualificationEvidence = tasks.register('verifyDomainGenericQualificationEvidence', Exec) {
     group = 'verification'
     description = 'Generates and verifies the domain-generic qualification profile.'
-    dependsOn prepareVerificationEnvironment, ':regelsuche-release:runDomainGenericQualification'
+    dependsOn prepareVerificationEnvironment, ':regelsuche-release:verifyRetainedDomainGenericQualification'
     workingDir rootDir
     inputs.file('scripts/verify-domain-generic-qualification.py')
+    inputs.file('scripts/domain_qualification_sources.py')
     doFirst {
         commandLine verificationPythonFile.get().absolutePath, 'scripts/verify-domain-generic-qualification.py'
     }
@@ -198,7 +199,7 @@ def generateCapabilityStatusForVerification = tasks.register('generateCapability
     description = 'Regenerates the public capability matrix from retained release and domain evidence.'
     dependsOn prepareVerificationEnvironment,
         ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence',
-        ':regelsuche-release:runDomainGenericQualification'
+        ':regelsuche-release:verifyRetainedDomainGenericQualification'
     workingDir rootDir
     doFirst {
         commandLine verificationPythonFile.get().absolutePath,
