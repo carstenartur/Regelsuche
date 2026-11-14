@@ -48,10 +48,12 @@ final class ExactScalarWitnessSearch {
         return evaluated;
     }
 
-    Comparison compare(Map<String, String> assignment, List<String> labels) {
+    Comparison compare(Map<String, String> assignment, List<String> labels, Runnable onAssignment) {
         if (!assumptions.stream().allMatch(guard -> satisfied(guard, assignment))) {
             return new Comparison(true, Optional.empty());
         }
+        // A rejected premise does not evaluate the source/candidate pair.
+        onAssignment.run();
         var first = evaluate(left, assignment);
         var second = evaluate(right, assignment);
         if (first.isEmpty() || second.isEmpty()) return new Comparison(false, Optional.empty());

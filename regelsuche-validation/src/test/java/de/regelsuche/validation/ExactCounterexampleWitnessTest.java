@@ -47,6 +47,19 @@ class ExactCounterexampleWitnessTest {
         }
     }
 
+    @Test void meterChargesOnlyAssignmentsAdmittedToTheExactPairEvaluation() {
+        var sources = new java.util.ArrayList<String>();
+        var measured = new DeterministicCounterexampleSearchService(sources::add);
+        var budget = new CounterexampleSearchService.CounterexampleBudget(0, true, false, 1L);
+        measured.search(new CounterexampleSearchService.HypothesisInput("affine", "x", "1", List.of("x-1 >= 0")), budget);
+        assertEquals(List.of("numeric-boundary-values", "numeric-boundary-values"), sources);
+        sources.clear();
+        measured.search(new CounterexampleSearchService.HypothesisInput("unbound", "3", "2", List.of("x > 0")), budget);
+        assertTrue(sources.isEmpty());
+        measured.search(new CounterexampleSearchService.HypothesisInput("ground", "2", "1", List.of()), budget);
+        assertEquals(List.of("numeric-boundary-values"), sources);
+    }
+
     @Test void unavailableExactArithmeticProducesNoRoundedWitness() {
         var unavailable = finder.search(new CounterexampleSearchService.HypothesisInput(
             "high power", "2^100", "0", List.of()), CounterexampleSearchService.CounterexampleBudget.defaultBudget());

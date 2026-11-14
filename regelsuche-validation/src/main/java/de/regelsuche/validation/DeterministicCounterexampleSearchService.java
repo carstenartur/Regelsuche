@@ -18,9 +18,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Deterministic baseline implementation for counterexample search.
@@ -34,6 +36,17 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     private static final List<Double> RATIONAL_VALUES = List.of(0.5, -0.5, 2.0 / 3.0, -2.0 / 3.0);
 
     private final ExpressionParser parser = new ExpressionParser();
+
+    private final Consumer<String> onAssignment;
+
+    public DeterministicCounterexampleSearchService() {
+        this(source -> {});
+    }
+
+    /** Observes each assignment actually evaluated, including the first refuting assignment. */
+    public DeterministicCounterexampleSearchService(Consumer<String> onAssignment) {
+        this.onAssignment = Objects.requireNonNull(onAssignment, "onAssignment");
+    }
 
     @Override
     public CounterexampleSearchResult search(HypothesisInput hypothesis, CounterexampleBudget budget) {
@@ -172,7 +185,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     ) {
         if (values.isEmpty()) return Optional.empty();
         if (orderedVariables.isEmpty()) {
-            if (scalar != null) return scalar.compare(Map.of(), List.of()).witness();
+            if (scalar != null) return scalar.compare(Map.of(), List.of(), () -> onAssignment.accept(source)).witness();
             return numericWitness(left, right, Map.of(), List.of(), inferredAssumptions, source);
         }
 
@@ -196,7 +209,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             if (scalar == null) {
                 witness = numericWitness(left, right, assignment, assignmentText, inferredAssumptions, source);
             } else {
-                var result = scalar.compare(exactAssignment, assignmentText);
+                var result = scalar.compare(exactAssignment, assignmentText, () -> onAssignment.accept(source));
                 witness = result.witness();
                 if (!result.defined()) {
                     // Preserve domain-obligation inference, without promoting a projected value to a witness.
@@ -211,6 +224,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
     private Optional<Counterexample> numericWitness(Expr left, Expr right, Map<String, RuntimeValue> assignment,
             List<String> labels, Map<String, CounterexampleSearchService.TypedAssumption> inferredAssumptions, String source) {
+        onAssignment.accept(source);
         Evaluation a = evaluate(left, assignment);
         Evaluation b = evaluate(right, assignment);
         if (!a.defined() || !b.defined()) {
@@ -252,6 +266,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             if (violatesAssumptions(assignment, assumptionGuards)) {
                 continue;
             }
+            onAssignment.accept("complex-samples");
             Evaluation leftEvaluation = evaluate(left, assignment);
             Evaluation rightEvaluation = evaluate(right, assignment);
             if (leftEvaluation.defined()
@@ -283,6 +298,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         for (int i = 2; i < orderedVariables.size(); i++) {
             assignment.put(orderedVariables.get(i), RuntimeValue.matrix(new Matrix(new double[][] {{1, 0}, {0, 1}})));
         }
+        onAssignment.accept("matrix-non-commutative");
         Evaluation leftEvaluation = evaluate(left, assignment);
         Evaluation rightEvaluation = evaluate(right, assignment);
         if (leftEvaluation.defined()
