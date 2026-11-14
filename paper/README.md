@@ -14,7 +14,7 @@ No pending claim may be promoted to a central empirical result by editing prose 
 ./paper/reproduce-paper.sh
 ```
 
-The foundation build performs deterministic structural checks and writes the claim and artifact summaries, the per-policy results for the public controller campaign and its allocation figure below `paper/generated/`. A later revision will compile the archival PDF once the selected manuscript toolchain is frozen.
+The foundation build performs deterministic structural checks and writes the claim and artifact summaries, the case split table, the per-policy results for the public controller campaign and its allocation figure below `paper/generated/`. A later revision will compile the archival PDF once the selected manuscript toolchain is frozen.
 
 ## Source of truth
 
