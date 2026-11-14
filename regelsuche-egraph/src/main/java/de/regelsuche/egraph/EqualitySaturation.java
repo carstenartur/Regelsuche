@@ -101,6 +101,12 @@ public final class EqualitySaturation {
         return new ConditionalResult(result, guards.assumptions, guards.decisions);
     }
 
+    /** Fresh scalar cancellation lane. A changed result is released only after detached guarded replay. */
+    public ProvedResult saturateWithCancellationProof(Expr input, List<Assumption> assumptions,
+            ToIntFunction<ENode> costOfNode, ProofOptions options) {
+        return de.regelsuche.egraph.proof.CancellationProof.run(this, input, assumptions, costOfNode, nativeProofOptions(options));
+    }
+
     private Execution saturateGraph(EGraph graph, EClassId root,
             ToIntFunction<ENode> costOfNode, Run run) {
         // Validate costs before mutation, but allow rewriting to make the root finite.

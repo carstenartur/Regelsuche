@@ -32,8 +32,13 @@ final class ProofSupport {
 
     record Frame(Object node, boolean exit, int depth) {}
 
-    ProofSupport(ProofLimits limits) {
+    private final boolean literalVariablePatterns;
+
+    ProofSupport(ProofLimits limits) { this(limits, false); }
+
+    ProofSupport(ProofLimits limits, boolean literalVariablePatterns) {
         this.limits = nonNull(limits);
+        this.literalVariablePatterns = literalVariablePatterns;
     }
 
     static <T> T nonNull(T value) {
@@ -155,6 +160,7 @@ final class ProofSupport {
                     new Parts("BINARY", b.operator().name(), List.of(b.left(), b.right()));
             case FunctionExpr f -> new Parts("FUNCTION", f.name(), f.arguments());
             case PatternExpr.Placeholder p -> new Parts("P", p.name(), List.of());
+            case PatternExpr.LiteralVariable v when literalVariablePatterns -> new Parts("VARIABLE", v.name(), List.of());
             case PatternExpr.LiteralNumber n -> new Parts("NUMBER", rational(n.value()), List.of());
             case PatternExpr.Operation b ->
                     new Parts("BINARY", b.operator().name(), List.of(b.left(), b.right()));

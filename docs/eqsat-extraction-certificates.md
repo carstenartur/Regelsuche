@@ -110,7 +110,7 @@ the four-byte `EQSC` marker and version integer, followed by these sections:
 | Section | Version 1 layout |
 | --- | --- |
 | Terms | Count and nodes in certificate order. Tags 0–3 mean number, variable, binary operator, function. Each node has a label and a counted list of prior term indices. |
-| Rule patterns | Count and nodes in postorder of first occurrence, visiting each rule's source then target in rule order. Equal nodes share an index. Tags 0–3 mean placeholder, number, binary operator, function. Each node has a label and a counted list of prior pattern indices. |
+| Rule patterns | Count and nodes in postorder of first occurrence, visiting each rule's source then target in rule order. Equal nodes share an index. Tags 0–3 mean placeholder, number, binary operator, function. Tag 4 encodes an exact literal variable, including its lossless symbol identity. Existing tags and encodings are unchanged. Each node has a label and a counted list of prior pattern indices. |
 | Rules | Count, then each ID and its source and target pattern indices. |
 | Proof steps | Count and steps in certificate order. Tags 0–4 mean reflexivity (term), symmetry (premise), transitivity (first premise, second premise), congruence (left term, right term, counted child proofs), pattern instance (rule, before term, after term, counted bindings of name then term). Binding names are in Java string order. |
 | Endpoints | Input term, output term, conclusion proof step. |
@@ -229,6 +229,20 @@ conditional unions are blocked. The stop reason distinguishes undecided guards
 and exhausted guard evidence from an attained fixpoint.
 
 Use the returned expression together with its assumption list. These decisions
-authorize local unions in the fixed context. Independent extraction replay for
-conditional derivations and solver-certificate references are tracked in
+authorize local unions in the fixed context. The checked scalar lane below supports detached replay of this specific derivation. Broader conditional proofs and solver-certificate references are tracked in
 [#662](https://github.com/carstenartur/Regelsuche/issues/662).
+
+## Checked scalar factor cancellation
+
+`EqualitySaturation.saturateWithCancellationProof(input, assumptions, cost, options)` runs the native scalar guard engine with exactly the built-in `ast_cancel_division_factor` rule. It returns a changed expression only after an independent proof check. It collects applied ground instances of `(k*r)/k = r` and `(r*k)/k = r` and lets the existing bounded proof builder connect their exact endpoints through congruence and transitivity. This covers nested and repeated cancellations. Use the existing saturation APIs for other rule inventories.
+
+The receiving caller supplies the expected input, expected output, the trusted built-in rule and its own typed assumptions. After decoding the ordinary extraction certificate, call:
+
+```java
+var check = CancellationProof.check(expectedInput, expectedOutput, decoded,
+    trustedRules, receiverAssumptions, replayLimits);
+```
+
+The checker independently constructs each oriented axiom from the named factor. Exact nonzero rational constants need no premise. A simple scalar symbol requires a canonical typed `nonZero` or `positive` premise from the receiver. Each certificate rule must match this independently derived pattern exactly, including its literal variable or rational, and the ordinary DAG checker validates every ground instance, congruence, reference and endpoint. A lookalike rule name, a custom string predicate, missing context, zero or an unrelated output cannot authorize a cancellation. Only the premises actually used are required. Mixed rule packs, facts inherited from equivalent compound factors, unrestricted AC permutations and solver evidence are outside this lane.
+
+The codec retains the existing byte layout for previously supported patterns. Older decoders reject the newly used literal-variable tag. The bounded receiver rejects oversized proof inputs or exhausted work with `LIMIT_EXCEEDED`.

@@ -59,6 +59,18 @@ public final class ExtractionProofChecker {
             this.checked = checked;
         }
 
+        static CheckResult denied(Status status, String detail, long work) {
+            if (status == Status.ACCEPTED) throw new IllegalArgumentException("checker token required");
+            return new CheckResult(status, detail, work, null);
+        }
+
+        CheckResult includingPrelude(long prelude) {
+            long total = Math.addExact(prelude, work);
+            var token = checked == null ? null : new CheckedCertificate(
+                    checked.certificate, checked.input, checked.output, total);
+            return new CheckResult(status, detail, total, token);
+        }
+
         public Status status() {
             return status;
         }
@@ -84,7 +96,12 @@ public final class ExtractionProofChecker {
             ExtractionCertificate certificate,
             Collection<? extends RewriteRule> trustedRules,
             ProofLimits limits) {
-        var s = new ProofSupport(limits);
+        return check(expectedInput, expectedOutput, certificate, trustedRules, limits, false);
+    }
+
+    static CheckResult check(Expr expectedInput, Expr expectedOutput, ExtractionCertificate certificate,
+            Collection<? extends RewriteRule> trustedRules, ProofLimits limits, boolean literalVariables) {
+        var s = new ProofSupport(limits, literalVariables);
         try {
             Objects.requireNonNull(certificate);
             s.work(1);

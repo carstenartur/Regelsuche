@@ -20,7 +20,7 @@ public final class ExtractionCertificateCodec {
     private static final int FORMAT_VERSION = 1;
     private static final int MAX_BYTES = 16 * 1024 * 1024;
     private static final List<Kind> TERM_KINDS = List.of(Kind.NUMBER, Kind.VARIABLE, Kind.BINARY, Kind.FUNCTION);
-    private static final List<String> PATTERN_TAGS = List.of("P", "NUMBER", "BINARY", "FUNCTION");
+    private static final List<String> PATTERN_TAGS = List.of("P", "NUMBER", "BINARY", "FUNCTION", "VARIABLE");
 
     private ExtractionCertificateCodec() {}
 
@@ -56,7 +56,7 @@ public final class ExtractionCertificateCodec {
         private final ProofSupport syntax;
 
         Writer(ProofLimits limits) {
-            syntax = new ProofSupport(limits);
+            syntax = new ProofSupport(limits, true);
         }
 
         void certificate(ExtractionCertificate value) {
@@ -206,7 +206,7 @@ public final class ExtractionCertificateCodec {
         private long readCharacters;
 
         Reader(byte[] bytes, ProofLimits limits) {
-            syntax = new ProofSupport(limits);
+            syntax = new ProofSupport(limits, true);
             syntax.size(bytes.length, MAX_BYTES, "certificate byte limit");
             syntax.work(bytes.length);
             input = ByteBuffer.wrap(bytes.clone());
@@ -278,7 +278,7 @@ public final class ExtractionCertificateCodec {
                 String tag = PATTERN_TAGS.get(reference(tag(), PATTERN_TAGS.size()));
                 String label = text(tag.equals("NUMBER") ? 4096 : Long.MAX_VALUE);
                 int arity = switch (tag) {
-                    case "P", "NUMBER" -> 0;
+                    case "P", "NUMBER", "VARIABLE" -> 0;
                     case "BINARY" -> 2;
                     default -> -1;
                 };
@@ -304,6 +304,7 @@ public final class ExtractionCertificateCodec {
             syntax.size(depth, syntax.limits.maxDepth(), "pattern depth");
             PatternExpr value = switch (tag) {
                 case "P" -> PatternExpr.var(label);
+                case "VARIABLE" -> PatternExpr.variable(label);
                 case "NUMBER" -> PatternExpr.num(syntax.number(label));
                 case "BINARY" -> PatternExpr.op(BinaryOperator.valueOf(label), arguments.get(0), arguments.get(1));
                 case "FUNCTION" -> new PatternExpr.Function(label, arguments);
