@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalCancellation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">RationalCancellation.java</span></div><h1>RationalCancellation.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionEvaluation;
+import de.regelsuche.assumption.AssumptionEvaluationEvidence;
+import de.regelsuche.assumption.AssumptionEvaluator;
+import de.regelsuche.assumption.AssumptionEvaluatorPortfolio;
+import de.regelsuche.assumption.AssumptionEvaluationDisposition;
+import de.regelsuche.assumption.AssumptionTruthValue;
+import de.regelsuche.assumption.KnownAssumptionEvaluator;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.egraph.EqualitySaturation.GuardDecision;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.regex.Pattern;
+
+/** Both structural orientations of the built-in scalar (x*y)/x cancellation. */
+final class RationalCancellation {
+    static final int MAX_DECISIONS = 256;
+<span class="fc" id="L29">    private static final Pattern IDENTIFIER = Pattern.compile(&quot;[\\p{L}][\\p{L}\\p{N}_]*&quot;);</span>
+<span class="fc" id="L30">    private static final PatternExpr FACTOR = PatternExpr.var(&quot;factor&quot;);</span>
+<span class="fc" id="L31">    private static final PatternExpr REST = PatternExpr.var(&quot;rest&quot;);</span>
+<span class="fc" id="L32">    private static final List&lt;PatternExpr&gt; SOURCES = List.of(</span>
+<span class="fc" id="L33">        source(FACTOR, REST), source(REST, FACTOR));</span>
+<span class="fc" id="L34">    private static final AssumptionEvaluatorPortfolio LOCAL = new AssumptionEvaluatorPortfolio(</span>
+<span class="fc" id="L35">        List.of(new CanonicalNonzeroEvaluator()));</span>
+<span class="fc" id="L36">    private static final AssumptionEvaluatorPortfolio UNSUPPORTED = new AssumptionEvaluatorPortfolio(</span>
+<span class="fc" id="L37">        List.of(new UnsupportedFactorEvaluator()));</span>
+<span class="fc" id="L38">    private static final AssumptionEvaluatorPortfolio LITERAL = new AssumptionEvaluatorPortfolio(</span>
+<span class="fc" id="L39">        List.of(new CanonicalNonzeroEvaluator(), new LiteralNonZeroEvaluator()));</span>
+
+    final List&lt;Assumption&gt; assumptions;
+<span class="fc" id="L42">    final List&lt;GuardDecision&gt; decisions = new ArrayList&lt;&gt;();</span>
+    boolean undecided;
+    boolean decisionLimit;
+
+<span class="fc" id="L46">    RationalCancellation(List&lt;Assumption&gt; assumptions) {</span>
+<span class="fc" id="L47">        this.assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L48">    }</span>
+
+    private static boolean isCanonicalGuardFact(Assumption fact) {
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (fact.symbols().size() != 1) return false;</span>
+<span class="fc" id="L52">        String subject = fact.symbols().getFirst();</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        return fact.equals(Assumption.nonZero(subject)) || fact.equals(Assumption.positive(subject));</span>
+    }
+
+    private static PatternExpr source(PatternExpr left, PatternExpr right) {
+<span class="fc" id="L57">        return PatternExpr.op(BinaryOperator.DIV, PatternExpr.op(BinaryOperator.MUL, left, right), FACTOR);</span>
+    }
+
+    void apply(EGraph graph, EGraphPatternMatcher matcher, RewriteRule rule, List&lt;EClassId&gt; candidates,
+            EqualitySaturation.Run run) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (int i = 0; i &lt; SOURCES.size(); i++) {</span>
+<span class="fc" id="L63">            var pattern = SOURCES.get(i);</span>
+            List&lt;EGraphPatternMatcher.Match&gt; matches;
+            try {
+<span class="fc" id="L66">                matches = matcher.matchAll(rule.id(), pattern, candidates);</span>
+<span class="nc" id="L67">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L68">                run.diagnostics.record(rule.id(), null, SaturationDiagnostics.Outcome.RULE_FAILURE,</span>
+                    SaturationDiagnostics.Stage.MATCHES, failure);
+<span class="nc" id="L70">                continue;</span>
+<span class="fc" id="L71">            }</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (var match : matches) {</span>
+<span class="fc" id="L73">                var rest = match.bindings().get(&quot;rest&quot;);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                if (graph.areEquivalent(match.root(), rest)) continue;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                if (decisions.size() == MAX_DECISIONS) {</span>
+<span class="fc" id="L76">                    decisionLimit = true;</span>
+<span class="fc" id="L77">                    return;</span>
+                }
+                try {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                    consider(graph, rule, match, rest, i == 0, run);</span>
+<span class="nc" id="L81">                } catch (RuntimeException failure) {</span>
+<span class="nc" id="L82">                    run.diagnostics.record(rule.id(), match.root(), SaturationDiagnostics.Outcome.RULE_FAILURE,</span>
+                        SaturationDiagnostics.Stage.ASSUMPTIONS, failure);
+<span class="fc" id="L84">                }</span>
+<span class="fc" id="L85">            }</span>
+        }
+<span class="fc" id="L87">    }</span>
+
+    private void consider(EGraph graph, RewriteRule rule, EGraphPatternMatcher.Match match,
+            EClassId rest, boolean factorOnLeft, EqualitySaturation.Run run) {
+<span class="fc" id="L91">        Expr factor = graph.extract(match.bindings().get(&quot;factor&quot;), node -&gt; 1);</span>
+<span class="fc" id="L92">        Expr after = graph.extract(rest, node -&gt; 1);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        Expr product = factorOnLeft ? new BinaryExpr(factor, BinaryOperator.MUL, after)</span>
+<span class="fc" id="L94">            : new BinaryExpr(after, BinaryOperator.MUL, factor);</span>
+<span class="fc" id="L95">        Expr before = new BinaryExpr(product, BinaryOperator.DIV, factor);</span>
+<span class="fc" id="L96">        List&lt;AssumptionEvaluation&gt; facts = guardFacts(graph, match.bindings().get(&quot;factor&quot;), factor);</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">        boolean trueFact = facts.stream().anyMatch(e -&gt; e.isSatisfied() || e.conflicting());</span>
+<span class="fc bfc" id="L98" title="All 4 branches covered.">        boolean falseFact = facts.stream().anyMatch(e -&gt; e.isRejected() || e.conflicting());</span>
+<span class="fc bfc" id="L99" title="All 4 branches covered.">        boolean applied = trueFact &amp;&amp; !falseFact;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (applied) {</span>
+<span class="fc" id="L101">            graph.union(match.root(), rest);</span>
+<span class="fc" id="L102">            run.applied(rule.id(), new SaturationProvenance.Witness(rule.id(), before, after));</span>
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        undecided |= trueFact == falseFact;</span>
+<span class="fc" id="L105">        decisions.add(new GuardDecision(rule.id(), before, after, facts, applied));</span>
+<span class="fc" id="L106">    }</span>
+
+    /** Inspect every scalar literal and variable in the matched class, independent of extraction order. */
+    private List&lt;AssumptionEvaluation&gt; guardFacts(EGraph graph, EClassId id, Expr selected) {
+<span class="fc" id="L110">        var subjects = new LinkedHashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L111">        subjects.add(selected);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (ENode node : graph.classOrThrow(id).nodes()) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (!node.isLeaf()) continue;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (node.symbol().startsWith(&quot;num:&quot;)) {</span>
+<span class="fc" id="L115">                subjects.add(new NumberExpr(ExactRational.fromCanonicalText(node.symbol().substring(4))));</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            } else if (node.symbol().startsWith(&quot;var:&quot;)) {</span>
+<span class="fc" id="L117">                subjects.add(new VariableExpr(node.symbol().substring(4)));</span>
+            }
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">        return subjects.stream().map(this::evaluate).toList();</span>
+    }
+
+    private AssumptionEvaluation evaluate(Expr factor) {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (factor instanceof NumberExpr number) {</span>
+<span class="fc" id="L125">            return LITERAL.evaluate(Assumption.nonZero(number.value().canonicalText()), assumptions);</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        if (factor instanceof VariableExpr variable &amp;&amp; IDENTIFIER.matcher(variable.name()).matches()) {</span>
+<span class="fc" id="L128">            return LOCAL.evaluate(Assumption.nonZero(variable.name()), assumptions);</span>
+        }
+        // A formatted compound could collide with a free symbol. Only exact atomic
+        // identities are currently authorized; the concrete factor is retained in before.
+<span class="fc" id="L132">        var requirement = Assumption.nonZero(ExpressionFormatter.format(factor));</span>
+<span class="fc" id="L133">        return UNSUPPORTED.evaluate(requirement, assumptions);</span>
+    }
+
+    private static final class CanonicalNonzeroEvaluator implements AssumptionEvaluator {
+<span class="fc" id="L137">        public String id() { return &quot;egraph.canonical-scalar-nonzero&quot;; }</span>
+<span class="fc" id="L138">        public String revision() { return &quot;1/&quot; + KnownAssumptionEvaluator.INSTANCE.revision(); }</span>
+
+        public AssumptionEvaluationEvidence evaluate(Assumption required, List&lt;Assumption&gt; known) {
+<span class="fc" id="L141">            var compatible = known.stream().filter(RationalCancellation::isCanonicalGuardFact).toList();</span>
+<span class="fc" id="L142">            var result = KnownAssumptionEvaluator.INSTANCE.evaluate(required, compatible);</span>
+<span class="fc" id="L143">            return AssumptionEvaluationEvidence.evaluated(id(), revision(), result.result(), result.explanation(), &quot;&quot;);</span>
+        }
+    }
+
+    private static final class UnsupportedFactorEvaluator implements AssumptionEvaluator {
+<span class="fc" id="L148">        public String id() { return &quot;egraph.compound-nonzero&quot;; }</span>
+<span class="fc" id="L149">        public String revision() { return &quot;1&quot;; }</span>
+
+        public AssumptionEvaluationEvidence evaluate(Assumption required, List&lt;Assumption&gt; known) {
+<span class="fc" id="L152">            return AssumptionEvaluationEvidence.inconclusive(id(), revision(), AssumptionEvaluationDisposition.UNSUPPORTED,</span>
+                &quot;The guard requires an exact rational literal or a variable identifier.&quot;, &quot;&quot;);
+        }
+    }
+
+    private static final class LiteralNonZeroEvaluator implements AssumptionEvaluator {
+<span class="fc" id="L158">        public String id() { return &quot;egraph.exact-rational-nonzero&quot;; }</span>
+<span class="fc" id="L159">        public String revision() { return &quot;1&quot;; }</span>
+
+        public AssumptionEvaluationEvidence evaluate(Assumption required, List&lt;Assumption&gt; known) {
+<span class="fc" id="L162">            ExactRational value = ExactRational.fromCanonicalText(required.symbols().getFirst());</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            return AssumptionEvaluationEvidence.evaluated(id(), revision(), value.isZero()</span>
+<span class="fc" id="L164">                ? AssumptionTruthValue.FALSE : AssumptionTruthValue.TRUE, &quot;Exact rational literal&quot;, value.canonicalText());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

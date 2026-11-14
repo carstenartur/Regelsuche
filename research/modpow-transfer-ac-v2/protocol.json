@@ -1,0 +1,17 @@
+{
+  "schema": "regelsuche.modpow-ac-transfer-protocol/v2",
+  "trainSha256": "c2932bb1a8a4412a819da52fb0b75ec62dae768b9e2261f19b1e7c6b6725c978",
+  "modelSha256": "e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068",
+  "testSha256": "dd27bae32ecfa484c2e6282eee65f6d848d8b0530f2bf1700df48f9cef220cc6",
+  "recognition": [
+    "EXACT",
+    "ARITHMETIC_AC"
+  ],
+  "maxAssignments": 1024,
+  "positiveCases": 6,
+  "negativeCases": 2,
+  "primitiveControl": "Both one-step product composition rules, independently replayed. Select minimum DAG, then TREE, then canonical expression.",
+  "success": "On every positive case the frozen model independently replays the selected result, preserves every other physical output, achieves strict source-cost savings and the complete primitive optimum. Both negatives produce zero learned applications. Both TRAIN relationship-breaking controls stay clean.",
+  "work": "Count assignment attempts, matcher steps and structural branches for all tuples in both profiles. Report generation and replay separately. This protocol has no common mechanical-work budget or speedup claim.",
+  "scope": "Public, preregistered mechanism replication on new source-only cases, extending the known historical v1 limitations. Model and training data reused from v1. This is not a blind generalization or an independently held-out family study."
+}

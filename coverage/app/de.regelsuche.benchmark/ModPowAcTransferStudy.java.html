@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModPowAcTransferStudy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ModPowAcTransferStudy.java</span></div><h1>ModPowAcTransferStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import static de.regelsuche.benchmark.ModPowTransferFiles.JSON;
+import static de.regelsuche.benchmark.ModPowTransferFiles.require;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.benchmark.ModPowTransferFiles.Row;
+import de.regelsuche.mining.TypedOutputPattern;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.RecognitionProfile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Process-separated evaluation of the preregistered public transfer panel using the frozen v1 learner. */
+public final class ModPowAcTransferStudy {
+    private static final String PROTOCOL_SHA = &quot;76f653520ccd573189f67b936cb7002e8a1d134eae8aefed23e434d561a8bc7f&quot;;
+<span class="fc" id="L23">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+
+    private ModPowAcTransferStudy() {}
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L28" title="All 2 branches missed.">        require(args.length == 4, &quot;usage: &lt;protocol.json&gt; &lt;uncompressed-model.json&gt; &lt;test.json&gt; &lt;new-result.json&gt;&quot;);</span>
+<span class="nc" id="L29">        ObjectNode result = evaluate(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]));</span>
+<span class="nc" id="L30">        Files.write(Path.of(args[3]), JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(result),</span>
+            StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+<span class="nc" id="L32">    }</span>
+
+    static ObjectNode evaluate(Path protocolFile, Path modelFile, Path corpusFile) throws IOException {
+<span class="fc" id="L35">        var protocol = JSON.readTree(boundBytes(protocolFile, PROTOCOL_SHA, &quot;protocol&quot;));</span>
+<span class="fc" id="L36">        String modelSha = protocol.required(&quot;modelSha256&quot;).textValue();</span>
+<span class="fc" id="L37">        var model = JSON.readTree(boundBytes(modelFile, modelSha, &quot;frozen model&quot;));</span>
+<span class="fc" id="L38">        require(model.required(&quot;trainSha256&quot;).equals(protocol.required(&quot;trainSha256&quot;)), &quot;training digest mismatch&quot;);</span>
+<span class="fc" id="L39">        var hypothesis = ModPowTransferFiles.candidate(model);</span>
+<span class="fc" id="L40">        var exact = new TypedOutputPattern(hypothesis, RecognitionProfile.exact());</span>
+<span class="fc" id="L41">        var ac = new TypedOutputPattern(hypothesis, RecognitionProfile.arithmeticAc());</span>
+<span class="fc" id="L42">        String corpusSha = protocol.required(&quot;testSha256&quot;).textValue();</span>
+<span class="fc" id="L43">        List&lt;Row&gt; cases = ModPowTransferFiles.rows(boundBytes(corpusFile, corpusSha, &quot;TEST corpus&quot;), &quot;TEST&quot;);</span>
+<span class="fc" id="L44">        int maxAssignments = protocol.required(&quot;maxAssignments&quot;).intValue();</span>
+
+<span class="fc" id="L46">        var report = JSON.createObjectNode().put(&quot;schema&quot;, &quot;regelsuche.modpow-ac-transfer-result/v2&quot;)</span>
+<span class="fc" id="L47">            .put(&quot;protocolSha256&quot;, PROTOCOL_SHA).put(&quot;modelSha256&quot;, modelSha).put(&quot;testSha256&quot;, corpusSha)</span>
+<span class="fc" id="L48">            .put(&quot;shuffledTrainWitnessCount&quot;, model.required(&quot;shuffledWitnessCount&quot;).intValue());</span>
+<span class="fc" id="L49">        var rows = report.putArray(&quot;cases&quot;);</span>
+<span class="fc" id="L50">        int positives = 0, exactTransfers = 0, acTransfers = 0;</span>
+<span class="fc" id="L51">        boolean controlsClean = true;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (Row row : cases) {</span>
+<span class="fc" id="L53">            var baseline = ModPowFrozenTransfer.baseline(row);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            require(baseline.approved().size() == 2, &quot;incomplete primitive replay on &quot; + row.id());</span>
+<span class="fc" id="L55">            Expr optimum = ModPowFrozenTransfer.best(row, baseline.approved());</span>
+<span class="fc" id="L56">            long optimumCost = ModPowFrozenTransfer.cost(row, optimum).dag();</span>
+<span class="fc" id="L57">            var result = rows.addObject().put(&quot;id&quot;, row.id()).put(&quot;positive&quot;, row.positive())</span>
+<span class="fc" id="L58">                .put(&quot;sourceAst&quot;, CODEC.encodeExpression(row.source())).put(&quot;sourceDag&quot;, ModPowFrozenTransfer.cost(row, row.source()).dag())</span>
+<span class="fc" id="L59">                .put(&quot;primitiveGenerated&quot;, baseline.generated()).put(&quot;primitiveApproved&quot;, baseline.approved().size())</span>
+<span class="fc" id="L60">                .put(&quot;primitiveOptimumDag&quot;, optimumCost).put(&quot;primitiveOptimumAst&quot;, CODEC.encodeExpression(optimum));</span>
+<span class="fc" id="L61">            result.set(&quot;premises&quot;, JSON.valueToTree(row.assumptions()));</span>
+<span class="fc" id="L62">            ObjectNode exactResult = profile(exact, row, maxAssignments, optimumCost);</span>
+<span class="fc" id="L63">            ObjectNode acResult = profile(ac, row, maxAssignments, optimumCost);</span>
+<span class="fc" id="L64">            result.set(&quot;exact&quot;, exactResult);</span>
+<span class="fc" id="L65">            result.set(&quot;arithmeticAc&quot;, acResult);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            if (row.positive()) {</span>
+<span class="fc" id="L67">                positives++;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                if (exactResult.get(&quot;qualifiedTransfer&quot;).booleanValue()) exactTransfers++;</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                if (acResult.get(&quot;qualifiedTransfer&quot;).booleanValue()) acTransfers++;</span>
+            } else {
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">                controlsClean &amp;= cleanNegative(exactResult) &amp;&amp; cleanNegative(acResult);</span>
+            }
+<span class="fc" id="L73">        }</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        require(positives == protocol.required(&quot;positiveCases&quot;).intValue()</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            &amp;&amp; cases.size() - positives == protocol.required(&quot;negativeCases&quot;).intValue(), &quot;protocol case counts changed&quot;);</span>
+<span class="fc" id="L76">        return report.put(&quot;positiveCases&quot;, positives).put(&quot;exactTransfers&quot;, exactTransfers)</span>
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">            .put(&quot;arithmeticAcTransfers&quot;, acTransfers).put(&quot;negativeControlsClean&quot;, controlsClean)</span>
+<span class="fc" id="L78">            .put(&quot;arithmeticAcMeetsTransferCriterion&quot;, controlsClean &amp;&amp; acTransfers == positives);</span>
+    }
+
+    private static ObjectNode profile(TypedOutputPattern matcher, Row row, int maxAssignments, long optimum) {
+<span class="fc" id="L82">        var measured = matcher.findWithMatchWork(row.source(), maxAssignments);</span>
+<span class="fc" id="L83">        var match = measured.result();</span>
+<span class="fc" id="L84">        List&lt;Expr&gt; valid = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L85">        var result = JSON.createObjectNode();</span>
+<span class="fc" id="L86">        var receipts = result.putArray(&quot;receipts&quot;);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (var proposal : match.applications()) {</span>
+<span class="fc" id="L88">            var proof = ModPowCompositionReplay.verify(row.source(), proposal.target(), row.assumptions());</span>
+<span class="fc" id="L89">            var receipt = receipts.addObject().put(&quot;targetAst&quot;, CODEC.encodeExpression(proposal.target()));</span>
+<span class="fc" id="L90">            receipt.set(&quot;positions&quot;, JSON.valueToTree(proposal.positions()));</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            boolean preserved = proposal.source() == row.source()</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                &amp;&amp; preservesOtherOutputs(row.source(), proposal.target(), proposal.positions().getFirst());</span>
+<span class="fc" id="L93">            receipt.put(&quot;replayApproved&quot;, proof.isPresent()).put(&quot;otherOutputInstancesPreserved&quot;, preserved);</span>
+<span class="fc" id="L94">            proof.ifPresent(checked -&gt; receipt.put(&quot;primitiveRule&quot;, checked.primitiveRule()));</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">            if (preserved &amp;&amp; proof.isPresent()) valid.add(proposal.target());</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        Expr selected = ModPowFrozenTransfer.best(row, valid);</span>
+<span class="fc" id="L98">        long selectedCost = ModPowFrozenTransfer.cost(row, selected).dag();</span>
+<span class="pc bpc" id="L99" title="3 of 8 branches missed.">        boolean qualified = match.complete() &amp;&amp; !valid.isEmpty() &amp;&amp; valid.size() == match.applications().size()</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            &amp;&amp; selectedCost == optimum &amp;&amp; selectedCost &lt; ModPowFrozenTransfer.cost(row, row.source()).dag();</span>
+<span class="fc" id="L101">        return result.put(&quot;assignmentAttempts&quot;, match.assignmentAttempts()).put(&quot;matcherSteps&quot;, match.matcherSteps())</span>
+<span class="fc" id="L102">            .put(&quot;structuralBranches&quot;, measured.patternBranches()).put(&quot;complete&quot;, match.complete())</span>
+<span class="fc" id="L103">            .put(&quot;proposed&quot;, match.applications().size()).put(&quot;verified&quot;, valid.size())</span>
+<span class="fc" id="L104">            .put(&quot;selectedAst&quot;, CODEC.encodeExpression(selected)).put(&quot;selectedDag&quot;, selectedCost)</span>
+<span class="fc" id="L105">            .put(&quot;qualifiedTransfer&quot;, qualified);</span>
+    }
+
+    private static boolean cleanNegative(ObjectNode result) {
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        return result.get(&quot;complete&quot;).booleanValue() &amp;&amp; result.get(&quot;proposed&quot;).intValue() == 0;</span>
+    }
+
+    private static boolean preservesOtherOutputs(FunctionExpr source, FunctionExpr target, int changed) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (source.arguments().size() != target.arguments().size()) return false;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int index = 0; index &lt; source.arguments().size(); index++) {</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">            if (index != changed &amp;&amp; source.arguments().get(index) != target.arguments().get(index)) return false;</span>
+        }
+<span class="fc" id="L117">        return true;</span>
+    }
+
+    private static byte[] boundBytes(Path path, String sha, String kind) throws IOException {
+<span class="fc" id="L121">        byte[] bytes = ModPowTransferFiles.read(path);</span>
+<span class="fc" id="L122">        require(ModPowTransferFiles.hash(bytes).equals(sha), kind + &quot; checksum mismatch&quot;);</span>
+<span class="fc" id="L123">        return bytes;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

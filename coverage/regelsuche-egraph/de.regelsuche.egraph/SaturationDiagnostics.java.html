@@ -43,8 +43,9 @@ public record SaturationDiagnostics(Map&lt;Outcome, Long&gt; counts, List&lt;Eve
 <span class="fc bfc" id="L43" title="All 2 branches covered.">                failure == null ? &quot;&quot; : failure.getClass().getName(), message));</span>
 <span class="fc" id="L44">        }</span>
 <span class="fc" id="L45">        SaturationDiagnostics snapshot() { return new SaturationDiagnostics(counts, events, dropped); }</span>
-<span class="fc" id="L46">        boolean hasFailures() { return counts.containsKey(Outcome.RULE_FAILURE); }</span>
-<span class="fc" id="L47">        boolean hasInconclusiveMatches() { return counts.containsKey(Outcome.MATCH_INCONCLUSIVE); }</span>
+<span class="fc" id="L46">        boolean hasUnresolvedConditions() { return counts.containsKey(Outcome.UNRESOLVED_CONDITIONS); }</span>
+<span class="fc" id="L47">        boolean hasFailures() { return counts.containsKey(Outcome.RULE_FAILURE); }</span>
+<span class="fc" id="L48">        boolean hasInconclusiveMatches() { return counts.containsKey(Outcome.MATCH_INCONCLUSIVE); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -45,12 +45,16 @@ public record SaturationStats(
         /** No further progress, but rule failures prevented a certified fix-point. */
 <span class="fc" id="L46">        RULE_FAILURES,</span>
         /** No further progress, but an owned concrete matcher exhausted its search bound. */
-<span class="fc" id="L48">        MATCHER_LIMIT</span>
+<span class="fc" id="L48">        MATCHER_LIMIT,</span>
+        /** A guard remained undecided in the run's fixed assumption context. */
+<span class="fc" id="L50">        UNDECIDED_GUARDS,</span>
+        /** A conditional application would exceed the retained guard decision budget. */
+<span class="fc" id="L52">        GUARD_BUDGET</span>
     }
 
-<span class="fc" id="L51">    public SaturationStats {</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        appliedRules = appliedRules == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(appliedRules));</span>
-<span class="fc" id="L53">    }</span>
+<span class="fc" id="L55">    public SaturationStats {</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        appliedRules = appliedRules == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(appliedRules));</span>
+<span class="fc" id="L57">    }</span>
 
     public SaturationStats(
         int eclasses,
@@ -62,7 +66,7 @@ public record SaturationStats(
         boolean saturated,
         Reason stopReason
     ) {
-<span class="nc" id="L65">        this(</span>
+<span class="nc" id="L69">        this(</span>
             eclasses,
             enodes,
             merges,
@@ -78,18 +82,18 @@ public record SaturationStats(
             0L,
             0L,
             iterations,
-<span class="nc bnc" id="L81" title="All 2 branches missed.">            appliedRules == null ? 0 : appliedRules.values().stream().mapToInt(Integer::intValue).sum()</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            appliedRules == null ? 0 : appliedRules.values().stream().mapToInt(Integer::intValue).sum()</span>
         );
-<span class="nc" id="L83">    }</span>
+<span class="nc" id="L87">    }</span>
 
     /** Total number of rule applications across all iterations. */
     public int totalApplications() {
-<span class="fc" id="L87">        return appliedRules.values().stream().mapToInt(Integer::intValue).sum();</span>
+<span class="fc" id="L91">        return appliedRules.values().stream().mapToInt(Integer::intValue).sum();</span>
     }
 
     /** Distinct rules that fired at least once. */
     public int distinctRulesFired() {
-<span class="nc" id="L92">        return appliedRules.size();</span>
+<span class="nc" id="L96">        return appliedRules.size();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EqualitySaturation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">EqualitySaturation.java</span></div><h1>EqualitySaturation.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionEvaluation;
+import de.regelsuche.transform.AstRewriteTransformationEngine.CancelDivisionFactorRule;
 import de.regelsuche.egraph.proof.ExtractionProofBuilder;
 import de.regelsuche.egraph.proof.ExtractionProofChecker;
 import de.regelsuche.egraph.proof.ProofLimits;
@@ -31,95 +34,134 @@ public final class EqualitySaturation {
     // Existing native pattern matcher/applier helpers are recursive.
     private static final int PROOF_NATIVE_MAX_DEPTH = 256;
     public record Config(int maxIterations, int maxNodes, boolean useDirtyWorklist) {
-<span class="fc" id="L34">        public Config {</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (maxIterations &lt;= 0) throw new IllegalArgumentException(&quot;maxIterations must be &gt; 0&quot;);</span>
-<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (maxNodes &lt;= 0) throw new IllegalArgumentException(&quot;maxNodes must be &gt; 0&quot;);</span>
-<span class="fc" id="L37">        }</span>
-<span class="fc" id="L38">        public Config(int maxIterations, int maxNodes) { this(maxIterations, maxNodes, true); }</span>
-<span class="fc" id="L39">        public static Config defaults() { return new Config(12, 10_000, true); }</span>
+<span class="fc" id="L37">        public Config {</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            if (maxIterations &lt;= 0) throw new IllegalArgumentException(&quot;maxIterations must be &gt; 0&quot;);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (maxNodes &lt;= 0) throw new IllegalArgumentException(&quot;maxNodes must be &gt; 0&quot;);</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc" id="L41">        public Config(int maxIterations, int maxNodes) { this(maxIterations, maxNodes, true); }</span>
+<span class="fc" id="L42">        public static Config defaults() { return new Config(12, 10_000, true); }</span>
     }
 
     private final List&lt;RewriteRule&gt; rules;
     private final Config config;
-<span class="fc" id="L44">    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules) { this(rules, Config.defaults()); }</span>
-<span class="fc" id="L45">    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules, Config config) {</span>
-<span class="fc" id="L46">        this.rules = List.copyOf(rules);</span>
-<span class="fc" id="L47">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
-<span class="fc" id="L48">    }</span>
-<span class="nc" id="L49">    public List&lt;RewriteRule&gt; rules() { return rules; }</span>
-<span class="nc" id="L50">    public Config config() { return config; }</span>
+<span class="fc" id="L47">    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules) { this(rules, Config.defaults()); }</span>
+<span class="fc" id="L48">    public EqualitySaturation(Collection&lt;RewriteRule&gt; rules, Config config) {</span>
+<span class="fc" id="L49">        this.rules = List.copyOf(rules);</span>
+<span class="fc" id="L50">        this.config = Objects.requireNonNull(config, &quot;config&quot;);</span>
+<span class="fc" id="L51">    }</span>
+<span class="nc" id="L52">    public List&lt;RewriteRule&gt; rules() { return rules; }</span>
+<span class="nc" id="L53">    public Config config() { return config; }</span>
 
     /** Exact extraction for additive, non-negative per-node costs. */
     public Result saturate(EGraph graph, EClassId root, ToIntFunction&lt;ENode&gt; costOfNode) {
-<span class="fc" id="L54">        Objects.requireNonNull(graph, &quot;graph&quot;);</span>
-<span class="fc" id="L55">        Objects.requireNonNull(root, &quot;root&quot;);</span>
-<span class="fc" id="L56">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
-<span class="fc" id="L57">        Execution execution = saturateGraph(graph, root, costOfNode, new Run(null));</span>
-<span class="fc" id="L58">        Expr best = graph.extract(root, costOfNode);</span>
-<span class="fc" id="L59">        return execution.result(best, de.regelsuche.parse.ExpressionFormatter.format(best), ProofOutcome.notRequested());</span>
+<span class="fc" id="L57">        Objects.requireNonNull(graph, &quot;graph&quot;);</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">        if (graph.usesArithmeticAc() &amp;&amp; !rules.isEmpty()) {</span>
+<span class="fc" id="L59">            throw new IllegalArgumentException(&quot;Saturation of native AC graphs requires a native multiset matcher&quot;);</span>
+        }
+<span class="fc" id="L61">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L62">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
+<span class="fc" id="L63">        Execution execution = saturateGraph(graph, root, costOfNode, new Run(null));</span>
+<span class="fc" id="L64">        Expr best = graph.extract(root, costOfNode);</span>
+<span class="fc" id="L65">        return execution.result(best, de.regelsuche.parse.ExpressionFormatter.format(best), ProofOutcome.notRequested());</span>
+    }
+
+    /** A local guard decision in the invocation's fixed scalar context. */
+    public record GuardDecision(String ruleId, Expr before, Expr after, List&lt;AssumptionEvaluation&gt; evaluations,
+            boolean applied) {
+<span class="fc" id="L71">        public GuardDecision {</span>
+<span class="fc" id="L72">            evaluations = List.copyOf(evaluations);</span>
+<span class="fc" id="L73">        }</span>
+    }
+
+    /** The expression in result() belongs to this specific immutable assumption context. */
+    public record ConditionalResult(Result result, List&lt;Assumption&gt; assumptions, List&lt;GuardDecision&gt; decisions) {
+<span class="fc" id="L78">        public ConditionalResult {</span>
+<span class="fc" id="L79">            Objects.requireNonNull(result);</span>
+<span class="fc" id="L80">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L81">            decisions = List.copyOf(decisions);</span>
+<span class="fc" id="L82">        }</span>
+    }
+
+    /** Fresh, isolated graph for the built-in scalar factor-cancellation rule and unconditional rules. */
+    public ConditionalResult saturateUnderAssumptions(Expr input, List&lt;Assumption&gt; assumptions,
+            ToIntFunction&lt;ENode&gt; costOfNode) {
+<span class="fc" id="L88">        var guards = new RationalCancellation(assumptions);</span>
+<span class="fc" id="L89">        var graph = new EGraph();</span>
+<span class="fc" id="L90">        graph.setInsertionLimit(config.maxNodes());</span>
+        EClassId root;
+        try {
+<span class="fc" id="L93">            root = graph.addExpression(Objects.requireNonNull(input));</span>
+<span class="fc" id="L94">        } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L95">            throw new IllegalArgumentException(&quot;Input exceeds the configured e-node budget&quot;, exhausted);</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        var run = new Run(null, guards);</span>
+<span class="fc" id="L98">        Execution execution = saturateGraph(graph, root, costOfNode, run);</span>
+<span class="fc" id="L99">        Expr best = graph.extract(root, costOfNode);</span>
+<span class="fc" id="L100">        var result = execution.result(best, de.regelsuche.parse.ExpressionFormatter.format(best), ProofOutcome.notRequested());</span>
+<span class="fc" id="L101">        return new ConditionalResult(result, guards.assumptions, guards.decisions);</span>
     }
 
     private Execution saturateGraph(EGraph graph, EClassId root,
             ToIntFunction&lt;ENode&gt; costOfNode, Run run) {
         // Validate costs before mutation, but allow rewriting to make the root finite.
-<span class="fc" id="L65">        graph.find(root);</span>
-<span class="fc" id="L66">        graph.validateNodeCosts(costOfNode);</span>
-<span class="fc" id="L67">        var matcher = new EGraphPatternMatcher(graph);</span>
-<span class="fc" id="L68">        var applier = new EGraphPatternApplier(graph);</span>
-<span class="fc" id="L69">        int iterations = 0;</span>
-<span class="fc" id="L70">        int merges = 0;</span>
-<span class="fc" id="L71">        boolean saturated = false;</span>
-<span class="fc" id="L72">        var stopReason = SaturationStats.Reason.ITERATION_BUDGET;</span>
-<span class="fc" id="L73">        Collection&lt;EClassId&gt; dirty = graph.consumeDirtyClasses();</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (dirty.isEmpty()) dirty = allClasses(graph);</span>
-<span class="fc" id="L75">        int previousLimit = graph.setInsertionLimit(config.maxNodes());</span>
+<span class="fc" id="L107">        graph.find(root);</span>
+<span class="fc" id="L108">        graph.validateNodeCosts(costOfNode);</span>
+<span class="fc" id="L109">        var matcher = new EGraphPatternMatcher(graph);</span>
+<span class="fc" id="L110">        var applier = new EGraphPatternApplier(graph);</span>
+<span class="fc" id="L111">        int iterations = 0;</span>
+<span class="fc" id="L112">        int merges = 0;</span>
+<span class="fc" id="L113">        boolean saturated = false;</span>
+<span class="fc" id="L114">        var stopReason = SaturationStats.Reason.ITERATION_BUDGET;</span>
+<span class="fc" id="L115">        Collection&lt;EClassId&gt; dirty = graph.consumeDirtyClasses();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (dirty.isEmpty()) dirty = allClasses(graph);</span>
+<span class="fc" id="L117">        int previousLimit = graph.setInsertionLimit(config.maxNodes());</span>
         try {
-<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (int i = 0; i &lt; config.maxIterations(); i++) {</span>
-<span class="fc" id="L78">                iterations = i + 1;</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (graph.nodeCount() &gt;= config.maxNodes()) {</span>
-<span class="nc" id="L80">                    stopReason = SaturationStats.Reason.NODE_BUDGET;</span>
-<span class="nc" id="L81">                    break;</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            for (int i = 0; i &lt; config.maxIterations(); i++) {</span>
+<span class="fc" id="L120">                iterations = i + 1;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                if (graph.nodeCount() &gt;= config.maxNodes()) {</span>
+<span class="nc" id="L122">                    stopReason = SaturationStats.Reason.NODE_BUDGET;</span>
+<span class="nc" id="L123">                    break;</span>
                 }
-<span class="fc" id="L83">                long versionBefore = graph.version();</span>
-<span class="fc" id="L84">                int applicationsBefore = run.applications();</span>
-<span class="fc" id="L85">                boolean budgetStop = false;</span>
+<span class="fc" id="L125">                long versionBefore = graph.version();</span>
+<span class="fc" id="L126">                int applicationsBefore = run.applications();</span>
+<span class="fc" id="L127">                boolean budgetStop = false;</span>
                 try {
-<span class="fc" id="L87">                    applyAllRules(graph, matcher, applier, run,</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">                        config.useDirtyWorklist() ? dirty : allClasses(graph));</span>
-<span class="fc" id="L89">                } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
-<span class="fc" id="L90">                    budgetStop = true;</span>
+<span class="fc" id="L129">                    applyAllRules(graph, matcher, applier, run,</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                        config.useDirtyWorklist() ? dirty : allClasses(graph));</span>
+<span class="fc" id="L131">                } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L132">                    budgetStop = true;</span>
                 } finally {
                     // Even partial passes have pending unions. Repair before returning.
-<span class="fc" id="L93">                    graph.rebuild();</span>
+<span class="fc" id="L135">                    graph.rebuild();</span>
                 }
-<span class="fc" id="L95">                merges += run.applications() - applicationsBefore;</span>
-<span class="fc" id="L96">                dirty = graph.consumeDirtyClasses();</span>
-<span class="fc bfc" id="L97" title="All 4 branches covered.">                if (budgetStop || graph.nodeCount() &gt;= config.maxNodes()) {</span>
-<span class="fc" id="L98">                    stopReason = SaturationStats.Reason.NODE_BUDGET;</span>
-<span class="fc" id="L99">                    break;</span>
+<span class="fc" id="L137">                merges += run.applications() - applicationsBefore;</span>
+<span class="fc" id="L138">                dirty = graph.consumeDirtyClasses();</span>
+<span class="fc bfc" id="L139" title="All 4 branches covered.">                if (budgetStop || graph.nodeCount() &gt;= config.maxNodes()) {</span>
+<span class="fc" id="L140">                    stopReason = SaturationStats.Reason.NODE_BUDGET;</span>
+<span class="fc" id="L141">                    break;</span>
                 }
-<span class="pc bpc" id="L101" title="1 of 4 branches missed.">                if (graph.version() == versionBefore || run.applications() == applicationsBefore) {</span>
-<span class="fc" id="L102">                    stopReason = run.noProgressReason();</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">                    saturated = stopReason == SaturationStats.Reason.FIX_POINT;</span>
-<span class="fc" id="L104">                    break;</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">                if (graph.version() == versionBefore || run.applications() == applicationsBefore) {</span>
+<span class="fc" id="L144">                    stopReason = run.noProgressReason();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                    saturated = stopReason == SaturationStats.Reason.FIX_POINT;</span>
+<span class="fc" id="L146">                    break;</span>
                 }
             }
         } finally {
-<span class="fc" id="L108">            graph.setInsertionLimit(previousLimit);</span>
+<span class="fc" id="L150">            graph.setInsertionLimit(previousLimit);</span>
         }
-<span class="fc" id="L110">        return new Execution(graph, matcher, run, iterations, merges, saturated, stopReason);</span>
+<span class="fc" id="L152">        return new Execution(graph, matcher, run, iterations, merges, saturated, stopReason);</span>
     }
 
-<span class="fc" id="L113">    private record Execution(EGraph graph, EGraphPatternMatcher matcher, Run run,</span>
+<span class="fc" id="L155">    private record Execution(EGraph graph, EGraphPatternMatcher matcher, Run run,</span>
             int iterations, int merges, boolean saturated, SaturationStats.Reason stopReason) {
         Result result(Expr best, String formatted, ProofOutcome proof) {
-<span class="fc" id="L116">            var metrics = matcher.stats();</span>
-<span class="fc" id="L117">            var stats = new SaturationStats(graph.classCount(), graph.nodeCount(), merges,</span>
+<span class="fc" id="L158">            var metrics = matcher.stats();</span>
+<span class="fc" id="L159">            var stats = new SaturationStats(graph.classCount(), graph.nodeCount(), merges,</span>
                 iterations, run.appliedRules, formatted,
-<span class="fc" id="L119">                saturated, stopReason, metrics.classesScanned(), metrics.nodesScanned(),</span>
-<span class="fc" id="L120">                metrics.candidateClassesSkipped(), metrics.matchesFound(), metrics.matcherCacheHits(),</span>
-<span class="fc" id="L121">                metrics.matcherCacheMisses(), iterations, run.applications());</span>
-<span class="fc" id="L122">            return new Result(best, stats, run.diagnostics.snapshot(),</span>
+<span class="fc" id="L161">                saturated, stopReason, metrics.classesScanned(), metrics.nodesScanned(),</span>
+<span class="fc" id="L162">                metrics.candidateClassesSkipped(), metrics.matchesFound(), metrics.matcherCacheHits(),</span>
+<span class="fc" id="L163">                metrics.matcherCacheMisses(), iterations, run.applications());</span>
+<span class="fc" id="L164">            return new Result(best, stats, run.diagnostics.snapshot(),</span>
                 new SaturationProvenance(run.witnesses, run.droppedWitnesses,
                     run.nativeWitnessExtractions, proof));
         }
@@ -127,23 +169,23 @@ public final class EqualitySaturation {
 
     /** Separate owned capture/build and receiving-side replay allowances. */
     public record ProofOptions(ProofLimits captureLimits, ProofLimits replayLimits) {
-<span class="fc" id="L130">        public ProofOptions {</span>
-<span class="fc" id="L131">            Objects.requireNonNull(captureLimits, &quot;captureLimits&quot;);</span>
-<span class="fc" id="L132">            Objects.requireNonNull(replayLimits, &quot;replayLimits&quot;);</span>
-<span class="fc" id="L133">        }</span>
+<span class="fc" id="L172">        public ProofOptions {</span>
+<span class="fc" id="L173">            Objects.requireNonNull(captureLimits, &quot;captureLimits&quot;);</span>
+<span class="fc" id="L174">            Objects.requireNonNull(replayLimits, &quot;replayLimits&quot;);</span>
+<span class="fc" id="L175">        }</span>
         public static ProofOptions defaults() {
-<span class="fc" id="L135">            return new ProofOptions(ProofLimits.defaults(), ProofLimits.defaults());</span>
+<span class="fc" id="L177">            return new ProofOptions(ProofLimits.defaults(), ProofLimits.defaults());</span>
         }
     }
 
     /** The returned expression changes only after independent exact-endpoint acceptance. */
     public record ProvedResult(Expr expression, Optional&lt;Result&gt; diagnosticResult, ProofOutcome proof) {
-<span class="fc" id="L141">        public ProvedResult {</span>
-<span class="fc" id="L142">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L143">            Objects.requireNonNull(diagnosticResult, &quot;diagnosticResult&quot;);</span>
-<span class="fc" id="L144">            Objects.requireNonNull(proof, &quot;proof&quot;);</span>
-<span class="fc" id="L145">            requireCheckedOutput(expression, proof);</span>
-<span class="fc" id="L146">        }</span>
+<span class="fc" id="L183">        public ProvedResult {</span>
+<span class="fc" id="L184">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L185">            Objects.requireNonNull(diagnosticResult, &quot;diagnosticResult&quot;);</span>
+<span class="fc" id="L186">            Objects.requireNonNull(proof, &quot;proof&quot;);</span>
+<span class="fc" id="L187">            requireCheckedOutput(expression, proof);</span>
+<span class="fc" id="L188">        }</span>
     }
 
     /**
@@ -151,321 +193,332 @@ public final class EqualitySaturation {
      * return the original input; diagnostic candidates, when present, are separate.
      */
     public ProvedResult saturateWithProof(Expr input, ToIntFunction&lt;ENode&gt; costOfNode, ProofOptions options) {
-<span class="fc" id="L154">        Objects.requireNonNull(input, &quot;input&quot;);</span>
-<span class="fc" id="L155">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
-<span class="fc" id="L156">        Objects.requireNonNull(options, &quot;options&quot;);</span>
-<span class="fc" id="L157">        options = nativeProofOptions(options);</span>
-<span class="fc" id="L158">        ExtractionProofBuilder builder = null;</span>
+<span class="fc" id="L196">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L197">        Objects.requireNonNull(costOfNode, &quot;costOfNode&quot;);</span>
+<span class="fc" id="L198">        Objects.requireNonNull(options, &quot;options&quot;);</span>
+<span class="fc" id="L199">        options = nativeProofOptions(options);</span>
+<span class="fc" id="L200">        ExtractionProofBuilder builder = null;</span>
         int source;
         try {
-<span class="fc" id="L161">            builder = new ExtractionProofBuilder(rules, options.captureLimits());</span>
-<span class="fc" id="L162">            source = builder.addExpression(input);</span>
-<span class="fc" id="L163">        } catch (ExtractionProofBuilder.UnsupportedRule unsupported) {</span>
-<span class="fc" id="L164">            return unavailable(input, ProofOutcome.Status.UNSUPPORTED_RULE, unsupported.getMessage(),</span>
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                builder == null ? unsupported.workUsed() : builder.workUsed());</span>
-<span class="fc" id="L166">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
-<span class="fc" id="L167">            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED, &quot;preflight: &quot; + exhausted.getMessage(),</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">                builder == null ? exhausted.workUsed() : builder.workUsed());</span>
-<span class="fc" id="L169">        } catch (ExtractionProofBuilder.InvalidInput invalid) {</span>
-<span class="fc" id="L170">            return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, &quot;unsupported proof input&quot;,</span>
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                builder == null ? invalid.workUsed() : builder.workUsed());</span>
-<span class="nc" id="L172">        } catch (IllegalArgumentException invalid) {</span>
-<span class="nc" id="L173">            return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, &quot;unsupported proof input&quot;, builder);</span>
-<span class="fc" id="L174">        }</span>
-<span class="fc" id="L175">        return runProved(input, source, costOfNode, options, builder);</span>
+<span class="fc" id="L203">            builder = new ExtractionProofBuilder(rules, options.captureLimits());</span>
+<span class="fc" id="L204">            source = builder.addExpression(input);</span>
+<span class="fc" id="L205">        } catch (ExtractionProofBuilder.UnsupportedRule unsupported) {</span>
+<span class="fc" id="L206">            return unavailable(input, ProofOutcome.Status.UNSUPPORTED_RULE, unsupported.getMessage(),</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                builder == null ? unsupported.workUsed() : builder.workUsed());</span>
+<span class="fc" id="L208">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="fc" id="L209">            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED, &quot;preflight: &quot; + exhausted.getMessage(),</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                builder == null ? exhausted.workUsed() : builder.workUsed());</span>
+<span class="fc" id="L211">        } catch (ExtractionProofBuilder.InvalidInput invalid) {</span>
+<span class="fc" id="L212">            return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, &quot;unsupported proof input&quot;,</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                builder == null ? invalid.workUsed() : builder.workUsed());</span>
+<span class="nc" id="L214">        } catch (IllegalArgumentException invalid) {</span>
+<span class="nc" id="L215">            return unavailable(input, ProofOutcome.Status.REPLAY_REJECTED, &quot;unsupported proof input&quot;, builder);</span>
+<span class="fc" id="L216">        }</span>
+<span class="fc" id="L217">        return runProved(input, source, costOfNode, options, builder);</span>
     }
 
     private static ProofOptions nativeProofOptions(ProofOptions options) {
-<span class="fc" id="L179">        ProofLimits limits = options.captureLimits();</span>
-<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (limits.maxDepth() &lt;= PROOF_NATIVE_MAX_DEPTH) return options;</span>
-<span class="fc" id="L181">        return new ProofOptions(new ProofLimits(limits.maxTerms(), limits.maxProofSteps(),</span>
-<span class="fc" id="L182">            limits.maxReferences(), limits.maxCharacters(), limits.maxRationalBits(),</span>
-<span class="fc" id="L183">            PROOF_NATIVE_MAX_DEPTH, limits.maxExpandedNodes(), limits.maxWork()), options.replayLimits());</span>
+<span class="fc" id="L221">        ProofLimits limits = options.captureLimits();</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (limits.maxDepth() &lt;= PROOF_NATIVE_MAX_DEPTH) return options;</span>
+<span class="fc" id="L223">        return new ProofOptions(new ProofLimits(limits.maxTerms(), limits.maxProofSteps(),</span>
+<span class="fc" id="L224">            limits.maxReferences(), limits.maxCharacters(), limits.maxRationalBits(),</span>
+<span class="fc" id="L225">            PROOF_NATIVE_MAX_DEPTH, limits.maxExpandedNodes(), limits.maxWork()), options.replayLimits());</span>
     }
 
     private ProvedResult runProved(Expr input, int source, ToIntFunction&lt;ENode&gt; costOfNode,
             ProofOptions options, ExtractionProofBuilder builder) {
-<span class="fc" id="L188">        var capture = new EGraphProofCapture(builder, options.captureLimits());</span>
-<span class="fc" id="L189">        var graph = new EGraph(capture);</span>
+<span class="fc" id="L230">        var capture = new EGraphProofCapture(builder, options.captureLimits());</span>
+<span class="fc" id="L231">        var graph = new EGraph(capture);</span>
         // Unlike the existing-graph API, even initial source insertion belongs to this cap.
-<span class="fc" id="L191">        graph.setInsertionLimit(config.maxNodes());</span>
+<span class="fc" id="L233">        graph.setInsertionLimit(config.maxNodes());</span>
         EClassId root;
         try {
-<span class="fc" id="L194">            root = capture.insertInput(graph, source);</span>
-<span class="fc" id="L195">        } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
-<span class="fc" id="L196">            return unavailable(input, ProofOutcome.Status.EXTRACTION_UNAVAILABLE,</span>
+<span class="fc" id="L236">            root = capture.insertInput(graph, source);</span>
+<span class="fc" id="L237">        } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L238">            return unavailable(input, ProofOutcome.Status.EXTRACTION_UNAVAILABLE,</span>
                 &quot;input exceeds the graph node budget&quot;, builder);
-<span class="nc" id="L198">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
-<span class="nc" id="L199">            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED,</span>
-<span class="nc" id="L200">                &quot;input insertion: &quot; + exhausted.getMessage(), builder);</span>
-<span class="fc" id="L201">        }</span>
-<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (!capture.active()) return new ProvedResult(input, Optional.empty(), capture.unavailable());</span>
+<span class="nc" id="L240">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="nc" id="L241">            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED,</span>
+<span class="nc" id="L242">                &quot;input insertion: &quot; + exhausted.getMessage(), builder);</span>
+<span class="fc" id="L243">        }</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (!capture.active()) return new ProvedResult(input, Optional.empty(), capture.unavailable());</span>
         try {
-<span class="fc" id="L204">            Execution execution = saturateGraph(graph, root, costOfNode, new Run(capture));</span>
-<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (!capture.active()) return new ProvedResult(input, Optional.empty(), capture.unavailable());</span>
-<span class="fc" id="L206">            int target = graph.extractProofTerm(root, costOfNode);</span>
-<span class="fc" id="L207">            Expr selected = builder.materialize(target);</span>
-<span class="fc" id="L208">            String formatted = diagnosticText(capture, selected);</span>
-<span class="fc" id="L209">            return checkedResult(input, source, selected, target, formatted, execution, options, builder);</span>
-<span class="fc" id="L210">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
-<span class="fc" id="L211">            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED,</span>
-<span class="fc" id="L212">                &quot;extraction/rendering: &quot; + exhausted.getMessage(), builder);</span>
-<span class="fc" id="L213">        } catch (IllegalStateException unavailable) {</span>
-<span class="fc" id="L214">            return unavailable(input, ProofOutcome.Status.EXTRACTION_UNAVAILABLE,</span>
+<span class="fc" id="L246">            Execution execution = saturateGraph(graph, root, costOfNode, new Run(capture));</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (!capture.active()) return new ProvedResult(input, Optional.empty(), capture.unavailable());</span>
+<span class="fc" id="L248">            int target = graph.extractProofTerm(root, costOfNode);</span>
+<span class="fc" id="L249">            Expr selected = builder.materialize(target);</span>
+<span class="fc" id="L250">            String formatted = diagnosticText(capture, selected);</span>
+<span class="fc" id="L251">            return checkedResult(input, source, selected, target, formatted, execution, options, builder);</span>
+<span class="fc" id="L252">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="fc" id="L253">            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED,</span>
+<span class="fc" id="L254">                &quot;extraction/rendering: &quot; + exhausted.getMessage(), builder);</span>
+<span class="fc" id="L255">        } catch (IllegalStateException unavailable) {</span>
+<span class="fc" id="L256">            return unavailable(input, ProofOutcome.Status.EXTRACTION_UNAVAILABLE,</span>
                 &quot;no finite bounded extraction&quot;, builder);
         }
     }
 
     private static String diagnosticText(EGraphProofCapture capture, Expr selected) {
         try {
-<span class="fc" id="L221">            return capture.format(selected);</span>
-<span class="fc" id="L222">        } catch (IllegalArgumentException notRepresentableByParser) {</span>
+<span class="fc" id="L263">            return capture.format(selected);</span>
+<span class="fc" id="L264">        } catch (IllegalArgumentException notRepresentableByParser) {</span>
             // Exact AST equality can still be checked when text syntax has a smaller numeric envelope.
-<span class="fc" id="L224">            return null;</span>
+<span class="fc" id="L266">            return null;</span>
         }
     }
 
     private ProvedResult checkedResult(Expr input, int source, Expr selected, int target,
             String formatted, Execution execution, ProofOptions options, ExtractionProofBuilder builder) {
-<span class="fc" id="L230">        long captureWork = builder.workUsed();</span>
-<span class="fc" id="L231">        var built = builder.build(source, target);</span>
-<span class="fc" id="L232">        long buildWork = builder.workUsed() - captureWork;</span>
+<span class="fc" id="L272">        long captureWork = builder.workUsed();</span>
+<span class="fc" id="L273">        var built = builder.build(source, target);</span>
+<span class="fc" id="L274">        long buildWork = builder.workUsed() - captureWork;</span>
         ProofOutcome proof;
-<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (built.status() != ExtractionProofBuilder.BuildStatus.BUILT) {</span>
-<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            var status = built.status() == ExtractionProofBuilder.BuildStatus.LIMIT_EXCEEDED</span>
-<span class="pc" id="L236">                ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.REPLAY_REJECTED;</span>
-<span class="fc" id="L237">            proof = ProofOutcome.unavailable(status, &quot;build: &quot; + built.detail(), captureWork, buildWork, 0);</span>
-<span class="fc" id="L238">        } else {</span>
-<span class="fc" id="L239">            var checked = ExtractionProofChecker.check(input, selected, built.certificate().orElseThrow(),</span>
-<span class="fc" id="L240">                rules, options.replayLimits());</span>
-<span class="fc" id="L241">            proof = checkedOutcome(input, selected, checked, captureWork, buildWork);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (built.status() != ExtractionProofBuilder.BuildStatus.BUILT) {</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            var status = built.status() == ExtractionProofBuilder.BuildStatus.LIMIT_EXCEEDED</span>
+<span class="pc" id="L278">                ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.REPLAY_REJECTED;</span>
+<span class="fc" id="L279">            proof = ProofOutcome.unavailable(status, &quot;build: &quot; + built.detail(), captureWork, buildWork, 0);</span>
+<span class="fc" id="L280">        } else {</span>
+<span class="fc" id="L281">            var checked = ExtractionProofChecker.check(input, selected, built.certificate().orElseThrow(),</span>
+<span class="fc" id="L282">                rules, options.replayLimits());</span>
+<span class="fc" id="L283">            proof = checkedOutcome(input, selected, checked, captureWork, buildWork);</span>
         }
-<span class="fc bfc" id="L243" title="All 2 branches covered.">        Optional&lt;Result&gt; diagnostic = formatted == null ? Optional.empty()</span>
-<span class="fc" id="L244">            : Optional.of(execution.result(selected, formatted, proof));</span>
-<span class="fc bfc" id="L245" title="All 2 branches covered.">        return new ProvedResult(proof.complete() ? selected : input, diagnostic, proof);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        Optional&lt;Result&gt; diagnostic = formatted == null ? Optional.empty()</span>
+<span class="fc" id="L286">            : Optional.of(execution.result(selected, formatted, proof));</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        return new ProvedResult(proof.complete() ? selected : input, diagnostic, proof);</span>
     }
 
     private static ProofOutcome checkedOutcome(Expr input, Expr selected,
             ExtractionProofChecker.CheckResult checked, long captureWork, long buildWork) {
-<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (checked.status() == ExtractionProofChecker.Status.ACCEPTED) {</span>
-<span class="fc" id="L251">            var token = checked.checked().orElseThrow();</span>
-<span class="pc bpc" id="L252" title="2 of 4 branches missed.">            if (token.input() != input || token.output() != selected) {</span>
-<span class="nc" id="L253">                throw new IllegalStateException(&quot;checker token belongs to different invocation endpoints&quot;);</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (checked.status() == ExtractionProofChecker.Status.ACCEPTED) {</span>
+<span class="fc" id="L293">            var token = checked.checked().orElseThrow();</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">            if (token.input() != input || token.output() != selected) {</span>
+<span class="nc" id="L295">                throw new IllegalStateException(&quot;checker token belongs to different invocation endpoints&quot;);</span>
             }
-<span class="fc" id="L255">            return ProofOutcome.complete(token, captureWork, buildWork);</span>
+<span class="fc" id="L297">            return ProofOutcome.complete(token, captureWork, buildWork);</span>
         }
-<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        var status = checked.status() == ExtractionProofChecker.Status.LIMIT_EXCEEDED</span>
-<span class="pc" id="L258">            ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.REPLAY_REJECTED;</span>
-<span class="fc" id="L259">        return ProofOutcome.unavailable(status, &quot;replay: &quot; + checked.detail(),</span>
-<span class="fc" id="L260">            captureWork, buildWork, checked.workUsed());</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        var status = checked.status() == ExtractionProofChecker.Status.LIMIT_EXCEEDED</span>
+<span class="pc" id="L300">            ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.REPLAY_REJECTED;</span>
+<span class="fc" id="L301">        return ProofOutcome.unavailable(status, &quot;replay: &quot; + checked.detail(),</span>
+<span class="fc" id="L302">            captureWork, buildWork, checked.workUsed());</span>
     }
 
     private static ProvedResult unavailable(Expr input, ProofOutcome.Status status, String detail,
             ExtractionProofBuilder builder) {
-<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        return unavailable(input, status, detail, builder == null ? 0 : builder.workUsed());</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        return unavailable(input, status, detail, builder == null ? 0 : builder.workUsed());</span>
     }
 
     private static ProvedResult unavailable(Expr input, ProofOutcome.Status status, String detail,
             long captureWork) {
-<span class="fc" id="L270">        return new ProvedResult(input, Optional.empty(), ProofOutcome.unavailable(status, detail,</span>
+<span class="fc" id="L312">        return new ProvedResult(input, Optional.empty(), ProofOutcome.unavailable(status, detail,</span>
             captureWork, 0, 0));
     }
 
     private static void requireCheckedOutput(Expr output, ProofOutcome proof) {
-<span class="fc bfc" id="L275" title="All 4 branches covered.">        if (proof.complete() &amp;&amp; proof.checked().orElseThrow().output() != output) {</span>
-<span class="fc" id="L276">            throw new IllegalArgumentException(&quot;checked certificate belongs to another output object&quot;);</span>
+<span class="fc bfc" id="L317" title="All 4 branches covered.">        if (proof.complete() &amp;&amp; proof.checked().orElseThrow().output() != output) {</span>
+<span class="fc" id="L318">            throw new IllegalArgumentException(&quot;checked certificate belongs to another output object&quot;);</span>
         }
-<span class="fc" id="L278">    }</span>
+<span class="fc" id="L320">    }</span>
 
     private void checkBudget(EGraph graph) {
-<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (graph.nodeCount() &gt;= config.maxNodes()) throw new EGraph.NodeBudgetExceeded();</span>
-<span class="fc" id="L282">    }</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        if (graph.nodeCount() &gt;= config.maxNodes()) throw new EGraph.NodeBudgetExceeded();</span>
+<span class="fc" id="L324">    }</span>
 
     private void applyAllRules(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
             Run run, Collection&lt;EClassId&gt; candidates) {
-<span class="fc" id="L286">        List&lt;EClassId&gt; snapshot = canonicalSorted(graph, candidates);</span>
-<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
-<span class="fc" id="L288">            checkBudget(graph);</span>
+<span class="fc" id="L328">        List&lt;EClassId&gt; snapshot = canonicalSorted(graph, candidates);</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc" id="L330">            checkBudget(graph);</span>
             try {
-<span class="fc bfc" id="L290" title="All 2 branches covered.">                if (!rule.isEquivalencePreservingByConstruction()) {</span>
-<span class="fc" id="L291">                    run.diagnostics.record(rule.id(), null, NOT_EQUIVALENCE_PRESERVING, ELIGIBILITY, null);</span>
-<span class="fc" id="L292">                    continue;</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                if (!rule.isEquivalencePreservingByConstruction()) {</span>
+<span class="fc" id="L333">                    run.diagnostics.record(rule.id(), null, NOT_EQUIVALENCE_PRESERVING, ELIGIBILITY, null);</span>
+<span class="fc" id="L334">                    continue;</span>
                 }
-<span class="nc" id="L294">            } catch (RuntimeException failure) {</span>
-<span class="nc" id="L295">                run.diagnostics.record(rule.id(), null, RULE_FAILURE, ELIGIBILITY, failure);</span>
-<span class="nc" id="L296">                continue;</span>
-<span class="fc" id="L297">            }</span>
-<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (rule.getClass() == PatternRewriteRule.class</span>
-<span class="fc bfc" id="L299" title="All 2 branches covered.">                    &amp;&amp; ((PatternRewriteRule) rule).recognitionProfile().equals(RecognitionProfile.exact())) {</span>
-<span class="fc" id="L300">                applyPattern(graph, matcher, applier, (PatternRewriteRule) rule, snapshot, run);</span>
+<span class="nc" id="L336">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L337">                run.diagnostics.record(rule.id(), null, RULE_FAILURE, ELIGIBILITY, failure);</span>
+<span class="nc" id="L338">                continue;</span>
+<span class="fc" id="L339">            }</span>
+<span class="fc bfc" id="L340" title="All 4 branches covered.">            if (run.guards != null &amp;&amp; rule instanceof CancelDivisionFactorRule) {</span>
+<span class="fc" id="L341">                run.guards.apply(graph, matcher, rule, snapshot, run);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">            } else if (rule.getClass() == PatternRewriteRule.class</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">                    &amp;&amp; ((PatternRewriteRule) rule).recognitionProfile().equals(RecognitionProfile.exact())) {</span>
+<span class="fc" id="L344">                applyPattern(graph, matcher, applier, (PatternRewriteRule) rule, snapshot, run);</span>
             } else {
-<span class="fc" id="L302">                applyConcrete(graph, rule, snapshot, run);</span>
+<span class="fc" id="L346">                applyConcrete(graph, rule, snapshot, run);</span>
             }
-<span class="fc" id="L304">        }</span>
-<span class="fc" id="L305">    }</span>
+<span class="fc" id="L348">        }</span>
+<span class="fc" id="L349">    }</span>
 
     private void applyPattern(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
             PatternRewriteRule rule, List&lt;EClassId&gt; snapshot, Run run) {
         List&lt;EGraphPatternMatcher.Match&gt; matches;
         try {
-<span class="fc" id="L311">            matches = matcher.matchAll(rule.id(), rule.source(), snapshot);</span>
-<span class="nc" id="L312">        } catch (RuntimeException failure) {</span>
-<span class="nc" id="L313">            run.diagnostics.record(rule.id(), null, RULE_FAILURE, MATCHES, failure);</span>
-<span class="nc" id="L314">            return;</span>
-<span class="fc" id="L315">        }</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (matches.isEmpty()) run.diagnostics.record(rule.id(), null, NON_APPLICABLE, MATCHES, null);</span>
-<span class="fc bfc" id="L317" title="All 2 branches covered.">        for (var match : matches) {</span>
-<span class="fc" id="L318">            checkBudget(graph);</span>
+<span class="fc" id="L355">            matches = matcher.matchAll(rule.id(), rule.source(), snapshot);</span>
+<span class="nc" id="L356">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L357">            run.diagnostics.record(rule.id(), null, RULE_FAILURE, MATCHES, failure);</span>
+<span class="nc" id="L358">            return;</span>
+<span class="fc" id="L359">        }</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (matches.isEmpty()) run.diagnostics.record(rule.id(), null, NON_APPLICABLE, MATCHES, null);</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        for (var match : matches) {</span>
+<span class="fc" id="L362">            checkBudget(graph);</span>
             try {
                 // Freeze one finite term per binding before any graph mutation.
-<span class="fc bfc" id="L321" title="All 2 branches covered.">                var instance = run.capture == null ? null</span>
-<span class="fc" id="L322">                    : run.capture.prepare(graph, rule.id(), match.bindings());</span>
-<span class="fc" id="L323">                EClassId rhs = applier.instantiate(rule.target(), match.bindings());</span>
-<span class="fc bfc" id="L324" title="All 2 branches covered.">                if (graph.areEquivalent(match.root(), rhs)) continue;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                var instance = run.capture == null ? null</span>
+<span class="fc" id="L366">                    : run.capture.prepare(graph, rule.id(), match.bindings());</span>
+<span class="fc" id="L367">                EClassId rhs = applier.instantiate(rule.target(), match.bindings());</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">                if (graph.areEquivalent(match.root(), rhs)) continue;</span>
                 // Proof mode never calls the legacy recursive witness extractor.
-<span class="fc bfc" id="L326" title="All 2 branches covered.">                SaturationProvenance.Witness witness = run.capture == null</span>
-<span class="fc" id="L327">                    ? nativeWitness(graph, rule, match, run) : null;</span>
-<span class="fc" id="L328">                graph.union(match.root(), rhs);</span>
-<span class="fc bfc" id="L329" title="All 2 branches covered.">                if (run.capture != null) run.capture.recorded(instance);</span>
-<span class="fc" id="L330">                run.applied(rule.id(), witness);</span>
-<span class="fc" id="L331">            } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
-<span class="fc" id="L332">                throw exhausted;</span>
-<span class="nc" id="L333">            } catch (RuntimeException failure) {</span>
-<span class="nc" id="L334">                run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, INSERTION, failure);</span>
-<span class="fc" id="L335">            }</span>
-<span class="fc" id="L336">        }</span>
-<span class="fc" id="L337">    }</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                SaturationProvenance.Witness witness = run.capture == null</span>
+<span class="fc" id="L371">                    ? nativeWitness(graph, rule, match, run) : null;</span>
+<span class="fc" id="L372">                graph.union(match.root(), rhs);</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                if (run.capture != null) run.capture.recorded(instance);</span>
+<span class="fc" id="L374">                run.applied(rule.id(), witness);</span>
+<span class="fc" id="L375">            } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L376">                throw exhausted;</span>
+<span class="nc" id="L377">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L378">                run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, INSERTION, failure);</span>
+<span class="fc" id="L379">            }</span>
+<span class="fc" id="L380">        }</span>
+<span class="fc" id="L381">    }</span>
 
     private SaturationProvenance.Witness nativeWitness(EGraph graph, PatternRewriteRule rule,
             EGraphPatternMatcher.Match match, Run run) {
-<span class="fc bfc" id="L341" title="All 2 branches covered.">        if (run.witnesses.size() &gt;= SaturationProvenance.MAX_WITNESSES) return null;</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (run.witnesses.size() &gt;= SaturationProvenance.MAX_WITNESSES) return null;</span>
         try {
-<span class="fc" id="L343">            Map&lt;String, Expr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L344" title="All 2 branches covered.">            for (var binding : match.bindings().entrySet()) {</span>
-<span class="fc" id="L345">                run.nativeWitnessExtractions++;</span>
+<span class="fc" id="L387">            Map&lt;String, Expr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            for (var binding : match.bindings().entrySet()) {</span>
+<span class="fc" id="L389">                run.nativeWitnessExtractions++;</span>
                 // A witness needs finite syntax, independently of the optimization objective.
-<span class="fc" id="L347">                bindings.put(binding.getKey(), graph.extract(binding.getValue(), node -&gt; 1));</span>
-<span class="fc" id="L348">            }</span>
-<span class="fc" id="L349">            return new SaturationProvenance.Witness(rule.id(),</span>
-<span class="fc" id="L350">                rule.source().instantiate(bindings), rule.target().instantiate(bindings));</span>
-<span class="fc" id="L351">        } catch (RuntimeException failure) {</span>
-<span class="fc" id="L352">            run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, EXTRACTION, failure);</span>
-<span class="fc" id="L353">            return null;</span>
+<span class="fc" id="L391">                bindings.put(binding.getKey(), graph.extract(binding.getValue(), node -&gt; 1));</span>
+<span class="fc" id="L392">            }</span>
+<span class="fc" id="L393">            return new SaturationProvenance.Witness(rule.id(),</span>
+<span class="fc" id="L394">                rule.source().instantiate(bindings), rule.target().instantiate(bindings));</span>
+<span class="fc" id="L395">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L396">            run.diagnostics.record(rule.id(), match.root(), RULE_FAILURE, EXTRACTION, failure);</span>
+<span class="fc" id="L397">            return null;</span>
         }
     }
 
     private void applyConcrete(EGraph graph, RewriteRule rule, List&lt;EClassId&gt; snapshot, Run run) {
-<span class="fc" id="L358">        var seen = new LinkedHashSet&lt;EClassId&gt;();</span>
-<span class="fc bfc" id="L359" title="All 2 branches covered.">        for (EClassId raw : snapshot) {</span>
-<span class="fc" id="L360">            checkBudget(graph);</span>
-<span class="fc" id="L361">            EClassId source = graph.find(raw);</span>
-<span class="fc bfc" id="L362" title="All 2 branches covered.">            if (!seen.add(source)) continue;</span>
+<span class="fc" id="L402">        var seen = new LinkedHashSet&lt;EClassId&gt;();</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        for (EClassId raw : snapshot) {</span>
+<span class="fc" id="L404">            checkBudget(graph);</span>
+<span class="fc" id="L405">            EClassId source = graph.find(raw);</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            if (!seen.add(source)) continue;</span>
             List&lt;Expr&gt; representatives;
             try {
                 // The optimization objective ranks results; it must not hide applicable rules.
-<span class="fc" id="L366">                representatives = graph.representatives(source, node -&gt; 1);</span>
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">                if (representatives.isEmpty()) {</span>
-<span class="nc" id="L368">                    run.diagnostics.record(rule.id(), source, NON_APPLICABLE, EXTRACTION, null);</span>
+<span class="fc" id="L410">                representatives = graph.representatives(source, node -&gt; 1);</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">                if (representatives.isEmpty()) {</span>
+<span class="nc" id="L412">                    run.diagnostics.record(rule.id(), source, NON_APPLICABLE, EXTRACTION, null);</span>
                 }
-<span class="nc" id="L370">            } catch (RuntimeException failure) {</span>
-<span class="nc" id="L371">                run.diagnostics.record(rule.id(), source, RULE_FAILURE, EXTRACTION, failure);</span>
-<span class="nc" id="L372">                continue;</span>
-<span class="fc" id="L373">            }</span>
-<span class="fc bfc" id="L374" title="All 2 branches covered.">            for (Expr before : representatives) {</span>
-<span class="fc" id="L375">                checkBudget(graph);</span>
-<span class="fc" id="L376">                applyConcreteRepresentative(graph, rule, source, before, run);</span>
-<span class="fc" id="L377">            }</span>
-<span class="fc" id="L378">        }</span>
-<span class="fc" id="L379">    }</span>
+<span class="nc" id="L414">            } catch (RuntimeException failure) {</span>
+<span class="nc" id="L415">                run.diagnostics.record(rule.id(), source, RULE_FAILURE, EXTRACTION, failure);</span>
+<span class="nc" id="L416">                continue;</span>
+<span class="fc" id="L417">            }</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            for (Expr before : representatives) {</span>
+<span class="fc" id="L419">                checkBudget(graph);</span>
+<span class="fc" id="L420">                applyConcreteRepresentative(graph, rule, source, before, run);</span>
+<span class="fc" id="L421">            }</span>
+<span class="fc" id="L422">        }</span>
+<span class="fc" id="L423">    }</span>
 
     private void applyConcreteRepresentative(EGraph graph, RewriteRule rule, EClassId source, Expr before, Run run) {
-<span class="fc" id="L382">        var stage = MATCHES;</span>
+<span class="fc" id="L426">        var stage = MATCHES;</span>
         try {
-<span class="fc" id="L384">            EquivalenceAwarePatternMatcher.MatchAttempt attempt = null;</span>
+<span class="fc" id="L428">            EquivalenceAwarePatternMatcher.MatchAttempt attempt = null;</span>
             boolean matched;
             // Only the unmodified base rule has a matcher contract we can interpret directly.
-<span class="fc bfc" id="L387" title="All 2 branches covered.">            if (rule.getClass() == PatternRewriteRule.class) {</span>
-<span class="fc" id="L388">                var pattern = (PatternRewriteRule) rule;</span>
-<span class="fc" id="L389">                attempt = EquivalenceAwarePatternMatcher.matchDetailed(</span>
-<span class="fc" id="L390">                    pattern.source(), before, Map.of(), pattern.recognitionProfile());</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            if (rule.getClass() == PatternRewriteRule.class) {</span>
+<span class="fc" id="L432">                var pattern = (PatternRewriteRule) rule;</span>
+<span class="fc" id="L433">                attempt = EquivalenceAwarePatternMatcher.matchDetailed(</span>
+<span class="fc" id="L434">                    pattern.source(), before, Map.of(), pattern.recognitionProfile());</span>
                 // Returned attempts delegate this work; exceptional exits settle it themselves.
-<span class="fc" id="L392">                RetainedOperation.work(attempt.visitedBranches());</span>
-<span class="fc bfc" id="L393" title="All 2 branches covered.">                if (attempt.inconclusive()) {</span>
-<span class="fc" id="L394">                    run.diagnostics.recordInconclusiveMatch(rule.id(), source, attempt.limitCode());</span>
-<span class="fc" id="L395">                    return;</span>
+<span class="fc" id="L436">                RetainedOperation.work(attempt.visitedBranches());</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">                if (attempt.inconclusive()) {</span>
+<span class="fc" id="L438">                    run.diagnostics.recordInconclusiveMatch(rule.id(), source, attempt.limitCode());</span>
+<span class="fc" id="L439">                    return;</span>
                 }
-<span class="fc" id="L397">                matched = attempt.matched();</span>
-<span class="fc" id="L398">            } else {</span>
-<span class="fc" id="L399">                matched = rule.matches(before);</span>
+<span class="fc" id="L441">                matched = attempt.matched();</span>
+<span class="fc" id="L442">            } else {</span>
+<span class="fc" id="L443">                matched = rule.matches(before);</span>
             }
-<span class="fc bfc" id="L401" title="All 2 branches covered.">            if (!matched) {</span>
-<span class="fc" id="L402">                run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);</span>
-<span class="fc" id="L403">                return;</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            if (!matched) {</span>
+<span class="fc" id="L446">                run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);</span>
+<span class="fc" id="L447">                return;</span>
             }
-<span class="fc" id="L405">            stage = ASSUMPTIONS;</span>
-<span class="fc bfc" id="L406" title="All 2 branches covered.">            if (!rule.assumptions(before).isEmpty()) {</span>
-<span class="fc" id="L407">                run.diagnostics.record(rule.id(), source, UNRESOLVED_CONDITIONS, stage, null);</span>
-<span class="fc" id="L408">                return;</span>
+<span class="fc" id="L449">            stage = ASSUMPTIONS;</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">            if (!rule.assumptions(before).isEmpty()) {</span>
+<span class="fc" id="L451">                run.diagnostics.record(rule.id(), source, UNRESOLVED_CONDITIONS, stage, null);</span>
+<span class="fc" id="L452">                return;</span>
             }
-<span class="fc" id="L410">            stage = APPLY;</span>
-<span class="fc bfc" id="L411" title="All 2 branches covered.">            Expr after = Objects.requireNonNull(attempt == null ? rule.apply(before)</span>
-<span class="fc" id="L412">                : ((PatternRewriteRule) rule).target().instantiate(attempt.bindings()), &quot;rule returned null&quot;);</span>
-<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            if (before.equals(after)) {</span>
-<span class="nc" id="L414">                run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);</span>
-<span class="nc" id="L415">                return;</span>
+<span class="fc" id="L454">            stage = APPLY;</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            Expr after = Objects.requireNonNull(attempt == null ? rule.apply(before)</span>
+<span class="fc" id="L456">                : ((PatternRewriteRule) rule).target().instantiate(attempt.bindings()), &quot;rule returned null&quot;);</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">            if (before.equals(after)) {</span>
+<span class="nc" id="L458">                run.diagnostics.record(rule.id(), source, NON_APPLICABLE, stage, null);</span>
+<span class="nc" id="L459">                return;</span>
             }
-<span class="fc" id="L417">            stage = INSERTION;</span>
-<span class="fc" id="L418">            EClassId rhs = graph.addExpression(after);</span>
-<span class="fc bfc" id="L419" title="All 2 branches covered.">            if (!graph.areEquivalent(source, rhs)) {</span>
-<span class="fc" id="L420">                graph.union(source, rhs);</span>
-<span class="fc" id="L421">                run.applied(rule.id(), new SaturationProvenance.Witness(rule.id(), before, after));</span>
+<span class="fc" id="L461">            stage = INSERTION;</span>
+<span class="fc" id="L462">            EClassId rhs = graph.addExpression(after);</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            if (!graph.areEquivalent(source, rhs)) {</span>
+<span class="fc" id="L464">                graph.union(source, rhs);</span>
+<span class="fc" id="L465">                run.applied(rule.id(), new SaturationProvenance.Witness(rule.id(), before, after));</span>
             }
-<span class="fc" id="L423">        } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
-<span class="fc" id="L424">            throw exhausted;</span>
-<span class="fc" id="L425">        } catch (RuntimeException failure) {</span>
-<span class="fc" id="L426">            run.diagnostics.record(rule.id(), source, RULE_FAILURE, stage, failure);</span>
-<span class="fc" id="L427">        }</span>
-<span class="fc" id="L428">    }</span>
+<span class="fc" id="L467">        } catch (EGraph.NodeBudgetExceeded exhausted) {</span>
+<span class="fc" id="L468">            throw exhausted;</span>
+<span class="fc" id="L469">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L470">            run.diagnostics.record(rule.id(), source, RULE_FAILURE, stage, failure);</span>
+<span class="fc" id="L471">        }</span>
+<span class="fc" id="L472">    }</span>
 
     private static Collection&lt;EClassId&gt; allClasses(EGraph graph) {
-<span class="fc" id="L431">        return graph.classes().stream().map(EClass::id).toList();</span>
+<span class="fc" id="L475">        return graph.classes().stream().map(EClass::id).toList();</span>
     }
     private static List&lt;EClassId&gt; canonicalSorted(EGraph graph, Collection&lt;EClassId&gt; ids) {
-<span class="fc" id="L434">        return ids.stream().map(graph::find).distinct().sorted().toList();</span>
+<span class="fc" id="L478">        return ids.stream().map(graph::find).distinct().sorted().toList();</span>
     }
-    private static final class Run {
+    static final class Run {
+        final RationalCancellation guards;
         final EGraphProofCapture capture;
-<span class="fc" id="L438">        Run(EGraphProofCapture capture) { this.capture = capture; }</span>
-<span class="fc" id="L439">        final Map&lt;String, Integer&gt; appliedRules = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L440">        final SaturationDiagnostics.Collector diagnostics = new SaturationDiagnostics.Collector();</span>
-<span class="fc" id="L441">        final List&lt;SaturationProvenance.Witness&gt; witnesses = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L483">        Run(EGraphProofCapture capture) { this(capture, null); }</span>
+<span class="fc" id="L484">        Run(EGraphProofCapture capture, RationalCancellation guards) {</span>
+<span class="fc" id="L485">            this.capture = capture;</span>
+<span class="fc" id="L486">            this.guards = guards;</span>
+<span class="fc" id="L487">        }</span>
+<span class="fc" id="L488">        final Map&lt;String, Integer&gt; appliedRules = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L489">        final SaturationDiagnostics.Collector diagnostics = new SaturationDiagnostics.Collector();</span>
+<span class="fc" id="L490">        final List&lt;SaturationProvenance.Witness&gt; witnesses = new ArrayList&lt;&gt;();</span>
         long droppedWitnesses;
         long nativeWitnessExtractions;
-<span class="fc" id="L444">        int applications() { return appliedRules.values().stream().mapToInt(Integer::intValue).sum(); }</span>
+<span class="fc" id="L493">        int applications() { return appliedRules.values().stream().mapToInt(Integer::intValue).sum(); }</span>
         SaturationStats.Reason noProgressReason() {
-<span class="fc bfc" id="L446" title="All 2 branches covered.">            if (diagnostics.hasFailures()) return SaturationStats.Reason.RULE_FAILURES;</span>
-<span class="fc bfc" id="L447" title="All 2 branches covered.">            if (diagnostics.hasInconclusiveMatches()) return SaturationStats.Reason.MATCHER_LIMIT;</span>
-<span class="fc" id="L448">            return SaturationStats.Reason.FIX_POINT;</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">            if (diagnostics.hasFailures()) return SaturationStats.Reason.RULE_FAILURES;</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">            if (diagnostics.hasInconclusiveMatches()) return SaturationStats.Reason.MATCHER_LIMIT;</span>
+<span class="fc bfc" id="L497" title="All 4 branches covered.">            if (guards != null &amp;&amp; guards.decisionLimit) return SaturationStats.Reason.GUARD_BUDGET;</span>
+<span class="fc bfc" id="L498" title="All 6 branches covered.">            if (guards != null &amp;&amp; (guards.undecided || diagnostics.hasUnresolvedConditions())) {</span>
+<span class="fc" id="L499">                return SaturationStats.Reason.UNDECIDED_GUARDS;</span>
+            }
+<span class="fc" id="L501">            return SaturationStats.Reason.FIX_POINT;</span>
         }
         void applied(String rule, SaturationProvenance.Witness witness) {
-<span class="fc" id="L451">            appliedRules.merge(rule, 1, Integer::sum);</span>
-<span class="fc bfc" id="L452" title="All 4 branches covered.">            if (witnesses.size() &lt; SaturationProvenance.MAX_WITNESSES &amp;&amp; witness != null) witnesses.add(witness);</span>
-<span class="fc" id="L453">            else droppedWitnesses++;</span>
-<span class="fc" id="L454">        }</span>
+<span class="fc" id="L504">            appliedRules.merge(rule, 1, Integer::sum);</span>
+<span class="fc bfc" id="L505" title="All 4 branches covered.">            if (witnesses.size() &lt; SaturationProvenance.MAX_WITNESSES &amp;&amp; witness != null) witnesses.add(witness);</span>
+<span class="fc" id="L506">            else droppedWitnesses++;</span>
+<span class="fc" id="L507">        }</span>
     }
 
     public record Result(Expr expression, SaturationStats stats,
             SaturationDiagnostics diagnostics, SaturationProvenance provenance) {
-<span class="fc" id="L459">        public Result {</span>
-<span class="fc" id="L460">            Objects.requireNonNull(expression);</span>
-<span class="fc" id="L461">            Objects.requireNonNull(stats);</span>
-<span class="fc" id="L462">            Objects.requireNonNull(diagnostics);</span>
-<span class="fc" id="L463">            Objects.requireNonNull(provenance);</span>
-<span class="fc" id="L464">            requireCheckedOutput(expression, provenance.proofOutcome());</span>
-<span class="fc" id="L465">        }</span>
+<span class="fc" id="L512">        public Result {</span>
+<span class="fc" id="L513">            Objects.requireNonNull(expression);</span>
+<span class="fc" id="L514">            Objects.requireNonNull(stats);</span>
+<span class="fc" id="L515">            Objects.requireNonNull(diagnostics);</span>
+<span class="fc" id="L516">            Objects.requireNonNull(provenance);</span>
+<span class="fc" id="L517">            requireCheckedOutput(expression, provenance.proofOutcome());</span>
+<span class="fc" id="L518">        }</span>
         public Result(Expr expression, SaturationStats stats) {
-<span class="nc" id="L467">            this(expression, stats, SaturationDiagnostics.empty(), SaturationProvenance.empty());</span>
-<span class="nc" id="L468">        }</span>
+<span class="nc" id="L520">            this(expression, stats, SaturationDiagnostics.empty(), SaturationProvenance.empty());</span>
+<span class="nc" id="L521">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -151,9 +151,9 @@ public final class ModPowFrozenTransfer {
 <span class="fc" id="L151">        return bytes;</span>
     }
 
-<span class="fc" id="L154">    private record Baseline(int generated, List&lt;Expr&gt; approved) {}</span>
+<span class="fc" id="L154">    record Baseline(int generated, List&lt;Expr&gt; approved) {}</span>
 
-    private static Baseline baseline(Row row) {
+    static Baseline baseline(Row row) {
         // This preflight also bounds role-renaming/cost recursion independently of matching.
 <span class="fc" id="L158">        requireBounded(row.source());</span>
 <span class="pc bpc" id="L159" title="1 of 2 branches missed.">        require(productSites(row.source()) == 1, &quot;v1 requires exactly one product-exponent site&quot;);</span>
@@ -174,13 +174,13 @@ public final class ModPowFrozenTransfer {
 <span class="fc" id="L174">        return new Baseline(steps.size(), List.copyOf(approved));</span>
     }
 
-    private static Expr best(Row row, List&lt;Expr&gt; alternatives) {
+    static Expr best(Row row, List&lt;Expr&gt; alternatives) {
 <span class="fc" id="L178">        var candidates = new ArrayList&lt;Expr&gt;(); candidates.add(row.source()); candidates.addAll(alternatives);</span>
 <span class="fc" id="L179">        return candidates.stream().min(Comparator.comparingLong((Expr e) -&gt; cost(row, e).dag())</span>
 <span class="fc" id="L180">            .thenComparingLong(e -&gt; cost(row, e).tree()).thenComparing(CODEC::encodeExpression)).orElseThrow();</span>
     }
 
-    private static ModPowDagRediscoveryStudy.ProgramCost cost(Row row, Expr program) {
+    static ModPowDagRediscoveryStudy.ProgramCost cost(Row row, Expr program) {
 <span class="fc" id="L184">        var names = new HashMap&lt;String, String&gt;(); row.roles().forEach((role, name) -&gt; names.put(name, role));</span>
 <span class="fc" id="L185">        return ModPowDagRediscoveryStudy.cost(rename(program, names),</span>
 <span class="fc" id="L186">            new ModPowDagRediscoveryStudy.BitProfile(row.id(), row.qBits(), row.eBits(), row.rBits()));</span>

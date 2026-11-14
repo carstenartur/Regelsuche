@@ -56,8 +56,8 @@ public final class EClass {
 <span class="fc" id="L56">        this.parents.addAll(other.parents);</span>
 <span class="fc" id="L57">    }</span>
 
-    void clearParents() {
-<span class="fc" id="L60">        parents.clear();</span>
+    void removeParent(ENode parent) {
+<span class="fc" id="L60">        parents.remove(parent);</span>
 <span class="fc" id="L61">    }</span>
 
     void replaceNodes(Set&lt;ENode&gt; replacement) {

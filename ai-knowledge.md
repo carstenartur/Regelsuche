@@ -132,6 +132,21 @@ addressed directly when diagnosing a failure:
 ./gradlew :ai-knowledge-verification:verifyComplexityHotspots
 ```
 
+The extractor produces the two method rankings in `complexity.json`. Maven can
+apply the same Java policy decision to a retained extraction using the following
+command from the repository root.
+
+```bash
+mvn -pl regelsuche-quality -am test -Dtest=ComplexityHotspotsTest \
+  -Dregelsuche.complexityResult=/absolute/path/to/complexity.json
+```
+
+The JSON decision and Markdown table are written to
+`regelsuche-quality/target/reports/quality/complexity`. A policy violation
+writes both diagnostics and fails the build. The Gradle lifecycle invokes the
+same verifier immediately after extracting the current checkout.
+
+
 These commands require the same enablement flag as `aiKnowledgeCheck`.
 `checkAiKnowledgeIndex` evaluates rule-bearing claim seeds from
 `ai-knowledge/claims.seed.yaml`. Claims marked with `severity: error` fail the
@@ -157,9 +172,27 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main before the November 14 integrations
+
+The active baseline is the native v0.1.10 projection of main
+`273d850569325fde5f15db9faa45a32c98632ebe`. Its [post-merge CI run](https://github.com/carstenartur/Regelsuche/actions/runs/43551043301)
+passed seven verification jobs and the aggregate `ciCheck` against the previous
+baseline. The extractor measured 765250 context units, up 14380 from 750870
+within the 15000-unit allowance. Its normalized context debt was 14.46.
+
+The [qualification and artifact hashes](../ai-knowledge/baseline-history/2026-11-14-main-273d850/provenance.json)
+bind the clean checkout, CI jobs and all 285 verified archive entries.
+The pinned extractor's `TrendAnalyzer.snapshot` projects the active baseline
+from the [accepted complexity report](../ai-knowledge/baseline-history/2026-11-14-main-273d850/accepted-complexity.json).
+The [passing check](../ai-knowledge/baseline-history/2026-11-14-main-273d850/accepted-check.json)
+records the native gate outcome. The [later run on main](https://github.com/carstenartur/Regelsuche/actions/runs/43557641631)
+measured 765970 units, up 15100 against the then-active baseline and 720 from
+the qualified predecessor. Its [rejected trend](../ai-knowledge/baseline-history/2026-11-14-main-273d850/rejected-trend.json)
+is retained separately.
+
 ### Accepted main before the comparison follow-up (2026-11-10)
 
-The active baseline projects the native v0.1.10 measurements of accepted main
+The previous baseline projected the native v0.1.10 measurements of accepted main
 `c267b7fa9c95cc14cfd53b00ceb5d0325908feda`, tree
 `a023dbc29cc3402d26b9e42e28d41ab2c3c450f4`. Its
 [complete main CI](https://github.com/carstenartur/Regelsuche/actions/runs/42752771954)
@@ -181,7 +214,7 @@ This smaller artifact contains no `metrics-snapshot.json` or `trend.json`.
 The [projected baseline](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/projected-baseline.json)
 uses the unchanged `TrendAnalyzer.snapshot` implementation on the native
 complexity report, including the measured footprint model v3. It is byte-identical
-to the active baseline, SHA-256
+to the baseline used at that time, SHA-256
 `8a5f0e2efa4673872858d6df4e62404724727a018940c6d7f3978d5c4bb5f95a`.
 [Provenance](../ai-knowledge/baseline-history/2026-11-10-main-c267b7f/provenance.json)
 records exact inputs and the projection. This is neither a downloaded original
