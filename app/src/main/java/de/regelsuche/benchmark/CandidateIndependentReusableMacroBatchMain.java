@@ -234,7 +234,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         return campaign;
     }
 
-    private static ObjectNode formation(FormationResult formation) {
+    static ObjectNode formation(FormationResult formation) {
         ObjectNode result = JSON.createObjectNode();
         result.put("status", formation.status().name());
         result.put("detail", formation.detail());
@@ -321,7 +321,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         return result;
     }
 
-    private static ObjectNode evaluation(
+    static ObjectNode evaluation(
         TaskBinding binding,
         PairedEvaluation evaluation
     ) {
@@ -400,7 +400,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         return List.copyOf(result);
     }
 
-    private static List<TaskBinding> evaluationTasks(
+    static List<TaskBinding> evaluationTasks(
         List<ObjectNode> cases
     ) {
         List<TaskBinding> result = new ArrayList<>();
@@ -446,7 +446,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         return List.copyOf(result);
     }
 
-    private static Map<String, List<String>> operationRules(
+    static Map<String, List<String>> operationRules(
         ObjectNode profile
     ) {
         LinkedHashMap<String, List<String>> result = new LinkedHashMap<>();
@@ -465,7 +465,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         return Map.copyOf(result);
     }
 
-    private static List<ObjectNode> macroCases(ObjectNode corpus) {
+    static List<ObjectNode> macroCases(ObjectNode corpus) {
         List<ObjectNode> result = new ArrayList<>();
         for (JsonNode item : requireArray(
                 corpus, "cases", "case corpus")) {
@@ -603,7 +603,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         return result;
     }
 
-    private static ObjectNode readObject(Path path) throws IOException {
+    static ObjectNode readObject(Path path) throws IOException {
         require(
             Files.isRegularFile(path) && !Files.isSymbolicLink(path),
             "expected regular non-symbolic JSON file: " + path);
@@ -612,7 +612,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
             path.toString());
     }
 
-    private static void requireContentHash(
+    static void requireContentHash(
         ObjectNode value,
         String context
     ) {
@@ -630,7 +630,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         value.put("contentHash", semanticHash(value));
     }
 
-    private static String semanticHash(JsonNode value) {
+    static String semanticHash(JsonNode value) {
         try {
             return "sha256:" + java.util.HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(
@@ -641,7 +641,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         }
     }
 
-    private static String canonicalJson(JsonNode value) {
+    static String canonicalJson(JsonNode value) {
         try {
             if (value.isObject()) {
                 TreeSet<String> fields = new TreeSet<>();
@@ -752,7 +752,7 @@ public final class CandidateIndependentReusableMacroBatchMain {
         }
     }
 
-    private record TaskBinding(
+    record TaskBinding(
         String caseId,
         String split,
         String structuralCluster,
