@@ -3,7 +3,9 @@ WORKDIR /workspace
 
 COPY . .
 RUN chmod +x ./gradlew \
-    && ./gradlew --no-daemon :regelsuche-benchmarks:installDist -x test
+    && ./gradlew --no-daemon :regelsuche-benchmarks:installDist :app:test \
+        --tests de.regelsuche.docs.HiddenRuleComparisonTest \
+        --tests de.regelsuche.docs.HiddenRulePilotCampaignTest.productionRuntimeContainsNoHiddenManifestIdentifiersOrTemplates
 
 FROM eclipse-temurin:25.0.5_8-jre-noble AS runtime
 
@@ -25,6 +27,7 @@ RUN apt-get update \
 WORKDIR /opt/regelsuche-benchmarks
 COPY --from=build \
     /workspace/regelsuche-benchmarks/build/install/regelsuche-benchmarks/ ./
+COPY --from=build /workspace/app/build/reports/hidden-rule-pilot/comparison.json ./hidden-rule-comparison.json
 RUN chown -R regelsuche:regelsuche /opt/regelsuche-benchmarks
 
 ENV HOME=/tmp

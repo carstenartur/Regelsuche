@@ -3,6 +3,7 @@ package de.regelsuche.docs;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.docs.HiddenRulePilotEvaluator.HiddenReference;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class HiddenRulePilotCampaignTest {
     @Test
@@ -30,17 +32,8 @@ class HiddenRulePilotCampaignTest {
             ? Path.of("build", "reports", "hidden-rule-pilot") : Path.of(configuredDirectory);
         Path output = directory.resolve("report.json");
         Path runtimeOutput = directory.resolve("runtime.json");
-        if (maven) {
-            Path expected = Path.of(System.getProperty("regelsuche.repositoryRoot"))
-                .resolve("app/target/reports/hidden-rule-pilot/report.json");
-            assertEquals(expected.toAbsolutePath().normalize(), output.toAbsolutePath().normalize(),
-                "Maven's real producer must write its own target output, without overwriting Gradle evidence");
-            for (Path member : List.of(output, runtimeOutput)) {
-                for (Path current = member.toAbsolutePath(); current != null; current = current.getParent()) {
-                    assertFalse(Files.isSymbolicLink(current), "Maven output must not traverse a symbolic link");
-                }
-            }
-        }
+        checkMavenOutput(output);
+        checkMavenOutput(runtimeOutput);
         campaign.write(output, report);
         campaign.writeRuntime(runtimeOutput, report);
 
@@ -92,10 +85,23 @@ class HiddenRulePilotCampaignTest {
         assertTrue(runtimeJson.contains("\"elapsedNanos\""));
     }
 
+    static void checkMavenOutput(Path member) {
+        if (Boolean.getBoolean("regelsuche.maven.reactor")) {
+            Path directory = Path.of(System.getProperty("regelsuche.repositoryRoot"))
+                .resolve("app/target/reports/hidden-rule-pilot");
+            assertEquals(directory.toAbsolutePath().normalize(), member.toAbsolutePath().normalize().getParent(),
+                "Maven's real producer must write its own target output, without overwriting Gradle evidence");
+            for (Path current = member.toAbsolutePath(); current != null; current = current.getParent()) {
+                assertFalse(Files.isSymbolicLink(current), "Maven output must not traverse a symbolic link");
+            }
+        }
+    }
+
     @Test
     void productionRuntimeContainsNoHiddenManifestIdentifiersOrTemplates() {
         assertEquals(20, HiddenRulePilotCatalog.references().size());
-        String runtimeSurface = productionRuntimeSurface();
+        String runtimeSurface = productionRuntimeSurface(
+            Path.of("src", "main", "java", "de", "regelsuche", "docs"));
         for (HiddenReference reference : HiddenRulePilotCatalog.references().values()) {
             List<String> forbidden = new ArrayList<>(reference.forbiddenRuntimeTokens());
             forbidden.add(reference.hiddenRuleId());
@@ -113,29 +119,31 @@ class HiddenRulePilotCampaignTest {
         }
     }
 
-    private static String productionRuntimeSurface() {
-        Path packageRoot = Path.of("src", "main", "java", "de", "regelsuche", "docs");
-        if (!Files.isDirectory(packageRoot)) {
-            return "";
-        }
-        StringBuilder surface = new StringBuilder();
+    @Test
+    void sourceAuditRejectsAnEmptyOrMissingSourceDirectory(@TempDir Path directory) {
+        assertThrows(IllegalStateException.class, () -> productionRuntimeSurface(directory));
+        assertThrows(UncheckedIOException.class, () -> productionRuntimeSurface(directory.resolve("absent")));
+    }
+
+    private static String productionRuntimeSurface(Path packageRoot) {
         try (var files = Files.list(packageRoot)) {
-            files.filter(Files::isRegularFile)
+            List<Path> sources = files.filter(Files::isRegularFile)
                 .filter(file -> file.getFileName().toString().startsWith("HiddenRulePilot"))
                 .filter(file -> file.getFileName().toString().endsWith(".java"))
-                .sorted()
-                .forEach(file -> {
-                    try {
-                        surface.append(compact(Files.readString(file, StandardCharsets.UTF_8)))
-                            .append('\n');
-                    } catch (IOException exception) {
-                        throw new UncheckedIOException(exception);
-                    }
-                });
+                .sorted().toList();
+            for (String required : List.of("HiddenRulePilotRunner.java", "HiddenRulePilotRuntimeCatalog.java")) {
+                if (!sources.contains(packageRoot.resolve(required))) {
+                    throw new IllegalStateException("Missing runtime source for leakage audit: " + required);
+                }
+            }
+            StringBuilder surface = new StringBuilder();
+            for (Path source : sources) {
+                surface.append(compact(Files.readString(source, StandardCharsets.UTF_8))).append('\n');
+            }
+            return surface.toString();
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
-        return surface.toString();
     }
 
     private static String compact(String value) {

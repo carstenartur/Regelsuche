@@ -247,6 +247,27 @@ def runSharedRewriteFragmentImage = tasks.register('runSharedRewriteFragmentImag
     }
 }
 
+def hiddenRuleCheckout = project(':app').layout.buildDirectory.file(
+    'reports/hidden-rule-pilot/comparison.json')
+def hiddenRuleContainer = layout.buildDirectory.file(
+    'reports/comparative-ci/hidden-rule/container.json')
+def extractHiddenRuleContainerReport = tasks.register('extractHiddenRuleContainerReport', Exec) {
+    group = 'verification'
+    description = 'Extracts the twenty-case comparison executed during the pinned image build.'
+    dependsOn buildComparativeBenchmarkImage
+    outputs.file hiddenRuleContainer
+    outputs.upToDateWhen { false }
+    doFirst {
+        hiddenRuleContainer.get().asFile.parentFile.mkdirs()
+        commandLine 'docker', 'run', '--rm', '--network', 'none', '--entrypoint', 'cat',
+            comparativeImage, '/opt/regelsuche-benchmarks/hidden-rule-comparison.json'
+        standardOutput = new java.io.ByteArrayOutputStream()
+    }
+    doLast {
+        hiddenRuleContainer.get().asFile.bytes = standardOutput.toByteArray()
+    }
+}
+
 def verifyComparativeBenchmarks = tasks.register(
     'verifyComparativeBenchmarks', Exec) {
     group = 'verification'
@@ -258,7 +279,8 @@ def verifyComparativeBenchmarks = tasks.register(
         ':regelsuche-benchmarks:writeComparativeBenchmarkRunB',
         ':regelsuche-benchmarks:writeSharedRewriteFragment',
         runComparativeBenchmarkImage,
-        runSharedRewriteFragmentImage
+        runSharedRewriteFragmentImage,
+        ':app:test', extractHiddenRuleContainerReport
     workingDir repositoryRoot
     inputs.file repositoryRoot.file(
         'scripts/verify-comparative-benchmark-reproducibility.py')
@@ -266,6 +288,8 @@ def verifyComparativeBenchmarks = tasks.register(
     inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-a')
     inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-b')
     inputs.dir comparativeDockerOutput
+    inputs.file hiddenRuleCheckout
+    inputs.file hiddenRuleContainer
     inputs.file sharedRewriteCheckout
     inputs.file sharedRewriteContainer
     outputs.upToDateWhen { false }
@@ -278,6 +302,10 @@ def verifyComparativeBenchmarks = tasks.register(
             '--container-run', 'build/reports/comparative-ci/run-docker'
     }
     doLast {
+        if (java.nio.file.Files.mismatch(hiddenRuleCheckout.get().asFile.toPath(),
+                hiddenRuleContainer.get().asFile.toPath()) != -1L) {
+            throw new GradleException('Hidden-rule comparison differs between the checkout and pinned image.')
+        }
         def checkout = sharedRewriteCheckout.get().asFile.toPath()
         def container = sharedRewriteContainer.get().asFile.toPath()
         if (java.nio.file.Files.mismatch(checkout, container) != -1L) {

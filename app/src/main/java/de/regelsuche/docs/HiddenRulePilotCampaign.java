@@ -31,9 +31,17 @@ public final class HiddenRulePilotCampaign {
     public static final String SCHEMA = "regelsuche.hidden-rule-benchmark/v2";
     public static final String RUNTIME_SCHEMA = "regelsuche.hidden-rule-benchmark-runtime/v1";
 
-    private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();
+    private final HiddenRulePilotRunner runner;
     private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();
     private final HiddenRuleHoldoutPartition partition = new HiddenRuleHoldoutPartition();
+
+    public HiddenRulePilotCampaign() {
+        this(new HiddenRulePilotRunner());
+    }
+
+    HiddenRulePilotCampaign(HiddenRulePilotRunner runner) {
+        this.runner = Objects.requireNonNull(runner);
+    }
 
     public PilotReport run(List<PilotCase> cases) {
         Objects.requireNonNull(cases, "cases");

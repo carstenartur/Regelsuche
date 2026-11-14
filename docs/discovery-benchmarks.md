@@ -166,13 +166,38 @@ Unmeasured work is not omitted. The report currently retains machine-readable ga
 - an equality-saturation competitor with exact side-condition provenance;
 - a multi-domain simplification corpus;
 - independent assumption-aware validation of every simplifier output;
-- hidden-rule rediscovery using the #227 leakage controls;
+- hidden-rule rediscovery with an independent induction engine beyond the two search schedulers below;
 - open-target discovery with an information-equivalent external generator;
 - fully held-out cross-family transfer;
 - autonomous campaign-controller comparison over the #355 Research Brief and ledger;
 - discovery-component and controller ablations.
 
 The randomized-valid simplification control and the six named native SymPy operation baselines are no longer coverage gaps: each is a configured seven-case matrix whose operation or scheduling policy is content-bound. A remaining gap disappears only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
+
+## Hidden-rule rediscovery with two search schedulers
+
+Track B reuses the 20 opaque tasks from #227. The two configurations change the
+search scheduler between BestFirst and the project's A* implementation. Both
+use the same learner, primitive inventories, observable concrete endpoints,
+search limits, holdouts and post-hoc evaluator. Generalized reference rules
+and family labels reside in the evaluation-only test catalog. The evidence
+records the input and limits for each case, the active inventory, candidate
+and validation evidence, search work and failures for both configurations.
+
+| On the fixed 20 cases | BestFirst | Project A* |
+| --- | ---: | ---: |
+| Accepted rediscoveries | 19 | 19 |
+| Formation search states explored | 64 | 64 |
+| Formation transformations generated | 66 | 66 |
+| False positives / executed negative holdouts | 0 / 38 | 0 / 38 |
+| Skipped negative holdouts | 2 | 2 |
+
+Both schedulers miss the observable endpoint on case 020. Candidate validation
+uses the existing #227 evaluator. The benchmark tests the effect of scheduler
+choice with the same induction pipeline. The current Maven and Gradle app test
+suites produce `reports/hidden-rule-pilot/comparison.json` under their respective
+output directories. The checkout verification compares the canonical report with
+a fresh execution in the pinned benchmark image.
 
 ## Shared-fragment rewriting and equality saturation
 
