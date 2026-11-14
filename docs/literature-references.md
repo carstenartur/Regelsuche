@@ -97,7 +97,16 @@ Eine bestätigte Vorarbeit in einem zugänglichen Bestand lässt sich auch bei
 Lücken in weiteren Beständen dokumentieren. Historische v1-Bewertungen behalten
 ihre eigene Fassung und Inhaltsidentität.
 
-Ein vollständiges externes Neuheitsurteil hat eigene Anforderungen. [Issue #391](https://github.com/carstenartur/Regelsuche/issues/391)
+### Einen eingefrorenen Literaturbefund unabhängig nachprüfen
+
+Die Java-Schnittstelle `de.regelsuche.literature.ExternalNoveltyReview` prüft private Gutachterpakete für einzelne skalare Gleichungen. Sie liest keine externen Dienste und veröffentlicht keine Suchanfrage. Das vorhandene v2-Dossier mit Quellen, Annahmen, Relationen, offenen Treffern und Zugangsproblemen bleibt Bestandteil des Pakets. Die bestehende Workbench-Literatursuche bleibt freiwillig; das neue Format ist eine separate Java-Schnittstelle.
+
+1. **Vor der Recherche** `Plan` an die drei Identitäten des gespeicherten Kandidaten (`Subject`), die unveränderte Gleichung, die Annahmen, die Hashes der Formation und des Zugriffsprotokolls und den Zeitpunkt des Einfrierens binden. Den Hash aus `freeze(plan)` und den Hash des versionierten Quellenkatalogs außerhalb des später importierten Pakets aufbewahren. Der Katalog beschreibt pro Bestand Fassung, Datum, Möglichkeiten, Zugangsbedingungen und Grenzen.
+2. `NoveltyQueryForms.forEquation(...)` erzeugt vier Suchtexte: Original, systematische Variablenumbenennung, Struktur und vertauschte Gleichungsseiten. Das Profil ist auf einzelne Gleichungen von höchstens 128 Zeichen begrenzt. Es verspricht keine vollständige Suche nach mathematisch äquivalenten Aussagen. Für jeden durchsuchten Bestand Suchfamilie, Text, Zeitpunkt und tatsächlich beobachtete Trefferkennungen festhalten. Im v2-Dossier muss jede davon beim richtigen Bestand entweder mit einer inspizierten Quelle oder als offener Treffer erklärt sein.
+3. Den Hash aus `packetRoot(packet)` an die Begutachtung geben. Ein Votum bindet das gesamte Paket, die pseudonyme Person, die Hashes ihrer Qualifikations- und Konfliktprüfung sowie Entscheidung und Begründung. Signiert werden die Bytes aus `signingBytes(opinion)` mit Ed25519. Die empfangende Stelle liefert eine **eigene** Liste aller für das Paket zugeteilten, unabhängig geprüften Personen mit ihren öffentlichen Schlüsseln und den beiden Nachweisen. Schlüssel und Zuordnungen aus dem eingereichten Paket sind keine Autorität.
+4. `replay(expectedFreeze, expectedCatalogue, assignedReviewers, bytes)` rekonstruiert die Entscheidung. `artifacts(...)` liefert sieben benannte private JSON-Dateien: Plan, Katalog, Suchprotokoll, Trefferdossier, Eingang der Gutachten, Entscheidung und Gesamtprotokoll. Das Ergebnis erteilt weder einen mathematischen Beweis noch Promotion oder Veröffentlichungsfreigabe.
+
+Bestätigte Vorarbeit bleibt Vorarbeit. Bei fehlendem Zugang oder ungeklärtem Treffer bleibt die Neuheit ungeklärt; eine vollständige Suche ohne einschlägigen Treffer ist zunächst nur ein Befund innerhalb des Katalogumfangs. Die positive Protokollentscheidung benötigt mindestens zwei gültige Zustimmungen und die vollständige zugeteilte Gruppe. Die Prüfstelle muss die Identitäten, die Unabhängigkeit, Zugriffsrechte und Echtheit der vorab festgehaltenen Wurzeln selbst feststellen. Zeitstempel allein beweisen keine Geheimhaltung. Automatisierte Tests verwenden ausschließlich synthetische Quellen und Testschlüssel.
 
 ## Freiwilliger Abruf über TheoremSearch
 
