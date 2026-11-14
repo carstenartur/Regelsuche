@@ -59,8 +59,18 @@ zweier Ganzzahlliterale dar.
 - Für Ganzzahlkonstanten bestehen `long`-Einstiege; exakte Textwerte verwenden
   `NumberExpr.exact`, `PatternExpr.num` oder `ExactRational.parse`.
 - Ein impliziter `double`-Konstruktor besteht nicht. Numerische Diagnostik
-  projiziert Werte ausdrücklich mit `toBigDecimal(MathContext)` und darf diese
-  Projektion nicht als exakte Gleichheit oder neu berechnetes Zahlenblatt verwenden.
+  verwendet `ExactRational.approximate(MathContext)`. Der Rückgabewert enthält
+  die gerundete Dezimalzahl, ihre Stellenzahl und den Rundungsmodus. Die
+  Projektionsschnittstelle verlangt endliche Präzision. Die Solver-IR verwendet
+  weiterhin die exakte Dezimalumwandlung oder den rationalen Quotienten.
+- Der öffentliche Validierungsdienst vergleicht abgeschlossene arithmetische
+  Terme mit der begrenzten exakten rationalen Auswertung. So bleiben etwa
+  `9007199254740992` und `9007199254740993` unterscheidbar. Division durch
+  null und überschrittene Auswertungsgrenzen ergeben `UNAVAILABLE`.
+  Exakte univariate Polynome vergleicht der Dienst anhand ihrer rationalen Normalformen.
+  Endliche Stichproben tragen gesonderte Ergebnisse (`SAMPLE_AGREEMENT` und
+  `SAMPLE_DISAGREEMENT`). Der Discovery-Pfad hält sie als Beobachtungen fest. Gegenbeispiel-Samples mit nichtendlichen Skalar-,
+  Matrix- oder komplexen Werten liefern keinen Widerspruch.
 - Zahlenfaltung, Koeffizientenrechnung, Ableitungen, quadratische Ergänzungen
   und die linearen Gleichungs- und Ungleichungslöser rechnen rational. Die
   primitive Zahlenfaltung ist auf 4.096 Bit je rationaler Komponente begrenzt.

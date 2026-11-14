@@ -60,6 +60,7 @@ final class TargetFreeHeldOutQualifier {
                 "post-freeze disclosure differs from commitment");
         }
 
+        var replay = new FrozenPrimitiveLineage(boundary.candidateFormationRules());
         RepresentationCandidateAssessor assessor =
             new RepresentationCandidateAssessor(
                 disclosure.classificationCatalog());
@@ -73,7 +74,7 @@ final class TargetFreeHeldOutQualifier {
                 candidate,
                 assessor,
                 classificationEngine,
-                oracle))
+                replay, oracle))
             .sorted(Comparator.comparing(
                 CandidateQualification::candidateHash))
             .toList();
@@ -120,7 +121,7 @@ final class TargetFreeHeldOutQualifier {
         CandidateEvidence candidate,
         RepresentationCandidateAssessor assessor,
         AstRewriteTransformationEngine classificationEngine,
-        SymPyOracleValidator oracle
+        FrozenPrimitiveLineage replay, SymPyOracleValidator oracle
     ) {
         boolean referenceMatched = rule.referenceExpressions().stream()
             .map(CANONICALIZER::canonicalize)
@@ -136,8 +137,8 @@ final class TargetFreeHeldOutQualifier {
             || !rule.requireTemporaryComplexityIncrease()
             || candidate.temporaryComplexityIncrease();
         Proof proof = proof(
-            benchmarkCase.sourceExpression(), candidate,
-            referenceMatched, oracle);
+            benchmarkCase.sourceExpression(), benchmarkCase.assumptions(), candidate,
+            referenceMatched, replay, oracle);
         RepresentationCandidateAssessment assessment = assessor.assess(
             RepresentationCandidateProposal.whole(
                 benchmarkCase.sourceExpression(),
@@ -242,10 +243,10 @@ final class TargetFreeHeldOutQualifier {
     }
 
     private static Proof proof(
-        String source,
+        String source, List<String> initialAssumptions,
         CandidateEvidence candidate,
         boolean referenceMatched,
-        SymPyOracleValidator oracle
+        FrozenPrimitiveLineage replay, SymPyOracleValidator oracle
     ) {
         if (!referenceMatched) {
             return new Proof(
@@ -260,6 +261,12 @@ final class TargetFreeHeldOutQualifier {
         try {
             var validation =
                 oracle.validateEquivalence(source, candidate.expression());
+            if (validation.status() != OracleValidator.OracleValidationStatus.AGREE
+                    && validation.status() != OracleValidator.OracleValidationStatus.DISAGREE
+                    && replay.verifies(source, candidate.expression(), candidate.depth(), candidate.pathRuleIds(),
+                        candidate.primitiveRuleIds(), initialAssumptions, candidate.assumptions(), candidate.pathExpressions())) {
+                return new Proof(CandidateProofStatus.SYMBOLICALLY_VERIFIED, "VERIFIED_PRIMITIVE_REPLAY");
+            }
             return new Proof(
                 validation.status()
                     == OracleValidator.OracleValidationStatus.AGREE

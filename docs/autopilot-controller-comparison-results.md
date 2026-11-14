@@ -45,3 +45,34 @@ gzip -dc docs/evidence/autopilot-controller-comparison-v1.json.gz \
 ```
 
 `./gradlew :regelsuche-autopilot:dockerIntegrationTest` includes a host/image byte comparison using the production Dockerfile. The recorded pair above ran on the host. Testcontainers skipped the image execution in this workspace because a Docker daemon was unavailable. The full default production run reproduced all 37 files from base revision `34eb0900f26f9791545e0201d2f5db2d4a2ee96f` byte for byte and passed the production campaign verifier.
+
+## Prospective dispatch across seven stages
+
+A separate Track F run froze two panel selections, three dispatch policies and fourteen stage opportunities per lane before executing the panels. All six lanes independently regenerated the twelve original seeds. They used the #355 target-free brief, inventory, models and native ceilings, two formation batches and six candidate slots in each batch. The original terminal-only feedback and full campaign hash reproduced the historical artifact above. The receipt-driven arm used the new native continuation dispatcher. [Frozen protocol](https://github.com/carstenartur/Regelsuche/blob/3357cf7a828c1a1e58b6c0c8b925538c1efebe6b/research/benchmarks/track-f-stage-allocation/plan.json) · [All native receipts and dispatches](../research/benchmarks/track-f-stage-allocation/measured.json.gz)
+
+| Panel | Dispatch policy | Completed lineages / formed | Distinct completed rules | Tickets executed / skipped / remaining |
+|---|---|---:|---:|---:|
+| Null batch followed by open batch | Receipt-driven | 1 / 1 | 1 | 8 / 0 / 6 |
+| Null batch followed by open batch | Uniform across seven stages | 1 / 1 | 1 | 8 / 6 / 0 |
+| Null batch followed by open batch | Static, no feedback | 0 / 1 | 0 | 3 / 11 / 0 |
+| Two batches with eligible continuations | Receipt-driven | 2 / 2 | 1 | 13 / 0 / 1 |
+| Two batches with eligible continuations | Uniform across seven stages | 2 / 2 | 1 | 13 / 1 / 0 |
+| Two batches with eligible continuations | Static, no feedback | 1 / 2 | 1 | 8 / 6 / 0 |
+
+The zero-output batch retained an alpha-equivalence rejection. On the competing panel, the two disjoint six-observation batches formed the same conjecture and output branch ID. Each had its own sources and lineage hash. All arms spent 240 generated states, 228 explored states, 12 observations and two mining batches per panel. Formation recorded one used and eleven skipped candidate slots on the first panel, two used and ten skipped on the second.
+
+For each completed lineage, the production evaluator executed three positive and three negative holdouts in its joint validation and counterexample call. Instrumentation counted 77 evaluated counterexample assignments (5 boundary, 4 rational, 64 random and 4 complex). Project novelty compared seven active project rules with an empty prior-candidate pool. One polynomial-normal-form obligation returned a lossless, confirmed symbolic result, followed by one lifecycle handoff. The retained evidence includes inferred assumptions, assignments, the solver obligation/result, evidence sources and all unfinished candidates. Formal proof, external novelty, promotion and public evidence keep their historical scope.
+
+Uniform and receipt-driven completed the same lineages for the same native work on both panels. The static policy preassigned both downstream chains to the first batch. Its deficit depends on that ordering. Each dispatch ticket measures an opportunity to call a stage. No wall-time equivalence was tested. All six lanes share the same parent generation and underlying rule family. These measurements support a paired comparison on the two registered panels. Generalization to new conjectures, resource cuts and additional panel orders remains open.
+
+From the repository root, reproduce and verify the decompressed raw JSON (SHA-256 `5c3a00f1db80ae5632ffe3ce734badbcde93575be1786094eb443c76c7801df0`).
+
+```sh
+./gradlew :regelsuche-autopilot:installDist
+dir=research/benchmarks/track-f-stage-allocation
+out=build/reports/controllers/stage-allocation.json
+regelsuche-autopilot/build/install/regelsuche-autopilot/bin/regelsuche-autopilot \
+  --compare-stage-allocation "$dir/plan.json" "$out"
+gzip -dc "$dir/measured.json.gz" | cmp - "$out"
+python3 scripts/verify-track-f-stage-allocation.py --report "$out"
+```

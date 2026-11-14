@@ -15,6 +15,13 @@ public final class AutonomousProductionCampaignMain {
             CampaignControllerComparison.write(Path.of(args[1]));
             return;
         }
+        if (args.length > 0 && "--compare-stage-allocation".equals(args[0])) {
+            if (args.length != 3) {
+                throw new IllegalArgumentException("Expected --compare-stage-allocation <plan-file> <output-file>");
+            }
+            StageAllocationComparison.write(Path.of(args[1]), Path.of(args[2]));
+            return;
+        }
         Path output = args.length > 0
             ? Path.of(args[0])
             : Path.of("build", "reports", "autopilot-production-campaign");

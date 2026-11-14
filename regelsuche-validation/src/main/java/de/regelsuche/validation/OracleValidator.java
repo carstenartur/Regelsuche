@@ -25,6 +25,9 @@ public interface OracleValidator {
     enum OracleValidationStatus {
         AGREE,
         DISAGREE,
+        /** A finite sample is diagnostic and carries no symbolic equality or refutation authority. */
+        SAMPLE_AGREEMENT,
+        SAMPLE_DISAGREEMENT,
         UNAVAILABLE
     }
 }

@@ -44,7 +44,7 @@ public final class AutonomousProductionLifecycleRunner {
     private static final String VALIDATION_REVISION =
         "production-validation-holdouts-348/v1";
     private static final int RANDOM_COUNTEREXAMPLE_SAMPLES = 64;
-    private static final Instant LIFECYCLE_CREATED_AT =
+    static final Instant LIFECYCLE_CREATED_AT =
         Instant.parse("2026-07-15T00:00:00Z");
 
     public LifecycleRun runPinned(int parallelism) {
@@ -167,7 +167,7 @@ public final class AutonomousProductionLifecycleRunner {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
-    private static EvaluationPlan evaluationPlan(long deterministicSeed) {
+    static EvaluationPlan evaluationPlan(long deterministicSeed) {
         return new EvaluationPlan(
             VALIDATION_REVISION,
             List.of(

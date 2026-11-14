@@ -371,6 +371,20 @@ public record ExactRational(
         return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);
     }
 
+    /** A decimal diagnostic retains its rounding policy and cannot be used as an exact AST leaf. */
+    public record DecimalApproximation(BigDecimal value, MathContext context) {
+        public DecimalApproximation {
+            Objects.requireNonNull(context, "context");
+            if (context.getPrecision() == 0) throw new IllegalArgumentException("finite precision required");
+            value = Objects.requireNonNull(value, "value").round(context);
+        }
+    }
+
+    public DecimalApproximation approximate(MathContext context) {
+        if (context.getPrecision() == 0) throw new IllegalArgumentException("finite precision required");
+        return new DecimalApproximation(toBigDecimal(context), context);
+    }
+
     /** A root exists here only when both integer components are perfect squares. */
     public Optional<ExactRational> sqrtExact() {
         var owned = Arithmetic.observe(this, null, 4);
