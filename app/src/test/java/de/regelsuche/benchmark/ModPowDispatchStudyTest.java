@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -31,8 +31,13 @@ class ModPowDispatchStudyTest {
         for (var output : List.of(first, second)) {
             process("evaluate", protocol, model, receipt.toString(), digest, historical, output.toString());
         }
-        assertArrayEquals(Files.readAllBytes(first), Files.readAllBytes(second));
-        var result = ModPowTransferFiles.JSON.readTree(Files.readAllBytes(first));
+        byte[] observed = Files.readAllBytes(first);
+        assertArrayEquals(observed, Files.readAllBytes(second));
+        assertArrayEquals(Files.readAllBytes(study.resolve("acquisition.json")), Files.readAllBytes(receipt));
+        try (var frozen = new GZIPInputStream(Files.newInputStream(study.resolve("result.json.gz")))) {
+            assertArrayEquals(frozen.readAllBytes(), observed);
+        }
+        var result = ModPowTransferFiles.JSON.readTree(observed);
         assertEquals(12, result.at("/prospective/cases").size());
         assertEquals(12, result.at("/retrospective/cases").size());
         assertTrue(result.at("/acquisition/counts/primitiveMatchAttempts").asLong() > 8);
@@ -52,12 +57,6 @@ class ModPowDispatchStudyTest {
             "evaluate", protocol, model, receipt.toString(), "0".repeat(64), historical, tmp.resolve("forged.json").toString()}));
         assertFalse(Files.exists(tmp.resolve("forged.json")));
 
-        Path destination = Path.of(System.getProperty("modpow.dispatch.output", tmp.toString()));
-        if (!destination.equals(tmp)) {
-            Files.createDirectories(destination);
-            Files.copy(receipt, destination.resolve("acquisition.json"));
-            Files.copy(first, destination.resolve("result.json"));
-        }
     }
 
     private void process(String... arguments) throws Exception {
@@ -71,7 +70,7 @@ class ModPowDispatchStudyTest {
             }
         }
         var cmd = new ArrayList<>(List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-            "-Xmx384m", "-cp", classpath.stream().collect(Collectors.joining(File.pathSeparator)),
+            "-Xmx384m", "-cp", String.join(File.pathSeparator, classpath),
             ModPowDispatchStudy.class.getName()));
         cmd.addAll(List.of(arguments));
         Path log = Files.createTempFile(tmp, "process-", ".log");
