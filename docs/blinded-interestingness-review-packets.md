@@ -80,4 +80,22 @@ The custodian fixes origin at registration. For external ratings the custodian a
 
 The vault serializes submission and freeze across processes with a file lock and replaces the state by atomic rename. A second submission for the same assignment is refused. The audit command only opens after freeze and exposes the full private assignment roster with rated, excluded, abstained and missing slots. The freeze includes the existing intake report, the exposure history and policy/packet commitments. Repeated freeze returns the same commitment. The registration and freeze commands return only a hash. The audit itself contains private pseudonyms and labels.
 
-This command supports initial collection revision 1. Linked corrections, post-submission withdrawals, controlled consensus analysis and the single TEST exposure require a subsequent workflow before a counted study. The governance draft describes those responsibilities. [Restricted review policy draft](independent-review-governance-draft.md)
+### Linked corrections and one TEST exposure
+
+When held-out analysis will be required, pass a private profile file as the last argument of `init`. Its format is a JSON array of the existing Java `InterestingnessProfileCalibration.CaseProfiles` record values with `caseId`, `candidateId`, `theoryDiscovery` and `searchReuse`. Serialize the assessment records with a regular Jackson mapper. The custodian verifies provenance against the original candidate artifacts, then registration checks the theory assessment identity against the frozen case, validates both profiles against identical raw evidence, and commits the actual profile inputs before accepting labels.
+
+```sh
+./gradlew -q :regelsuche-learning:restrictedReviewCollection \
+  --args="init /private/study/vault /private/study/plan.json /private/study/exchange /private/study/policy.md DEVELOPMENT_FIXTURE /private/study/profiles.json"
+./gradlew -q :regelsuche-learning:restrictedReviewCollection --args="evaluate /private/study/vault"
+./gradlew -q :regelsuche-learning:restrictedReviewCollection \
+  --args="revise /private/study/vault $previous_freeze_hash WITHDRAWAL"
+(umask 077; ./gradlew -q :regelsuche-learning:restrictedReviewCollection \
+  --args="audit /private/study/vault 1" > /private/study/revision-1.json)
+```
+
+Run `evaluate` after freezing. The first completed analysis records the exposed TEST artifact hashes against the study and freeze. Retries return the stored receipt. The audit contains the consensus, both predictor metrics, the CALIBRATION-only selection commitment, TEST ranking, Pareto front, profile-order agreement, leave-one-out stability, sensitivity and the gate decision under the registered thresholds. Incomplete or discordant panels retain their blockers and exposure history. Fixture diagnostics use only fixture consensus and zero expert counts, even if the numerical gate accepts the ranking. Empirical consensus, promotion and public evidence remain unevaluated for fixtures.
+
+A revision requires the exact predecessor freeze receipt and a reason of `TRANSCRIPTION`, `WITHDRAWAL`, `INCIDENT` or `ATTESTATION_CORRECTION`. Unchanged slots carry forward. Submit a correction with the new revision number, or an `EXCLUDED` withdrawal, then freeze again. Earlier revisions remain addressable, and a replacement receipt links to its predecessor. The predictive identity remains fixed. Each labelled revision binds its immediately preceding labelled identity. A TEST exposure on any earlier revision prevents fresh analysis of a correction. Historical snapshots and prose deletion remain subject to the consent and retention policy.
+
+A counted study still requires approved governance, independent human reviewers and a separate independent audit. [Restricted review policy draft](independent-review-governance-draft.md)

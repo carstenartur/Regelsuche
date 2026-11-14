@@ -42,7 +42,7 @@ public final class InterestingnessRestrictedCollection {
 
     public static void main(String[] args) throws Exception {
         if (args.length < 2) throw new IllegalArgumentException(
-            "init VAULT PLAN EXPORT POLICY ORIGIN | submit VAULT AUTHENTICATED_REVIEWER_HASH | freeze VAULT | audit VAULT");
+            "init VAULT PLAN EXPORT POLICY ORIGIN [PROFILES] | submit VAULT REVIEWER_HASH | freeze VAULT | audit VAULT [REVISION] | revise VAULT PRIOR_FREEZE REASON | evaluate VAULT");
         Path root = Path.of(args[1]);
         String result;
         try {
@@ -58,8 +58,9 @@ public final class InterestingnessRestrictedCollection {
     private static String run(String[] args, Path root) throws IOException {
         return switch (args[0]) {
             case "init" -> {
-                require(args.length == 6, "init requires vault, plan, export, policy and origin");
-                yield init(root, Path.of(args[2]), Path.of(args[3]), Path.of(args[4]), ReviewOrigin.valueOf(args[5]));
+                require(args.length == 6 || args.length == 7, "init requires vault, plan, export, policy, origin and optional profiles");
+                yield init(root, Path.of(args[2]), Path.of(args[3]), Path.of(args[4]), ReviewOrigin.valueOf(args[5]),
+                    args.length == 7 ? Path.of(args[6]) : null);
             }
             case "submit" -> {
                 require(args.length == 3, "submit requires vault and authenticated reviewer hash");
@@ -72,8 +73,16 @@ public final class InterestingnessRestrictedCollection {
                 yield freeze(root);
             }
             case "audit" -> {
-                require(args.length == 2, "audit requires vault");
-                yield audit(root);
+                require(args.length == 2 || args.length == 3, "audit requires vault and optional revision");
+                yield args.length == 3 ? audit(root, Integer.parseInt(args[2])) : audit(root);
+            }
+            case "revise" -> {
+                require(args.length == 4, "revise requires vault, predecessor freeze hash and reason");
+                yield revise(root, args[2], args[3]);
+            }
+            case "evaluate" -> {
+                require(args.length == 2, "evaluate requires vault");
+                yield evaluate(root);
             }
             default -> throw new IllegalArgumentException("unknown restricted collection command");
         };
@@ -81,6 +90,11 @@ public final class InterestingnessRestrictedCollection {
 
     public static synchronized String init(Path root, Path planFile, Path export, Path policy,
             ReviewOrigin origin) throws IOException {
+        return init(root, planFile, export, policy, origin, null);
+    }
+
+    public static synchronized String init(Path root, Path planFile, Path export, Path policy,
+            ReviewOrigin origin, Path profileFile) throws IOException {
         StudyPlan plan = JSON.treeToValue(read(planFile), StudyPlan.class);
         var privateFile = export.resolve("private/assignment-manifest.json");
         var supplied = read(privateFile);
@@ -116,6 +130,11 @@ public final class InterestingnessRestrictedCollection {
         registration.put("privateAssignmentManifestHash", expected.privateManifest().contentHash());
         registration.put("origin", origin.name());
         registration.put("revision", 1);
+        JsonNode profiles = null;
+        if (profileFile != null) {
+            profiles = JSON.valueToTree(InterestingnessRestrictedEvaluation.profiles(JSON, read(profileFile), plan));
+            registration.put("profileInputsHash", digest(profiles));
+        }
         String registrationHash = digest(registration);
         var state = JSON.createObjectNode();
         state.set("registration", registration);
@@ -123,6 +142,9 @@ public final class InterestingnessRestrictedCollection {
         state.set("plan", JSON.readTree(plan.toCanonicalJson()));
         state.set("assignments", supplied.required("assignments"));
         state.putObject("receipts");
+        state.putObject("history");
+        state.put("revision", 1);
+        if (profiles != null) state.set("profiles", profiles);
 
         Path target = root.toAbsolutePath().normalize();
         Path parent = target.getParent();
@@ -155,7 +177,7 @@ public final class InterestingnessRestrictedCollection {
         return locked(root, state -> {
             if (state.has("frozen")) throw new IllegalStateException("collection is frozen");
             require(text(form, "registrationHash").equals(text(state, "registrationHash"))
-                && integer(form, "revision") == 1, "registration or revision mismatch");
+                && integer(form, "revision") == state.required("revision").intValue(), "registration or revision mismatch");
             String packetId = text(form, "packetId");
             JsonNode assignment = null;
             for (var row : state.required("assignments")) {
@@ -164,7 +186,8 @@ public final class InterestingnessRestrictedCollection {
             require(assignment != null && reviewerHash.equals(text(assignment, "reviewerHash"))
                 && text(form, "packetContentHash").equals(text(assignment, "packetContentHash")), "assignment mismatch");
             var receipts = (ObjectNode) state.required("receipts");
-            require(!receipts.has(packetId), "assignment already submitted");
+            require(!receipts.has(packetId) || integer(receipts.required(packetId), "revision") < integer(state, "revision"),
+                "assignment already submitted in this revision");
             String disposition = text(form, "disposition");
             require(Set.of("RATED", "ABSTAINED", "EXCLUDED").contains(disposition), "unknown disposition");
             boolean blind = bool(form, "blind");
@@ -179,7 +202,8 @@ public final class InterestingnessRestrictedCollection {
             receipt.put("registrationHash", text(state, "registrationHash"));
             receipt.put("assignmentHash", text(assignment, "contentHash"));
             receipt.put("packetContentHash", text(assignment, "packetContentHash"));
-            receipt.put("revision", 1);
+            receipt.put("revision", integer(state, "revision"));
+            if (receipts.has(packetId)) receipt.set("priorReceiptHash", receipts.required(packetId).required("receiptHash"));
             receipt.put("blind", blind);
             receipt.put("independent", independent);
             receipt.put("disposition", disposition);
@@ -220,6 +244,11 @@ public final class InterestingnessRestrictedCollection {
             frozen.put("registrationHash", text(state, "registrationHash"));
             frozen.set("registration", state.required("registration"));
             frozen.set("historicalExposures", state.required("plan").required("historicalExposures"));
+            frozen.set("revision", state.required("revision"));
+            if (state.has("priorFreezeHash")) {
+                frozen.set("priorFreezeHash", state.required("priorFreezeHash"));
+                frozen.set("correctionReason", state.required("correctionReason"));
+            }
             var slots = frozen.putArray("slots");
             var submissions = new ArrayList<ReviewSubmission>();
             for (var assignment : state.required("assignments")) {
@@ -237,7 +266,8 @@ public final class InterestingnessRestrictedCollection {
                 }
             }
             StudyPlan plan = JSON.treeToValue(state.required("plan"), StudyPlan.class);
-            var intake = new InterestingnessIndependentReviewIntake().evaluate(plan, submissions, 1, "");
+            var intake = new InterestingnessIndependentReviewIntake().evaluate(plan, submissions, integer(state, "revision"),
+                state.path("priorLabeledEvaluationHash").asText(""));
             frozen.set("intake", JSON.readTree(intake.toCanonicalJson()));
             String freezeHash = digest(frozen);
             frozen.put("freezeHash", freezeHash);
@@ -247,14 +277,77 @@ public final class InterestingnessRestrictedCollection {
         });
     }
 
-    /** The audit contains private pseudonymous assignments. It is available only after freeze. */
-    public static String audit(Path root) throws IOException {
+    public static String revise(Path root, String priorFreezeHash, String reason) throws IOException {
+        require(Set.of("TRANSCRIPTION", "WITHDRAWAL", "INCIDENT", "ATTESTATION_CORRECTION").contains(reason),
+            "unknown correction reason");
         return locked(root, state -> {
-            if (!state.has("frozen")) throw new IllegalStateException("collection is open");
-            ObjectNode frozen = ((ObjectNode) state.required("frozen")).deepCopy();
+            if (!state.has("frozen")) throw new IllegalStateException("freeze current revision first");
+            ObjectNode previous = (ObjectNode) state.required("frozen");
+            require(text(previous, "freezeHash").equals(priorFreezeHash), "predecessor freeze mismatch");
+            int revision = integer(state, "revision");
+            ((ObjectNode) state.required("history")).set(Integer.toString(revision), previous);
+            state.remove("frozen");
+            state.put("revision", Math.incrementExact(revision));
+            state.put("priorFreezeHash", priorFreezeHash);
+            state.put("priorLabeledEvaluationHash", previous.required("intake").required("labeledEvaluationHash").asText());
+            state.put("correctionReason", reason);
+            writeAtomically(root.resolve(STATE), state);
+            return priorFreezeHash;
+        });
+    }
+
+    /** Atomically saves the only analysis of TEST in this registration. Retries retrieve the same receipt. */
+    public static String evaluate(Path root) throws IOException {
+        return locked(root, state -> {
+            if (!state.has("frozen")) throw new IllegalStateException("freeze current revision first");
+            if (!state.has("profiles")) throw new IllegalStateException("no profile inputs registered before intake");
+            JsonNode frozen = state.required("frozen");
+            if (state.has("evaluation")) {
+                var saved = state.required("evaluation");
+                if (!saved.required("freezeHash").equals(frozen.required("freezeHash"))) {
+                    throw new IllegalStateException("TEST was already exposed on an earlier revision");
+                }
+                return text(saved, "evaluationHash");
+            }
+            require(digest(state.required("profiles")).equals(text(state.required("registration"), "profileInputsHash")),
+                "registered profile input mismatch");
+            var result = InterestingnessRestrictedEvaluation.evaluate(JSON, state);
+            String commitment = digest(result);
+            result.put("evaluationHash", commitment);
+            state.set("evaluation", result);
+            writeAtomically(root.resolve(STATE), state);
+            return commitment;
+        });
+    }
+
+    /** Role-restricted audit. The primary freeze and any later analysis have independent commitments. */
+    public static String audit(Path root) throws IOException {
+        return audit(root, 0);
+    }
+
+    public static String audit(Path root, int requestedRevision) throws IOException {
+        return locked(root, state -> {
+            int revision = requestedRevision == 0 ? integer(state, "revision") : requestedRevision;
+            JsonNode saved = revision == integer(state, "revision") ? state.get("frozen")
+                : state.required("history").get(Integer.toString(revision));
+            if (saved == null) throw new IllegalStateException("revision is open or does not exist");
+            ObjectNode frozen = ((ObjectNode) saved).deepCopy();
             var claimed = frozen.remove("freezeHash");
             require(digest(frozen).equals(claimed.asText()), "freeze hash mismatch");
-            return state.required("frozen").toString();
+            frozen.set("freezeHash", claimed);
+            if (state.has("evaluation")) {
+                var result = (ObjectNode) state.required("evaluation");
+                if (result.required("freezeHash").equals(claimed)) {
+                    var material = result.deepCopy();
+                    var hash = material.remove("evaluationHash");
+                    require(digest(material).equals(hash.asText()), "evaluation hash mismatch");
+                    frozen.set("evaluation", result);
+                } else {
+                    frozen.set("priorTestExposureLedger", result.required("testExposureLedger"));
+                    frozen.set("priorEvaluationHash", result.required("evaluationHash"));
+                }
+            }
+            return frozen.toString();
         });
     }
 
@@ -269,7 +362,12 @@ public final class InterestingnessRestrictedCollection {
             "owner-only vault required");
         try (var channel = FileChannel.open(root.resolve("lock"), StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
              var lock = channel.lock()) {
-            return operation.apply((ObjectNode) read(root.resolve(STATE)));
+            ObjectNode state = (ObjectNode) read(root.resolve(STATE));
+            var registration = state.required("registration");
+            require(digest(registration).equals(text(state, "registrationHash")), "registration hash mismatch");
+            require(registration.required("studyPlanHash").equals(state.required("plan").required("contentHash")),
+                "registered study mismatch");
+            return operation.apply(state);
         }
     }
 
