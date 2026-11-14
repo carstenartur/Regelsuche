@@ -186,3 +186,26 @@ ist ein gespeicherter `FORMALLY_PROVED`-Status kein wiederverwendbarer Beweis:
 Dafür ist ein frischer Backendlauf erforderlich. Nichtformale Ergebnisse der
 Skriptgenerierung bleiben innerhalb derselben Konfiguration wiederverwendbar.
 Eine während der Ausführung geänderte Konfiguration verhindert die Freigabe.
+
+### Laufenden Proof-Job anhalten
+
+Im Tab **Proof-Jobs** wirkt die Abbruchaktion auf die angezeigte, persistente
+Job-ID. Ein vor dem ersten Versuch abgebrochener Job wechselt mit null gestarteten
+Versuchen auf `CANCELLED`. Für einen aktiven Worker speichert der Scheduler erst den
+Zeitpunkt der Anforderung und `CANCELLING`, unterbricht den Worker und wartet
+auf dessen Rückkehr. Erst danach speichert er `CANCELLED`. Währenddessen
+verhindert die Jobansicht eine zweite Abbruchaktion. „Aktualisieren“ und
+`GET /api/proof/jobs/{jobId}` zeigen den zuletzt gespeicherten Zustand.
+
+Die Ansicht zeigt die gezählten Worker-Versuche einschließlich Wiederholungen,
+das konfigurierte Zeitlimit pro Versuch und den dokumentierten Stoppgrund.
+Cache-Treffer starten keinen Worker. Ein bereits disponierter Wiederholungsversuch
+erhöht den Versuchszähler erst beim tatsächlichen Start. Historische Datensätze
+können fehlende Zähler und Zeitlimits haben. Bei einem Neustart bleibt eine
+ausstehende Stoppanforderung erhalten. Die Wiederherstellung bekommt einen
+eigenen Abschlussgrund und Zeitstempel. Eine verspätete Worker-Antwort nach
+einer Stoppanforderung erzeugt weder einen neuen Job-Ergebnisstatus noch einen
+Erfolgseintrag im Cache, Inventar oder Job-Artefaktbundle.
+
+Diese Messwerte betreffen den Proof-Worker des jeweiligen Jobs. Die
+unveränderlichen Discovery-Runs im Tab „Runs“ lesen ihre eigenen Quellen.

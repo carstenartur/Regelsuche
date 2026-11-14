@@ -29,7 +29,11 @@ public record ProofJob(
     Instant createdAt,
     Instant updatedAt,
     CandidateProofStatus resultStatus,
-    String errorMessage
+    String errorMessage,
+    Integer attemptsStarted,
+    Long attemptTimeoutMillis,
+    Instant cancellationRequestedAt,
+    String stopReason
 ) {
     public ProofJob {
         Objects.requireNonNull(id, "id");
@@ -47,6 +51,19 @@ public record ProofJob(
         createdAt = createdAt == null ? Instant.now() : createdAt;
         updatedAt = updatedAt == null ? createdAt : updatedAt;
         errorMessage = errorMessage == null ? "" : errorMessage;
+        stopReason = stopReason == null ? "" : stopReason;
+        if ((attemptsStarted != null && attemptsStarted < 0)
+                || (attemptTimeoutMillis != null && attemptTimeoutMillis <= 0)) {
+            throw new IllegalArgumentException("invalid proof attempt accounting");
+        }
+    }
+
+    /** Snapshots predating attempt accounting retain unknown values. */
+    public ProofJob(String id, String leftPattern, String rightPattern, List<Assumption> assumptions,
+                    ProofJobStatus status, int priority, int retryCount, int maxRetries, String workerType,
+                    Instant createdAt, Instant updatedAt, CandidateProofStatus resultStatus, String errorMessage) {
+        this(id, leftPattern, rightPattern, assumptions, status, priority, retryCount, maxRetries, workerType,
+            createdAt, updatedAt, resultStatus, errorMessage, null, null, null, "");
     }
 
     /** Convenience constructor with defaults for optional fields. */
@@ -57,31 +74,51 @@ public record ProofJob(
             null, null, null, null);
     }
 
-    public ProofJob withStatus(ProofJobStatus newStatus) {
-        return new ProofJob(id, leftPattern, rightPattern, assumptions,
-            newStatus, priority, retryCount, maxRetries, workerType,
-            createdAt, Instant.now(), resultStatus, errorMessage);
+    ProofJob withBudget(long timeoutMillis) {
+        return new ProofJob(id, leftPattern, rightPattern, assumptions, status, priority, retryCount,
+            maxRetries, workerType, createdAt, updatedAt, resultStatus, errorMessage,
+            0, timeoutMillis, null, "");
+    }
+
+    ProofJob startAttempt(long timeoutMillis) {
+        Integer count = attemptsStarted == null ? null : Integer.valueOf(Math.incrementExact(attemptsStarted));
+        return new ProofJob(id, leftPattern, rightPattern, assumptions, ProofJobStatus.RUNNING, priority,
+            retryCount, maxRetries, workerType, createdAt, Instant.now(), resultStatus, errorMessage,
+            count, timeoutMillis, cancellationRequestedAt, stopReason);
+    }
+
+    public ProofJob withStatus(ProofJobStatus status) {
+        return transition(status, retryCount, resultStatus, errorMessage, cancellationRequestedAt, stopReason);
+    }
+
+    ProofJob stopping(String reason) {
+        return transition(ProofJobStatus.CANCELLING, retryCount, null, errorMessage, Instant.now(), reason);
+    }
+
+    ProofJob stopped(String reason) {
+        Instant requested = cancellationRequestedAt == null ? Instant.now() : cancellationRequestedAt;
+        return transition(ProofJobStatus.CANCELLED, retryCount, null, errorMessage, requested, reason);
     }
 
     public ProofJob withRetry() {
-        return new ProofJob(id, leftPattern, rightPattern, assumptions,
-            ProofJobStatus.RETRYING, priority, retryCount + 1, maxRetries, workerType,
-            createdAt, Instant.now(), resultStatus, errorMessage);
+        return transition(ProofJobStatus.RETRYING, retryCount + 1, resultStatus, errorMessage, null, "");
     }
 
     public ProofJob withDone(CandidateProofStatus result) {
-        return new ProofJob(id, leftPattern, rightPattern, assumptions,
-            ProofJobStatus.DONE, priority, retryCount, maxRetries, workerType,
-            createdAt, Instant.now(), result, "");
+        return transition(ProofJobStatus.DONE, retryCount, result, "", null, "");
     }
 
     public ProofJob withFailed(String reason) {
-        return new ProofJob(id, leftPattern, rightPattern, assumptions,
-            ProofJobStatus.FAILED, priority, retryCount, maxRetries, workerType,
-            createdAt, Instant.now(), resultStatus, reason);
+        return transition(ProofJobStatus.FAILED, retryCount, resultStatus, reason, null, "");
     }
 
-    /** @return {@code true} if this job may still be retried. */
+    private ProofJob transition(ProofJobStatus next, int retries, CandidateProofStatus result,
+                                String error, Instant requestTime, String reason) {
+        return new ProofJob(id, leftPattern, rightPattern, assumptions, next, priority, retries, maxRetries,
+            workerType, createdAt, Instant.now(), result, error, attemptsStarted, attemptTimeoutMillis,
+            requestTime, reason);
+    }
+
     public boolean canRetry() {
         return retryCount < maxRetries;
     }

@@ -1,6 +1,8 @@
 package de.regelsuche.web;
 
+import static de.regelsuche.testsupport.ConditionAwaiter.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,13 +15,17 @@ import de.regelsuche.proof.JsonFileProofArtifactRepository;
 import de.regelsuche.proof.LeanProofWorker;
 import de.regelsuche.proof.ProofJobScheduler;
 import de.regelsuche.proof.ProofWorkbenchService;
+import de.regelsuche.proof.ProofWorker;
+import de.regelsuche.proof.ProverExecutor;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,12 +43,16 @@ class ProofJobsApiTest {
 
     @BeforeEach
     void start(@TempDir Path tmp) throws IOException {
+        startWith(tmp, new LeanProofWorker());
+    }
+
+    private void startWith(Path tmp, ProofWorker worker) throws IOException {
         InMemoryProofJobRepository jobs = new InMemoryProofJobRepository();
         InMemoryProofCache cache = new InMemoryProofCache();
         JsonFileProofArtifactRepository artifacts = new JsonFileProofArtifactRepository(tmp);
         // Skeleton-only LeanProofWorker — no external Lean toolchain required.
         scheduler = new ProofJobScheduler(
-            new LeanProofWorker(), jobs, cache,
+            worker, jobs, cache,
             new InMemoryRuleInventoryRepository(), artifacts,
             Duration.ofSeconds(5));
         scheduler.start();
@@ -99,15 +109,19 @@ class ProofJobsApiTest {
         String detailBody = read(detail);
         assertTrue(detailBody.contains("\"leftPattern\":\"a+0\""), detailBody);
 
+        assertTrue(detailBody.contains("\"attemptsStarted\":"), detailBody);
+        assertTrue(detailBody.contains("\"attemptTimeoutMillis\":5000"), detailBody);
+
         // POST cancel
         HttpURLConnection cancel = open("/api/proof/jobs/" + jobId + "/cancel", "POST");
         assertEquals(200, cancel.getResponseCode());
-        // The job is now either CANCELLED or already DONE (if the scheduler
-        // raced ahead). Both are acceptable terminal states.
         String cancelBody = read(cancel);
         assertTrue(cancelBody.contains("CANCELLED") || cancelBody.contains("DONE")
-                || cancelBody.contains("RUNNING") || cancelBody.contains("QUEUED"),
-            cancelBody);
+                || cancelBody.contains("CANCELLING"), cancelBody);
+        if (!cancelBody.contains("\"status\":\"DONE\"")) {
+            assertTrue(cancelBody.contains("\"stopReason\":\"USER_CANCELLED\""), cancelBody);
+            assertTrue(cancelBody.contains("\"cancellationRequestedAt\":"), cancelBody);
+        }
 
         // GET artifacts listing — endpoint must respond even if bundle is empty
         HttpURLConnection artifacts = open(
@@ -172,6 +186,68 @@ class ProofJobsApiTest {
                 .getBytes(StandardCharsets.UTF_8));
         }
         assertEquals(400, submit.getResponseCode());
+    }
+
+    @Test
+    void httpCancellationStopsAnActiveTransportAndRetainsItsAttempt(@TempDir Path dir) throws Exception {
+        stop();
+        Path java = Path.of(System.getProperty("java.home"), "bin",
+            System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java");
+        Path marker = dir.resolve("pid");
+        String classes = Path.of(Transport.class.getProtectionDomain().getCodeSource()
+            .getLocation().toURI()).toString();
+        var executor = new ProverExecutor(List.of(java.toString(), "-cp", classes,
+            Transport.class.getName(), marker.toString()), "bounded-transport", ".lean");
+        startWith(dir, new LeanProofWorker(null, executor));
+
+        String id = submitIdentity();
+        await(Duration.ofSeconds(4), () -> Files.isRegularFile(marker), "transport did not start");
+        var child = ProcessHandle.of(Long.parseLong(Files.readString(marker))).orElseThrow();
+        try {
+            String route = "/api/proof/jobs/" + id;
+            String running = read(open(route, "GET"));
+            assertTrue(running.contains("\"status\":\"RUNNING\""), running);
+            String request = read(open(route + "/cancel", "POST"));
+            assertTrue(request.contains("\"status\":\"CANCELLING\""), request);
+            assertTrue(request.contains("\"attemptsStarted\":1"), request);
+            await(Duration.ofSeconds(3), () -> scheduler.get(id).orElseThrow().status().isTerminal(),
+                "cancellation did not finish");
+            assertFalse(child.isAlive());
+            String terminal = read(open(route, "GET"));
+            assertTrue(terminal.contains("\"status\":\"CANCELLED\""), terminal);
+            assertTrue(terminal.contains("\"stopReason\":\"USER_CANCELLED\""), terminal);
+            assertEquals(extract(request, "cancellationRequestedAt"), extract(terminal, "cancellationRequestedAt"));
+            assertEquals(terminal, read(open(route + "/cancel", "POST")));
+            String next = submitIdentity();
+            await(Duration.ofSeconds(4), () -> scheduler.get(next).orElseThrow().status().isTerminal(),
+                "queue did not recover");
+            assertTrue(read(open("/api/proof/jobs/" + next, "GET")).contains("\"status\":\"DONE\""));
+        } finally {
+            child.destroyForcibly();
+        }
+    }
+
+    private String submitIdentity() throws IOException {
+        var submit = open("/api/proof/jobs", "POST");
+        submit.setDoOutput(true);
+        submit.setRequestProperty("Content-Type", "application/json");
+        try (var stream = submit.getOutputStream()) {
+            stream.write("{\"leftPattern\":\"x+0\",\"rightPattern\":\"x\"}".getBytes(StandardCharsets.UTF_8));
+        }
+        assertEquals(201, submit.getResponseCode());
+        return extract(read(submit), "jobId");
+    }
+
+    /** External transport fixture for observing the child process independently of the scheduler. */
+    public static class Transport {
+        public static void main(String[] args) throws Exception {
+            Path marker = Path.of(args[0]);
+            if (Files.exists(marker)) return;
+            Path staged = Files.createTempFile(marker.getParent(), "transport", ".tmp");
+            Files.writeString(staged, Long.toString(ProcessHandle.current().pid()));
+            Files.move(staged, marker, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            Thread.sleep(15_000);
+        }
     }
 
     @Test

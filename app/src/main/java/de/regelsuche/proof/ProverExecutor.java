@@ -162,8 +162,8 @@ public final class ProverExecutor {
         try {
             finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
+            terminate(process);
             Thread.currentThread().interrupt();
-            process.destroyForcibly();
             return new ProverExecutionResult(
                 ProverExecutionResult.Status.PROVER_FAILED,
                 -1,
@@ -174,12 +174,7 @@ public final class ProverExecutor {
             );
         }
         if (!finished) {
-            process.destroyForcibly();
-            try {
-                process.waitFor(2, TimeUnit.SECONDS);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
+            terminate(process);
             return new ProverExecutionResult(
                 ProverExecutionResult.Status.PROVER_TIMEOUT,
                 -1,
@@ -203,6 +198,12 @@ public final class ProverExecutor {
             duration,
             toolName
         );
+    }
+
+    private static void terminate(Process process) {
+        var descendants = process.descendants().toList();
+        descendants.reversed().forEach(ProcessHandle::destroyForcibly);
+        process.destroyForcibly().onExit().join();
     }
 
     private static String readQuietly(java.io.InputStream stream) {

@@ -2285,8 +2285,8 @@
                 const div = document.createElement('div');
                 div.className = 'item';
                 const isTerminal = job.status === 'DONE' || job.status === 'FAILED' || job.status === 'CANCELLED';
-                const cancelBtn = isTerminal ? ''
-                    : ' <button class="proof-cancel" data-id="' + escapeHtml(job.id) + '">Cancel</button>';
+                const cancelBtn = isTerminal || job.status === 'CANCELLING' ? ''
+                    : ' <button class="proof-cancel" data-id="' + escapeHtml(job.id) + '">Abbrechen</button>';
                 const artifactBtn = ' <button class="proof-artifacts" data-id="' + escapeHtml(job.id) + '">Artefakte</button>';
                 div.innerHTML = '<div><b>' + escapeHtml(job.leftPattern) + ' → '
                     + escapeHtml(job.rightPattern) + '</b></div>'
@@ -2294,10 +2294,16 @@
                     + ' · Worker: ' + escapeHtml(job.workerId)
                     + ' · Priorität: ' + job.priority
                     + ' · Retries: ' + job.retryCount + '/' + job.maxRetries
+                    + (job.attemptsStarted == null ? '' : ' · Gestartete Versuche: ' + escapeHtml(String(job.attemptsStarted)))
+                    + (job.attemptTimeoutMillis == null ? '' : ' · Zeitlimit je Versuch: ' + escapeHtml(String(job.attemptTimeoutMillis)) + ' ms')
                     + (job.proofStatus ? ' · Proof: <code>' + escapeHtml(job.proofStatus) + '</code>' : '')
                     + '</div>'
                     + '<div class="hint">ID: <code>' + escapeHtml(job.id) + '</code>'
                     + ' · created ' + escapeHtml(job.createdAt) + '</div>'
+                    + (job.cancellationRequestedAt ? '<div>Stopp angefordert: ' + escapeHtml(job.cancellationRequestedAt)
+                        + ' · Grund: ' + escapeHtml(job.stopReason)
+                        + (job.status === 'CANCELLING' ? ' · Worker-Beendigung ausstehend'
+                            : ' · Beendet: ' + escapeHtml(job.updatedAt)) + '</div>' : '')
                     + (job.errorMessage ? '<div class="hint">Fehler: ' + escapeHtml(job.errorMessage) + '</div>' : '')
                     + '<div class="actions">' + artifactBtn + cancelBtn + '</div>';
                 container.appendChild(div);
