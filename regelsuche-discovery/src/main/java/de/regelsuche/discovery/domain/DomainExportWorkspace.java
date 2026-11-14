@@ -13,7 +13,6 @@ import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier.VerifiedDoma
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -95,29 +94,10 @@ public final class DomainExportWorkspace {
                     .equals(read(snapshot.artifactBytes(ArtifactRole.LIFECYCLE_HANDOFF)))) {
                 throw new IllegalArgumentException("retained lifecycle handoff differs from source evidence");
             }
-            validateResources(evidence);
             return new DomainExportWorkspace(snapshot, evidence);
         } catch (IOException | NullPointerException exception) {
             throw new IllegalArgumentException("malformed supported domain evidence", exception);
         }
-    }
-
-    private static void validateResources(DomainDiscoveryEvidence evidence) {
-        EnumSet<Resource> roles = EnumSet.noneOf(Resource.class);
-        var budget = evidence.budget();
-        for (ResourceLine line : evidence.resources()) {
-            int configured = switch (line.resource()) {
-                case EXPLORED_STATES -> budget.maxExploredStates();
-                case GENERATED_SUCCESSORS -> budget.maxGeneratedSuccessors();
-                case CANDIDATE_EVALUATIONS, CERTIFICATE_ATTEMPTS -> budget.maxCandidateAttempts();
-                case COUNTEREXAMPLE_ATTEMPTS -> budget.maxCounterexampleAttempts();
-            };
-            if (!roles.add(line.resource()) || line.configured() != configured
-                    || (long) line.executed() + line.skipped() + line.remaining() != configured) {
-                throw new IllegalArgumentException("source resources do not match the recorded budget");
-            }
-        }
-        if (!roles.equals(EnumSet.allOf(Resource.class))) throw new IllegalArgumentException("source resource dimensions are incomplete");
     }
 
     public DomainDiscoveryEvidence replay() {

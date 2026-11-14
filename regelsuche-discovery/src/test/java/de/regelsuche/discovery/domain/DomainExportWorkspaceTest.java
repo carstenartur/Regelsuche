@@ -1,4 +1,5 @@
 package de.regelsuche.discovery.domain;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -129,6 +130,54 @@ class DomainExportWorkspaceTest {
         var changed = DomainDiscoveryExport.DomainExportManifest.create(manifest.campaignId(), manifest.domainId(), manifest.domainRevision(),
             manifest.domainDescriptorHash(), manifest.discoveryEvidenceHash(), manifest.lifecycleHandoffHash(), artifacts);
         Files.writeString(directory.resolve(DomainDiscoveryExport.MANIFEST_FILE_NAME), changed.toCanonicalJson());
+    }
+
+    @Test void issuedResourceCountsMustMatchTheirTraceAndBudget() {
+        var source = sequence("observed=1,4,9,16;holdout=25,36");
+        var rows = new java.util.ArrayList<>(source.resources());
+        int index = 0;
+        while (rows.get(index).resource() != DomainDiscoveryEvidence.Resource.EXPLORED_STATES) index++;
+        var original = rows.get(index);
+        rows.set(index,new DomainDiscoveryEvidence.ResourceLine(original.resource(),original.configured(),
+            original.executed()-1,original.skipped(),original.remaining()+1));
+        assertThrows(IllegalArgumentException.class, () -> withResources(source,rows));
+        rows.set(index,original);
+        rows.add(original);
+        assertThrows(IllegalArgumentException.class, () -> withResources(source,rows));
+        rows.remove(index);
+        rows.remove(original);
+        assertThrows(IllegalArgumentException.class, () -> withResources(source,rows));
+    }
+
+    @Test void attemptLedgerRejectsCertificatesAndEvaluationClaimsOutsideTheirStage() {
+        var digest = "sha256:" + "a".repeat(64);
+        var confirmed = DomainDiscoveryEvidence.EvaluationDisposition.CONFIRMED;
+        var refuted = DomainDiscoveryEvidence.EvaluationDisposition.REFUTED;
+        var counterexample = DomainDiscoveryEvidence.AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE;
+        var evaluated = DomainDiscoveryEvidence.AttemptDisposition.REFUTED_BY_EVALUATOR;
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.CandidateAttempt(
+            1,digest,evaluated,CounterexampleStatus.NONE_FOUND,1,"",refuted,"evaluated",digest,java.util.Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.CandidateAttempt(
+            1,digest,counterexample,CounterexampleStatus.FOUND,1,"witness",confirmed,"evaluated",digest,java.util.Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.CandidateAttempt(
+            1,digest,counterexample,CounterexampleStatus.FOUND,1,"",DomainDiscoveryEvidence.EvaluationDisposition.NOT_RUN,
+            "skipped","",java.util.Map.of()));
+    }
+
+    @Test void resourceRowsEnforceBalanceAtConstruction() {
+        var dim = DomainDiscoveryEvidence.Resource.EXPLORED_STATES;
+        assertThrows(IllegalArgumentException.class, () -> new DomainDiscoveryEvidence.ResourceLine(dim,2,0,0,0));
+        assertThrows(IllegalArgumentException.class, () ->
+            new DomainDiscoveryEvidence.ResourceLine(dim,0,Integer.MAX_VALUE,Integer.MAX_VALUE,2));
+        assertEquals(Integer.MAX_VALUE, new DomainDiscoveryEvidence.ResourceLine(
+            dim,Integer.MAX_VALUE,Integer.MAX_VALUE-1,1,0).configured());
+    }
+
+    private static DomainDiscoveryEvidence withResources(DomainDiscoveryEvidence source,
+                                                        java.util.List<DomainDiscoveryEvidence.ResourceLine> rows) {
+        return new DomainDiscoveryEvidence(source.campaignId(),source.descriptor(),source.seed(),source.budget(),
+            source.outcome(),source.states(),source.transitions(),source.candidateAttempts(),rows,
+            source.selectedCandidateHash(),source.certificate(),source.domainEvidence());
     }
 
     static DomainDiscoveryEvidence sequence(String payload) {
