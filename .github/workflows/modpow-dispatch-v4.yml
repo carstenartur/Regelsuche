@@ -1,0 +1,50 @@
+name: Frozen modular-program dispatch comparison
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/modpow-dispatch-v4.yml'
+      - 'app/src/**/ModPow*'
+      - 'docs/research/modpow-dispatch-v4/**'
+      - 'regelsuche-learning/src/**/TypedOutputPattern*'
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+      - name: Qualify the matcher and reproduce all three frozen studies
+        run: |
+          mvn -B -ntp -pl app -am test \
+            -Dtest=TypedOutputPatternTest,TypedOutputPatternLimitTest,TypedModPowAcTransferIntegrationTest,TypedModPowTransferIntegrationTest,ModPowFrozenTransferTest,ModPowAcTransferTest,ModPowBudgetStudyTest,ModPowDispatchStudyTest \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dmodpow.dispatch.output="$RUNNER_TEMP/modpow-v4"
+      - name: Record replayable research evidence
+        working-directory: ${{ runner.temp }}/modpow-v4
+        run: |
+          sha256sum acquisition.json result.json
+          python3 - <<'PY'
+          import base64, gzip, json, pathlib
+          for name in ("acquisition", "result"):
+              raw = pathlib.Path(name + ".json").read_bytes()
+              print("MODPOW_V4_" + name.upper() + "_GZIP_BASE64=" + base64.b64encode(gzip.compress(raw, mtime=0)).decode())
+          report = json.loads(pathlib.Path("result.json").read_bytes())
+          for scope in ("prospective", "retrospective"):
+              print(scope, json.dumps(report[scope]["summary"], separators=(",", ":")))
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: modpow-dispatch-v4-evidence
+          path: ${{ runner.temp }}/modpow-v4/*.json
+          if-no-files-found: error

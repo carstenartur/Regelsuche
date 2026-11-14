@@ -56,33 +56,57 @@ public final class ModPowFrozenTransfer {
         return train(corpus, null);
     }
 
+    /** Optional counters for the historical TRAIN execution used by the v4 comparison. */
+    static final class TrainWork {
+        long primitiveGeneratorCalls, primitiveMatchAttempts, generatedCandidates, replayRequests;
+        long scoreCalls, trainingExamples, generalizations, serializations, modelDecodes;
+
+        ObjectNode counts() {
+            return JSON.createObjectNode().put("primitiveGeneratorCalls", primitiveGeneratorCalls)
+                .put("primitiveMatchAttempts", primitiveMatchAttempts).put("generatedCandidates", generatedCandidates)
+                .put("replayRequests", replayRequests).put("scoreCalls", scoreCalls)
+                .put("trainingExamples", trainingExamples).put("generalizations", generalizations)
+                .put("serializations", serializations).put("modelDecodes", modelDecodes);
+        }
+    }
+
     private static ObjectNode train(Path corpus, String expectedCorpusHash) throws IOException {
+        return train(corpus, expectedCorpusHash, new TrainWork());
+    }
+
+    static ObjectNode train(Path corpus, String expectedCorpusHash, TrainWork work) throws IOException {
         byte[] bytes = readCorpus(corpus, expectedCorpusHash, "TRAIN");
         var rows = rows(bytes, "TRAIN"); require(rows.size() == 2, "v1 fixes exactly two TRAIN observations");
         var examples = new ArrayList<TypedPatternGeneralizer.Example>();
         var model = JSON.createObjectNode().put("schema", MODEL_SCHEMA).put("trainSha256", hash(bytes));
         var witnesses = model.putArray("witnesses"); int shuffled = 0;
         for (var row : rows) {
-            Baseline run = baseline(row);
+            Baseline run = baseline(row, work);
             require(run.approved().size() == 2, "TRAIN primitive replay did not approve both alternatives");
-            Expr best = best(row, run.approved());
-            require(cost(row, best).dag() < cost(row, row.source()).dag(), "TRAIN has no target-blind saving");
+            Function<Expr, ModPowDagRediscoveryStudy.ProgramCost> score = measuredScore(row, work);
+            Expr best = best(row, run.approved(), score, score);
+            require(score.apply(best).dag() < score.apply(row.source()).dag(), "TRAIN has no target-blind saving");
+            work.trainingExamples++;
             examples.add(new TypedPatternGeneralizer.Example(row.source(), best, row.assumptions()));
             var witness = witnesses.addObject().put("id", row.id())
                 .put("sourceAst", CODEC.encodeExpression(row.source())).put("selectedAst", CODEC.encodeExpression(best))
-                .put("sourceDag", cost(row, row.source()).dag()).put("selectedDag", cost(row, best).dag())
+                .put("sourceDag", score.apply(row.source()).dag()).put("selectedDag", score.apply(best).dag())
                 .put("primitiveGenerated", run.generated());
             witness.set("assumptions", JSON.valueToTree(row.assumptions()));
+            work.replayRequests++;
             witness.put("primitiveRule", ModPowCompositionReplay.verify(row.source(), best, row.assumptions()).orElseThrow().primitiveRule());
-            Row broken = shuffled(row); Baseline control = baseline(broken);
+            Row broken = shuffled(row); Baseline control = baseline(broken, work);
+            var controlScore = measuredScore(broken, work);
             require(control.approved().size() == 2, "SHUFFLED replay failed");
-            if (cost(broken, best(broken, control.approved())).dag() < cost(broken, broken.source()).dag()) shuffled++;
+            if (controlScore.apply(best(broken, control.approved(), controlScore, controlScore)).dag() < controlScore.apply(broken.source()).dag()) shuffled++;
         }
         require(shuffled == 0, "relationship-breaking control gained unexpectedly");
+        work.generalizations++;
         var learned = new TypedPatternGeneralizer().generalize(examples).orElseThrow();
         model.set("sourceTemplate", template(learned.source())); model.set("targetTemplate", template(learned.target()));
         model.put("shuffledWitnessCount", shuffled);
         // Decode the exact format as an untrusted syntax proposal before recording the artifact.
+        work.modelDecodes++;
         new TypedOutputPattern(candidate(model));
         return model;
     }
@@ -155,18 +179,42 @@ public final class ModPowFrozenTransfer {
     record Baseline(int generated, List<Expr> approved) {}
 
     static Baseline baseline(Row row) {
+        return baseline(row, null);
+    }
+
+    private static Baseline baseline(Row row, TrainWork work) {
         // This preflight also bounds role-renaming/cost recursion independently of matching.
         requireBounded(row.source());
         require(productSites(row.source()) == 1, "v1 requires exactly one product-exponent site");
         var rules = compositionRules();
+        if (work != null) {
+            work.primitiveGeneratorCalls++;
+            // Unindexed transformAst calls applyIfMatched for each primitive at each AST occurrence.
+            work.primitiveMatchAttempts += (long) rules.size() * occurrences(row.source());
+        }
         var steps = new AstRewriteTransport(List.copyOf(rules), 1024, 4096).generate(row.source());
+        if (work != null) work.generatedCandidates += steps.size();
         require(steps.size() == 2 && steps.stream().map(AstRewriteTransport.Step::rule).distinct().count() == 2,
             "primitive enumeration did not expose both factor orders; no completeness claim");
         var approved = new ArrayList<Expr>();
         for (var step : steps) {
+            if (work != null) work.replayRequests++;
             if (ModPowCompositionReplay.verify(row.source(), step.target(), row.assumptions()).isPresent()) approved.add(step.target());
         }
         return new Baseline(steps.size(), List.copyOf(approved));
+    }
+
+    private static int occurrences(Expr expression) {
+        if (expression instanceof FunctionExpr f) return 1 + f.arguments().stream().mapToInt(ModPowFrozenTransfer::occurrences).sum();
+        if (expression instanceof BinaryExpr b) return 1 + occurrences(b.left()) + occurrences(b.right());
+        return 1;
+    }
+
+    private static Function<Expr, ModPowDagRediscoveryStudy.ProgramCost> measuredScore(Row row, TrainWork work) {
+        return expression -> {
+            work.scoreCalls++;
+            return cost(row, expression);
+        };
     }
 
     static List<PatternRewriteRule> compositionRules() {
@@ -184,9 +232,14 @@ public final class ModPowFrozenTransfer {
     }
 
     static Expr best(Row row, List<Expr> alternatives, Function<Expr, ModPowDagRediscoveryStudy.ProgramCost> score) {
+        return best(row, alternatives, expression -> cost(row, expression), score);
+    }
+
+    private static Expr best(Row row, List<Expr> alternatives, Function<Expr, ModPowDagRediscoveryStudy.ProgramCost> dagScore,
+            Function<Expr, ModPowDagRediscoveryStudy.ProgramCost> treeScore) {
         var candidates = new ArrayList<Expr>(); candidates.add(row.source()); candidates.addAll(alternatives);
-        return candidates.stream().min(Comparator.comparingLong((Expr e) -> cost(row, e).dag())
-            .thenComparingLong(e -> score.apply(e).tree()).thenComparing(CODEC::encodeExpression)).orElseThrow();
+        return candidates.stream().min(Comparator.comparingLong((Expr e) -> dagScore.apply(e).dag())
+            .thenComparingLong(e -> treeScore.apply(e).tree()).thenComparing(CODEC::encodeExpression)).orElseThrow();
     }
 
     static ModPowDagRediscoveryStudy.ProgramCost cost(Row row, Expr program) {
