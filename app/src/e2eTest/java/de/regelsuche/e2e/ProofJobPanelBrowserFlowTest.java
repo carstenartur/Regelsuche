@@ -1,20 +1,32 @@
 package de.regelsuche.e2e;
 
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.ScreenshotType;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.mining.RuleCandidate;
+import de.regelsuche.proof.ProofWorker;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -122,20 +134,9 @@ class ProofJobPanelBrowserFlowTest {
     @Test
     @DisplayName("Proof-Workbench: Sophie-Germain-Identität durch Queue und Artefakte")
     void proofJobPanelBrowserFlow() throws Exception {
-        // 1. start the primary search flow once so non-entry tabs become visible
-        // (body.pre-search hides them until the first search/demo interaction).
-        page.locator("#searchForm input[name='expression']").fill("x + 0");
-        page.locator("#searchForm button[type='submit']").click();
-        page.waitForFunction(
-            "() => document.body.dataset.preSearch === 'false'",
-            null, new Page.WaitForFunctionOptions().setTimeout(10_000));
+        openProofJobs();
 
-        // 2. open Proof-Jobs tab
-        page.locator(".tab[data-tab='proofJobs']").click();
-        page.waitForSelector("#tab-proofJobs.active",
-            new Page.WaitForSelectorOptions().setTimeout(5_000));
-
-        // 3. submit the nontrivial Sophie-Germain identity
+        // Submit the Sophie-Germain identity.
         page.locator("#proofJobLeft").fill("a^4 + 4*b^4");
         page.locator("#proofJobRight").fill(
             "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)");
@@ -180,6 +181,109 @@ class ProofJobPanelBrowserFlowTest {
 
         // 7. capture screenshot + (optional) video
         screenshot("proof-job-panel.png");
+    }
+
+    @Test
+    void cancelsRunningProofJobAndRetainsTerminalRecord() throws Exception {
+        var entered = new CountDownLatch(1);
+        var interrupted = new CountDownLatch(1);
+        var exit = new CountDownLatch(1);
+        var worker = new ProofWorker() {
+            public String workerId() { return "browser-cancellation-fixture"; }
+            public Result prove(RuleCandidate candidate, List<Assumption> assumptions) {
+                entered.countDown();
+                try {
+                    exit.await();
+                } catch (InterruptedException requested) {
+                    interrupted.countDown();
+                    try {
+                        exit.await();
+                    } catch (InterruptedException shutdown) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                return new Result(candidate, CandidateProofStatus.FORMALLY_PROVABLE, "", workerId(), 0);
+            }
+        };
+
+        try (var controlled = new RegelsucheAppEnvironment(worker)) {
+            try {
+                page.navigate(controlled.baseUrl());
+                openProofJobs();
+                page.locator("#proofJobLeft").fill("x+0");
+                page.locator("#proofJobRight").fill("x");
+                var submitted = page.waitForResponse(response ->
+                    response.request().method().equals("POST") && response.url().endsWith("/api/proof/jobs"),
+                    () -> page.locator("#proofJobSubmit").click());
+                assertEquals(201, submitted.status());
+                var json = new JsonMapper();
+                String id = json.readTree(submitted.body()).required("jobId").textValue();
+                var row = page.locator("#proofJobList .item").filter(
+                    new Locator.FilterOptions().setHasText(id));
+
+                assertTrue(entered.await(5, TimeUnit.SECONDS), "worker did not start");
+                page.locator("#proofJobReload").click();
+                assertThat(row.locator("code").first()).hasText("RUNNING");
+                assertThat(row).containsText("Gestartete Versuche: 1");
+                assertThat(row).containsText("Zeitlimit je Versuch: 10000 ms");
+                var cancel = row.getByRole(AriaRole.BUTTON,
+                    new Locator.GetByRoleOptions().setName("Abbrechen"));
+                var request = page.waitForResponse(response -> response.request().method().equals("POST")
+                    && response.url().endsWith("/api/proof/jobs/" + id + "/cancel"), cancel::click);
+                assertEquals(200, request.status());
+                var stop = json.readTree(request.body());
+                assertEquals(id, stop.required("id").textValue());
+                String requestedAt = stop.required("cancellationRequestedAt").textValue();
+                assertTrue(interrupted.await(5, TimeUnit.SECONDS), "worker did not receive the interrupt");
+                assertThat(row.locator("code").first()).hasText("CANCELLING");
+                assertThat(row).containsText("Worker-Beendigung ausstehend");
+                assertThat(row).containsText(requestedAt);
+                assertThat(cancel).hasCount(0);
+
+                exit.countDown();
+                // The worker and the HTTP response can finish in either order. Use the
+                // same explicit refresh control available to the user until exit is visible.
+                for (int retry = 0; retry < 20; retry++) {
+                    var list = page.waitForResponse(controlled.baseUrl() + "/api/proof/jobs",
+                        () -> page.locator("#proofJobReload").click());
+                    var job = json.readTree(list.body()).required("jobs").get(0);
+                    assertEquals(id, job.required("id").textValue());
+                    if ("CANCELLED".equals(job.required("status").textValue())) break;
+                }
+                assertThat(row.locator("code").first()).hasText("CANCELLED");
+                assertThat(row).containsText("Beendet:");
+                assertThat(row).containsText("USER_CANCELLED");
+                assertThat(row).containsText(requestedAt);
+                assertThat(row).containsText("Gestartete Versuche: 1");
+                assertThat(cancel).hasCount(0);
+
+                page.reload();
+                assertThat(page.locator("#tab-proofJobs")).isVisible();
+                page.locator("#proofJobReload").click();
+                assertThat(row.locator("code").first()).hasText("CANCELLED");
+                assertThat(row).containsText(requestedAt);
+                row.locator(".proof-artifacts").click();
+                assertThat(page.locator("#proofJobArtifacts")).containsText("Bundle für Job");
+                assertThat(page.locator("#proofJobArtifacts")).containsText(id);
+                assertThat(page.locator("#proofJobArtifacts")).containsText("Noch keine Artefakte");
+                assertThat(page.locator("#proofJobArtifacts a")).hasCount(0);
+            } finally {
+                exit.countDown();
+            }
+        }
+    }
+
+    private void openProofJobs() {
+        // Start the primary search to reveal the Proof-Jobs tab.
+        page.locator("#searchForm input[name='expression']").fill("x + 0");
+        page.locator("#searchForm button[type='submit']").click();
+        page.waitForFunction(
+            "() => document.body.dataset.preSearch === 'false'",
+            null, new Page.WaitForFunctionOptions().setTimeout(10_000));
+
+        page.locator(".tab[data-tab='proofJobs']").click();
+        page.waitForSelector("#tab-proofJobs.active",
+            new Page.WaitForSelectorOptions().setTimeout(5_000));
     }
 
     private void screenshot(String fileName) {

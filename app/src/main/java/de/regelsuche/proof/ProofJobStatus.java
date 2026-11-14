@@ -9,7 +9,7 @@ package de.regelsuche.proof;
  *                   ↘ FAILED
  *                   ↘ RETRYING → RUNNING
  *   QUEUED → CANCELLED
- *   RUNNING → CANCELLED
+ *   RUNNING → CANCELLING → CANCELLED
  * </pre>
  * </p>
  */
@@ -18,6 +18,8 @@ public enum ProofJobStatus {
     QUEUED,
     /** Currently being executed by a worker. */
     RUNNING,
+    /** Stop requested; the worker has not yet acknowledged exit. */
+    CANCELLING,
     /** A previous attempt failed; the job has been requeued. */
     RETRYING,
     /** Worker returned a successful proof result. */

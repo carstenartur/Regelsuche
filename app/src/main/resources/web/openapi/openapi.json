@@ -1489,7 +1489,7 @@
         "operationId": "listProofJobs",
         "summary": "Persistente Proof-Jobs auflisten",
         "x-regelsuche-context": "/api/proof/jobs",
-        "responses": {"200": {"description": "Jobliste", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "503": {"$ref": "#/components/responses/Unavailable"}}
+        "responses": {"200": {"description": "Jobliste", "content": {"application/json": {"schema": {"type":"object","required":["jobs"],"properties":{"jobs":{"type":"array","items":{"$ref":"#/components/schemas/ProofJobSnapshot"}}}}}}}, "503": {"$ref": "#/components/responses/Unavailable"}}
       },
       "post": {
         "tags": ["Proof Jobs"],
@@ -1512,7 +1512,7 @@
         "summary": "Proof-Job-Details laden",
         "x-regelsuche-context": "/api/proof/jobs",
         "parameters": [{"$ref": "#/components/parameters/JobId"}],
-        "responses": {"200": {"description": "Jobstatus, Retries und Fehler", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}, "503": {"$ref": "#/components/responses/Unavailable"}}
+        "responses": {"200": {"description": "Jobstatus, Retries und Fehler", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProofJobSnapshot"}}}}, "404": {"$ref": "#/components/responses/NotFound"}, "503": {"$ref": "#/components/responses/Unavailable"}}
       }
     },
     "/api/proof/jobs/{jobId}/cancel": {
@@ -1522,7 +1522,7 @@
         "summary": "Proof-Job abbrechen",
         "x-regelsuche-context": "/api/proof/jobs",
         "parameters": [{"$ref": "#/components/parameters/JobId"}],
-        "responses": {"200": {"description": "Aktualisierter Jobzustand", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}, "409": {"$ref": "#/components/responses/Conflict"}}
+        "responses": {"200": {"description": "Aktualisierter Jobzustand", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProofJobSnapshot"}}}}, "404": {"$ref": "#/components/responses/NotFound"}, "409": {"$ref": "#/components/responses/Conflict"}}
       }
     },
     "/api/proof/jobs/{jobId}/artifacts": {
@@ -2210,6 +2210,19 @@
           "assumptions": {"type": "array", "items": {"$ref": "#/components/schemas/AssumptionValue"}},
           "tool": {"type": "string", "enum": ["lean", "lean4", "smt"], "default": "lean4"},
           "backend": {"type": "string", "enum": ["lean", "lean4", "smt"]}
+        }
+      },
+      "ProofJobSnapshot": {
+        "type": "object",
+        "required": ["id", "status", "updatedAt"],
+        "properties": {
+          "id": {"type": "string"},
+          "status": {"enum": ["QUEUED", "RUNNING", "RETRYING", "CANCELLING", "CANCELLED", "DONE", "FAILED"]},
+          "updatedAt": {"type": "string", "format": "date-time"},
+          "attemptsStarted": {"type": "integer", "minimum": 0, "description": "Actual worker attempts across retries. Absent when historical accounting is unknown."},
+          "attemptTimeoutMillis": {"type": "integer", "minimum": 1, "description": "Configured wall-clock timeout per worker attempt."},
+          "cancellationRequestedAt": {"type": "string", "format": "date-time"},
+          "stopReason": {"type": "string", "description": "Recorded explicit stop, scheduler shutdown, or recovery of a pending stop after restart."}
         }
       },
       "ProofJobRequest": {

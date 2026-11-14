@@ -9,18 +9,13 @@ import de.regelsuche.mining.RuleStatus;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ScheduledFuture;
 
 /**
  * Schedules and executes {@link ProofJob}s asynchronously.
@@ -72,16 +67,14 @@ public final class ProofJobScheduler implements AutoCloseable {
     /**
      * Single executor that runs every individual proof attempt. Using a
      * shared virtual-thread-per-task executor avoids the per-job leak that
-     * existed in the first PR 15 cut, where every {@code processPending()}
+     * existed in the original implementation, where every polling
      * call instantiated (and never closed) a fresh executor.
      */
     private final ExecutorService workerExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    /** Running futures keyed by job id — for cancellation. */
-    private final Map<String, Future<?>> runningFutures = new ConcurrentHashMap<>();
-
-    /** Job ids that have been explicitly cancelled by the caller. */
-    private final Set<String> cancelRequests = ConcurrentHashMap.newKeySet();
+    // All transitions and worker admission use the scheduler monitor.
+    private Attempt activeAttempt;
+    private boolean closing;
 
     public ProofJobScheduler(
         ProofWorker worker,
@@ -130,7 +123,7 @@ public final class ProofJobScheduler implements AutoCloseable {
      */
     public void start() {
         scheduler.scheduleWithFixedDelay(
-            this::processPending,
+            this::dispatch,
             0L,
             POLL_INTERVAL_MS,
             TimeUnit.MILLISECONDS
@@ -145,7 +138,8 @@ public final class ProofJobScheduler implements AutoCloseable {
      * @param priority    lower value = higher priority (0 = most urgent)
      * @return the new job id
      */
-    public String submit(RuleCandidate candidate, List<Assumption> assumptions, int priority) {
+    public synchronized String submit(RuleCandidate candidate, List<Assumption> assumptions, int priority) {
+        if (closing) throw new IllegalStateException("Proof scheduler is closed");
         String id = UUID.randomUUID().toString();
         ProofJob job = new ProofJob(
             id,
@@ -155,7 +149,7 @@ public final class ProofJobScheduler implements AutoCloseable {
             priority,
             worker.workerId()
         );
-        jobRepository.save(job);
+        jobRepository.save(job.withBudget(jobTimeoutMillis));
         return id;
     }
 
@@ -166,24 +160,23 @@ public final class ProofJobScheduler implements AutoCloseable {
      * @param jobId job to cancel
      * @return the updated job snapshot, or empty if not found
      */
-    public Optional<ProofJob> cancel(String jobId) {
-        Optional<ProofJob> found = jobRepository.findById(jobId);
-        if (found.isEmpty()) {
-            return Optional.empty();
+    public synchronized Optional<ProofJob> cancel(String jobId) {
+        return jobRepository.findById(jobId).map(job -> requestStop(job, "USER_CANCELLED"));
+    }
+
+    private ProofJob requestStop(ProofJob job, String reason) {
+        if (job.status().isTerminal() || job.status() == ProofJobStatus.CANCELLING) {
+            return job;
         }
-        ProofJob job = found.get();
-        if (job.status().isTerminal()) {
-            return Optional.of(job);
+        if (activeAttempt == null || activeAttempt.thread == null || !activeAttempt.job.id().equals(job.id())) {
+            ProofJob cancelled = job.stopped(reason);
+            jobRepository.save(cancelled);
+            return cancelled;
         }
-        cancelRequests.add(jobId);
-        // Interrupt a running future if present
-        Future<?> future = runningFutures.get(jobId);
-        if (future != null) {
-            future.cancel(true);
-        }
-        ProofJob cancelled = job.withStatus(ProofJobStatus.CANCELLED);
-        jobRepository.save(cancelled);
-        return Optional.of(cancelled);
+        ProofJob pending = job.stopping(reason);
+        jobRepository.save(pending);
+        activeAttempt.thread.interrupt();
+        return pending;
     }
 
     /**
@@ -195,99 +188,103 @@ public final class ProofJobScheduler implements AutoCloseable {
 
     // ── internal poll loop ─────────────────────────────────────────────────
 
-    private void processPending() {
-        Optional<ProofJob> next = jobRepository.findNextQueued();
-        if (next.isEmpty()) {
-            return;
-        }
+    private synchronized void dispatch() {
+        if (closing || activeAttempt != null) return;
+        var next = jobRepository.findNextQueued();
+        if (next.isEmpty()) return;
         ProofJob job = next.get();
-
-        // Honour pending cancellation requests
-        if (cancelRequests.contains(job.id())) {
-            cancelRequests.remove(job.id());
-            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
-            return;
-        }
-
-        // Status-only caches cannot establish a formal proof, even with a current key.
-        // A future reusable proof cache must independently replay its retained evidence.
-        String cacheIdentity = worker.cacheIdentity();
-        ProofCacheKey cacheKey = ProofCacheKey.of(
-            job.leftPattern(), job.rightPattern(), job.assumptions(), cacheIdentity);
-        Optional<CandidateProofStatus> cached = proofCache.get(cacheKey)
-            .filter(status -> status != CandidateProofStatus.FORMALLY_PROVED);
-        if (cached.isPresent() && cacheIdentity.equals(worker.cacheIdentity())) {
+        String identity = worker.cacheIdentity();
+        ProofCacheKey key = ProofCacheKey.of(job.leftPattern(), job.rightPattern(), job.assumptions(), identity);
+        var cached = proofCache.get(key).filter(status -> status != CandidateProofStatus.FORMALLY_PROVED);
+        if (cached.isPresent() && identity.equals(worker.cacheIdentity())) {
             jobRepository.save(job.withDone(cached.get()));
             return;
         }
+        Attempt attempt = new Attempt(job, identity, key);
+        activeAttempt = attempt;
+        workerExecutor.execute(attempt::run);
+    }
 
-        // Mark as RUNNING
-        jobRepository.save(job.withStatus(ProofJobStatus.RUNNING));
+    private final class Attempt {
+        final ProofJob job;
+        final String identity;
+        final ProofCacheKey key;
+        Thread thread;
+        boolean timedOut;
 
-        // Build a minimal RuleCandidate for the worker
-        RuleCandidate candidate = new RuleCandidate(
-            job.leftPattern(),
-            job.rightPattern(),
-            0,
-            0.0,
-            0,
-            false,
-            false,
-            false,
-            List.of(),
-            RuleStatus.NEW,
-            CandidateProofStatus.OBSERVED,
-            ""
-        );
+        Attempt(ProofJob job, String identity, ProofCacheKey key) {
+            this.job = job;
+            this.identity = identity;
+            this.key = key;
+        }
 
-        // Submit to the shared worker executor with timeout
-        Future<ProofWorker.Result> future = workerExecutor
-            .submit(() -> worker.prove(candidate, job.assumptions()));
-        runningFutures.put(job.id(), future);
-        try {
-            ProofWorker.Result result = future.get(jobTimeoutMillis, TimeUnit.MILLISECONDS);
-            runningFutures.remove(job.id());
-
-            if (cancelRequests.contains(job.id())) {
-                cancelRequests.remove(job.id());
-                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
-                return;
+        void run() {
+            try {
+                execute();
+            } finally {
+                synchronized (ProofJobScheduler.this) {
+                    if (activeAttempt == this) activeAttempt = null;
+                }
             }
+        }
 
-            if (!cacheIdentity.equals(worker.cacheIdentity())) {
-                handleFailure(job, "proof configuration changed during the attempt");
-                return;
+        void execute() {
+            ProofJob running;
+            ScheduledFuture<?> deadline;
+            synchronized (ProofJobScheduler.this) {
+                if (jobRepository.findById(job.id()).orElseThrow().status().isTerminal()) return;
+                thread = Thread.currentThread();
+                running = job.startAttempt(jobTimeoutMillis);
+                jobRepository.save(running);
+                deadline = scheduler.schedule(this::timeout, jobTimeoutMillis, TimeUnit.MILLISECONDS);
             }
-            CandidateProofStatus status = result.status();
-            proofCache.put(cacheKey, status);
-            writeArtifactBundle(job, result, status, null);
-            jobRepository.save(job.withDone(status));
+            RuleCandidate candidate = new RuleCandidate(job.leftPattern(), job.rightPattern(), 0, 0.0,
+                0, false, false, false, List.of(), RuleStatus.NEW, CandidateProofStatus.OBSERVED, "");
+            ProofWorker.Result result = null;
+            Throwable failure = null;
+            try {
+                result = worker.prove(candidate, job.assumptions());
+            } catch (Throwable thrown) {
+                failure = thrown;
+            } finally {
+                deadline.cancel(false);
+                // The prover may restore its interrupt flag. Persist its outcome on a thread
+                // that can perform file I/O even after a cooperative stop.
+                synchronized (ProofJobScheduler.this) {
+                    Thread.interrupted();
+                    finish(running, result, failure);
+                    activeAttempt = null;
+                }
+            }
+        }
 
-            // Update RuleInventory if we have a positive result
-            if (inventoryRepository != null && status.isPositive()) {
-                updateInventory(job, status);
+        void timeout() {
+            synchronized (ProofJobScheduler.this) {
+                if (activeAttempt == this) {
+                    timedOut = true;
+                    thread.interrupt();
+                }
             }
+        }
 
-        } catch (TimeoutException ex) {
-            future.cancel(true);
-            runningFutures.remove(job.id());
-            handleFailure(job, "timeout after " + jobTimeoutMillis + "ms");
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            runningFutures.remove(job.id());
-            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
-        } catch (CancellationException ex) {
-            runningFutures.remove(job.id());
-            cancelRequests.remove(job.id());
-            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
-        } catch (Exception ex) {
-            runningFutures.remove(job.id());
-            if (cancelRequests.contains(job.id())) {
-                cancelRequests.remove(job.id());
-                jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));
-                return;
+        void finish(ProofJob running, ProofWorker.Result result, Throwable failure) {
+            ProofJob current = jobRepository.findById(job.id()).orElseThrow();
+            if (current.status() == ProofJobStatus.CANCELLING) {
+                jobRepository.save(current.stopped(current.stopReason()));
+            } else if (timedOut) {
+                handleFailure(running, "timeout after " + jobTimeoutMillis + "ms");
+            } else if (failure != null || result == null) {
+                String reason = failure == null ? "worker returned no result" : failure.toString();
+                handleFailure(running, reason);
+            } else if (!identity.equals(worker.cacheIdentity())) {
+                handleFailure(running, "proof configuration changed during the attempt");
+            } else {
+                CandidateProofStatus status = result.status();
+                proofCache.put(key, status);
+                writeArtifactBundle(running, result, status, null);
+                jobRepository.save(running.withDone(status));
+                if (inventoryRepository != null && status.isPositive()) updateInventory(running, status);
             }
-            handleFailure(job, ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
         }
     }
 
@@ -429,6 +426,12 @@ public final class ProofJobScheduler implements AutoCloseable {
 
     @Override
     public void close() {
+        synchronized (this) {
+            closing = true;
+            if (activeAttempt != null) {
+                jobRepository.findById(activeAttempt.job.id()).ifPresent(job -> requestStop(job, "SCHEDULER_SHUTDOWN"));
+            }
+        }
         scheduler.shutdownNow();
         workerExecutor.shutdownNow();
         try {

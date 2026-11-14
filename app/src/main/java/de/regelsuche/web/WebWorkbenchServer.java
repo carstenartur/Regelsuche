@@ -3087,6 +3087,12 @@ public class WebWorkbenchServer {
         writer.property("updatedAt", job.updatedAt().toString());
         writer.property("proofStatus", job.resultStatus() == null ? "" : job.resultStatus().name());
         writer.property("errorMessage", job.errorMessage());
+        if (job.attemptsStarted() != null) writer.property("attemptsStarted", job.attemptsStarted().intValue());
+        if (job.attemptTimeoutMillis() != null) writer.property("attemptTimeoutMillis", job.attemptTimeoutMillis().longValue());
+        if (job.cancellationRequestedAt() != null) {
+            writer.property("cancellationRequestedAt", job.cancellationRequestedAt().toString());
+            writer.property("stopReason", job.stopReason());
+        }
         writer.array("assumptions", arr -> job.assumptions().forEach(a ->
             arr.objectValue(o -> {
                 o.property("kind", a.kind().name());

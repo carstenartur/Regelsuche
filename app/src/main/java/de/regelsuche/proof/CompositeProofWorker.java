@@ -39,6 +39,9 @@ public final class CompositeProofWorker implements ProofWorker {
     public Result prove(RuleCandidate candidate, List<Assumption> assumptions) {
         Result best = null;
         for (ProofWorker worker : workers) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new java.util.concurrent.CancellationException("Proof attempt interrupted");
+            }
             Result result = worker.prove(candidate, assumptions);
             if (result.status() == CandidateProofStatus.FORMALLY_PROVED) {
                 return result;

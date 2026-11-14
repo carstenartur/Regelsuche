@@ -54,15 +54,18 @@ public final class RegelsucheAppEnvironment implements AutoCloseable {
     }
 
     public RegelsucheAppEnvironment(boolean enableProofWorkbench) throws IOException {
+        this(enableProofWorkbench ? new StubAlwaysSucceedsWorker() : null);
+    }
+
+    RegelsucheAppEnvironment(ProofWorker worker) throws IOException {
         InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
         ProofWorkbenchService proofService = null;
-        if (enableProofWorkbench) {
+        if (worker != null) {
             this.proofArtifactRoot = Files.createTempDirectory("regelsuche-e2e-proof-");
             JsonFileProofArtifactRepository artifacts =
                 new JsonFileProofArtifactRepository(this.proofArtifactRoot);
             InMemoryProofJobRepository jobs = new InMemoryProofJobRepository();
             InMemoryProofCache cache = new InMemoryProofCache();
-            ProofWorker worker = new StubAlwaysSucceedsWorker();
             this.proofScheduler = new ProofJobScheduler(
                 worker, jobs, cache, inventory, artifacts, Duration.ofSeconds(10));
             this.proofScheduler.start();

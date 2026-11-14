@@ -48,10 +48,12 @@ public final class JsonFileProofJobRepository implements ProofJobRepository {
 
     @Override
     public synchronized void save(ProofJob job) {
-        jobs.put(job.id(), job);
+        ProofJob previous = jobs.put(job.id(), job);
         try {
             persist();
         } catch (IOException ex) {
+            if (previous == null) jobs.remove(job.id());
+            else jobs.put(job.id(), previous);
             throw new UncheckedIOException("Failed to persist proof job " + job.id(), ex);
         }
     }
@@ -96,15 +98,20 @@ public final class JsonFileProofJobRepository implements ProofJobRepository {
 
     private void load() throws IOException {
         String content = Files.readString(file, StandardCharsets.UTF_8);
+        boolean recoveredStop = false;
         for (Map<String, String> raw : MiniJson.parseObjectArray(content, "jobs")) {
             ProofJob job = jobFromRaw(raw);
             // RUNNING jobs at the time the JVM died are not actually running
             // any more — flip them back to QUEUED so the scheduler retries.
             if (job.status() == ProofJobStatus.RUNNING) {
                 job = job.withStatus(ProofJobStatus.QUEUED);
+            } else if (job.status() == ProofJobStatus.CANCELLING) {
+                job = job.stopped(job.stopReason() + "_RECOVERED_AFTER_RESTART");
+                recoveredStop = true;
             }
             jobs.put(job.id(), job);
         }
+        if (recoveredStop) persist();
     }
 
     private synchronized void persist() throws IOException {
@@ -127,6 +134,13 @@ public final class JsonFileProofJobRepository implements ProofJobRepository {
             builder.append(",\"workerId\":").append(quote(job.workerType()));
             builder.append(",\"createdAt\":").append(quote(job.createdAt().toString()));
             builder.append(",\"updatedAt\":").append(quote(job.updatedAt().toString()));
+            if (job.attemptsStarted() != null)
+                builder.append(",\"attemptsStarted\":").append(job.attemptsStarted());
+            if (job.attemptTimeoutMillis() != null)
+                builder.append(",\"attemptTimeoutMillis\":").append(job.attemptTimeoutMillis());
+            if (job.cancellationRequestedAt() != null)
+                builder.append(",\"cancellationRequestedAt\":").append(quote(job.cancellationRequestedAt().toString()));
+            if (!job.stopReason().isEmpty()) builder.append(",\"stopReason\":").append(quote(job.stopReason()));
             builder.append(",\"lastError\":").append(quote(job.errorMessage()));
             builder.append(",\"proofStatus\":")
                 .append(job.resultStatus() == null ? "null" : quote(job.resultStatus().name()));
@@ -173,7 +187,11 @@ public final class JsonFileProofJobRepository implements ProofJobRepository {
             Instant.parse(raw.getOrDefault("createdAt", Instant.EPOCH.toString())),
             Instant.parse(raw.getOrDefault("updatedAt", Instant.EPOCH.toString())),
             resultStatus,
-            raw.getOrDefault("lastError", "")
+            raw.getOrDefault("lastError", ""),
+            raw.containsKey("attemptsStarted") ? Integer.valueOf(raw.get("attemptsStarted")) : null,
+            raw.containsKey("attemptTimeoutMillis") ? Long.valueOf(raw.get("attemptTimeoutMillis")) : null,
+            raw.containsKey("cancellationRequestedAt") ? Instant.parse(raw.get("cancellationRequestedAt")) : null,
+            raw.getOrDefault("stopReason", "")
         );
     }
 
