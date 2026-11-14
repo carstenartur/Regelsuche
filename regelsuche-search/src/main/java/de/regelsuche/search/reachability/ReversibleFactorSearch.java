@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Target-directed breadth-first diagnostic on the reciprocal additive factor/distribution fragment. */
+/** Target-directed path search on the reciprocal additive factor/distribution fragment. */
 public final class ReversibleFactorSearch {
     public static final String INVENTORY = ReversibleFactorFragment.ID;
-    public enum Mode { ONE_SIDED, BIDIRECTIONAL }
+    public enum Mode { ONE_SIDED, BIDIRECTIONAL, ITERATIVE_DEEPENING }
     public enum Status { REACHED, NO_PATH_WITHIN_DEPTH, WORK_EXHAUSTED }
     public record Count(int calls, long generated) {}
     public record Work(Count forward, Count reverse, Count replay) {
@@ -39,14 +39,21 @@ public final class ReversibleFactorSearch {
         var reverse = new Frontier(end, new Counter(allowance));
         var replay = new Counter(allowance);
         try {
-            State meeting = find(fragment, forward, reverse, depth, mode);
-            if (meeting == null) return result(Status.NO_PATH_WITHIN_DEPTH, List.of(), forward, reverse, replay);
-            var path = join(forward, reverse, meeting);
+            List<Step> path = mode == Mode.ITERATIVE_DEEPENING
+                ? IterativeFactorSearch.find(fragment, start, end, depth, forward.work)
+                : breadthFirstPath(fragment, forward, reverse, depth, mode);
+            if (path == null) return result(Status.NO_PATH_WITHIN_DEPTH, List.of(), forward, reverse, replay);
             if (!replays(new ReversibleFactorFragment(), start, end, path, replay)) throw new IllegalStateException("invalid reconstructed path");
             return result(Status.REACHED, path, forward, reverse, replay);
         } catch (BoundedReachabilityOracle.EngineWorkExhausted exhausted) {
             return result(Status.WORK_EXHAUSTED, List.of(), forward, reverse, replay);
         }
+    }
+
+    private static List<Step> breadthFirstPath(ReversibleFactorFragment fragment, Frontier forward,
+            Frontier reverse, int depth, Mode mode) {
+        State meeting = find(fragment, forward, reverse, depth, mode);
+        return meeting == null ? null : join(forward, reverse, meeting);
     }
 
     private static Result result(Status status, List<Step> path, Frontier left, Frontier right, Counter replay) {

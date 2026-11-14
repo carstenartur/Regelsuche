@@ -12,6 +12,21 @@ class ReversibleFactorSearchTest {
     private static final String SOURCE = "pair(a*x+a*y,b*x+b*y)";
     private static final String TARGET = "pair(a*(x+y),b*(x+y))";
 
+    @Test void iterativeDeepeningChargesEarlierIterationsAndNeverUsesTheReverseFrontier() {
+        var mode = ReversibleFactorSearch.Mode.ITERATIVE_DEEPENING;
+        var empty = SEARCH.search("x", "y", CONTEXT, Integer.MAX_VALUE, 1, mode);
+        assertEquals(ReversibleFactorSearch.Status.NO_PATH_WITHIN_DEPTH, empty.status());
+        assertEquals(1, empty.work().totalCalls());
+        var shallow = SEARCH.search(SOURCE, TARGET, CONTEXT, 1, 1000, mode);
+        var reached = SEARCH.search(SOURCE, TARGET, CONTEXT, 2, 1000, mode);
+        assertEquals(ReversibleFactorSearch.Status.NO_PATH_WITHIN_DEPTH, shallow.status());
+        assertEquals(2, reached.witness().size());
+        assertEquals(0, reached.work().reverse().calls());
+        assertTrue(reached.work().forward().calls() > shallow.work().forward().calls());
+        assertTrue(reached.work().replay().calls() > 0);
+        assertTrue(SEARCH.replays(SOURCE, TARGET, CONTEXT, reached.witness()));
+    }
+
     @Test void twoFrontiersMeetAndReplayTheActualDirectedProductionSteps() {
         var run = SEARCH.search(SOURCE, TARGET, CONTEXT, 2, 1000, ReversibleFactorSearch.Mode.BIDIRECTIONAL);
         assertEquals(ReversibleFactorSearch.Status.REACHED, run.status());
