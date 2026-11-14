@@ -47,10 +47,13 @@ public final class InterestingnessProfileCalibration {
         Map<String, CaseProfiles> byCaseId = validateAndIndex(corpus, profiles);
         List<ScoredCase> calibration = scoredCases(
             corpus.split(CorpusSplit.CALIBRATION), byCaseId);
+        List<ProfileMetric> calibrationMetrics = profileMetrics(calibration, List.of());
+        InterestingnessProfile selected = select(calibrationMetrics);
         List<ScoredCase> test = scoredCases(corpus.split(CorpusSplit.TEST), byCaseId);
-
-        List<ProfileMetric> metrics = profileMetrics(calibration, test);
-        InterestingnessProfile selected = select(metrics);
+        List<ProfileMetric> metrics = calibrationMetrics.stream()
+            .map(metric -> new ProfileMetric(metric.profile(), metric.calibrationAgreementPermille(),
+                pairwiseLabelAgreement(test, metric.profile())))
+            .toList();
         List<RankedCase> testRanking = ranking(test, selected);
         List<String> pareto = paretoFront(test, selected);
         Sensitivity sensitivity = sensitivity(calibration, test, selected);
@@ -123,7 +126,7 @@ public final class InterestingnessProfileCalibration {
         return Map.copyOf(byCaseId);
     }
 
-    private static void validateProfilePair(CaseProfiles item) {
+    static void validateProfilePair(CaseProfiles item) {
         InterestingnessAssessment theory = item.theoryDiscovery();
         InterestingnessAssessment reuse = item.searchReuse();
         if (!item.candidateId().equals(theory.candidateId())

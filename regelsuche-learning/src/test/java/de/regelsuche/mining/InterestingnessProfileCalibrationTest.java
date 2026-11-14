@@ -129,7 +129,7 @@ class InterestingnessProfileCalibrationTest {
             () -> calibration.calibrate(corpus, missing));
     }
 
-    private Dataset dataset() {
+    Dataset dataset() {
         List<Prepared> prepared = List.of(
             prepared(
                 "cal-surprise-case",
@@ -398,7 +398,7 @@ class InterestingnessProfileCalibrationTest {
     private record Prepared(CorpusCase corpusCase, CaseProfiles profiles) {
     }
 
-    private record Dataset(
+    record Dataset(
         List<CorpusCase> cases,
         List<CaseProfiles> profiles
     ) {

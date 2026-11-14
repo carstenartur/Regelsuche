@@ -35,6 +35,15 @@ public final class InterestingnessCalibrationCorpus {
         List<CorpusCase> cases,
         ConsensusReport consensusReport
     ) {
+        return freeze(cases, consensusReport, false);
+    }
+
+    /** Package-local numerical rehearsal. Fixture rows retain zero counted and blind experts. */
+    CorpusReport freezeDevelopmentDiagnostics(List<CorpusCase> cases, ConsensusReport consensusReport) {
+        return freeze(cases, consensusReport, true);
+    }
+
+    private CorpusReport freeze(List<CorpusCase> cases, ConsensusReport consensusReport, boolean development) {
         Objects.requireNonNull(consensusReport, "consensusReport");
         List<CorpusCase> ordered = orderedCases(cases);
         validateUniqueCases(ordered);
@@ -42,7 +51,7 @@ public final class InterestingnessCalibrationCorpus {
         validateSplitIsolation(ordered);
 
         List<FrozenCase> frozen = ordered.stream()
-            .map(item -> freezeCase(item, consensusReport))
+            .map(item -> freezeCase(item, consensusReport, development))
             .toList();
         validateLabelDiversity(frozen);
         String predictiveHash = hash(predictiveMaterial(frozen));
@@ -127,10 +136,16 @@ public final class InterestingnessCalibrationCorpus {
 
     private static FrozenCase freezeCase(
         CorpusCase item,
-        ConsensusReport consensusReport
+        ConsensusReport consensusReport,
+        boolean development
     ) {
         CandidateConsensus consensus = consensusReport.requireCandidate(item.candidateId());
-        if (consensus.status() != ConsensusStatus.CONSENSUS) {
+        boolean eligible = development
+            ? consensus.status() == ConsensusStatus.DEVELOPMENT_ONLY
+                && consensus.sources().equals(List.of(InterestingnessReviewConsensus.ReviewSource.TEST_FIXTURE))
+                && consensus.countedExpertReviews() == 0 && consensus.blindExpertReviews() == 0
+            : consensus.status() == ConsensusStatus.CONSENSUS;
+        if (!eligible) {
             throw new IllegalArgumentException(
                 "candidate lacks expert consensus: " + item.candidateId()
                     + " status=" + consensus.status().name());

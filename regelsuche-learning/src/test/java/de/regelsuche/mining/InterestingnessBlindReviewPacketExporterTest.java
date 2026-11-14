@@ -109,7 +109,7 @@ class InterestingnessBlindReviewPacketExporterTest {
         }
     }
 
-    private static List<ReviewAssignment> assignments(StudyPlan plan) {
+    static List<ReviewAssignment> assignments(StudyPlan plan) {
         List<ReviewAssignment> result = new ArrayList<>();
         int candidate = 0;
         for (CandidateCase item : plan.cases()) {
@@ -137,7 +137,7 @@ class InterestingnessBlindReviewPacketExporterTest {
             .toList();
     }
 
-    private static Map<String, String> materials(StudyPlan plan) {
+    static Map<String, String> materials(StudyPlan plan) {
         Map<String, String> result = new LinkedHashMap<>();
         char marker = 'm';
         for (CandidateCase item : plan.cases()) {

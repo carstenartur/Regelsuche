@@ -97,10 +97,11 @@ public final class InterestingnessReviewConsensus {
         int relevance = median((experts.isEmpty() ? ordered : experts).stream()
             .map(ReviewLabel::relevancePermille)
             .toList());
-        int spread = spread(experts.stream()
+        var diagnosticLabels = experts.isEmpty() && fixturePresent ? ordered : experts;
+        int spread = spread(diagnosticLabels.stream()
             .map(ReviewLabel::relevancePermille)
             .toList());
-        int confidence = mean(experts.stream()
+        int confidence = mean(diagnosticLabels.stream()
             .map(ReviewLabel::confidencePermille)
             .toList());
         int blindExperts = (int) experts.stream().filter(ReviewLabel::blindReview).count();
