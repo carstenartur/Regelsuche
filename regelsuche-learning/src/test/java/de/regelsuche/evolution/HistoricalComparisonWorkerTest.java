@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,27 @@ class HistoricalComparisonWorkerTest {
         return worker.handle(JSON.writeValueAsString(request));
     }
     private Map<String, Object> task(String kind, String source) { return Map.of("kind", kind, "source", source); }
+
+    @Test void regeneratesThePublicSourceOnlyCandidateFreeze() throws Exception {
+        var panel = Path.of("..", "docs", "research", "cassini-development-v1");
+        String sources = Files.readString(panel.resolve("sources.json"));
+        assertEquals(Files.readString(panel.resolve("candidates.json")), HistoricalComparisonWorker.freezeInvariants(sources));
+    }
+
+    @Test void freezeIncludesEveryLawAndBindsExactSourceBytes() throws Exception {
+        var identity = Map.of("linear", List.of(List.of("1", "0"), List.of("0", "1")),
+            "offset", List.of("0", "0"), "initial", List.of("0", "1"), "degree", 2, "workBudget", 100000);
+        String source = JSON.writeValueAsString(Map.of("version", 1, "cases", List.of(Map.of("id", "a", "request", identity))));
+        var frozen = JSON.readTree(HistoricalComparisonWorker.freezeInvariants(source));
+        assertEquals(5, frozen.required("cases").get(0).required("laws").size());
+        assertEquals("COMPLETE", frozen.required("cases").get(0).required("status").asText());
+        assertEquals(SchematicProofPlan.hash(source), frozen.required("sourceHash").asText());
+        assertNotEquals(frozen.required("sourceHash"),
+            JSON.readTree(HistoricalComparisonWorker.freezeInvariants(source + " ")).required("sourceHash"));
+        var contaminated = Map.of("id", "a", "request", identity, "reference", "x0");
+        String invalid = JSON.writeValueAsString(Map.of("version", 1, "cases", List.of(contaminated)));
+        assertThrows(IllegalArgumentException.class, () -> HistoricalComparisonWorker.freezeInvariants(invalid));
+    }
 
     @Test void callsTheExistingStructuralSolverForBothHistoricalGoals(@TempDir Path directory) throws Exception {
         var worker = new HistoricalComparisonWorker();

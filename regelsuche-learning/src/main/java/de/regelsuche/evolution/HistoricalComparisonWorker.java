@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Request;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -200,8 +202,34 @@ public final class HistoricalComparisonWorker {
         }).toList();
     }
 
+    static String freezeInvariants(String input) {
+        var source = CheckedSchemaSupport.read(input);
+        CheckedSchemaSupport.fields(source, "version", "cases");
+        if (integer(source.get("version")) != 1) throw new IllegalArgumentException("source version");
+        var rows = new ArrayList<Map<String, Object>>();
+        var ids = new HashSet<String>();
+        var synthesis = new RecurrenceInvariantSynthesis();
+        for (var row : array(source.get("cases"))) {
+            CheckedSchemaSupport.fields(row, "id", "request");
+            String id = CheckedSchemaSupport.text(row, "id");
+            if (id.isBlank() || !ids.add(id)) throw new IllegalArgumentException("distinct case id required");
+            var request = row.get("request");
+            var report = synthesis.solve(recurrence(request));
+            var laws = report.laws().stream().map(law -> Map.of("polynomial", law.proposal().polynomial(),
+                "evolution", law.proposal().evolution().name(), "initialValue", law.initialValue().toString())).toList();
+            rows.add(Map.of("id", id, "request", CheckedSchemaSupport.JSON.convertValue(request, Map.class),
+                "status", report.status(), "consumedWork", report.work().consumedWorkUnits(), "laws", laws));
+        }
+        return LearnedSchedulingArtifacts.json(Map.of("version", 1, "sourceHash", SchematicProofPlan.hash(input),
+            "cases", rows)) + "\n";
+    }
+
     public static void main(String[] args) throws Exception {
-        if (args.length != 0) throw new IllegalArgumentException("JSONL stdin only");
+        if (args.length == 2 && args[0].equals("freeze-invariants")) {
+            System.out.print(freezeInvariants(Files.readString(Path.of(args[1]))));
+            return;
+        }
+        if (args.length != 0) throw new IllegalArgumentException("expected JSONL stdin or freeze-invariants SOURCES");
         System.out.println("{\"status\":\"READY\",\"java\":\"" + Runtime.version() + "\"}");
         var worker = new HistoricalComparisonWorker();
         try (var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
