@@ -14,13 +14,30 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** Conservative together/cancel-style candidates for rational expressions. */
 public class RationalNormalizationHypothesisOperator implements HypothesisOperator {
     public static final String RULE_ID = "hypothesis_rational_normalization";
 
+    /** Nonempty subsets of the two root-level production rewrites. */
+    public enum Forms { CANCELLATION, EQUAL_DENOMINATOR, COMBINED }
+
+    private final Forms forms;
     private final ExpressionParser parser = new ExpressionParser();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+
+    public RationalNormalizationHypothesisOperator() {
+        this(Forms.COMBINED);
+    }
+
+    public RationalNormalizationHypothesisOperator(Forms forms) {
+        this.forms = Objects.requireNonNull(forms, "forms");
+    }
+
+    public Forms forms() {
+        return forms;
+    }
 
     @Override
     public List<Transformation> generateCandidates(String expression) {
@@ -31,8 +48,12 @@ public class RationalNormalizationHypothesisOperator implements HypothesisOperat
             return List.of();
         }
         Map<String, Transformation> candidates = new LinkedHashMap<>();
-        addSameDenominatorCandidate(root, candidates);
-        addCancellationCandidate(root, candidates);
+        if (forms != Forms.CANCELLATION) {
+            addSameDenominatorCandidate(root, candidates);
+        }
+        if (forms != Forms.EQUAL_DENOMINATOR) {
+            addCancellationCandidate(root, candidates);
+        }
         return candidates.values().stream()
             .sorted(Comparator.comparing(Transformation::transformedExpression))
             .toList();

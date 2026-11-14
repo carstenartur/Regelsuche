@@ -294,7 +294,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         return campaign;
     }
 
-    private static ObjectNode renderEvaluation(
+    static ObjectNode renderEvaluation(
         ObjectNode benchmarkCase,
         ObjectNode task,
         SearchResult result
@@ -360,7 +360,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         return result;
     }
 
-    private static ObjectNode renderCandidate(CandidateForm candidate) {
+    static ObjectNode renderCandidate(CandidateForm candidate) {
         ObjectNode result = JSON.createObjectNode();
         result.put("candidateFormId", candidate.candidateFormId());
         result.put("operatorId", candidate.operatorId());
@@ -372,7 +372,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         return result;
     }
 
-    private static ArrayNode renderFormationEvidence(
+    static ArrayNode renderFormationEvidence(
         List<FormationEvidence> evidence
     ) {
         ArrayNode result = JSON.createArrayNode();
@@ -401,7 +401,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         return result;
     }
 
-    private static ObjectNode renderResourceUse(ResourceUse use) {
+    static ObjectNode renderResourceUse(ResourceUse use) {
         ObjectNode result = JSON.createObjectNode();
         result.put("configuredStates", use.configuredExploredStates());
         result.put("executedStates", use.executedExploredStates());
@@ -415,7 +415,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         return result;
     }
 
-    private static EvaluationTask evaluationTask(ObjectNode task) {
+    static EvaluationTask evaluationTask(ObjectNode task) {
         return new EvaluationTask(
             text(task, "taskId"),
             text(task, "source"),
@@ -538,7 +538,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         }
     }
 
-    private static List<ObjectNode> rationalCases(ObjectNode corpus) {
+    static List<ObjectNode> rationalCases(ObjectNode corpus) {
         List<ObjectNode> result = new ArrayList<>();
         for (JsonNode item : requireArray(corpus, "cases", "case corpus cases")) {
             if (!item.isObject() || !CHALLENGE.equals(text(item, "challengeId"))) {
@@ -608,7 +608,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
             "case exposes expected references during formation: " + caseId);
     }
 
-    private static ObjectNode readObject(Path path) throws IOException {
+    static ObjectNode readObject(Path path) throws IOException {
         require(Files.isRegularFile(path) && !Files.isSymbolicLink(path),
             "expected regular non-symbolic JSON file: " + path);
         JsonNode value = JSON.readTree(Files.readString(
@@ -616,7 +616,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         return requireObject(value, path.toString());
     }
 
-    private static void requireContentHash(ObjectNode value, String context) {
+    static void requireContentHash(ObjectNode value, String context) {
         String retained = text(value, "contentHash");
         ObjectNode material = value.deepCopy();
         material.remove("contentHash");
@@ -630,7 +630,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         value.put("contentHash", semanticHash(value));
     }
 
-    private static String semanticHash(JsonNode value) {
+    static String semanticHash(JsonNode value) {
         try {
             return "sha256:" + java.util.HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(
