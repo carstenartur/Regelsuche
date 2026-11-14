@@ -51,7 +51,14 @@ public final class OpenTargetConjectureMiner {
         this.scorer = Objects.requireNonNull(scorer, "scorer");
     }
 
+    public enum SupportScope { CROSS_OBSERVATION, SINGLE_OBSERVATION }
+
     public MiningReport mine(List<OpenTargetObservation> observations) {
+        return mine(observations, SupportScope.CROSS_OBSERVATION);
+    }
+
+    public MiningReport mine(List<OpenTargetObservation> observations, SupportScope scope) {
+        Objects.requireNonNull(scope, "scope");
         List<OpenTargetObservation> ordered = observations == null
             ? List.of()
             : observations.stream()
@@ -73,15 +80,15 @@ public final class OpenTargetConjectureMiner {
             }
         }
 
-        Map<String, List<ConvergenceEvidence>> clusters = evidence.stream()
+        record SupportGroup(String signature, String observationId) { }
+        Map<SupportGroup, List<ConvergenceEvidence>> clusters = evidence.stream()
             .collect(Collectors.groupingBy(
-                ConvergenceEvidence::pathCompetitionSignature,
+                item -> new SupportGroup(item.pathCompetitionSignature(),
+                    scope == SupportScope.SINGLE_OBSERVATION ? item.observationId() : ""),
                 LinkedHashMap::new,
                 Collectors.toList()));
         List<OpenTargetConjecture> conjectures = new ArrayList<>();
-        clusters.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEach(entry -> mineCluster(entry.getKey(), entry.getValue(), conjectures, rejected));
+        clusters.forEach((group, items) -> mineCluster(group.signature(), items, conjectures, rejected));
         return new MiningReport(
             SCHEMA,
             false,
