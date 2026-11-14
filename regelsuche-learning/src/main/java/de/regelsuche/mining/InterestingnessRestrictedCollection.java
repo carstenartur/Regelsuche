@@ -112,6 +112,7 @@ public final class InterestingnessRestrictedCollection {
             instructions = text(packet, "reviewerInstructions");
         }
         require(instructions != null, "empty export");
+        requireExactPublicTree(export, packets.keySet());
         var expected = new InterestingnessBlindReviewPacketExporter().export(plan, assignments, presentations, instructions);
         require(JSON.readTree(expected.privateManifest().toCanonicalJson()).equals(supplied), "private manifest mismatch");
         require(JSON.readTree(expected.publicManifest().toCanonicalJson()).equals(read(export.resolve("public/manifest.json"))),
@@ -231,9 +232,24 @@ public final class InterestingnessRestrictedCollection {
             }
             receipt.put("receiptHash", receiptHash);
             receipts.set(packetId, receipt);
+            if ("WITHDRAWN".equals(receipt.path("reason").textValue())) {
+                deleteAssignmentProse(root, state, packetId);
+            }
             writeAtomically(root.resolve(STATE), state);
             return receiptHash;
         });
+    }
+
+    private static void deleteAssignmentProse(Path root, ObjectNode state, String packetId) throws IOException {
+        JsonNode current = state.required("receipts").required(packetId);
+        Files.deleteIfExists(root.resolve("prose").resolve(text(current, "receiptHash").substring(7)));
+        for (var history : state.required("history")) {
+            for (var slot : history.required("slots")) {
+                if (packetId.equals(text(slot.required("assignment"), "packetId")) && slot.has("receiptHash")) {
+                    Files.deleteIfExists(root.resolve("prose").resolve(text(slot, "receiptHash").substring(7)));
+                }
+            }
+        }
     }
 
     public static String freeze(Path root) throws IOException {
@@ -368,6 +384,21 @@ public final class InterestingnessRestrictedCollection {
             require(registration.required("studyPlanHash").equals(state.required("plan").required("contentHash")),
                 "registered study mismatch");
             return operation.apply(state);
+        }
+    }
+
+    private static void requireExactPublicTree(Path export, Set<String> packetIds) throws IOException {
+        Path directory = export.resolve("public");
+        require(Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)
+            && Files.isDirectory(directory.resolve("packets"), LinkOption.NOFOLLOW_LINKS), "public packet directory unavailable");
+        try (var entries = Files.list(directory)) {
+            require(entries.map(path -> path.getFileName().toString()).collect(java.util.stream.Collectors.toSet())
+                .equals(Set.of("manifest.json", "packets")), "unexpected public export entry");
+        }
+        var expected = packetIds.stream().map(id -> id + ".json").collect(java.util.stream.Collectors.toSet());
+        try (var entries = Files.list(directory.resolve("packets"))) {
+            require(entries.map(path -> path.getFileName().toString()).collect(java.util.stream.Collectors.toSet())
+                .equals(expected), "unexpected packet file");
         }
     }
 

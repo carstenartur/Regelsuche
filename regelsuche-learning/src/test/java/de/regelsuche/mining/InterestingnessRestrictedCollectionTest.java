@@ -189,6 +189,8 @@ class InterestingnessRestrictedCollectionTest {
         withdrawal.remove(List.of("rationaleCodes", "confidencePermille", "relevancePermille", "optionalProse"));
         submit(0, withdrawal);
         assertThrows(IllegalArgumentException.class, () -> submit(0, withdrawal));
+        assertFalse(Files.exists(vault.resolve("prose").resolve(before.required("slots").get(0)
+            .required("receiptHash").asText().substring(7))));
         String second = InterestingnessRestrictedCollection.freeze(vault);
         var after = JSON.readTree(InterestingnessRestrictedCollection.audit(vault));
         assertNotEquals(first, second);
@@ -212,6 +214,11 @@ class InterestingnessRestrictedCollectionTest {
             vault, planFile, exchange, policy, ReviewOrigin.DEVELOPMENT_FIXTURE));
         assertFalse(Files.exists(vault));
         Files.writeString(packet, original);
+        Path stray = exchange.resolve("public/private-notes.json");
+        Files.writeString(stray, "private synthetic notes");
+        assertThrows(IllegalArgumentException.class, () -> InterestingnessRestrictedCollection.init(
+            vault, planFile, exchange, policy, ReviewOrigin.DEVELOPMENT_FIXTURE));
+        Files.delete(stray);
         String first = InterestingnessRestrictedCollection.init(vault, planFile, exchange, policy,
             ReviewOrigin.DEVELOPMENT_FIXTURE);
         Files.writeString(policy, "Different draft.");
