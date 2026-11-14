@@ -145,6 +145,36 @@ class InterestingnessRestrictedCollectionTest {
             .required("intake").required("decisions").size());
     }
 
+    @Test void externalCustodyRequiresQualificationAndDoesNotCountNonBlindExclusions() throws Exception {
+        prepare();
+        registration = InterestingnessRestrictedCollection.init(vault, planFile, exchange, policy, ReviewOrigin.EXTERNAL_EXPERT);
+        assertThrows(IllegalArgumentException.class, () -> submit(0, form(0)));
+        var conflict = form(0).put("disposition", "EXCLUDED").put("reason", "EXPOSURE")
+            .put("blind", false).put("independent", false);
+        conflict.remove(List.of("relevancePermille", "confidencePermille", "rationaleCodes"));
+        submit(0, conflict);
+        InterestingnessRestrictedCollection.freeze(vault);
+        var audit = JSON.readTree(InterestingnessRestrictedCollection.audit(vault));
+        assertEquals(0, audit.required("intake").required("decisions").size());
+        assertEquals("EXPOSURE", audit.required("slots").get(0).required("reason").asText());
+        assertFalse(audit.required("slots").get(0).required("blind").asBoolean());
+    }
+
+    @Test void aDisagreementSurvivesAlongsideTheOriginalFixtureReceipts() throws Exception {
+        start();
+        var first = form(0).put("relevancePermille", 0);
+        var second = form(1).put("relevancePermille", 1000);
+        submit(0, first);
+        submit(1, second);
+        InterestingnessRestrictedCollection.freeze(vault);
+        var audit = JSON.readTree(InterestingnessRestrictedCollection.audit(vault));
+        assertEquals(0, audit.required("slots").get(0).required("label").required("relevancePermille").asInt());
+        assertEquals(1000, audit.required("slots").get(1).required("label").required("relevancePermille").asInt());
+        for (var decision : audit.required("intake").required("decisions")) {
+            assertEquals("DEVELOPMENT_ONLY", decision.required("outcome").asText());
+        }
+    }
+
     @Test void rejectsModifiedPacketsAndDifferentRegistrationInputs() throws Exception {
         prepare();
         var packet = exchange.resolve("public/packets/" + assignments.get(0).required("packetId").asText() + ".json");

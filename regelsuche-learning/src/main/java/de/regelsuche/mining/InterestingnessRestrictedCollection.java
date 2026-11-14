@@ -36,6 +36,7 @@ public final class InterestingnessRestrictedCollection {
         "rationaleCodes", "qualificationEvidenceHash", "optionalProse", "reason");
     private static final Set<String> EXCLUSION_REASONS = Set.of("WITHDRAWN", "CONFLICT", "EXPOSURE", "INELIGIBLE");
     private static final String STATE = "collection.json";
+    private static final int MAX_FORM_BYTES = 64 * 1024;
 
     private InterestingnessRestrictedCollection() { }
 
@@ -62,7 +63,9 @@ public final class InterestingnessRestrictedCollection {
             }
             case "submit" -> {
                 require(args.length == 3, "submit requires vault and authenticated reviewer hash");
-                yield submit(root, args[2], new String(System.in.readAllBytes(), StandardCharsets.UTF_8));
+                var bytes = System.in.readNBytes(MAX_FORM_BYTES + 1);
+                require(bytes.length <= MAX_FORM_BYTES, "form too large");
+                yield submit(root, args[2], new String(bytes, StandardCharsets.UTF_8));
             }
             case "freeze" -> {
                 require(args.length == 2, "freeze requires vault");
@@ -145,6 +148,7 @@ public final class InterestingnessRestrictedCollection {
 
     /** reviewerHash comes from the custodian-authenticated delivery channel, never the form. */
     public static String submit(Path root, String reviewerHash, String formJson) throws IOException {
+        require(formJson.getBytes(StandardCharsets.UTF_8).length <= MAX_FORM_BYTES, "form too large");
         var form = JSON.readTree(formJson);
         require(form != null && form.isObject(), "expected one submission object");
         form.fieldNames().forEachRemaining(key -> require(FIELDS.contains(key), "unexpected form field"));
