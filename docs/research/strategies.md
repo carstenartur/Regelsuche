@@ -37,14 +37,14 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 ## Gelernte Zwischenform für Faktorisierung
 
 - **Hypothese.** Derselbe gelernte Plan lässt sich auf anders geschriebene univariate Polynome übertragen und spart gegenüber direkter Faktorisierung Arbeit.
-- **Umsetzungsstand.** Ausführbarer Versuch im festgeschriebenen PR-Stand.
+- **Umsetzungsstand.** Ausführbarer Versuch im Hauptzweig.
 - **Befund.** Der Plan erschloss zwei weitere Eingabeformen. Die Anwendung kostete 3.042 Koeffizientenprüfungen gegenüber 2.535 bei direkter Faktorisierung. Die direkte Variante löste auch den Fall mit ungeradem Linearkoeffizienten. [Versuch, Kosten und Reproduktion](https://github.com/carstenartur/Regelsuche/blob/9e072ef3bb4375f17adb107a340b22bfa328e89e/docs/trace-derived-polynomial-plans.md#übertragung-auf-andere-eingabeformen)
 - **Folgerung.** Eine Zwischenform erneut prüfen, wenn sie einen folgenden Suchschritt ersetzt oder eine direkt unerreichbare Lösung erschließt.
 - [`TracePlanTransferTest.java` im Versuchsstand](https://github.com/carstenartur/Regelsuche/blob/9e072ef3bb4375f17adb107a340b22bfa328e89e/regelsuche-learning/src/test/java/de/regelsuche/evolution/TracePlanTransferTest.java)
 
 Lerner und Strategieauswahl im aktuellen Checkout
 
-- [`ExactFinitePolynomialTraceLearner.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ExactFinitePolynomialTraceLearner.java#L35) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ExactFinitePolynomialTraceLearner.java | public final class ExactFinitePolynomialTraceLearner { -->
+- [`ExactFinitePolynomialTraceLearner.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ExactFinitePolynomialTraceLearner.java#L36) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ExactFinitePolynomialTraceLearner.java | public final class ExactFinitePolynomialTraceLearner { -->
 - [`FinitePolynomialStrategySearch.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/FinitePolynomialStrategySearch.java#L35) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/FinitePolynomialStrategySearch.java | public final class FinitePolynomialStrategySearch { -->
 
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
