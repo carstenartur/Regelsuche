@@ -17,6 +17,7 @@ import de.regelsuche.mining.OpenTargetConjectureEvidence.CampaignContext;
 import de.regelsuche.mining.OpenTargetConjectureEvidence.SeedProvenance;
 import de.regelsuche.mining.OpenTargetConjectureMiner;
 import de.regelsuche.mining.OpenTargetConjectureMiner.MiningReport;
+import de.regelsuche.mining.OpenTargetConjectureMiner.SupportScope;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetObservation;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
@@ -91,9 +92,9 @@ public final class AutonomousProductionMiningRunner {
         CampaignPlan plan = AutonomousCampaignArtifactsV2.plan(
             brief, List.of(fullDecision, rejectionDecision));
 
-        MiningBatch fullBatch = mineBatch(brief, plan, fullDecision, fullInputs);
+        MiningBatch fullBatch = mineBatch(brief, plan, fullDecision, fullInputs, SupportScope.CROSS_OBSERVATION);
         MiningBatch rejectionBatch = mineBatch(
-            brief, plan, rejectionDecision, rejectionInputs);
+            brief, plan, rejectionDecision, rejectionInputs, SupportScope.CROSS_OBSERVATION);
         validatePinnedOutcomes(fullBatch, rejectionBatch);
 
         CandidateFormationReceipt formationReceipt = formationReceipt(
@@ -171,24 +172,25 @@ public final class AutonomousProductionMiningRunner {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
-    private static MiningBatch mineBatch(
+    static MiningBatch mineBatch(
         AutonomousResearchBriefV2 brief,
         CampaignPlan plan,
         AggregateDecision decision,
-        List<GeneratedObservation> inputs
+        List<GeneratedObservation> inputs,
+        SupportScope scope
     ) {
         OpenTargetConjectureMiner miner = new OpenTargetConjectureMiner();
         List<OpenTargetObservation> replayed = inputs.stream()
             .map(AutonomousProductionMiningRunner::replayObservation)
             .toList();
-        MiningReport report = miner.mine(replayed);
+        MiningReport report = miner.mine(replayed, scope);
         MiningReport liveReport = miner.mine(inputs.stream()
             .map(item -> OpenTargetObservation.from(
                 item.snapshot().observationId(),
                 item.branch().familyId(),
                 item.seed().expression(),
                 item.searchResult()))
-            .toList());
+            .toList(), scope);
         if (!report.equals(liveReport)) {
             throw new IllegalStateException(
                 "immutable observation replay changed production mining evidence");
