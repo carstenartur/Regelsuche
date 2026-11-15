@@ -85,7 +85,12 @@ public final class RecurrenceInvariantSynthesis {
             var basis = RecurrenceInvariantSupport.basis(dimension, request.degree());
             work.add(basis.size());
             var images = RecurrenceInvariantSupport.images(request.transition(), work);
-            solveSigns(request, basis, basis, images, laws, false, work);
+            var blocks = coefficientBlocks(request, basis, work);
+            for (Evolution evolution : Evolution.values()) {
+                for (var block : blocks) {
+                    solveSign(request, block, block, images, evolution, laws, false, work);
+                }
+            }
             return new Report(Status.COMPLETE, laws, work.ledger());
         } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
             return new Report(Status.BUDGET_INCONCLUSIVE, List.of(), work.ledger());
@@ -144,6 +149,21 @@ public final class RecurrenceInvariantSynthesis {
         return offset.stream().allMatch(Rational::isZero);
     }
 
+    private static List<List<Monomial>> coefficientBlocks(Request request, List<Monomial> basis, Work work) {
+        if (!isHomogeneous(request.transition(), work)) return List.of(basis);
+        // Linear substitutions preserve total degree. The constant block cannot yield a law.
+        var blocks = new ArrayList<List<Monomial>>(request.degree());
+        for (int degree = 1; degree <= request.degree(); degree++) {
+            blocks.add(monomialsOfDegree(basis, degree, work));
+        }
+        return blocks;
+    }
+
+    private static List<Monomial> monomialsOfDegree(List<Monomial> basis, int degree, Work work) {
+        work.add(basis.size());
+        return basis.stream().filter(monomial -> monomial.totalDegree() == degree).toList();
+    }
+
     private static void solveFirstInBasis(Request request, List<Monomial> basis, List<Monomial> columns,
             List<String> images, boolean homogeneous, List<VerifiedLaw> laws, Work work) {
         if (!homogeneous) {
@@ -155,10 +175,7 @@ public final class RecurrenceInvariantSynthesis {
         if (restricted) work.add(columns.size());
         var support = restricted ? new HashSet<>(columns) : null;
         for (int degree = request.degree(); degree >= 1; degree--) {
-            int blockDegree = degree;
-            work.add(basis.size());
-            var rows = basis.stream().filter(monomial -> monomial.powers().values().stream()
-                .mapToInt(Integer::intValue).sum() == blockDegree).toList();
+            var rows = monomialsOfDegree(basis, degree, work);
             if (support != null) work.add(rows.size());
             var selected = support == null ? rows : rows.stream().filter(support::contains).toList();
             if (!selected.isEmpty()) {

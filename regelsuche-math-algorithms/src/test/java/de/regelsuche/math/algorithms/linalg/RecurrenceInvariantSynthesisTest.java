@@ -75,6 +75,22 @@ class RecurrenceInvariantSynthesisTest {
         check(exhausted.laws().isEmpty(), "no unverified claims on exhaustion");
     }
 
+    @Test void findsBothHomogeneousDegreesWithinOneBudgetInTheUsualOrder() {
+        var transition = transition(new long[][] {{0, 1, 0}, {1, 0, 0}, {0, 0, 2}}, 0, 0, 0);
+        var report = synthesis.solve(new Request(transition, values(2, 3, 7), 2, new Budget(10_000)));
+
+        equal(Status.COMPLETE, report.status());
+        equal(List.of(
+            new Proposal("x0 + x1", Evolution.FIXED),
+            new Proposal("x0*x1", Evolution.FIXED),
+            new Proposal("x0^2 + x1^2", Evolution.FIXED),
+            new Proposal("x0 - x1", Evolution.ALTERNATING),
+            new Proposal("x0^2 - x1^2", Evolution.ALTERNATING)
+        ), report.laws().stream().map(law -> law.proposal()).toList());
+        equal(values(5, 6, 13, -1, -5),
+            report.laws().stream().map(law -> law.initialValue()).toList());
+    }
+
     @Test void preservesOneBudgetAcrossEliminationAndProof() {
         var full = synthesis.solve(new Request(fibonacci(), values(0, 1), 2, BUDGET));
         int used = full.work().consumedWorkUnits();
@@ -293,6 +309,7 @@ class RecurrenceInvariantSynthesisTest {
         tests.transfersToPellAndExactRationalTransitions();
         tests.handlesAffineOffsetsAndDegenerateNullspaces();
         tests.distinguishesAnEmptyAnsatzFromAnExhaustedBudget();
+        tests.findsBothHomogeneousDegreesWithinOneBudgetInTheUsualOrder();
         tests.preservesOneBudgetAcrossEliminationAndProof();
         tests.rejectsForgedNoOpForeignAndSourceReboundClaims();
         tests.distinguishesFittingNumbersFromAUniversalStepIdentity();
