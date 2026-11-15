@@ -163,7 +163,7 @@
         },
         "oracleStatus": {
           "type": "string",
-          "pattern": "^(AGREE|DISAGREE|UNAVAILABLE|VALIDATOR_ERROR_[A-Za-z0-9_$]+|NOT_RUN_[A-Z_]+)$"
+          "pattern": "^(AGREE|DISAGREE|SAMPLE_AGREEMENT|SAMPLE_DISAGREEMENT|UNAVAILABLE|VALIDATOR_ERROR_[A-Za-z0-9_$]+|NOT_RUN_[A-Z_]+)$"
         },
         "oracleEvidence": {
           "type": "string"
@@ -246,6 +246,8 @@
         "evidenceStrength": {
           "enum": [
             "DETERMINISTIC_NUMERIC_SAMPLES",
+            "EXACT_RATIONAL_CONSTANT_COMPARISON",
+            "EXACT_UNIVARIATE_POLYNOMIAL_COMPARISON",
             "NORMALIZED_QUADRATIC_COEFFICIENTS",
             "NO_CLASSIFIED_INDEPENDENT_EQUALITY_EVIDENCE"
           ]

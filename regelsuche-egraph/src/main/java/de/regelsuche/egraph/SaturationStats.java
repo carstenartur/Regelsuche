@@ -36,7 +36,7 @@ public record SaturationStats(
 
     /** Why saturation stopped. */
     public enum Reason {
-        /** No progress, rule failures or incomplete owned matches — relative fix-point reached. */
+        /** All active native rules reached a relative fix-point without failures or incomplete matches. */
         FIX_POINT,
         /** Hit the configured iteration budget. */
         ITERATION_BUDGET,
@@ -49,7 +49,9 @@ public record SaturationStats(
         /** A guard remained undecided in the run's fixed assumption context. */
         UNDECIDED_GUARDS,
         /** A conditional application would exceed the retained guard decision budget. */
-        GUARD_BUDGET
+        GUARD_BUDGET,
+        /** Concrete callbacks inspect only selected child representatives. Closure is unverified. */
+        INCOMPLETE_REFERENCE_BRIDGE
     }
 
     public SaturationStats {

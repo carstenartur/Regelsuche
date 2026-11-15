@@ -200,7 +200,7 @@ def runComparativeBenchmarkImage = tasks.register(
         output.setExecutable(true, false)
         commandLine 'docker', 'run', '--rm',
             '-v', "${output.absolutePath}:/output",
-            comparativeImage, '/output'
+            comparativeImage, '--public', '.', '/output'
     }
 }
 
@@ -304,6 +304,7 @@ def verifyComparativeBenchmarks = tasks.register(
     inputs.file repositoryRoot.file(
         'scripts/verify-comparative-benchmark-reproducibility.py')
     inputs.file repositoryRoot.file('scripts/verify-comparative-benchmark.py')
+    inputs.file repositoryRoot.file('scripts/compose-public-benchmark.py')
     inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-a')
     inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-b')
     inputs.dir comparativeDockerOutput
@@ -322,13 +323,11 @@ def verifyComparativeBenchmarks = tasks.register(
             '--root', repositoryRoot.asFile.absolutePath,
             '--run-a', 'build/reports/comparative-ci/run-a',
             '--run-b', 'build/reports/comparative-ci/run-b',
-            '--container-run', 'build/reports/comparative-ci/run-docker'
+            '--container-run', 'build/reports/comparative-ci/run-docker',
+            '--hidden-rule-checkout', hiddenRuleCheckout.get().asFile.absolutePath,
+            '--hidden-rule-container', hiddenRuleContainer.get().asFile.absolutePath
     }
     doLast {
-        if (java.nio.file.Files.mismatch(hiddenRuleCheckout.get().asFile.toPath(),
-                hiddenRuleContainer.get().asFile.toPath()) != -1L) {
-            throw new GradleException('Hidden-rule comparison differs between the checkout and pinned image.')
-        }
         if (java.nio.file.Files.mismatch(preparationCheckout.get().asFile.toPath(),
                 preparationContainer.get().asFile.toPath()) != -1L) {
             throw new GradleException('Preparation ablation differs between the checkout and pinned image.')
@@ -351,6 +350,7 @@ def verifyComparativeBenchmarks = tasks.register(
 
 project(':app') {
     tasks.matching { candidate -> candidate.name == 'test' }.configureEach {
+        outputs.file hiddenRuleCheckout
         outputs.dir layout.buildDirectory.dir('reports/plugin-artifact-index')
         outputs.dir layout.buildDirectory.dir('reports/plugin-artifact-trust')
         outputs.dir layout.buildDirectory.dir('reports/plugin-trust-store-revision')

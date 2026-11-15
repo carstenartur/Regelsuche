@@ -14,6 +14,28 @@ public final class AutonomousCampaignFeedback {
     private AutonomousCampaignFeedback() {
     }
 
+    /** Dispatch eligible native continuations until exhaustion; return the number of consumed tickets. */
+    public static int continueEligible(List<ProductionCandidateContinuation> candidates, int tickets,
+            ProductionCandidateContinuation.DispatchSink sink) {
+        Objects.requireNonNull(sink, "sink");
+        if (tickets < 0) { throw new IllegalArgumentException("negative dispatch budget"); }
+        int remaining = tickets;
+        while (remaining > 0) {
+            int available = remaining;
+            var selected = candidates.stream()
+                .filter(candidate -> candidate.nextStage() != null && candidate.requiredTickets() <= available)
+                .min(java.util.Comparator
+                    .comparing(ProductionCandidateContinuation::nextStage).reversed()
+                    .thenComparingInt(ProductionCandidateContinuation::batch)
+                    .thenComparing(ProductionCandidateContinuation::id));
+            if (selected.isEmpty()) { break; }
+            var continuation = selected.get();
+            remaining -= continuation.requiredTickets();
+            continuation.advance(sink);
+        }
+        return tickets - remaining;
+    }
+
     public static FeedbackDecision complete(
         LifecycleRun lifecycle,
         CampaignPlan nextPlan

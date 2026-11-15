@@ -43,6 +43,8 @@ def verifyPaperFoundation = tasks.register(
     inputs.file(paperRepositoryRoot.file('research/benchmarks/candidate-independent/case-corpus.json'))
     inputs.file(paperRepositoryRoot.file('research/benchmarks/candidate-independent/corpus-freeze-receipt.json'))
     inputs.file(paperRepositoryRoot.file('docs/evidence/autopilot-controller-comparison-v1.json.gz'))
+    inputs.file(paperRepositoryRoot.file('scripts/paper_recurrence_results.py'))
+    inputs.file(paperRepositoryRoot.file('research/benchmarks/candidate-independent/track-c-recurrence/comparison-result.json'))
     inputs.file(paperManifest)
     inputs.file(paperManifestSchema)
     inputs.files(paperSources)

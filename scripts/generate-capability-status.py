@@ -567,12 +567,22 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
     root = args.repository_root.resolve()
     try:
+        from domain_qualification_sources import verify_qualification
+
+        if args.domain_report.resolve().parent != args.domain_run.resolve().parent:
+            raise ContractError("domain report and run must belong to the same retained source bundle")
+        domain_report = load_json(args.domain_report)
+        domain_run = load_json(args.domain_run)
+        try:
+            verify_qualification(args.domain_run.resolve().parent, domain_report, domain_run)
+        except (ValueError, OSError, KeyError, TypeError) as error:
+            raise ContractError(f"invalid domain source evidence: {error}") from error
         status = derive_status(
             root,
             load_json(args.release_report),
             load_json(args.release_run),
-            load_json(args.domain_report),
-            load_json(args.domain_run),
+            domain_report,
+            domain_run,
             args.repository_revision,
         )
         json_text = json.dumps(status, ensure_ascii=False, indent=2) + "\n"

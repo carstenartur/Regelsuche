@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
+import shutil
+import tempfile
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from domain_qualification_sources import verify_qualification
 
 try:
     from jsonschema import Draft202012Validator
@@ -72,18 +75,6 @@ def load(path: Path) -> dict:
         fail(f"cannot read {path}: {error}")
 
 
-def sha256(value: bytes) -> str:
-    return "sha256:" + hashlib.sha256(value).hexdigest()
-
-
-def java_bool(value: bool) -> str:
-    return "true" if value else "false"
-
-
-def java_list(values: list[str]) -> str:
-    return "[" + ", ".join(values) + "]"
-
-
 def require_nonempty(path: Path) -> None:
     require(path.is_file(), f"missing file: {path}")
     require(path.stat().st_size > 0, f"empty file: {path}")
@@ -91,6 +82,30 @@ def require_nonempty(path: Path) -> None:
 
 def require_rejection(validator: Draft202012Validator, value: dict, label: str) -> None:
     require(bool(list(validator.iter_errors(value))), f"{label} unexpectedly passed schema validation")
+
+
+def verify_source_rejection_controls(root, report, run):
+    def rejects(directory, supplied_report, supplied_run, reason):
+        try:
+            verify_qualification(directory, supplied_report, supplied_run)
+        except ValueError:
+            return
+        fail(f"accepted altered {reason}")
+
+    with tempfile.TemporaryDirectory() as temporary:
+        retained = Path(temporary) / "qualification"
+        shutil.copytree(root, retained)
+        # Byte drift replicated identically in every run must still fail the original byte hash.
+        for index in range(1, 4):
+            path = retained / f"runs/run-{index}/sequence/export-manifest.json"
+            path.write_bytes(path.read_bytes() + b"\n")
+        rejects(retained, report, run, "manifest originals")
+    forged = copy.deepcopy(report)
+    forged["domains"][0]["certificateHash"] = "sha256:" + "0" * 64
+    rejects(root, forged, run, "domain row")
+    forged = copy.deepcopy(report)
+    forged["cleanRunCount"] += 1
+    rejects(root, forged, run, "clean-run count")
 
 
 def main() -> int:
@@ -174,163 +189,9 @@ def main() -> int:
     require(run.get("domainGenericClaimAuthorized") is True, "run domain claim not authorized")
     require(run.get("autonomousCampaignClaimAuthorized") is False, "run broadened AUTONOMOUS_CAMPAIGN")
 
-    first_bytes: dict[tuple[str, str], bytes] = {}
-    fingerprints: list[str] = []
-    for clean_run in (1, 2, 3):
-        material: list[str] = []
-        for directory_name, expected_domain in (
-            ("expression", "expression-rewrite"),
-            ("sequence", "integer-sequence-finite-difference"),
-        ):
-            directory = ROOT / "runs" / f"run-{clean_run}" / directory_name
-            manifest_path = directory / "export-manifest.json"
-            receipt_path = (
-                ROOT / "runs" / f"run-{clean_run}" / "verification-receipts" / f"{directory_name}.json"
-            )
-            manifest = load(manifest_path)
-            receipt = load(receipt_path)
-            require(manifest.get("domainId") == expected_domain, "manifest domain identity drift")
-            require(receipt.get("domainId") == expected_domain, "receipt domain identity drift")
-            require(
-                receipt.get("manifestContentHash") == manifest.get("contentHash"),
-                "receipt/manifest hash mismatch",
-            )
-            require(receipt.get("identityBindingStatus") == "VERIFIED", "identity binding not verified")
-            require(
-                receipt.get("mathematicalValidationStatus") == "NOT_EVALUATED",
-                "export receipt inflated mathematical validation",
-            )
-            material.append(
-                expected_domain
-                + "|"
-                + manifest["contentHash"]
-                + "|"
-                + receipt["contentHash"]
-            )
-            for file_name in (
-                "domain.json",
-                "evidence.json",
-                "lifecycle-handoff.json",
-                "export-manifest.json",
-            ):
-                key = (directory_name, file_name)
-                retained = (directory / file_name).read_bytes()
-                if clean_run == 1:
-                    first_bytes[key] = retained
-                else:
-                    require(retained == first_bytes[key], f"clean-run byte drift: {key}")
-            key = (directory_name, "verification.json")
-            retained = receipt_path.read_bytes()
-            if clean_run == 1:
-                first_bytes[key] = retained
-            else:
-                require(retained == first_bytes[key], f"clean-run receipt drift: {key}")
-        fingerprint_material = (
-            "regelsuche.domain-generic-clean-run/v1\nexports="
-            + java_list(sorted(material))
-        ).encode("utf-8")
-        fingerprints.append(sha256(fingerprint_material))
+    verify_qualification(ROOT, report, run)
+    verify_source_rejection_controls(ROOT, report, run)
 
-    require(fingerprints == run.get("cleanRunFingerprints"), "clean-run fingerprints drift")
-    require(len(set(fingerprints)) == 1, "clean-run fingerprints are not identical")
-
-    domain_material: list[str] = []
-    for domain in domains:
-        domain_material.append(
-            "|".join(
-                [
-                    domain["domainId"],
-                    domain["domainRevision"],
-                    domain["stateType"],
-                    domain["candidateType"],
-                    domain["certificateType"],
-                    domain["domainDescriptorHash"],
-                    domain["discoveryEvidenceHash"],
-                    domain["lifecycleHandoffHash"],
-                    domain["exportVerificationHash"],
-                    domain["identityBindingStatus"],
-                    domain["outcome"],
-                    domain["selectedCandidateHash"],
-                    domain["certificateHash"],
-                    java_list(domain["resourceNames"]),
-                    java_bool(domain["resourcesBalanced"]),
-                    java_bool(domain["representationFreeHandoff"]),
-                    domain["proofStatus"],
-                    domain["externalNoveltyStatus"],
-                    domain["promotionStatus"],
-                    domain["publicEvidenceStatus"],
-                ]
-            )
-        )
-    check_material = [
-        check["code"]
-        + "|passed="
-        + java_bool(check["passed"])
-        + "|actual="
-        + check["actual"]
-        + "|required="
-        + check["required"]
-        for check in checks
-    ]
-    report_material = (
-        "regelsuche.domain-generic-discovery-qualification/v1"
-        + "\nprofile="
-        + report["profile"]
-        + "\nstatus="
-        + report["status"]
-        + "\ndomainGenericClaimAuthorized="
-        + java_bool(report["domainGenericClaimAuthorized"])
-        + "\nautonomousCampaignClaimAuthorized="
-        + java_bool(report["autonomousCampaignClaimAuthorized"])
-        + "\ncleanRunCount="
-        + str(report["cleanRunCount"])
-        + "\ncleanRunsIdentical="
-        + java_bool(report["cleanRunsIdentical"])
-        + "\ndomains="
-        + java_list(domain_material)
-        + "\nchecks="
-        + java_list(check_material)
-        + "\nblockers="
-        + java_list(report["blockers"])
-        + "\nproofStatus="
-        + report["proofStatus"]
-        + "\nexternalNoveltyStatus="
-        + report["externalNoveltyStatus"]
-        + "\npromotionStatus="
-        + report["promotionStatus"]
-        + "\npublicEvidenceStatus="
-        + report["publicEvidenceStatus"]
-    ).encode("utf-8")
-    require(report.get("contentHash") == sha256(report_material), "qualification report content hash drift")
-
-    require(run.get("profileCatalogHash") == sha256(catalog_path.read_bytes()), "profile catalog hash drift")
-    require(run.get("qualificationReportHash") == report.get("contentHash"), "run/report hash mismatch")
-    run_material = (
-        "regelsuche.domain-generic-discovery-qualification-run/v1"
-        + "\nprofileCatalogHash="
-        + run["profileCatalogHash"]
-        + "\nqualificationReportHash="
-        + run["qualificationReportHash"]
-        + "\ncleanRunFingerprints="
-        + java_list(run["cleanRunFingerprints"])
-        + "\ncleanRunsIdentical="
-        + java_bool(run["cleanRunsIdentical"])
-        + "\ndomainGenericQualificationStatus="
-        + run["domainGenericQualificationStatus"]
-        + "\ndomainGenericClaimAuthorized="
-        + java_bool(run["domainGenericClaimAuthorized"])
-        + "\nautonomousCampaignClaimAuthorized="
-        + java_bool(run["autonomousCampaignClaimAuthorized"])
-        + "\nproofStatus="
-        + run["proofStatus"]
-        + "\nexternalNoveltyStatus="
-        + run["externalNoveltyStatus"]
-        + "\npromotionStatus="
-        + run["promotionStatus"]
-        + "\npublicEvidenceStatus="
-        + run["publicEvidenceStatus"]
-    ).encode("utf-8")
-    require(run.get("contentHash") == sha256(run_material), "qualification run content hash drift")
 
     invalid_autonomy = copy.deepcopy(report)
     invalid_autonomy["autonomousCampaignClaimAuthorized"] = True

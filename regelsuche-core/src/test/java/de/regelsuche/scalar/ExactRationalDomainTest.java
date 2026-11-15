@@ -9,11 +9,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.math.BigInteger;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import org.junit.jupiter.api.Test;
 
 class ExactRationalDomainTest {
     private final ExactRationalDomain domain =
         new ExactRationalDomain();
+
+    @Test
+    void decimalDiagnosticsRetainPrecisionAndRoundingWithoutCreatingAnExactLeaf() {
+        var third = ExactRational.parse("1/3");
+        var up = new MathContext(3, RoundingMode.UP);
+        var down = new MathContext(3, RoundingMode.DOWN);
+        assertEquals("0.334", third.approximate(up).value().toPlainString());
+        assertEquals("0.333", third.approximate(down).value().toPlainString());
+        assertEquals(up, third.approximate(up).context());
+        assertNotEquals(ExactRational.ONE.approximate(up), ExactRational.ONE.approximate(down));
+        assertThrows(IllegalArgumentException.class, () -> third.approximate(MathContext.UNLIMITED));
+        assertThrows(ArithmeticException.class, () -> third.approximate(new MathContext(3, RoundingMode.UNNECESSARY)));
+    }
 
     @Test
     void valueOnlyAndEvidenceParsingEnforceTheSameGrammarAndLimits() {

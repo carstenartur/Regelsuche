@@ -7,6 +7,8 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.List;
@@ -32,11 +34,29 @@ public final class ComparativeBenchmarkMain {
             SharedFragmentRewriteBenchmark.write(Path.of(args[1]));
             return;
         }
+        if (args.length > 0 && "--public".equals(args[0])) {
+            if (args.length != 3) {
+                throw new IllegalArgumentException("expected --public <source-root> <output-directory>");
+            }
+            writePublic(Path.of(args[1]), Path.of(args[2]));
+            return;
+        }
         Path output = args.length == 0
             ? Path.of("build", "reports", "comparative-benchmarks")
             : Path.of(args[0]);
-        Report report = ComparativeBenchmarkRunner.system().run();
-        new ComparativeBenchmarkBundleWriter().write(output, report);
+        new ComparativeBenchmarkBundleWriter().write(output, ComparativeBenchmarkRunner.system().run());
+    }
+
+    private static void writePublic(Path repository, Path output) {
+        var report = ComparativeBenchmarkRunner.system().run();
+        verify(report);
+        try {
+            var attachments = PublicComparativeEvidence.read(repository, report.toCanonicalJson(),
+                SharedFragmentRewriteBenchmark.canonicalReport());
+            new ComparativeBenchmarkBundleWriter().write(output, report, attachments);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Could not verify public comparative evidence", failure);
+        }
     }
 
     static void verify(Report report) {

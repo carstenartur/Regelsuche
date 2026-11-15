@@ -72,8 +72,9 @@ class ReferenceIndependentCandidateValidationTest {
         var outcomes = Evidence.ARTIFACT.content().rows().stream()
             .flatMap(row -> row.outcomes().stream()).toList();
         assertTrue(outcomes.stream().anyMatch(outcome ->
-            outcome.validation().oracleStatus().equals("AGREE")
-                && outcome.evidenceStrength().equals("DETERMINISTIC_NUMERIC_SAMPLES")));
+            outcome.validation().oracleStatus().equals("SAMPLE_AGREEMENT")
+                && outcome.evidenceStrength().equals("DETERMINISTIC_NUMERIC_SAMPLES")
+                && !outcome.validation().intrinsicallyVerified()));
         assertTrue(outcomes.stream().allMatch(outcome ->
             outcome.formalProofStatus().equals("NOT_ESTABLISHED")
                 && outcome.primitiveReplayStatus().equals("FROZEN_LINEAGE_NOT_REPLAYED")));

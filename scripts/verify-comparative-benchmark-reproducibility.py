@@ -19,9 +19,9 @@ def require(condition: bool, message: str) -> None:
         fail(message)
 
 
-def validate(root: Path, verifier: Path) -> None:
+def validate(root: Path, verifier: Path, directory_option: str, *options: str) -> None:
     completed = subprocess.run(
-        [sys.executable, str(verifier), "--root", str(root)],
+        [sys.executable, str(verifier), directory_option, str(root), *options],
         check=False,
     )
     require(
@@ -77,10 +77,13 @@ def main() -> int:
     parser.add_argument("--run-a", type=Path, required=True)
     parser.add_argument("--run-b", type=Path, required=True)
     parser.add_argument("--container-run", type=Path, required=True)
+    parser.add_argument("--hidden-rule-checkout", type=Path, required=True)
+    parser.add_argument("--hidden-rule-container", type=Path, required=True)
     args = parser.parse_args()
 
     root = args.root.resolve()
     verifier = root / "scripts/verify-comparative-benchmark.py"
+    composer = root / "scripts/compose-public-benchmark.py"
     run_a = (root / args.run_a).resolve() if not args.run_a.is_absolute() else args.run_a
     run_b = (root / args.run_b).resolve() if not args.run_b.is_absolute() else args.run_b
     container_run = (
@@ -92,7 +95,12 @@ def main() -> int:
     try:
         require(verifier.is_file(), f"missing benchmark verifier: {verifier}")
         for retained_root in (run_a, run_b, container_run):
-            validate(retained_root, verifier)
+            validate(retained_root, verifier, "--root")
+        validate(run_a, composer, "--bundle", "--hidden-rule-replay",
+                 str(root / args.hidden_rule_checkout), "--hidden-rule-replay",
+                 str(root / args.hidden_rule_container))
+        for retained_root in (run_b, container_run):
+            validate(retained_root, composer, "--bundle")
         compare(run_a, run_b, "gradle-repeat")
         compare(run_a, container_run, "gradle-container")
     except (RuntimeError, OSError, ValueError) as error:

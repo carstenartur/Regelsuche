@@ -10,6 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "research/benchmarks/comparative-v2"
 POLICY = "NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY"
+HIDDEN_RULE_REPLAY_BYTES = 121655
+HIDDEN_RULE_REPLAY_SHA256 = "dd7dc15f2455727d8a9bf1d7b4782085e40ef29da5f40797767f2424bda7b9ce"
 
 
 def require(value, message):
@@ -44,6 +46,26 @@ def legacy_track(data, track):
 def hidden(data):
     return {"informationParity": data["informationParity"],
             "profiles": {k: select(v, "summary", "failureTaxonomy") for k, v in data["profiles"].items()}}
+
+
+def verify_hidden_rule_replay(frozen, replay):
+    expected = json.loads(frozen)
+    for profile in ("best-first", "project-a-star"):
+        cases = [row for row in expected["profiles"][profile]["cases"] if row["opaqueCaseId"] == "case-002"]
+        require(len(cases) == 1, f"frozen case-002 must occur once in {profile}")
+        searches = cases[0]["validation"]["counterexampleSearches"]
+        require(len(searches) == 1, f"frozen case-002 must retain one search in {profile}")
+        sources = searches[0]["attemptedSources"]
+        require(sources.count("matrix-non-commutative") == 1,
+                f"frozen case-002 must retain one matrix source in {profile}")
+        sources.remove("matrix-non-commutative")
+
+    expected_bytes = json.dumps(expected, separators=(",", ":"), ensure_ascii=False).encode()
+    require(replay == expected_bytes,
+            "exact-validation hidden-rule replay differs beyond the two case-002 matrix-source omissions")
+    require(len(replay) == HIDDEN_RULE_REPLAY_BYTES
+            and hashlib.sha256(replay).hexdigest() == HIDDEN_RULE_REPLAY_SHA256,
+            "exact-validation hidden-rule replay digest differs from the integrated validator")
 
 
 def grammar(data, inventory, form):
@@ -158,8 +180,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true", help="regenerate the checked-in canonical publication")
     parser.add_argument("--bundle", type=Path, help="check the detached published evidence and legacy aggregate")
+    parser.add_argument("--hidden-rule-replay", action="append", type=Path, default=[],
+                        help="verify a fresh Track B run against the integrated validator's pinned replay")
     args = parser.parse_args()
     registry = json.loads((PUBLIC / "sources.json").read_bytes())
+    expected_composition = registry.pop("compositionSha256")
     sources = {}
     raw = {}
     for key, item in registry.items():
@@ -169,7 +194,16 @@ def main():
                 else read_source(ROOT / source["path"]))
         require(hashlib.sha256(data).hexdigest() == source["sha256"] and len(data) == source["bytes"], key)
         sources[key], raw[key] = source, data
+    replays = [path.read_bytes() for path in args.hidden_rule_replay]
+    for replay in replays:
+        verify_hidden_rule_replay(raw["hidden-rule-current"], replay)
+    if replays:
+        require(all(replay == replays[0] for replay in replays), "hidden-rule replays differ between environments")
+        print(f"Track B integrated replay: {HIDDEN_RULE_REPLAY_BYTES} bytes; SHA-256 {HIDDEN_RULE_REPLAY_SHA256}")
     rendered = canonical(compose(raw, sources))
+    composition_sha256 = hashlib.sha256(rendered).hexdigest()
+    require(composition_sha256 == expected_composition,
+            f"public composition digest differs: {composition_sha256}")
     if args.write:
         require(not args.bundle, "cannot update a detached publication")
         (PUBLIC / "report.json").write_bytes(rendered)
@@ -179,7 +213,7 @@ def main():
         require((args.bundle / "report.json").read_bytes() == raw["legacy"], "legacy run differs")
         files = {p.relative_to(args.bundle / "v2").as_posix() for p in (args.bundle / "v2").rglob("*") if p.is_file()}
         require(files == {"report.json", *(s["attachment"] for s in sources.values())}, "public evidence inventory differs")
-    print(f"public comparative v2: {len(sources)} artifacts; SHA-256 {hashlib.sha256(rendered).hexdigest()}")
+    print(f"public comparative v2: {len(sources)} artifacts; SHA-256 {composition_sha256}")
 
 
 if __name__ == "__main__":

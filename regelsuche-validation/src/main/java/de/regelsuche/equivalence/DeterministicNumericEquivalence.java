@@ -6,24 +6,13 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
-import de.regelsuche.parse.ExpressionParser;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 final class DeterministicNumericEquivalence {
-    private final ExpressionParser parser = new ExpressionParser();
-
-    Boolean areEquivalent(String leftExpression, String rightExpression) {
-        Expr left;
-        Expr right;
-        try {
-            left = parser.parseTerm(leftExpression);
-            right = parser.parseTerm(rightExpression);
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
+    Boolean areEquivalent(Expr left, Expr right) {
         Set<String> variables = new HashSet<>();
         collectVariables(left, variables);
         collectVariables(right, variables);
@@ -61,7 +50,7 @@ final class DeterministicNumericEquivalence {
 
     private double evaluate(Expr expression, Map<String, Double> variables) {
         if (expression instanceof NumberExpr numberExpr) {
-            return numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue();
+            return numberExpr.value().approximate(java.math.MathContext.DECIMAL128).value().doubleValue();
         }
         if (expression instanceof VariableExpr variableExpr) {
             return variables.getOrDefault(variableExpr.name(), 0.0);

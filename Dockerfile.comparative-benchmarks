@@ -36,6 +36,11 @@ COPY --from=build \
     /workspace/regelsuche-benchmarks/build/install/regelsuche-benchmarks/ ./
 COPY --from=build /workspace/app/build/reports/hidden-rule-pilot/comparison.json ./hidden-rule-comparison.json
 COPY --from=build /workspace/regelsuche-experiments/build/reports/preparation-ablation/ /opt/regelsuche-benchmarks/preparation-ablation/
+COPY --from=build /workspace/research/benchmarks/ ./research/benchmarks/
+COPY --from=build /workspace/docs/evidence/ ./docs/evidence/
+COPY --from=build /workspace/docs/autopilot-controller-comparison.md \
+    /workspace/docs/discovery-component-panel-protocol.md \
+    /workspace/docs/open-target-fan-in-control.md ./docs/
 RUN chown -R regelsuche:regelsuche /opt/regelsuche-benchmarks
 
 ENV HOME=/tmp
@@ -46,4 +51,4 @@ RUN /opt/regelsuche-sympy/bin/python /opt/regelsuche-sympy-reference/reference.p
 VOLUME ["/output"]
 
 ENTRYPOINT ["./bin/regelsuche-benchmarks"]
-CMD ["/output"]
+CMD ["--public", ".", "/output"]
