@@ -68,6 +68,8 @@ zweier Ganzzahlliterale dar.
   `9007199254740992` und `9007199254740993` unterscheidbar. Division durch
   null und überschrittene Auswertungsgrenzen ergeben `UNAVAILABLE`.
   Exakte univariate Polynome vergleicht der Dienst anhand ihrer rationalen Normalformen.
+  Der multivariate Normalformprüfer kann Nenner, die sich exakt zu einer
+  von null verschiedenen Konstanten vereinfachen, in rationale Koeffizienten überführen.
   Die polynomiale Normalform verwendet die formale Konvention für die
   nullte Potenz. Die Prüfung reeller Umformungspfade kontrolliert separat
   die Definitionsbedingungen ihrer Zwischenausdrücke.
