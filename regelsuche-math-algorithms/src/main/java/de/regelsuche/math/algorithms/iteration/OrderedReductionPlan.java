@@ -57,23 +57,25 @@ public record OrderedReductionPlan(List<Term> terms, List<Lookup> lookups, Optio
 
     static Verification verify(OrderedReduction source, OrderedReductionPlan plan, boolean windows,
             IterationLimits limits, BooleanSupplier cancellation) {
-        Objects.requireNonNull(source);
-        Objects.requireNonNull(plan);
         var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
         try {
-            checkSchedule(source, plan, windows, work);
-            var original = IterationPolynomial.parseOrderedSummand(source, work);
-            var reconstruction = IterationPolynomial.zero(work);
-            for (var term : plan.terms()) {
-                var monomial = symbols(source, term, work);
-                reconstruction = reconstruction.add(IterationPolynomial.single(
-                    monomial, ExactRational.integer(term.coefficient()), work));
-            }
-            if (!reconstruction.same(original)) throw new Unavailable("ORDERED_IDENTITY_MISMATCH");
-            return new Verification(Optional.of(new Verified(source, plan)), "VERIFIED", work.used());
+            return new Verification(Optional.of(check(source, plan, windows, work)), "VERIFIED", work.used());
         } catch (Unavailable unavailable) {
             return new Verification(Optional.empty(), unavailable.getMessage(), work.used());
         }
+    }
+
+    static Verified check(OrderedReduction source, OrderedReductionPlan plan, boolean windows, Work work) {
+        checkSchedule(source, plan, windows, work);
+        var original = IterationPolynomial.parseOrderedSummand(source, work);
+        var reconstruction = IterationPolynomial.zero(work);
+        for (var term : plan.terms()) {
+            var monomial = symbols(source, term, work);
+            reconstruction = reconstruction.add(IterationPolynomial.single(
+                monomial, ExactRational.integer(term.coefficient()), work));
+        }
+        if (!reconstruction.same(original)) throw new Unavailable("ORDERED_IDENTITY_MISMATCH");
+        return new Verified(source, plan);
     }
 
     private static IterationPolynomial.Monomial symbols(OrderedReduction source, Term term, Work work) {
