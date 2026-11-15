@@ -1,0 +1,116 @@
+{
+  "revision": "f7f244c4488ea09413861028e956c97c18a6fed9",
+  "tree": "145229c9640f164e62b236274d7c664a024abab4",
+  "event": "push",
+  "branch": "main",
+  "run": 43684112280,
+  "attempt": 1,
+  "conclusion": "cancelled",
+  "verificationConclusion": "success",
+  "url": "https://github.com/carstenartur/Regelsuche/actions/runs/43684112280",
+  "successfulJobs": [
+    {
+      "id": 132720841024,
+      "name": "Checked Lean and SMT proof authority",
+      "conclusion": "success"
+    },
+    {
+      "id": 132720841197,
+      "name": "Isolated JMH authority",
+      "conclusion": "success"
+    },
+    {
+      "id": 132720841201,
+      "name": "External polynomial comparison",
+      "conclusion": "success"
+    },
+    {
+      "id": 132720841204,
+      "name": "Isolated SymPy runtime authority",
+      "conclusion": "success"
+    },
+    {
+      "id": 132720841291,
+      "name": "Typed source-only learning comparison",
+      "conclusion": "success"
+    },
+    {
+      "id": 132720841293,
+      "name": "Checkout-local Gradle authority",
+      "conclusion": "success"
+    },
+    {
+      "id": 132720841309,
+      "name": "Complete Maven product and Docker authority",
+      "conclusion": "success"
+    },
+    {
+      "id": 132731169457,
+      "name": "Checkout-local ciCheck",
+      "conclusion": "success"
+    }
+  ],
+  "downstreamReportPublication": {
+    "id": 132732666831,
+    "name": "Publish generated reports",
+    "conclusion": "cancelled"
+  },
+  "archiveId": 14151470780,
+  "archiveBytes": 29194130,
+  "archiveSha256": "sha256:5fab96eb372e26b7ffe61385c6da454f2d5ab1998a7091c599c078aa0d2a35af",
+  "archiveIndex": {
+    "path": "index.json",
+    "sha256": "e695223c58e1bd386d25d99336d8b79c50bdd7677ef492d8463104169f59121c",
+    "checkout": {
+      "revision": "f7f244c4488ea09413861028e956c97c18a6fed9",
+      "trackedChangesPresent": false,
+      "tree": "145229c9640f164e62b236274d7c664a024abab4"
+    },
+    "verifiedFileCount": 287
+  },
+  "retainedArchiveMembers": [
+    {
+      "localFile": "previous-baseline.json",
+      "archivePath": "files/ai-knowledge/complexity-baseline.json",
+      "sha256": "5a9584fb06a1f72bc5591a7c1a09b8580d85edce9a52d91f3065932e7426dbaa"
+    },
+    {
+      "localFile": "accepted-complexity.json",
+      "archivePath": "files/build/ai-knowledge/complexity.json",
+      "sha256": "2d5b60e57427a8c54afe01c5df6ab005bc380ae9473d313c4324152c2ce95037"
+    },
+    {
+      "localFile": "accepted-check.json",
+      "archivePath": "files/build/ai-knowledge/check.json",
+      "sha256": "3d3786f0ce7f7d76b881baec38763fe1b9566fe46e7630d68639a30544868a4c"
+    }
+  ],
+  "rejectedMeasurement": {
+    "revision": "9acff85470dcf90b75eeaa8c76f22788c50af8d3",
+    "workflowRun": 43687276553,
+    "job": 132730268331,
+    "artifactId": 14150183851,
+    "artifactSha256": "8049c60cad5a598c29c2bf6bd43fbf896a388529d20709bf17b32bfa402c6b65",
+    "archiveMember": "build/ai-knowledge/trend.json",
+    "retainedFile": "rejected-trend.json",
+    "sha256": "ae1775750322ece1693849fcab2f17c70f5c451ed142cbee6c94d69cc852bb87",
+    "estimatedContextTokens": 789720,
+    "contextTokenIncrease": 15400,
+    "contextTokenAllowance": 15000,
+    "usedAsBaseline": false
+  },
+  "baselineProjection": {
+    "extractorTag": "v0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "source": "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java",
+    "sourceSha256": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae",
+    "method": "TrendAnalyzer.snapshot and StableIo.writeJson on accepted-complexity.json",
+    "sha256": "1875bcf469b274e020dc0dcc2f91827f24c3c0b58e96283e4a93b66851878f9f",
+    "trendAgainstPreviousBaseline": {
+      "passed": true,
+      "contextTokenIncrease": 12860,
+      "contextTokenAllowance": 15000
+    },
+    "newDeltaOnRejectedMeasurement": 2540.0
+  }
+}
