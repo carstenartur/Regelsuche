@@ -61,6 +61,33 @@ aus. Checker-Capability und Checkerrevision sind fest an den exakten endlichen
 Polynomsolver gebunden. Zusätzliche Selektionsschritte, ausgetauschte
 Hole-Grammatiken oder ein anderer Checker werden abgelehnt.
 
+## Begrenzte univariate Monombasis (Teilumfang #874)
+
+Die deklarierte Ansatzformation kann eine endliche Monombasis ohne Kenntnis
+eines gewünschten Endausdrucks generieren:
+
+```java
+var basis = FinitePolynomialTemplate.declaredUnivariateMonomialBasis(
+    "public-quadratic-basis", 2, -2, 2);
+var ansatz = basis.instantiateVariable("x");
+```
+
+Für Grad 2 ist das Template
+`${coef0} + ${coef1}*@v + ${coef2}*@v^2` mit drei exakten
+Koeffizientenlücken. Die Domänen sind vor dem Solver eingefroren. Der
+bestehende Planresolver bindet Quelle, Template, Domänen, Limits und
+Checkerrevision in seine Formationsevidenz; erst die vollständige
+Polynomprüfung bestätigt einzelne Belegungen. Ein negatives Ergebnis gilt
+nur für den deklarierten endlichen Suchraum.
+
+Aktuell sind Grade 1 bis 7 zulässig (höchstens acht Lücken); die bestehende
+Grenze von 100.000 vollständigen Belegungen und die Domänengrenzen werden
+nicht angehoben. Dies ist weder eine multivariate Monombasis noch eine
+automatisch gelernte Grammatik, kein allgemeiner nichtlinearer
+Koeffizientensolver und kein formaler Beweis. Die übrigen Schritte von #874
+bleiben offen. Die Charakterisierung führt einen vollständigen positiven
+und einen vollständigen negativen Solverlauf sowie Grenzfalltests aus.
+
 ## Resolution
 
 Der Resolver führt den vollständigen endlichen Solverlauf selbst aus. Für jede
