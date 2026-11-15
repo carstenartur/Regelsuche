@@ -6,6 +6,7 @@ import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.RowOrigin;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier.VerifiedLaw;
 import de.regelsuche.parse.ExpressionParser;
@@ -15,13 +16,14 @@ import de.regelsuche.representation.RepresentationBridge.WorkLedger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
  * Synthesizes degree-one/two laws of an explicitly supplied affine rational recurrence.
- * Coefficient equations use the existing matrix bridge and exact RREF solver.
- * No historical formula, sample sequence or desired answer enters candidate formation.
+ * Typed monomial images of the transition feed the exact RREF solver.
+ * Every resulting law is checked by an independent symbolic substitution.
  */
 public final class RecurrenceInvariantSynthesis {
     public enum Evolution {
@@ -84,11 +86,11 @@ public final class RecurrenceInvariantSynthesis {
             int dimension = request.transition().linear().columns();
             var basis = RecurrenceInvariantSupport.basis(dimension, request.degree());
             work.add(basis.size());
-            var images = RecurrenceInvariantSupport.images(request.transition(), work);
             var blocks = coefficientBlocks(request, basis, work);
+            var images = RecurrenceInvariantSupport.liftedImages(request.transition(), basis, work);
             for (Evolution evolution : Evolution.values()) {
                 for (var block : blocks) {
-                    solveSign(request, block, block, images, evolution, laws, false, work);
+                    solveLiftedBlock(request, block, images, evolution, laws, work);
                 }
             }
             return new Report(Status.COMPLETE, laws, work.ledger());
@@ -194,6 +196,34 @@ public final class RecurrenceInvariantSynthesis {
         return ordered.size() == support.size() ? ordered : List.of();
     }
 
+    private static void solveLiftedBlock(Request request, List<Monomial> block, Map<Monomial, Polynomial> images,
+            Evolution evolution, List<VerifiedLaw> laws, Work work) {
+        var rows = new ArrayList<List<Rational>>(block.size());
+        var variables = new ArrayList<String>(block.size());
+        var origins = new ArrayList<RowOrigin>(block.size());
+        var multiplier = Rational.of(evolution.multiplier());
+        for (int row = 0; row < block.size(); row++) {
+            var monomial = block.get(row);
+            work.add(3);
+            variables.add("k" + row);
+            origins.add(new RowOrigin(row, "coefficient of " + monomial.key()));
+            var coefficients = new ArrayList<Rational>(block.size());
+            for (int column = 0; column < block.size(); column++) {
+                work.add(1);
+                var coefficient = images.get(block.get(column)).terms().getOrDefault(monomial, Rational.ZERO);
+                if (row == column) {
+                    work.add(1);
+                    coefficient = coefficient.subtract(multiplier);
+                }
+                coefficients.add(coefficient);
+            }
+            rows.add(coefficients);
+        }
+        var reduced = new ExactRrefSolver().solveHomogeneous(new ExactMatrix(rows), variables, origins,
+            new Budget(work.remaining()));
+        admitReduction(request, block, evolution, reduced, laws, false, work);
+    }
+
     private static void solveSigns(Request request, List<Monomial> rows, List<Monomial> columns, List<String> images,
             List<VerifiedLaw> laws, boolean firstOnly, Work work) {
         for (Evolution evolution : Evolution.values()) {
@@ -211,12 +241,17 @@ public final class RecurrenceInvariantSynthesis {
             throw new RecurrenceInvariantSupport.Exhausted();
         var system = matrix.representation().orElseThrow(() -> new IllegalStateException("affine coefficient bridge failed"));
         var reduced = new ExactRrefSolver().solve(system, new Budget(work.remaining()));
+        admitReduction(request, columns, evolution, reduced, laws, firstOnly, work);
+    }
+
+    private static void admitReduction(Request request, List<Monomial> columns, Evolution evolution,
+            ExactRrefSolver.Result reduced, List<VerifiedLaw> laws, boolean firstOnly, Work work) {
         work.add(reduced.work().consumedWorkUnits());
         if (reduced.status() == ExactRrefSolver.Status.BUDGET_INCONCLUSIVE)
             throw new RecurrenceInvariantSupport.Exhausted();
         var reduction = reduced.reduction().orElseThrow(() -> new IllegalStateException("coefficient reduction failed"));
         for (var vector : reduction.nullspaceBasis()) {
-            var polynomial = reconstruct(columns, system.variables(), vector, work);
+            var polynomial = reconstruct(columns, reduction.variables(), vector, work);
             if (polynomial.totalDegree() == 0) continue;
             String text = polynomial.toCanonicalString();
             // Keep the representation guard; never silently drop a direction while claiming COMPLETE.

@@ -3,6 +3,7 @@ package de.regelsuche.math.algorithms.linalg;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.RowOrigin;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
 import de.regelsuche.math.algorithms.linalg.ExactRrefReduction.CapabilityFrontier;
 import de.regelsuche.math.algorithms.linalg.ExactRrefReduction.Pivot;
@@ -36,10 +37,22 @@ public final class ExactRrefSolver {
 
     public Result solve(ExactLinearSystem source, Budget budget) {
         Objects.requireNonNull(source, "source");
+        return solve(source.coefficients(), source.rightHandSide(), source.variables(), source.rowOrigins(),
+            source, budget);
+    }
+
+    /** Uses the reduction itself to establish rank for a source that is already an exact coefficient matrix. */
+    Result solveHomogeneous(ExactMatrix coefficients, List<String> variables, List<RowOrigin> origins, Budget budget) {
+        var zero = new ExactVector(Collections.nCopies(coefficients.rowCount(), Rational.ZERO));
+        return solve(coefficients, zero, variables, origins, null, budget);
+    }
+
+    private Result solve(ExactMatrix coefficients, ExactVector rightHandSide, List<String> variables,
+            List<RowOrigin> origins, ExactLinearSystem declared, Budget budget) {
         Objects.requireNonNull(budget, "budget");
         WorkCounter work = new WorkCounter(budget.maxWorkUnits());
         try {
-            MutableAugmentedMatrix matrix = copy(source, work);
+            MutableAugmentedMatrix matrix = copy(coefficients, rightHandSide, work);
             List<RowOperation> operations = new ArrayList<>();
             List<Pivot> coefficientPivots = new ArrayList<>();
             int pivotRow = 0;
@@ -100,15 +113,17 @@ public final class ExactRrefSolver {
                     ? SolutionClassification.UNIQUE
                     : SolutionClassification.UNDERDETERMINED
                 : SolutionClassification.INCONSISTENT;
-            if (source.coefficientRank() != coefficientRank
-                    || source.augmentedRank() != augmentedRank
-                    || source.solutionClassification() != classification) {
+            if (declared != null && (declared.coefficientRank() != coefficientRank
+                    || declared.augmentedRank() != augmentedRank
+                    || declared.solutionClassification() != classification)) {
                 return Result.withoutReduction(
                     Status.INVALID_SOURCE,
                     work.ledger(),
                     "SOURCE_RANK_METADATA_MISMATCH");
             }
 
+            ExactLinearSystem source = declared != null ? declared : new ExactLinearSystem(coefficients,
+                variables, rightHandSide, origins, coefficientRank, augmentedRank, classification);
             ExactMatrix reducedCoefficients = reducedCoefficients(matrix);
             ExactVector reducedRightHandSide = reducedRightHandSide(matrix);
             List<Integer> freeColumns = freeColumns(
@@ -172,21 +187,25 @@ public final class ExactRrefSolver {
         ExactLinearSystem source,
         WorkCounter work
     ) {
-        List<List<Rational>> rows = new ArrayList<>(source.equationCount());
-        for (int row = 0; row < source.equationCount(); row++) {
+        return copy(source.coefficients(), source.rightHandSide(), work);
+    }
+
+    private static MutableAugmentedMatrix copy(ExactMatrix coefficients, ExactVector rightHandSide, WorkCounter work) {
+        List<List<Rational>> rows = new ArrayList<>(coefficients.rowCount());
+        for (int row = 0; row < coefficients.rowCount(); row++) {
             List<Rational> retained = new ArrayList<>(
-                source.variableCount() + 1);
+                coefficients.columns() + 1);
             for (int column = 0;
-                    column < source.variableCount();
+                    column < coefficients.columns();
                     column++) {
                 work.consume();
-                retained.add(source.coefficients().get(row, column));
+                retained.add(coefficients.get(row, column));
             }
             work.consume();
-            retained.add(source.rightHandSide().get(row));
+            retained.add(rightHandSide.get(row));
             rows.add(retained);
         }
-        return new MutableAugmentedMatrix(rows, source.variableCount());
+        return new MutableAugmentedMatrix(rows, coefficients.columns());
     }
 
     private static int findPivot(

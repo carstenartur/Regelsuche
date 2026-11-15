@@ -17,6 +17,7 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,35 +28,59 @@ import static org.junit.jupiter.api.Assertions.*;
 class CoupledRecurrenceExperimentTest {
     private static final String PROTOCOL = "config/benchmarks/coupled-recurrence-v1.json";
     private static final String DIGEST = "c2a45639714bb4fd990d31e4625e7b9de4185b65e0d5e37f801b0fc769a91b4a";
-    private static final String RECEIPT = "docs/research/coupled-recurrence-v1/degree-blocks.tsv";
+    private static final Path RECEIPTS = Path.of("docs/research/coupled-recurrence-v1");
 
     @Test
     void measuresCompleteSynthesisOnEveryCoupledTransition() throws IOException {
         var checkout = StateChoiceOraclePanel.load().checkout();
-        var protocol = read(checkout.resolve(PROTOCOL), DIGEST);
+        var protocol = protocol(checkout);
+        var requests = requests(protocol);
         var receipt = new StringBuilder();
         row(receipt, "case", "family", "budget", "status", "fixed", "alternating", "formation", "proof", "query",
             "total", "lawsAndValues");
         for (var raw : array(protocol.get("cases"))) {
-            measure(receipt, protocol, object(raw));
+            var fixture = object(raw);
+            measure(receipt, protocol, fixture, requests.get(fixture.get("id")));
         }
+        var baseline = Files.readString(checkout.resolve(RECEIPTS).resolve("degree-blocks.tsv"));
+        assertEquals(results(baseline), results(receipt.toString()), "same ordered laws and trajectory values");
         var output = System.getProperty("coupledRecurrenceOutput");
         if (output == null) {
-            assertEquals(Files.readString(checkout.resolve(RECEIPT)), receipt.toString());
+            assertEquals(Files.readString(checkout.resolve(RECEIPTS).resolve("typed-coefficients.tsv")), receipt.toString());
         } else {
             Files.writeString(Path.of(output), receipt.toString());
         }
     }
 
-    private static void measure(StringBuilder receipt, Map<?, ?> protocol, Map<?, ?> fixture) {
+    static Map<String, Object> protocol(Path checkout) throws IOException {
+        return read(checkout.resolve(PROTOCOL), DIGEST);
+    }
+
+    static Map<String, Request> requests(Map<?, ?> protocol) {
+        var requests = new LinkedHashMap<String, Request>();
+        int budget = number(protocol, "workBudget") - number(protocol, "queryReserve");
+        int degree = number(protocol, "degree");
+        for (var raw : array(protocol.get("cases"))) {
+            var fixture = object(raw);
+            var transition = new Transition(new ExactMatrix(array(fixture.get("linear")).stream()
+                .map(RecurrenceExperimentTrajectories::vector).toList()), new ExactVector(vector(fixture.get("offset"))));
+            requests.put((String) fixture.get("id"), new Request(transition, vector(fixture.get("initial")), degree, new Budget(budget)));
+        }
+        return requests;
+    }
+
+    private static List<List<String>> results(String receipt) {
+        return receipt.lines().skip(1).map(line -> {
+            var cells = line.split("\\t", 11);
+            return List.of(cells[0], cells[3], cells[4], cells[5], cells[8], cells[10]);
+        }).toList();
+    }
+
+    private static void measure(StringBuilder receipt, Map<?, ?> protocol, Map<?, ?> fixture, Request request) {
         var id = (String) fixture.get("id");
-        var transition = new Transition(new ExactMatrix(array(fixture.get("linear")).stream()
-            .map(RecurrenceExperimentTrajectories::vector).toList()), new ExactVector(vector(fixture.get("offset"))));
-        var initial = vector(fixture.get("initial"));
         int budget = number(protocol, "workBudget");
         int reserve = number(protocol, "queryReserve");
         var indices = array(protocol.get("indices")).stream().map(v -> ((Number) v).intValue()).toList();
-        var request = new Request(transition, initial, number(protocol, "degree"), new Budget(budget - reserve));
         var report = new RecurrenceInvariantSynthesis().solve(request);
         assertEquals(Status.COMPLETE, report.status(), id);
         long fixed = report.laws().stream().filter(law -> law.proposal().evolution() == Evolution.FIXED).count();
@@ -67,7 +92,7 @@ class CoupledRecurrenceExperimentTest {
         var lawValues = new ArrayList<String>();
         int proof = 0;
         for (var law : report.laws()) {
-            var replay = verifier.verify(transition, law.proposal(), initial, request.budget());
+            var replay = verifier.verify(request.transition(), law.proposal(), request.initialState(), request.budget());
             var proofLaw = replay.law().orElseThrow(() -> new AssertionError(id + ": " + replay.outcome()));
             assertEquals(law.initialValue(), proofLaw.initialValue(), id);
             proof += replay.work().consumedWorkUnits();

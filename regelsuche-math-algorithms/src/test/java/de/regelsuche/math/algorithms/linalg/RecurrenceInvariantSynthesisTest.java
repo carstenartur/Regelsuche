@@ -91,6 +91,21 @@ class RecurrenceInvariantSynthesisTest {
             report.laws().stream().map(law -> law.initialValue()).toList());
     }
 
+    @Test void derivesTheCoupledAffineLawWithinTheTypedCoefficientBudget() {
+        var transition = new Transition(new ExactMatrix(List.of(
+            List.of(ratio("3", "4"), ratio("1", "2")),
+            List.of(ratio("-1", "2"), Rational.ONE)
+        )), new ExactVector(values(1, 1)));
+        var report = synthesis.solve(new Request(transition, values(2, 3), 2, new Budget(4_000)));
+
+        equal(Status.COMPLETE, report.status());
+        equal(1, report.laws().size());
+        var law = report.laws().getFirst();
+        equal(Evolution.FIXED, law.proposal().evolution());
+        equivalent("x0-2/3*x1-2/9*x0^2+1/9*x0*x1-2/9*x1^2", law.proposal().polynomial());
+        equal(ratio("-20", "9"), law.initialValue());
+    }
+
     @Test void preservesOneBudgetAcrossEliminationAndProof() {
         var full = synthesis.solve(new Request(fibonacci(), values(0, 1), 2, BUDGET));
         int used = full.work().consumedWorkUnits();
@@ -310,6 +325,7 @@ class RecurrenceInvariantSynthesisTest {
         tests.handlesAffineOffsetsAndDegenerateNullspaces();
         tests.distinguishesAnEmptyAnsatzFromAnExhaustedBudget();
         tests.findsBothHomogeneousDegreesWithinOneBudgetInTheUsualOrder();
+        tests.derivesTheCoupledAffineLawWithinTheTypedCoefficientBudget();
         tests.preservesOneBudgetAcrossEliminationAndProof();
         tests.rejectsForgedNoOpForeignAndSourceReboundClaims();
         tests.distinguishesFittingNumbersFromAUniversalStepIdentity();
