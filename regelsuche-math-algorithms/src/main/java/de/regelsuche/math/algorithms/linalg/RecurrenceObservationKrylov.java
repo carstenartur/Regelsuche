@@ -148,7 +148,14 @@ public final class RecurrenceObservationKrylov {
             if (allZero) return Rational.ZERO;
             int order = relation.size();
             if (index.bitLength() < Integer.SIZE && index.intValue() < order) return base.get(index.intValue());
-            if (order == 1 && relation.getFirst().isOne()) return base.getFirst();
+            if (order == 1) {
+                var ratio = relation.getFirst();
+                if (ratio.isZero()) return Rational.ZERO;
+                if (ratio.isOne()) return base.getFirst();
+                if (ratio.equals(Rational.NEGATIVE_ONE)) {
+                    return index.testBit(0) ? base.getFirst().negate() : base.getFirst();
+                }
+            }
 
             Rational[] power = null;
             Rational[] remainder = null;

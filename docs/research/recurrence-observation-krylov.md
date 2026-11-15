@@ -43,16 +43,18 @@ für weitere Anfangszustände binden. `valueAt(index, budget)` und
 Sie berechnen $z^n \bmod (z^r-\sum_i c_i z^i)$ mit binärer Potenzierung
 und kombinieren dessen Koeffizienten mit den gebundenen Werten.
 Mit gewöhnlicher Polynommultiplikation kostet eine Einzelabfrage
-$O(r^2\log n)$ arithmetische Schritte. Eine Stapelabfrage speichert
+$O(r^2\log n)$ arithmetische Schritte. Bei Ordnung eins mit
+Koeffizient $0$, $1$ oder $-1$ genügen eine Fallunterscheidung und
+gegebenenfalls die Parität des Index. Eine Stapelabfrage speichert
 bis zu 128 binäre Potenzen innerhalb des Aufrufs.
 [Fiduccia, An Efficient Formula for Linear Recurrences](https://doi.org/10.1137/0214007)
 
 Jede Phase hat ein Arbeitsbudget und meldet den Verbrauch. Für eine
 gemeinsame Obergrenze erhält die nächste Phase jeweils den Rest des
 vorigen Aufrufs. Bei `BUDGET_INCONCLUSIVE` oder `ARITHMETIC_LIMIT`
-enthält der Bericht keinen Teilwert. Die Eingaben verwenden die
-128-Bit-Grenze des Übergangs für rationale Koeffizienten und
-Zustandswerte. Die Rechnung begrenzt Beträge normierter Zähler und
+enthält der Bericht keinen Teilwert. Für rationale Koeffizienten
+und Zustandswerte gilt die Grenze des Übergangs von 128 gemäß
+`BigInteger.bitLength()`. Die Rechnung begrenzt Beträge normierter Zähler und
 Nenner auf 16.384 Bit. Vor der Zeilenreduktion werden die Nenner
 zeilenweise beseitigt und die Größen der ganzzahligen Minoren
 konservativ über die Zeilennormen abgeschätzt. Die Grenze kann daher
@@ -83,14 +85,14 @@ Indizes $128+((73i+31)\bmod384)$ für $0\le i<24$.
 
 | Aufgabe | Ordnung | Krylov, 1 Abfrage | Direkt, 1 Abfrage | Krylov, 24 Abfragen | Direkt, 24 Abfragen |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Rotationsspiegelung, Achse | 1 | 562 | 1.053 | 1.404 | 4.919 |
+| Rotationsspiegelung, Achse | 1 | 478 | 1.053 | 524 | 4.919 |
 | Axiale Drift, quadratische Beobachtung | 3 | 6.579 | 1.231 | 11.710 | 5.666 |
 | Verschiebung einer beobachteten Koordinate | 3 | 2.749 | 149 | 7.880 | 1.052 |
 | Zehn verschiedene Moden | 10 | 31.381 | 543 | 69.606 | 3.615 |
 
 Beide Verfahren lieferten in allen acht Läufen dieselben exakten
 Werte. Bei der Rotationsspiegelung mit Ordnung eins spart Krylov
-46,6 Prozent beim Kaltstart und 71,5 Prozent im Stapel. Bei allen
+54,6 Prozent beim Kaltstart und 89,3 Prozent im Stapel. Bei allen
 drei übrigen Aufgaben kostet die direkte Rechnung weniger. Auch
 der Stapel mit axialer Drift amortisiert die Vorbereitung in diesem
 Vergleich nicht.
@@ -101,7 +103,7 @@ Die Zähler erfassen durchlaufene Einträge und elementare Rechenschritte,
 beispielsweise je eine Einheit für Prüfung, Multiplikation und Addition
 eines von null verschiedenen Produkts. Die eigene Arbeitszählung der
 exakten Zeilenreduktion fließt ein. Die Zähler gewichten die
-Arithmetik unabhängig von der Bitlänge. Sie messen keine Laufzeit.
+Arithmetik unabhängig von der Bitlänge.
 Beide Verfahren erhalten dieselben schon exakt konstruierten Eingaben.
 [Einzelkosten und Wertprüfsummen](recurrence-observation-krylov/work.tsv)
 

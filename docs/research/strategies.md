@@ -119,3 +119,13 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - [`CoupledRecurrenceExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceExperimentTest.java#L28) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceExperimentTest.java | class CoupledRecurrenceExperimentTest { -->
 - [`CoupledRecurrenceTransferExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceTransferExperimentTest.java#L32) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceTransferExperimentTest.java | class CoupledRecurrenceTransferExperimentTest { -->
+
+## Minimale Rekurrenz für eine Beobachtung
+
+- **Hypothese.** Ein kleiner Krylov-Raum der Zielbeobachtung kann den Aufwand für weit entfernte Abfrageindizes senken.
+- **Umsetzungsstand.** Der Java-Kern bestimmt und prüft die universell minimale Ordnung für rationale affine Übergänge mit bis zu drei Koordinaten und Beobachtungen bis Gesamtgrad zwei. Der geprüfte Plan kann für verschiedene Anfangszustände gebunden werden.
+- **Befund.** Alle acht Läufe liefern dieselben exakten Werte wie binäre affine Potenzierung mit Wiederverwendung im Stapel. Die Beobachtung der Ordnung eins spart bei 24 Abfragen 89,3 Prozent. Bei den drei anderen Aufgaben kostet direkte Rechnung weniger. [Vergleich und Reproduktion](recurrence-observation-krylov.md)
+- **Folgerung.** Die Aufbereitung anhand der erkennbaren Struktur der Beobachtung und der zu erwartenden Anfragen auswählen.
+
+- [`RecurrenceObservationKrylov.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java#L29) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java | public final class RecurrenceObservationKrylov { -->
+- [`RecurrenceObservationComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java#L33) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java | class RecurrenceObservationComparisonTest { -->

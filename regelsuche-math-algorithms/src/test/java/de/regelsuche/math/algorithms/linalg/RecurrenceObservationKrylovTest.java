@@ -37,6 +37,7 @@ class RecurrenceObservationKrylovTest {
         var bound = complete(plan.bind(values(2, 3, 7), BUDGET));
         assertEquals(values(2, -2, 2, -2), complete(bound.valuesAt(
             List.of(BigInteger.ZERO, BigInteger.ONE, HUGE, HUGE.add(BigInteger.ONE)), BUDGET)));
+        assertEquals(Rational.of(-2), complete(bound.valueAt(HUGE.add(BigInteger.ONE), new Budget(1))));
 
         var zeroTrajectory = complete(plan.bind(values(1, 1, 0), BUDGET));
         assertEquals(Rational.ZERO, complete(zeroTrajectory.valueAt(HUGE, BUDGET)));
