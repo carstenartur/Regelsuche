@@ -182,18 +182,15 @@ Schemas:
 - `docs/schemas/regelsuche-plugin-trust-store-chain-checkpoint-v1.schema.json`
 - `docs/schemas/regelsuche-plugin-trust-store-revision-verification-v1.schema.json`
 
-## Verbleibender Umfang von #104
+## Distribution und Betrieb
 
-Dieser Vertrag authentisiert Trust-State-Revisionen, führt aber selbst keinen
-Netzwerkzugriff aus. Der separate [Java-Distributionsclient](plugin-distribution-client.md)
-bindet diese Prüfung an echte HTTPS-Abfragen und atomare JAR-Generationen;
-rollback-geschützte Speicherung bleibt eine explizite externe Authority-Pflicht.
-Weiterhin offen bleiben insbesondere:
+Der [Java-Distributionsclient](plugin-distribution-client.md) bindet die lokale
+Revisionsprüfung an HTTPS-Abfragen und atomare JAR-Generationen. Die
+[Testinstallation](plugin-distribution-client.md#verification-of-the-test-installation)
+prüft die Folge signierter Revisionen und weist Replay, Forks und ausgelassene
+Vorgänger ab. Rollback-geschützte Speicherung liegt bei der externen Authority.
 
-- gehosteter oder föderierter Transport signierter Index- und Trust-State-Revisionen;
-- ein produktiv angebundener rollback-geschützter Checkpoint-Provider;
-- Runtime-Integration sowie Regel-/Knowledge-Pack-Installation;
-- Source-to-binary-Provenance-Attestierungen;
-- separat baubare Community-Beispielprojekte und Publishing-Dokumentation;
-- ein optionales Transparenzprotokoll gegen Equivocation zwischen verschiedenen
-  Clients.
+Der [öffentliche Betrieb](TODO-extern.md#öffentlicher-plugin-katalog) umfasst
+die Rollen und Infrastruktur für signierte Index- und Trust-State-Revisionen.
+Ein optionales Transparenzprotokoll würde Abweichungen zwischen Clients
+vergleichbar machen.

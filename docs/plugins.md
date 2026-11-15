@@ -94,7 +94,13 @@ Das Manifestformat, die Trust-Store-Struktur, Policies und Fail-closed-Status si
 
 - Der Katalog in `plugins list` und `GET /api/plugins` dient als lokaler Plugin-Index.
 - `docs/plugin-api.md` enthält den Autorenleitfaden inklusive Metadaten, Abhängigkeiten und Service-Registrierung.
-- Die Beispielplugins unter `de.regelsuche.plugin.example` dienen als Templates/Referenzprojekte für Community-Erweiterungen.
+- Der eigenständige [Algebra-Consumer](../examples/external-consumers/hello-rule-java25)
+  und das [Discovery-Beispiel](../examples/external-consumers/geometric-sequence-domain-java25)
+  bauen gegen veröffentlichte SDK-Artefakte.
+- Das [Faktorisierungs-Regelpaket](../examples/factorization.regelsuche) und sein
+  [Exportprofil](../examples/factorization-export-profile.rules) sind direkt
+  importierbare Datenvorlagen. Die [Anleitung für Regeldateien](rule-files.md)
+  beschreibt den Export und Wiederimport.
 
 ## Abgrenzung zu Core-Regelpaketen
 

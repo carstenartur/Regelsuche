@@ -58,7 +58,10 @@ Ein Methodenbericht mit begrenzten Aussagen kann ohne externe Neuheitsbestätigu
 - [ ] Betreiber benennen und produktiven Endpunkt, Infrastruktur, Rollen für Publisher, Kuration und Vertrauensanker sowie Verwahrung und Wiederherstellung von Schlüsseln und Checkpoints festlegen.
 - [ ] Betrieb, Backup-Wiederherstellung, Sperrung und Incident-Verfahren unter den tatsächlichen Zuständigkeiten abnehmen. Die berechtigten Herausgeber entscheiden über die Veröffentlichung echter Pakete. Unabhängige Community-Nutzung erst mit entsprechenden Belegen ausweisen.
 
-Vorher bleiben Implementierung und reproduzierbare Ende-zu-Ende-Prüfung eines Testkatalogs, eigenständig baubare Pakete und die Prüfung der Herkunftsbelege in #104.
+Die [technische Testinstallation](plugin-distribution-client.md#verification-of-the-test-installation)
+beschreibt den reproduzierbaren Testkatalog, die Herkunftsprüfung und den
+Installationsablauf. Die [SDK-Qualifikation](released-sdk-maven-qualification.md)
+dokumentiert die eigenständig baubaren Beispiele.
 
 ## Geschützte Qualifikation und prospektive Repräsentationsstudien
 

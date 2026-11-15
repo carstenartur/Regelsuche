@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify current external Maven consumers against the actual pinned SDK release.
+"""Qualify external Maven consumers and a data-only rule package against the pinned SDK release.
 
 Build orchestration only: no mathematical implementation, reactor build or mock success.
 """
@@ -422,6 +422,35 @@ def qualify(root, evidence, maven):
                     if reports.is_dir():
                         result['surefireReportSha256'] = copy_consumer(reports, output / 'surefire-reports')
                     save()
+            data = work / 'factorization-rule-package'
+            output = evidence / data.name
+            result = {'status': 'RUNNING', 'commands': []}
+            summary['rulePackage'] = result
+            try:
+                data.mkdir()
+                output.mkdir()
+                pack = root / 'examples/factorization.regelsuche'
+                export_profile = root / 'examples/factorization-export-profile.rules'
+                verifier = root / 'scripts/VerifyReleasedRulePackage.java'
+                for source in (pack, export_profile, verifier):
+                    no_symlinks(source)
+                    shutil.copyfile(source, data / source.name)
+                incomplete = data / 'incomplete.regelsuche'
+                incomplete.write_text('rule incomplete:\n  pattern: X\n', encoding='utf-8')
+                modules = ('regelsuche-plugin-api', 'regelsuche-core')
+                jars = [repository / 'de/regelsuche' / module / VERSION / f'{module}-{VERSION}.jar'
+                        for module in modules]
+                result['sourceSha256'] = {path.name: sha256(path) for path in sorted(data.iterdir())}
+                result['jarSha256'] = {jar.name: sha256(jar) for jar in jars}
+                log = output / 'cli.log'
+                execute([java, '-cp', os.pathsep.join(map(str, jars)), verifier.name, pack.name,
+                         export_profile.name, incomplete.name], data, log, result['commands'])
+                result.update(status='PASSED', stdout=log.read_text(encoding='utf-8'))
+            except Exception as error:
+                result.update(status='FAILED', error=str(error))
+            save()
+            if result['status'] != 'PASSED':
+                raise RuntimeError('released SDK rule package qualification failed; inspect retained logs')
             if any(item['status'] != 'PASSED' for item in summary['consumers'].values()):
                 raise RuntimeError('released SDK Maven consumer qualification failed; inspect retained consumer logs')
         summary['status'] = 'PASSED'

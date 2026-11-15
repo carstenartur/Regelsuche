@@ -94,6 +94,87 @@ class InstalledDiscoveryCommandTest {
             assertFalse(Files.exists(directory.resolve("removed.json")));
         }
     }
+    @Test void failedUpdatePreservesActiveDiscoveryAndOfflineRollbackRestoresTheOriginalProvider() throws Exception {
+        try (var fixture = new Fixture(); var catalog = new PluginTestCatalog(fixture.distribution)) {
+            byte[] originalJar = InstalledDiscoveryFixture.jar(directory.resolve("original-provider"), fixture.marker,
+                "1.0.0", "normal");
+            var originalEntry = catalog.publishArtifact(PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN,
+                "example", "1.0.0", "2", "1.0.0", "", List.of("algebra"), List.of(), originalJar);
+            var genesis = catalog.publishRevision(1, "", catalog.publishers(), List.of(originalEntry));
+            var initial = fixture.transactions.install("install", genesis.sources(),
+                InstalledExtensionRuntimeTest.request("1.0.0", "1.0.0", "2"));
+            assertEquals(Outcome.COMMITTED, initial.outcome());
+            var original = initial.installation();
+            assertDiscoveryRun(fixture, "original.json", original, "1.0.0");
+            var originalState = fixture.ledger.delegate.read();
+
+            byte[] updateJar = InstalledDiscoveryFixture.jar(directory.resolve("update-provider"), fixture.marker,
+                "2.0.0", "normal");
+            var entry = catalog.publishArtifact(PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN,
+                "example", "2.0.0", "2", "1.0.0", "", List.of("algebra"), List.of(), updateJar);
+            var publication = catalog.publishRevision(2, genesis.revision().contentHash(),
+                catalog.publishers(), List.of(originalEntry, entry));
+            var request = InstalledExtensionRuntimeTest.request("2.0.0", "1.0.0", "2");
+            String artifactPath = URI.create(entry.artifactUri()).getPath();
+            byte[] wrongBytes = updateJar.clone();
+            wrongBytes[0] ^= 1;
+            fixture.distribution.responses.put(artifactPath, wrongBytes);
+            var rejected = assertThrows(SecurityException.class,
+                () -> fixture.transactions.install("update", publication.sources(), request));
+            assertEquals("artifact admission failed: ARTIFACT_HASH_MISMATCH", rejected.getMessage());
+            assertEquals(originalState, fixture.ledger.delegate.read());
+            assertTrue(fixture.ledger.delegate.lookup("update").isEmpty());
+            assertEquals(original, fixture.transactions.active().orElseThrow());
+            assertDiscoveryRun(fixture, "after-rejection.json", original, "1.0.0");
+
+            fixture.distribution.responses.put(artifactPath, updateJar);
+            var update = fixture.transactions.install("update", publication.sources(), request);
+            assertEquals(Outcome.COMMITTED, update.outcome());
+            var installed = update.installation();
+            assertEquals("UPDATE", installed.operation());
+            assertEquals(original.contentHash(), installed.previousInstallationHash());
+            assertEquals(2, installed.checkpoint().sequence());
+            assertDiscoveryRun(fixture, "updated.json", installed, "2.0.0");
+
+            fixture.offline();
+            var removal = fixture.transactions.remove("remove");
+            assertEquals(Outcome.COMMITTED, removal.outcome());
+            var removed = removal.installation();
+            assertEquals("REMOVE", removed.operation());
+            assertEquals(installed.checkpoint(), removed.checkpoint());
+            assertTrue(removed.artifacts().isEmpty());
+            assertEquals(1, fixture.run("removed.json", "small"));
+            assertFalse(Files.exists(directory.resolve("removed.json")));
+
+            var removedState = fixture.ledger.delegate.read();
+            String foreign = PluginDistributionFixtures.hash("foreign-generation");
+            assertThrows(SecurityException.class, () -> fixture.transactions.rollback("foreign", foreign));
+            assertEquals(removedState, fixture.ledger.delegate.read());
+            assertTrue(fixture.ledger.delegate.lookup("foreign").isEmpty());
+
+            var rollback = fixture.transactions.rollback("rollback", original.contentHash());
+            assertEquals(Outcome.COMMITTED, rollback.outcome());
+            var restored = rollback.installation();
+            assertEquals("ROLLBACK", restored.operation());
+            assertEquals(removed.contentHash(), restored.previousInstallationHash());
+            assertEquals(original.contentHash(), restored.rollbackSourceHash());
+            assertEquals(installed.checkpoint(), restored.checkpoint());
+            assertEquals(original.artifacts(), restored.artifacts());
+            assertDiscoveryRun(fixture, "restored.json", restored, "1.0.0");
+        }
+    }
+
+    private void assertDiscoveryRun(Fixture fixture, String file, PluginInstallationEvidence installation,
+            String version) throws IOException {
+        assertEquals(0, fixture.run(file, "small"), fixture.output::toString);
+        String evidence = Files.readString(directory.resolve(file));
+        assertTrue(evidence.contains("late-" + version));
+        var properties = properties(evidence);
+        assertEquals(installation.contentHash(), properties.get("sdk.provider.extension.trustEvidenceSha256"));
+        assertEquals(installation.artifacts().getFirst().artifactSha256(),
+            properties.get("sdk.provider.artifactSha256"));
+    }
+
     @Test void tamperedSelectedJarRejectsBeforeInitialization() throws Exception {
         try (var f = new Fixture()) {
             var installed=f.install("1.0.0","normal"); f.offline();

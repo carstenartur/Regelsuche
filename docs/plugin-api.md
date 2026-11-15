@@ -166,8 +166,10 @@ Content-Hash und Indexeintrag veröffentlicht werden.
 app rules export --dir rules/ --out exports/
 ```
 
-Die erzeugte Datei `exported-rules.regelsuche` enthält die aktiven Regeln und
-lässt sich mit `rules import` in eine andere Installation übernehmen:
+Die erzeugte Datei enthält aktive Musterregeln. Für ein transportables Datenpaket
+wähle ein Profil, das die weiterzugebenden Regeln gezielt aktiviert. Das
+[Faktorisierungsbeispiel](rule-files.md) verwendet dafür `factorization_export`.
+Mit `rules import` übernimmst du die Datei in die Zielinstallation.
 
 ```text
 app rules import exported-rules.regelsuche --into rules/
@@ -242,7 +244,8 @@ Vollständiges integriertes Beispiel mit allen Erweiterungspunkten:
 app/src/main/java/de/regelsuche/plugin/example/BinomialFormulaPlugin.java
 ```
 
-Für Issue #104 sind zusätzlich separat klon- und baubare Community-Beispiele
-erforderlich, die gegen veröffentlichte API-Artefakte statt interne App-Pakete
-bauen. Das integrierte Beispiel ersetzt diese noch ausstehenden externen
-Referenzprojekte nicht.
+Der [Algebra-Consumer](../examples/external-consumers/hello-rule-java25) und
+der [Discovery-Consumer](../examples/external-consumers/geometric-sequence-domain-java25)
+sind eigenständige Projekte und bauen gegen veröffentlichte SDK-Artefakte.
+Die [SDK-Qualifikation](released-sdk-maven-qualification.md) dokumentiert ihre
+Builds und die Prüfung der exportierbaren Regelvorlagen.
