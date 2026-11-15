@@ -4,7 +4,7 @@ This directory contains the source-controlled foundation for the claim-bounded R
 
 ## Status
 
-The package is marked `FOUNDATION`. Its public results include the four Track C forms and historical inventory audit, paired cross-family transfer, the original and seven-stage controller comparisons, and discovery-component controls. The claim registry separately tracks the complete studies and independent reproduction.
+The package is marked `FOUNDATION`. Its public results include target-directed search, target-free simplification, equality validation and shared-fragment rewriting baselines, the four Track C forms and historical inventory audit, paired cross-family transfer, the original and seven-stage controller comparisons, and discovery-component controls. The claim registry separately tracks the complete studies and independent reproduction.
 
 No pending claim may be promoted to a central empirical result by editing prose alone. The final build must consume retained canonical evidence and the claim-status source from #385.
 

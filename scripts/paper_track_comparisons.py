@@ -7,8 +7,13 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from paper_controller_figure import table
+from paper_public_baselines import formation_outcome_table, legacy_sections, rewriting_sections
 
 SOURCES = {
+    "legacy": ("research/benchmarks/comparative-v2/legacy.json.gz",
+               "8ea2d80744f5e70eb2af7c6e6115de8d194276516329d6ca683ca1d8262ebdcf", "c5a4824f9060da04be1684bd0cef8e37001f109e"),
+    "rewriting": ("research/benchmarks/comparative-v2/rewriting.json.gz",
+                   "860bf1a08de7f605ad688569781d4d13c5868f8eef3ed3656932b3efa4b33651", "c5a4824f9060da04be1684bd0cef8e37001f109e"),
     "audit": ("research/benchmarks/candidate-independent/track-c-project-inventory/audit-result.json.gz",
               "6fd69dc66f4ce982dc3314c3082104cea2543b5cfc30ba68831fe4836a503af7", "e5a3c7919128335691bcb1b3f0de04e58ef63e10"),
     "transfer": ("research/benchmarks/track-d-public-transfer/transfer-result.json",
@@ -244,5 +249,34 @@ def write_track_reports(root, output, require_input):
         rediscovery_table(reports["historicalHidden"], reports["exactHidden"], reports["correctedHidden"]),
         f"[Historical hidden-rule execution]({source('historicalHidden')}) · "
         f"[Initial exact execution]({source('exactHidden')}) · [Corrected exact execution]({source('correctedHidden')}).",
+    ])
+    sections.extend(legacy_sections(reports["legacy"]))
+    sections.append(f"[A1, A2 and E1 case records and resource ledgers]({source('legacy')}). "
+                    f"Decoded evidence SHA-256 `{SOURCES['legacy'][1]}`.")
+    sections.extend(rewriting_sections(reports["rewriting"]))
+    sections.extend([
+        f"[E2 case records, native budgets and proof objects]({source('rewriting')}). "
+        f"Decoded evidence SHA-256 `{SOURCES['rewriting'][1]}`.",
+        "## Open-target case outcomes",
+        "The pooled counts below summarize the same public case slots shown by arm above. Campaign seeds repeat "
+        "the case inputs. Empty candidates, failed prefix matches and downstream misses remain distinct.",
+        formation_outcome_table(reports["audit"]["forms"], FORMS),
+    ])
+    receipt_path = "paper/public-reproduction.json"
+    receipt = json.loads(require_input(root / receipt_path, receipt_path).read_bytes())
+    benchmark, manuscript = receipt["comparison"], receipt["manuscript"]
+    revision = receipt["revision"]
+    sections.extend([
+        "## Reproduction on the previous integrated revision",
+        f"These byte comparisons refer to [the recorded revision](https://github.com/carstenartur/Regelsuche/commit/{revision}). "
+        "The manuscript archive's own revision and file inventory identify the current package.",
+        table(["Artifact", "Executed environments", "Byte-identical outputs"], [
+            ["Public benchmark", benchmark["environments"], f"Canonical report and {benchmark['attachments']} evidence attachments"],
+            ["Manuscript package", manuscript["environments"],
+             f"{manuscript['archiveBytes']:,}-byte archive including a {manuscript['pdfPages']}-page PDF"],
+        ]),
+        f"Benchmark report SHA-256 `{benchmark['reportSha256']}`. [Benchmark verification]({benchmark['evidence']}).",
+        f"Manuscript archive SHA-256 `{manuscript['archiveSha256']}`. PDF SHA-256 `{manuscript['pdfSha256']}`. "
+        f"[Manuscript verification]({manuscript['evidence']}).",
     ])
     (output / "public-discovery-comparisons.md").write_text("\n\n".join(sections) + "\n")

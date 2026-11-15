@@ -105,13 +105,13 @@ The archival artifact will distinguish:
 - semantic reproduction through canonical roots;
 - non-reproduction with retained mismatches.
 
-The clean package build regenerates the tables and figure, verifies the source tree and executable modes, and renders the PDF. Offline replay also checks each file against the archive inventory. These checks test the manuscript and its public evidence at a named code revision. An independent scientific reproduction requires a separately identified execution and its receipt. [Archive verification](../docs/paper-foundation-verification.md)
+The clean package build regenerates the tables and figure, verifies the source tree and executable modes, and renders the PDF. Offline replay also checks each file against the archive inventory. These checks test the manuscript and its public evidence at a named code revision. An independent scientific reproduction requires a separately identified execution and its receipt. [Generated reproduction matrix](generated/public-discovery-comparisons.md) · [Archive verification](../docs/paper-foundation-verification.md)
 
 The independent artifact in #387 must execute without undocumented maintainer knowledge, undeclared network access, or mutable external inputs. Corrective changes receive new immutable artifact identities.
 
 ## 9. Results
 
-The complete primary evaluation remains pending. The public experiments below report candidate formation, held-out reuse, paired search utility and campaign completion in their respective units. The public comparison report also contains the target-directed search, simplification and equality-validation results with their task-specific limits. [Public comparison report](../research/benchmarks/comparative-v2/report.json)
+The public experiments below report candidate formation, held-out reuse, paired search utility and campaign completion in their respective units. The generated tables also give the public target-directed search, target-free simplification, equality-validation and rewriting baselines. The benchmark report retains the complete case records and work ledgers for each regime. [Public comparison report](../research/benchmarks/comparative-v2/report.json)
 
 ### Retrospective controller comparison
 
@@ -123,21 +123,11 @@ The feedback controller found no eligible continuation after qualification. Both
 
 The production fitter solved for recurrence coefficients from two TRAIN prefixes. The deterministic and randomized controls proposed coefficients from the same bounded grammar. Each arm froze its model set before scoring the six public cases. Agreement with an observed prefix and agreement with its subsequent terms were both required. All three arms repeatedly fit the same geometric TRAIN sequence. None of their frozen sets confirmed any VALIDATION or TEST case. The randomized arm also produced an empty campaign. Its duplicate draws and every case in that campaign remain in the denominators. A fixed cap on submitted candidates leaves the solvers free to incur different internal work. The experiment measures reuse within a bounded recurrence grammar. [Generated formation and per-split outcomes](generated/public-recurrence-results.md) · [Independent replay and experimental design](../docs/track-c-recurrence-comparison.md)
 
-### Outstanding primary evaluation
+### Public search, simplification, equality and rewriting baselines
 
-Required result families include:
+The generated tables report target-directed search with visible targets, target-free recovery of fixed simplification forms, equality validation on a shared polynomial pair, and rewriting within a common unconditional fragment. They retain missed reference forms, the cost miss shared by both rewriting arms, excluded translations and the distinct proof and replay outcomes. The open-target table accounts separately for empty outputs, failed prefix matches and unsuccessful downstream reuse. [Generated baseline and failure tables](generated/public-discovery-comparisons.md)
 
-- campaign and candidate terminal accounting;
-- split and leakage audits;
-- positive, negative, unsupported, and incomplete evaluation;
-- baseline and ablation comparisons;
-- per-case paired utility;
-- cumulative amortization and break-even;
-- reproduction matrix;
-- claim-status matrix;
-- failure taxonomy.
-
-No primary result may be copied manually into the manuscript.
+The complete primary evaluation remains pending. The published campaign comparison measures stage allocation and lifecycle completion. Its formal proof and final qualification outcomes remain pending under #235. The independent reproduction and end-to-end cost studies have their own claim requirements.
 
 ### Open-target formation, transfer and controller allocation
 

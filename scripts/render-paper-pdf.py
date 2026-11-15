@@ -24,6 +24,13 @@ SECTIONS = ("paper/manuscript.md", "paper/generated/public-corpus-splits.md",
             "paper/limitations.md",
             "paper/claims-and-evidence.md", "paper/artifact-appendix.md")
 WIDTHS = {
+    "States explored": (.21, .12, .19, .16, .15, .17),
+    "Reference forms": (.37, .18, .45),
+    "Lossless translation": (.22, .12, .10, .19, .37),
+    "Proof or replay status": (.20, .13, .12, .14, .41),
+    "Unsupported case": (.37, .63),
+    "Terminal outcomes across all arms": (.18, .16, .15, .51),
+    "Executed environments": (.24, .38, .38),
     "Mined checks": (.24, .12, .16, .16, .16, .16),
     "Negative executed": (.16, .22, .12, .18, .17, .15),
     "Emitted": (.15, .22, .12, .11, .13, .14, .13),
