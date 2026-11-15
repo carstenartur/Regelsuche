@@ -60,13 +60,21 @@ public final class OrderedReductionSearch {
     /** Derives and checks a block summary for fixed-length row replacements. */
     public static PointUpdateResult searchPointUpdates(OrderedReduction source, IterationLimits limits, int maximumStates,
             BooleanSupplier cancellation) {
-        return pointUpdates(source, new PointUpdates(null), limits, maximumStates, cancellation);
+        return pointUpdates(source, new PointUpdates(null, false), limits, maximumStates, cancellation);
     }
 
-    /** Uses a previously checked polynomial lemma during point-update plan synthesis. */
+    /** Uses previously checked knowledge during point-update plan synthesis. */
     public static PointUpdateResult searchPointUpdates(OrderedReduction source, OrderedReductionKnowledge knowledge,
             IterationLimits limits, int maximumStates, BooleanSupplier cancellation) {
-        return pointUpdates(source, new PointUpdates(Objects.requireNonNull(knowledge)), limits, maximumStates, cancellation);
+        Objects.requireNonNull(knowledge);
+        return pointUpdates(source, new PointUpdates(knowledge, knowledge.pairState().isPresent()),
+            limits, maximumStates, cancellation);
+    }
+
+    /** Searches for a grouped pair statistic directly from a triple source. */
+    public static PointUpdateResult searchProjectedPointUpdates(OrderedReduction source, IterationLimits limits,
+            int maximumStates, BooleanSupplier cancellation) {
+        return pointUpdates(source, new PointUpdates(null, true), limits, maximumStates, cancellation);
     }
 
     /** Supplies only the block statistics. The source coefficients and every cut are still checked. */
@@ -136,7 +144,7 @@ public final class OrderedReductionSearch {
         }
     }
 
-    private record PointUpdates(OrderedReductionKnowledge knowledge)
+    private record PointUpdates(OrderedReductionKnowledge knowledge, boolean projectPair)
             implements PlanKind<OrderedBlockReductionPlan, OrderedBlockReductionPlan.Verified> {
         @Override public String rule() { return "derive-block-reduction"; }
 
@@ -146,7 +154,17 @@ public final class OrderedReductionSearch {
 
         @Override public OrderedBlockReductionPlan derive(OrderedReduction source,
                 Map<IterationPolynomial.Monomial, ExactRational> terms, Work work) {
-            return OrderedBlockReductionPlan.derive(factor(source, terms, false, work), work);
+            var reduction = factor(source, terms, false, work);
+            if (projectPair) {
+                var known = knowledge == null ? Optional.<OrderedPairStateProjection.Kernel>empty() : knowledge.pairState();
+                var match = known.flatMap(kernel -> OrderedPairStateProjection.reuse(reduction, kernel, work))
+                    .or(() -> OrderedPairStateProjection.infer(reduction, work));
+                if (match.isPresent()) {
+                    var pair = match.orElseThrow();
+                    return new OrderedBlockReductionPlan(reduction, pair.statistics(), Optional.of(pair.projection()));
+                }
+            }
+            return OrderedBlockReductionPlan.derive(reduction, work);
         }
 
         @Override public OrderedBlockReductionPlan.Verified check(OrderedReduction source, OrderedBlockReductionPlan plan,

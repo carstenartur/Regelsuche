@@ -63,7 +63,7 @@ Auswahlstrategie ist eine eigene Messgröße.
 | --- | ---: | ---: | ---: | ---: |
 | Java-Reduktionen | 7.412 | 7.388 | — | −0,32 % |
 | Rekurrenzen mit gemeinsamem vollständigem Ansatzraum | 25.930 | 16.972 | 20.678 | −34,55 % |
-| Rekurrenzen mit vom Quellcode abgeleiteter Gradaufteilung | 13.968 | 13.372 | 17.078 | −4,27 % |
+| Rekurrenzen mit aus dem Übergang abgeleiteter Gradaufteilung | 13.968 | 13.372 | 17.078 | −4,27 % |
 
 Jede Zahl steht für verrechnete Arbeitseinheiten in der jeweiligen
 Familie. Bei den Java-Reduktionen bleiben die 474 Einheiten für
