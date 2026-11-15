@@ -12,6 +12,7 @@ import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavai
 import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
 import static de.regelsuche.math.algorithms.iteration.OrderedBlockReductionPlan.Layout;
 import static de.regelsuche.math.algorithms.iteration.OrderedBlockReductionPlan.Split;
+import static de.regelsuche.math.algorithms.iteration.OrderedBlockReductionPlan.WeightedSplit;
 import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
 import static de.regelsuche.math.algorithms.iteration.RowMoments.bounded;
 
@@ -30,6 +31,7 @@ public final class OrderedBlockAccumulator {
     private final int columns;
     private final List<List<Moment>> statistics;
     private final Layout layout;
+    private final int stateCells;
     private final int size;
     private final int firstLeaf;
     private final Block[] nodes;
@@ -40,9 +42,10 @@ public final class OrderedBlockAccumulator {
         this.columns = columns;
         this.statistics = statistics;
         this.layout = layout;
+        stateCells = statistics.size() + (layout.pairTotal().isEmpty() ? 0 : 1);
         size = rows.size();
         long leaves = size <= 1 ? 1 : 2L * Integer.highestOneBit(size - 1);
-        long cells = 2 * leaves * (statistics.size() + 1L);
+        long cells = 2 * leaves * (stateCells + 1L);
         if (cells > MAX_STATE_CELLS) throw new Unavailable("BLOCK_STORAGE_LIMIT");
         work.charge(cells);
         firstLeaf = (int) leaves;
@@ -90,36 +93,51 @@ public final class OrderedBlockAccumulator {
     }
 
     private Block empty() {
-        var values = new BigInteger[statistics.size()];
+        var values = new BigInteger[stateCells];
         Arrays.fill(values, BigInteger.ZERO);
         return new Block(BigInteger.ZERO, values);
     }
 
     private Block leaf(List<BigInteger> row, Work work) {
         var inputs = RowMoments.values(row, columns, work);
-        var values = new BigInteger[statistics.size()];
-        for (int i = 0; i < values.length; i++) {
+        var values = new BigInteger[stateCells];
+        for (int i = 0; i < statistics.size(); i++) {
             work.charge(1);
             var factors = statistics.get(i);
             values[i] = factors.size() == 1 ? RowMoments.product(factors.getFirst(), inputs, work) : BigInteger.ZERO;
+        }
+        if (!layout.pairTotal().isEmpty()) {
+            work.charge(1);
+            values[statistics.size()] = BigInteger.ZERO;
         }
         return new Block(BigInteger.ZERO, values);
     }
 
     private Block merge(Block left, Block right, Work work) {
-        var values = new BigInteger[statistics.size()];
-        for (int i = 0; i < values.length; i++) {
+        var values = new BigInteger[stateCells];
+        for (int i = 0; i < statistics.size(); i++) {
             var sum = bounded(left.statistics()[i].add(right.statistics()[i]), work);
             for (var split : layout.statistics().get(i)) {
                 sum = bounded(sum.add(left.cross(right, split, work)), work);
             }
             values[i] = sum;
         }
-        var total = bounded(left.value().add(right.value()), work);
-        for (var product : layout.total()) {
+        if (!layout.pairTotal().isEmpty()) {
+            int pair = statistics.size();
+            values[pair] = weightedSum(left.statistics()[pair], right.statistics()[pair], layout.pairTotal(),
+                left, right, work);
+        }
+        var total = weightedSum(left.value(), right.value(), layout.total(), left, right, work);
+        return new Block(total, values);
+    }
+
+    private static BigInteger weightedSum(BigInteger leftValue, BigInteger rightValue, List<WeightedSplit> crossTerms,
+            Block left, Block right, Work work) {
+        var total = bounded(leftValue.add(rightValue), work);
+        for (var product : crossTerms) {
             var weighted = bounded(product.coefficient().multiply(left.cross(right, product.split(), work)), work);
             total = bounded(total.add(weighted), work);
         }
-        return new Block(total, values);
+        return total;
     }
 }
