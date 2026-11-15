@@ -219,7 +219,37 @@
                         <option value="TERM">Skalarer Term</option><option value="SYSTEM">Lineares Gleichungssystem (Zeilen mit ; trennen)</option>
                     </select></label>
                     <label class="field"><span>Geordnete Unbekannte für Systeme</span><input name="runtimeUnknowns" value="x,y"></label>
-                    <label class="field"><span>Anfängliche Annahmen (eine pro Zeile)</span><textarea name="runtimeAssumptions" placeholder="b != 0&#10;d != 0"></textarea></label>
+                    <fieldset class="field" id="runtimeAssumptionEditor">
+                        <legend>Anfängliche Annahmen und Zahlenbereiche</legend>
+                        <ul id="runtimeAssumptionRows" role="list"></ul>
+                        <div class="actions"><button id="addRuntimeAssumption" type="button">Annahme hinzufügen</button></div>
+                        <details id="runtimeAssumptionText">
+                            <summary>Annahmen als Text bearbeiten</summary>
+                            <label class="field"><span>Eine Annahme pro Zeile</span>
+                                <textarea name="runtimeAssumptions" placeholder="b != 0&#10;d != 0"></textarea>
+                            </label>
+                        </details>
+                        <template id="runtimeAssumptionRow">
+                            <li>
+                                <div class="runtime-assumption-row">
+                                    <label class="field"><span>Ausdruck</span><input type="text"></label>
+                                    <label class="field"><span>Bedingung oder Zahlenbereich</span>
+                                        <select>
+                                            <option value="">Freitext</option>
+                                            <option value=" != 0">Ungleich null (≠ 0)</option>
+                                            <option value=" > 0">Positiv (&gt; 0)</option>
+                                            <option value=" >= 0">Nichtnegativ (≥ 0)</option>
+                                            <option value=" ∈ N">Natürlich (ℕ)</option>
+                                            <option value=" ∈ Z">Ganzzahlig (ℤ)</option>
+                                            <option value=" ∈ Q">Rational (ℚ)</option>
+                                            <option value=" ∈ R">Reell (ℝ)</option>
+                                        </select>
+                                    </label>
+                                    <button type="button" aria-label="Annahme entfernen">Entfernen</button>
+                                </div>
+                            </li>
+                        </template>
+                    </fieldset>
                     <label class="field"><span>Regel-IDs (optional, durch Komma getrennt; leer = vollständiges Inventar)</span><input name="runtimeRuleIds"></label>
                     <label class="field"><span>Vorbereitende Support-Regel-IDs (optional, durch Komma getrennt)</span><input name="runtimePreparationRuleIds"></label>
                     <label class="field"><span>Logisches Arbeitsbudget</span><input name="runtimeWork" type="number" min="0" max="1000000" value="200000"></label>

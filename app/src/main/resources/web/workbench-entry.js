@@ -107,6 +107,52 @@
         return element;
     }
 
+    function wireRuntimeAssumptions() {
+        const rows = byId('runtimeAssumptionRows');
+        const template = byId('runtimeAssumptionRow');
+        const add = byId('addRuntimeAssumption');
+        const text = byId('searchForm').elements.runtimeAssumptions;
+        const suffixes = Array.from(template.content.querySelector('select').options, option => option.value).filter(Boolean);
+
+        // Search continues to read the same textarea and normalize lines as before.
+        function updateText() {
+            text.value = Array.from(rows.children, row => {
+                const expression = row.querySelector('input').value;
+                return expression.trim() ? expression + row.querySelector('select').value : expression;
+            }).join('\n');
+        }
+
+        function addRow(line) {
+            const row = template.content.firstElementChild.cloneNode(true);
+            const input = row.querySelector('input');
+            const condition = row.querySelector('select');
+            // Only unpack the literal forms that these controls generate.
+            const suffix = suffixes.find(value => line.endsWith(value) && line.slice(0, -value.length).trim()) || '';
+            input.value = line.slice(0, line.length - suffix.length);
+            condition.value = suffix;
+            row.addEventListener('input', updateText);
+            row.querySelector('button').addEventListener('click', () => {
+                const neighbor = row.nextElementSibling || row.previousElementSibling;
+                row.remove();
+                updateText();
+                (neighbor ? neighbor.querySelector('input') : add).focus();
+            });
+            rows.appendChild(row);
+            return input;
+        }
+
+        function updateRows() {
+            rows.replaceChildren();
+            text.value.split('\n').filter(line => line.trim()).forEach(addRow);
+        }
+
+        add.addEventListener('click', () => addRow('').focus());
+        text.addEventListener('input', updateRows);
+        updateRows();
+    }
+
+    wireRuntimeAssumptions();
+
     const evidenceLabels = {
         REJECTED: 'Verworfen; kein verwendbarer Nachweis.',
         OBSERVED: 'Beobachtetes Muster; noch nicht unabhängig geprüft.',

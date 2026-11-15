@@ -1,10 +1,13 @@
 package de.regelsuche.e2e;
 
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.AriaRole;
+import de.regelsuche.json.JsonReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
@@ -59,14 +62,57 @@ class SafeRuntimeBrowserTest {
         assertTrue(page.locator("#runtimeExport").isDisabled());
         for (String profile : List.of("DIRECT_V1", "SAFE_PREPARATION_V4")) {
             select(profile, "1+(a/b)*(c/d)", "rational_multiply_fractions");
-            page.locator("[name=runtimeAssumptions]").fill("b != 0\nd != 0");
+            var assumptions = openAssumptionText();
+            assumptions.fill("b != 0\nd != 0");
             submit();
             assertTrue(page.locator("#runtimeCandidates").textContent().contains("Annahmen: b != 0, d != 0"));
-            page.locator("[name=runtimeAssumptions]").fill("b != 0");
+            assumptions.fill("b != 0");
             submit();
             assertTrue(page.locator("#runtimeSummary").textContent().contains("UNSUPPORTED"));
             assertEquals("", page.locator("#runtimeCandidates").textContent());
         }
+    }
+
+    @Test void structuredAssumptionsAndDomainsRoundTripThroughTheRuntimeRequest() {
+        page.setViewportSize(390, 844);
+        var add = page.locator("#addRuntimeAssumption");
+        assertFalse(add.isVisible());
+        select("DIRECT_V1", "1+(a/b)*(c/d)", "rational_multiply_fractions");
+        var rows = page.locator("#runtimeAssumptionRows li");
+        for (String symbol : List.of("b", "d", "z")) {
+            add.press("Enter");
+            var input = rows.last().getByLabel("Ausdruck", new Locator.GetByLabelOptions().setExact(true));
+            assertEquals(Boolean.TRUE, input.evaluate("element => document.activeElement === element"));
+            input.fill(symbol);
+            rows.last().getByLabel("Bedingung oder Zahlenbereich").selectOption(symbol.equals("z") ? " ∈ Z" : " != 0");
+        }
+        add.press("Enter");
+        rows.last().getByLabel("Ausdruck", new Locator.GetByLabelOptions().setExact(true)).fill("custom(x, y)");
+        assertEquals(Boolean.TRUE, page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
+
+        String structured = page.waitForRequest("**/api/search", this::submit).postData();
+        var payload = new JsonReader(structured).readObject();
+        assertEquals(List.of("b != 0", "d != 0", "z ∈ Z", "custom(x, y)"),
+            ((Map<?, ?>) payload.get("runtimeRequest")).get("assumptions"));
+        assertTrue(page.locator("#runtimeCandidates").textContent().contains("b != 0"));
+        assertTrue(page.locator("#runtimeCandidates").textContent().contains("z ∈ Z"));
+
+        var assumptions = openAssumptionText();
+        assertEquals("b != 0\nd != 0\nz ∈ Z\ncustom(x, y)", assumptions.inputValue());
+        assumptions.fill("  b != 0\n\nd != 0\nz ∈ Z\ncustom(x, y)  \n");
+        assertEquals(structured, page.waitForRequest("**/api/search", this::submit).postData());
+        assertEquals(4, rows.count());
+        assertEquals(" ∈ Z", rows.nth(2).getByLabel("Bedingung oder Zahlenbereich").inputValue());
+        assertEquals("custom(x, y)  ", rows.last().getByLabel("Ausdruck", new Locator.GetByLabelOptions().setExact(true)).inputValue());
+
+        rows.nth(1).getByRole(AriaRole.BUTTON).press("Enter");
+        assertEquals(Boolean.TRUE, rows.nth(1).getByLabel("Ausdruck", new Locator.GetByLabelOptions().setExact(true))
+            .evaluate("element => document.activeElement === element"));
+        assertFalse(assumptions.inputValue().contains("d != 0"));
+        rows.nth(1).getByLabel("Bedingung oder Zahlenbereich").selectOption(" ∈ Q");
+        assertTrue(assumptions.inputValue().contains("z ∈ Q"));
+        submit();
+        assertTrue(page.locator("#runtimeSummary").textContent().contains("UNSUPPORTED"));
     }
 
     @Test void systemRemainsTypedThroughTheSearchControls() {
@@ -82,7 +128,7 @@ class SafeRuntimeBrowserTest {
     @Test void nestedPreparationShowsItsLocalGuardsAndRemainsAblatable() throws Exception {
         select("DIRECT_V1", "1+((a/b)+0)*(c/d)", "rational_multiply_fractions,ast_add_zero_right");
         page.locator("[name=runtimePreparationRuleIds]").fill("ast_add_zero_right");
-        page.locator("[name=runtimeAssumptions]").fill("b != 0\nd != 0");
+        openAssumptionText().fill("b != 0\nd != 0");
         submit();
         assertFalse(page.locator("#runtimeCandidates").textContent().contains("PREPARED"));
         page.locator("#runtimeProfile").selectOption("SAFE_PREPARATION_V4");
@@ -98,9 +144,15 @@ class SafeRuntimeBrowserTest {
         assertTrue(page.locator("#runtimeCandidates").textContent().contains("PREPARED"));
         select("SAFE_PREPARATION_V4", "1+((a/b)+0)*(c/d)", "rational_multiply_fractions,ast_add_zero_right");
         page.locator("[name=runtimePreparationRuleIds]").fill("ast_add_zero_right");
-        page.locator("[name=runtimeAssumptions]").fill("b != 0");
+        openAssumptionText().fill("b != 0");
         submit();
         assertFalse(page.locator("#runtimeCandidates").textContent().contains("PREPARED"));
+    }
+
+    private Locator openAssumptionText() {
+        var text = page.locator("[name=runtimeAssumptions]");
+        if (!text.isVisible()) page.locator("#runtimeAssumptionText summary").click();
+        return text;
     }
 
     private void select(String profile, String source, String rules) {
