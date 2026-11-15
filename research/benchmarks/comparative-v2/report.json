@@ -3324,6 +3324,12 @@
       "path": "research/benchmarks/candidate-independent/finite-sequence-candidate-forms.json",
       "sha256": "ae120d1c51a53db822496a7bce4ea8ee556c775a85a82132ad0916a36a35f2b2"
     },
+    "hidden-rule-constant-denominators": {
+      "attachment": "evidence/1af25ae8e84e3d0e88d7fe1d3a8547b99bf35afb877e0318bfa95f0511801fdc.json",
+      "bytes": 138533,
+      "path": "research/benchmarks/comparative-v2/hidden-rule-constant-denominators.json.gz",
+      "sha256": "1af25ae8e84e3d0e88d7fe1d3a8547b99bf35afb877e0318bfa95f0511801fdc"
+    },
     "hidden-rule-current": {
       "attachment": "evidence/eea493b38abcc45719d694f4ef4c58e29f5e2a4b7732ad24d9cec5b5cd2bdf08.json",
       "bytes": 121705,
@@ -3529,10 +3535,72 @@
     },
     "B": {
       "regimeRevisions": {
+        "hidden-rule-constant-denominators": "c1f3a273d6d0a81e9862f8564729dfcf3cd35c89",
         "hidden-rule-current": "9ddd37acd174edcfdfe440e72f726bf7392ed34c",
         "hidden-rule-historical": "03b58d1dfdd9c5076622f1f9bf35dd9c618bf897"
       },
       "regimes": {
+        "hidden-rule-constant-denominators": {
+          "informationParity": {
+            "concreteTaskEndpointsVisible": true,
+            "familyVisibleToRunner": false,
+            "generalizedReferenceVisibleToRunner": false,
+            "holdoutsUsedDuringFormation": false,
+            "primitiveInventoryVisible": true
+          },
+          "profiles": {
+            "best-first": {
+              "failureTaxonomy": {
+                "candidate validation evidence failed": 1,
+                "candidate was not frozen": 1,
+                "holdout evaluation incomplete": 1,
+                "no candidate was produced": 1,
+                "paired ablation showed no material benefit": 1
+              },
+              "summary": {
+                "acceptedCases": 19,
+                "cases": 20,
+                "counterexampleSearches": 19,
+                "evaluatedNegativeHoldouts": 38,
+                "falsePositiveHoldouts": 0,
+                "falsePositiveRatePermille": 0,
+                "families": 4,
+                "frozenCandidates": 19,
+                "generatedValidationExamples": 175,
+                "materialAblations": 19,
+                "negativeHoldouts": 40,
+                "rediscoveredCases": 19,
+                "rediscoveryRatePermille": 950,
+                "skippedNegativeHoldouts": 2
+              }
+            },
+            "project-a-star": {
+              "failureTaxonomy": {
+                "candidate validation evidence failed": 1,
+                "candidate was not frozen": 1,
+                "holdout evaluation incomplete": 1,
+                "no candidate was produced": 1,
+                "paired ablation showed no material benefit": 1
+              },
+              "summary": {
+                "acceptedCases": 19,
+                "cases": 20,
+                "counterexampleSearches": 19,
+                "evaluatedNegativeHoldouts": 38,
+                "falsePositiveHoldouts": 0,
+                "falsePositiveRatePermille": 0,
+                "families": 4,
+                "frozenCandidates": 19,
+                "generatedValidationExamples": 175,
+                "materialAblations": 19,
+                "negativeHoldouts": 40,
+                "rediscoveredCases": 19,
+                "rediscoveryRatePermille": 950,
+                "skippedNegativeHoldouts": 2
+              }
+            }
+          }
+        },
         "hidden-rule-current": {
           "informationParity": {
             "concreteTaskEndpointsVisible": true,
@@ -3656,7 +3724,7 @@
           }
         }
       },
-      "scope": "The same twenty opaque tasks under exact and historical validation; report each separately."
+      "scope": "The same twenty opaque tasks under historical validation, the initial exact validator, and exact validation with nonzero constant denominators."
     },
     "C": {
       "coverage": "Four independent campaigns per form with enumerative and seeded random controls. Shared cases across arms and forms are repeated observations. The finite retrospective project inventory tests no external novelty.",

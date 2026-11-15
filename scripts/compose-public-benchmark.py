@@ -10,8 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "research/benchmarks/comparative-v2"
 POLICY = "NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY"
-HIDDEN_RULE_REPLAY_BYTES = 121655
-HIDDEN_RULE_REPLAY_SHA256 = "dd7dc15f2455727d8a9bf1d7b4782085e40ef29da5f40797767f2424bda7b9ce"
+HIDDEN_RULE_REPLAY = "hidden-rule-constant-denominators"
 
 
 def require(value, message):
@@ -49,23 +48,7 @@ def hidden(data):
 
 
 def verify_hidden_rule_replay(frozen, replay):
-    expected = json.loads(frozen)
-    for profile in ("best-first", "project-a-star"):
-        cases = [row for row in expected["profiles"][profile]["cases"] if row["opaqueCaseId"] == "case-002"]
-        require(len(cases) == 1, f"frozen case-002 must occur once in {profile}")
-        searches = cases[0]["validation"]["counterexampleSearches"]
-        require(len(searches) == 1, f"frozen case-002 must retain one search in {profile}")
-        sources = searches[0]["attemptedSources"]
-        require(sources.count("matrix-non-commutative") == 1,
-                f"frozen case-002 must retain one matrix source in {profile}")
-        sources.remove("matrix-non-commutative")
-
-    expected_bytes = json.dumps(expected, separators=(",", ":"), ensure_ascii=False).encode()
-    require(replay == expected_bytes,
-            "exact-validation hidden-rule replay differs beyond the two case-002 matrix-source omissions")
-    require(len(replay) == HIDDEN_RULE_REPLAY_BYTES
-            and hashlib.sha256(replay).hexdigest() == HIDDEN_RULE_REPLAY_SHA256,
-            "exact-validation hidden-rule replay digest differs from the integrated validator")
+    require(replay == frozen, "hidden-rule replay differs from the frozen constant-denominator report")
 
 
 def grammar(data, inventory, form):
@@ -148,10 +131,17 @@ def compose(raw, sources):
     require(a["scorePolicy"] == POLICY, "legacy score policy")
     tracks = {key: legacy_track(a, track) for key, track in
               [("A1", "TARGET_DIRECTED_SEARCH"), ("A2", "SIMPLIFICATION_COMPETITION"), ("E1", "EQUALITY_VALIDATION")]}
-    tracks["B"] = {"regimeRevisions": {"hidden-rule-current": "9ddd37acd174edcfdfe440e72f726bf7392ed34c",
-                                      "hidden-rule-historical": "03b58d1dfdd9c5076622f1f9bf35dd9c618bf897"},
-                   "regimes": {k: hidden(data[k]) for k in ("hidden-rule-current", "hidden-rule-historical")},
-                   "scope": "The same twenty opaque tasks under exact and historical validation; report each separately."}
+    hidden_rule_revisions = {
+        "hidden-rule-historical": "03b58d1dfdd9c5076622f1f9bf35dd9c618bf897",
+        "hidden-rule-current": "9ddd37acd174edcfdfe440e72f726bf7392ed34c",
+        HIDDEN_RULE_REPLAY: "c1f3a273d6d0a81e9862f8564729dfcf3cd35c89",
+    }
+    tracks["B"] = {
+        "regimeRevisions": hidden_rule_revisions,
+        "regimes": {key: hidden(data[key]) for key in hidden_rule_revisions},
+        "scope": "The same twenty opaque tasks under historical validation, the initial exact validator, "
+                 "and exact validation with nonzero constant denominators.",
+    }
     tracks["C"] = {
         "formation": "Only public TRAIN prefixes or start expressions and authorized assumptions. Each form uses its frozen grammar, resource accounts, independent evaluation and project-inventory audit.",
         "coverage": "Four independent campaigns per form with enumerative and seeded random controls. Shared cases across arms and forms are repeated observations. The finite retrospective project inventory tests no external novelty.",
@@ -196,10 +186,11 @@ def main():
         sources[key], raw[key] = source, data
     replays = [path.read_bytes() for path in args.hidden_rule_replay]
     for replay in replays:
-        verify_hidden_rule_replay(raw["hidden-rule-current"], replay)
+        verify_hidden_rule_replay(raw[HIDDEN_RULE_REPLAY], replay)
     if replays:
         require(all(replay == replays[0] for replay in replays), "hidden-rule replays differ between environments")
-        print(f"Track B integrated replay: {HIDDEN_RULE_REPLAY_BYTES} bytes; SHA-256 {HIDDEN_RULE_REPLAY_SHA256}")
+        pinned = sources[HIDDEN_RULE_REPLAY]
+        print(f"Track B integrated replay: {pinned['bytes']} bytes; SHA-256 {pinned['sha256']}")
     rendered = canonical(compose(raw, sources))
     composition_sha256 = hashlib.sha256(rendered).hexdigest()
     require(composition_sha256 == expected_composition,
