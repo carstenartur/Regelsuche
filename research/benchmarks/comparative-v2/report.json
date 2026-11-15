@@ -3426,6 +3426,12 @@
       "path": "research/benchmarks/track-f-stage-allocation/plan.json",
       "sha256": "0b67a54b17f48304e38226579ff0f013180d4400fc679185a360ff023c981eb9"
     },
+    "stages-qualification": {
+      "attachment": "evidence/ad45f3b6f84013a0872d7761079e2fae768cbe5178a73cff20667ea7e75c863d.json",
+      "bytes": 20552,
+      "path": "research/benchmarks/track-f-stage-allocation/qualification.json.gz",
+      "sha256": "ad45f3b6f84013a0872d7761079e2fae768cbe5178a73cff20667ea7e75c863d"
+    },
     "terminal": {
       "attachment": "evidence/04eaa8a4bb800791b62fed4d1cab4fcd6c3e2e4de46a9c561a24a03272972d19.json",
       "bytes": 138180,
@@ -4492,6 +4498,62 @@
       ]
     },
     "F": {
+      "finalQualification": {
+        "configuredNegativeHoldouts": 12,
+        "configuredPositiveHoldouts": 12,
+        "conjectureId": "open-target-conjecture-91ef32d35224049e4cd2",
+        "correctnessRegressionCount": 0,
+        "executedNegativeHoldouts": 12,
+        "executedPositiveHoldouts": 12,
+        "lanes": [
+          {
+            "arm": "UNIFORM_ALL_STAGES",
+            "distinctQualifiedCandidates": 1,
+            "notEvaluatedLineages": 0,
+            "panel": "null-then-open",
+            "qualifiedLineages": 1
+          },
+          {
+            "arm": "STATIC_NO_FEEDBACK",
+            "distinctQualifiedCandidates": 0,
+            "notEvaluatedLineages": 1,
+            "panel": "null-then-open",
+            "qualifiedLineages": 0
+          },
+          {
+            "arm": "NATIVE_RECEIPT_DRIVEN",
+            "distinctQualifiedCandidates": 1,
+            "notEvaluatedLineages": 0,
+            "panel": "null-then-open",
+            "qualifiedLineages": 1
+          },
+          {
+            "arm": "UNIFORM_ALL_STAGES",
+            "distinctQualifiedCandidates": 1,
+            "notEvaluatedLineages": 0,
+            "panel": "competing-continuations",
+            "qualifiedLineages": 2
+          },
+          {
+            "arm": "STATIC_NO_FEEDBACK",
+            "distinctQualifiedCandidates": 1,
+            "notEvaluatedLineages": 1,
+            "panel": "competing-continuations",
+            "qualifiedLineages": 1
+          },
+          {
+            "arm": "NATIVE_RECEIPT_DRIVEN",
+            "distinctQualifiedCandidates": 1,
+            "notEvaluatedLineages": 0,
+            "panel": "competing-continuations",
+            "qualifiedLineages": 2
+          }
+        ],
+        "qualificationExecutions": 1,
+        "qualificationRunHash": "sha256:b33694dcd412b4ecedecd8a168157b6e689b6673b22a3d04efddec94cc32d6f1",
+        "refutingHoldouts": 0,
+        "scope": "Post-handoff evaluation of one identical rewrite on the public composite-factor suite"
+      },
       "scope": "Finish only genuinely eligible actions. Retain rejected/inconclusive or zero-output batches and missing preassigned slots. Track gate status, actual receipt identity, candidate lineage, native resources and exact reasons. No increase to positive or scientific claims or formal proof authority. Compute between-arm comparisons only on matching public panel, never pool with #1204.",
       "sevenStageAllocation": [
         {

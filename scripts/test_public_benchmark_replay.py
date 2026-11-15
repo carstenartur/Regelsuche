@@ -1,4 +1,4 @@
-"""Track B's live replay must reproduce the complete pinned report."""
+"""Public benchmark replay and final qualification controls."""
 import gzip
 import importlib.util
 import json
@@ -31,6 +31,52 @@ class PublicBenchmarkReplayTest(unittest.TestCase):
         older = gzip.decompress((COMPOSER.PUBLIC / "hidden-rule-current.json.gz").read_bytes())
         with self.assertRaisesRegex(ValueError, "differs from the frozen constant-denominator report"):
             COMPOSER.verify_hidden_rule_replay(self.frozen, older)
+
+    def test_retains_one_post_handoff_qualification_with_all_lane_outcomes(self):
+        registry = json.loads((COMPOSER.PUBLIC / "sources.json").read_bytes())
+        del registry["compositionSha256"]
+        raw = {key: COMPOSER.read_source(COMPOSER.ROOT / item["path"])
+               for key, item in registry.items()}
+        track = COMPOSER.compose(raw, registry)["tracks"]["F"]
+        self.assertIn("finalQualification", track, "Track F needs the post-handoff receipt")
+        qualification = track["finalQualification"]
+        self.assertEqual(1, qualification["qualificationExecutions"])
+        self.assertEqual([1, 0, 1, 2, 1, 2],
+                         [lane["qualifiedLineages"] for lane in qualification["lanes"]])
+
+    def test_qualification_cannot_be_transferred_to_an_unfinished_lineage(self):
+        registry = json.loads((COMPOSER.PUBLIC / "sources.json").read_bytes())
+        allocation = registry["stages-measured"]
+        qualification = registry["stages-qualification"]
+        stage = json.loads(COMPOSER.read_source(COMPOSER.ROOT / allocation["path"]))
+        result = json.loads(COMPOSER.read_source(COMPOSER.ROOT / qualification["path"]))
+        unfinished = next(lineage for lane in result["lanes"] for lineage in lane["lineages"]
+                          if lineage["allocationStatus"] != "COMPLETED")
+        unfinished["qualificationStatus"] = "QUALIFIED"
+        with self.assertRaisesRegex(ValueError, "unfinished lineage"):
+            COMPOSER.final_qualification(result, stage, allocation["sha256"])
+
+    def test_qualification_rejects_changed_proof_strength_and_claim_gates(self):
+        registry = json.loads((COMPOSER.PUBLIC / "sources.json").read_bytes())
+        allocation = registry["stages-measured"]
+        qualification = registry["stages-qualification"]
+        stage = json.loads(COMPOSER.read_source(COMPOSER.ROOT / allocation["path"]))
+        retained = COMPOSER.read_source(COMPOSER.ROOT / qualification["path"])
+        for field, value, message in (
+            ("formalProofStatus", "FORMALLY_PROVED", "formal proof status"),
+            ("promotionStatus", "PROMOTED", "qualification receipt"),
+            ("campaignManifestHash", "sha256:" + "0" * 64, "qualification receipt"),
+        ):
+            with self.subTest(field=field):
+                result = json.loads(retained)
+                if field == "formalProofStatus":
+                    result["lanes"][0]["lineages"][0][field] = value
+                elif field == "campaignManifestHash":
+                    result["qualification"]["evidence"][field] = value
+                else:
+                    result["qualification"]["run"][field] = value
+                with self.assertRaisesRegex(ValueError, message):
+                    COMPOSER.final_qualification(result, stage, allocation["sha256"])
 
 
 if __name__ == "__main__":

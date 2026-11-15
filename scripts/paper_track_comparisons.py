@@ -7,14 +7,21 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from paper_controller_figure import table
+from paper_public_baselines import formation_outcome_table, legacy_sections, rewriting_sections
 
 SOURCES = {
+    "legacy": ("research/benchmarks/comparative-v2/legacy.json.gz",
+               "8ea2d80744f5e70eb2af7c6e6115de8d194276516329d6ca683ca1d8262ebdcf", "c5a4824f9060da04be1684bd0cef8e37001f109e"),
+    "rewriting": ("research/benchmarks/comparative-v2/rewriting.json.gz",
+                   "860bf1a08de7f605ad688569781d4d13c5868f8eef3ed3656932b3efa4b33651", "c5a4824f9060da04be1684bd0cef8e37001f109e"),
     "audit": ("research/benchmarks/candidate-independent/track-c-project-inventory/audit-result.json.gz",
               "6fd69dc66f4ce982dc3314c3082104cea2543b5cfc30ba68831fe4836a503af7", "e5a3c7919128335691bcb1b3f0de04e58ef63e10"),
     "transfer": ("research/benchmarks/track-d-public-transfer/transfer-result.json",
                  "9c10cf1e8a36659204183674e0c94e820c18424862dc62e06d647883e1343605", "0d8c6545478cbb8eca50e539124c8118939055aa"),
     "controller": ("research/benchmarks/track-f-stage-allocation/measured.json.gz",
                    "5c3a00f1db80ae5632ffe3ce734badbcde93575be1786094eb443c76c7801df0", "ab12f340e7e6f894ff32088adbc2df1dfa4f11b8"),
+    "qualification": ("research/benchmarks/track-f-stage-allocation/qualification.json.gz",
+                      "ad45f3b6f84013a0872d7761079e2fae768cbe5178a73cff20667ea7e75c863d", None),
     "historicalHidden": ("research/benchmarks/comparative-v2/hidden-rule-historical.json.gz",
                          "46605224e9851071df8522c9d74ed70bf09ff1911d3d54448888f09a8449ff7e", "df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b"),
     "exactHidden": ("research/benchmarks/comparative-v2/hidden-rule-current.json.gz",
@@ -36,7 +43,7 @@ PANELS = {"null-then-open": "Zero then one", "competing-continuations": "One the
 
 def source(key):
     path, _, revision = SOURCES[key]
-    return f"https://github.com/carstenartur/Regelsuche/blob/{revision}/{path}"
+    return f"https://github.com/carstenartur/Regelsuche/blob/{revision}/{path}" if revision else f"../../{path}"
 
 
 def fraction(numerator, denominator):
@@ -76,7 +83,7 @@ def controller_figure(rows, output):
              '<rect width="660" height="236" fill="#ffffff"/>',
              '<g font-family="sans-serif" font-size="12" fill="#25303c">']
     for i, row in enumerate(rows):
-        panel, policy, _, executed, skipped, remaining = row
+        panel, policy, _, executed, skipped, remaining, _ = row
         y = 9 + i * 30
         parts.append(f'<text x="3" y="{y+13}">{escape(panel)} · {escape(policy)}</text>')
         slots = ["executed"] * executed + ["skipped"] * skipped + ["remaining"] * remaining
@@ -145,6 +152,68 @@ def rediscovery_table(historical, exact, corrected):
     return table(["Validator", "Search", "Recovered", "Negative executed", "Negative skipped", "False positives"], rows)
 
 
+def qualification_summary(controller, companion):
+    if companion["stageAllocationSha256"] != "sha256:" + SOURCES["controller"][1]:
+        raise ValueError("qualification belongs to a different allocation report")
+    qualification = companion["qualification"]
+    lanes = {(lane["panel"], lane["arm"]): lane for lane in companion["lanes"]}
+    if len(lanes) != len(companion["lanes"]) or set(lanes) != {(v["panel"], v["arm"]) for v in controller["lanes"]}:
+        raise ValueError("qualification lane set differs from allocation")
+    coverage = {}
+    total_qualified = total_formed = 0
+    for lane in controller["lanes"]:
+        key = lane["panel"], lane["arm"]
+        qualified = 0
+        for branch, linked in zip(lane["candidates"], lanes[key]["lineages"], strict=True):
+            if any(branch[field] != linked[field] for field in ("id", "batch", "lineageHash", "conjectureId")):
+                raise ValueError("qualification links a different lineage")
+            if branch["status"] != linked["allocationStatus"]:
+                raise ValueError("qualification changes an allocation status")
+            if branch["status"] != "COMPLETED":
+                if linked["qualificationStatus"] != "NOT_EVALUATED":
+                    raise ValueError("qualification evaluated an incomplete handoff")
+                continue
+            proof = branch["receipts"]["PROOF"]
+            if (proof["backendId"], proof["backendStatus"], proof["formalProofStatus"]) != (
+                    "polynomial-normal-form", "CONFIRMED", "NOT_EVALUATED"):
+                raise ValueError("qualification proof scope differs from allocation")
+            if (linked["formalProofStatus"] != proof["formalProofStatus"]
+                    or linked["handoffHash"] != branch["receipts"]["LIFECYCLE_HANDOFF"]["contentHash"]
+                    or linked["qualificationRunHash"] != qualification["run"]["contentHash"]
+                    or branch["conjectureId"] != qualification["evaluation"]["conjectureId"]):
+                raise ValueError("qualification evidence does not bind the original handoff and shared replay")
+            qualified += linked["qualificationStatus"] == "QUALIFIED"
+        if qualified != lanes[key]["qualifiedLineages"]:
+            raise ValueError("qualification count differs from lineage statuses")
+        formed = len(lane["candidates"])
+        coverage[key] = fraction(qualified, formed)
+        total_qualified += qualified
+        total_formed += formed
+
+    evaluation = qualification["evaluation"]
+    positive = fraction(sum(case["passed"] for case in evaluation["positiveResults"]),
+                        evaluation["configuredPositiveHoldouts"])
+    negative = fraction(sum(case["passed"] for case in evaluation["negativeResults"]),
+                        evaluation["configuredNegativeHoldouts"])
+    utility = qualification["utility"]
+    cases = utility["cases"]
+    executions = companion["qualificationExecutions"]
+    if executions != 1:
+        raise ValueError("qualification must evaluate the shared rewrite once")
+    baseline_states = sum(case["baselineExploredStates"] for case in cases)
+    candidate_states = sum(case["candidateExploredStates"] for case in cases)
+    return coverage, (
+        f"The completed handoffs all retained a confirmed symbolic polynomial-normal-form check. Their formal-proof "
+        f"status remains `NOT_EVALUATED`. The public composite-factor suite evaluated the same rewrite in "
+        f"one post-handoff run linked to {total_qualified} of {total_formed} formed lineages. "
+        f"It passed {positive} positive holdouts and {negative} negative controls. The paired search measured "
+        f"material gains on {utility['materialGainCount']} of {len(cases)} tasks and {utility['correctnessRegressionCount']} "
+        f"correctness regressions, with {baseline_states} explored states in the baseline and {candidate_states} "
+        f"with the rewrite. The other {total_formed - total_qualified} handoffs stayed incomplete and had no qualification evaluation. "
+        f"[Public qualification companion]({source('qualification')}). Decoded evidence SHA-256 `{SOURCES['qualification'][1]}`."
+    )
+
+
 def write_track_reports(root, output, require_input):
     reports = {}
     for key, (relative, sha, _) in SOURCES.items():
@@ -166,6 +235,7 @@ def write_track_reports(root, output, require_input):
         emitted = sum(len(b["bridgeApplications"]) for _, _, b in executions)
         paired.append([family["family"], "Held-out" if family["role"] == "HELD_OUT" else "Formation",
                        f"{int(before[0])} / {int(after[0])}", f"{int(before[1])} / {int(after[1])}", calls, emitted])
+    coverage, qualification = qualification_summary(reports["controller"], reports["qualification"])
     downstream = []
     for panel, panel_label in PANELS.items():
         for policy, label in POLICIES.items():
@@ -173,7 +243,7 @@ def write_track_reports(root, output, require_input):
             branches = lane["candidates"]
             tickets = Counter(e["status"] for e in lane["dispatch"])
             downstream.append([panel_label, label, fraction(sum(b["status"] == "COMPLETED" for b in branches), len(branches)),
-                               tickets["EXECUTED"], tickets["SKIPPED"], lane["remainingTickets"]])
+                               tickets["EXECUTED"], tickets["SKIPPED"], lane["remainingTickets"], coverage[(panel, policy)]])
     controller_figure(downstream, output)
     fan = []
     for key, name in (("production", "Production"), ("noFanIn", "No fan-in")):
@@ -202,12 +272,13 @@ def write_track_reports(root, output, require_input):
         "## Seven-stage allocation", "Both panels ran the same registered twelve seeds and two six-slot formation batches. "
         "Completed counts eligible lineages that reached conservative lifecycle handoff. The two batches in the second "
         "panel formed different lineages for the same conjecture.",
-        table(["Batch outputs", "Policy", "Completed / formed", "Executed", "Skipped", "Remaining"], downstream),
+        table(["Batch outputs", "Policy", "Completed / formed", "Executed", "Skipped", "Remaining", "Qualified / formed"], downstream),
         "![Dispatch opportunities grouped by disposition](public-stage-dispatch.svg)",
         "Every lane had fourteen stage dispatch opportunities. The evaluator uses one validation and one counterexample "
         "ticket in the same call. Receipt-driven and uniform allocation completed the same branches using identical native "
         "work. The static policy reserved both candidate chains for the first batch. Tickets do not establish CPU parity. "
         f"[All six dispatch traces and native resource ledgers]({source('controller')}).",
+        qualification,
         "## Cross-observation formation", table(["Policy", "Batches", "Candidates", "Rejected clusters"], fan),
         "On the original public production campaign, the same miner formed a candidate only when it could pool observations. "
         "The control preserves all twelve seeds, capacity and native rejection records. "
@@ -244,5 +315,34 @@ def write_track_reports(root, output, require_input):
         rediscovery_table(reports["historicalHidden"], reports["exactHidden"], reports["correctedHidden"]),
         f"[Historical hidden-rule execution]({source('historicalHidden')}) · "
         f"[Initial exact execution]({source('exactHidden')}) · [Corrected exact execution]({source('correctedHidden')}).",
+    ])
+    sections.extend(legacy_sections(reports["legacy"]))
+    sections.append(f"[A1, A2 and E1 case records and resource ledgers]({source('legacy')}). "
+                    f"Decoded evidence SHA-256 `{SOURCES['legacy'][1]}`.")
+    sections.extend(rewriting_sections(reports["rewriting"]))
+    sections.extend([
+        f"[E2 case records, native budgets and proof objects]({source('rewriting')}). "
+        f"Decoded evidence SHA-256 `{SOURCES['rewriting'][1]}`.",
+        "## Open-target case outcomes",
+        "The pooled counts below summarize the same public case slots shown by arm above. Campaign seeds repeat "
+        "the case inputs. Empty candidates, failed prefix matches and downstream misses remain distinct.",
+        formation_outcome_table(reports["audit"]["forms"], FORMS),
+    ])
+    receipt_path = "paper/public-reproduction.json"
+    receipt = json.loads(require_input(root / receipt_path, receipt_path).read_bytes())
+    benchmark, manuscript = receipt["comparison"], receipt["manuscript"]
+    revision = receipt["revision"]
+    sections.extend([
+        "## Reproduction on the previous integrated revision",
+        f"These byte comparisons refer to [the recorded revision](https://github.com/carstenartur/Regelsuche/commit/{revision}). "
+        "The manuscript archive's own revision and file inventory identify the current package.",
+        table(["Artifact", "Executed environments", "Byte-identical outputs"], [
+            ["Public benchmark", benchmark["environments"], f"Canonical report and {benchmark['attachments']} evidence attachments"],
+            ["Manuscript package", manuscript["environments"],
+             f"{manuscript['archiveBytes']:,}-byte archive including a {manuscript['pdfPages']}-page PDF"],
+        ]),
+        f"Benchmark report SHA-256 `{benchmark['reportSha256']}`. [Benchmark verification]({benchmark['evidence']}).",
+        f"Manuscript archive SHA-256 `{manuscript['archiveSha256']}`. PDF SHA-256 `{manuscript['pdfSha256']}`. "
+        f"[Manuscript verification]({manuscript['evidence']}).",
     ])
     (output / "public-discovery-comparisons.md").write_text("\n\n".join(sections) + "\n")

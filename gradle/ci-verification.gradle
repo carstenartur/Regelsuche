@@ -293,6 +293,7 @@ def verifyComparativeBenchmarks = tasks.register(
     dependsOn 'prepareVerificationEnvironment',
         verifyComparativeZ3Toolchain,
         ':regelsuche-benchmarks:test',
+        ':regelsuche-release:test',
         ':regelsuche-benchmarks:writeComparativeBenchmarkRunA',
         ':regelsuche-benchmarks:writeComparativeBenchmarkRunB',
         ':regelsuche-benchmarks:writeSharedRewriteFragment',

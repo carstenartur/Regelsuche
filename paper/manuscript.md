@@ -105,13 +105,13 @@ The archival artifact will distinguish:
 - semantic reproduction through canonical roots;
 - non-reproduction with retained mismatches.
 
-The clean package build regenerates the tables and figure, verifies the source tree and executable modes, and renders the PDF. Offline replay also checks each file against the archive inventory. These checks test the manuscript and its public evidence at a named code revision. An independent scientific reproduction requires a separately identified execution and its receipt. [Archive verification](../docs/paper-foundation-verification.md)
+The clean package build regenerates the tables and figure, verifies the source tree and executable modes, and renders the PDF. Offline replay also checks each file against the archive inventory. These checks test the manuscript and its public evidence at a named code revision. An independent scientific reproduction requires a separately identified execution and its receipt. [Generated reproduction matrix](generated/public-discovery-comparisons.md) · [Archive verification](../docs/paper-foundation-verification.md)
 
 The independent artifact in #387 must execute without undocumented maintainer knowledge, undeclared network access, or mutable external inputs. Corrective changes receive new immutable artifact identities.
 
 ## 9. Results
 
-The complete primary evaluation remains pending. The public experiments below report candidate formation, held-out reuse, paired search utility and campaign completion in their respective units. The public comparison report also contains the target-directed search, simplification and equality-validation results with their task-specific limits. [Public comparison report](../research/benchmarks/comparative-v2/report.json)
+The public experiments below report candidate formation, held-out reuse, paired search utility and campaign completion in their respective units. The generated tables also give the public target-directed search, target-free simplification, equality-validation and rewriting baselines. The benchmark report retains the complete case records and work ledgers for each regime. [Public comparison report](../research/benchmarks/comparative-v2/report.json)
 
 ### Retrospective controller comparison
 
@@ -123,27 +123,17 @@ The feedback controller found no eligible continuation after qualification. Both
 
 The production fitter solved for recurrence coefficients from two TRAIN prefixes. The deterministic and randomized controls proposed coefficients from the same bounded grammar. Each arm froze its model set before scoring the six public cases. Agreement with an observed prefix and agreement with its subsequent terms were both required. All three arms repeatedly fit the same geometric TRAIN sequence. None of their frozen sets confirmed any VALIDATION or TEST case. The randomized arm also produced an empty campaign. Its duplicate draws and every case in that campaign remain in the denominators. A fixed cap on submitted candidates leaves the solvers free to incur different internal work. The experiment measures reuse within a bounded recurrence grammar. [Generated formation and per-split outcomes](generated/public-recurrence-results.md) · [Independent replay and experimental design](../docs/track-c-recurrence-comparison.md)
 
-### Outstanding primary evaluation
+### Public search, simplification, equality and rewriting baselines
 
-Required result families include:
+The generated tables report target-directed search with visible targets, target-free recovery of fixed simplification forms, equality validation on a shared polynomial pair, and rewriting within a common unconditional fragment. They retain missed reference forms, the cost miss shared by both rewriting arms, excluded translations and the distinct proof and replay outcomes. The open-target table accounts separately for empty outputs, failed prefix matches and unsuccessful downstream reuse. [Generated baseline and failure tables](generated/public-discovery-comparisons.md)
 
-- campaign and candidate terminal accounting;
-- split and leakage audits;
-- positive, negative, unsupported, and incomplete evaluation;
-- baseline and ablation comparisons;
-- per-case paired utility;
-- cumulative amortization and break-even;
-- reproduction matrix;
-- claim-status matrix;
-- failure taxonomy.
-
-No primary result may be copied manually into the manuscript.
+The complete primary evaluation remains pending. The public campaign comparison measures stage allocation, lifecycle completion and scoped post-handoff qualification. The independent reproduction and end-to-end cost studies have their own claim requirements.
 
 ### Open-target formation, transfer and controller allocation
 
 Four frozen comparisons cover the three challenges and four candidate forms in the public eighteen-case corpus. Neither sequence form transferred to a VALIDATION or TEST case. All rational arms reached the same two symbolic difference-of-squares TEST tasks and missed the two nested-reciprocal TEST tasks. The macro arms improved a TRAIN path and recorded no held-out improvement. Each campaign repeated the same public evaluation cases. The historical inventory audit shows how different definitions of novelty affect interpretation. A macro classified as new by the seven-rule checker matched a pattern emitted by an earlier project run through different operations. [Evidence-generated formation, evaluation and historical inventory tables](generated/public-discovery-comparisons.md)
 
-On a separate bridge panel, eight source-only searches formed a coefficient-gap bridge. Native factorization reached both intended held-out targets with or without that bridge. The bridge matcher emitted no moves. On the seven-stage controller panel, receipt-driven and uniform scheduling completed the same lineages using the same native work. The static policy completed fewer lineages when it had already allocated its chains to the first batch. The panel contained one distinct conjecture. [Paired transfer table and controller allocation figure](generated/public-discovery-comparisons.md)
+On a separate bridge panel, eight source-only searches formed a coefficient-gap bridge. Native factorization reached both intended held-out targets with or without that bridge. The bridge matcher emitted no moves. On the seven-stage controller panel, receipt-driven and uniform scheduling completed the same lineages using the same native work. The static policy completed fewer lineages when it had already allocated its chains to the first batch. The panels produced one distinct rewrite. Its single qualification evaluation linked to every completed handoff. The original symbolic polynomial check was confirmed and the original formal proof status remains `NOT_EVALUATED`. [Paired transfer, controller allocation and post-handoff qualification](generated/public-discovery-comparisons.md)
 
 The archived component comparison used the public fixture revision and pre-#1245 counterexample validator pinned by its protocol. Under that validator, production pooled 23 observations and formed five candidates. Per-observation mining formed none. Removing project-novelty scheduling changed four scores and left the selected order unchanged at all 47 prefix budgets. Disabling counterexample-guided refinement produced no difference in terminal dispositions. The separate unguarded-log challenge inferred three positivity guards but produced no refuting witness or revised hypothesis in any arm. This null control limits conclusions about refinement under that validator. [Matched discovery-component ablations](generated/public-discovery-comparisons.md)
 
