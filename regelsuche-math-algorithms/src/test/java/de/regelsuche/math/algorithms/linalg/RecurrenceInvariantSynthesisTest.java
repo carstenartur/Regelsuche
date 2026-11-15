@@ -173,6 +173,17 @@ class RecurrenceInvariantSynthesisTest {
             "checking retained knowledge avoids coefficient search, but is not free");
     }
 
+    @Test void aTransportedProposalMustFitTheExactScalarParser() {
+        var source = transition(new long[][] {{-1}}, 0);
+        var target = transition(new long[][] {{-1}}, 20);
+        var proposal = new Proposal("1" + "0".repeat(1023) + "*x0", Evolution.ALTERNATING);
+        var anchor = verifier.verify(source, proposal, values(0), BUDGET).law().orElseThrow();
+
+        var transported = verifier.transport(anchor, target, values(0), BUDGET);
+        equal(Outcome.UNSUPPORTED, transported.outcome());
+        check(transported.law().isEmpty(), "unsupported proposal text cannot become a verified step");
+    }
+
     @Test void checksAffineTransferOnIndependentConcreteTrajectories() {
         var random = new java.util.Random(73142);
         for (int example = 0; example < 36; example++) {
@@ -331,6 +342,7 @@ class RecurrenceInvariantSynthesisTest {
         tests.distinguishesFittingNumbersFromAUniversalStepIdentity();
         tests.validatesDimensionsDegreeAndExactLargeCoefficients();
         tests.reusesAStoredProposalWithAnIndependentlyCheckedNewInitialState();
+        tests.aTransportedProposalMustFitTheExactScalarParser();
         tests.checksAffineTransferOnIndependentConcreteTrajectories();
         tests.respectsLinearAnsatzAndRejectsOversizedInputs();
         tests.reportsOversizedValidLawsAsUnsupportedInsteadOfThrowing();
