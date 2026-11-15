@@ -1,0 +1,84 @@
+{
+  "schema": "regelsuche.state-choice-oracle/v1",
+  "targetEqualQualityWorkSavingPercent": 20,
+  "sourceRevision": "4fa61819b871f7b6be5fcf15f9467dfdbda07ebf",
+  "inputScope": "Frozen public diagnostic panel. The witness is evaluator-only. No fitting or teaching consumes the target cases.",
+  "orderedReductions": {
+    "rowCounts": [8, 32],
+    "changes": 16,
+    "initialStep": 19,
+    "initialStart": 7,
+    "initialModulus": 31,
+    "changeIndexStep": 7,
+    "changeIndexStart": 1,
+    "changeValueStep": 23,
+    "changeValueStart": 3,
+    "changeValueModulus": 37,
+    "maxWork": 2000000,
+    "maxTerms": 256,
+    "maxStates": 4,
+    "timeoutMillis": 30000,
+    "cases": [
+      {
+        "id": "commons-int-variance",
+        "source": "https://github.com/apache/commons-statistics/blob/2937eb2e711483d8ea9dc216af45c16fd0066b77/commons-statistics-descriptive/src/main/java/org/apache/commons/statistics/descriptive/IntVariance.java#L244-L263",
+        "contract": "Exact numerator n*sum(x^2)-sum(x)^2 before conversion to double. The replacement workload is added by the experiment.",
+        "slots": 2,
+        "summand": "(x0-x1)^2",
+        "statistics": [[[]], [[0]], [[0, 0]]],
+        "nonnegative": false,
+        "expected": "VERIFIED"
+      },
+      {
+        "id": "symja-elementary-symmetric-3",
+        "source": "https://github.com/axkr/symja_android_library/blob/05bebd3b169fbf138d5b903fa379548168095596/symja_android_library/matheclipse-core/src/main/java/org/matheclipse/core/reflection/system/SymmetricPolynomial.java#L26-L60",
+        "contract": "Third elementary symmetric polynomial on integer arguments. The replacement workload is added by the experiment.",
+        "slots": 3,
+        "summand": "x0*x1*x2",
+        "statistics": [[[0]], [[0], [0]]],
+        "nonnegative": false,
+        "expected": "VERIFIED"
+      },
+      {
+        "id": "atcoder-abc177c",
+        "source": "https://github.com/haruki57/atcoder-java/blob/8a3614314e4db69ffe623506e9e973c799b87238/src/main/java/ABC177C.java#L11-L26",
+        "contract": "Sum of products of all distinct-index pairs reduced modulo 1000000007. Both arms reduce the exact result after every observation. The replacement workload is added by the experiment.",
+        "slots": 2,
+        "summand": "x0*x1",
+        "statistics": [[[0]]],
+        "nonnegative": true,
+        "expected": "VERIFIED"
+      },
+      {
+        "id": "princeton-inversions",
+        "source": "https://github.com/kevin-wayne/algs4/blob/7bb62c32f03fec900f0cc796a548ab992feffe4e/src/main/java/edu/princeton/cs/algs4/Inversions.java#L43-L83",
+        "contract": "Count ordered pairs with xi>xj. The adjacent-key restriction is expressible. The point-update contract rejects restricted pairs.",
+        "slots": 2,
+        "summand": "1",
+        "expected": "POINT_UPDATES_REQUIRE_UNRESTRICTED_ROWS"
+      },
+      {
+        "id": "princeton-three-sum",
+        "source": "https://github.com/kevin-wayne/algs4/blob/7bb62c32f03fec900f0cc796a548ab992feffe4e/src/main/java/edu/princeton/cs/algs4/ThreeSum.java#L68-L88",
+        "contract": "Count distinct-index triples with xi+xj+xk=0. The ternary predicate has no encoding in the adjacent-key iteration model.",
+        "slots": 3,
+        "expected": "UNREPRESENTABLE_SOURCE"
+      }
+    ]
+  },
+  "recurrences": {
+    "source": "config/benchmarks/historical-sympy-v1.json",
+    "sourceSha256": "fcd686dabd14c6bdf5318602c37b0915134a010a0ae5acc85dbe28fc48abbb1a",
+    "selection": "All rows with task.kind INVARIANT, in original order.",
+    "valueIndices": [0, 1, 2, 7, 24, 63],
+    "cases": [
+      {"id": "cassini", "polynomial": "x0^2+x0*x1-x1^2", "evolution": "ALTERNATING"},
+      {"id": "pell", "polynomial": "x0^2+2*x0*x1-x1^2", "evolution": "ALTERNATING"},
+      {"id": "recurrence-parameter-4", "polynomial": "x0^2+4*x0*x1-x1^2", "evolution": "ALTERNATING"},
+      {"id": "recurrence-negative-parameter", "polynomial": "x0^2-3*x0*x1-x1^2", "evolution": "ALTERNATING"},
+      {"id": "recurrence-rational", "polynomial": "x0^2+(1/2)*x0*x1-x1^2", "evolution": "ALTERNATING"},
+      {"id": "no-invariant-in-ansatz"},
+      {"id": "recurrence-affine", "polynomial": "x0^2+x1^2-x0-x1", "evolution": "FIXED"}
+    ]
+  }
+}
