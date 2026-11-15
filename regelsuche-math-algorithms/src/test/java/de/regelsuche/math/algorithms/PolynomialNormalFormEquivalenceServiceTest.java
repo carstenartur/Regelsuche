@@ -43,6 +43,25 @@ class PolynomialNormalFormEquivalenceServiceTest {
     }
 
     @Test
+    void provesPolynomialQuotientsWithNonzeroConstantDenominators() {
+        var service = new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
+
+        assertTrue(service.arePolynomiallyEquivalent("(x+y)^2/1", "x^2+2*x*y+y^2"));
+        assertTrue(service.arePolynomiallyEquivalent("(3*x-6*y)/(-3/2)", "-2*x+4*y"));
+        assertTrue(service.arePolynomiallyEquivalent("(x+y)/(x-x+2)", "x/2+y/2"));
+    }
+
+    @Test
+    void refusesZeroAndNonconstantDenominatorsWithoutAssumptions() {
+        var service = new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
+
+        assertFalse(service.arePolynomiallyEquivalent("(x/0)*0", "0"));
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN, service.lastResult().status());
+        assertFalse(service.arePolynomiallyEquivalent("x*y/x", "y"));
+        assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN, service.lastResult().status());
+    }
+
+    @Test
     void supportsSmallLinearNormalFormEliminationWithoutClaimingGroebnerBasis() {
         PolynomialNormalFormEquivalenceService service = new PolynomialNormalFormEquivalenceService(
             new DefaultMathematicalAlgorithmRegistry(Map.of(

@@ -12,8 +12,8 @@ import java.util.Optional;
 /**
  * Deterministic polynomial normal-form equivalence for direct polynomial identities.
  *
- * <p>This service expands and canonicalizes supported polynomial expressions. It is not a Gröbner-basis
- * implementation and does not decide ideal membership or polynomial systems.
+ * <p>This service expands and canonicalizes direct polynomial identities over the rationals.
+ * Nonzero constant denominators become exact rational coefficients.
  */
 public class PolynomialNormalFormEquivalenceService implements PolynomialEquivalenceService, OracleValidator {
     private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();
