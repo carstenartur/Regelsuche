@@ -13,8 +13,10 @@ import de.regelsuche.representation.RepresentationBridge;
 import de.regelsuche.representation.RepresentationBridge.Budget;
 import de.regelsuche.representation.RepresentationBridge.WorkLedger;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Synthesizes degree-one/two laws of an explicitly supplied affine rational recurrence.
@@ -71,6 +73,9 @@ public final class RecurrenceInvariantSynthesis {
         }
     }
 
+    /** A first-law result, or a bounded miss after searching the entire declared ansatz. */
+    record FirstLawReport(Status status, Optional<VerifiedLaw> law, boolean usedSupport, WorkLedger work) {}
+
     public Report solve(Request request) {
         Objects.requireNonNull(request, "request");
         var work = new Work(request.budget().maxWorkUnits());
@@ -80,8 +85,7 @@ public final class RecurrenceInvariantSynthesis {
             var basis = RecurrenceInvariantSupport.basis(dimension, request.degree());
             work.add(basis.size());
             var images = RecurrenceInvariantSupport.images(request.transition(), work);
-            for (Evolution evolution : Evolution.values())
-                solveSign(request, basis, images, evolution, laws, work);
+            solveSigns(request, basis, basis, images, laws, false, work);
             return new Report(Status.COMPLETE, laws, work.ledger());
         } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
             return new Report(Status.BUDGET_INCONCLUSIVE, List.of(), work.ledger());
@@ -90,9 +94,100 @@ public final class RecurrenceInvariantSynthesis {
         }
     }
 
-    private static void solveSign(Request request, List<Monomial> basis, List<String> images,
-            Evolution evolution, List<VerifiedLaw> laws, Work work) {
-        var equations = coefficientEquations(basis, images, evolution, work);
+    FirstLawReport findFirst(Request request) {
+        return findFirst(request, List.of());
+    }
+
+    /** Tries untrusted coefficient-free support first and pays for a miss before ordinary search. */
+    FirstLawReport findFirst(Request request, List<Monomial> support) {
+        return findFirst(request, support, false);
+    }
+
+    /** First-law control that partitions the ansatz by degree for homogeneous transitions. */
+    FirstLawReport findFirstWithHomogeneousBlocks(Request request, List<Monomial> support) {
+        return findFirst(request, support, true);
+    }
+
+    private FirstLawReport findFirst(Request request, List<Monomial> support, boolean separateDegrees) {
+        var work = new Work(request.budget().maxWorkUnits());
+        var laws = new ArrayList<VerifiedLaw>();
+        try {
+            var basis = RecurrenceInvariantSupport.basis(request.transition().linear().columns(), request.degree());
+            work.add(basis.size());
+            var images = RecurrenceInvariantSupport.images(request.transition(), work);
+            boolean homogeneous = separateDegrees && isHomogeneous(request.transition(), work);
+            if (!support.isEmpty()) {
+                var columns = supportColumns(basis, support, work);
+                if (!columns.isEmpty()) {
+                    try {
+                        solveFirstInBasis(request, basis, columns, images, homogeneous, laws, work);
+                    } catch (Unsupported unsupported) {
+                        // The restricted attempt can fail its representation guard independently of the full search.
+                    }
+                    if (!laws.isEmpty()) {
+                        return new FirstLawReport(Status.COMPLETE, Optional.of(laws.getFirst()), true, work.ledger());
+                    }
+                }
+            }
+            solveFirstInBasis(request, basis, basis, images, homogeneous, laws, work);
+            return new FirstLawReport(Status.COMPLETE, laws.stream().findFirst(), false, work.ledger());
+        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
+            return new FirstLawReport(Status.BUDGET_INCONCLUSIVE, Optional.empty(), false, work.ledger());
+        } catch (Unsupported unsupported) {
+            return new FirstLawReport(Status.UNSUPPORTED, Optional.empty(), false, work.ledger());
+        }
+    }
+
+    private static boolean isHomogeneous(Transition transition, Work work) {
+        var offset = transition.offset().values();
+        work.add(offset.size());
+        return offset.stream().allMatch(Rational::isZero);
+    }
+
+    private static void solveFirstInBasis(Request request, List<Monomial> basis, List<Monomial> columns,
+            List<String> images, boolean homogeneous, List<VerifiedLaw> laws, Work work) {
+        if (!homogeneous) {
+            solveSigns(request, basis, columns, images, laws, true, work);
+            return;
+        }
+        // Linear substitutions preserve total degree, so each nonconstant degree is an independent block.
+        boolean restricted = columns != basis;
+        if (restricted) work.add(columns.size());
+        var support = restricted ? new HashSet<>(columns) : null;
+        for (int degree = request.degree(); degree >= 1; degree--) {
+            int blockDegree = degree;
+            work.add(basis.size());
+            var rows = basis.stream().filter(monomial -> monomial.powers().values().stream()
+                .mapToInt(Integer::intValue).sum() == blockDegree).toList();
+            if (support != null) work.add(rows.size());
+            var selected = support == null ? rows : rows.stream().filter(support::contains).toList();
+            if (!selected.isEmpty()) {
+                solveSigns(request, rows, selected, images, laws, true, work);
+                if (!laws.isEmpty()) return;
+            }
+        }
+    }
+
+    private static List<Monomial> supportColumns(List<Monomial> basis, List<Monomial> support, Work work) {
+        work.add(1);
+        if (support.size() >= basis.size()) return List.of();
+        work.add((long) support.size() + basis.size());
+        var offered = new HashSet<>(support);
+        var ordered = basis.stream().filter(offered::contains).toList();
+        return ordered.size() == support.size() ? ordered : List.of();
+    }
+
+    private static void solveSigns(Request request, List<Monomial> rows, List<Monomial> columns, List<String> images,
+            List<VerifiedLaw> laws, boolean firstOnly, Work work) {
+        for (Evolution evolution : Evolution.values()) {
+            solveSign(request, rows, columns, images, evolution, laws, firstOnly, work);
+            if (firstOnly && !laws.isEmpty()) return;
+        }
+    }
+
+    private static void solveSign(Request request, List<Monomial> rows, List<Monomial> columns, List<String> images,
+            Evolution evolution, List<VerifiedLaw> laws, boolean firstOnly, Work work) {
+        var equations = coefficientEquations(rows, columns, images, evolution, work);
         var matrix = new LinearSystemRepresentationBridge().analyze(equations, new Budget(work.remaining()));
         work.add(matrix.work().consumedWorkUnits());
         if (matrix.status() == RepresentationBridge.Status.BUDGET_INCONCLUSIVE)
@@ -104,29 +199,31 @@ public final class RecurrenceInvariantSynthesis {
             throw new RecurrenceInvariantSupport.Exhausted();
         var reduction = reduced.reduction().orElseThrow(() -> new IllegalStateException("coefficient reduction failed"));
         for (var vector : reduction.nullspaceBasis()) {
-            var polynomial = reconstruct(basis, system.variables(), vector, work);
+            var polynomial = reconstruct(columns, system.variables(), vector, work);
             if (polynomial.totalDegree() == 0) continue;
             String text = polynomial.toCanonicalString();
             // Keep the representation guard; never silently drop a direction while claiming COMPLETE.
             if (text.length() > MAX_PROPOSAL_LENGTH) throw new Unsupported();
             admit(request, new Proposal(text, evolution), laws, work);
+            if (firstOnly) return;
         }
     }
 
-    private static List<Equation> coefficientEquations(List<Monomial> basis, List<String> images,
+    private static List<Equation> coefficientEquations(List<Monomial> rows, List<Monomial> coefficientBasis,
+            List<String> images,
             Evolution evolution, Work work) {
         var columns = new ArrayList<Polynomial>();
         var original = RecurrenceInvariantSupport.variables(images.size());
-        for (var monomial : basis) {
+        for (var monomial : coefficientBasis) {
             String before = RecurrenceInvariantSupport.monomial(monomial, original, work);
             String after = RecurrenceInvariantSupport.monomial(monomial, images, work);
             columns.add(RecurrenceInvariantSupport.project("(" + after + ")-(" + evolution.multiplier() + ")*(" + before + ")", work));
         }
         var equations = new ArrayList<Equation>();
         var parser = new ExpressionParser();
-        for (var monomial : basis) {
+        for (var monomial : rows) {
             var left = new StringBuilder("0");
-            for (int column = 0; column < basis.size(); column++) {
+            for (int column = 0; column < coefficientBasis.size(); column++) {
                 work.add(1);
                 Rational coefficient = columns.get(column).terms().getOrDefault(monomial, Rational.ZERO);
                 // Keep zero*coefficient-variable: the bridge must retain unconstrained columns.

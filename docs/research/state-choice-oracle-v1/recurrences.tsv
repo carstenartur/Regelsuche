@@ -1,0 +1,22 @@
+case	arm	outcome	budget	preparation	planningWithProof	query	total	usedSupport	evolution	polynomial	values
+cassini	DIRECT	VERIFIED	100000	0	4350	6	4356	false	ALTERNATING	x0^2 + x0*x1 - x1^2	-1,1,-1,1,-1,1
+cassini	SUPPLIED	VERIFIED	100000	0	2731	6	2737	true	ALTERNATING	x0^2 + x0*x1 - x1^2	-1,1,-1,1,-1,1
+cassini	SUPPLIED_RECHECKED	VERIFIED	100000	576	2731	6	3313	true	ALTERNATING	x0^2 + x0*x1 - x1^2	-1,1,-1,1,-1,1
+pell	DIRECT	VERIFIED	100000	0	4400	6	4406	false	ALTERNATING	x0^2 + 2*x0*x1 - x1^2	-1,1,-1,1,-1,1
+pell	SUPPLIED	VERIFIED	100000	0	2746	6	2752	true	ALTERNATING	x0^2 + 2*x0*x1 - x1^2	-1,1,-1,1,-1,1
+pell	SUPPLIED_RECHECKED	VERIFIED	100000	588	2746	6	3340	true	ALTERNATING	x0^2 + 2*x0*x1 - x1^2	-1,1,-1,1,-1,1
+recurrence-parameter-4	DIRECT	VERIFIED	100000	0	4416	6	4422	false	ALTERNATING	x0^2 + 4*x0*x1 - x1^2	5,-5,5,-5,5,-5
+recurrence-parameter-4	SUPPLIED	VERIFIED	100000	0	2762	6	2768	true	ALTERNATING	x0^2 + 4*x0*x1 - x1^2	5,-5,5,-5,5,-5
+recurrence-parameter-4	SUPPLIED_RECHECKED	VERIFIED	100000	602	2762	6	3370	true	ALTERNATING	x0^2 + 4*x0*x1 - x1^2	5,-5,5,-5,5,-5
+recurrence-negative-parameter	DIRECT	VERIFIED	100000	0	4503	6	4509	false	ALTERNATING	x0^2 - 3*x0*x1 - x1^2	9,-9,9,-9,9,-9
+recurrence-negative-parameter	SUPPLIED	VERIFIED	100000	0	2829	6	2835	true	ALTERNATING	x0^2 - 3*x0*x1 - x1^2	9,-9,9,-9,9,-9
+recurrence-negative-parameter	SUPPLIED_RECHECKED	VERIFIED	100000	630	2829	6	3465	true	ALTERNATING	x0^2 - 3*x0*x1 - x1^2	9,-9,9,-9,9,-9
+recurrence-rational	DIRECT	VERIFIED	100000	0	4560	6	4566	false	ALTERNATING	x0^2 + 1/2*x0*x1 - x1^2	4/225,-4/225,4/225,-4/225,4/225,-4/225
+recurrence-rational	SUPPLIED	VERIFIED	100000	0	2879	6	2885	true	ALTERNATING	x0^2 + 1/2*x0*x1 - x1^2	4/225,-4/225,4/225,-4/225,4/225,-4/225
+recurrence-rational	SUPPLIED_RECHECKED	VERIFIED	100000	676	2879	6	3561	true	ALTERNATING	x0^2 + 1/2*x0*x1 - x1^2	4/225,-4/225,4/225,-4/225,4/225,-4/225
+no-invariant-in-ansatz	DIRECT	NO_LAW_IN_ANSATZ	100000	0	1038	0	1038	false	-	-	-
+no-invariant-in-ansatz	SUPPLIED	NO_LAW_IN_ANSATZ	100000	0	1038	0	1038	false	-	-	-
+no-invariant-in-ansatz	SUPPLIED_RECHECKED	NO_LAW_IN_ANSATZ	100000	0	1038	0	1038	false	-	-	-
+recurrence-affine	DIRECT	VERIFIED	100000	0	2627	6	2633	false	FIXED	-x0^2 - x1^2 + x0 + x1	0,0,0,0,0,0
+recurrence-affine	SUPPLIED	VERIFIED	100000	0	1951	6	1957	true	FIXED	-x0^2 - x1^2 + x0 + x1	0,0,0,0,0,0
+recurrence-affine	SUPPLIED_RECHECKED	VERIFIED	100000	634	1951	6	2591	true	FIXED	-x0^2 - x1^2 + x0 + x1	0,0,0,0,0,0

@@ -7,6 +7,7 @@ import de.regelsuche.ast.iteration.OrderedReduction.Bound;
 import de.regelsuche.ast.iteration.OrderedReduction.KeyInterval;
 import de.regelsuche.ast.iteration.OrderedReduction.Restriction;
 import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.search.moves.MoveSearch;
 import java.util.ArrayList;
@@ -68,7 +69,15 @@ public final class OrderedReductionSearch {
         return pointUpdates(source, new PointUpdates(Objects.requireNonNull(knowledge)), limits, maximumStates, cancellation);
     }
 
-    private static PointUpdateResult pointUpdates(OrderedReduction source, PointUpdates kind,
+    /** Supplies only the block statistics. The source coefficients and every cut are still checked. */
+    static PointUpdateResult searchWithBlockStatistics(OrderedReduction source, List<List<Moment>> statistics,
+            IterationLimits limits, int maximumStates, BooleanSupplier cancellation) {
+        return pointUpdates(source, new SuppliedBlockStatistics(Objects.requireNonNull(statistics)),
+            limits, maximumStates, cancellation);
+    }
+
+    private static PointUpdateResult pointUpdates(OrderedReduction source,
+            PlanKind<OrderedBlockReductionPlan, OrderedBlockReductionPlan.Verified> kind,
             IterationLimits limits, int maximumStates, BooleanSupplier cancellation) {
         var result = run(source, kind, limits, maximumStates, cancellation);
         return new PointUpdateResult(result.verified(), result.reason(), witness(result), result.metrics());
@@ -138,6 +147,25 @@ public final class OrderedReductionSearch {
         @Override public OrderedBlockReductionPlan derive(OrderedReduction source,
                 Map<IterationPolynomial.Monomial, ExactRational> terms, Work work) {
             return OrderedBlockReductionPlan.derive(factor(source, terms, false, work), work);
+        }
+
+        @Override public OrderedBlockReductionPlan.Verified check(OrderedReduction source, OrderedBlockReductionPlan plan,
+                Work work) {
+            return OrderedBlockReductionPlan.check(source, plan, work);
+        }
+    }
+
+    private record SuppliedBlockStatistics(List<List<Moment>> statistics)
+            implements PlanKind<OrderedBlockReductionPlan, OrderedBlockReductionPlan.Verified> {
+        @Override public String rule() { return "use-supplied-block-statistics"; }
+
+        @Override public void checkSource(OrderedReduction source, Work work) {
+            OrderedBlockReductionPlan.checkSource(source, work);
+        }
+
+        @Override public OrderedBlockReductionPlan derive(OrderedReduction source,
+                Map<IterationPolynomial.Monomial, ExactRational> terms, Work work) {
+            return OrderedBlockReductionPlan.supply(factor(source, terms, false, work), statistics, work);
         }
 
         @Override public OrderedBlockReductionPlan.Verified check(OrderedReduction source, OrderedBlockReductionPlan plan,

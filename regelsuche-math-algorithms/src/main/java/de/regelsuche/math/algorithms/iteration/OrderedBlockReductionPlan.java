@@ -62,6 +62,18 @@ public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List<Lis
         return new OrderedBlockReductionPlan(reduction, List.copyOf(required));
     }
 
+    static OrderedBlockReductionPlan supply(OrderedReductionPlan reduction, List<List<Moment>> statistics, Work work) {
+        work.charge(1);
+        if (statistics.size() > MAX_STATISTICS) throw new Unavailable("BLOCK_STATISTIC_LIMIT");
+        for (var factors : statistics) {
+            if (factors.isEmpty() || factors.size() >= OrderedReduction.MAX_ARITY) {
+                throw new Unavailable("INVALID_BLOCK_STATISTIC");
+            }
+            work.charge(1L + factors.size());
+        }
+        return new OrderedBlockReductionPlan(reduction, statistics);
+    }
+
     static Verified check(OrderedReduction source, OrderedBlockReductionPlan plan, Work work) {
         checkSource(source, work);
         OrderedReductionPlan.check(source, plan.reduction(), false, work);
