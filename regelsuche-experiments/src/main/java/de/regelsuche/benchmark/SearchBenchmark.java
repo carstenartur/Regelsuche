@@ -210,7 +210,7 @@ public class SearchBenchmark {
             }
             Step step;
             if (value instanceof NumberValue number) {
-                step = Step.number(number.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue());
+                step = Step.number(number.value().approximate(java.math.MathContext.DECIMAL128).value().doubleValue());
             } else if (value instanceof VariableValue variable) {
                 step = Step.variable(variable.name());
             } else if (value instanceof OrderedValue ordered) {

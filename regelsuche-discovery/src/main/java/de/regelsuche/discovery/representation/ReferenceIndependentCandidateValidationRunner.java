@@ -201,6 +201,10 @@ public final class ReferenceIndependentCandidateValidationRunner {
         return switch (value.oracleEvidence()) {
             case "validated by deterministic numeric samples",
                  "not equivalent under deterministic numeric samples" -> "DETERMINISTIC_NUMERIC_SAMPLES";
+            case "matching exact rational constants",
+                 "different exact rational constants" -> "EXACT_RATIONAL_CONSTANT_COMPARISON";
+            case "matching exact univariate polynomial normal forms",
+                 "different exact univariate polynomial normal forms" -> "EXACT_UNIVARIATE_POLYNOMIAL_COMPARISON";
             case "matching normalized quadratic coefficients" -> "NORMALIZED_QUADRATIC_COEFFICIENTS";
             default -> "NO_CLASSIFIED_INDEPENDENT_EQUALITY_EVIDENCE";
         };

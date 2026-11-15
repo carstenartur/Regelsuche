@@ -82,12 +82,15 @@ final class SharedFragmentRewriteBenchmark {
     }
 
     static void write(Path output) {
-        String report = new SharedFragmentRewriteBenchmark(ProofLimits.defaults()).report();
         try {
-            AtomicJsonFile.writeUtf8(output, report);
+            AtomicJsonFile.writeUtf8(output, canonicalReport());
         } catch (IOException failure) {
             throw new UncheckedIOException("Could not write shared rewrite benchmark", failure);
         }
+    }
+
+    static String canonicalReport() {
+        return new SharedFragmentRewriteBenchmark(ProofLimits.defaults()).report();
     }
 
     String report() {

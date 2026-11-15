@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
 import de.regelsuche.benchmarks.ComparativeBenchmark.ClaimStatus;
@@ -16,9 +17,12 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +31,49 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class ComparativeBenchmarkBundleWriterTest {
+
+    @Test
+    void failedStagingPreservesEveryPreviouslyPublishedArtifact(@TempDir Path directory)
+            throws Exception {
+        Report report = singleResultReport();
+        var writer = new ComparativeBenchmarkBundleWriter();
+        writer.write(directory, report);
+        Files.writeString(directory.resolve("sentinel.txt"), "prior evidence");
+        Map<Path, byte[]> invalid = new LinkedHashMap<>();
+        invalid.put(Path.of("v2/conflict"), new byte[] {1});
+        invalid.put(Path.of("v2/conflict/child.json"), new byte[] {2});
+
+        assertThrows(UncheckedIOException.class, () -> writer.write(directory, report, invalid));
+
+        assertEquals("prior evidence", Files.readString(directory.resolve("sentinel.txt")));
+        assertEquals(report.toCanonicalJson(), Files.readString(directory.resolve("report.json")));
+        assertFalse(Files.exists(directory.resolve("v2")));
+    }
+
+    @Test
+    void failedReplacementRestoresPreviouslyPublishedArtifacts(@TempDir Path directory) throws Exception {
+        Assumptions.assumeTrue(Files.getFileStore(directory).supportsFileAttributeView("posix"));
+        Path old = Files.writeString(directory.resolve("prior.json"), "prior evidence");
+        Path[] staged = new Path[1];
+        try {
+            ComparativeBenchmarkPublication.replace(directory, staging -> {
+                staged[0] = staging;
+                Files.writeString(staging.resolve("next.json"), "replacement");
+                Files.setPosixFilePermissions(staging, Set.of(PosixFilePermission.OWNER_READ,
+                    PosixFilePermission.OWNER_EXECUTE));
+                Assumptions.assumeFalse(Files.isWritable(staging));
+            });
+            fail("Replacement succeeded with a read-only staging directory");
+        } catch (IOException failure) {
+            assertEquals("prior evidence", Files.readString(old));
+            assertFalse(Files.exists(directory.resolve("next.json")));
+        } finally {
+            if (staged[0] != null && Files.exists(staged[0])) {
+                Files.setPosixFilePermissions(staged[0], Set.of(PosixFilePermission.OWNER_READ,
+                    PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE));
+            }
+        }
+    }
 
     @Test
     void rewriteRemovesStaleArtifactsAndRetainsEveryCanonicalObject(

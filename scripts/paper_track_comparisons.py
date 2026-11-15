@@ -15,6 +15,12 @@ SOURCES = {
                  "9c10cf1e8a36659204183674e0c94e820c18424862dc62e06d647883e1343605", "0d8c6545478cbb8eca50e539124c8118939055aa"),
     "controller": ("research/benchmarks/track-f-stage-allocation/measured.json.gz",
                    "5c3a00f1db80ae5632ffe3ce734badbcde93575be1786094eb443c76c7801df0", "ab12f340e7e6f894ff32088adbc2df1dfa4f11b8"),
+    "historicalHidden": ("research/benchmarks/comparative-v2/hidden-rule-historical.json.gz",
+                         "46605224e9851071df8522c9d74ed70bf09ff1911d3d54448888f09a8449ff7e", "df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b"),
+    "exactHidden": ("research/benchmarks/comparative-v2/hidden-rule-current.json.gz",
+                    "eea493b38abcc45719d694f4ef4c58e29f5e2a4b7732ad24d9cec5b5cd2bdf08", "df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b"),
+    "exactComponents": ("docs/evidence/discovery-component-panel-exact-v1.json.gz",
+                        "fbeb2b16f1a61ff4281c22a9d31996e693e3fcbce709b63f91cdcb4dd971176a", "5ddc10da51282fd6e23a01c3b6c7de1dd3bfa3cb"),
     "components": ("docs/evidence/discovery-component-panel-v1.json.gz",
                    "33300f2dd7f34a53d36ab36d5d241c453a289ab12d1b325310964618a8d169b7", "a0abfcbf8b136047c52e51d87a13b0933433f9d7"),
     "fanIn": ("docs/evidence/open-target-fan-in-v1.json.gz",
@@ -104,6 +110,38 @@ def component_rows(panel):
     return rows
 
 
+def validator_table(historical, exact):
+    rows = []
+    names = {"PRODUCTION": "Production", "NO_FAN_IN": "No fan-in", "NO_REFINEMENT": "No refinement",
+             "NO_NOVELTY_SCHEDULING": "No novelty scheduling"}
+    for key, name in names.items():
+        previous = historical["arms"][key]
+        current = exact["arms"][key]
+        if previous["frozenSchedule"] != current["frozenSchedule"]:
+            raise ValueError("component ordering changed across the registered validator runs")
+        old_checks = previous["challengesInFrozenOrder"]
+        new_checks = current["challengesInFrozenOrder"]
+        if [c["candidateId"] for c in old_checks] != [c["candidateId"] for c in new_checks]:
+            raise ValueError("mismatched component candidates")
+        outcomes = [Counter(c["terminalRecheck"]["status"] for c in checks) for checks in (old_checks, new_checks)]
+        rows.append([name, len(new_checks), outcomes[0]["NO_COUNTEREXAMPLE_FOUND"], outcomes[0]["INCONCLUSIVE"],
+                     outcomes[1]["NO_COUNTEREXAMPLE_FOUND"], outcomes[1]["INCONCLUSIVE"]])
+    return table(["Policy", "Mined checks", "Earlier: no witness", "Earlier inconclusive",
+                  "Exact: no witness", "Exact inconclusive"], rows)
+
+
+def rediscovery_table(previous, current):
+    if previous["tasks"] != current["tasks"]:
+        raise ValueError("hidden-rule tasks changed across validator versions")
+    rows = []
+    for version, panel in (("Historical", previous), ("Exact", current)):
+        for key, name in (("best-first", "Best-first"), ("project-a-star", "Project A*")):
+            data = panel["profiles"][key]["summary"]
+            rows.append([version, name, fraction(data["rediscoveredCases"], data["cases"]),
+                         data["evaluatedNegativeHoldouts"], data["skippedNegativeHoldouts"], data["falsePositiveHoldouts"]])
+    return table(["Validator", "Search", "Recovered", "Negative executed", "Negative skipped", "False positives"], rows)
+
+
 def write_track_reports(root, output, require_input):
     reports = {}
     for key, (relative, sha, _) in SOURCES.items():
@@ -171,8 +209,8 @@ def write_track_reports(root, output, require_input):
         "On the original public production campaign, the same miner formed a candidate only when it could pool observations. "
         "The control preserves all twelve seeds, capacity and native rejection records. "
         f"[All batch receipts]({source('fanIn')}).",
-        "## Matched discovery-component ablations",
-        "The separate diagnostic used historical input/output observations and a fixed challenge. Each row disables "
+        "## Historical matched discovery-component ablations",
+        "The original component run used the pre-#1245 validator on historical input/output observations and a fixed challenge. Each control disables "
         "one production mechanism under the same slot and validation ceilings. Score changes compare the candidates "
         "present in both arms. Changed prefixes count budgets whose selected IDs differ from production.",
         table(["Policy", "Candidates", "Score changes", "Changed prefixes", "Refuted", "Revisions"],
@@ -184,4 +222,21 @@ def write_track_reports(root, output, require_input):
         "three positivity guards. This panel provides no evidence about how often refinement repairs a refuted conjecture. "
         f"[Matched inputs, schedules, challenges and control]({source('components')}).",
     ]
+    sections.extend([
+        "## Validator-version comparison",
+        "The same public component protocol ran with the exactness revision. No witness means the sampled search "
+        "returned NO_COUNTEREXAMPLE_FOUND. Inconclusive means the validator could not decide within its exact arithmetic "
+        "bounds. The separate log control is excluded from the mined-check denominator.",
+        validator_table(reports["components"], reports["exactComponents"]),
+        "One distinct rational cancellation candidate changed to inconclusive in every arm that formed it. Its exact "
+        "search found no defined scalar pair within the bounds. The four other mined candidates retained their bounded "
+        "no-witness status. Twelve polynomial source pairs now carry exact "
+        "univariate normal-form provenance. Both versions of the separate log control retained three positivity guards "
+        "and found no refuting witness. "
+        f"[Historical component execution]({source('components')}) · [Exact execution]({source('exactComponents')}).",
+        "The separate hidden-rule replay used the same twenty tasks in both versions. A missing admitted candidate "
+        "can leave negative holdouts unexecuted. The false-positive count has the executed holdouts as its denominator.",
+        rediscovery_table(reports["historicalHidden"], reports["exactHidden"]),
+        f"[Historical hidden-rule execution]({source('historicalHidden')}) · [Exact execution]({source('exactHidden')}).",
+    ])
     (output / "public-discovery-comparisons.md").write_text("\n\n".join(sections) + "\n")

@@ -9,8 +9,8 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -18,61 +18,77 @@ import java.util.Set;
 public final class ComparativeBenchmarkBundleWriter {
 
     public void write(Path outputDirectory, Report report) {
+        write(outputDirectory, report, Map.of());
+    }
+
+    void write(Path outputDirectory, Report report, Map<Path, byte[]> attachments) {
         Objects.requireNonNull(outputDirectory, "outputDirectory");
         Objects.requireNonNull(report, "report");
         requireCompleteTrackMatrices(report);
         ComparativeBenchmarkMain.verify(report);
         try {
-            clearContents(outputDirectory);
-            Files.createDirectories(outputDirectory);
-            writeFile(
-                outputDirectory.resolve("report.json"),
-                report.toCanonicalJson());
-
-            for (var manifest : report.parityManifests()) {
-                writeFile(
-                    outputDirectory.resolve("parity-manifests")
-                        .resolve(safe(manifest.id()) + ".json"),
-                    manifest.toCanonicalJson());
-            }
-            for (var configuration : report.configurations()) {
-                writeFile(
-                    outputDirectory.resolve("configurations")
-                        .resolve(safe(configuration.id()) + ".json"),
-                    configuration.toCanonicalJson());
-            }
-            for (var benchmarkCase : report.cases()) {
-                writeFile(
-                    outputDirectory.resolve("cases")
-                        .resolve(safe(benchmarkCase.id()) + ".json"),
-                    benchmarkCase.toCanonicalJson());
-            }
-            for (int index = 0; index < report.results().size(); index++) {
-                var result = report.results().get(index);
-                String filename = String.format(
-                    "%03d-%s-%s.json",
-                    index,
-                    shortHash(result.configurationHash()),
-                    shortHash(result.caseHash()));
-                writeFile(
-                    outputDirectory.resolve("results").resolve(filename),
-                    result.toCanonicalJson());
-            }
-            for (CapabilityClaim claim : report.claims()) {
-                writeFile(
-                    outputDirectory.resolve("claims")
-                        .resolve(safe(claim.id()) + ".json"),
-                    claimJson(claim));
-            }
-            for (CoverageGap gap : report.coverageGaps()) {
-                writeFile(
-                    outputDirectory.resolve("coverage-gaps")
-                        .resolve(gap.track().name().toLowerCase() + ".json"),
-                    gapJson(gap));
-            }
+            ComparativeBenchmarkPublication.replace(outputDirectory.toAbsolutePath().normalize(),
+                staging -> writeBundle(staging, report, attachments));
         } catch (IOException exception) {
             throw new UncheckedIOException(
                 "Could not write comparative benchmark evidence", exception);
+        }
+    }
+
+    private static void writeBundle(Path outputDirectory, Report report, Map<Path, byte[]> attachments)
+            throws IOException {
+        writeFile(
+            outputDirectory.resolve("report.json"),
+            report.toCanonicalJson());
+
+        for (var manifest : report.parityManifests()) {
+            writeFile(
+                outputDirectory.resolve("parity-manifests")
+                    .resolve(safe(manifest.id()) + ".json"),
+                manifest.toCanonicalJson());
+        }
+        for (var configuration : report.configurations()) {
+            writeFile(
+                outputDirectory.resolve("configurations")
+                    .resolve(safe(configuration.id()) + ".json"),
+                configuration.toCanonicalJson());
+        }
+        for (var benchmarkCase : report.cases()) {
+            writeFile(
+                outputDirectory.resolve("cases")
+                    .resolve(safe(benchmarkCase.id()) + ".json"),
+                benchmarkCase.toCanonicalJson());
+        }
+        for (int index = 0; index < report.results().size(); index++) {
+            var result = report.results().get(index);
+            String filename = String.format(
+                "%03d-%s-%s.json",
+                index,
+                shortHash(result.configurationHash()),
+                shortHash(result.caseHash()));
+            writeFile(
+                outputDirectory.resolve("results").resolve(filename),
+                result.toCanonicalJson());
+        }
+        for (CapabilityClaim claim : report.claims()) {
+            writeFile(
+                outputDirectory.resolve("claims")
+                    .resolve(safe(claim.id()) + ".json"),
+                claimJson(claim));
+        }
+        for (CoverageGap gap : report.coverageGaps()) {
+            writeFile(
+                outputDirectory.resolve("coverage-gaps")
+                    .resolve(gap.track().name().toLowerCase() + ".json"),
+                gapJson(gap));
+        }
+        for (var attachment : attachments.entrySet()) {
+            Path path = outputDirectory.resolve(attachment.getKey()).normalize();
+            if (!path.startsWith(outputDirectory.resolve("v2"))) {
+                throw new IOException("Attachment lies outside the public evidence directory: " + attachment.getKey());
+            }
+            Files.createDirectories(path.getParent());
+            Files.write(path, attachment.getValue());
         }
     }
 
@@ -143,25 +159,6 @@ public final class ComparativeBenchmarkBundleWriter {
             throws IOException {
         Files.createDirectories(path.toAbsolutePath().normalize().getParent());
         Files.writeString(path, content, StandardCharsets.UTF_8);
-    }
-
-    /**
-     * Deletes every previous evidence entry while preserving the requested root.
-     * The root may be a Docker volume mount and therefore must never be removed.
-     */
-    private static void clearContents(Path directory) throws IOException {
-        if (!Files.exists(directory)) {
-            return;
-        }
-        Path normalizedRoot = directory.toAbsolutePath().normalize();
-        try (var paths = Files.walk(normalizedRoot)) {
-            for (Path path : paths
-                    .filter(item -> !item.equals(normalizedRoot))
-                    .sorted(Comparator.reverseOrder())
-                    .toList()) {
-                Files.delete(path);
-            }
-        }
     }
 
     private static String safe(String value) {

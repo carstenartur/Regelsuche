@@ -25,6 +25,19 @@ import org.junit.jupiter.api.Test;
  */
 class TargetFreeIntrinsicCandidateValidatorTest {
     @Test
+    void sampledAgreementCannotCertifyNearMatchesOrAFunctionIdentity() {
+        var oracle = new de.regelsuche.validation.SymPyOracleValidator();
+        var near = TargetFreeIntrinsicCandidateValidator.validate("x", "x + 1/300000000", List.of(), true, oracle);
+        assertEquals(CandidateProofStatus.REJECTED, near.status());
+        var approximate = TargetFreeIntrinsicCandidateValidator.validate("sin(x)", "sin(x) + 1/300000000",
+            List.of(), true, oracle);
+        assertEquals(CandidateProofStatus.OBSERVED, approximate.status());
+        assertFalse(approximate.intrinsicallyVerified());
+        var exact = TargetFreeIntrinsicCandidateValidator.validate("x + x", "2*x", List.of(), true, oracle);
+        assertTrue(exact.intrinsicallyVerified());
+    }
+
+    @Test
     void invokesOracleForNonReferenceCandidates() {
         FakeOracle oracle = new FakeOracle(
             OracleValidator.OracleValidationStatus.AGREE,

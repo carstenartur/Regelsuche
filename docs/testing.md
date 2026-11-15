@@ -247,6 +247,21 @@ Wichtige fokussierte Verträge:
 
 Convenience-Skripte dürfen lediglich an diese checkout-eigenen Tasks delegieren.
 
+Der Track-B-Replay von `verifyComparativeBenchmarks` verwendet den integrierten
+Validator aus [Revision `74efc6d`](https://github.com/carstenartur/Regelsuche/commit/74efc6da0a8edadd1870c7fb2d17b078d1303ab5).
+Gegenüber dem eingefrorenen Bericht aus Revision `9ddd37ac` entfällt bei
+`case-002` in `best-first` und `project-a-star` je der Eintrag
+`matrix-non-commutative` in `validation.counterexampleSearches[0].attemptedSources`.
+Die neue Zulässigkeitsprüfung verwirft die nicht unterstützten Matrixpotenzen
+vor dem Aufruf. Alle übrigen Bytes stimmen mit dem eingefrorenen Bericht
+überein.
+
+Der integrierte Replay hat 121.655 Bytes und SHA-256
+`dd7dc15f2455727d8a9bf1d7b4782085e40ef29da5f40797767f2424bda7b9ce`.
+Die Berichte aus Checkout und gepinntem Container müssen bytegleich sein.
+Die beiden eingefrorenen Track-B-Berichte bleiben die Quellen der
+v2-Zusammenfassung.
+
 ## Testdaten und Determinismus
 
 - Fixtures gehören zum fachlichen Test oder zu einer versionierten

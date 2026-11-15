@@ -1,7 +1,9 @@
 package de.regelsuche.docs;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
+import de.regelsuche.validation.OracleValidator.OracleValidationStatus;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.learning.MacroLearningPipeline;
@@ -47,7 +49,8 @@ public final class HiddenRulePilotRunner {
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final ExpressionParser parser = new ExpressionParser();
-    private final SymPyEquivalenceService equivalence = new SymPyEquivalenceService();
+    private final PolynomialNormalFormEquivalenceService equivalence =
+        new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
     private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();
 
     private final BestFirstSearchStrategy searchStrategy;
@@ -147,7 +150,8 @@ public final class HiddenRulePilotRunner {
     private SuccessfulTransformationPath toLearningPath(RuntimeTask task, SearchState reached) {
         String first = reached.path().getFirst();
         String last = reached.path().getLast();
-        boolean verified = equivalence.areEquivalent(first, last);
+        var evidence = equivalence.validateEquivalence(first, last);
+        boolean verified = evidence.status() == OracleValidationStatus.AGREE;
         return new SuccessfulTransformationPath(
             task.opaqueCaseId() + "-path",
             first,
@@ -157,7 +161,7 @@ public final class HiddenRulePilotRunner {
             scorer.score(first),
             reached.score(),
             verified,
-            verified ? "symbolic-equivalence" : "equivalence-unconfirmed",
+            verified ? "symbolic-equivalence" : evidence.evidence(),
             Map.of("source", "hidden-rule-pilot-runtime"),
             reached.assumptions());
     }
@@ -178,9 +182,11 @@ public final class HiddenRulePilotRunner {
         PositiveHoldout holdout
     ) {
         List<Transformation> direct = operator.generateCandidates(holdout.inputExpression());
-        boolean applies = direct.stream().anyMatch(candidate ->
-            equivalence.areEquivalent(candidate.transformedExpression(), holdout.targetExpression()));
         SearchTarget target = syntaxTarget(holdout.targetExpression());
+        var targetSyntax = parser.parseTerm(holdout.targetExpression());
+        boolean applies = direct.stream().anyMatch(candidate ->
+            parser.parseTerm(candidate.transformedExpression()).equals(targetSyntax)
+                || equivalence.areEquivalent(candidate.transformedExpression(), holdout.targetExpression()));
 
         GoalSearchResult baseline = search(
             task.primitiveEngine(),

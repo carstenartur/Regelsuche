@@ -37,15 +37,15 @@ class TargetFreeRepresentationStudyConclusionTest {
         assertEquals(first, second);
         assertEquals(24, summary.configuredEntries());
         assertEquals(41, summary.evaluatedCandidates());
-        assertEquals(20, summary.qualifiedEntries());
-        assertEquals(20, summary.qualifiedCandidates());
+        assertEquals(8, summary.qualifiedEntries());
+        assertEquals(8, summary.qualifiedCandidates());
         assertEquals(6, summary.configuredCases());
-        assertEquals(5, summary.uniformlyQualifiedCaseCount());
+        assertEquals(1, summary.uniformlyQualifiedCaseCount());
         assertEquals(1, summary.uniformlyUnqualifiedCaseCount());
-        assertEquals(0, summary.policyDifferentiatingCaseCount());
+        assertEquals(4, summary.policyDifferentiatingCaseCount());
         assertEquals(4, summary.configuredPolicies());
         assertEquals(0, summary.allPolicyMatchedWorkCaseCount());
-        assertEquals(20, summary.qualifiedCandidatesAtDepthOne());
+        assertEquals(8, summary.qualifiedCandidatesAtDepthOne());
         assertEquals(0, summary.qualifiedCandidatesAtDepthAtLeastThree());
         assertEquals(4, summary.assumptionViolationCandidates());
         assertEquals(0, summary.directRuleLeakCandidates());
@@ -69,8 +69,7 @@ class TargetFreeRepresentationStudyConclusionTest {
             content.decision().evidenceClassification()
         );
         assertEquals(
-            TargetFreeRepresentationStudyConclusion
-                .POLICY_COMPARISON_STATUS,
+            "POLICY_DIFFERENCE_REQUIRES_SEPARATE_INTERPRETATION",
             content.decision().policyComparisonStatus()
         );
         assertEquals(
@@ -84,7 +83,7 @@ class TargetFreeRepresentationStudyConclusionTest {
 
         assertTrue(content.policies().stream().allMatch(policy ->
             policy.configuredCases() == 6
-                && policy.qualifiedCases() == 5
+                && policy.qualifiedCases() == ("BOUNDED_ENUMERATION_V1".equals(policy.policyId()) ? 5 : 1)
         ));
         assertEquals(
             List.of(
@@ -107,11 +106,12 @@ class TargetFreeRepresentationStudyConclusionTest {
                     "repeated-term-compression"))
                 .findFirst().orElseThrow().status()
         );
-        assertTrue(content.cases().stream()
-            .filter(value -> !value.caseId().equals(
-                "repeated-term-compression"))
-            .allMatch(value -> value.status().equals(
-                "QUALIFIED_BY_ALL_POLICIES")));
+        assertEquals(1L, content.cases().stream()
+            .filter(value -> "QUALIFIED_BY_ALL_POLICIES".equals(
+                value.status())).count());
+        assertEquals(1L, content.cases().stream()
+            .filter(value -> "NO_POLICY_QUALIFIED".equals(
+                value.status())).count());
 
         String canonical = first.toCanonicalJson();
         assertEquals(
