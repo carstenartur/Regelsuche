@@ -36,6 +36,17 @@ public final class OrderedReductionSdk {
         return OrderedReductionKnowledge.learn(example, limits(budget), cancellation::isCancelled);
     }
 
+    public static OrderedReductionKnowledge.Acquisition learnPairState(OrderedBlockReductionPlan.Verified example,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return OrderedReductionKnowledge.learnPairState(example, limits(budget), cancellation::isCancelled);
+    }
+
+    public static OrderedReductionSearch.PointUpdateResult searchProjectedPointUpdates(OrderedReduction source,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return OrderedReductionSearch.searchProjectedPointUpdates(source, limits(budget), budget.maximumStates(),
+            cancellation::isCancelled);
+    }
+
     public static OrderedReductionSearch.PointUpdateResult searchPointUpdates(OrderedReduction source,
             OrderedReductionKnowledge knowledge, OptimizationBudget budget, CancellationToken cancellation) {
         return OrderedReductionSearch.searchPointUpdates(source, knowledge, limits(budget), budget.maximumStates(),

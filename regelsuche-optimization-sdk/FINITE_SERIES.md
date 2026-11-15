@@ -256,3 +256,14 @@ candidates can be checked with `verifyPointUpdates` before creating a session.
 a verified example. Pass the resulting knowledge to the
 `searchPointUpdates` overload to attempt reuse during synthesis.
 [Derivation and measured comparisons](../docs/research/ordered-block-reductions.md)
+
+A checked pair can also supply a complete block statistic for a triple
+whose summand is a product of that adjacent pair kernel and a polynomial
+in the remaining row. Acquire it with `learnPairState` and pass the
+knowledge to `searchPointUpdates`. The verifier checks the factored
+product against the full triple before creating a session. Use
+`searchProjectedPointUpdates` to derive a grouping directly from the
+source. Both methods keep the ordinary statistics if none of the
+available groupings reduces the number of retained values. Runtime
+integer limits apply to the intermediates used by the selected plan.
+[Pair-state transfer and measured work](../docs/research/pair-state-transfer.md)

@@ -18,12 +18,14 @@ import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
 import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
 
 /** A candidate set of block statistics for an unrestricted ordered reduction. */
-public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List<List<Moment>> statistics) {
+public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List<List<Moment>> statistics,
+        Optional<OrderedPairStateProjection> pairState) {
     private static final int MAX_STATISTICS =
         IterationPolynomial.MAX_TERMS * (OrderedReduction.MAX_ARITY * (OrderedReduction.MAX_ARITY + 1) / 2 - 1);
 
     public OrderedBlockReductionPlan {
         Objects.requireNonNull(reduction);
+        Objects.requireNonNull(pairState);
         if (statistics.size() > MAX_STATISTICS) throw new IllegalArgumentException("BLOCK_STATISTIC_LIMIT");
         var snapshot = new ArrayList<List<Moment>>();
         for (var statistic : statistics) {
@@ -35,11 +37,15 @@ public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List<Lis
         statistics = List.copyOf(snapshot);
     }
 
+    public OrderedBlockReductionPlan(OrderedReductionPlan reduction, List<List<Moment>> statistics) {
+        this(reduction, statistics, Optional.empty());
+    }
+
     public record Verification(Optional<Verified> verified, String reason, long work) {}
 
     record Split(int left, int right) {}
     record WeightedSplit(BigInteger coefficient, Split split) {}
-    record Layout(List<List<Split>> statistics, List<WeightedSplit> total) {}
+    record Layout(List<List<Split>> statistics, List<WeightedSplit> pairTotal, List<WeightedSplit> total) {}
 
     static void checkSource(OrderedReduction source, Work work) {
         for (var restriction : source.restrictions()) {
@@ -89,13 +95,17 @@ public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List<Lis
         for (var factors : plan.statistics()) {
             statistics.add(compileSplits(factors, indices, work));
         }
+        if (plan.pairState().isPresent()) {
+            var compiled = plan.pairState().orElseThrow().checkAndCompile(plan.reduction(), indices, work);
+            return new Verified(source, plan, new Layout(List.copyOf(statistics), compiled.pair(), compiled.total()));
+        }
         var total = new ArrayList<WeightedSplit>();
         for (var term : plan.reduction().terms()) {
             for (var split : compileSplits(term.factors(), indices, work)) {
                 total.add(new WeightedSplit(term.coefficient(), split));
             }
         }
-        return new Verified(source, plan, new Layout(List.copyOf(statistics), List.copyOf(total)));
+        return new Verified(source, plan, new Layout(List.copyOf(statistics), List.of(), List.copyOf(total)));
     }
 
     private static List<Split> compileSplits(List<Moment> factors, Map<List<Moment>, Integer> indices, Work work) {

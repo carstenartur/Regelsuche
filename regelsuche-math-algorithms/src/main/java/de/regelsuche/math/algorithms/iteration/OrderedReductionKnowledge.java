@@ -19,14 +19,17 @@ import java.util.function.BooleanSupplier;
 import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
 import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
 
-/** An exact normalization lemma acquired from a verified point-update plan. */
+/** A reusable fact acquired from a verified point-update plan. */
 public final class OrderedReductionKnowledge {
     private final BinaryExpr pattern;
     private final Map<IterationPolynomial.Monomial, ExactRational> proof;
+    private final OrderedPairStateProjection.Kernel pairState;
 
-    private OrderedReductionKnowledge(BinaryExpr pattern, Map<IterationPolynomial.Monomial, ExactRational> proof) {
+    private OrderedReductionKnowledge(BinaryExpr pattern, Map<IterationPolynomial.Monomial, ExactRational> proof,
+            OrderedPairStateProjection.Kernel pairState) {
         this.pattern = pattern;
         this.proof = proof;
+        this.pairState = pairState;
     }
 
     public record Acquisition(Optional<OrderedReductionKnowledge> knowledge, String reason, long work) {}
@@ -45,11 +48,34 @@ public final class OrderedReductionKnowledge {
             }
             var pattern = selected.orElseThrow();
             var polynomial = IterationPolynomial.parseRowSummand(pattern, allowed, work);
-            return new Acquisition(Optional.of(new OrderedReductionKnowledge(pattern, polynomial.terms())),
+            return new Acquisition(Optional.of(new OrderedReductionKnowledge(pattern, polynomial.terms(), null)),
                 "VERIFIED", work.used());
         } catch (Unavailable unavailable) {
             return new Acquisition(Optional.empty(), unavailable.getMessage(), work.used());
         }
+    }
+
+    /** Retains a checked pair sum and its required row statistics for later triple reductions. */
+    public static Acquisition learnPairState(OrderedBlockReductionPlan.Verified example, IterationLimits limits,
+            BooleanSupplier cancellation) {
+        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
+        try {
+            work.charge(1);
+            if (example.source().slots().size() != 2) {
+                return new Acquisition(Optional.empty(), "PAIR_STATE_REQUIRES_TWO_SLOTS", work.used());
+            }
+            var terms = example.plan().reduction().terms();
+            if (terms.size() > limits.maximumTerms()) throw new Unavailable("TERM_LIMIT");
+            var kernel = OrderedPairStateProjection.kernel(terms, work);
+            var knowledge = kernel.map(value -> new OrderedReductionKnowledge(null, Map.of(), value));
+            return new Acquisition(knowledge, knowledge.isPresent() ? "VERIFIED" : "NO_PAIR_STATE", work.used());
+        } catch (Unavailable unavailable) {
+            return new Acquisition(Optional.empty(), unavailable.getMessage(), work.used());
+        }
+    }
+
+    Optional<OrderedPairStateProjection.Kernel> pairState() {
+        return Optional.ofNullable(pairState);
     }
 
     private static Optional<BinaryExpr> select(Expr expression, Work work) {
@@ -64,6 +90,7 @@ public final class OrderedReductionKnowledge {
     }
 
     Optional<IterationPolynomial> tryNormalize(BinaryExpr input, Set<SymbolId> allowed, Work work) {
+        if (pattern == null) return Optional.empty();
         var bindings = new HashMap<SymbolId, SymbolId>();
         var used = new HashSet<SymbolId>();
         if (!matches(pattern, input, allowed, bindings, used, work)) return Optional.empty();
