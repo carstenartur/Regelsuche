@@ -1,0 +1,57 @@
+{
+  "schema": "regelsuche.track-f-stage-allocation-plan/v1",
+  "baseRevision": "03b58d1dfdd9c5076622f1f9bf35dd9c618bf897",
+  "authority": "Use PinnedAutonomousProductionCampaign.brief() and all twelve original registered seeds, its default AST inventory, models, enumeration order and native stage resource vector separately for each lane and each panel. No initial evidence or prior candidate pool. Each panel has two formation batches, six candidate slots apiece in all arms. All generated candidates and rejected clusters remain visible.",
+  "panels": [
+    {
+      "id": "null-then-open",
+      "batches": [
+        [
+          "gap-two-factor-01",
+          "twin-prime-factor-01"
+        ],
+        "ALL"
+      ]
+    },
+    {
+      "id": "competing-continuations",
+      "batches": [
+        [
+          "gap-two-factor-01",
+          "gap-two-factor-02",
+          "gap-two-factor-03",
+          "twin-prime-factor-01",
+          "twin-prime-factor-02",
+          "twin-prime-factor-03"
+        ],
+        [
+          "gap-two-factor-04",
+          "gap-two-factor-05",
+          "gap-two-factor-06",
+          "twin-prime-factor-04",
+          "twin-prime-factor-05",
+          "twin-prime-factor-06"
+        ]
+      ]
+    }
+  ],
+  "unit": "One dispatch ticket is one opportunity to launch a stage operation on a generated catalog, a registered aggregate batch, or a candidate lineage. Uniformity is measured in these predeclared discrete opportunities, never summed resource counts or equal wall time. Every arm has fourteen tickets and the same immutable native resource ceilings from #355. Record configured/executed/skipped/remaining for tickets and every native resource. No transfer between resource units.",
+  "stages": [
+    "GENERATION",
+    "CANDIDATE_FORMATION",
+    "VALIDATION",
+    "COUNTEREXAMPLE_SEARCH",
+    "PROJECT_NOVELTY",
+    "PROOF",
+    "LIFECYCLE_HANDOFF"
+  ],
+  "atomicValidation": "The deployed evaluator performs validation and counterexample search together. Require two tickets, one for each stage, before invoking it, charge the executed holdouts and factual sampled checks to their registered native dimensions. Expose both stage receipts and the joint invocation. Other stages use the production generation, mining, project novelty, proof and lifecycle decision components without injecting scores or outcomes.",
+  "arms": {
+    "UNIFORM_ALL_STAGES": "Irrevocably allocate exactly two tickets to each of all seven stages. Retain the unused generation ticket. At each stage process eligible branches in (batch index, output lineage id) order. No spillover across stages.",
+    "STATIC_NO_FEEDBACK": "Register tickets before processing any receipts: one generation, two formation, then two complete candidate chains bound to batch indices [0,0], followed by one spare PROOF ticket bound to batch 0. Each chain selects its corresponding output ordinal within batch 0. Missing slots have zero execution and stay counted as skipped tickets. No borrowing across batches or stages.",
+    "NATIVE_RECEIPT_DRIVEN": "Execute one generation and both registered formation operations. Then the explicitly new native production feedback dispatch schedules eligible candidate lineages one receipt at a time. Prefer the lineage closest to finished, breaking ties by batch then lineage id. Follow successful validation with novelty, proof and lifecycle according to native gate results. Stop when no eligible actions remain or tickets are exhausted. The pre-existing #355 complete-only feedback comparator cannot schedule positive continuations. Show its actual reference terminal disposition separately, not as a historical adaptive policy result."
+  },
+  "branches": "A candidate is one lineage from an aggregate output. Identical candidate IDs across batches count once in the distinct-rule denominator and once per distinct lineage in branch accounting. No invented mathematical family diversity. Both formation batches execute under every arm before downstream scheduling.",
+  "stopping": "Finish only genuinely eligible actions. Retain rejected/inconclusive or zero-output batches and missing preassigned slots. Track gate status, actual receipt identity, candidate lineage, native resources and exact reasons. No increase to positive or scientific claims or formal proof authority. Compute between-arm comparisons only on matching public panel, never pool with #1204.",
+  "verification": "Use fresh native run per lane and panel. Compare brief, generator/input/branch and formation evidence roots, budget and all outcomes with independent checks. Reproduce canonical raw evidence twice. No results are authorized or predicted before this registration."
+}
