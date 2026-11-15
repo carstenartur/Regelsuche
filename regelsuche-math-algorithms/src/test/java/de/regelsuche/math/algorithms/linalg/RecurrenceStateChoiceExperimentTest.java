@@ -2,8 +2,6 @@ package de.regelsuche.math.algorithms.linalg;
 
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.math.algorithms.equivalence.Monomial;
-import de.regelsuche.math.algorithms.equivalence.Polynomial;
-import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Evolution;
@@ -16,7 +14,6 @@ import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier.VerifiedLaw;
 import de.regelsuche.math.algorithms.oracle.StateChoiceOraclePanel;
 import de.regelsuche.representation.RepresentationBridge.Budget;
-import de.regelsuche.scalar.ExactRational;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -26,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
+import static de.regelsuche.math.algorithms.linalg.RecurrenceExperimentTrajectories.advance;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceExperimentTrajectories.evaluate;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceExperimentTrajectories.vector;
 import static de.regelsuche.math.algorithms.oracle.StateChoiceOraclePanel.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -54,7 +54,7 @@ class RecurrenceStateChoiceExperimentTest {
             String id = (String) all.get(i).get("id");
             var fields = object(object(all.get(i).get("task")).get("recurrence"));
             var transition = new Transition(new ExactMatrix(array(fields.get("linear")).stream()
-                .map(RecurrenceStateChoiceExperimentTest::vector).toList()), new ExactVector(vector(fields.get("offset"))));
+                .map(RecurrenceExperimentTrajectories::vector).toList()), new ExactVector(vector(fields.get("offset"))));
             var initial = vector(fields.get("initial"));
             int budget = number(fields, "workBudget");
             // Reserve one work unit for each requested valueAt call in both arms.
@@ -132,35 +132,6 @@ class RecurrenceStateChoiceExperimentTest {
             values.add(actual.toString());
         }
         return List.copyOf(values);
-    }
-
-    private static List<Rational> advance(Transition transition, List<Rational> state) {
-        var next = new ArrayList<Rational>();
-        for (int i = 0; i < state.size(); i++) {
-            var value = transition.offset().get(i);
-            for (int j = 0; j < state.size(); j++) {
-                value = value.add(transition.linear().get(i, j).multiply(state.get(j)));
-            }
-            next.add(value);
-        }
-        return List.copyOf(next);
-    }
-
-    private static Rational evaluate(Polynomial polynomial, List<Rational> state) {
-        Rational sum = Rational.ZERO;
-        for (var term : polynomial.terms().entrySet()) {
-            var value = term.getValue();
-            for (int i = 0; i < state.size(); i++) {
-                int exponent = term.getKey().exponentOf("x" + i);
-                for (int j = 0; j < exponent; j++) value = value.multiply(state.get(i));
-            }
-            sum = sum.add(value);
-        }
-        return sum;
-    }
-
-    private static List<Rational> vector(Object raw) {
-        return array(raw).stream().map(v -> Rational.fromExact(ExactRational.parse((String) v))).toList();
     }
 
     private static void retain(StringBuilder report, String id, String arm, int budget, FirstLawReport search,

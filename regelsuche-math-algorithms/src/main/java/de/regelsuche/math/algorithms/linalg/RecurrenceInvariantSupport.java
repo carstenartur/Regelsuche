@@ -6,7 +6,9 @@ import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.representation.RepresentationBridge.WorkLedger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** Shared finite representation helpers; arithmetic stays in the existing exact polynomial core. */
@@ -50,6 +52,44 @@ final class RecurrenceInvariantSupport {
             result.add(image.toString());
         }
         return List.copyOf(result);
+    }
+
+    /** Exact images of the coefficient basis, shared by both evolution signs. */
+    static Map<Monomial, Polynomial> liftedImages(RecurrenceInvariantSynthesis.Transition transition,
+            List<Monomial> basis, Work work) {
+        int dimension = transition.linear().columns();
+        var variables = variables(dimension);
+        var coordinates = variables.stream().map(Monomial::variable).toList();
+        work.add(dimension);
+        var coordinateImages = new ArrayList<Polynomial>(dimension);
+        for (int row = 0; row < dimension; row++) {
+            work.add(1);
+            var polynomial = Polynomial.constant(transition.offset().get(row));
+            for (int col = 0; col < dimension; col++) {
+                work.add(1);
+                var coefficient = transition.linear().get(row, col);
+                if (coefficient.isZero()) continue;
+                work.add(1L + polynomial.termCount());
+                polynomial = polynomial.add(Polynomial.term(coordinates.get(col), coefficient));
+            }
+            coordinateImages.add(polynomial);
+        }
+
+        var images = new HashMap<Monomial, Polynomial>();
+        for (var monomial : basis) {
+            var image = Polynomial.constant(Rational.ONE);
+            work.add(1L + dimension);
+            for (int i = 0; i < dimension; i++) {
+                int power = monomial.exponentOf(variables.get(i));
+                var coordinateImage = coordinateImages.get(i);
+                for (int j = 0; j < power; j++) {
+                    work.add(1L + (long) image.termCount() * coordinateImage.termCount());
+                    image = image.multiply(coordinateImage);
+                }
+            }
+            images.put(monomial, image);
+        }
+        return Map.copyOf(images);
     }
 
     /** Simultaneous substitution, never sequential textual replacement of variable names. */

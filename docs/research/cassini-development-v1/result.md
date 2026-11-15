@@ -19,7 +19,10 @@ The identity row retains every independent basis law emitted by the solver. The 
 2. Separate Java 25 processes independently generated identical candidate bytes. The [formation commit](https://github.com/carstenartur/Regelsuche/commit/d043a55d63ece9a78b9c1ec0c6229da17d929f8d) published the worker and all rows before the first correspondence run. The freeze SHA-256 is `342018a587b904af0c02efd7bd3aa09a6292ae7206f2185625993ab21d2f5711`.
 3. Two separate Python processes produced identical evaluation bytes, SHA-256 `d6fa93eeeadf5594c2c2539da6b4879e5db9d30a4011b19ddcfe7c641348cbf9`. The evaluator pins both external commitments before looking at any row and reuses the independent sparse-rational judge. The original match and a scaled sign-reversal control exercise rational normalization. Tests also cover incorrect base, evolution and polynomial, altered source bytes, reordered laws and omitted laws.
 
-All JSON files are UTF-8 with a final LF. From the repository root, with Java 25 and Python 3.11 or later:
+All JSON files are UTF-8 with a final LF. Run the byte-for-byte reproduction from the
+[original repository revision](https://github.com/carstenartur/Regelsuche/tree/6b42812b71ab47c86c837467ab57de44e9275468),
+with Java 25 and Python 3.11 or later. The current solver's costs are recorded in
+[a separate run on the same requests](../coupled-recurrence-v1/cassini-current.json).
 
 ```bash
 set -eu

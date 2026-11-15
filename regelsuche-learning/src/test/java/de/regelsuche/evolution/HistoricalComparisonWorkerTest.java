@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -20,10 +21,21 @@ class HistoricalComparisonWorkerTest {
     }
     private Map<String, Object> task(String kind, String source) { return Map.of("kind", kind, "source", source); }
 
-    @Test void regeneratesThePublicSourceOnlyCandidateFreeze() throws Exception {
-        var panel = Path.of("..", "docs", "research", "cassini-development-v1");
+    @Test void reproducesCurrentSourceOnlyCostsAndPreservesTheFrozenLaws() throws Exception {
+        var research = Path.of("..", "docs", "research");
+        var panel = research.resolve("cassini-development-v1");
         String sources = Files.readString(panel.resolve("sources.json"));
-        assertEquals(Files.readString(panel.resolve("candidates.json")), HistoricalComparisonWorker.freezeInvariants(sources));
+        String historical = Files.readString(panel.resolve("candidates.json"));
+        assertEquals("sha256:342018a587b904af0c02efd7bd3aa09a6292ae7206f2185625993ab21d2f5711",
+            SchematicProofPlan.hash(historical));
+        String current = HistoricalComparisonWorker.freezeInvariants(sources);
+        assertEquals(Files.readString(research.resolve("coupled-recurrence-v1/cassini-current.json")), current);
+        var frozenLaws = JSON.readTree(historical);
+        var currentLaws = JSON.readTree(current);
+        for (var receipt : List.of(frozenLaws, currentLaws)) {
+            receipt.required("cases").forEach(row -> ((ObjectNode) row).remove("consumedWork"));
+        }
+        assertEquals(frozenLaws, currentLaws);
     }
 
     @Test void freezeIncludesEveryLawAndBindsExactSourceBytes() throws Exception {
