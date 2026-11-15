@@ -32,6 +32,13 @@ public final class OrderedReductionSearch {
         }
     }
 
+    public record PointUpdateResult(Optional<OrderedBlockReductionPlan.Verified> verified, String reason,
+            List<CheckedMove> witness, MoveSearch.Metrics metrics) {
+        public PointUpdateResult {
+            witness = List.copyOf(witness);
+        }
+    }
+
     public static Result search(OrderedReduction source, IterationLimits limits, int maximumStates,
             BooleanSupplier cancellation) {
         return search(source, false, limits, maximumStates, cancellation);
@@ -45,11 +52,37 @@ public final class OrderedReductionSearch {
 
     private static Result search(OrderedReduction source, boolean windows, IterationLimits limits, int maximumStates,
             BooleanSupplier cancellation) {
-        var result = IterationSearch.search(new Input(), new Domain(Objects.requireNonNull(source), windows),
+        var result = run(source, new Indexed(windows), limits, maximumStates, cancellation);
+        return new Result(result.verified(), result.reason(), witness(result), result.metrics());
+    }
+
+    /** Derives and checks a block summary for fixed-length row replacements. */
+    public static PointUpdateResult searchPointUpdates(OrderedReduction source, IterationLimits limits, int maximumStates,
+            BooleanSupplier cancellation) {
+        return pointUpdates(source, new PointUpdates(null), limits, maximumStates, cancellation);
+    }
+
+    /** Uses a previously checked polynomial lemma during point-update plan synthesis. */
+    public static PointUpdateResult searchPointUpdates(OrderedReduction source, OrderedReductionKnowledge knowledge,
+            IterationLimits limits, int maximumStates, BooleanSupplier cancellation) {
+        return pointUpdates(source, new PointUpdates(Objects.requireNonNull(knowledge)), limits, maximumStates, cancellation);
+    }
+
+    private static PointUpdateResult pointUpdates(OrderedReduction source, PointUpdates kind,
+            IterationLimits limits, int maximumStates, BooleanSupplier cancellation) {
+        var result = run(source, kind, limits, maximumStates, cancellation);
+        return new PointUpdateResult(result.verified(), result.reason(), witness(result), result.metrics());
+    }
+
+    private static <P, V> IterationSearch.Result<V> run(OrderedReduction source, PlanKind<P, V> kind,
+            IterationLimits limits, int maximumStates, BooleanSupplier cancellation) {
+        return IterationSearch.search(new Input<>(), new Domain<>(Objects.requireNonNull(source), kind),
             limits, maximumStates, cancellation);
-        return new Result(result.verified(), result.reason(), result.witness().stream()
-            .map(step -> new CheckedMove(step.ruleId(), step.synthesisWork(), step.verificationWork())).toList(),
-            result.metrics());
+    }
+
+    private static List<CheckedMove> witness(IterationSearch.Result<?> result) {
+        return result.witness().stream()
+            .map(step -> new CheckedMove(step.ruleId(), step.synthesisWork(), step.verificationWork())).toList();
     }
 
     public static OrderedReductionPlan.Verification verify(OrderedReduction source, OrderedReductionPlan plan,
@@ -57,27 +90,81 @@ public final class OrderedReductionSearch {
         return OrderedReductionPlan.verify(source, plan, windows, limits, cancellation);
     }
 
-    private sealed interface Form permits Input, Normalized, Candidate {}
-    private record Input() implements Form {}
-    private record Normalized(Map<IterationPolynomial.Monomial, ExactRational> terms) implements Form {}
-    private record Candidate(OrderedReductionPlan plan) implements Form {}
+    public static OrderedBlockReductionPlan.Verification verifyPointUpdates(OrderedReduction source,
+            OrderedBlockReductionPlan plan, IterationLimits limits, BooleanSupplier cancellation) {
+        var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
+        try {
+            var checked = OrderedBlockReductionPlan.check(source, plan, work);
+            return new OrderedBlockReductionPlan.Verification(Optional.of(checked), "VERIFIED", work.used());
+        } catch (Unavailable unavailable) {
+            return new OrderedBlockReductionPlan.Verification(Optional.empty(), unavailable.getMessage(), work.used());
+        }
+    }
 
-    private record Domain(OrderedReduction source, boolean windows)
-            implements IterationSearch.Domain<Form, OrderedReductionPlan.Verified> {
+    private sealed interface Form<P> permits Input, Normalized, Candidate {}
+    private record Input<P>() implements Form<P> {}
+    private record Normalized<P>(Map<IterationPolynomial.Monomial, ExactRational> terms) implements Form<P> {}
+    private record Candidate<P>(P plan) implements Form<P> {}
+
+    private interface PlanKind<P, V> {
+        String rule();
+        default OrderedReductionKnowledge knowledge() { return null; }
+        default void checkSource(OrderedReduction source, Work work) {}
+        P derive(OrderedReduction source, Map<IterationPolynomial.Monomial, ExactRational> terms, Work work);
+        V check(OrderedReduction source, P plan, Work work);
+    }
+
+    private record Indexed(boolean windows) implements PlanKind<OrderedReductionPlan, OrderedReductionPlan.Verified> {
+        @Override public String rule() { return "derive-indexed-reduction"; }
+
+        @Override public OrderedReductionPlan derive(OrderedReduction source,
+                Map<IterationPolynomial.Monomial, ExactRational> terms, Work work) {
+            return factor(source, terms, windows, work);
+        }
+
+        @Override public OrderedReductionPlan.Verified check(OrderedReduction source, OrderedReductionPlan plan, Work work) {
+            return OrderedReductionPlan.check(source, plan, windows, work);
+        }
+    }
+
+    private record PointUpdates(OrderedReductionKnowledge knowledge)
+            implements PlanKind<OrderedBlockReductionPlan, OrderedBlockReductionPlan.Verified> {
+        @Override public String rule() { return "derive-block-reduction"; }
+
+        @Override public void checkSource(OrderedReduction source, Work work) {
+            OrderedBlockReductionPlan.checkSource(source, work);
+        }
+
+        @Override public OrderedBlockReductionPlan derive(OrderedReduction source,
+                Map<IterationPolynomial.Monomial, ExactRational> terms, Work work) {
+            return OrderedBlockReductionPlan.derive(factor(source, terms, false, work), work);
+        }
+
+        @Override public OrderedBlockReductionPlan.Verified check(OrderedReduction source, OrderedBlockReductionPlan plan,
+                Work work) {
+            return OrderedBlockReductionPlan.check(source, plan, work);
+        }
+    }
+
+    private record Domain<P, V>(OrderedReduction source, PlanKind<P, V> kind)
+            implements IterationSearch.Domain<Form<P>, V> {
         @Override public String family() { return "ordered-reduction"; }
         @Override public String noPlanReason() { return "NO_ORDERED_PLAN"; }
         @Override public int maximumDepth() { return 2; }
-        @Override public boolean finished(Form form) { return form instanceof Candidate; }
+        @Override public boolean finished(Form<P> form) { return form instanceof Candidate<?>; }
 
-        @Override public IterationSearch.Proposal<Form> propose(Form form, IterationLimits limits,
+        @Override public IterationSearch.Proposal<Form<P>> propose(Form<P> form, IterationLimits limits,
                 BooleanSupplier cancellation) {
-            String rule = form instanceof Input ? "normalize-ordered-summand" : "derive-indexed-reduction";
-            var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
+            String rule = form instanceof Input<?> ? "normalize-ordered-summand" : kind.rule();
+            var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE, kind.knowledge());
             try {
-                Form candidate = switch (form) {
-                    case Input ignored -> new Normalized(IterationPolynomial.parseOrderedSummand(source, work).terms());
-                    case Normalized(var terms) -> new Candidate(derive(source, terms, windows, work));
-                    case Candidate ignored -> throw new IllegalStateException("ordered plan is terminal");
+                Form<P> candidate = switch (form) {
+                    case Input<P> ignored -> {
+                        kind.checkSource(source, work);
+                        yield new Normalized<>(IterationPolynomial.parseOrderedSummand(source, work).terms());
+                    }
+                    case Normalized<P>(var terms) -> new Candidate<>(kind.derive(source, terms, work));
+                    case Candidate<P> ignored -> throw new IllegalStateException("ordered plan is terminal");
                 };
                 return new IterationSearch.Proposal<>(rule, Optional.of(candidate), "CANDIDATE", work.used());
             } catch (Unavailable unavailable) {
@@ -85,16 +172,15 @@ public final class OrderedReductionSearch {
             }
         }
 
-        @Override public IterationSearch.Check<OrderedReductionPlan.Verified> verify(Form from, Form to,
+        @Override public IterationSearch.Check<V> verify(Form<P> from, Form<P> to,
                 IterationLimits limits, BooleanSupplier cancellation) {
-            if (to instanceof Candidate candidate) {
-                var check = OrderedReductionPlan.verify(source, candidate.plan(), windows, limits, cancellation);
-                return new IterationSearch.Check<>(check.verified().isPresent(), check.verified(),
-                    check.reason(), check.work());
-            }
-            var normalized = (Normalized) to;
             var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
             try {
+                if (to instanceof Candidate<P>(var plan)) {
+                    return new IterationSearch.Check<>(true, Optional.of(kind.check(source, plan, work)),
+                        "VERIFIED", work.used());
+                }
+                var normalized = (Normalized<P>) to;
                 var original = IterationPolynomial.parseOrderedSummand(source, work);
                 work.charge(original.terms().size() + normalized.terms().size());
                 if (!original.terms().equals(normalized.terms())) throw new Unavailable("SUMMAND_MISMATCH");
@@ -105,7 +191,7 @@ public final class OrderedReductionSearch {
         }
     }
 
-    private static OrderedReductionPlan derive(OrderedReduction source, Map<IterationPolynomial.Monomial, ExactRational> polynomial,
+    private static OrderedReductionPlan factor(OrderedReduction source, Map<IterationPolynomial.Monomial, ExactRational> polynomial,
             boolean windows, Work work) {
         var terms = new ArrayList<OrderedReductionPlan.Term>();
         for (var entry : RowMoments.split(source.slots(), polynomial, work).entrySet()) {

@@ -226,3 +226,33 @@ reports source row reads, Fenwick cell accesses and charged work.
 The Java source adapter must separately prove the arithmetic, effects and
 exception behavior of a program before applying a rewrite.
 
+## Fixed-length point updates
+
+For unrestricted ordered tuples, `OrderedReductionSdk.searchPointUpdates`
+derives an exact slot-monomial summary for contiguous blocks. Each block
+keeps the necessary ordered subtuple sums. The verifier checks the
+original summand and every dependency needed to join two adjacent
+blocks. Positions used in the polynomial are ordinary input columns.
+Keep the position column fixed when replacing a row in a positional sum.
+
+```java
+var budget = OptimizationBudget.DEFAULT;
+var cancellation = CancellationToken.NONE;
+var verified = OrderedReductionSdk.searchPointUpdates(source, budget, cancellation)
+    .verified().orElseThrow();
+var tree = OrderedReductionSdk.preparePointUpdates(verified, rows, budget, cancellation);
+var before = tree.value();
+var changed = OrderedReductionSdk.replaceRow(tree, index, replacement, budget, cancellation);
+var after = changed.value();
+```
+
+Builds and updates take work budgets. Large inputs can require a larger
+build budget. For a fixed plan and row count, each successful update
+recomputes one path and reports its number of block combinations. Each
+accumulator is a mutable session whose calls must be serialized. External
+candidates can be checked with `verifyPointUpdates` before creating a session.
+
+`learnPointUpdateKnowledge` can acquire an exact normalization lemma from
+a verified example. Pass the resulting knowledge to the
+`searchPointUpdates` overload to attempt reuse during synthesis.
+[Derivation and measured comparisons](../docs/research/ordered-block-reductions.md)

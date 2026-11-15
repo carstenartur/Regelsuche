@@ -18,13 +18,18 @@ public final class IterationPolynomial {
     public static final class Work {
         private final IterationLimits limits;
         private final BooleanSupplier cancellation;
+        private final OrderedReductionKnowledge knowledge;
         final int maximumDegree;
         final long start = System.nanoTime(), timeout;
         long used;
         public Work(IterationLimits limits, BooleanSupplier cancellation, int maximumDegree) {
+            this(limits, cancellation, maximumDegree, null);
+        }
+        Work(IterationLimits limits, BooleanSupplier cancellation, int maximumDegree, OrderedReductionKnowledge knowledge) {
             this.maximumDegree = maximumDegree;
             this.limits = Objects.requireNonNull(limits);
             this.cancellation = Objects.requireNonNull(cancellation);
+            this.knowledge = knowledge;
             timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());
         }
 
@@ -68,6 +73,17 @@ public final class IterationPolynomial {
     public static IterationPolynomial variable(SymbolId s, Work w) { return single(new Monomial(List.of(s)),ExactRational.ONE,w); }
     public static IterationPolynomial single(Monomial m, ExactRational c, Work w) {
         var map = new LinkedHashMap<Monomial,ExactRational>(); put(map,m,c,w); return new IterationPolynomial(map,w);
+    }
+    /** An injective renaming preserves distinct monomials of the checked polynomial. */
+    static IterationPolynomial rename(Map<Monomial, ExactRational> proof, Map<SymbolId, SymbolId> bindings, Work work) {
+        var terms = new LinkedHashMap<Monomial, ExactRational>();
+        for (var entry : proof.entrySet()) {
+            var symbols = entry.getKey().symbols();
+            work.charge(1L + symbols.size());
+            var renamed = new Monomial(symbols.stream().map(bindings::get).toList());
+            put(terms, renamed, entry.getValue(), work);
+        }
+        return new IterationPolynomial(terms, work);
     }
     private static void put(Map<Monomial,ExactRational> map, Monomial m, ExactRational c, Work w) {
         w.coefficient(c);
@@ -172,6 +188,10 @@ public final class IterationPolynomial {
                     || exponent.value().signum() < 0
                     || exponent.value().numerator().compareTo(BigInteger.valueOf(degree)) > 0) {
                 throw new Unavailable("UNSUPPORTED_POWER");
+            }
+            if (work.knowledge != null) {
+                var reused = work.knowledge.tryNormalize(binary, allowed, work);
+                if (reused.isPresent()) return reused.orElseThrow();
             }
             var base = parse(binary.left(), allowed, integers, true, degree, work, childDepth, nodes);
             var result = constant(BigInteger.ONE, work);

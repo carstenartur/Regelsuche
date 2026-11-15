@@ -72,8 +72,10 @@ Lerner und Strategieauswahl im aktuellen Checkout
 ## Blockzustände für Punktänderungen an geordneten Summen
 
 - **Hypothese.** Aus der Abhängigkeit zwischen zwei Teilblöcken lassen sich die nötigen Zustandsgrößen ableiten und bei einzelnen Wertänderungen zusammenführen.
-- **Umsetzungsstand.** Vorgeschlagen.
-- **Befund.** Die vorhandene Paar- und Fensterreduktion ist der Ausgangspunkt. Die automatische Herleitung eines Blockzustands für beliebige Wertänderungen und dessen Lernvorteil sind offen. [Vorhandene Reduktionspläne](../../regelsuche-optimization-sdk/FINITE_SERIES.md#ordered-tuples-and-filtered-pair-windows)
-- **Folgerung.** Den erzeugten Plan gegen eine inkrementelle Referenz prüfen. Die Synthesekosten auf getrennten Aufgabenfamilien mit und ohne gelerntes Wissen messen.
+- **Umsetzungsstand.** Exakte Synthese und Prüfung im Java-Kern und über das SDK für unbeschränkte geordnete Tupel.
+- **Befund.** Der hergeleitete Plan stimmt für acht Punktänderungen auf 100.000 Zeilen mit der linearen Delta-Referenz überein. Jedes Update benötigt 17 Blockkombinationen. Im Dreieraufgaben-Vergleich spart die wiederverwendete Teilidentität 77 von 7.980 Arbeitseinheiten einschließlich Lernen und Prüfung. [Prüfverfahren, Daten und Reproduktion](ordered-block-reductions.md)
+- **Folgerung.** Den Beitrag gelernter Regeln zur Ableitung der Blockgrößen auf unabhängig erstellten Aufgaben messen.
 
 - [`OrderedReductionSearch.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedReductionSearch.java#L23) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedReductionSearch.java | public final class OrderedReductionSearch { -->
+- [`OrderedReductionKnowledge.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedReductionKnowledge.java#L23) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedReductionKnowledge.java | public final class OrderedReductionKnowledge { -->
+- [`OrderedBlockReductionComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedBlockReductionComparisonTest.java#L23) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedBlockReductionComparisonTest.java | class OrderedBlockReductionComparisonTest { -->
